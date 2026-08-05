@@ -1,0 +1,162 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import 'core/auth/auth_notifier.dart';
+import 'core/auth/session_events.dart';
+import 'core/theme/app_theme.dart';
+import 'features/auth/change_password_screen.dart';
+import 'features/auth/login_screen.dart';
+import 'features/auth/splash_screen.dart';
+import 'features/customers/customers_screen.dart';
+import 'features/dashboard/dashboard_screen.dart';
+import 'features/inventory/items_screen.dart';
+import 'features/expenses/expenses_screen.dart';
+import 'features/sales/sales_screen.dart';
+import 'features/shell/app_shell.dart';
+import 'features/purchase_orders/purchase_orders_screen.dart';
+import 'features/suppliers/suppliers_screen.dart';
+import 'features/shell/module_placeholder_screen.dart';
+import 'l10n/app_localizations.dart';
+
+/// Bumped whenever the auth *status* changes so the router's
+/// `refreshListenable` re-evaluates its redirect. A plain counter, kept
+/// separate from the router so `StateNotifier` (which doesn't implement
+/// Flutter's `Listenable`) can drive it via `ref.listen` in the app widget.
+final routerRefreshProvider = Provider<ValueNotifier<int>>((ref) {
+  final notifier = ValueNotifier<int>(0);
+  ref.onDispose(notifier.dispose);
+  return notifier;
+});
+
+/// App router — route inventory in PORTING.md §5. Screens are added here
+/// as they are ported (one GoRoute per module).
+///
+/// Auth gating (PORTING.md §3): the router is created once and refreshes
+/// its redirect when the auth status changes, so navigation state survives
+/// login/logout. While the session is being restored (`AuthStatus.unknown`)
+/// everything redirects to `/splash`; logged-out users land on `/login`;
+/// authenticated users are kept out of `/login` and `/splash`.
+final routerProvider = Provider<GoRouter>((ref) {
+  return GoRouter(
+    initialLocation: '/splash',
+    refreshListenable: ref.watch(routerRefreshProvider),
+    redirect: (context, state) => _authRedirect(ref, state.matchedLocation),
+    routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      // Auth-module completion (PORTING.md §3): standalone screen outside
+      // the shell (no rail) — opened from the shell's app bar. Session
+      // stays valid after a change; a wrong current password is a 401 that
+      // the dio layer treats as a credential error, not an expired session.
+      GoRoute(
+        path: '/change-password',
+        builder: (context, state) => const ChangePasswordScreen(),
+      ),
+      // Authenticated shell (PORTING.md §5): one branch per module in
+      // [shellDestinations] — each keeps its state while switching. Real
+      // screens replace the placeholder as they are ported.
+      //
+      // Note: indexedStack builds all branches eagerly (go_router 17.x has
+      // no `lazy` option). Branches are placeholders today, so that's free;
+      // when real module screens land, gate their fetches on visibility
+      // (or switch to a per-branch lazy route) to avoid 15 fetches at boot.
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            AppShell(navigationShell: navigationShell),
+        branches: [
+          for (final dest in shellDestinations)
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: dest.path,
+                  builder: (context, state) => switch (dest.path) {
+                    '/' => const DashboardScreen(),
+                    // First ported data screen (PORTING.md §5/§6): the
+                    // items grid lives at the inventory branch root; the
+                    // web app hosts it at /inventory/items.
+                    '/inventory' => const ItemsScreen(),
+                    // Second ported data screen: server-paginated list
+                    // (GET /customers + pagination block).
+                    '/customers' => const CustomersScreen(),
+                    '/suppliers' => const SuppliersScreen(),
+                    '/purchasing' => const PurchaseOrdersScreen(),
+                    '/expenses' => const ExpensesScreen(),
+                    '/sales' => const SalesScreen(),
+                    _ => ModulePlaceholderScreen(
+                      title: dest.label(AppLocalizations.of(context)!),
+                    ),
+                  },
+                ),
+              ],
+            ),
+        ],
+      ),
+    ],
+  );
+});
+
+/// Resolves where an un-authed/auth'd user may go. Called on every auth
+/// status change (via [routerRefreshProvider]) and on every navigation.
+String? _authRedirect(Ref ref, String location) {
+  final auth = ref.read(authProvider);
+  switch (auth.status) {
+    case AuthStatus.unknown:
+      return location == '/splash' ? null : '/splash';
+    case AuthStatus.unauthenticated:
+      return location == '/login' ? null : '/login';
+    case AuthStatus.authenticated:
+      if (location == '/login' || location == '/splash') return '/';
+      // Non-admins can type an admin-only URL directly — send them home
+      // instead of showing a branch the rail doesn't list (the shell's
+      // indexOf fallback would otherwise highlight the wrong rail item).
+      final isAdmin = auth.user?.isAdmin ?? false;
+      final onAdminPath = shellDestinations
+          .where((d) => d.adminOnly)
+          .any((d) => location == d.path);
+      if (onAdminPath && !isAdmin) return '/';
+      return null;
+  }
+}
+
+class MiniErpApp extends ConsumerWidget {
+  const MiniErpApp({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Re-evaluate the router redirect when the auth status changes.
+    ref.listen(authProvider, (previous, next) {
+      if (previous?.status != next.status) {
+        ref.read(routerRefreshProvider).value++;
+      }
+    });
+
+    // PORTING.md §2: a 401 anywhere (expired token mid-session) clears the
+    // session and the router redirects to /login.
+    ref.listen(unauthorizedEventsProvider, (previous, next) {
+      if (next.hasValue) {
+        ref.read(authProvider.notifier).sessionExpired();
+      }
+    });
+
+    return MaterialApp.router(
+      title: 'MiniERP',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
+      routerConfig: ref.watch(routerProvider),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('en'), Locale('ur')],
+    );
+  }
+}

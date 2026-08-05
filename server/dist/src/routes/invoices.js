@@ -1,0 +1,22 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const router = express_1.default.Router();
+const invoiceController_1 = __importDefault(require("../controllers/invoiceController"));
+const auth_1 = require("../middleware/auth");
+const requirePermission_1 = require("../middleware/requirePermission");
+router.use(auth_1.authenticateToken);
+router.get('/', (0, requirePermission_1.requirePermission)('invoices', 'read'), invoiceController_1.default.getInvoices);
+router.get('/returns', (0, requirePermission_1.requirePermission)('invoices', 'read'), invoiceController_1.default.getInvoiceReturnHistory);
+router.get('/:id', (0, requirePermission_1.requirePermission)('invoices', 'read'), invoiceController_1.default.getInvoice);
+router.get('/:id/payments', (0, requirePermission_1.requirePermission)('invoices', 'read'), invoiceController_1.default.getInvoicePayments);
+router.post('/', (0, requirePermission_1.requirePermission)('invoices', 'create'), invoiceController_1.default.createInvoice);
+router.put('/:id', (0, requirePermission_1.requirePermission)('invoices', 'update'), invoiceController_1.default.updateInvoice);
+router.delete('/:id', (0, requirePermission_1.requirePermission)('invoices', 'delete'), invoiceController_1.default.deleteInvoice);
+router.put('/:id/cancel', (0, requirePermission_1.requirePermission)('invoices', 'update'), invoiceController_1.default.cancelInvoice);
+router.post('/:id/return', (0, requirePermission_1.requirePermission)('invoices', 'update'), invoiceController_1.default.returnInvoiceItems);
+exports.default = router;
+//# sourceMappingURL=invoices.js.map
