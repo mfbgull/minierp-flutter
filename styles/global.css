@@ -1,0 +1,280 @@
+/* Global Styles */
+
+@font-face {
+  font-family: 'Noto Nastaliq Urdu';
+  src: url('/fonts/NotoNastaliqUrdu-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Nastaliq Urdu';
+  src: url('/fonts/NotoNastaliqUrdu-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Nastaliq Urdu';
+  src: url('/fonts/NotoNastaliqUrdu-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Nastaliq Urdu';
+  src: url('/fonts/NotoNastaliqUrdu-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--neutral-700);
+  background-color: var(--neutral-50);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Safe area support for modern phones */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Typography */
+h1 { font-size: var(--font-size-3xl); font-weight: 700; line-height: 1.2; color: var(--neutral-900); }
+h2 { font-size: var(--font-size-2xl); font-weight: 600; line-height: 1.3; color: var(--neutral-900); }
+h3 { font-size: var(--font-size-xl); font-weight: 600; line-height: 1.4; color: var(--neutral-900); }
+h4 { font-size: var(--font-size-lg); font-weight: 600; line-height: 1.4; color: var(--neutral-900); }
+.small { font-size: var(--font-size-sm); font-weight: 400; line-height: 1.4; }
+.tiny { font-size: var(--font-size-xs); font-weight: 500; line-height: 1.3; }
+
+/* Layout */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  scrollbar-width: thin;
+  margin-left: var(--sidebar-width);
+  transition: margin-left 0.3s ease;
+}
+
+/* Account for the fixed ShortcutBar at the bottom on desktop */
+@media (min-width: 769px) {
+  .main-content {
+    padding-bottom: 36px;
+  }
+}
+
+.main-content.topmenu-active {
+  margin-left: 0;
+}
+
+.main-content.sidebar-active {
+  margin-left: var(--sidebar-width);
+  background-color: var(--neutral-50, #f8fafc) !important;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: var(--sidebar-collapsed-width);
+  padding-bottom: 12px;
+}
+
+/* Navigation Toggle Toolbar */
+.nav-toggle-toolbar {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+}
+
+.nav-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.nav-toggle-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.app-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--neutral-100);
+  border-bottom: 1px solid var(--neutral-200);
+}
+
+.settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm);
+  background: var(--neutral-200);
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--neutral-700);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.settings-btn:hover {
+  background: var(--neutral-300);
+  color: var(--neutral-900);
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-lg);
+  /* Standard content width: cap on wide viewports so the layout reads as
+     a focused app instead of stretching edge-to-edge on big monitors. Matches
+     the items page pattern (.items-page { max-width: 1400px; margin: 0 auto; }).
+     Pages that need to be narrower (e.g. 1200px on statements) still override
+     this via their own page-wrapper class. */
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+/* Thin scrollbar for content */
+.content::-webkit-scrollbar {
+  width: 6px;
+}
+.content::-webkit-scrollbar-thumb {
+  background-color: var(--neutral-300);
+  border-radius: 3px;
+}
+
+/* Page Header - Two Column Layout */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.page-header .header-content {
+
+}
+
+.page-header .header-actions {
+  display: flex;
+  gap: var(--space-md);
+  flex-shrink: 0;
+  align-items: flex-start;
+}
+
+.page-header h1 {
+  margin: 0;
+}
+
+.page-subtitle {
+  color: var(--neutral-600);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+  }
+
+  .page-header .header-actions {
+    width: 100%;
+  }
+}
+
+/* Card */
+.card {
+  background: var(--neutral-100);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+}
+
+/* Utilities */
+.text-center { text-align: center; }
+.mt-xs { margin-top: var(--space-xs); }
+.mt-sm { margin-top: var(--space-sm); }
+.mt-md { margin-top: var(--space-md); }
+.mt-lg { margin-top: var(--space-lg); }
+.mb-xs { margin-bottom: var(--space-xs); }
+.mb-sm { margin-bottom: var(--space-sm); }
+.mb-md { margin-bottom: var(--space-md); }
+.mb-lg { margin-bottom: var(--space-lg); }
+
+/* App Logo */
+.app-logo {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Loading spinner */
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.spinner {
+  border: 3px solid var(--neutral-50);
+  border-top: 3px solid var(--primary-500);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Stock Quantity Indicators */
+.qty-in {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.qty-out {
+  color: var(--error);
+  font-weight: 500;
+}
+

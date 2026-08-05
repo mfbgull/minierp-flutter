@@ -1,0 +1,28 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const router = express_1.default.Router();
+const auth_1 = require("../middleware/auth");
+const requirePermission_1 = require("../middleware/requirePermission");
+const rateLimiter_1 = require("../middleware/rateLimiter");
+const expenseController_1 = __importDefault(require("../controllers/expenseController"));
+router.use(auth_1.authenticateToken);
+router.get('/categories', (0, requirePermission_1.requirePermission)('expenses', 'read'), expenseController_1.default.getExpenseCategories);
+router.get('/status-options', (0, requirePermission_1.requirePermission)('expenses', 'read'), expenseController_1.default.getExpenseStatusOptions);
+router.get('/payment-method-options', (0, requirePermission_1.requirePermission)('expenses', 'read'), expenseController_1.default.getExpensePaymentMethodOptions);
+router.post('/', (0, requirePermission_1.requirePermission)('expenses', 'create'), rateLimiter_1.sensitiveOperationLimiter, expenseController_1.default.createExpense);
+router.get('/', (0, requirePermission_1.requirePermission)('expenses', 'read'), expenseController_1.default.getExpenses);
+router.get('/summary', (0, requirePermission_1.requirePermission)('expenses', 'read'), expenseController_1.default.getExpenseSummary);
+router.get('/date-range', (0, requirePermission_1.requirePermission)('expenses', 'read'), expenseController_1.default.getExpensesByDateRange);
+router.get('/category/:category', (0, requirePermission_1.requirePermission)('expenses', 'read'), expenseController_1.default.getExpensesByCategory);
+router.get('/:id', (0, requirePermission_1.requirePermission)('expenses', 'read'), expenseController_1.default.getExpenseById);
+router.put('/:id', (0, requirePermission_1.requirePermission)('expenses', 'update'), rateLimiter_1.sensitiveOperationLimiter, expenseController_1.default.updateExpense);
+router.delete('/:id', (0, requirePermission_1.requirePermission)('expenses', 'delete'), rateLimiter_1.sensitiveOperationLimiter, expenseController_1.default.deleteExpense);
+router.post('/categories', (0, requirePermission_1.requirePermission)('expenses', 'create'), rateLimiter_1.sensitiveOperationLimiter, expenseController_1.default.createExpenseCategory);
+router.put('/categories/:id', (0, requirePermission_1.requirePermission)('expenses', 'update'), rateLimiter_1.sensitiveOperationLimiter, expenseController_1.default.updateExpenseCategory);
+router.delete('/categories/:id', (0, requirePermission_1.requirePermission)('expenses', 'delete'), rateLimiter_1.sensitiveOperationLimiter, expenseController_1.default.deleteExpenseCategory);
+exports.default = router;
+//# sourceMappingURL=expenses.js.map

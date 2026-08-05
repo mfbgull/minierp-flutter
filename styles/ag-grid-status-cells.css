@@ -1,0 +1,146 @@
+/* ============================================
+   AG Grid Cell Status / Conditional Coloring
+   Shared across all AG Grid pages
+   
+   Light mode defaults via CSS variables.
+   Dark mode overrides are in dark-mode.css.
+   
+   All classes target `.ag-cell` for specificity
+   to override AG Grid default cell styles.
+   ============================================ */
+
+/* --- Semantic Color Groups ---
+ * Success (green):  Active, Paid, Completed, Accepted, Invoiced, Converted
+ * Warning (amber):  Partial, Pending, Approved, Sent, Confirmed
+ * Neutral (gray):   Draft, Inactive, Expired, Custom
+ * Error (red):      Cancelled, Rejected
+ * Info (blue):      Unpaid, Overdue, System
+ */
+
+/* =============================== */
+/* == SUCCESS / ACTIVE (green)  == */
+/* =============================== */
+/* Statuses: Active, Paid, Completed, Accepted, Invoiced, Converted */
+/* Conditional: Balance ≤ 0, Movement In, Rate ≥ 95%, Rec: Adequate */
+.ag-cell.cell-status-active,
+.ag-cell.cell-balance-clear,
+.ag-cell.cell-movement-in,
+.ag-cell.cell-rate-excellent,
+.ag-cell.cell-rec-adequate {
+  background-color: var(--success-bg, #dcfce7);
+  color: var(--success, #15803d);
+}
+
+/* =============================== */
+/* == WARNING / PENDING (amber) == */
+/* =============================== */
+/* Statuses: Partial, Partially Paid, Pending, Approved, Sent, Confirmed */
+/* Conditional: Low Stock, Credit ≥ 75%, Balance > 0, Rate 80-89%, Rec: Order Soon */
+.ag-cell.cell-status-partial,
+.ag-cell.cell-stock-low,
+.ag-cell.cell-credit-warn,
+.ag-cell.cell-balance-due,
+.ag-cell.cell-rate-fair,
+.ag-cell.cell-rec-order-soon {
+  background-color: var(--warning-bg, #fef3c7);
+  color: var(--warning, #d97706);
+}
+
+/* =============================== */
+/* == DRAFT / INACTIVE (gray)    == */
+/* =============================== */
+/* Statuses: Draft, Inactive, Expired */
+/* Conditional: Custom (role type) */
+.ag-cell.cell-status-draft,
+.ag-cell.cell-status-inactive,
+.ag-cell.cell-type-custom {
+  background-color: var(--neutral-100, #f3f4f6);
+  color: var(--text-tertiary, #6b7280);
+}
+
+/* =============================== */
+/* == ERROR / CANCELLED (red)    == */
+/* =============================== */
+/* Statuses: Cancelled, Rejected */
+/* Conditional: Stock = 0, Credit ≥ 90%, Movement Out, Rate < 80%, Rec: Order Now */
+.ag-cell.cell-status-cancelled,
+.ag-cell.cell-stock-out,
+.ag-cell.cell-credit-high,
+.ag-cell.cell-movement-out,
+.ag-cell.cell-rate-poor,
+.ag-cell.cell-rec-order-now {
+  background-color: var(--error-bg, #fee2e2);
+  color: var(--error, #dc2626);
+}
+
+/* =============================== */
+/* == INFO / OVERDUE (blue)      == */
+/* =============================== */
+/* Statuses: Overdue, Unpaid */
+/* Conditional: System (role type), Rate 90-94%, Rec: Monitor */
+.ag-cell.cell-status-overdue,
+.ag-cell.cell-type-system,
+.ag-cell.cell-rate-good,
+.ag-cell.cell-rec-monitor {
+  background-color: var(--info-bg, #dbeafe);
+  color: var(--info, #1d4ed8);
+}
+
+/* =========================== */
+/* == MOVEMENT TYPE (In/Out) == */
+/* =========================== */
+.ag-cell.cell-movement-in {
+  background-color: var(--success-bg, #dcfce7);
+  color: var(--success, #15803d);
+}
+
+.ag-cell.cell-movement-out {
+  background-color: var(--error-bg, #fee2e2);
+  color: var(--error, #dc2626);
+}
+
+/* ================================== */
+/* == SUPPLIER DELIVERY RATE SCORE == */
+/* ================================== */
+.ag-cell.cell-rate-excellent {
+  background-color: var(--success-bg, #dcfce7);
+  color: var(--success, #15803d);
+}
+
+.ag-cell.cell-rate-good {
+  background-color: var(--info-bg, #dbeafe);
+  color: var(--info, #1d4ed8);
+}
+
+.ag-cell.cell-rate-fair {
+  background-color: var(--warning-bg, #fef3c7);
+  color: var(--warning, #d97706);
+}
+
+.ag-cell.cell-rate-poor {
+  background-color: var(--error-bg, #fee2e2);
+  color: var(--error, #dc2626);
+}
+
+/* ============================= */
+/* == FORECAST RECOMMENDATION == */
+/* ============================= */
+.ag-cell.cell-rec-order-now {
+  background-color: var(--error-bg, #fee2e2);
+  color: var(--error, #dc2626);
+}
+
+.ag-cell.cell-rec-order-soon {
+  background-color: var(--warning-bg, #fef3c7);
+  color: var(--warning, #d97706);
+}
+
+.ag-cell.cell-rec-monitor {
+  background-color: var(--info-bg, #dbeafe);
+  color: var(--info, #1d4ed8);
+}
+
+.ag-cell.cell-rec-adequate {
+  background-color: var(--success-bg, #dcfce7);
+  color: var(--success, #15803d);
+}

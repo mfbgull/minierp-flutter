@@ -1,0 +1,187 @@
+@font-face {
+  font-family: 'Jameel Noori Nastaleeq';
+  src: url('/fonts/JameelNooriNastaleeq.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+html[dir="rtl"] {
+  font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', serif;
+}
+
+html[dir="rtl"] h1,
+html[dir="rtl"] h2,
+html[dir="rtl"] h3,
+html[dir="rtl"] h4,
+html[dir="rtl"] .page-title {
+  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', 'Noto Sans Urdu', system-ui, sans-serif;
+  font-size: 1.4em;
+}
+
+html[dir="rtl"] .form-input,
+html[dir="rtl"] .form-input-container input,
+html[dir="rtl"] .form-input-container select,
+html[dir="rtl"] .form-input-container textarea {
+  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', 'Noto Sans Urdu', system-ui, sans-serif;
+  font-size: 18px;
+  line-height: 1.8;
+}
+
+html[dir="rtl"] .compact-card-title,
+html[dir="rtl"] .card-title {
+  font-size: 1.1em;
+}
+
+html[dir="rtl"] .ag-grid-wrapper {
+  font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', 'Noto Sans Urdu', system-ui, sans-serif;
+  font-size: 16px;
+}
+
+html[dir="rtl"] .sidebar {
+  right: 0;
+  left: auto;
+  border-right: none;
+  border-left: 1px solid var(--border-color);
+}
+
+html[dir="rtl"] .sidebar-menu {
+  text-align: right;
+}
+
+html[dir="rtl"] .nav-label {
+  margin-right: 12px;
+  margin-left: 0;
+}
+
+html[dir="rtl"] .nav-section-title {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .nav-children {
+  padding-left: 0;
+  padding-right: 16px;
+}
+
+html[dir="rtl"] .nav-arrow {
+  transform: rotate(180deg);
+}
+
+html[dir="rtl"] .dropdown-active .nav-arrow {
+  transform: rotate(90deg);
+}
+
+html[dir="rtl"] .sidebar-footer {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .user-details {
+  text-align: right;
+}
+
+html[dir="rtl"] .top-menu {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .top-menu-left {
+  margin-right: 0;
+  margin-left: 16px;
+}
+
+html[dir="rtl"] .top-menu-right {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+html[dir="rtl"] .top-menu-nav {
+  justify-content: flex-end;
+}
+
+html[dir="rtl"] .top-menu-item {
+  text-align: center;
+}
+
+html[dir="rtl"] .main-content {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+  padding-left: 0 !important;
+}
+
+html[dir="rtl"] .compact .main-content {
+  margin-right: 0 !important;
+  margin-left: 0 !important;
+}
+
+html[dir="rtl"] .topmenu-active {
+  margin-right: 0;
+  margin-left: 0;
+}
+
+html[dir="rtl"] .sidebar-active,
+html[dir="rtl"] .main-content.sidebar-active {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+html[dir="rtl"] .page-header {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .page-title {
+  text-align: right;
+}
+
+html[dir="rtl"] .form-input-container label,
+html[dir="rtl"] .form-label {
+  text-align: right;
+}
+
+html[dir="rtl"] .form-input,
+html[dir="rtl"] .form-input-container input,
+html[dir="rtl"] .form-input-container select,
+html[dir="rtl"] .form-input-container textarea {
+  text-align: right;
+  direction: rtl;
+}
+
+html[dir="rtl"] .ag-grid-wrapper {
+  direction: rtl;
+}
+
+html[dir="rtl"] .ag-header {
+  text-align: right;
+}
+
+html[dir="rtl"] .compact-card {
+  text-align: right;
+}
+
+html[dir="rtl"] .modal-content {
+  direction: rtl;
+}
+
+html[dir="rtl"] .modal-header {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .modal-footer {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .btn-group {
+  flex-direction: row-reverse;
+}
+
+@media (max-width: 768px) {
+  html[dir="rtl"] .main-content {
+    margin-right: 0;
+  }
+
+  html[dir="rtl"] .sidebar {
+    transform: translateX(100%);
+  }
+
+  html[dir="rtl"] .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+}

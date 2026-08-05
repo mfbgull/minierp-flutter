@@ -1,0 +1,8 @@
+# Flutter gen-l10n configuration — PORTING.md §9
+arb-dir: lib/l10n
+template-arb-file: en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+# ur.arb has 764 keys vs en's 812 — fall back to en for missing keys
+# (same behavior as the web app) and log the gaps here:
+untranslated-messages-file: build/untranslated-messages.txt
