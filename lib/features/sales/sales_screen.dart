@@ -16,6 +16,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/formatters.dart';
@@ -25,7 +26,6 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/status_badge.dart';
 import 'invoice_providers.dart';
-import 'sales_form_dialog.dart';
 
 /// Localized label for an invoice status value, falling back to the raw
 /// server value when there's no key (defensive — the server owns the
@@ -329,7 +329,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
               ref.read(invoicesProvider).valueOrNull ?? const <Invoice>[];
           final matches = invoices.where((i) => i.id == id);
           if (matches.isEmpty) return;
-          showSalesFormDialog(context, invoice: matches.first);
+          context.push('/sales/form', extra: matches.first);
         },
         noRowsWidget: Center(
           child: Text(
@@ -535,8 +535,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
               ),
               const SizedBox(width: 12),
               FilledButton.icon(
-                onPressed: () =>
-                    showSalesFormDialog(context, invoice: null),
+                onPressed: () => context.push('/sales/form'),
                 icon: const Icon(Icons.add, size: 18),
                 label: Text(l10n.salesNewinvoice),
               ),

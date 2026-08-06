@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/ledger_dialog.dart' show LedgerDialog, LedgerDialogConfig;
 import 'supplier_providers.dart' show supplierLedgerProvider;
+import 'supplier_statement_dialog.dart';
 
 /// Opens the ledger dialog for [supplierId]; [supplierName] titles it.
 Future<void> showSupplierLedgerDialog(
@@ -49,6 +50,16 @@ class SupplierLedgerDialog extends StatelessWidget {
         closingBalanceLabel: l10n.suppliersLedgerClosingbalance,
         noEntriesLabel: l10n.suppliersLedgerNoentries,
         entriesProvider: supplierLedgerProvider,
+      ),
+      // The ledger's footer action: open this supplier's statement.
+      footerAction: TextButton.icon(
+        onPressed: () => showSupplierStatementDialog(
+          context,
+          supplierId: supplierId,
+          supplierName: supplierName,
+        ),
+        icon: const Icon(Icons.description_outlined, size: 18),
+        label: Text(l10n.suppliersStatement),
       ),
     );
   }

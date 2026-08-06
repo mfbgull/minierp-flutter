@@ -4,10 +4,11 @@
 // provider and renders a [ServerPaginationBar] under the grid. Column
 // sort maps to the server's SUPPLIER_SORT_COLUMNS whitelist.
 //
-// Keyboard: the shared [rowDetailShortcutActions] bind F2 / Enter to open
-// the focused row's detail (the same path as a double tap), and a
-// [GridStatusBar] beneath the grid states those hints — the items/customers
-// convention.
+// Built on the shared [PlutoGridScreen] mixin: F2/Enter + double-tap open
+// the focused row's detail, and the keyboard-hint status bar sits beneath
+// the grid. The only mixin overrides beyond the data mapping are
+// [gridRowsFrom] (the provider yields a `PagedResponse` envelope, not a
+// plain list) and [onGridSorted] (sorting happens server-side).
 
 import 'dart:async';
 
@@ -17,13 +18,10 @@ import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/supplier.dart' show Supplier;
-import '../../data/repositories/api_result.dart' show ApiError;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/grid_status_bar.dart';
 import '../../widgets/pagination_bar.dart';
-import '../../widgets/pluto_grid_shortcuts.dart';
-import '../../widgets/screen_error_panel.dart';
+import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/status_badge.dart';
 import 'supplier_detail_dialog.dart';
 import 'supplier_form_dialog.dart';
@@ -36,42 +34,35 @@ class SuppliersScreen extends ConsumerStatefulWidget {
   ConsumerState<SuppliersScreen> createState() => _SuppliersScreenState();
 }
 
-class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
+class _SuppliersScreenState extends ConsumerState<SuppliersScreen>
+    with PlutoGridScreen<Supplier, SuppliersScreen> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
-  PlutoGridStateManager? _stateManager;
-  late List<PlutoColumn> _columns;
-  bool _columnsReady = false;
-  PlutoGridConfiguration _configuration = const PlutoGridConfiguration();
-  bool _configurationReady = false;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Column titles are localized — build them once here (lookups of
-    // inherited widgets are not allowed before initState completes).
-    if (!_columnsReady) {
-      _columns = _buildColumns(AppLocalizations.of(context)!);
-      _columnsReady = true;
-    }
-    // Same for the grid configuration: F2/Enter open the focused row's
-    // detail (see [rowDetailShortcutActions]). Built once — the shortcut
-    // map holds a closure over this State's context, so it must not be
-    // recreated after the widget is disposed.
-    if (!_configurationReady) {
-      _configuration = PlutoGridConfiguration(
-        shortcut: PlutoGridShortcut(
-          actions: rowDetailShortcutActions(_openDetail),
-        ),
-      );
-      _configurationReady = true;
-    }
-  }
-
-  void _openDetail(int supplierId) {
+  void openRowDetail(int supplierId) {
     if (!mounted) return;
     showSupplierDetailDialog(context, supplierId: supplierId);
   }
+
+  /// The suppliers provider returns a `PagedResponse` envelope — unwrap
+  /// the current page's items as the grid rows.
+  @override
+  Iterable<Supplier> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<Supplier>).items;
+
+  @override
+  PlutoRow gridRowFor(Supplier supplier) => PlutoRow(
+    cells: {
+      'id': PlutoCell(value: supplier.id),
+      'code': PlutoCell(value: supplier.supplierCode),
+      'name': PlutoCell(value: supplier.supplierName),
+      'phone': PlutoCell(value: supplier.phone ?? ''),
+      'email': PlutoCell(value: supplier.email ?? ''),
+      'balance': PlutoCell(value: supplier.currentBalance ?? 0),
+      'active': PlutoCell(value: supplier.isActive),
+    },
+  );
 
   @override
   void dispose() {
@@ -94,16 +85,19 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
 
   /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
   String? _sortColumnFor(String field) => switch (field) {
-        'code' => 'supplier_code',
-        'name' => 'supplier_name',
-        'email' => 'email',
-        'phone' => 'phone',
-        'balance' => 'current_balance',
-        'active' => 'is_active', // whitelisted server sort column
-        _ => null,
-      };
+    'code' => 'supplier_code',
+    'name' => 'supplier_name',
+    'email' => 'email',
+    'phone' => 'phone',
+    'balance' => 'current_balance',
+    'active' => 'is_active', // whitelisted server sort column
+    _ => null,
+  };
 
-  void _onSorted(PlutoGridOnSortedEvent event) {
+  /// Column sort maps to the server-side sort providers (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
     final sortBy = _sortColumnFor(event.column.field);
     if (sortBy == null) return;
     final sort = event.column.sort;
@@ -118,36 +112,14 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
     }
   }
 
-  void _applyPage(AsyncValue<PagedResponse<Supplier>> value) {
-    final manager = _stateManager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final supplier in value.value?.items ?? const <Supplier>[])
-          _rowFor(supplier),
-      ]);
-    }
-  }
-
-  static PlutoRow _rowFor(Supplier supplier) => PlutoRow(cells: {
-        'id': PlutoCell(value: supplier.id),
-        'code': PlutoCell(value: supplier.supplierCode),
-        'name': PlutoCell(value: supplier.supplierName),
-        'phone': PlutoCell(value: supplier.phone ?? ''),
-        'email': PlutoCell(value: supplier.email ?? ''),
-        'balance': PlutoCell(value: supplier.currentBalance ?? 0),
-        'active': PlutoCell(value: supplier.isActive),
-      });
-
   @override
   Widget build(BuildContext context) {
     final suppliers = ref.watch(suppliersProvider);
     final l10n = AppLocalizations.of(context)!;
     final page = suppliers.valueOrNull;
 
-    ref.listen(suppliersProvider, (previous, next) => _applyPage(next));
+    // Keep the grid in sync with provider transitions (loading → data).
+    watchGridProvider(suppliersProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -177,12 +149,18 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
                                   _debounce?.cancel();
                                   _searchController.clear();
                                   ref
-                                      .read(suppliersSearchProvider.notifier)
-                                      .state = '';
+                                          .read(
+                                            suppliersSearchProvider.notifier,
+                                          )
+                                          .state =
+                                      '';
                                   if (ref.read(suppliersPageProvider) != 1) {
                                     ref
-                                        .read(suppliersPageProvider.notifier)
-                                        .state = 1;
+                                            .read(
+                                              suppliersPageProvider.notifier,
+                                            )
+                                            .state =
+                                        1;
                                   }
                                 },
                               ),
@@ -211,7 +189,7 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
             ],
           ),
         ),
-        Expanded(child: _buildBody(suppliers)),
+        Expanded(child: gridScreenBody(suppliers, provider: suppliersProvider)),
         if (page != null)
           ServerPaginationBar(
             page: page.currentPage,
@@ -235,66 +213,10 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
     );
   }
 
-  Widget _buildBody(AsyncValue<PagedResponse<Supplier>> suppliers) {
-    final errorMessage = switch (suppliers) {
-      AsyncError(:final error) => error is ApiError ? error.message : null,
-      _ => null,
-    };
-    if (errorMessage != null) {
-      _stateManager = null;
-      return ScreenErrorPanel(
-        message: errorMessage,
-        onRetry: () => ref.invalidate(suppliersProvider),
-      );
-    }
-    return _grid();
-  }
-
-  Widget _grid() {
-    final l10n = AppLocalizations.of(context)!;
-    // The keyboard-hint status bar sits flush under the grid (items
-    // convention); the pagination bar renders below the whole body.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: PlutoGrid(
-              columns: _columns,
-              configuration: _configuration,
-              // Growable — PlutoGrid's FilteredList appends to the list.
-              rows: <PlutoRow>[],
-              onLoaded: (event) {
-                _stateManager = event.stateManager;
-                _stateManager?.hideColumn(
-                  _columns.firstWhere((c) => c.field == 'id'),
-                  true,
-                  notify: false,
-                );
-                _applyPage(ref.read(suppliersProvider));
-              },
-              onSorted: _onSorted,
-              onRowDoubleTap: (event) {
-                final id = (event.row.cells['id']?.value as num?)?.toInt();
-                if (id == null || id <= 0) return;
-                showSupplierDetailDialog(context, supplierId: id);
-              },
-              noRowsWidget: Center(
-                child: Text(
-                  l10n.commonNoresults,
-                  style: TextStyle(color: Theme.of(context).colorScheme.outline),
-                ),
-              ),
-            ),
-          ),
-        ),
-        const GridStatusBar(),
-      ],
-    );
-  }
-
-  static List<PlutoColumn> _buildColumns(AppLocalizations l10n) {
+  /// Column set — order/format mirrors the web SuppliersGrid (Code, Name,
+  /// Phone, Email, Balance, Active); read-only for now.
+  @override
+  List<PlutoColumn> buildGridColumns(AppLocalizations l10n) {
     PlutoColumn textColumn(String field, String title, double width) =>
         PlutoColumn(
           title: title,
@@ -313,6 +235,7 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
         width: 80,
         readOnly: true,
         renderer: (ctx) => const SizedBox.shrink(),
+        // Hidden in onLoaded — never reveal it via the column menu.
         enableContextMenu: false,
         enableFilterMenuItem: false,
         enableHideColumnMenuItem: false,

@@ -5,7 +5,8 @@
 // table (Date | Description | Debit | Credit | Balance) with a totals
 // footer row. They differ only in the data provider and the l10n keys —
 // parameterize those via [LedgerDialogConfig] so there is one
-// implementation.
+// implementation. The table rows themselves are the shared
+// [LedgerHeaderRow] / [LedgerEntryRow] / [LedgerTotalsRow] primitives.
 //
 // The module facades (`features/customers/customer_ledger_dialog.dart`,
 // `features/suppliers/supplier_ledger_dialog.dart`) keep their public
@@ -14,12 +15,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/utils/formatters.dart';
 import '../data/models/ledger_entry.dart' show LedgerEntry;
 import '../data/repositories/api_result.dart' show ApiError;
 import '../l10n/app_localizations.dart';
 import 'detail_error.dart';
 import 'detail_labels.dart';
+import 'ledger_table.dart';
 
 /// What differs between the customer and supplier ledgers: the localized
 /// strings and the `autoDispose` family provider that fetches the entries
@@ -51,23 +52,26 @@ class LedgerDialogConfig {
 
   /// The module's ledger provider — `customerLedgerProvider` /
   /// `supplierLedgerProvider`.
-  final AutoDisposeFutureProviderFamily<List<LedgerEntry>, int>
-      entriesProvider;
+  final AutoDisposeFutureProviderFamily<List<LedgerEntry>, int> entriesProvider;
 }
 
 /// The ledger dialog body — watches [LedgerDialogConfig.entriesProvider]
 /// for [entryId], then renders the table, totals, empty or error state.
+/// [footerAction] (if given) renders in the footer before the Close button
+/// — e.g. the supplier's Statement opener.
 class LedgerDialog extends ConsumerWidget {
   const LedgerDialog({
     super.key,
     required this.entryId,
     required this.entryName,
     required this.config,
+    this.footerAction,
   });
 
   final int entryId;
   final String entryName;
   final LedgerDialogConfig config;
+  final Widget? footerAction;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -80,6 +84,7 @@ class LedgerDialog extends ConsumerWidget {
             entryName: entryName,
             entries: value,
             config: config,
+            footerAction: footerAction,
           ),
           AsyncError(:final error) => DetailError(
             message: error is ApiError ? error.message : '$error',
@@ -101,16 +106,13 @@ class _LedgerBody extends StatelessWidget {
     required this.entryName,
     required this.entries,
     required this.config,
+    required this.footerAction,
   });
 
   final String entryName;
   final List<LedgerEntry> entries;
   final LedgerDialogConfig config;
-
-  // Shared column widths keep the header, rows and totals aligned.
-  static const _dateWidth = 110.0;
-  static const _amountWidth = 92.0;
-  static const _balanceWidth = 104.0;
+  final Widget? footerAction;
 
   @override
   Widget build(BuildContext context) {
@@ -146,6 +148,10 @@ class _LedgerBody extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              if (footerAction != null) ...[
+                footerAction!,
+                const SizedBox(width: 4),
+              ],
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(l10n.commonClose),
@@ -181,220 +187,21 @@ class _LedgerTable extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _HeaderRow(config: config),
+          LedgerHeaderRow(
+            debitLabel: config.debitLabel,
+            creditLabel: config.creditLabel,
+            balanceLabel: config.balanceLabel,
+          ),
           for (final entry in entries) ...[
             const Divider(height: 1),
-            _EntryRow(entry: entry),
+            LedgerEntryRow(entry: entry),
           ],
           const Divider(height: 1),
-          _TotalsRow(
+          LedgerTotalsRow(
             totalDebit: totalDebit,
             totalCredit: totalCredit,
             closingBalance: closingBalance,
-            config: config,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeaderRow extends StatelessWidget {
-  const _HeaderRow({required this.config});
-
-  final LedgerDialogConfig config;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final scheme = Theme.of(context).colorScheme;
-    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
-      color: scheme.onSurfaceVariant,
-      letterSpacing: 0.3,
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: [
-          SizedBox(
-            width: _LedgerBody._dateWidth,
-            child: Text(l10n.commonDate, style: style),
-          ),
-          Expanded(child: Text(l10n.commonDescription, style: style)),
-          SizedBox(
-            width: _LedgerBody._amountWidth,
-            child: Text(
-              config.debitLabel,
-              style: style,
-              textAlign: TextAlign.end,
-            ),
-          ),
-          SizedBox(
-            width: _LedgerBody._amountWidth,
-            child: Text(
-              config.creditLabel,
-              style: style,
-              textAlign: TextAlign.end,
-            ),
-          ),
-          SizedBox(
-            width: _LedgerBody._balanceWidth,
-            child: Text(
-              config.balanceLabel,
-              style: style,
-              textAlign: TextAlign.end,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EntryRow extends StatelessWidget {
-  const _EntryRow({required this.entry});
-
-  final LedgerEntry entry;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final muted = Theme.of(context).textTheme.bodySmall?.copyWith(
-      color: scheme.onSurfaceVariant,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-    final amount = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: _LedgerBody._dateWidth,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  Formatters.date(entry.transactionDate),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                Text(entry.transactionType, style: muted),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  entry.description.isEmpty ? '—' : entry.description,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                if (entry.referenceNo.isNotEmpty)
-                  Text(entry.referenceNo, style: muted),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: _LedgerBody._amountWidth,
-            child: Text(
-              entry.debit > 0 ? Formatters.currency(entry.debit) : '—',
-              style: entry.debit > 0 ? amount : muted,
-              textAlign: TextAlign.end,
-            ),
-          ),
-          SizedBox(
-            width: _LedgerBody._amountWidth,
-            child: Text(
-              entry.credit > 0 ? Formatters.currency(entry.credit) : '—',
-              style: entry.credit > 0 ? amount : muted,
-              textAlign: TextAlign.end,
-            ),
-          ),
-          SizedBox(
-            width: _LedgerBody._balanceWidth,
-            child: Text(
-              Formatters.currency(entry.balance),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-              textAlign: TextAlign.end,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TotalsRow extends StatelessWidget {
-  const _TotalsRow({
-    required this.totalDebit,
-    required this.totalCredit,
-    required this.closingBalance,
-    required this.config,
-  });
-
-  final num totalDebit;
-  final num totalCredit;
-  final num closingBalance;
-  final LedgerDialogConfig config;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final scheme = Theme.of(context).colorScheme;
-    final labelStyle = Theme.of(
-      context,
-    ).textTheme.labelLarge?.copyWith(color: scheme.onSurfaceVariant);
-    final totalStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
-      fontWeight: FontWeight.w700,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-
-    return Container(
-      color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: [
-          SizedBox(
-            width: _LedgerBody._dateWidth,
-            child: Text(l10n.commonTotal, style: labelStyle),
-          ),
-          Expanded(
-            child: Text(
-              config.closingBalanceLabel,
-              style: labelStyle,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          SizedBox(
-            width: _LedgerBody._amountWidth,
-            child: Text(
-              Formatters.currency(totalDebit),
-              style: totalStyle,
-              textAlign: TextAlign.end,
-            ),
-          ),
-          SizedBox(
-            width: _LedgerBody._amountWidth,
-            child: Text(
-              Formatters.currency(totalCredit),
-              style: totalStyle,
-              textAlign: TextAlign.end,
-            ),
-          ),
-          SizedBox(
-            width: _LedgerBody._balanceWidth,
-            child: Text(
-              Formatters.currency(closingBalance),
-              style: totalStyle,
-              textAlign: TextAlign.end,
-            ),
+            closingLabel: config.closingBalanceLabel,
           ),
         ],
       ),

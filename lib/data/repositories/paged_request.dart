@@ -26,13 +26,13 @@ class PagedRequest {
   /// Query parameters for the request. Empty search/sortBy are omitted so
   /// the server applies its own defaults.
   Map<String, dynamic> toQuery() => {
-        'page': page,
-        'limit': limit,
-        if (search != null && search!.isNotEmpty) 'search': search,
-        if (sortBy != null && sortBy!.isNotEmpty) 'sortBy': sortBy,
-        'sortOrder': sortOrder,
-        ...?extra,
-      };
+    'page': page,
+    'limit': limit,
+    if (search != null && search!.isNotEmpty) 'search': search,
+    if (sortBy != null && sortBy!.isNotEmpty) 'sortBy': sortBy,
+    'sortOrder': sortOrder,
+    ...?extra,
+  };
 }
 
 /// Enveloped list result including the server's `pagination` block

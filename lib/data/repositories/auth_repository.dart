@@ -47,16 +47,14 @@ class AuthRepository {
       );
 
   Future<ApiResult<AuthUser>> me() => _api.get(
-        ApiEndpoints.me,
-        parse: (Object? json) => AuthUser.fromJson(json as Map<String, dynamic>),
-      );
+    ApiEndpoints.me,
+    parse: (Object? json) => AuthUser.fromJson(json as Map<String, dynamic>),
+  );
 
   /// Best-effort server-side logout (clears the cookie for the web
   /// client); the native client clears its stored token locally.
-  Future<ApiResult<void>> logout() => _api.post(
-        ApiEndpoints.logout,
-        parse: (_) {},
-      );
+  Future<ApiResult<void>> logout() =>
+      _api.post(ApiEndpoints.logout, parse: (_) {});
 
   /// `POST /auth/change-password` (rate-limited 3/hour). A 401 here means
   /// "wrong current password", not an expired session — the dio interceptor
@@ -64,15 +62,11 @@ class AuthRepository {
   Future<ApiResult<void>> changePassword({
     required String currentPassword,
     required String newPassword,
-  }) =>
-      _api.post(
-        ApiEndpoints.changePassword,
-        body: {
-          'currentPassword': currentPassword,
-          'newPassword': newPassword,
-        },
-        parse: (_) {},
-      );
+  }) => _api.post(
+    ApiEndpoints.changePassword,
+    body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+    parse: (_) {},
+  );
 }
 
 final authRepositoryProvider = Provider<AuthRepository>(

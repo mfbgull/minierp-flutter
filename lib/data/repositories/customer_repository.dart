@@ -54,23 +54,24 @@ class CustomerRepository {
       );
 
   Future<ApiResult<Customer>> get(int id) => _api.get(
-        '${ApiEndpoints.customers}/$id',
-        parse: (Object? json) => Customer.fromJson(json as Map<String, dynamic>),
-      );
+    '${ApiEndpoints.customers}/$id',
+    parse: (Object? json) => Customer.fromJson(json as Map<String, dynamic>),
+  );
 
   /// `POST /customers` — `customer_code` is auto-generated server-side
   /// (`CUSTnnn`); body uses snake_case API keys.
   Future<ApiResult<Customer>> create(Map<String, dynamic> body) => _api.post(
-        ApiEndpoints.customers,
-        body: body,
-        parse: (Object? json) => Customer.fromJson(json as Map<String, dynamic>),
-      );
+    ApiEndpoints.customers,
+    body: body,
+    parse: (Object? json) => Customer.fromJson(json as Map<String, dynamic>),
+  );
 
   Future<ApiResult<Customer>> update(int id, Map<String, dynamic> body) =>
       _api.put(
         '${ApiEndpoints.customers}/$id',
         body: body,
-        parse: (Object? json) => Customer.fromJson(json as Map<String, dynamic>),
+        parse: (Object? json) =>
+            Customer.fromJson(json as Map<String, dynamic>),
       );
 
   /// Soft delete (deactivates); fails server-side if the customer has
@@ -83,16 +84,16 @@ class CustomerRepository {
   /// here), so ledger UIs treat the first row's `balance` as the closing
   /// balance.
   Future<ApiResult<List<LedgerEntry>>> ledger(int id) => _api.getList(
-        '${ApiEndpoints.customers}/$id/ledger',
-        parseItem: (Object? json) =>
-            LedgerEntry.fromJson(json as Map<String, dynamic>),
-      );
+    '${ApiEndpoints.customers}/$id/ledger',
+    parseItem: (Object? json) =>
+        LedgerEntry.fromJson(json as Map<String, dynamic>),
+  );
 
   Future<ApiResult<CustomerBalance>> balance(int id) => _api.get(
-        '${ApiEndpoints.customers}/$id/balance',
-        parse: (Object? json) =>
-            CustomerBalance.fromJson(json as Map<String, dynamic>),
-      );
+    '${ApiEndpoints.customers}/$id/balance',
+    parse: (Object? json) =>
+        CustomerBalance.fromJson(json as Map<String, dynamic>),
+  );
 }
 
 final customerRepositoryProvider = Provider<CustomerRepository>(

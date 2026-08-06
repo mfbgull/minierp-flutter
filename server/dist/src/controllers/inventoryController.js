@@ -266,6 +266,20 @@ function getStockMovements(req, res) {
         res.status(500).json({ error: 'Failed to fetch stock movements' });
     }
 }
+function getStockMovement(req, res) {
+    try {
+        const movement = StockMovement_1.default.getById(Number(req.params.id), database_1.default);
+        if (!movement) {
+            res.status(404).json({ error: 'Stock movement not found' });
+            return;
+        }
+        res.json(movement);
+    }
+    catch (error) {
+        logger_1.default.error('Get stock movement error:', error);
+        res.status(500).json({ error: 'Failed to fetch stock movement' });
+    }
+}
 function createStockMovement(req, res) {
     try {
         const { item_id, warehouse_id, quantity, movement_type } = req.body;
@@ -484,6 +498,7 @@ exports.default = {
     updateWarehouse,
     deleteWarehouse,
     getStockMovements,
+    getStockMovement,
     createStockMovement,
     getStockSummary,
     getItemLedger,

@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/ledger_entry.dart' show LedgerEntry;
+import '../models/statement.dart' show StatementData;
 import '../models/supplier.dart' show Supplier;
 import 'api_result.dart';
 import 'paged_request.dart';
@@ -60,6 +61,15 @@ class SupplierRepository {
     '${ApiEndpoints.suppliers}/$id/ledger',
     parseItem: (Object? json) =>
         LedgerEntry.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// `GET /suppliers/:id/statement` — enveloped `{data: {supplier, period,
+  /// openingBalance, closingBalance, transactions}}`; transactions are
+  /// ordered oldest-first. Called without date filters (all history).
+  Future<ApiResult<StatementData>> statement(int id) => _api.get(
+    '${ApiEndpoints.suppliers}/$id/statement',
+    parse: (Object? json) =>
+        StatementData.fromJson(json as Map<String, dynamic>),
   );
 }
 

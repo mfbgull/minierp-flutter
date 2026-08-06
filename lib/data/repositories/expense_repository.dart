@@ -45,16 +45,16 @@ class ExpenseFilters {
   final DateTime? toDate;
 
   Map<String, dynamic> toQuery() => {
-        // The expenses controller defaults to 10 rows/page; the client
-        // wants the full dataset for client-side grid sort (items-screen
-        // convention), so cap at the server's practical list ceiling.
-        'limit': 1000,
-        if (search != null && search!.isNotEmpty) 'search': search,
-        if (category != null && category!.isNotEmpty) 'category': category,
-        if (status != null && status!.isNotEmpty) 'status': status,
-        if (fromDate != null) 'from_date': _isoDate(fromDate!),
-        if (toDate != null) 'to_date': _isoDate(toDate!),
-      };
+    // The expenses controller defaults to 10 rows/page; the client
+    // wants the full dataset for client-side grid sort (items-screen
+    // convention), so cap at the server's practical list ceiling.
+    'limit': 1000,
+    if (search != null && search!.isNotEmpty) 'search': search,
+    if (category != null && category!.isNotEmpty) 'category': category,
+    if (status != null && status!.isNotEmpty) 'status': status,
+    if (fromDate != null) 'from_date': _isoDate(fromDate!),
+    if (toDate != null) 'to_date': _isoDate(toDate!),
+  };
 
   static String _isoDate(DateTime date) =>
       '${date.year.toString().padLeft(4, '0')}-'
@@ -71,20 +71,21 @@ class ExpenseRepository {
       _client.getList(
         ApiEndpoints.expenses,
         queryParameters: filters.toQuery(),
-        parseItem: (Object? json) => Expense.fromJson(json! as Map<String, dynamic>),
+        parseItem: (Object? json) =>
+            Expense.fromJson(json! as Map<String, dynamic>),
       );
 
   Future<ApiResult<List<ExpenseCategory>>> categories() => _client.getList(
-        '${ApiEndpoints.expenses}/categories',
-        parseItem: (Object? json) =>
-            ExpenseCategory.fromJson(json! as Map<String, dynamic>),
-      );
+    '${ApiEndpoints.expenses}/categories',
+    parseItem: (Object? json) =>
+        ExpenseCategory.fromJson(json! as Map<String, dynamic>),
+  );
 
   Future<ApiResult<List<ExpenseOption>>> statusOptions() => _client.getList(
-        '${ApiEndpoints.expenses}/status-options',
-        parseItem: (Object? json) =>
-            ExpenseOption.fromJson(json! as Map<String, dynamic>),
-      );
+    '${ApiEndpoints.expenses}/status-options',
+    parseItem: (Object? json) =>
+        ExpenseOption.fromJson(json! as Map<String, dynamic>),
+  );
 
   Future<ApiResult<List<ExpenseOption>>> paymentMethodOptions() =>
       _client.getList(
@@ -95,16 +96,17 @@ class ExpenseRepository {
 
   /// `POST /expenses` — body keys per the controller's createExpense DTO.
   Future<ApiResult<Expense>> create(Map<String, dynamic> body) => _client.post(
-        ApiEndpoints.expenses,
-        body: body,
-        parse: (Object? json) => Expense.fromJson(json! as Map<String, dynamic>),
-      );
+    ApiEndpoints.expenses,
+    body: body,
+    parse: (Object? json) => Expense.fromJson(json! as Map<String, dynamic>),
+  );
 
   Future<ApiResult<Expense>> update(int id, Map<String, dynamic> body) =>
       _client.put(
         '${ApiEndpoints.expenses}/$id',
         body: body,
-        parse: (Object? json) => Expense.fromJson(json! as Map<String, dynamic>),
+        parse: (Object? json) =>
+            Expense.fromJson(json! as Map<String, dynamic>),
       );
 
   Future<ApiResult<void>> delete(int id) =>

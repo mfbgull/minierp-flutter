@@ -11,11 +11,13 @@ import 'features/auth/login_screen.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/customers/customers_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
-import 'features/inventory/items_screen.dart';
+import 'features/inventory/inventory_shell.dart';
+import 'features/purchases/purchasing_shell.dart';
 import 'features/expenses/expenses_screen.dart';
-import 'features/sales/sales_screen.dart';
+import 'data/models/invoice.dart' show Invoice;
+import 'features/sales/sales_invoice_form_page.dart';
+import 'features/sales_orders/sales_shell.dart';
 import 'features/shell/app_shell.dart';
-import 'features/purchase_orders/purchase_orders_screen.dart';
 import 'features/suppliers/suppliers_screen.dart';
 import 'features/shell/module_placeholder_screen.dart';
 import 'l10n/app_localizations.dart';
@@ -57,6 +59,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/change-password',
         builder: (context, state) => const ChangePasswordScreen(),
       ),
+      // Invoice create/edit form (PORTING.md §7): standalone page outside
+      // the shell (full-width form; back arrow returns to the sales
+      // grid). Create when no `extra` is passed, edit when the screen
+      // pushes the row's `Invoice` as `extra`.
+      GoRoute(
+        path: '/sales/form',
+        builder: (context, state) =>
+            SalesInvoiceFormPage(invoice: state.extra as Invoice?),
+      ),
       // Authenticated shell (PORTING.md §5): one branch per module in
       // [shellDestinations] — each keeps its state while switching. Real
       // screens replace the placeholder as they are ported.
@@ -79,14 +90,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                     // First ported data screen (PORTING.md §5/§6): the
                     // items grid lives at the inventory branch root; the
                     // web app hosts it at /inventory/items.
-                    '/inventory' => const ItemsScreen(),
+                    '/inventory' => const InventoryShell(),
                     // Second ported data screen: server-paginated list
                     // (GET /customers + pagination block).
                     '/customers' => const CustomersScreen(),
                     '/suppliers' => const SuppliersScreen(),
-                    '/purchasing' => const PurchaseOrdersScreen(),
+                    '/purchasing' => const PurchasingShell(),
                     '/expenses' => const ExpensesScreen(),
-                    '/sales' => const SalesScreen(),
+                    // Sales module shell: invoices grid (branch root) +
+                    // sales-orders grid as tabs (web: /sales-orders).
+                    '/sales' => const SalesShell(),
                     _ => ModulePlaceholderScreen(
                       title: dest.label(AppLocalizations.of(context)!),
                     ),

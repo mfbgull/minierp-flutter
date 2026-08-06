@@ -13,9 +13,11 @@ import '../../data/repositories/inventory_repository.dart' show ItemDetail;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
+import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'inventory_providers.dart';
 import 'item_form_dialog.dart';
+import 'stock_ledger_dialog.dart';
 
 /// Opens the read-only detail dialog for [itemId].
 Future<void> showItemDetailDialog(BuildContext context, {required int itemId}) {
@@ -122,14 +124,40 @@ class _DetailBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _infoGrid(context, l10n, item),
+                DetailInfoRows(
+                  labelWidth: 140,
+                  rows: [
+                    (l10n.inventoryCategory, item.category ?? '—'),
+                    (l10n.inventoryUom, item.unitOfMeasure),
+                    (l10n.inventoryRack, item.rackNo ?? '—'),
+                    (
+                      l10n.inventorySaletype,
+                      _saleTypeLabel(l10n, item.saleType),
+                    ),
+                  ],
+                ),
                 if (item.description?.isNotEmpty ?? false) ...[
                   const SizedBox(height: 12),
                   detailSectionLabel(context, l10n.commonDescription),
                   const SizedBox(height: 2),
                   Text(item.description!),
                 ],
-                _pricingRow(context, l10n, item),
+                DetailTiles(
+                  tiles: [
+                    DetailTile(
+                      l10n.inventoryStandardcost,
+                      Formatters.currency(item.standardCost ?? 0),
+                    ),
+                    DetailTile(
+                      l10n.inventorySellingprice,
+                      Formatters.currency(item.standardSellingPrice ?? 0),
+                    ),
+                    DetailTile(
+                      l10n.inventoryPurchaseprice,
+                      Formatters.currency(item.purchasePrice ?? 0),
+                    ),
+                  ],
+                ),
                 if (_hasFlags(item)) ...[
                   const SizedBox(height: 14),
                   detailSectionLabel(context, l10n.inventoryItemtype),
@@ -180,6 +208,17 @@ class _DetailBody extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton.icon(
+                onPressed: () => showStockLedgerDialog(
+                  context,
+                  itemId: detail.item.id,
+                  itemLabel:
+                      '${detail.item.itemCode} · ${detail.item.itemName}',
+                ),
+                icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                label: Text(l10n.inventoryStockledger),
+              ),
+              const SizedBox(width: 4),
+              TextButton.icon(
                 onPressed: () => showItemFormDialog(context, item: detail.item),
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 label: Text(l10n.inventoryEdit),
@@ -221,91 +260,6 @@ class _DetailBody extends StatelessWidget {
         style: Theme.of(
           context,
         ).textTheme.labelSmall?.copyWith(color: scheme.primary),
-      ),
-    );
-  }
-
-  static Widget _infoGrid(
-    BuildContext context,
-    AppLocalizations l10n,
-    Item item,
-  ) {
-    final rows = <(String, String)>[
-      (l10n.inventoryCategory, item.category ?? '—'),
-      (l10n.inventoryUom, item.unitOfMeasure),
-      (l10n.inventoryRack, item.rackNo ?? '—'),
-      (l10n.inventorySaletype, _saleTypeLabel(l10n, item.saleType)),
-    ];
-    return Column(
-      children: [
-        for (final (label, value) in rows)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                SizedBox(width: 140, child: detailSectionLabel(context, label)),
-                Expanded(
-                  child: Text(
-                    value,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  static Widget _pricingRow(
-    BuildContext context,
-    AppLocalizations l10n,
-    Item item,
-  ) {
-    final scheme = Theme.of(context).colorScheme;
-    final tiles = <(String, String)>[
-      (l10n.inventoryStandardcost, Formatters.currency(item.standardCost ?? 0)),
-      (
-        l10n.inventorySellingprice,
-        Formatters.currency(item.standardSellingPrice ?? 0),
-      ),
-      (
-        l10n.inventoryPurchaseprice,
-        Formatters.currency(item.purchasePrice ?? 0),
-      ),
-    ];
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          for (final (label, value) in tiles)
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(value, style: Theme.of(context).textTheme.titleSmall),
-                  ],
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }

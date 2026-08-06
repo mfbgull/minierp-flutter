@@ -13,6 +13,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
+import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'supplier_form_dialog.dart';
 import 'supplier_ledger_dialog.dart';
@@ -65,6 +66,7 @@ class _DetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -113,8 +115,38 @@ class _DetailBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _infoGrid(context, l10n),
-                _balanceRow(context, l10n),
+                DetailInfoRows(
+                  rows: [
+                    (
+                      l10n.suppliersContactperson,
+                      detailDash(supplier.contactPerson),
+                    ),
+                    (l10n.suppliersPhone, detailDash(supplier.phone)),
+                    (l10n.suppliersEmail, detailDash(supplier.email)),
+                    (
+                      l10n.suppliersPaymentterms,
+                      detailDash(supplier.paymentTerms),
+                    ),
+                  ],
+                ),
+                DetailTiles(
+                  tiles: [
+                    DetailTile(
+                      l10n.suppliersBalance,
+                      Formatters.currency(supplier.currentBalance ?? 0),
+                      emphasize: true,
+                      color: (supplier.currentBalance ?? 0) < 0
+                          ? scheme.error
+                          : null,
+                    ),
+                    DetailTile(
+                      l10n.suppliersCreditutilization,
+                      supplier.creditUtilizationPercent == null
+                          ? '—'
+                          : '${Formatters.number(supplier.creditUtilizationPercent!)}%',
+                    ),
+                  ],
+                ),
                 if (supplier.address?.isNotEmpty ?? false) ...[
                   const SizedBox(height: 14),
                   detailSectionLabel(context, l10n.suppliersAddress),
@@ -162,98 +194,6 @@ class _DetailBody extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _infoGrid(BuildContext context, AppLocalizations l10n) {
-    final rows = <(String, String)>[
-      (l10n.suppliersContactperson, detailDash(supplier.contactPerson)),
-      (l10n.suppliersPhone, detailDash(supplier.phone)),
-      (l10n.suppliersEmail, detailDash(supplier.email)),
-      (l10n.suppliersPaymentterms, detailDash(supplier.paymentTerms)),
-    ];
-    return Column(
-      children: [
-        for (final (label, value) in rows)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                SizedBox(width: 150, child: detailSectionLabel(context, label)),
-                Expanded(
-                  child: Text(
-                    value,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _balanceRow(BuildContext context, AppLocalizations l10n) {
-    final scheme = Theme.of(context).colorScheme;
-    final tiles = <(String, String, bool)>[
-      (
-        l10n.suppliersBalance,
-        Formatters.currency(supplier.currentBalance ?? 0),
-        true,
-      ),
-      (
-        l10n.suppliersCreditutilization,
-        supplier.creditUtilizationPercent == null
-            ? '—'
-            : '${Formatters.number(supplier.creditUtilizationPercent!)}%',
-        false,
-      ),
-    ];
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          for (final (label, value, emphasize) in tiles)
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      value,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: emphasize
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: emphasize
-                            ? ((supplier.currentBalance ?? 0) < 0
-                                  ? scheme.error
-                                  : null)
-                            : null,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }

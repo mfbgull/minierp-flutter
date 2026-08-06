@@ -192,6 +192,55 @@ class PaymentMethod {
       };
 }
 
+/// An existing payment row returned by `GET /invoices/:id/payments` (the
+/// server's payment record for invoice allocation view). Distinct from
+/// `InvoicePayment` (a form-nested record) and `PaymentMethod` (a form
+/// split line).
+class InvoicePaymentRecord {
+  const InvoicePaymentRecord({
+    required this.id,
+    this.invoiceId,
+    this.paymentNo,
+    this.paymentDate,
+    required this.amount,
+    required this.method,
+    this.referenceNo,
+    this.notes,
+  });
+
+  factory InvoicePaymentRecord.fromJson(Map<String, dynamic> json) =>
+      InvoicePaymentRecord(
+        id: asInt(json['id']) ?? 0,
+        invoiceId: asInt(json['invoice_id']),
+        paymentNo: asString(json['payment_no']),
+        paymentDate: asString(json['payment_date']),
+        amount: asNum(json['amount']) ?? 0,
+        method: asString(json['payment_method']) ?? '',
+        referenceNo: asString(json['reference_no']),
+        notes: asString(json['notes']),
+      );
+
+  final int id;
+  final int? invoiceId;
+  final String? paymentNo;
+  final String? paymentDate;
+  final num amount;
+  final String method;
+  final String? referenceNo;
+  final String? notes;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        if (invoiceId != null) 'invoice_id': invoiceId,
+        if (paymentNo != null) 'payment_no': paymentNo,
+        if (paymentDate != null) 'payment_date': paymentDate,
+        'amount': amount,
+        'payment_method': method,
+        if (referenceNo != null) 'reference_no': referenceNo,
+        if (notes != null) 'notes': notes,
+      };
+}
+
 /// Company block printed on documents (`CompanyInfo` in types/client-types.ts).
 class CompanyInfo {
   const CompanyInfo({

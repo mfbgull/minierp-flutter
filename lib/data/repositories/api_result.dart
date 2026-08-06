@@ -18,10 +18,11 @@ sealed class ApiResult<T> {
 
   /// Unwrap or throw — for flows where a failure is a programming error.
   T get requireData => switch (this) {
-        ApiSuccess(:final data) => data,
-        ApiFailure() =>
-          throw StateError('ApiResult.requireData called on a failure'),
-      };
+    ApiSuccess(:final data) => data,
+    ApiFailure() => throw StateError(
+      'ApiResult.requireData called on a failure',
+    ),
+  };
 }
 
 class ApiSuccess<T> extends ApiResult<T> {
@@ -33,16 +34,16 @@ class ApiSuccess<T> extends ApiResult<T> {
   R fold<R>({
     required R Function(T data) onSuccess,
     required R Function(ApiError error) onFailure,
-  }) =>
-      onSuccess(data);
+  }) => onSuccess(data);
 
   @override
   ApiResult<R> map<R>(R Function(T data) transform) =>
       ApiSuccess(transform(data));
 
   @override
-  Future<ApiResult<R>> asyncMap<R>(Future<R> Function(T data) transform) async =>
-      ApiSuccess(await transform(data));
+  Future<ApiResult<R>> asyncMap<R>(
+    Future<R> Function(T data) transform,
+  ) async => ApiSuccess(await transform(data));
 
   @override
   String toString() => 'ApiSuccess($data)';
@@ -57,15 +58,15 @@ class ApiFailure<T> extends ApiResult<T> {
   R fold<R>({
     required R Function(T data) onSuccess,
     required R Function(ApiError error) onFailure,
-  }) =>
-      onFailure(error);
+  }) => onFailure(error);
 
   @override
   ApiResult<R> map<R>(R Function(T data) transform) => ApiFailure(error);
 
   @override
-  Future<ApiResult<R>> asyncMap<R>(Future<R> Function(T data) transform) async =>
-      ApiFailure(error);
+  Future<ApiResult<R>> asyncMap<R>(
+    Future<R> Function(T data) transform,
+  ) async => ApiFailure(error);
 
   @override
   String toString() => 'ApiFailure($error)';
