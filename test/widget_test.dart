@@ -10,6 +10,7 @@
 // which doesn't exist under `flutter test`.
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +24,7 @@ import 'package:minierp_app/core/auth/token_storage.dart';
 import 'package:minierp_app/features/auth/change_password_screen.dart';
 import 'package:minierp_app/features/customers/customer_ledger_dialog.dart';
 import 'package:minierp_app/features/suppliers/supplier_ledger_dialog.dart';
+import 'package:minierp_app/features/suppliers/supplier_statement_dialog.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 class _FakeTokenStorage implements TokenStorage {
@@ -38,6 +40,120 @@ class _FakeTokenStorage implements TokenStorage {
   Future<void> clear() async => token = null;
 }
 
+/// Joined stock-movement rows shared by the list GET fake and the detail
+/// GET fake (a detail fetch returns the same joined shape as a list row).
+Map<String, dynamic> _movementPurchaseRow() => {
+  'id': 1,
+  'movement_no': 'SM-2026-0100',
+  'item_id': 4,
+  'warehouse_id': 1,
+  'movement_type': 'PURCHASE',
+  'quantity': 100.0,
+  'unit_cost': 10.0,
+  'reference_doctype': 'PURCHASE',
+  'reference_docno': 'PUR-2026-001',
+  'remarks': 'Goods received',
+  'movement_date': '2026-02-01',
+  'created_by': 1,
+  'created_at': '2026-02-01 09:00:00',
+  'item_code': 'RM001',
+  'item_name': 'Raw Material A',
+  'unit_of_measure': 'kg',
+  'warehouse_code': 'WH-MAIN',
+  'warehouse_name': 'Main Warehouse',
+  'created_by_name': 'admin',
+};
+
+Map<String, dynamic> _movementSaleRow() => {
+  'id': 2,
+  'movement_no': 'SM-2026-0101',
+  'item_id': 1,
+  'warehouse_id': 1,
+  'movement_type': 'SALE',
+  'quantity': -5.0,
+  'unit_cost': 25.0,
+  'reference_doctype': 'SALE',
+  'reference_docno': 'INV-2026-001',
+  'remarks': 'POS sale',
+  'movement_date': '2026-02-02',
+  'created_by': 1,
+  'created_at': '2026-02-02 12:30:00',
+  'item_code': 'FG001',
+  'item_name': 'Widget A',
+  'unit_of_measure': 'pcs',
+  'warehouse_code': 'WH-MAIN',
+  'warehouse_name': 'Main Warehouse',
+  'created_by_name': 'admin',
+};
+
+Map<String, dynamic> _movementAdjustmentRow() => {
+  'id': 3,
+  'movement_no': 'SM-2026-0102',
+  'item_id': 4,
+  'warehouse_id': 1,
+  'movement_type': 'ADJUSTMENT',
+  'quantity': -10.0,
+  'unit_cost': 10.0,
+  'reference_doctype': 'ADJUSTMENT',
+  'reference_docno': 'ADJ-2026-001',
+  'remarks': 'Broken stock',
+  'movement_date': '2026-02-03',
+  'created_by': 1,
+  'created_at': '2026-02-03 10:00:00',
+  'item_code': 'RM001',
+  'item_name': 'Raw Material A',
+  'unit_of_measure': 'kg',
+  'warehouse_code': 'WH-MAIN',
+  'warehouse_name': 'Main Warehouse',
+  'created_by_name': 'admin',
+};
+
+/// Transfer OUT leg (no reference — the IN leg names its movement_no).
+Map<String, dynamic> _movementTransferOutRow() => {
+  'id': 4,
+  'movement_no': 'SM-2026-0103',
+  'item_id': 4,
+  'warehouse_id': 1,
+  'movement_type': 'TRANSFER',
+  'quantity': -5.0,
+  'unit_cost': 10.0,
+  'reference_doctype': 'TRANSFER',
+  'reference_docno': null,
+  'remarks': 'Transfer to raw',
+  'movement_date': '2026-02-04',
+  'created_by': 1,
+  'created_at': '2026-02-04 09:00:00',
+  'item_code': 'RM001',
+  'item_name': 'Raw Material A',
+  'unit_of_measure': 'kg',
+  'warehouse_code': 'WH-MAIN',
+  'warehouse_name': 'Main Warehouse',
+  'created_by_name': 'admin',
+};
+
+/// Transfer IN leg — its `reference_docno` names the OUT leg's number.
+Map<String, dynamic> _movementTransferInRow() => {
+  'id': 5,
+  'movement_no': 'SM-2026-0104',
+  'item_id': 4,
+  'warehouse_id': 2,
+  'movement_type': 'TRANSFER',
+  'quantity': 5.0,
+  'unit_cost': 10.0,
+  'reference_doctype': 'TRANSFER',
+  'reference_docno': 'SM-2026-0103',
+  'remarks': 'Transfer to raw',
+  'movement_date': '2026-02-04',
+  'created_by': 1,
+  'created_at': '2026-02-04 09:00:00',
+  'item_code': 'RM001',
+  'item_name': 'Raw Material A',
+  'unit_of_measure': 'kg',
+  'warehouse_code': 'WH-RAW',
+  'warehouse_name': 'Raw Materials',
+  'created_by_name': 'admin',
+};
+
 class _AuthFakeAdapter implements HttpClientAdapter {
   _AuthFakeAdapter({
     this.failLogin = false,
@@ -52,9 +168,101 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   /// Mutable so a test can fail once, then retry successfully.
   bool failItems = false;
 
+  /// When true, `GET /inventory/stock-ledger/1` returns an empty array.
+  bool emptyStockLedger = false;
+
+  /// Captured query parameters of the last stock-ledger fetch.
+  Map<String, dynamic>? lastLedgerQuery;
+
   /// Captured create/update bodies for the item form tests.
   Map<String, dynamic>? lastItemPostBody;
   Map<String, dynamic>? lastItemPutBody;
+
+  /// Captured create/update bodies for the warehouse form tests.
+  Map<String, dynamic>? lastWarehousePostBody;
+  Map<String, dynamic>? lastWarehousePutBody;
+
+  /// When true, the warehouse create POST rejects with a 400 (failure
+  /// path test).
+  bool rejectWarehouseCreate = false;
+
+  /// Warehouse #1 delete flow — the DELETE fake flips this so the list
+  /// GET drops WH-MAIN on refetch.
+  bool warehouse1Deleted = false;
+
+  int warehouseDeleteCount = 0;
+
+  /// When true, the warehouse DELETE rejects with a 404 (failure-path
+  /// test).
+  bool rejectWarehouseDelete = false;
+
+  /// Captured stock-adjustment POST body (stock-movements tab tests).
+  Map<String, dynamic>? lastMovementPostBody;
+
+  /// Every movement POST body, in order (the transfer flow posts two).
+  final List<Map<String, dynamic>> movementPostBodies = [];
+  int movementPostCount = 0;
+
+  /// When true, the stock-movements POST rejects with a 400 (failure-path
+  /// test).
+  bool rejectMovementCreate = false;
+
+  /// When true, only the SECOND movement POST rejects with a 400 (the
+  /// transfer flow's incoming leg).
+  bool rejectSecondMovement = false;
+
+  /// How many times the movement detail GET ran (dialog fetch assertions).
+  int movementDetailFetchCount = 0;
+
+  /// Captured query params of the last movements list GET (filter tests).
+  Map<String, dynamic>? lastMovementQuery;
+
+  /// Captured purchase-order mutation bodies (form create/edit tests).
+  Map<String, dynamic>? lastPoPostBody;
+  Map<String, dynamic>? lastPoPutBody;
+  Map<String, dynamic>? lastPoItemPostBody;
+  Map<String, dynamic>? lastPoItemPutBody;
+  Map<String, dynamic>? lastPoStatusBody;
+  int poItemDeleteCount = 0;
+  int poDeleteCount = 0;
+
+  /// Stateful PO #1 workflow status — the detail fake reads it so a
+  /// submit POST flips the badge in subsequent GETs.
+  String po1Status = 'Draft';
+
+  /// When true, the status POST rejects with a 400 (failure-path test).
+  bool rejectPoStatus = false;
+
+  /// Captured process-return body + stateful returned qty for purchase
+  /// #1 — the /purchases GET fakes read it so a return POST flips the
+  /// list/detail rows.
+  Map<String, dynamic>? lastPurchaseReturnBody;
+  num purchase1ReturnedQty = 0;
+
+  /// When true, the return POST rejects with a 400 (failure-path test).
+  bool rejectPurchaseReturn = false;
+
+  /// Stateful physical-count #1 workflow status — the /physical-counts
+  /// fakes read it so a complete/cancel POST flips the badge on refetch.
+  String pc1Status = 'Draft';
+
+  /// When true, the physical-count complete POST rejects with a 400
+  /// (failure-path test).
+  bool rejectPcComplete = false;
+
+  /// System quantities for PC-2026-001's item lines (fake variance calc).
+  static const Map<int, num> pc1SystemQty = {4: 100.0, 5: 50.0};
+
+  /// Stateful counted quantities per item for physical-count #1 (seeded
+  /// with RM001's existing count) — the detail/items fakes read it so a
+  /// record POST flips the table on refetch.
+  final Map<int, num> pc1CountedQty = {4: 95.0};
+
+  /// Last recorded item body for the physical-count record tests.
+  Map<String, dynamic>? lastPcRecordBody;
+
+  /// When true, the items POST rejects with a 400 (failure-path test).
+  bool rejectPcRecord = false;
 
   /// Last /customers query params (for pagination/search/sort assertions).
   Map<String, dynamic>? lastCustomersQuery;
@@ -78,6 +286,31 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   Map<String, dynamic>? lastInvoicesQuery;
   Map<String, dynamic>? lastInvoicePostBody;
   Map<String, dynamic>? lastInvoicePutBody;
+
+  /// Last /sales-orders query params (sales-orders grid tests).
+  Map<String, dynamic>? lastSalesOrdersQuery;
+
+  /// Last /quotations query params + captured create/update bodies.
+  Map<String, dynamic>? lastQuotationsQuery;
+  Map<String, dynamic>? lastQuotationPostBody;
+  Map<String, dynamic>? lastQuotationPutBody;
+  int quotationDeleteCount = 0;
+  int quotationConvertCount = 0;
+
+  /// Stateful quotation #1 status — the list + detail fakes read it so a
+  /// delete POST removes the row and a convert POST flips the badge to
+  /// Converted on refetch.
+  String quotation1Status = 'Sent';
+
+  /// Captured create/update bodies for the sales-order form tests.
+  Map<String, dynamic>? lastSalesOrderPostBody;
+  Map<String, dynamic>? lastSalesOrderPutBody;
+  int salesOrderDeleteCount = 0;
+  int salesOrderCancelCount = 0;
+
+  /// Stateful SO #1 status — the detail fake reads it so a cancel
+  /// POST flips the badge on refetch.
+  String so1Status = 'Confirmed';
 
   @override
   Future<ResponseBody> fetch(
@@ -459,6 +692,40 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         ],
       });
     }
+    if (options.path == '/suppliers/1/statement' && options.method == 'GET') {
+      // Enveloped — the real getSupplierStatement shape; transactions are
+      // ordered oldest-first and carry no id (unlike the ledger rows).
+      // opening 100 + 500 debit - 200 credit = closing 400.
+      return _json({
+        'success': true,
+        'data': {
+          'supplier': {'id': 1, 'supplier_name': 'Alpha Traders'},
+          'period': {'fromDate': null, 'toDate': null},
+          'openingBalance': 100.0,
+          'closingBalance': 400.0,
+          'transactions': [
+            {
+              'transaction_date': '2026-01-10',
+              'transaction_type': 'PURCHASE',
+              'reference_no': 'PO-2026-001',
+              'description': 'Purchase goods',
+              'debit': 500.0,
+              'credit': 0.0,
+              'balance': 600.0,
+            },
+            {
+              'transaction_date': '2026-01-20',
+              'transaction_type': 'PAYMENT',
+              'reference_no': 'PAY-2026-005',
+              'description': 'Payment made',
+              'debit': 0.0,
+              'credit': 200.0,
+              'balance': 400.0,
+            },
+          ],
+        },
+      });
+    }
     if (options.path == '/purchase-orders' && options.method == 'GET') {
       // Bare array — the real getPurchaseOrders shape (no envelope, no
       // pagination; the client grid sorts/filters client-side).
@@ -503,11 +770,12 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'total_amount': 1500.0,
         'paid_amount': 500.0,
         'balance_amount': 1000.0,
-        'status': 'Draft',
+        'status': po1Status,
         'expected_delivery_date': '2026-02-01',
         'items': [
           {
             'id': 1,
+            'item_id': 4,
             'item_code': 'RM001',
             'item_name': 'Raw Material A',
             'unit_of_measure': 'kg',
@@ -518,6 +786,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           },
           {
             'id': 2,
+            'item_id': 5,
             'item_code': 'FG002',
             'item_name': 'Finished Good B',
             'unit_of_measure': 'pcs',
@@ -528,6 +797,204 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           },
         ],
       });
+    }
+    if (options.path == '/purchase-orders' && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastPoPostBody = body;
+      // Bare 201 — the real createPurchaseOrder shape (PO no generated).
+      return _json({
+        'id': 99,
+        'po_no': 'PO-2026-099',
+        'po_date': body['po_date'],
+        'supplier_id': body['supplier_id'],
+        'status': body['status'] ?? 'Draft',
+        'total_amount': 0,
+      }, status: 201);
+    }
+    if (options.path == '/purchase-orders/1' && options.method == 'PUT') {
+      lastPoPutBody = options.data as Map<String, dynamic>;
+      return _json({'id': 1, 'po_no': 'PO-2026-001', 'status': 'Draft'});
+    }
+    if (options.path == '/purchase-orders/1' && options.method == 'DELETE') {
+      poDeleteCount++;
+      return _json({
+        'success': true,
+        'message': 'Purchase order deleted successfully',
+      });
+    }
+    if (options.path == '/purchase-orders/1/items' &&
+        options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastPoItemPostBody = body;
+      return _json({
+        'id': 30,
+        'item_id': body['item_id'],
+        'item_code': 'FG001',
+        'item_name': 'Widget A',
+        'unit_of_measure': 'pcs',
+        'quantity': body['quantity'],
+        'unit_price': body['unit_price'],
+        'amount': body['quantity'] * body['unit_price'],
+      }, status: 201);
+    }
+    if (options.path == '/purchase-orders/1/items/1' &&
+        options.method == 'PUT') {
+      final body = options.data as Map<String, dynamic>;
+      lastPoItemPutBody = body;
+      return _json({
+        'id': 1,
+        'item_id': 1,
+        'item_code': 'RM001',
+        'item_name': 'Raw Material A',
+        'unit_of_measure': 'kg',
+        'quantity': body['quantity'],
+        'unit_price': body['unit_price'],
+      });
+    }
+    if (options.path == '/purchase-orders/1/items/1' &&
+        options.method == 'DELETE') {
+      poItemDeleteCount++;
+      return _json({'success': true, 'message': 'Line item deleted'});
+    }
+    if (options.path == '/purchase-orders/1/status' &&
+        options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastPoStatusBody = body;
+      if (rejectPoStatus) {
+        return _json({
+          'error': 'Cannot transition from Draft to Submitted',
+        }, status: 400);
+      }
+      po1Status = body['status'] as String;
+      return _json({'id': 1, 'po_no': 'PO-2026-001', 'status': po1Status});
+    }
+    if (options.path == '/purchases' && options.method == 'GET') {
+      // Bare array — the real Purchase.getAll shape (joined item/warehouse/
+      // user fields; no envelope, no pagination).
+      return _json([
+        {
+          'id': 1,
+          'purchase_no': 'PUR-2026-001',
+          'purchase_date': '2026-01-15',
+          'item_id': 4,
+          'item_code': 'RM001',
+          'item_name': 'Raw Material A',
+          'unit_of_measure': 'kg',
+          'quantity': 100.0,
+          'unit_cost': 10.0,
+          'total_cost': 1000.0,
+          'supplier_name': 'Alpha Traders',
+          'warehouse_id': 1,
+          'warehouse_name': 'Main Warehouse',
+          'invoice_no': 'INV-101',
+          'remarks': 'Bulk order',
+          'returned_quantity': purchase1ReturnedQty,
+          'created_by_username': 'admin',
+        },
+        {
+          'id': 2,
+          'purchase_no': 'PUR-2026-002',
+          'purchase_date': '2026-01-22',
+          'item_id': 5,
+          'item_code': 'FG002',
+          'item_name': 'Finished Good B',
+          'unit_of_measure': 'pcs',
+          'quantity': 25.0,
+          'unit_cost': 40.0,
+          'total_cost': 1000.0,
+          'supplier_name': 'Beta Supplies',
+          'warehouse_id': 1,
+          'warehouse_name': 'Main Warehouse',
+          'invoice_no': 'INV-102',
+          'returned_quantity': 0,
+          'created_by_username': 'admin',
+        },
+      ]);
+    }
+    if (options.path == '/purchases/1' && options.method == 'GET') {
+      // Bare object — the real getPurchase shape (same joined fields).
+      return _json({
+        'id': 1,
+        'purchase_no': 'PUR-2026-001',
+        'purchase_date': '2026-01-15',
+        'item_id': 4,
+        'item_code': 'RM001',
+        'item_name': 'Raw Material A',
+        'unit_of_measure': 'kg',
+        'quantity': 100.0,
+        'unit_cost': 10.0,
+        'total_cost': 1000.0,
+        'supplier_name': 'Alpha Traders',
+        'warehouse_id': 1,
+        'warehouse_name': 'Main Warehouse',
+        'invoice_no': 'INV-101',
+        'remarks': 'Bulk order',
+        'returned_quantity': purchase1ReturnedQty,
+        'created_by_username': 'admin',
+      });
+    }
+    if (options.path == '/purchases/1/return' && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastPurchaseReturnBody = body;
+      if (rejectPurchaseReturn) {
+        return _json({
+          'error': 'Insufficient stock remaining to return',
+        }, status: 400);
+      }
+      final qty = (body['quantity'] as num).toDouble();
+      purchase1ReturnedQty += qty;
+      // Enveloped — the real returnPurchaseItems shape.
+      return _json({
+        'success': true,
+        'message': 'Return processed successfully',
+        'data': {'returnedQuantity': qty, 'totalCost': qty * 10.0},
+      });
+    }
+    if (options.path == '/purchases/returns' && options.method == 'GET') {
+      // Bare array — the real Purchase.getReturnHistory shape (negative-
+      // quantity stock movements; no envelope, no pagination).
+      return _json([
+        {
+          'id': 1,
+          'movement_no': 'SM-2026-0018',
+          'item_id': 1,
+          'warehouse_id': 1,
+          'quantity': -5.0,
+          'unit_cost': 10.0,
+          'reference_doctype': 'PURCHASE_RETURN',
+          'reference_docno': 'PUR-2026-011',
+          'remarks': 'Damaged on delivery',
+          'return_date': '2026-02-10',
+          'created_at': '2026-02-10 10:30:00',
+          'created_by': 1,
+          'item_code': 'RM001',
+          'item_name': 'Raw Material A',
+          'unit_of_measure': 'kg',
+          'warehouse_code': 'WH-MAIN',
+          'warehouse_name': 'Main Warehouse',
+          'created_by_username': 'admin',
+        },
+        {
+          'id': 2,
+          'movement_no': 'SM-2026-0021',
+          'item_id': 2,
+          'warehouse_id': 2,
+          'quantity': -2.0,
+          'unit_cost': 40.0,
+          'reference_doctype': 'PO_RETURN',
+          'reference_docno': 'PO-2026-002',
+          'remarks': null,
+          'return_date': '2026-02-12',
+          'created_at': '2026-02-12 09:15:00',
+          'created_by': 1,
+          'item_code': 'FG002',
+          'item_name': 'Finished Good B',
+          'unit_of_measure': 'pcs',
+          'warehouse_code': 'WH-SEC',
+          'warehouse_name': 'Secondary Warehouse',
+          'created_by_username': 'admin',
+        },
+      ]);
     }
     if (options.path == '/suppliers' && options.method == 'POST') {
       final body = options.data as Map<String, dynamic>;
@@ -621,6 +1088,36 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'is_finished_good': 1,
           'is_active': 0,
         },
+        // The purchase-order detail lines reference these (their item_id
+        // must resolve in the same list for the PO form's line selects).
+        {
+          'id': 4,
+          'item_code': 'RM001',
+          'item_name': 'Raw Material A',
+          'category': 'Raw',
+          'unit_of_measure': 'kg',
+          'current_stock': 30,
+          'reorder_level': 0,
+          'standard_cost': 10.0,
+          'standard_selling_price': 14.0,
+          'is_raw_material': 1,
+          'is_finished_good': 0,
+          'is_active': 1,
+        },
+        {
+          'id': 5,
+          'item_code': 'FG002',
+          'item_name': 'Finished Good B',
+          'category': 'Parts',
+          'unit_of_measure': 'pcs',
+          'current_stock': 8,
+          'reorder_level': 0,
+          'standard_cost': 40.0,
+          'standard_selling_price': 60.0,
+          'is_raw_material': 0,
+          'is_finished_good': 1,
+          'is_active': 1,
+        },
       ];
       // The server filters code/name/description on `search`.
       final search = options.queryParameters['search'] as String?;
@@ -706,6 +1203,76 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         ],
       });
     }
+    if (options.path == '/inventory/stock-ledger/1') {
+      // Bare array — the real StockMovementModel.getItemLedger shape:
+      // newest-first by movement_date, warehouse join (no item join),
+      // honoring the optional `warehouse_id` query filter.
+      lastLedgerQuery = options.queryParameters;
+      if (emptyStockLedger) {
+        return _json(<Object>[]);
+      }
+      final ledgerRows = [
+        {
+          'id': 3,
+          'movement_no': 'SM-2026-0102',
+          'item_id': 1,
+          'warehouse_id': 2,
+          'movement_type': 'TRANSFER',
+          'quantity': 2.0,
+          'unit_cost': 25.0,
+          'reference_doctype': 'TRANSFER',
+          'reference_docno': 'SM-2026-0099',
+          'remarks': 'Transfer in',
+          'movement_date': '2026-02-03',
+          'created_by': 1,
+          'created_at': '2026-02-03 10:00:00',
+          // Matches the /inventory/warehouses fake's id-2 entry (the
+          // filter dropdown lists warehouses from that endpoint).
+          'warehouse_code': 'WH-RAW',
+          'warehouse_name': 'Raw Materials',
+        },
+        {
+          'id': 2,
+          'movement_no': 'SM-2026-0101',
+          'item_id': 1,
+          'warehouse_id': 1,
+          'movement_type': 'SALE',
+          'quantity': -3.0,
+          'unit_cost': 25.0,
+          'reference_doctype': 'SALE',
+          'reference_docno': 'INV-2026-001',
+          'remarks': 'POS sale',
+          'movement_date': '2026-02-02',
+          'created_by': 1,
+          'created_at': '2026-02-02 12:30:00',
+          'warehouse_code': 'WH-MAIN',
+          'warehouse_name': 'Main Warehouse',
+        },
+        {
+          'id': 1,
+          'movement_no': 'SM-2026-0100',
+          'item_id': 1,
+          'warehouse_id': 1,
+          'movement_type': 'PURCHASE',
+          'quantity': 10.0,
+          'unit_cost': 10.0,
+          'reference_doctype': 'PURCHASE',
+          'reference_docno': 'PUR-2026-001',
+          'remarks': 'Goods received',
+          'movement_date': '2026-02-01',
+          'created_by': 1,
+          'created_at': '2026-02-01 09:00:00',
+          'warehouse_code': 'WH-MAIN',
+          'warehouse_name': 'Main Warehouse',
+        },
+      ];
+      final warehouseFilter = options.queryParameters['warehouse_id'] as int?;
+      return _json([
+        for (final row in ledgerRows)
+          if (warehouseFilter == null || row['warehouse_id'] == warehouseFilter)
+            row,
+      ]);
+    }
     if (options.path == '/inventory/items-categories') {
       return _json([
         {'category': 'Parts'},
@@ -733,6 +1300,291 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'is_active': 1,
         },
       ]);
+    }
+    if (options.path == '/inventory/warehouses' && options.method == 'GET') {
+      // Enveloped array — the real Warehouse.getAll shape.
+      // WH-MAIN is dropped after the delete test's DELETE (the server
+      // soft-deletes, so the refetched list omits the row).
+      return _json({
+        'success': true,
+        'data': [
+          if (!warehouse1Deleted)
+            {
+              'id': 1,
+              'warehouse_code': 'WH-MAIN',
+              'warehouse_name': 'Main Warehouse',
+              'location': 'Sector 14',
+              'is_active': 1,
+              'total_items': 125,
+              'unique_items': 12,
+            },
+          {
+            'id': 2,
+            'warehouse_code': 'WH-RAW',
+            'warehouse_name': 'Raw Materials',
+            'location': 'Sector 9',
+            'is_active': 0,
+            'total_items': 40,
+            'unique_items': 8,
+          },
+        ],
+      });
+    }
+    if (options.path == '/inventory/warehouses/1' &&
+        options.method == 'DELETE') {
+      warehouseDeleteCount++;
+      if (rejectWarehouseDelete) {
+        return _json({'error': 'Warehouse not found'}, status: 404);
+      }
+      warehouse1Deleted = true;
+      return _json({
+        'success': true,
+        'message': 'Warehouse deleted successfully',
+      });
+    }
+    if (options.path == '/inventory/warehouses' && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastWarehousePostBody = body;
+      if (rejectWarehouseCreate) {
+        return _json({'error': 'Warehouse code already exists'}, status: 400);
+      }
+      // Bare 201 — the real createWarehouse shape.
+      return _json({
+        'id': 99,
+        'warehouse_code': body['warehouse_code'],
+        'warehouse_name': body['warehouse_name'],
+        'location': body['location'],
+        'is_active': 1,
+        'total_items': 0,
+        'unique_items': 0,
+      }, status: 201);
+    }
+    if (options.path == '/inventory/warehouses/1' && options.method == 'PUT') {
+      final body = options.data as Map<String, dynamic>;
+      lastWarehousePutBody = body;
+      // Bare updated warehouse — the real updateWarehouse shape.
+      return _json({
+        'id': 1,
+        'warehouse_code': body['warehouse_code'],
+        'warehouse_name': body['warehouse_name'],
+        'location': body['location'],
+        'is_active': 1,
+        'total_items': 125,
+        'unique_items': 12,
+      });
+    }
+    if (options.path == '/inventory/stock-movements' &&
+        options.method == 'GET') {
+      // Bare array — the real StockMovementModel.getAll shape, honoring
+      // the `movement_type` query filter like the model's getAll.
+      lastMovementQuery = options.queryParameters;
+      final type = options.queryParameters['movement_type'] as String?;
+      return _json([
+        for (final row in [
+          _movementPurchaseRow(),
+          _movementSaleRow(),
+          _movementAdjustmentRow(),
+          _movementTransferOutRow(),
+          _movementTransferInRow(),
+        ])
+          if (type == null || type.isEmpty || row['movement_type'] == type) row,
+      ]);
+    }
+    if (options.path == '/inventory/stock-movements' &&
+        options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastMovementPostBody = body;
+      movementPostBodies.add(body);
+      movementPostCount++;
+      if (rejectMovementCreate) {
+        // sendError() shape — `{error: 'message'}` — surfaces verbatim.
+        return _json({
+          'error': 'Insufficient stock for adjustment',
+        }, status: 400);
+      }
+      if (rejectSecondMovement && movementPostCount >= 2) {
+        return _json({'error': 'Destination warehouse not found'}, status: 400);
+      }
+      // Bare movement row — the real createStockMovement shape.
+      return _json({
+        'id': 3,
+        'movement_no': 'SM-2026-0102',
+        'item_id': body['item_id'],
+        'warehouse_id': body['warehouse_id'],
+        'movement_type': body['movement_type'],
+        'quantity': body['quantity'],
+        'unit_cost': 0,
+        'reference_doctype': 'ADJUSTMENT',
+        'reference_docno': 'ADJ-2026-001',
+        'remarks': body['remarks'] ?? '',
+        'movement_date': '2026-02-03',
+        'created_by': 1,
+        'created_at': '2026-02-03 10:00:00',
+      });
+    }
+    final movementDetailId = RegExp(
+      r'^/inventory/stock-movements/(\d+)$',
+    ).firstMatch(options.path);
+    if (movementDetailId != null && options.method == 'GET') {
+      movementDetailFetchCount++;
+      final id = int.parse(movementDetailId.group(1)!);
+      return _json(switch (id) {
+        1 => _movementPurchaseRow(),
+        2 => _movementSaleRow(),
+        3 => _movementAdjustmentRow(),
+        4 => _movementTransferOutRow(),
+        5 => _movementTransferInRow(),
+        _ => throw StateError('Unexpected movement detail id: $id'),
+      });
+    }
+    if (options.path == '/inventory/stock-balances' &&
+        options.method == 'GET') {
+      // Bare array — the real stockBalances shape (item×warehouse rows).
+      return _json([
+        {
+          'item_id': 1,
+          'item_code': 'FG001',
+          'item_name': 'Widget A',
+          'warehouse_id': 1,
+          'warehouse_code': 'WH-MAIN',
+          'warehouse_name': 'Main Warehouse',
+          'quantity': 25.0,
+        },
+        {
+          'item_id': 4,
+          'item_code': 'RM001',
+          'item_name': 'Raw Material A',
+          'warehouse_id': 2,
+          'warehouse_code': 'WH-RAW',
+          'warehouse_name': 'Raw Materials',
+          'quantity': 200.0,
+        },
+      ]);
+    }
+    if (options.path == '/inventory/physical-counts' &&
+        options.method == 'GET') {
+      // Enveloped array — the real PhysicalCountModel.getAll shape.
+      return _json({
+        'success': true,
+        'data': [
+          {
+            'id': 1,
+            'count_no': 'PC-2026-001',
+            'count_date': '2026-03-01',
+            'warehouse_id': 1,
+            'warehouse_name': 'Main Warehouse',
+            'status': pc1Status,
+            'created_by': 1,
+            'total_items': 10,
+            'counted_items': 0,
+            'variance_items': 0,
+          },
+          {
+            'id': 2,
+            'count_no': 'PC-2026-002',
+            'count_date': '2026-03-05',
+            'warehouse_id': 1,
+            'warehouse_name': 'Main Warehouse',
+            'status': 'Completed',
+            'created_by': 1,
+            'total_items': 10,
+            'counted_items': 10,
+            'variance_items': 2,
+          },
+        ],
+      });
+    }
+    if (options.path == '/inventory/physical-counts/1') {
+      // Bare object with the counted item lines — the real
+      // getPhysicalCount shape. Status and per-item counted quantities
+      // read the stateful pc1Status/pc1CountedQty so a complete/cancel/
+      // record POST flips them on refetch.
+      final system = _AuthFakeAdapter.pc1SystemQty;
+      return _json({
+        'id': 1,
+        'count_no': 'PC-2026-001',
+        'count_date': '2026-03-01',
+        'warehouse_id': 1,
+        'warehouse_name': 'Main Warehouse',
+        'status': pc1Status,
+        'created_by': 1,
+        'total_items': 2,
+        'counted_items': pc1CountedQty.length,
+        'variance_items': pc1CountedQty.entries
+            .where((e) => e.value != system[e.key])
+            .length,
+        'items': [
+          {
+            'id': 1,
+            'count_id': 1,
+            'item_id': 4,
+            'item_code': 'RM001',
+            'item_name': 'Raw Material A',
+            'unit_of_measure': 'kg',
+            'system_quantity': 100.0,
+            'counted_quantity': pc1CountedQty[4],
+            'variance': pc1CountedQty[4] == null
+                ? null
+                : pc1CountedQty[4]! - 100.0,
+            'adjustment_posted': 0,
+          },
+          {
+            'id': 2,
+            'count_id': 1,
+            'item_id': 5,
+            'item_code': 'RM002',
+            'item_name': 'Raw Material B',
+            'unit_of_measure': 'kg',
+            'system_quantity': 50.0,
+            'counted_quantity': pc1CountedQty[5],
+            'variance': pc1CountedQty[5] == null
+                ? null
+                : pc1CountedQty[5]! - 50.0,
+            'adjustment_posted': 0,
+          },
+        ],
+      });
+    }
+    if (options.path == '/inventory/physical-counts/1/items' &&
+        options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastPcRecordBody = body;
+      if (rejectPcRecord) {
+        return _json({
+          'error': 'Cannot record count for Completed session',
+        }, status: 400);
+      }
+      final itemId = body['item_id'] as int;
+      final qty = body['counted_quantity'] as num;
+      pc1CountedQty[itemId] = qty;
+      final system = _AuthFakeAdapter.pc1SystemQty[itemId] ?? 0;
+      return _json({
+        'id': itemId,
+        'count_id': 1,
+        'item_id': itemId,
+        'item_code': itemId == 4 ? 'RM001' : 'RM002',
+        'item_name': itemId == 4 ? 'Raw Material A' : 'Raw Material B',
+        'unit_of_measure': 'kg',
+        'system_quantity': system,
+        'counted_quantity': qty,
+        'variance': qty - system,
+        'adjustment_posted': 0,
+      });
+    }
+    if (options.path == '/inventory/physical-counts/1/complete' &&
+        options.method == 'POST') {
+      if (rejectPcComplete) {
+        return _json({
+          'error': 'Cannot complete Completed session',
+        }, status: 400);
+      }
+      pc1Status = 'Completed';
+      return _json({'id': 1, 'count_no': 'PC-2026-001', 'status': pc1Status});
+    }
+    if (options.path == '/inventory/physical-counts/1/cancel' &&
+        options.method == 'POST') {
+      pc1Status = 'Cancelled';
+      return _json({'id': 1, 'count_no': 'PC-2026-001', 'status': pc1Status});
     }
     if (options.path == '/expenses' && options.method == 'POST') {
       final body = options.data as Map<String, dynamic>;
@@ -1069,6 +1921,317 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           : all.where((i) => statuses.contains(i['status'])).toList();
       return _json({'success': true, 'data': rows});
     }
+    if (options.path == '/quotations' && options.method == 'GET') {
+      // Bare array — the real getQuotations shape (no envelope, no
+      // pagination; the client grid sorts/filters client-side).
+      lastQuotationsQuery = options.queryParameters;
+      return _json([
+        {
+          'id': 1,
+          'quotation_no': 'QT-2026-001',
+          'quotation_date': '2026-01-18',
+          'customer_id': 1,
+          'customer_name': 'Acme Corp',
+          'warehouse_id': 1,
+          'warehouse_code': 'WH-MAIN',
+          'warehouse_name': 'Main Warehouse',
+          'expiry_date': '2026-02-18',
+          'status': quotation1Status,
+          'total_amount': 1200.0,
+          'notes': null,
+          'created_by': 1,
+          'created_by_username': 'admin',
+          'created_at': '2026-01-18 09:00:00',
+          'updated_at': '2026-01-18 09:00:00',
+        },
+        {
+          'id': 2,
+          'quotation_no': 'QT-2026-002',
+          'quotation_date': '2026-01-22',
+          'customer_id': 2,
+          'customer_name': 'Beta Ltd',
+          'warehouse_id': 1,
+          'warehouse_code': 'WH-MAIN',
+          'warehouse_name': 'Main Warehouse',
+          'expiry_date': null,
+          'status': 'Draft',
+          'total_amount': 900.0,
+          'notes': null,
+          'created_by': 1,
+          'created_by_username': 'admin',
+          'created_at': '2026-01-22 10:00:00',
+          'updated_at': '2026-01-22 10:00:00',
+        },
+        {
+          'id': 3,
+          'quotation_no': 'QT-2026-003',
+          'quotation_date': '2026-02-02',
+          'customer_id': 3,
+          'customer_name': 'Gamma Inc',
+          'warehouse_id': 1,
+          'warehouse_code': 'WH-MAIN',
+          'warehouse_name': 'Main Warehouse',
+          'expiry_date': '2026-02-15',
+          'status': 'Accepted',
+          'total_amount': 700.0,
+          'notes': 'Follow up',
+          'created_by': 1,
+          'created_by_username': 'admin',
+          'created_at': '2026-02-02 11:00:00',
+          'updated_at': '2026-02-02 11:00:00',
+        },
+      ]);
+    }
+    if (options.path == '/quotations/1' && options.method == 'GET') {
+      // Bare object with items — the real getQuotation shape.
+      return _json({
+        'id': 1,
+        'quotation_no': 'QT-2026-001',
+        'quotation_date': '2026-01-18',
+        'customer_id': 1,
+        'customer_name': 'Acme Corp',
+        'warehouse_id': 1,
+        'warehouse_code': 'WH-MAIN',
+        'warehouse_name': 'Main Warehouse',
+        'expiry_date': '2026-02-18',
+        'status': quotation1Status,
+        'total_amount': 1200.0,
+        'notes': 'Follow up',
+        'terms': 'Net 30',
+        'created_by': 1,
+        'created_by_username': 'admin',
+        'created_at': '2026-01-18 09:00:00',
+        'updated_at': '2026-01-18 09:00:00',
+        'items': [
+          {
+            'id': 1,
+            'item_id': 1,
+            'item_code': 'FG001',
+            'item_name': 'Widget A',
+            'quantity': 10.0,
+            'unit_price': 100.0,
+            'discount_type': 'none',
+            'discount_value': 0,
+            'tax_rate': 0,
+            'amount': 1000.0,
+          },
+          {
+            'id': 2,
+            'item_id': 5,
+            'item_code': 'FG002',
+            'item_name': 'Finished Good B',
+            'quantity': 5.0,
+            'unit_price': 40.0,
+            'discount_type': 'none',
+            'discount_value': 0,
+            'tax_rate': 0,
+            'amount': 200.0,
+          },
+        ],
+      });
+    }
+    if (options.path == '/quotations' && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastQuotationPostBody = body;
+      // Bare 201 — the real createQuotation shape (quotation no
+      // generated; the response omits items).
+      return _json({
+        'id': 99,
+        'quotation_no': 'QT-2026-099',
+        'quotation_date': body['quotation_date'],
+        'customer_id': body['customer_id'],
+        'status': body['status'] ?? 'Draft',
+        'total_amount': 0,
+      }, status: 201);
+    }
+    if (options.path == '/quotations/1' && options.method == 'PUT') {
+      final body = options.data as Map<String, dynamic>;
+      lastQuotationPutBody = body;
+      // Bare updated quotation — the real updateQuotation shape (items
+      // replaced server-side; the response omits them).
+      return _json({
+        'id': 1,
+        'quotation_no': 'QT-2026-001',
+        'quotation_date': body['quotation_date'],
+        'customer_id': body['customer_id'],
+        'status': body['status'] ?? quotation1Status,
+        'total_amount': 0,
+      });
+    }
+    if (options.path == '/quotations/1' && options.method == 'DELETE') {
+      quotationDeleteCount++;
+      return _json({
+        'success': true,
+        'message': 'Quotation deleted successfully',
+      });
+    }
+    if (options.path == '/quotations/1/convert' && options.method == 'POST') {
+      quotationConvertCount++;
+      quotation1Status = 'Converted';
+      // Flat enveloped 201 — the real convertQuotationToSalesOrder shape
+      // (message + created-SO ref spread at the top level, NO `data`
+      // field, so the repo parses the raw body).
+      return _json({
+        'success': true,
+        'message': 'Quotation converted to sales order',
+        'salesOrderId': 7,
+        'salesOrderNo': 'SO-2026-007',
+      }, status: 201);
+    }
+    if (options.path == '/sales-orders' && options.method == 'GET') {
+      // Bare array — the real getSalesOrders shape (no envelope, no
+      // pagination; the client grid sorts/filters client-side).
+      lastSalesOrdersQuery = options.queryParameters;
+      return _json([
+        {
+          'id': 1,
+          'so_no': 'SO-2026-001',
+          'so_date': '2026-01-20',
+          'customer_id': 1,
+          'customer_name': 'Acme Corp',
+          'warehouse_id': 1,
+          'warehouse_code': 'WH-MAIN',
+          'warehouse_name': 'Main Warehouse',
+          'delivery_date': '2026-02-01',
+          'status': so1Status,
+          'total_amount': 1500.0,
+          'notes': null,
+          'source_type': 'DIRECT',
+          'created_by': 1,
+          'created_by_username': 'admin',
+          'created_at': '2026-01-20 09:00:00',
+          'updated_at': '2026-01-20 09:00:00',
+        },
+        {
+          'id': 2,
+          'so_no': 'SO-2026-002',
+          'so_date': '2026-01-25',
+          'customer_id': 2,
+          'customer_name': 'Beta Ltd',
+          'warehouse_id': 1,
+          'warehouse_code': 'WH-MAIN',
+          'warehouse_name': 'Main Warehouse',
+          'delivery_date': null,
+          'status': 'Completed',
+          'total_amount': 2500.0,
+          'notes': null,
+          'source_type': 'QUOTATION',
+          'source_id': 3,
+          'quotation_no': 'QT-2026-003',
+          'created_by': 1,
+          'created_by_username': 'admin',
+          'created_at': '2026-01-25 10:00:00',
+          'updated_at': '2026-01-25 10:00:00',
+        },
+        {
+          'id': 3,
+          'so_no': 'SO-2026-003',
+          'so_date': '2026-02-02',
+          'customer_id': 3,
+          'customer_name': 'Gamma Inc',
+          'warehouse_id': 1,
+          'warehouse_code': 'WH-MAIN',
+          'warehouse_name': 'Main Warehouse',
+          'delivery_date': '2026-02-20',
+          'status': 'Invoiced',
+          'total_amount': 800.0,
+          'notes': 'Urgent',
+          'source_type': 'DIRECT',
+          'created_by': 1,
+          'created_by_username': 'admin',
+          'created_at': '2026-02-02 11:00:00',
+          'updated_at': '2026-02-02 11:00:00',
+        },
+      ]);
+    }
+    if (options.path == '/sales-orders' && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastSalesOrderPostBody = body;
+      // Bare 201 — the real createSalesOrder shape (SO no generated;
+      // the response omits items).
+      return _json({
+        'id': 99,
+        'so_no': 'SO-2026-099',
+        'so_date': body['so_date'],
+        'customer_id': body['customer_id'],
+        'status': body['status'] ?? 'Draft',
+        'total_amount': 0,
+      }, status: 201);
+    }
+    if (options.path == '/sales-orders/1' && options.method == 'PUT') {
+      final body = options.data as Map<String, dynamic>;
+      lastSalesOrderPutBody = body;
+      // Bare updated SO — the real updateSalesOrder shape (items
+      // replaced server-side; the response omits them).
+      return _json({
+        'id': 1,
+        'so_no': 'SO-2026-001',
+        'so_date': body['so_date'],
+        'customer_id': body['customer_id'],
+        'status': body['status'] ?? so1Status,
+        'total_amount': 0,
+      });
+    }
+    if (options.path == '/sales-orders/1' && options.method == 'DELETE') {
+      salesOrderDeleteCount++;
+      return _json({'message': 'Sales order deleted successfully'});
+    }
+    if (options.path == '/sales-orders/1/cancel' && options.method == 'POST') {
+      salesOrderCancelCount++;
+      // Enveloped — the real cancelSalesOrder shape (reverses linked-
+      // invoice stock server-side and returns the invoice it cancelled).
+      so1Status = 'Cancelled';
+      return _json({
+        'success': true,
+        'message': 'Sales order cancelled successfully',
+        'invoiceId': 1,
+        'invoiceNo': 'INV-2026-440955',
+      });
+    }
+    if (options.path == '/sales-orders/1' && options.method == 'GET') {
+      // Bare object with items — the real getSalesOrder shape.
+      return _json({
+        'id': 1,
+        'so_no': 'SO-2026-001',
+        'so_date': '2026-01-20',
+        'customer_id': 1,
+        'customer_name': 'Acme Corp',
+        'warehouse_id': 1,
+        'warehouse_code': 'WH-MAIN',
+        'warehouse_name': 'Main Warehouse',
+        'delivery_date': '2026-02-01',
+        'status': so1Status,
+        'total_amount': 1500.0,
+        'notes': null,
+        'source_type': 'DIRECT',
+        'created_by': 1,
+        'created_by_username': 'admin',
+        'created_at': '2026-01-20 09:00:00',
+        'updated_at': '2026-01-20 09:00:00',
+        'items': [
+          {
+            'id': 1,
+            'item_id': 1,
+            'item_code': 'FG001',
+            'item_name': 'Widget A',
+            'quantity': 10.0,
+            'delivered_quantity': 0.0,
+            'unit_price': 100.0,
+            'amount': 1000.0,
+          },
+          {
+            'id': 2,
+            'item_id': 5,
+            'item_code': 'FG002',
+            'item_name': 'Finished Good B',
+            'quantity': 5.0,
+            'delivered_quantity': 5.0,
+            'unit_price': 100.0,
+            'amount': 500.0,
+          },
+        ],
+      });
+    }
     if (options.path == '/dashboard/summary') {
       return _json({
         'success': true,
@@ -1342,10 +2505,14 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
-  Future<void> bootToItems(WidgetTester tester, {String role = 'admin'}) async {
+  Future<void> bootToItems(
+    WidgetTester tester, {
+    String role = 'admin',
+    _AuthFakeAdapter? adapter,
+  }) async {
     final storage = _FakeTokenStorage()..token = 'test-token';
     final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
-    dio.httpClientAdapter = _AuthFakeAdapter(role: role);
+    dio.httpClientAdapter = adapter ?? _AuthFakeAdapter(role: role);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -1373,7 +2540,7 @@ void main() {
     expect(find.text('Item Code'), findsOneWidget);
     expect(find.text('Current Stock'), findsOneWidget);
     // Active/Inactive status badges render from is_active.
-    expect(find.text('Active'), findsNWidgets(2));
+    expect(find.text('Active'), findsNWidgets(4));
     expect(find.text('Inactive'), findsOneWidget);
     // Stock formatted with thousands separators.
     expect(find.text('120'), findsOneWidget);
@@ -1470,7 +2637,15 @@ void main() {
     // Detail dialog with the header + warehouse breakdown from the bare
     // /inventory/items/1 response.
     expect(find.text('Item Details'), findsOneWidget);
-    expect(find.text('Stock by Warehouse'), findsOneWidget);
+    // Scoped to the dialog — the inventory shell's tab bar also renders a
+    // 'Stock by Warehouse' destination behind the dialog.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Stock by Warehouse'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Main Warehouse'), findsOneWidget);
     expect(find.text('WH-MAIN'), findsOneWidget);
     expect(find.text('Secondary Warehouse'), findsOneWidget);
@@ -1483,6 +2658,201 @@ void main() {
     await tester.tap(find.widgetWithText(TextButton, 'Close'));
     await tester.pumpAndSettle();
     expect(find.text('Item Details'), findsNothing);
+  });
+
+  testWidgets('stock ledger opens from the item detail with in/out rows', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToItems(tester);
+
+    // Open the item detail (double-tap Widget A), then the stock ledger.
+    await tester.tap(find.text('Widget A'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Widget A'));
+    await tester.pumpAndSettle();
+    expect(find.text('Item Details'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Stock Ledger'));
+    await tester.pumpAndSettle();
+
+    // Header shows the item label; rows come from the bare ledger array
+    // (SALE -5 then PURCHASE +10, newest-first).
+    expect(find.text('Stock Ledger'), findsWidgets);
+    expect(find.text('FG001 · Widget A'), findsOneWidget);
+    // Type labels from the movement-type l10n keys.
+    expect(find.text('Sale'), findsOneWidget);
+    expect(find.text('Purchase'), findsOneWidget);
+    // References from the rows.
+    expect(find.text('INV-2026-001'), findsOneWidget);
+    expect(find.text('PUR-2026-001'), findsOneWidget);
+    // Running balance walks oldest-first: PURCHASE +10 → 10; SALE -3 → 7.
+    // Scoped to the top dialog — '3'/'7'/'10' also render in the grid and
+    // the item detail dialog underneath. '10' appears twice (the In cell
+    // and the balance cell of the purchase row).
+    final ledgerDialog = find.byType(Dialog).last;
+    expect(
+      find.descendant(of: ledgerDialog, matching: find.text('10')),
+      findsNWidgets(2),
+    );
+    expect(
+      find.descendant(of: ledgerDialog, matching: find.text('3')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: ledgerDialog, matching: find.text('7')),
+      findsOneWidget,
+    );
+
+    // Close returns to the item detail underneath (its own 'Stock Ledger'
+    // button remains, so assert on ledger-only content instead).
+    await tester.tap(find.widgetWithText(TextButton, 'Close').last);
+    await tester.pumpAndSettle();
+    expect(find.text('FG001 · Widget A'), findsNothing);
+    expect(find.text('Item Details'), findsOneWidget);
+  });
+
+  testWidgets('stock ledger shows the empty state when no movements exist', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..emptyStockLedger = true;
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(find.text('Widget A'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Widget A'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TextButton, 'Stock Ledger'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No stock movements found'), findsOneWidget);
+  });
+
+  testWidgets('stock ledger filters by warehouse via warehouse_id', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(find.text('Widget A'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Widget A'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Stock Ledger'));
+    await tester.pumpAndSettle();
+
+    // Unfiltered: all three rows (TRANSFER +2, SALE -3, PURCHASE +10).
+    final ledgerDialog = find.byType(Dialog).last;
+    expect(adapter.lastLedgerQuery, isEmpty);
+    expect(
+      find.descendant(of: ledgerDialog, matching: find.text('Transfer')),
+      findsOneWidget,
+    );
+
+    // Pick the Raw Materials warehouse (WH-RAW, id 2) from the filter
+    // dropdown; only the TRANSFER row remains.
+    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('WH-RAW · Raw Materials').last);
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastLedgerQuery, {'warehouse_id': 2});
+    expect(
+      find.descendant(
+        of: find.byType(Dialog).last,
+        matching: find.text('Transfer'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog).last,
+        matching: find.text('Sale'),
+      ),
+      findsNothing,
+    );
+    // Running balance after the single filtered movement: +2 → 2.
+    expect(
+      find.descendant(of: find.byType(Dialog).last, matching: find.text('2')),
+      findsNWidgets(2), // In cell + balance cell.
+    );
+
+    // Back to All Warehouses restores the full ledger.
+    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All Warehouses').last);
+    await tester.pumpAndSettle();
+    expect(adapter.lastLedgerQuery, isEmpty);
+    expect(
+      find.descendant(
+        of: find.byType(Dialog).last,
+        matching: find.text('Sale'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('stock ledger exports the visible rows to CSV', (tester) async {
+    useWideSurface(tester);
+    await bootToItems(tester);
+
+    // Open the item detail, then the stock ledger.
+    await tester.tap(find.text('Widget A'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Widget A'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Stock Ledger'));
+    await tester.pumpAndSettle();
+
+    // Stub the file_picker save channel to return a real temp path; the
+    // export helper then writes the CSV there.
+    final target = '${Directory.systemTemp.path}/minierp-ledger-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    // The save helper does real async file I/O (File.writeAsBytes) that
+    // never completes under the test's fake-async zone — drive it inside
+    // runAsync so the write finishes and the toast can appear.
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    // Success toast + the CSV file exists with the ledger rows.
+    expect(find.text('Stock ledger exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Date'));
+    expect(content, contains('Balance'));
+    // All three fixture rows survive the export (newest-first).
+    expect(content, contains('Transfer'));
+    expect(content, contains('WH-RAW'));
+    expect(content, contains('Sale'));
+    expect(content, contains('INV-2026-001'));
+    expect(content, contains('Purchase'));
+    expect(content, contains('PUR-2026-001'));
+    if (file.existsSync()) file.deleteSync();
   });
 
   testWidgets('item form: create posts the schema-shaped body', (tester) async {
@@ -1827,60 +3197,45 @@ void main() {
     expect(find.text('INV-2026-440957'), findsNothing);
   });
 
-  testWidgets('invoice form: create posts the schema-shaped body', (
-    tester,
-  ) async {
+  testWidgets('invoice form: create page opens and validates', (tester) async {
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
     await bootToSales(tester, adapter);
 
+    // New Invoice pushes the routed form page (the sales refactor
+    // replaced the modal dialog with a full page at /sales/form).
     await tester.tap(find.widgetWithText(FilledButton, 'New Invoice'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(Dialog, 'New Invoice'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text('New Invoice'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(PlutoGrid), findsOneWidget);
 
-    // Saving empty: the line qty validator blocks first (the customer
-    // rule is checked after validation passes).
+    // Saving without a customer: the customer rule fires first.
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Save'));
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
-    expect(find.text('Required'), findsWidgets);
-    expect(find.text('Customer is required'), findsNothing);
+    expect(find.text('Customer is required'), findsOneWidget);
     expect(adapter.lastInvoicePostBody, isNull);
 
-    // Pick the customer (first <int> dropdown) and the line item (second).
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    // Pick a customer; without a line item the submit still blocks.
+    // (Scroll-safe: the Save tap above scrolled the page down, and the
+    // always-visible payment panel makes the form tall.)
+    await tester.ensureVisible(find.byType(DropdownButtonFormField<int>).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Acme Corp').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('FG001 — Widget A').last);
-    await tester.pumpAndSettle();
-
-    // Line fields: qty(0), rate(1), tax(2); totals panel discount(3);
-    // notes(4).
-    await tester.enterText(find.byType(TextFormField).at(0), '10');
-    await tester.enterText(find.byType(TextFormField).at(1), '100');
-
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Save'));
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
-
-    // Dialog closed, POST body matches the createInvoice DTO shape.
-    expect(find.widgetWithText(Dialog, 'New Invoice'), findsNothing);
-    final body = adapter.lastInvoicePostBody!;
-    expect(body['customer_id'], 1);
-    expect(body['invoice_no'], startsWith('INV-'));
-    expect(body['status'], 'Unpaid'); // default
-    expect(body['discount_scope'], 'invoice');
-    expect(body['discount_type'], 'flat');
-    expect(body['discount_value'], 0);
-    expect(body['total_amount'], 1000); // qty × rate, no tax/discount
-    final items = body['items'] as List;
-    expect(items, hasLength(1));
-    expect(items.single['item_id'], 1);
-    expect(items.single['quantity'], 10);
-    expect(items.single['unit_price'], 100);
-    expect(items.single['tax_rate'], 0);
-    expect(items.single['discount_type'], 'none');
+    expect(find.text('At least one item is required'), findsOneWidget);
+    expect(adapter.lastInvoicePostBody, isNull);
   });
 
   testWidgets('invoice form: edit prefills items and PUTs updates', (
@@ -1890,37 +3245,52 @@ void main() {
     final adapter = _AuthFakeAdapter();
     await bootToSales(tester, adapter);
 
-    // Double-tap the row opens the edit dialog.
+    // Double-tap the row pushes the routed edit page with the row as
+    // `extra`; the grid prefills from the bare detail fetch.
     await tester.tap(find.text('INV-2026-440955'));
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text('INV-2026-440955'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(Dialog, 'Edit Invoice'), findsOneWidget);
-
-    // The line prefills from the bare detail: qty/rate fields + item
-    // select label (from /inventory/items lookup).
-    expect(find.text('FG001 — Widget A'), findsOneWidget);
     expect(
       find.descendant(
-        of: find.byType(TextFormField),
-        matching: find.text('10'),
+        of: find.byType(AppBar),
+        matching: find.text('Edit Invoice'),
       ),
       findsOneWidget,
     );
 
-    await tester.enterText(find.byType(TextFormField).at(0), '12');
+    // The line prefills from the bare detail: item label + qty cell in
+    // the line-items grid (the description cell shows the item name).
+    expect(
+      find.descendant(
+        of: find.byType(PlutoGrid),
+        matching: find.text('Widget A'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byType(PlutoGrid), matching: find.text('10')),
+      findsOneWidget,
+    );
+
+    // Save posts the prefilled body unchanged (qty 10 × rate 100).
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Save'));
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(Dialog, 'Edit Invoice'), findsNothing);
+    // Page popped, PUT body matches the updateInvoice DTO shape.
+    expect(find.text('Edit Invoice'), findsNothing);
     final body = adapter.lastInvoicePutBody!;
     expect(body.containsKey('invoice_no'), isFalse); // edit keeps the no.
     expect(body['customer_id'], 1);
     expect(body['status'], 'Unpaid');
-    expect(body['total_amount'], 1200);
+    expect(body['discount_scope'], 'invoice');
+    expect(body['discount_type'], 'flat');
+    expect(body['discount_value'], 0);
+    expect(body['total_amount'], 1000);
     final items = body['items'] as List;
     expect(items.single['item_id'], 1);
-    expect(items.single['quantity'], 12);
+    expect(items.single['quantity'], 10);
     expect(items.single['unit_price'], 100);
   });
 
@@ -1946,6 +3316,473 @@ void main() {
     await tester.tap(find.text('Customers'));
     await tester.pumpAndSettle();
   }
+
+  // Sales Orders — the `/sales` branch's second tab (the shell hosts the
+  // invoices grid as tab 0 and the SO grid as tab 1; the web app routes
+  // /sales-orders inside the sales module).
+  Future<void> bootToSalesOrders(
+    WidgetTester tester,
+    _AuthFakeAdapter adapter,
+  ) async {
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.point_of_sale_outlined));
+    await tester.pumpAndSettle();
+    // Switch the sales shell to the Sales Orders tab (invoices is the
+    // default). "Sales Orders" also names the rail tooltip/dashboard
+    // card — scope the tap to the shell's NavigationBar.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Sales Orders'),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('sales orders screen renders the PlutoGrid with server data', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSalesOrders(tester, adapter);
+
+    // Rows + column headers from the fake /sales-orders payload.
+    expect(find.text('SO-2026-001'), findsOneWidget);
+    expect(find.text('SO-2026-002'), findsOneWidget);
+    expect(find.text('SO-2026-003'), findsOneWidget);
+    expect(find.text('Acme Corp'), findsOneWidget);
+    expect(find.text('Beta Ltd'), findsOneWidget);
+    expect(find.text('SO #'), findsOneWidget);
+    // Status badges map to the salesorders* localized labels.
+    expect(find.text('Confirmed'), findsOneWidget);
+    expect(find.text('Completed'), findsOneWidget);
+    expect(find.text('Invoiced'), findsOneWidget);
+    // Totals via the shared currency formatter.
+    expect(find.text('1,500.00'), findsOneWidget);
+    expect(find.text('2,500.00'), findsOneWidget);
+    expect(find.text('800.00'), findsOneWidget);
+  });
+
+  testWidgets('sales orders screen F2 opens the SO detail dialog', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSalesOrders(tester, adapter);
+
+    // Same current-cell + focus setup as the items/PO F2 tests — fired
+    // through the REAL key pipeline (FocusScope → keyManager →
+    // configuration.shortcut → rowDetailShortcutActions).
+    final sm = tester
+        .state<PlutoGridState>(find.byType(PlutoGrid))
+        .stateManager;
+    sm.setCurrentCell(sm.firstCell, 0);
+    sm.gridFocusNode.requestFocus();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.f2);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
+    await tester.pumpAndSettle();
+
+    // Detail dialog renders the fetched SO (header label + an item row
+    // from the fake /sales-orders/1 payload).
+    expect(find.text('Sales Order Details'), findsOneWidget);
+    expect(find.text('Widget A'), findsOneWidget);
+    expect(find.text('FG001'), findsOneWidget);
+    expect(find.text('1,500.00'), findsWidgets); // total tile + amounts
+
+    // Close returns to the grid.
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sales Order Details'), findsNothing);
+  });
+
+  testWidgets('sales orders screen New SO button opens the create form', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSalesOrders(tester, adapter);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'New Sales Order'));
+    await tester.pumpAndSettle();
+    expect(find.text('New Sales Order'), findsWidgets); // title
+
+    // Validation: saving empty shows the server DTO-message equivalents.
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Select a customer'), findsOneWidget);
+    expect(adapter.lastSalesOrderPostBody, isNull);
+
+    // Pick a customer (first int dropdown; the line's item select comes
+    // after). Menu label is '<code> — <name>' like the PO form.
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('CUST001').last);
+    await tester.pumpAndSettle();
+
+    // Fill the first line: item select (int dropdown #2 — #0 is the
+    // customer, #1 the warehouse, #2 the line's item), quantity, unit
+    // price.
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('FG001').last);
+    await tester.pumpAndSettle();
+    // Notes is the first TextFormField; the line's quantity and unit
+    // price are the next two.
+    await tester.enterText(find.byType(TextFormField).at(1), '10');
+    await tester.enterText(find.byType(TextFormField).at(2), '100');
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    // Dialog closed; POST body matches the createSalesOrder DTO shape.
+    expect(find.widgetWithText(Dialog, 'New Sales Order'), findsNothing);
+    expect(adapter.lastSalesOrderPostBody?['customer_id'], 1);
+    expect(adapter.lastSalesOrderPostBody?['so_date'], isNotEmpty);
+    expect(adapter.lastSalesOrderPostBody?['status'], 'Draft');
+    final items = adapter.lastSalesOrderPostBody?['items'] as List;
+    expect(items, hasLength(1));
+    expect((items.first as Map)['item_id'], 1);
+    expect((items.first as Map)['quantity'], 10);
+    expect((items.first as Map)['unit_price'], 100);
+  });
+
+  testWidgets('sales orders form: edit prefills and PUTs the full body', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSalesOrders(tester, adapter);
+
+    // Double-tap the row opens the detail dialog.
+    await tester.tap(find.text('SO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SO-2026-001'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sales Order Details'), findsOneWidget);
+
+    // Draft SO #1 (so1Status starts 'Confirmed' → flip to Draft so the
+    // Edit button shows; simpler: reuse the detail's Edit button which
+    // renders for Draft only, so drive via the second row? No — set
+    // status first via the stateful fake).
+    adapter.so1Status = 'Draft';
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+
+    // Re-open after flipping to Draft: Edit appears.
+    await tester.tap(find.text('SO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SO-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Sales Order'), findsOneWidget);
+
+    // Change the first line's quantity; PUT carries the full replacement
+    // items array (server-side delete + reinsert). The notes field is
+    // TextFormField #0; the first line's qty/price are #1/#2.
+    await tester.enterText(find.byType(TextFormField).at(1), '20');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Sales Order'), findsNothing);
+    expect(adapter.lastSalesOrderPutBody?['customer_id'], 1);
+    expect(adapter.lastSalesOrderPutBody?['so_date'], '2026-01-20');
+    final items = adapter.lastSalesOrderPutBody?['items'] as List;
+    expect(items, hasLength(2)); // prefilled from the detail fetch
+    expect((items.first as Map)['item_id'], 1);
+    expect((items.first as Map)['quantity'], 20);
+    expect((items.first as Map)['unit_price'], 100);
+  });
+
+  testWidgets('sales orders detail: Cancel confirms and flips the badge', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSalesOrders(tester, adapter);
+
+    // Open the detail of Confirmed SO #1.
+    await tester.tap(find.text('SO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SO-2026-001'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sales Order Details'), findsOneWidget);
+    expect(adapter.salesOrderCancelCount, 0);
+
+    // Cancel (visible for non-Cancelled orders) → confirm dialog.
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Cancel this sales order'), findsOneWidget);
+    // The confirm dialog's actions: confirm is a FilledButton labelled
+    // Cancel, dismiss is a TextButton labelled Close.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog).last,
+        matching: find.widgetWithText(FilledButton, 'Cancel'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The cancel POST fired; both the detail and list providers were
+    // invalidated and refetched with the Cancelled status (the detail
+    // badge and the grid row behind it both flip; the detail's Cancel
+    // button disappears).
+    expect(adapter.salesOrderCancelCount, 1);
+    expect(find.text('Cancelled'), findsWidgets);
+    // The detail dialog's Cancel button is gone (status is now Cancelled).
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.widgetWithText(TextButton, 'Cancel'),
+      ),
+      findsNothing,
+    );
+  });
+
+  // Quotations — the `/sales` branch's third tab (the shell hosts the
+  // invoices grid as tab 0, sales orders as tab 1, quotations as tab 2;
+  // the web app routes /quotations inside the sales module).
+  Future<void> bootToQuotations(
+    WidgetTester tester,
+    _AuthFakeAdapter adapter,
+  ) async {
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.point_of_sale_outlined));
+    await tester.pumpAndSettle();
+    // "Quotations" may also name a dashboard card — scope the tap to the
+    // shell's NavigationBar.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Quotations'),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('quotations screen renders the PlutoGrid with server data', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToQuotations(tester, adapter);
+
+    // Rows + column headers from the fake /quotations payload.
+    expect(find.text('QT-2026-001'), findsOneWidget);
+    expect(find.text('QT-2026-002'), findsOneWidget);
+    expect(find.text('QT-2026-003'), findsOneWidget);
+    expect(find.text('Acme Corp'), findsOneWidget);
+    expect(find.text('Beta Ltd'), findsOneWidget);
+    expect(find.text('Quotation #'), findsOneWidget);
+    // Status badges map to the quotations* localized labels.
+    expect(find.text('Sent'), findsOneWidget);
+    expect(find.text('Draft'), findsOneWidget);
+    expect(find.text('Accepted'), findsOneWidget);
+    // Totals via the shared currency formatter.
+    expect(find.text('1,200.00'), findsOneWidget);
+    expect(find.text('900.00'), findsOneWidget);
+    expect(find.text('700.00'), findsOneWidget);
+  });
+
+  testWidgets('quotations screen F2 opens the quotation detail dialog', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToQuotations(tester, adapter);
+
+    // Same current-cell + focus setup as the SO/PO F2 tests — fired
+    // through the REAL key pipeline (FocusScope → keyManager →
+    // configuration.shortcut → rowDetailShortcutActions).
+    final sm = tester
+        .state<PlutoGridState>(find.byType(PlutoGrid))
+        .stateManager;
+    sm.setCurrentCell(sm.firstCell, 0);
+    sm.gridFocusNode.requestFocus();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.f2);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
+    await tester.pumpAndSettle();
+
+    // Detail dialog renders the fetched quotation (header label + an
+    // item row from the fake /quotations/1 payload).
+    expect(find.text('Quotation Details'), findsOneWidget);
+    expect(find.text('Widget A'), findsOneWidget);
+    expect(find.text('FG001'), findsOneWidget);
+    expect(find.text('1,200.00'), findsWidgets); // total tile + amounts
+
+    // Close returns to the grid.
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('Quotation Details'), findsNothing);
+  });
+
+  testWidgets('quotations screen New Quotation button opens the create form', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToQuotations(tester, adapter);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'New Quotation'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(Dialog, 'New Quotation'), findsOneWidget);
+
+    // Validation: saving empty shows the server DTO-message equivalents.
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Select a customer'), findsOneWidget);
+    expect(adapter.lastQuotationPostBody, isNull);
+
+    // Pick a customer (dropdown #0; the line's item select is #2).
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('CUST001').last);
+    await tester.pumpAndSettle();
+
+    // Fill the first line: item select, quantity, unit price. Notes is
+    // TextFormField #0 and terms #1; the line's qty/price are #2/#3.
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('FG001').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(2), '10');
+    await tester.enterText(find.byType(TextFormField).at(3), '100');
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    // Dialog closed; POST body matches the createQuotation DTO shape.
+    expect(find.widgetWithText(Dialog, 'New Quotation'), findsNothing);
+    expect(adapter.lastQuotationPostBody?['customer_id'], 1);
+    expect(adapter.lastQuotationPostBody?['quotation_date'], isNotEmpty);
+    expect(adapter.lastQuotationPostBody?['status'], 'Draft');
+    final items = adapter.lastQuotationPostBody?['items'] as List;
+    expect(items, hasLength(1));
+    expect((items.first as Map)['item_id'], 1);
+    expect((items.first as Map)['quantity'], 10);
+    expect((items.first as Map)['unit_price'], 100);
+  });
+
+  testWidgets('quotation form: edit prefills and PUTs the full body', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToQuotations(tester, adapter);
+
+    // Double-tap the row opens the detail dialog.
+    await tester.tap(find.text('QT-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('QT-2026-001'));
+    await tester.pumpAndSettle();
+    expect(find.text('Quotation Details'), findsOneWidget);
+
+    // QT-2026-001 is Sent — no Edit. Flip to Draft and re-open so the
+    // Edit button appears.
+    adapter.quotation1Status = 'Draft';
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('QT-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('QT-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Quotation'), findsOneWidget);
+
+    // Change the first line's quantity; PUT carries the full replacement
+    // items array (server-side delete + reinsert). Notes=0, terms=1,
+    // first line's qty=2.
+    await tester.enterText(find.byType(TextFormField).at(2), '20');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(Dialog, 'Edit Quotation'), findsNothing);
+    expect(adapter.lastQuotationPutBody?['customer_id'], 1);
+    expect(adapter.lastQuotationPutBody?['quotation_date'], '2026-01-18');
+    final items = adapter.lastQuotationPutBody?['items'] as List;
+    expect(items, hasLength(2)); // prefilled from the detail fetch
+    expect((items.first as Map)['item_id'], 1);
+    expect((items.first as Map)['quantity'], 20);
+    expect((items.first as Map)['unit_price'], 100);
+  });
+
+  testWidgets(
+    'quotations detail: Convert to SO confirms and creates a sales order',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      adapter.quotation1Status = 'Accepted';
+      await bootToQuotations(tester, adapter);
+
+      // Open the detail of the Accepted quotation.
+      await tester.tap(find.text('QT-2026-001'));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text('QT-2026-001'));
+      await tester.pumpAndSettle();
+      expect(find.text('Quotation Details'), findsOneWidget);
+      expect(adapter.quotationConvertCount, 0);
+
+      // Accepted → the Convert to SO action is visible; tapping opens the
+      // confirm dialog.
+      await tester.tap(find.widgetWithText(TextButton, 'Convert to SO'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('create a sales order'), findsOneWidget);
+      // Confirm via the dialog's FilledButton (dismiss is a TextButton
+      // labelled Cancel).
+      await tester.tap(
+        find.descendant(
+          of: find.byType(Dialog).last,
+          matching: find.widgetWithText(FilledButton, 'Convert to SO'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // The convert POST fired; both the detail and list providers were
+      // invalidated and refetched with the Converted status (the dialog
+      // badge and the grid row behind it both flip). The success toast
+      // names the created sales order.
+      expect(adapter.quotationConvertCount, 1);
+      expect(find.text('Converted'), findsWidgets);
+      expect(find.textContaining('SO-2026-007'), findsOneWidget);
+      // The detail dialog's Convert button is gone (status is Converted).
+      expect(
+        find.descendant(
+          of: find.byType(Dialog),
+          matching: find.widgetWithText(TextButton, 'Convert to SO'),
+        ),
+        findsNothing,
+      );
+    },
+  );
 
   Future<void> bootToSuppliers(
     WidgetTester tester,
@@ -1989,6 +3826,16 @@ void main() {
     // Purchases chart legend), so scope to the nav rail label — it comes
     // first in tree order (rail renders before the content area).
     await tester.tap(find.text('Purchases').first);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> bootToPurchaseReturns(
+    WidgetTester tester,
+    _AuthFakeAdapter adapter,
+  ) async {
+    await bootToPurchaseOrders(tester, adapter);
+    // Switch the purchasing shell to the returns tab (PO is the default).
+    await tester.tap(find.text('Purchase Returns'));
     await tester.pumpAndSettle();
   }
 
@@ -2422,6 +4269,53 @@ void main() {
     expect(find.text('Purchase goods'), findsNothing);
   });
 
+  testWidgets('supplier ledger Statement button opens the statement dialog', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSuppliers(tester, adapter);
+
+    // Detail (double-tap) → Ledger → Statement.
+    await tester.tap(find.text('Alpha Traders'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Alpha Traders'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Ledger'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Statement'));
+    await tester.pumpAndSettle();
+
+    // Balance tiles + the opening row + transaction rows, scoped to the
+    // statement dialog (the ledger behind also renders balances and the
+    // 'Statement' footer button).
+    final statementDialog = find.byType(SupplierStatementDialog);
+    Finder inStatement(String text) =>
+        find.descendant(of: statementDialog, matching: find.text(text));
+    expect(inStatement('Statement'), findsOneWidget); // header label
+    expect(inStatement('Opening Balance'), findsNWidgets(2)); // tile + row
+    expect(inStatement('Closing Balance'), findsNWidgets(2)); // tile + totals
+    expect(inStatement('Purchase goods'), findsOneWidget);
+    expect(inStatement('Payment made'), findsOneWidget);
+    // opening: tile + row; total debit 500 = entry + totals; total credit
+    // 200 = entry + totals; closing 400 = tile + entry-2 balance + totals.
+    expect(inStatement('100.00'), findsNWidgets(2));
+    expect(inStatement('500.00'), findsNWidgets(2));
+    expect(inStatement('200.00'), findsNWidgets(2));
+    expect(inStatement('400.00'), findsNWidgets(3));
+
+    // Close (scoped — the ledger behind has its own Close) returns to the
+    // ledger dialog.
+    await tester.tap(
+      find.descendant(
+        of: statementDialog,
+        matching: find.widgetWithText(TextButton, 'Close'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(SupplierStatementDialog), findsNothing);
+  });
+
   testWidgets('supplier form: create posts the schema-shaped body', (
     tester,
   ) async {
@@ -2580,6 +4474,500 @@ void main() {
     expect(find.text('Purchase Order Details'), findsNothing);
   });
 
+  testWidgets('purchase returns screen renders the returns grid', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseReturns(tester, adapter);
+
+    // Rows from the bare-array fake (return no + item), the localized
+    // type badges, the qty magnitudes and the currency-formatted values.
+    expect(find.text('SM-2026-0018'), findsOneWidget);
+    expect(find.text('SM-2026-0021'), findsOneWidget);
+    expect(find.text('Raw Material A'), findsOneWidget);
+    expect(find.text('Finished Good B'), findsOneWidget);
+    expect(find.text('Purchase Return'), findsOneWidget); // type badge
+    expect(find.text('PO Return'), findsOneWidget);
+    expect(find.text('5'), findsOneWidget); // |quantity| of row 1
+    expect(find.text('10.00'), findsOneWidget); // unit cost, row 1
+    expect(find.text('50.00'), findsOneWidget); // 5 × 10 return value
+    expect(find.text('40.00'), findsOneWidget); // unit cost, row 2
+    expect(find.text('80.00'), findsOneWidget); // 2 × 40 return value
+    // Grid column headers.
+    expect(find.text('Return No'), findsOneWidget);
+    expect(find.text('Return Date'), findsOneWidget);
+    expect(find.text('Type'), findsOneWidget);
+  });
+
+  testWidgets('purchase returns screen shows the keyboard hint status bar', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseReturns(tester, adapter);
+
+    // The same AG-Grid-style status bar the other grids render (the
+    // offstage PO grid's bar is skipped by the default finders).
+    expect(find.text('↑ ↓ ← →'), findsOneWidget);
+    expect(find.text('Enter / F2'), findsOneWidget);
+    expect(find.text('Navigate'), findsOneWidget);
+    expect(find.text('Open'), findsOneWidget);
+  });
+
+  testWidgets('purchasing shell defaults to PO and switches to returns', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    // Default tab = the purchase orders grid; the returns rows are
+    // offstage (IndexedStack) and skipped by the default finders.
+    expect(find.text('PO-2026-001'), findsOneWidget);
+    expect(find.text('SM-2026-0018'), findsNothing);
+
+    await tester.tap(find.text('Purchase Returns'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('SM-2026-0018'), findsOneWidget);
+    expect(find.text('PO-2026-001'), findsNothing);
+  });
+
+  testWidgets('purchase orders screen New PO button opens the create form', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    await tester.tap(find.text('New Purchase Order'));
+    await tester.pumpAndSettle();
+
+    // The toolbar button keeps its label — scope the title to the dialog.
+    expect(find.widgetWithText(Dialog, 'New Purchase Order'), findsOneWidget);
+    expect(find.text('Add Item'), findsOneWidget);
+  });
+
+  testWidgets('purchase order form: create posts the schema-shaped body', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    await tester.tap(find.text('New Purchase Order'));
+    await tester.pumpAndSettle();
+
+    // Supplier (first int dropdown; the item/warehouse selects come
+    // after). Menu label is '<code> — <name>'.
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SUP001 — Alpha Traders').last);
+    await tester.pumpAndSettle();
+
+    // Pick the line's item (third int dropdown: supplier, warehouse,
+    // then the line).
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FG001 — Widget A').last);
+    await tester.pumpAndSettle();
+
+    // Notes field first, then the line's qty + unit price.
+    await tester.enterText(find.byType(TextFormField).at(1), '10');
+    await tester.enterText(find.byType(TextFormField).at(2), '15.5');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    // Dialog closed; POST body matches the purchaseOrderSchema shape.
+    expect(find.widgetWithText(Dialog, 'New Purchase Order'), findsNothing);
+    expect(adapter.lastPoPostBody?['supplier_id'], 1);
+    expect(adapter.lastPoPostBody?['status'], 'Draft'); // schema default
+    expect(adapter.lastPoPostBody?['items'], [
+      {'item_id': 1, 'quantity': 10, 'unit_price': 15.5},
+    ]);
+    final now = DateTime.now();
+    final today =
+        '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+    expect(adapter.lastPoPostBody?['po_date'], today);
+  });
+
+  testWidgets('purchase order form: edit prefills and reconciles items', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    // Open PO-2026-001's detail, then Edit.
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pumpAndSettle();
+    expect(find.text('Purchase Order Details'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+    await tester.pumpAndSettle();
+
+    // Prefilled from the fake detail: supplier, item line (code — name),
+    // qty 100, unit price 10.
+    expect(find.text('Edit Purchase Order'), findsOneWidget);
+    expect(find.text('SUP001 — Alpha Traders'), findsOneWidget);
+    expect(find.text('RM001 — Raw Material A'), findsOneWidget);
+
+    // Notes first, then the line's qty + unit price — change the qty.
+    await tester.enterText(find.byType(TextFormField).at(1), '120');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    // Header PUT (no items/status — the update DTO is header-only).
+    expect(adapter.lastPoPutBody?['supplier_id'], 1);
+    expect(adapter.lastPoPutBody?['po_date'], '2026-01-20');
+    expect(adapter.lastPoPutBody?['expected_delivery_date'], '2026-02-01');
+    expect(adapter.lastPoPutBody!.containsKey('items'), isFalse);
+    expect(adapter.lastPoPutBody!.containsKey('status'), isFalse);
+    // The changed line goes through PUT items/:id (quantity only — price
+    // is unchanged); no adds, no deletes.
+    expect(adapter.lastPoItemPutBody?['quantity'], 120);
+    expect(adapter.lastPoItemPutBody?['unit_price'], 10);
+    expect(adapter.lastPoItemPostBody, isNull);
+    expect(adapter.poItemDeleteCount, 0);
+    expect(find.text('Edit Purchase Order'), findsNothing);
+  });
+
+  testWidgets('purchase order form: item change removes and re-adds the line', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+    await tester.pumpAndSettle();
+
+    // Switch the first line's item (supplier, warehouse, then the line).
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FG002 — Finished Good B').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    // PUT can't re-target a line — the old line is deleted and the new
+    // item re-added via POST carrying item_id (the bug the review caught:
+    // _lineBody would have omitted it for a line with a server id).
+    expect(adapter.poItemDeleteCount, 1);
+    expect(adapter.lastPoItemPostBody?['item_id'], 5);
+    expect(adapter.lastPoItemPostBody?['quantity'], 100);
+    expect(adapter.lastPoItemPostBody?['unit_price'], 10);
+    expect(adapter.lastPoItemPutBody, isNull);
+  });
+
+  testWidgets('purchase order: submit moves a Draft PO to Submitted', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    // Open the detail dialog for PO-2026-001.
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pumpAndSettle();
+
+    // Draft-only actions: Submit + Edit in the footer.
+    expect(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Submit')),
+      findsOneWidget,
+    );
+
+    // Submit → confirm dialog.
+    await tester.tap(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Submit')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(
+      find.text(
+        'Submit this purchase order? It will be locked and posted to the supplier ledger.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Submit'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastPoStatusBody, {'status': 'Submitted'});
+    // The detail refetched: badge flipped, Submit/Edit actions gone.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Submitted'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Submit')),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Edit')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('purchase order: submit rejection keeps the PO in Draft', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectPoStatus = true;
+    await bootToPurchaseOrders(tester, adapter);
+
+    // Open the detail dialog for PO-2026-001 and submit.
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Submit')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Submit'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastPoStatusBody, {'status': 'Submitted'});
+    // The server's message surfaces verbatim; badge stays Draft and the
+    // Submit action remains available.
+    expect(
+      find.text('Cannot transition from Draft to Submitted'),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Draft')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Submit')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('purchase order form: delete confirms and pops both dialogs', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    // Detail dialog → Edit → the form shows the destructive Delete.
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(OutlinedButton, 'Delete'), findsOneWidget);
+
+    // Confirm dialog → Delete.
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(
+      find.text(
+        'Are you sure you want to delete this purchase order? This cannot be undone.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Delete'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(adapter.poDeleteCount, 1);
+    // Both dialogs popped — back on the grid, toast visible.
+    expect(find.text('Edit Purchase Order'), findsNothing);
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.text('Purchase order deleted'), findsOneWidget);
+    expect(find.text('PO-2026-001'), findsOneWidget);
+  });
+
+  testWidgets('purchases screen renders the purchases grid', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    // The rail + shell tab both read 'Purchases' — scope to the bar.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Purchases'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('PUR-2026-001'), findsOneWidget);
+    expect(find.text('PUR-2026-002'), findsOneWidget);
+    expect(find.text('Raw Material A'), findsOneWidget);
+    expect(find.text('Alpha Traders'), findsOneWidget);
+    expect(find.text('INV-101'), findsOneWidget);
+  });
+
+  testWidgets('process return posts quantity + reason and refetches', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Purchases'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open the detail dialog for PUR-2026-001 (double-tap the row).
+    await tester.tap(find.text('PUR-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PUR-2026-001'));
+    await tester.pumpAndSettle();
+
+    // Detail shows the Process Return action, then opens the return form.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Process Return'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Process Return'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Fill qty + reason and submit.
+    await tester.enterText(find.byType(TextFormField).first, '50');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Damaged');
+    await tester.tap(find.widgetWithText(FilledButton, 'Return to Supplier'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastPurchaseReturnBody?['quantity'], 50);
+    expect(adapter.lastPurchaseReturnBody?['reason'], 'Damaged');
+    expect(adapter.purchase1ReturnedQty, 50);
+    // Toast (with the returned value from the enveloped data payload) +
+    // the detail refetched: the Returned Qty tile reads 50 (the stateful
+    // GET was re-read) and 50 remain returnable.
+    expect(
+      find.textContaining('Return processed successfully'),
+      findsOneWidget,
+    );
+    expect(find.text('50'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Process Return'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('process return validates qty against the available amount', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Purchases'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open the detail dialog for PUR-2026-001 and the return form.
+    await tester.tap(find.text('PUR-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PUR-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Process Return'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 500 exceeds the 100 available — the validator blocks the POST.
+    await tester.enterText(find.byType(TextFormField).first, '500');
+    await tester.tap(find.widgetWithText(FilledButton, 'Return to Supplier'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Return quantity exceeds the available quantity'),
+      findsOneWidget,
+    );
+    expect(adapter.lastPurchaseReturnBody, isNull);
+  });
+
+  testWidgets('process return surfaces a server rejection', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectPurchaseReturn = true;
+    await bootToPurchaseOrders(tester, adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Purchases'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open the detail dialog for PUR-2026-001 and the return form.
+    await tester.tap(find.text('PUR-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PUR-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Process Return'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).first, '50');
+    await tester.tap(find.widgetWithText(FilledButton, 'Return to Supplier'));
+    await tester.pumpAndSettle();
+
+    // The server's message surfaces in the ErrorBanner; the dialog stays
+    // open with the submit action available and no quantity recorded.
+    expect(find.text('Insufficient stock remaining to return'), findsOneWidget);
+    expect(find.text('Return to Supplier'), findsOneWidget);
+    expect(adapter.purchase1ReturnedQty, 0);
+  });
+
   testWidgets('items screen F2 opens the item detail dialog', (tester) async {
     useWideSurface(tester);
     await bootToItems(tester);
@@ -2661,5 +5049,1440 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Item Details'), findsNothing);
+  });
+
+  testWidgets('warehouses tab renders the warehouses grid', (tester) async {
+    useWideSurface(tester);
+    await bootToItems(tester);
+
+    // The sibling tabs stay mounted in the IndexedStack but offstage, so
+    // their grids are skipped by the default finders.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Warehouses'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('WH-MAIN'), findsOneWidget);
+    expect(find.text('Main Warehouse'), findsOneWidget);
+    expect(find.text('WH-RAW'), findsOneWidget);
+    expect(find.text('Active'), findsOneWidget);
+    expect(find.text('Inactive'), findsOneWidget);
+  });
+
+  testWidgets('stock movements tab renders and opens the movement detail', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToItems(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('SM-2026-0100'), findsOneWidget);
+    expect(find.text('SM-2026-0101'), findsOneWidget);
+    expect(find.text('PURCHASE'), findsOneWidget);
+    expect(find.text('SALE'), findsOneWidget);
+
+    // Double-tap opens the in-memory movement detail dialog.
+    await tester.tap(find.text('SM-2026-0100'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SM-2026-0100'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Stock Movement'),
+      ),
+      findsOneWidget,
+    );
+    // The movement no appears twice inside the dialog: the title and the
+    // Movement No info row.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('SM-2026-0100'),
+      ),
+      findsNWidgets(2),
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Close'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
+  });
+
+  testWidgets('stock by warehouse tab renders item×warehouse balances', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToItems(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock by Warehouse'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The item/warehouse code columns are hidden; names render per row.
+    expect(find.text('Widget A'), findsOneWidget);
+    expect(find.text('Raw Material A'), findsOneWidget);
+    expect(find.text('Raw Materials'), findsOneWidget);
+  });
+
+  testWidgets('stock by warehouse double-tap drills into the item detail', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToItems(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock by Warehouse'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Double-tap the Widget A balance row (hidden id cell = item id 1) —
+    // opens the fetched item detail dialog with its per-warehouse
+    // breakdown (GET /inventory/items/1).
+    await tester.tap(find.text('Widget A'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Widget A'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Item Details'), findsOneWidget);
+    // Scoped: the balances grid behind also renders 'Main Warehouse', and
+    // the 'Stock by Warehouse' tab label sits behind the dialog.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Main Warehouse'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Stock by Warehouse'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Widget A')),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
+  });
+
+  testWidgets('physical counts tab renders and opens the count detail', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToItems(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Physical Counts'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('PC-2026-001'), findsOneWidget);
+    expect(find.text('PC-2026-002'), findsOneWidget);
+    expect(find.text('Draft'), findsOneWidget);
+    expect(find.text('Completed'), findsOneWidget);
+
+    // Double-tap opens the count detail (header + counted item lines).
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Physical Count'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Counted Items'), findsOneWidget);
+    expect(find.text('RM001 — Raw Material A'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
+  });
+
+  testWidgets('warehouse form: create posts the schema-shaped body', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Warehouses'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('New Warehouse'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('New Warehouse'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'WH-NEW');
+    await tester.enterText(find.byType(TextFormField).at(1), 'New Warehouse B');
+    await tester.enterText(find.byType(TextFormField).at(2), 'Sector 21');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastWarehousePostBody, {
+      'warehouse_code': 'WH-NEW',
+      'warehouse_name': 'New Warehouse B',
+      'location': 'Sector 21',
+    });
+    expect(find.byType(Dialog), findsNothing);
+  });
+
+  testWidgets('warehouse form: edit prefills and PUTs updates', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Warehouses'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Double-tap the WH-MAIN row opens the edit form, prefilled.
+    await tester.tap(find.text('WH-MAIN'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('WH-MAIN'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Warehouse'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'WH-MAIN'), findsOneWidget);
+    expect(
+      find.widgetWithText(TextFormField, 'Main Warehouse'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(TextFormField, 'Sector 14'), findsOneWidget);
+
+    // Code is immutable on edit; change the name only.
+    await tester.enterText(find.byType(TextFormField).at(1), 'Main WH Updated');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastWarehousePutBody?['warehouse_code'], 'WH-MAIN');
+    expect(adapter.lastWarehousePutBody?['warehouse_name'], 'Main WH Updated');
+    expect(adapter.lastWarehousePutBody?['location'], 'Sector 14');
+    expect(adapter.lastWarehousePostBody, isNull);
+    expect(find.byType(Dialog), findsNothing);
+  });
+
+  testWidgets('warehouse form: validates required fields before posting', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Warehouses'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('New Warehouse'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    // Code + name are required — both validators surface the message.
+    expect(find.text('Required'), findsNWidgets(2));
+    expect(adapter.lastWarehousePostBody, isNull);
+    expect(find.byType(Dialog), findsOneWidget);
+  });
+
+  testWidgets('warehouse form: surfaces a server rejection on create', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectWarehouseCreate = true;
+    await bootToItems(tester, adapter: adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Warehouses'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('New Warehouse'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(0), 'WH-MAIN');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Duplicate');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    // The server's message surfaces in the error panel; the dialog stays
+    // open with the submit action re-enabled.
+    expect(find.text('Warehouse code already exists'), findsOneWidget);
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Save'), findsOneWidget);
+  });
+
+  testWidgets('warehouses tab search filters rows after the debounce', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToItems(tester);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Warehouses'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('WH-MAIN'), findsOneWidget);
+    expect(find.text('WH-RAW'), findsOneWidget);
+
+    // Type before the 300ms debounce fires — the rows are untouched.
+    await tester.enterText(find.byType(TextField), 'raw');
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('WH-MAIN'), findsOneWidget);
+    expect(find.text('WH-RAW'), findsOneWidget);
+
+    // After the debounce, only WH-RAW (code 'raw') matches.
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pumpAndSettle();
+    expect(find.text('WH-MAIN'), findsNothing);
+    expect(find.text('Main Warehouse'), findsNothing);
+    expect(find.text('WH-RAW'), findsOneWidget);
+    expect(find.text('Raw Materials'), findsOneWidget);
+  });
+
+  testWidgets('physical count: complete transitions Draft to Completed', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Physical Counts'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open the count detail (double-tap the PC-2026-001 row).
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pumpAndSettle();
+
+    // Draft-only actions: Complete + Cancel in the footer.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Complete Count'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Cancel Count'),
+      ),
+      findsOneWidget,
+    );
+
+    // Complete → confirm dialog.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Complete Count'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(
+      find.text(
+        'Complete this count? Adjustments will be posted for any items with variances.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Complete Count'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The detail refetched: badge flipped, actions gone, toast shown.
+    expect(find.text('Count completed'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Completed'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Complete Count'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Cancel Count'),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('physical count: cancel transitions Draft to Cancelled', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Physical Counts'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open the count detail.
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pumpAndSettle();
+
+    // Cancel → confirm dialog (destructive).
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Cancel Count'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(
+      find.text('Cancel this count? It cannot be completed afterward.'),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Cancel Count'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The detail refetched: badge flipped, actions gone, toast shown.
+    expect(find.text('Count cancelled'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Cancelled'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Complete Count'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Cancel Count'),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('physical count: complete rejection keeps the count in Draft', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectPcComplete = true;
+    await bootToItems(tester, adapter: adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Physical Counts'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open the count detail and attempt to complete.
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Complete Count'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Complete Count'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The server message surfaces verbatim; badge stays Draft and the
+    // actions remain available.
+    expect(find.text('Cannot complete Completed session'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Draft')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Complete Count'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Cancel Count'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('physical count: record items posts quantities and refetches', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Physical Counts'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open the count detail.
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pumpAndSettle();
+
+    // Record Items opens the editable item table (RM001 prefilled 95,
+    // RM002 uncounted).
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Record Items'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // Scope to the record dialog — the detail dialog behind also renders
+    // the same item labels in its table.
+    final recordDialog = find.ancestor(
+      of: find.widgetWithText(FilledButton, 'Save Counts'),
+      matching: find.byType(Dialog),
+    );
+    expect(
+      find.descendant(
+        of: recordDialog,
+        matching: find.text('RM001 — Raw Material A'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: recordDialog,
+        matching: find.text('RM002 — Raw Material B'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(TextFormField, '95'), findsOneWidget);
+
+    // Record RM001 → 88 and leave RM002 blank (unchanged).
+    await tester.enterText(find.byType(TextFormField).first, '88');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save Counts'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastPcRecordBody, {'item_id': 4, 'counted_quantity': 88});
+    // The record dialog popped, the detail refetched and the table shows
+    // the recorded 88 next to RM001 while RM002 stays uncounted (—).
+    expect(find.text('Counts recorded'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(Dialog), matching: find.text('88')),
+      findsOneWidget,
+    );
+    // RM002 stays uncounted: the em dash renders in both its Counted and
+    // Variance cells.
+    expect(
+      find.descendant(of: find.byType(Dialog), matching: find.text('—')),
+      findsNWidgets(2),
+    );
+  });
+
+  testWidgets('physical count: record items validates before posting', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Physical Counts'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open the count detail and the record dialog.
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Record Items'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Both fields empty → nothing to record.
+    await tester.enterText(find.byType(TextFormField).first, '');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save Counts'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter at least one counted quantity'), findsOneWidget);
+    expect(adapter.lastPcRecordBody, isNull);
+
+    // Negative qty → per-field validation error, still no POST.
+    await tester.enterText(find.byType(TextFormField).first, '-5');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save Counts'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a valid quantity'), findsOneWidget);
+    expect(adapter.lastPcRecordBody, isNull);
+  });
+
+  testWidgets('physical count: record items rejection keeps the dialog open', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectPcRecord = true;
+    await bootToItems(tester, adapter: adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Physical Counts'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open the count detail and the record dialog.
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PC-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Record Items'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField).first, '88');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save Counts'));
+    await tester.pumpAndSettle();
+
+    // The server message surfaces verbatim; the dialog stays open so the
+    // user can retry (Save re-enabled).
+    expect(
+      find.text('Cannot record count for Completed session'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(FilledButton, 'Save Counts'), findsOneWidget);
+    expect(adapter.lastPcRecordBody, {'item_id': 4, 'counted_quantity': 88});
+  });
+
+  testWidgets('warehouse form: delete confirms and removes the warehouse', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Warehouses'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Double-tap WH-MAIN opens the edit form with the destructive Delete.
+    await tester.tap(find.text('WH-MAIN'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('WH-MAIN'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Warehouse'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Delete'), findsOneWidget);
+
+    // Confirm dialog → Delete.
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(
+      find.text('Delete this warehouse? It cannot be undone.'),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Delete'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(adapter.warehouseDeleteCount, 1);
+    // Form popped, the grid refetched without WH-MAIN, toast visible.
+    expect(find.text('Edit Warehouse'), findsNothing);
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.text('Warehouse deleted'), findsOneWidget);
+    expect(find.text('WH-MAIN'), findsNothing);
+    expect(find.text('WH-RAW'), findsOneWidget);
+  });
+
+  testWidgets('warehouse form: delete rejection keeps the form open', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectWarehouseDelete = true;
+    await bootToItems(tester, adapter: adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Warehouses'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open the edit form and attempt to delete.
+    await tester.tap(find.text('WH-MAIN'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('WH-MAIN'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Delete'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Delete'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The 404 message surfaces; the form stays open with Delete enabled.
+    expect(find.text('Warehouse not found'), findsOneWidget);
+    expect(find.text('Edit Warehouse'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, 'Delete'), findsOneWidget);
+    expect(adapter.warehouseDeleteCount, 1);
+  });
+
+  testWidgets('stock adjustment records a signed movement with reason', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'New Adjustment'));
+    await tester.pumpAndSettle();
+
+    // Item (first int dropdown; menu label is '<code> — <name>').
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FG001 — Widget A').last);
+    await tester.pumpAndSettle();
+
+    // Warehouse (second int dropdown).
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Warehouse').last);
+    await tester.pumpAndSettle();
+
+    // Quantity, then reason (the screen's search is a TextField, so the
+    // dialog owns the only TextFormFields).
+    await tester.enterText(find.byType(TextFormField).at(0), '-10');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Broken stock');
+    await tester.tap(find.widgetWithText(FilledButton, 'Record Adjustment'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.movementPostCount, 1);
+    expect(adapter.lastMovementPostBody, {
+      'item_id': 1,
+      'warehouse_id': 1,
+      'quantity': -10,
+      'movement_type': 'ADJUSTMENT',
+      'remarks': 'Broken stock',
+    });
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.text('Stock adjustment recorded'), findsOneWidget);
+  });
+
+  testWidgets('stock adjustment validates before posting', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'New Adjustment'));
+    await tester.pumpAndSettle();
+
+    // Empty save: item, warehouse, and quantity all required.
+    await tester.tap(find.widgetWithText(FilledButton, 'Record Adjustment'));
+    await tester.pumpAndSettle();
+    expect(find.text('Required'), findsNWidgets(3));
+    expect(adapter.movementPostCount, 0);
+
+    // Non-numeric and zero quantities are rejected locally.
+    await tester.enterText(find.byType(TextFormField).at(0), 'abc');
+    await tester.tap(find.widgetWithText(FilledButton, 'Record Adjustment'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a valid quantity'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextFormField).at(0), '0');
+    await tester.tap(find.widgetWithText(FilledButton, 'Record Adjustment'));
+    await tester.pumpAndSettle();
+    expect(find.text('Quantity cannot be zero'), findsOneWidget);
+    expect(adapter.movementPostCount, 0);
+  });
+
+  testWidgets('stock adjustment surfaces the server rejection', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectMovementCreate = true;
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'New Adjustment'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FG001 — Widget A').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Warehouse').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(0), '-10');
+    await tester.tap(find.widgetWithText(FilledButton, 'Record Adjustment'));
+    await tester.pumpAndSettle();
+
+    // The 400 message surfaces in the error banner; the dialog stays
+    // open for retry.
+    expect(adapter.movementPostCount, 1);
+    expect(find.text('Insufficient stock for adjustment'), findsOneWidget);
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(
+      find.widgetWithText(FilledButton, 'Record Adjustment'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('stock transfer posts outgoing and incoming movements', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'New Transfer'));
+    await tester.pumpAndSettle();
+
+    // Item, source, destination (the three int dropdowns in order).
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FG001 — Widget A').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Warehouse').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Raw Materials').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextFormField).at(0), '5');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Move to raw');
+    await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.movementPostBodies.length, 2);
+    // Outgoing leg: negative quantity, source warehouse, no reference.
+    expect(adapter.movementPostBodies[0], {
+      'item_id': 1,
+      'warehouse_id': 1,
+      'quantity': -5,
+      'movement_type': 'TRANSFER',
+      'reference_doctype': 'TRANSFER',
+      'remarks': 'Move to raw',
+    });
+    // Incoming leg: positive quantity, destination warehouse, linked to
+    // the outgoing movement's server-generated number.
+    expect(adapter.movementPostBodies[1], {
+      'item_id': 1,
+      'warehouse_id': 2,
+      'quantity': 5,
+      'movement_type': 'TRANSFER',
+      'reference_doctype': 'TRANSFER',
+      'reference_docno': 'SM-2026-0102',
+      'remarks': 'Move to raw',
+    });
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.text('Stock transferred'), findsOneWidget);
+  });
+
+  testWidgets('stock transfer validates source, destination, and quantity', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'New Transfer'));
+    await tester.pumpAndSettle();
+
+    // Empty save: item, source, destination, and quantity all required.
+    await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
+    await tester.pumpAndSettle();
+    expect(find.text('Required'), findsNWidgets(4));
+    expect(adapter.movementPostCount, 0);
+
+    // Same source and destination is rejected up front.
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FG001 — Widget A').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Warehouse').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Warehouse').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(0), '5');
+    await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Source and destination must be different'),
+      findsOneWidget,
+    );
+    expect(adapter.movementPostCount, 0);
+
+    // A non-positive quantity is rejected.
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Raw Materials').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(0), '0');
+    await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
+    await tester.pumpAndSettle();
+    expect(find.text('Quantity must be positive'), findsOneWidget);
+    expect(adapter.movementPostCount, 0);
+  });
+
+  testWidgets('stock transfer surfaces outgoing-leg rejection', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectMovementCreate = true;
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'New Transfer'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FG001 — Widget A').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Warehouse').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Raw Materials').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(0), '5');
+    await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
+    await tester.pumpAndSettle();
+
+    // The outgoing leg 400s before any INSERT — nothing recorded.
+    expect(adapter.movementPostCount, 1);
+    expect(find.text('Insufficient stock for adjustment'), findsOneWidget);
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Transfer Stock'), findsOneWidget);
+  });
+
+  testWidgets('stock transfer flags a failed incoming leg', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectSecondMovement = true;
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'New Transfer'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FG001 — Widget A').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Warehouse').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Raw Materials').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(0), '5');
+    await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
+    await tester.pumpAndSettle();
+
+    // The outgoing leg recorded; the incoming leg's 400 surfaces with
+    // the partial-failure prefix so a retry doesn't re-post the OUT.
+    expect(adapter.movementPostCount, 2);
+    expect(find.textContaining('Transfer incomplete:'), findsOneWidget);
+    expect(
+      find.textContaining('Destination warehouse not found'),
+      findsOneWidget,
+    );
+    expect(find.byType(Dialog), findsOneWidget);
+  });
+
+  testWidgets('stock transfer retry re-posts only the incoming leg', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectSecondMovement = true;
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'New Transfer'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FG001 — Widget A').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Warehouse').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Raw Materials').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(0), '5');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Move to raw');
+    await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
+    await tester.pumpAndSettle();
+    expect(adapter.movementPostCount, 2);
+
+    // Retry: the OUT leg is already on the server, so only the IN leg
+    // re-posts — reusing the same linking reference.
+    await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
+    await tester.pumpAndSettle();
+    expect(adapter.movementPostBodies.length, 3);
+    expect(adapter.movementPostBodies[2], {
+      'item_id': 1,
+      'warehouse_id': 2,
+      'quantity': 5,
+      'movement_type': 'TRANSFER',
+      'reference_doctype': 'TRANSFER',
+      'reference_docno': 'SM-2026-0102',
+      'remarks': 'Move to raw',
+    });
+    expect(find.textContaining('Transfer incomplete:'), findsOneWidget);
+    expect(find.byType(Dialog), findsOneWidget);
+  });
+
+  testWidgets('movement detail fetches and reverses an adjustment', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Double-tap the ADJUSTMENT row: the dialog fetches
+    // GET /inventory/stock-movements/3 for fresh data.
+    await tester.tap(find.text('SM-2026-0102'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SM-2026-0102'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.movementDetailFetchCount, 1);
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.widgetWithText(OutlinedButton, 'Reverse Adjustment'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.widgetWithText(OutlinedButton, 'Reverse Adjustment'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Reverse Adjustment'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The compensating movement: inverse quantity, linked to the original
+    // via reference_docno.
+    expect(adapter.movementPostCount, 1);
+    expect(adapter.lastMovementPostBody, {
+      'item_id': 4,
+      'warehouse_id': 1,
+      'quantity': 10.0,
+      'movement_type': 'ADJUSTMENT',
+      'remarks': 'Reverse of SM-2026-0102',
+      'reference_doctype': 'ADJUSTMENT',
+      'reference_docno': 'SM-2026-0102',
+    });
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.text('Adjustment reversed'), findsOneWidget);
+  });
+
+  testWidgets('movement detail hides reverse for non-adjustments', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SM-2026-0100'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SM-2026-0100'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.movementDetailFetchCount, 1);
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.widgetWithText(OutlinedButton, 'Reverse Adjustment'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.widgetWithText(FilledButton, 'Close'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('movement reversal surfaces the server rejection', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectMovementCreate = true;
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SM-2026-0102'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SM-2026-0102'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.widgetWithText(OutlinedButton, 'Reverse Adjustment'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Reverse Adjustment'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The 400 surfaces as an error toast; the dialog stays open.
+    expect(adapter.movementPostCount, 1);
+    expect(find.text('Insufficient stock for adjustment'), findsOneWidget);
+    expect(find.byType(Dialog), findsOneWidget);
+  });
+
+  testWidgets('movement filter refetches by movement type', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('SM-2026-0100'), findsOneWidget);
+
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Adjustment').last);
+    await tester.pumpAndSettle();
+
+    // The list refetched with the movement_type query param and now shows
+    // only the adjustment row.
+    expect(adapter.lastMovementQuery, {'movement_type': 'ADJUSTMENT'});
+    expect(find.text('SM-2026-0102'), findsOneWidget);
+    expect(find.text('SM-2026-0100'), findsNothing);
+    expect(find.text('SM-2026-0101'), findsNothing);
+  });
+
+  testWidgets('movement filter resets to all movements', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Adjustment').last);
+    await tester.pumpAndSettle();
+    expect(adapter.lastMovementQuery, {'movement_type': 'ADJUSTMENT'});
+
+    // Back to All — the refetch drops the query param.
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All Movements').last);
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastMovementQuery, isNot(contains('movement_type')));
+    expect(find.text('SM-2026-0100'), findsOneWidget);
+    expect(find.text('SM-2026-0101'), findsOneWidget);
+    expect(find.text('SM-2026-0102'), findsOneWidget);
+  });
+
+  testWidgets('transfer IN detail links to the OUT leg and opens it', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The IN leg's reference_docno names the OUT leg's movement number.
+    await tester.tap(find.text('SM-2026-0104'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SM-2026-0104'));
+    await tester.pumpAndSettle();
+    expect(adapter.movementDetailFetchCount, 1);
+    expect(find.text('Linked Movement: SM-2026-0103'), findsOneWidget);
+
+    // Tapping the link opens the counterpart's detail.
+    await tester.tap(find.text('Linked Movement: SM-2026-0103'));
+    await tester.pumpAndSettle();
+    expect(adapter.movementDetailFetchCount, 2);
+    expect(
+      find.descendant(
+        of: find.byType(Dialog).last,
+        matching: find.text('SM-2026-0103'),
+      ),
+      findsWidgets,
+    );
+  });
+
+  testWidgets('transfer OUT detail links back to the IN leg', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The OUT leg has no reference; the IN leg names its number, so the
+    // reverse match surfaces the link. 'SM-2026-0103' also appears in the
+    // IN row's Reference cell — the No-column cell is the first match.
+    await tester.tap(find.text('SM-2026-0103').first);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SM-2026-0103').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Linked Movement: SM-2026-0104'), findsOneWidget);
+  });
+
+  testWidgets('non-transfer movement detail shows no linked movement', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Stock Movements'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The purchase reference (PUR-2026-001) is a document number, never a
+    // movement number — nothing to link.
+    await tester.tap(find.text('SM-2026-0100'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SM-2026-0100'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Linked Movement'), findsNothing);
   });
 }

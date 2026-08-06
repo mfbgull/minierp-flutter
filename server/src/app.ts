@@ -73,7 +73,21 @@ const getAllowedOrigins = (): string | string[] => {
 };
 
 const corsOptions = {
-  origin: getAllowedOrigins(),
+  // In development allow any origin (the Flutter web dev server runs on a
+  // random port, so a fixed whitelist would block it). Production still
+  // enforces ALLOWED_ORIGINS via index.ts's eager getter.
+  origin: function (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean) => void
+  ) {
+    if (process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+      return;
+    }
+    const allowed = getAllowedOrigins();
+    const list = Array.isArray(allowed) ? allowed : [allowed];
+    callback(null, !origin || list.includes(origin));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],

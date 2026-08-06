@@ -17,10 +17,10 @@ class DashboardRepository {
   final RepositoryClient _api;
 
   Future<ApiResult<DashboardSummary>> summary() => _api.get(
-        ApiEndpoints.dashboardSummary,
-        parse: (Object? json) =>
-            DashboardSummary.fromJson(json as Map<String, dynamic>),
-      );
+    ApiEndpoints.dashboardSummary,
+    parse: (Object? json) =>
+        DashboardSummary.fromJson(json as Map<String, dynamic>),
+  );
 }
 
 final dashboardRepositoryProvider = Provider<DashboardRepository>(

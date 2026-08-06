@@ -11,12 +11,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/purchase_order.dart'
     show PurchaseOrderDetail, PurchaseOrderItem;
-import '../../data/repositories/api_result.dart' show ApiError;
+import '../../data/repositories/api_result.dart'
+    show ApiError, ApiFailure, ApiSuccess;
+import '../../data/repositories/purchase_order_repository.dart'
+    show purchaseOrderRepositoryProvider;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/app_toast.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
+import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'po_status.dart';
+import 'purchase_order_form_dialog.dart';
 import 'purchase_order_providers.dart';
 
 /// Opens the read-only detail dialog for [poId].
@@ -66,6 +73,7 @@ class _DetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final expected = detail.expectedDeliveryDate;
     final (color, darkColor) = poStatusColors(detail.status);
 
     return Column(
@@ -116,8 +124,35 @@ class _DetailBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _infoGrid(context, l10n),
-                _tiles(context, l10n),
+                DetailInfoRows(
+                  rows: [
+                    (l10n.purchasesSuppliercol, detail.supplierName),
+                    (l10n.commonDate, Formatters.date(detail.poDate)),
+                    (
+                      l10n.purchaseordersExpecteddelivery,
+                      expected == null || expected.isEmpty
+                          ? '—'
+                          : Formatters.date(expected),
+                    ),
+                    (
+                      l10n.purchasesWarehousecol,
+                      detailDash(detail.warehouseName),
+                    ),
+                  ],
+                ),
+                DetailTiles(
+                  tiles: [
+                    DetailTile(
+                      l10n.commonTotal,
+                      Formatters.currency(detail.totalAmount),
+                      emphasize: true,
+                    ),
+                    DetailTile(
+                      l10n.purchaseordersBalance,
+                      Formatters.currency(detail.balanceAmount),
+                    ),
+                  ],
+                ),
                 if (detail.items.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   detailSectionLabel(context, l10n.purchasesItemscard),
@@ -148,6 +183,17 @@ class _DetailBody extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              if (detail.status == 'Draft') ...[
+                _SubmitPoButton(detail: detail),
+                const SizedBox(width: 4),
+                TextButton.icon(
+                  onPressed: () =>
+                      showPurchaseOrderFormDialog(context, detail: detail),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: Text(l10n.commonEdit),
+                ),
+                const SizedBox(width: 4),
+              ],
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(l10n.commonClose),
@@ -156,91 +202,6 @@ class _DetailBody extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _infoGrid(BuildContext context, AppLocalizations l10n) {
-    final expected = detail.expectedDeliveryDate;
-    final rows = <(String, String)>[
-      (l10n.purchasesSuppliercol, detail.supplierName),
-      (l10n.commonDate, Formatters.date(detail.poDate)),
-      (
-        l10n.purchaseordersExpecteddelivery,
-        expected == null || expected.isEmpty ? '—' : Formatters.date(expected),
-      ),
-      (l10n.purchasesWarehousecol, detailDash(detail.warehouseName)),
-    ];
-    return Column(
-      children: [
-        for (final (label, value) in rows)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                SizedBox(width: 150, child: detailSectionLabel(context, label)),
-                Expanded(
-                  child: Text(
-                    value,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _tiles(BuildContext context, AppLocalizations l10n) {
-    final scheme = Theme.of(context).colorScheme;
-    final tiles = <(String, String, bool)>[
-      (l10n.commonTotal, Formatters.currency(detail.totalAmount), true),
-      (
-        l10n.purchaseordersBalance,
-        Formatters.currency(detail.balanceAmount),
-        false,
-      ),
-    ];
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          for (final (label, value, emphasize) in tiles)
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      value,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: emphasize
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -398,6 +359,65 @@ class _ItemRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Submit action for Draft POs — confirms, POSTs /:id/status, then
+/// invalidates the detail + list providers (the dialog refetches, the
+/// badge flips to Submitted and this button, plus Edit, disappear).
+class _SubmitPoButton extends ConsumerStatefulWidget {
+  const _SubmitPoButton({required this.detail});
+
+  final PurchaseOrderDetail detail;
+
+  @override
+  ConsumerState<_SubmitPoButton> createState() => _SubmitPoButtonState();
+}
+
+class _SubmitPoButtonState extends ConsumerState<_SubmitPoButton> {
+  bool _submitting = false;
+
+  Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonSubmit,
+      message: l10n.purchaseordersSubmitconfirm,
+      confirmLabel: l10n.commonSubmit,
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _submitting = true);
+    final repo = ref.read(purchaseOrderRepositoryProvider);
+    final result = await repo.updateStatus(widget.detail.id, 'Submitted');
+    if (!mounted) return;
+
+    switch (result) {
+      case ApiSuccess():
+        setState(() => _submitting = false);
+        ref.invalidate(purchaseOrderDetailProvider(widget.detail.id));
+        ref.invalidate(purchaseOrdersProvider);
+        showAppToast(context, l10n.purchaseordersSubmittedsuccess);
+      case ApiFailure(:final error):
+        setState(() => _submitting = false);
+        showAppToast(context, error.message, isError: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return FilledButton.icon(
+      onPressed: _submitting ? null : _submit,
+      icon: _submitting
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.send_outlined, size: 18),
+      label: Text(l10n.commonSubmit),
     );
   }
 }

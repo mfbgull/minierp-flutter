@@ -65,6 +65,7 @@ class PurchaseOrder {
 class PurchaseOrderItem {
   const PurchaseOrderItem({
     required this.id,
+    this.itemId = 0,
     required this.itemCode,
     required this.itemName,
     required this.unitOfMeasure,
@@ -79,6 +80,7 @@ class PurchaseOrderItem {
   factory PurchaseOrderItem.fromJson(Map<String, dynamic> json) =>
       PurchaseOrderItem(
         id: asInt(json['id']) ?? 0,
+        itemId: asInt(json['item_id']) ?? 0,
         itemCode: asString(json['item_code']) ?? '',
         itemName: asString(json['item_name']) ?? '',
         unitOfMeasure: asString(json['unit_of_measure']) ?? '',
@@ -91,6 +93,10 @@ class PurchaseOrderItem {
       );
 
   final int id;
+
+  /// The item this line orders (`item_id`); used by the edit form to
+  /// detect item changes on an existing line.
+  final int itemId;
   final String itemCode;
   final String itemName;
   final String unitOfMeasure;

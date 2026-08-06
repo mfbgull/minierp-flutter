@@ -45,22 +45,22 @@ class RepositoryClient {
     String path, {
     Map<String, dynamic>? queryParameters,
     required T Function(Object?) parse,
-  }) =>
-      _parse(_guard(() => _dio.get(path, queryParameters: queryParameters)), parse);
+  }) => _parse(
+    _guard(() => _dio.get(path, queryParameters: queryParameters)),
+    parse,
+  );
 
   Future<ApiResult<T>> post<T>(
     String path, {
     Object? body,
     required T Function(Object?) parse,
-  }) =>
-      _parse(_guard(() => _dio.post(path, data: body)), parse);
+  }) => _parse(_guard(() => _dio.post(path, data: body)), parse);
 
   Future<ApiResult<T>> put<T>(
     String path, {
     Object? body,
     required T Function(Object?) parse,
-  }) =>
-      _parse(_guard(() => _dio.put(path, data: body)), parse);
+  }) => _parse(_guard(() => _dio.put(path, data: body)), parse);
 
   /// Enveloped delete — `{success: true, message}`, no data payload.
   Future<ApiResult<void>> delete(String path) async {
@@ -80,12 +80,17 @@ class RepositoryClient {
     Map<String, dynamic>? queryParameters,
     required T Function(Object?) parseItem,
   }) async {
-    final guarded = await _guard(() => _dio.get(path, queryParameters: queryParameters));
+    final guarded = await _guard(
+      () => _dio.get(path, queryParameters: queryParameters),
+    );
     try {
       return guarded.map((response) {
         final data = _envelopeData(response);
         if (data is! List) {
-          throw ApiResponseException('Expected a list response', response.statusCode);
+          throw ApiResponseException(
+            'Expected a list response',
+            response.statusCode,
+          );
         }
         return _parseItems(data, parseItem);
       });
@@ -100,18 +105,27 @@ class RepositoryClient {
     Map<String, dynamic>? queryParameters,
     required T Function(Object?) parseItem,
   }) async {
-    final guarded = await _guard(() => _dio.get(path, queryParameters: queryParameters));
+    final guarded = await _guard(
+      () => _dio.get(path, queryParameters: queryParameters),
+    );
     try {
       return guarded.map((response) {
         final body = response.data;
         final data = _envelopeData(response);
         if (data is! List) {
-          throw ApiResponseException('Expected a list response', response.statusCode);
+          throw ApiResponseException(
+            'Expected a list response',
+            response.statusCode,
+          );
         }
-        final pagination =
-            body is Map<String, dynamic> ? body['pagination'] : null;
+        final pagination = body is Map<String, dynamic>
+            ? body['pagination']
+            : null;
         if (pagination is! Map<String, dynamic>) {
-          throw ApiResponseException('Missing pagination block', response.statusCode);
+          throw ApiResponseException(
+            'Missing pagination block',
+            response.statusCode,
+          );
         }
         return PagedResponse(
           items: _parseItems(data, parseItem),
@@ -133,24 +147,21 @@ class RepositoryClient {
   Future<ApiResult<T>> getRaw<T>(
     String path, {
     required T Function(Object?) parse,
-  }) =>
-      _parseRaw(_guard(() => _dio.get(path)), parse);
+  }) => _parseRaw(_guard(() => _dio.get(path)), parse);
 
   /// POST returning the created object directly (item create).
   Future<ApiResult<T>> postRaw<T>(
     String path, {
     Object? body,
     required T Function(Object?) parse,
-  }) =>
-      _parseRaw(_guard(() => _dio.post(path, data: body)), parse);
+  }) => _parseRaw(_guard(() => _dio.post(path, data: body)), parse);
 
   /// PUT returning the updated object directly (item update).
   Future<ApiResult<T>> putRaw<T>(
     String path, {
     Object? body,
     required T Function(Object?) parse,
-  }) =>
-      _parseRaw(_guard(() => _dio.put(path, data: body)), parse);
+  }) => _parseRaw(_guard(() => _dio.put(path, data: body)), parse);
 
   /// DELETE returning a bare body (invoice delete: `{message}` — no
   /// envelope, unlike the enveloped `delete` used by items/customers).
@@ -159,17 +170,23 @@ class RepositoryClient {
     return result.map<void>((_) {});
   }
 
-  /// GET a bare array (items-categories, items-uom).
+  /// GET a bare array (items-categories, items-uom, stock movements).
   Future<ApiResult<List<T>>> getRawList<T>(
     String path, {
+    Map<String, dynamic>? queryParameters,
     required T Function(Object?) parseItem,
   }) async {
-    final guarded = await _guard(() => _dio.get(path));
+    final guarded = await _guard(
+      () => _dio.get(path, queryParameters: queryParameters),
+    );
     try {
       return guarded.map((response) {
         final data = response.data;
         if (data is! List) {
-          throw ApiResponseException('Expected a list response', response.statusCode);
+          throw ApiResponseException(
+            'Expected a list response',
+            response.statusCode,
+          );
         }
         return _parseItems(data, parseItem);
       });
@@ -196,7 +213,9 @@ class RepositoryClient {
   ) async {
     try {
       final result = await guarded;
-      return result.map((response) => _tryParse(_envelopeData(response), parse));
+      return result.map(
+        (response) => _tryParse(_envelopeData(response), parse),
+      );
     } on ApiResponseException catch (e) {
       return ApiFailure(ApiError(message: e.message, statusCode: e.statusCode));
     }
@@ -249,8 +268,9 @@ class RepositoryClient {
     return body;
   }
 
-  List<T> _parseItems<T>(List<dynamic> data, T Function(Object?) parseItem) =>
-      [for (final item in data) _tryParse(item, parseItem)];
+  List<T> _parseItems<T>(List<dynamic> data, T Function(Object?) parseItem) => [
+    for (final item in data) _tryParse(item, parseItem),
+  ];
 
   ApiError _toError(DioException e) {
     final isNetwork = switch (e.type) {
@@ -258,8 +278,7 @@ class RepositoryClient {
       DioExceptionType.connectionTimeout ||
       DioExceptionType.sendTimeout ||
       DioExceptionType.receiveTimeout ||
-      DioExceptionType.transformTimeout =>
-        true,
+      DioExceptionType.transformTimeout => true,
       _ => false,
     };
     return ApiError(

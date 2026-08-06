@@ -11,7 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
-import '../models/purchase_order.dart' show PurchaseOrder, PurchaseOrderDetail;
+import '../models/purchase_order.dart'
+    show PurchaseOrder, PurchaseOrderDetail, PurchaseOrderItem;
 import 'api_result.dart';
 import 'repository_client.dart';
 
@@ -34,6 +35,72 @@ class PurchaseOrderRepository {
     parse: (Object? json) =>
         PurchaseOrderDetail.fromJson(json as Map<String, dynamic>),
   );
+
+  /// Create — bare 201 PO response (`{...po, items}`); the body carries
+  /// the header plus the `items` array ({item_id, quantity, unit_price}).
+  Future<ApiResult<PurchaseOrder>> create(Map<String, dynamic> body) =>
+      _api.postRaw(
+        ApiEndpoints.purchaseOrders,
+        body: body,
+        parse: (Object? json) =>
+            PurchaseOrder.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// Update the PO header — bare updated PO. The server accepts only
+  /// header fields here (items go through the item routes below).
+  Future<ApiResult<PurchaseOrder>> updateHeader(
+    int id,
+    Map<String, dynamic> body,
+  ) => _api.putRaw(
+    '${ApiEndpoints.purchaseOrders}/$id',
+    body: body,
+    parse: (Object? json) =>
+        PurchaseOrder.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// Add a line item — bare 201 `purchase_order_items` row.
+  Future<ApiResult<PurchaseOrderItem>> addItem(
+    int poId,
+    Map<String, dynamic> body,
+  ) => _api.postRaw(
+    '${ApiEndpoints.purchaseOrders}/$poId/items',
+    body: body,
+    parse: (Object? json) =>
+        PurchaseOrderItem.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// Update a line item's quantity/unit price — bare updated row.
+  Future<ApiResult<PurchaseOrderItem>> updateItem(
+    int poId,
+    int itemId,
+    Map<String, dynamic> body,
+  ) => _api.putRaw(
+    '${ApiEndpoints.purchaseOrders}/$poId/items/$itemId',
+    body: body,
+    parse: (Object? json) =>
+        PurchaseOrderItem.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// Remove a line item — bare `{success, message}` (deleteRaw ignores
+  /// the body).
+  Future<ApiResult<void>> removeItem(int poId, int itemId) =>
+      _api.deleteRaw('${ApiEndpoints.purchaseOrders}/$poId/items/$itemId');
+
+  /// Transition the PO's workflow status — bare updated PO. The server
+  /// enforces the valid transitions (Draft → Submitted / Cancelled, …)
+  /// and posts the AP supplier-ledger entry on Submit.
+  Future<ApiResult<PurchaseOrder>> updateStatus(int id, String status) =>
+      _api.postRaw(
+        '${ApiEndpoints.purchaseOrders}/$id/status',
+        body: {'status': status},
+        parse: (Object? json) =>
+            PurchaseOrder.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// Delete a Draft PO — enveloped `{success, message}`. The server only
+  /// allows Draft deletions (and cascades the line items).
+  Future<ApiResult<void>> deletePo(int id) =>
+      _api.delete('${ApiEndpoints.purchaseOrders}/$id');
 }
 
 final purchaseOrderRepositoryProvider = Provider<PurchaseOrderRepository>(

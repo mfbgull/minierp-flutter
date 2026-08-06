@@ -13,6 +13,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
+import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'customer_form_dialog.dart';
 import 'customer_ledger_dialog.dart';
@@ -65,6 +66,7 @@ class _DetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
     // Non-empty addresses only, in display order (billing then shipping).
     final addresses = [
       if (customer.billingAddress?.isNotEmpty ?? false)
@@ -72,6 +74,13 @@ class _DetailBody extends StatelessWidget {
       if (customer.shippingAddress?.isNotEmpty ?? false)
         customer.shippingAddress!,
     ];
+    // Payment terms: prefer the free-text terms; fall back to the days
+    // number (e.g. "Net 30" vs a bare "30").
+    final terms = customer.paymentTerms?.isNotEmpty == true
+        ? customer.paymentTerms!
+        : customer.paymentTermsDays != null
+        ? '${Formatters.number(customer.paymentTermsDays!)} days'
+        : null;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -120,8 +129,45 @@ class _DetailBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _infoGrid(context, l10n),
-                _balanceRow(context, l10n),
+                DetailInfoRows(
+                  rows: [
+                    (
+                      l10n.customersContactperson,
+                      detailDash(customer.contactPerson),
+                    ),
+                    (l10n.customersPhone, detailDash(customer.phone)),
+                    (l10n.customersEmail, detailDash(customer.email)),
+                    (l10n.customersPaymentterms, detailDash(terms)),
+                    (
+                      l10n.customersOpeningbalance,
+                      customer.openingBalance == null
+                          ? '—'
+                          : Formatters.currency(customer.openingBalance!),
+                    ),
+                  ],
+                ),
+                DetailTiles(
+                  tiles: [
+                    DetailTile(
+                      l10n.customersCurrentbalance,
+                      Formatters.currency(customer.currentBalance),
+                      emphasize: true,
+                      color: customer.currentBalance < 0 ? scheme.error : null,
+                    ),
+                    DetailTile(
+                      l10n.customersCreditlimit,
+                      customer.creditLimit == null
+                          ? '—'
+                          : Formatters.currency(customer.creditLimit!),
+                    ),
+                    DetailTile(
+                      l10n.customersCreditutilization,
+                      customer.creditUtilizationPercent == null
+                          ? '—'
+                          : '${Formatters.number(customer.creditUtilizationPercent!)}%',
+                    ),
+                  ],
+                ),
                 if (addresses.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   detailSectionLabel(context, l10n.customersAddress),
@@ -171,118 +217,6 @@ class _DetailBody extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _infoGrid(BuildContext context, AppLocalizations l10n) {
-    // Payment terms: prefer the free-text terms; fall back to the days
-    // number (e.g. "Net 30" vs a bare "30").
-    final terms = customer.paymentTerms?.isNotEmpty == true
-        ? customer.paymentTerms!
-        : customer.paymentTermsDays != null
-        ? '${Formatters.number(customer.paymentTermsDays!)} days'
-        : null;
-    final rows = <(String, String)>[
-      (l10n.customersContactperson, detailDash(customer.contactPerson)),
-      (l10n.customersPhone, detailDash(customer.phone)),
-      (l10n.customersEmail, detailDash(customer.email)),
-      (l10n.customersPaymentterms, detailDash(terms)),
-      (
-        l10n.customersOpeningbalance,
-        customer.openingBalance == null
-            ? '—'
-            : Formatters.currency(customer.openingBalance!),
-      ),
-    ];
-    return Column(
-      children: [
-        for (final (label, value) in rows)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                SizedBox(width: 150, child: detailSectionLabel(context, label)),
-                Expanded(
-                  child: Text(
-                    value,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _balanceRow(BuildContext context, AppLocalizations l10n) {
-    final scheme = Theme.of(context).colorScheme;
-    final tiles = <(String, String, bool)>[
-      (
-        l10n.customersCurrentbalance,
-        Formatters.currency(customer.currentBalance),
-        true,
-      ),
-      (
-        l10n.customersCreditlimit,
-        customer.creditLimit == null
-            ? '—'
-            : Formatters.currency(customer.creditLimit!),
-        false,
-      ),
-      (
-        l10n.customersCreditutilization,
-        customer.creditUtilizationPercent == null
-            ? '—'
-            : '${Formatters.number(customer.creditUtilizationPercent!)}%',
-        false,
-      ),
-    ];
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          for (final (label, value, emphasize) in tiles)
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      value,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: emphasize
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: emphasize
-                            ? (customer.currentBalance < 0
-                                  ? scheme.error
-                                  : null)
-                            : null,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 

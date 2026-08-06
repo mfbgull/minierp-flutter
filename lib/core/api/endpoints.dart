@@ -29,7 +29,12 @@ abstract final class ApiEndpoints {
   static const itemsUom = '/inventory/items-uom';
   static const warehouses = '/inventory/warehouses';
   static const stockMovements = '/inventory/stock-movements';
+  static const stockSummary = '/inventory/stock-summary';
+  static const stockLedger = '/inventory/stock-ledger';
+  static const stockBalances = '/inventory/stock-balances';
   static const physicalCounts = '/inventory/physical-counts';
+  static const physicalCountComplete = '/inventory/physical-counts';
+  static const physicalCountItems = '/inventory/physical-counts';
 
   // Sales
   static const invoices = '/invoices';

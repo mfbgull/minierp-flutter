@@ -842,6 +842,18 @@ abstract class AppLocalizations {
   /// **'No ledger entries found'**
   String get suppliersLedgerNoentries;
 
+  /// No description provided for @suppliersStatement.
+  ///
+  /// In en, this message translates to:
+  /// **'Statement'**
+  String get suppliersStatement;
+
+  /// No description provided for @suppliersOpeningbalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening Balance'**
+  String get suppliersOpeningbalance;
+
   /// No description provided for @reportsReports.
   ///
   /// In en, this message translates to:
@@ -998,6 +1010,84 @@ abstract class AppLocalizations {
   /// **'New Quotation'**
   String get quotationsNewquotation;
 
+  /// No description provided for @quotationsAdditem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Item'**
+  String get quotationsAdditem;
+
+  /// No description provided for @quotationsDetailstitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quotation Details'**
+  String get quotationsDetailstitle;
+
+  /// No description provided for @quotationsEditsquotation.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Quotation'**
+  String get quotationsEditsquotation;
+
+  /// No description provided for @quotationsErrorCustomerrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a customer'**
+  String get quotationsErrorCustomerrequired;
+
+  /// No description provided for @quotationsErrorDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a date'**
+  String get quotationsErrorDate;
+
+  /// No description provided for @quotationsErrorItemsrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least one item'**
+  String get quotationsErrorItemsrequired;
+
+  /// No description provided for @quotationsExpirydate.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Date'**
+  String get quotationsExpirydate;
+
+  /// No description provided for @quotationsItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Item'**
+  String get quotationsItem;
+
+  /// No description provided for @quotationsQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get quotationsQuantity;
+
+  /// No description provided for @quotationsQuotationdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Quotation Date'**
+  String get quotationsQuotationdate;
+
+  /// No description provided for @quotationsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Quotation saved'**
+  String get quotationsSaved;
+
+  /// No description provided for @quotationsTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms'**
+  String get quotationsTerms;
+
+  /// No description provided for @quotationsUnitprice.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit Price'**
+  String get quotationsUnitprice;
+
   /// No description provided for @quotationsQuotation.
   ///
   /// In en, this message translates to:
@@ -1088,6 +1178,18 @@ abstract class AppLocalizations {
   /// **'Edit'**
   String get quotationsEdit;
 
+  /// No description provided for @quotationsConvertconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'This will create a sales order from this quotation and mark it as converted. Continue?'**
+  String get quotationsConvertconfirm;
+
+  /// No description provided for @quotationsConvertedmsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Quotation converted — sales order {soNo} created'**
+  String quotationsConvertedmsg(Object soNo);
+
   /// No description provided for @quotationsConverttoso.
   ///
   /// In en, this message translates to:
@@ -1154,6 +1256,18 @@ abstract class AppLocalizations {
   /// **'Purchase Order Details'**
   String get purchaseordersDetailstitle;
 
+  /// No description provided for @purchaseordersDeleteconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this purchase order? This cannot be undone.'**
+  String get purchaseordersDeleteconfirm;
+
+  /// No description provided for @purchaseordersDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase order deleted'**
+  String get purchaseordersDeleted;
+
   /// No description provided for @purchaseordersNoitems.
   ///
   /// In en, this message translates to:
@@ -1165,6 +1279,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Balance'**
   String get purchaseordersBalance;
+
+  /// No description provided for @purchaseordersAdditem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Item'**
+  String get purchaseordersAdditem;
+
+  /// No description provided for @purchaseordersEditpurchaseorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Purchase Order'**
+  String get purchaseordersEditpurchaseorder;
+
+  /// No description provided for @purchaseordersErrorItemsrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least one item'**
+  String get purchaseordersErrorItemsrequired;
+
+  /// No description provided for @purchaseordersErrorSupplierrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a supplier'**
+  String get purchaseordersErrorSupplierrequired;
+
+  /// No description provided for @purchaseordersPodate.
+  ///
+  /// In en, this message translates to:
+  /// **'PO Date'**
+  String get purchaseordersPodate;
+
+  /// No description provided for @purchaseordersSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase order saved'**
+  String get purchaseordersSaved;
+
+  /// No description provided for @purchaseordersSubmitconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit this purchase order? It will be locked and posted to the supplier ledger.'**
+  String get purchaseordersSubmitconfirm;
+
+  /// No description provided for @purchaseordersSubmittedsuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase order submitted'**
+  String get purchaseordersSubmittedsuccess;
+
+  /// No description provided for @purchaseordersUnitprice.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit Price'**
+  String get purchaseordersUnitprice;
 
   /// No description provided for @salesordersSalesorders.
   ///
@@ -1201,6 +1369,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Date'**
   String get salesordersDate;
+
+  /// No description provided for @salesordersDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get salesordersDelivered;
 
   /// No description provided for @salesordersDelivery.
   ///
@@ -1291,6 +1465,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to delete sales order'**
   String get salesordersFailed;
+
+  /// No description provided for @salesordersAdditem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Item'**
+  String get salesordersAdditem;
+
+  /// No description provided for @salesordersBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get salesordersBalance;
+
+  /// No description provided for @salesordersCancelconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this sales order? Invoiced orders will have their linked invoice cancelled and stock reversed.'**
+  String get salesordersCancelconfirm;
+
+  /// No description provided for @salesordersCancelledmsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales order cancelled'**
+  String get salesordersCancelledmsg;
+
+  /// No description provided for @salesordersDeliverydate.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery Date'**
+  String get salesordersDeliverydate;
+
+  /// No description provided for @salesordersDetailstitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales Order Details'**
+  String get salesordersDetailstitle;
+
+  /// No description provided for @salesordersEditsalesorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Sales Order'**
+  String get salesordersEditsalesorder;
+
+  /// No description provided for @salesordersErrorCustomerrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a customer'**
+  String get salesordersErrorCustomerrequired;
+
+  /// No description provided for @salesordersErrorDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a date'**
+  String get salesordersErrorDate;
+
+  /// No description provided for @salesordersErrorItemsrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least one item'**
+  String get salesordersErrorItemsrequired;
+
+  /// No description provided for @salesordersItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Item'**
+  String get salesordersItem;
+
+  /// No description provided for @salesordersNoitems.
+  ///
+  /// In en, this message translates to:
+  /// **'No items on this order'**
+  String get salesordersNoitems;
+
+  /// No description provided for @salesordersQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get salesordersQuantity;
+
+  /// No description provided for @salesordersSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales order saved'**
+  String get salesordersSaved;
+
+  /// No description provided for @salesordersSodate.
+  ///
+  /// In en, this message translates to:
+  /// **'SO Date'**
+  String get salesordersSodate;
+
+  /// No description provided for @salesordersUnitprice.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit Price'**
+  String get salesordersUnitprice;
 
   /// No description provided for @productionProduction.
   ///
@@ -1459,6 +1729,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New Adjustment'**
   String get stockmovementsNewadjustment;
+
+  /// No description provided for @stockmovementsAdjustmentinvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid quantity'**
+  String get stockmovementsAdjustmentinvalid;
+
+  /// No description provided for @stockmovementsAdjustmentmsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock adjustment recorded'**
+  String get stockmovementsAdjustmentmsg;
+
+  /// No description provided for @stockmovementsAdjustmentreason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get stockmovementsAdjustmentreason;
+
+  /// No description provided for @stockmovementsAdjustmentsave.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Adjustment'**
+  String get stockmovementsAdjustmentsave;
+
+  /// No description provided for @stockmovementsAdjustmentzero.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity cannot be zero'**
+  String get stockmovementsAdjustmentzero;
+
+  /// No description provided for @stockmovementsAdjustmentsubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Item, Warehouse, Quantity — negative quantity adjusts stock down.'**
+  String get stockmovementsAdjustmentsubtitle;
+
+  /// No description provided for @stockmovementsAdjustmenthint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. -10 or 10'**
+  String get stockmovementsAdjustmenthint;
+
+  /// No description provided for @stockmovementsNewtransfer.
+  ///
+  /// In en, this message translates to:
+  /// **'New Transfer'**
+  String get stockmovementsNewtransfer;
+
+  /// No description provided for @stockmovementsTransfersubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Creates an outgoing movement from the source warehouse and an incoming movement to the destination.'**
+  String get stockmovementsTransfersubtitle;
+
+  /// No description provided for @stockmovementsTransferfrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From Warehouse'**
+  String get stockmovementsTransferfrom;
+
+  /// No description provided for @stockmovementsTransferto.
+  ///
+  /// In en, this message translates to:
+  /// **'To Warehouse'**
+  String get stockmovementsTransferto;
+
+  /// No description provided for @stockmovementsTransfersave.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer Stock'**
+  String get stockmovementsTransfersave;
+
+  /// No description provided for @stockmovementsTransfermsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock transferred'**
+  String get stockmovementsTransfermsg;
+
+  /// No description provided for @stockmovementsTransferdiff.
+  ///
+  /// In en, this message translates to:
+  /// **'Source and destination must be different'**
+  String get stockmovementsTransferdiff;
+
+  /// No description provided for @stockmovementsTransferpositive.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity must be positive'**
+  String get stockmovementsTransferpositive;
+
+  /// No description provided for @stockmovementsTransferpartialfail.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer incomplete: the outgoing movement was recorded, but the incoming leg failed:'**
+  String get stockmovementsTransferpartialfail;
+
+  /// No description provided for @stockmovementsReverse.
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse Adjustment'**
+  String get stockmovementsReverse;
+
+  /// No description provided for @stockmovementsReverseconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Post a compensating movement for this adjustment? Stock will be adjusted back by the same quantity.'**
+  String get stockmovementsReverseconfirm;
+
+  /// No description provided for @stockmovementsReversemsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustment reversed'**
+  String get stockmovementsReversemsg;
+
+  /// No description provided for @stockmovementsFilterall.
+  ///
+  /// In en, this message translates to:
+  /// **'All Movements'**
+  String get stockmovementsFilterall;
+
+  /// No description provided for @stockmovementsFilterpurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase'**
+  String get stockmovementsFilterpurchase;
+
+  /// No description provided for @stockmovementsFiltersale.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale'**
+  String get stockmovementsFiltersale;
+
+  /// No description provided for @stockmovementsFiltertransfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer'**
+  String get stockmovementsFiltertransfer;
+
+  /// No description provided for @stockmovementsFilterproduction.
+  ///
+  /// In en, this message translates to:
+  /// **'Production'**
+  String get stockmovementsFilterproduction;
+
+  /// No description provided for @stockmovementsFilteradjustment.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustment'**
+  String get stockmovementsFilteradjustment;
+
+  /// No description provided for @stockmovementsLinkedmovement.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked Movement'**
+  String get stockmovementsLinkedmovement;
 
   /// No description provided for @stockmovementsAlltransactions.
   ///
@@ -2510,6 +2936,12 @@ abstract class AppLocalizations {
   /// **'All transactions'**
   String get purchasesAlltransactions;
 
+  /// No description provided for @purchasesAvailableqty.
+  ///
+  /// In en, this message translates to:
+  /// **'Available for Return'**
+  String get purchasesAvailableqty;
+
   /// No description provided for @purchasesTotalvaluecard.
   ///
   /// In en, this message translates to:
@@ -2635,6 +3067,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Date'**
   String get purchasesDatecol;
+
+  /// No description provided for @purchasesDetailstitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase Details'**
+  String get purchasesDetailstitle;
 
   /// No description provided for @purchasesItemcol.
   ///
@@ -2816,6 +3254,12 @@ abstract class AppLocalizations {
   /// **'View Returns'**
   String get purchasesReturnhistory;
 
+  /// No description provided for @purchasesReturnno.
+  ///
+  /// In en, this message translates to:
+  /// **'Return No'**
+  String get purchasesReturnno;
+
   /// No description provided for @purchasesReturnnoitems.
   ///
   /// In en, this message translates to:
@@ -2839,6 +3283,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Return Qty'**
   String get purchasesReturnqty;
+
+  /// No description provided for @purchasesReturnqtyexceeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Return quantity exceeds the available quantity'**
+  String get purchasesReturnqtyexceeds;
+
+  /// No description provided for @purchasesReturnqtyinvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid return quantity'**
+  String get purchasesReturnqtyinvalid;
 
   /// No description provided for @purchasesReturndate.
   ///
@@ -3079,6 +3535,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Receipt'**
   String get salesReceipt;
+
+  /// No description provided for @salesreturnsAvailableqty.
+  ///
+  /// In en, this message translates to:
+  /// **'Available for Return'**
+  String get salesreturnsAvailableqty;
+
+  /// No description provided for @salesreturnsDisposition.
+  ///
+  /// In en, this message translates to:
+  /// **'Disposition'**
+  String get salesreturnsDisposition;
+
+  /// No description provided for @salesreturnsDispositionadjust.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust'**
+  String get salesreturnsDispositionadjust;
+
+  /// No description provided for @salesreturnsDispositioncredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit'**
+  String get salesreturnsDispositioncredit;
+
+  /// No description provided for @salesreturnsDispositionrefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund'**
+  String get salesreturnsDispositionrefund;
+
+  /// No description provided for @salesreturnsOriginalqty.
+  ///
+  /// In en, this message translates to:
+  /// **'Original Qty'**
+  String get salesreturnsOriginalqty;
+
+  /// No description provided for @salesreturnsProcessreturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Process Return'**
+  String get salesreturnsProcessreturn;
+
+  /// No description provided for @salesreturnsReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Return'**
+  String get salesreturnsReturn;
+
+  /// No description provided for @salesreturnsReturndate.
+  ///
+  /// In en, this message translates to:
+  /// **'Return Date'**
+  String get salesreturnsReturndate;
+
+  /// No description provided for @salesreturnsReturnno.
+  ///
+  /// In en, this message translates to:
+  /// **'Return No'**
+  String get salesreturnsReturnno;
+
+  /// No description provided for @salesreturnsReturnnoitems.
+  ///
+  /// In en, this message translates to:
+  /// **'No returns found'**
+  String get salesreturnsReturnnoitems;
+
+  /// No description provided for @salesreturnsReturnprocessed.
+  ///
+  /// In en, this message translates to:
+  /// **'Return processed successfully'**
+  String get salesreturnsReturnprocessed;
+
+  /// No description provided for @salesreturnsReturnqty.
+  ///
+  /// In en, this message translates to:
+  /// **'Return Qty'**
+  String get salesreturnsReturnqty;
+
+  /// No description provided for @salesreturnsReturnqtyexceeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Return quantity exceeds the available quantity'**
+  String get salesreturnsReturnqtyexceeds;
+
+  /// No description provided for @salesreturnsReturnqtyinvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid return quantity'**
+  String get salesreturnsReturnqtyinvalid;
+
+  /// No description provided for @salesreturnsReturnquantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Return Quantity'**
+  String get salesreturnsReturnquantity;
+
+  /// No description provided for @salesreturnsReturnreason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason for Return'**
+  String get salesreturnsReturnreason;
+
+  /// No description provided for @salesreturnsReturnreasonplaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter reason for return...'**
+  String get salesreturnsReturnreasonplaceholder;
+
+  /// No description provided for @salesreturnsReturnsubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Process a return for this invoice'**
+  String get salesreturnsReturnsubtitle;
+
+  /// No description provided for @salesreturnsReturntitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice Return'**
+  String get salesreturnsReturntitle;
+
+  /// No description provided for @salesreturnsReturnvalue.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Return Value'**
+  String get salesreturnsReturnvalue;
 
   /// No description provided for @inventoryItems.
   ///
@@ -3547,6 +4129,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quotations'**
   String get navQuotations;
+
+  /// No description provided for @physicalcountsCancelconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this count? It cannot be completed afterward.'**
+  String get physicalcountsCancelconfirm;
+
+  /// No description provided for @physicalcountsCancelcount.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Count'**
+  String get physicalcountsCancelcount;
+
+  /// No description provided for @physicalcountsCancelledmsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Count cancelled'**
+  String get physicalcountsCancelledmsg;
+
+  /// No description provided for @physicalcountsCompleteconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete this count? Adjustments will be posted for any items with variances.'**
+  String get physicalcountsCompleteconfirm;
+
+  /// No description provided for @physicalcountsCompletecount.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete Count'**
+  String get physicalcountsCompletecount;
+
+  /// No description provided for @physicalcountsCompletedmsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Count completed'**
+  String get physicalcountsCompletedmsg;
+
+  /// No description provided for @physicalcountsRecordhint.
+  ///
+  /// In en, this message translates to:
+  /// **'Counted quantity'**
+  String get physicalcountsRecordhint;
+
+  /// No description provided for @physicalcountsRecordinvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid quantity'**
+  String get physicalcountsRecordinvalid;
+
+  /// No description provided for @physicalcountsRecorditems.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Items'**
+  String get physicalcountsRecorditems;
+
+  /// No description provided for @physicalcountsRecordnone.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter at least one counted quantity'**
+  String get physicalcountsRecordnone;
+
+  /// No description provided for @physicalcountsRecordedmsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Counts recorded'**
+  String get physicalcountsRecordedmsg;
+
+  /// No description provided for @physicalcountsRecordsave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Counts'**
+  String get physicalcountsRecordsave;
+
+  /// No description provided for @warehousesDeletedmsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse deleted'**
+  String get warehousesDeletedmsg;
+
+  /// No description provided for @warehousesDeleteconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this warehouse? It cannot be undone.'**
+  String get warehousesDeleteconfirm;
 
   /// No description provided for @navSalesorders.
   ///
@@ -5468,6 +6134,66 @@ abstract class AppLocalizations {
   /// **'Stock by Warehouse'**
   String get inventoryStockbywarehouse;
 
+  /// No description provided for @inventoryStockledger.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock Ledger'**
+  String get inventoryStockledger;
+
+  /// No description provided for @inventoryStockledgerType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get inventoryStockledgerType;
+
+  /// No description provided for @inventoryStockledgerIn.
+  ///
+  /// In en, this message translates to:
+  /// **'In'**
+  String get inventoryStockledgerIn;
+
+  /// No description provided for @inventoryStockledgerOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Out'**
+  String get inventoryStockledgerOut;
+
+  /// No description provided for @inventoryStockledgerBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get inventoryStockledgerBalance;
+
+  /// No description provided for @inventoryStockledgerNoentries.
+  ///
+  /// In en, this message translates to:
+  /// **'No stock movements found'**
+  String get inventoryStockledgerNoentries;
+
+  /// No description provided for @inventoryStockledgerAllwarehouses.
+  ///
+  /// In en, this message translates to:
+  /// **'All Warehouses'**
+  String get inventoryStockledgerAllwarehouses;
+
+  /// No description provided for @inventoryStockledgerExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to CSV'**
+  String get inventoryStockledgerExportcsv;
+
+  /// No description provided for @inventoryStockledgerExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock ledger exported'**
+  String get inventoryStockledgerExported;
+
+  /// No description provided for @inventoryStockledgerExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export stock ledger'**
+  String get inventoryStockledgerExportfailed;
+
   /// No description provided for @inventoryRack.
   ///
   /// In en, this message translates to:
@@ -5731,6 +6457,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Must be 0 or more'**
   String get inventoryErrorNonnegative;
+
+  /// No description provided for @salesClicktoadditem.
+  ///
+  /// In en, this message translates to:
+  /// **'Click to add item...'**
+  String get salesClicktoadditem;
+
+  /// No description provided for @salesNoproductsfound.
+  ///
+  /// In en, this message translates to:
+  /// **'No products found'**
+  String get salesNoproductsfound;
+
+  /// No description provided for @salesPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get salesPayment;
+
+  /// No description provided for @salesRecordpaymentnow.
+  ///
+  /// In en, this message translates to:
+  /// **'Record payment now'**
+  String get salesRecordpaymentnow;
+
+  /// No description provided for @salesPaymenthistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment History'**
+  String get salesPaymenthistory;
+
+  /// No description provided for @salesPaymentdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Date'**
+  String get salesPaymentdate;
+
+  /// No description provided for @salesPaymentmethods.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Methods'**
+  String get salesPaymentmethods;
+
+  /// No description provided for @salesAddmethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Method'**
+  String get salesAddmethod;
+
+  /// No description provided for @salesMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Method'**
+  String get salesMethod;
+
+  /// No description provided for @salesReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get salesReference;
+
+  /// No description provided for @salesPaymenttotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Total'**
+  String get salesPaymenttotal;
+
+  /// No description provided for @paymentsErrorAmountGreaterThanZero.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment amount must be greater than zero'**
+  String get paymentsErrorAmountGreaterThanZero;
+
+  /// No description provided for @paymentsErrorAmountExceedsBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment exceeds the remaining balance of {balance}'**
+  String paymentsErrorAmountExceedsBalance(Object balance);
+
+  /// No description provided for @salesPaymentrecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment recorded'**
+  String get salesPaymentrecorded;
+
+  /// No description provided for @salesEditpayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Payment'**
+  String get salesEditpayment;
+
+  /// No description provided for @salesPaymentupdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment updated'**
+  String get salesPaymentupdated;
+
+  /// No description provided for @salesDiscountscope.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount Scope'**
+  String get salesDiscountscope;
+
+  /// No description provided for @salesInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice'**
+  String get salesInvoice;
+
+  /// No description provided for @salesPeritem.
+  ///
+  /// In en, this message translates to:
+  /// **'Per Item'**
+  String get salesPeritem;
 }
 
 class _AppLocalizationsDelegate

@@ -31,11 +31,12 @@ String? nonNegativeNumberValidator(
 }
 
 /// The dense input decoration used by every field in the form dialogs.
-InputDecoration formInputDecoration() => InputDecoration(
-      isDense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-    );
+InputDecoration formInputDecoration({String? hintText}) => InputDecoration(
+  isDense: true,
+  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+  hintText: hintText,
+);
 
 /// Inline API-error banner shown above the dialog footer on ApiFailure.
 class ErrorBanner extends StatelessWidget {
@@ -59,10 +60,9 @@ class ErrorBanner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: scheme.onErrorContainer),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onErrorContainer),
             ),
           ),
         ],

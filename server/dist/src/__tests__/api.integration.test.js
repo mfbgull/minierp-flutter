@@ -230,6 +230,51 @@ describe('Inventory Endpoints', () => {
             .set('Cookie', `token=${token}`);
         expect(res.status).toBe(200);
     });
+    it('GET /api/inventory/stock-movements - returns stock movements with auth', async () => {
+        const res = await (0, supertest_1.default)(app_1.default)
+            .get('/api/inventory/stock-movements')
+            .set('Cookie', `token=${token}`);
+        expect(res.status).toBe(200);
+    });
+    it('GET /api/inventory/stock-movements/:id - returns the joined movement', async () => {
+        // The fresh test DB has no items/warehouses/movements — create the
+        // chain first.
+        const item = await (0, supertest_1.default)(app_1.default)
+            .post('/api/inventory/items')
+            .set('Cookie', `token=${token}`)
+            .send({ item_code: 'IT-DETAIL', item_name: 'Detail Test Item' });
+        expect(item.status).toBe(201);
+        const warehouse = await (0, supertest_1.default)(app_1.default)
+            .post('/api/inventory/warehouses')
+            .set('Cookie', `token=${token}`)
+            .send({ warehouse_code: 'WH-DETAIL', warehouse_name: 'Detail Test WH' });
+        expect(warehouse.status).toBe(201);
+        const created = await (0, supertest_1.default)(app_1.default)
+            .post('/api/inventory/stock-movements')
+            .set('Cookie', `token=${token}`)
+            .send({
+            item_id: item.body.id,
+            warehouse_id: warehouse.body.id,
+            quantity: 5,
+            movement_type: 'ADJUSTMENT',
+            remarks: 'detail test',
+        });
+        expect(created.status).toBe(201);
+        const res = await (0, supertest_1.default)(app_1.default)
+            .get(`/api/inventory/stock-movements/${created.body.id}`)
+            .set('Cookie', `token=${token}`);
+        expect(res.status).toBe(200);
+        expect(res.body.id).toBe(created.body.id);
+        expect(res.body.movement_no).toBe(created.body.movement_no);
+        expect(res.body.item_code).toBe('IT-DETAIL');
+        expect(res.body.warehouse_code).toBe('WH-DETAIL');
+    });
+    it('GET /api/inventory/stock-movements/999999 - returns 404', async () => {
+        const res = await (0, supertest_1.default)(app_1.default)
+            .get('/api/inventory/stock-movements/999999')
+            .set('Cookie', `token=${token}`);
+        expect(res.status).toBe(404);
+    });
 });
 describe('Security Tests', () => {
     let authCookie;

@@ -406,6 +406,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get suppliersLedgerNoentries => 'No ledger entries found';
 
   @override
+  String get suppliersStatement => 'Statement';
+
+  @override
+  String get suppliersOpeningbalance => 'Opening Balance';
+
+  @override
   String get reportsReports => 'Reports';
 
   @override
@@ -484,6 +490,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quotationsNewquotation => 'New Quotation';
 
   @override
+  String get quotationsAdditem => 'Add Item';
+
+  @override
+  String get quotationsDetailstitle => 'Quotation Details';
+
+  @override
+  String get quotationsEditsquotation => 'Edit Quotation';
+
+  @override
+  String get quotationsErrorCustomerrequired => 'Select a customer';
+
+  @override
+  String get quotationsErrorDate => 'Select a date';
+
+  @override
+  String get quotationsErrorItemsrequired => 'Add at least one item';
+
+  @override
+  String get quotationsExpirydate => 'Expiry Date';
+
+  @override
+  String get quotationsItem => 'Item';
+
+  @override
+  String get quotationsQuantity => 'Quantity';
+
+  @override
+  String get quotationsQuotationdate => 'Quotation Date';
+
+  @override
+  String get quotationsSaved => 'Quotation saved';
+
+  @override
+  String get quotationsTerms => 'Terms';
+
+  @override
+  String get quotationsUnitprice => 'Unit Price';
+
+  @override
   String get quotationsQuotation => 'Quotation #';
 
   @override
@@ -529,6 +574,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quotationsEdit => 'Edit';
 
   @override
+  String get quotationsConvertconfirm =>
+      'This will create a sales order from this quotation and mark it as converted. Continue?';
+
+  @override
+  String quotationsConvertedmsg(Object soNo) {
+    return 'Quotation converted — sales order $soNo created';
+  }
+
+  @override
   String get quotationsConverttoso => 'Convert to SO';
 
   @override
@@ -563,10 +617,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchaseordersDetailstitle => 'Purchase Order Details';
 
   @override
+  String get purchaseordersDeleteconfirm =>
+      'Are you sure you want to delete this purchase order? This cannot be undone.';
+
+  @override
+  String get purchaseordersDeleted => 'Purchase order deleted';
+
+  @override
   String get purchaseordersNoitems => 'No items on this order';
 
   @override
   String get purchaseordersBalance => 'Balance';
+
+  @override
+  String get purchaseordersAdditem => 'Add Item';
+
+  @override
+  String get purchaseordersEditpurchaseorder => 'Edit Purchase Order';
+
+  @override
+  String get purchaseordersErrorItemsrequired => 'Add at least one item';
+
+  @override
+  String get purchaseordersErrorSupplierrequired => 'Select a supplier';
+
+  @override
+  String get purchaseordersPodate => 'PO Date';
+
+  @override
+  String get purchaseordersSaved => 'Purchase order saved';
+
+  @override
+  String get purchaseordersSubmitconfirm =>
+      'Submit this purchase order? It will be locked and posted to the supplier ledger.';
+
+  @override
+  String get purchaseordersSubmittedsuccess => 'Purchase order submitted';
+
+  @override
+  String get purchaseordersUnitprice => 'Unit Price';
 
   @override
   String get salesordersSalesorders => 'Sales Orders';
@@ -585,6 +674,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get salesordersDate => 'Date';
+
+  @override
+  String get salesordersDelivered => 'Delivered';
 
   @override
   String get salesordersDelivery => 'Delivery';
@@ -631,6 +723,55 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get salesordersFailed => 'Failed to delete sales order';
+
+  @override
+  String get salesordersAdditem => 'Add Item';
+
+  @override
+  String get salesordersBalance => 'Balance';
+
+  @override
+  String get salesordersCancelconfirm =>
+      'Cancel this sales order? Invoiced orders will have their linked invoice cancelled and stock reversed.';
+
+  @override
+  String get salesordersCancelledmsg => 'Sales order cancelled';
+
+  @override
+  String get salesordersDeliverydate => 'Delivery Date';
+
+  @override
+  String get salesordersDetailstitle => 'Sales Order Details';
+
+  @override
+  String get salesordersEditsalesorder => 'Edit Sales Order';
+
+  @override
+  String get salesordersErrorCustomerrequired => 'Select a customer';
+
+  @override
+  String get salesordersErrorDate => 'Select a date';
+
+  @override
+  String get salesordersErrorItemsrequired => 'Add at least one item';
+
+  @override
+  String get salesordersItem => 'Item';
+
+  @override
+  String get salesordersNoitems => 'No items on this order';
+
+  @override
+  String get salesordersQuantity => 'Quantity';
+
+  @override
+  String get salesordersSaved => 'Sales order saved';
+
+  @override
+  String get salesordersSodate => 'SO Date';
+
+  @override
+  String get salesordersUnitprice => 'Unit Price';
 
   @override
   String get productionProduction => 'Production';
@@ -715,6 +856,89 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stockmovementsNewadjustment => 'New Adjustment';
+
+  @override
+  String get stockmovementsAdjustmentinvalid => 'Enter a valid quantity';
+
+  @override
+  String get stockmovementsAdjustmentmsg => 'Stock adjustment recorded';
+
+  @override
+  String get stockmovementsAdjustmentreason => 'Reason';
+
+  @override
+  String get stockmovementsAdjustmentsave => 'Record Adjustment';
+
+  @override
+  String get stockmovementsAdjustmentzero => 'Quantity cannot be zero';
+
+  @override
+  String get stockmovementsAdjustmentsubtitle =>
+      'Item, Warehouse, Quantity — negative quantity adjusts stock down.';
+
+  @override
+  String get stockmovementsAdjustmenthint => 'e.g. -10 or 10';
+
+  @override
+  String get stockmovementsNewtransfer => 'New Transfer';
+
+  @override
+  String get stockmovementsTransfersubtitle =>
+      'Creates an outgoing movement from the source warehouse and an incoming movement to the destination.';
+
+  @override
+  String get stockmovementsTransferfrom => 'From Warehouse';
+
+  @override
+  String get stockmovementsTransferto => 'To Warehouse';
+
+  @override
+  String get stockmovementsTransfersave => 'Transfer Stock';
+
+  @override
+  String get stockmovementsTransfermsg => 'Stock transferred';
+
+  @override
+  String get stockmovementsTransferdiff =>
+      'Source and destination must be different';
+
+  @override
+  String get stockmovementsTransferpositive => 'Quantity must be positive';
+
+  @override
+  String get stockmovementsTransferpartialfail =>
+      'Transfer incomplete: the outgoing movement was recorded, but the incoming leg failed:';
+
+  @override
+  String get stockmovementsReverse => 'Reverse Adjustment';
+
+  @override
+  String get stockmovementsReverseconfirm =>
+      'Post a compensating movement for this adjustment? Stock will be adjusted back by the same quantity.';
+
+  @override
+  String get stockmovementsReversemsg => 'Adjustment reversed';
+
+  @override
+  String get stockmovementsFilterall => 'All Movements';
+
+  @override
+  String get stockmovementsFilterpurchase => 'Purchase';
+
+  @override
+  String get stockmovementsFiltersale => 'Sale';
+
+  @override
+  String get stockmovementsFiltertransfer => 'Transfer';
+
+  @override
+  String get stockmovementsFilterproduction => 'Production';
+
+  @override
+  String get stockmovementsFilteradjustment => 'Adjustment';
+
+  @override
+  String get stockmovementsLinkedmovement => 'Linked Movement';
 
   @override
   String get stockmovementsAlltransactions => 'All transactions';
@@ -1253,6 +1477,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchasesAlltransactions => 'All transactions';
 
   @override
+  String get purchasesAvailableqty => 'Available for Return';
+
+  @override
   String get purchasesTotalvaluecard => 'Total Value';
 
   @override
@@ -1314,6 +1541,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get purchasesDatecol => 'Date';
+
+  @override
+  String get purchasesDetailstitle => 'Purchase Details';
 
   @override
   String get purchasesItemcol => 'Item';
@@ -1407,6 +1637,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchasesReturnhistory => 'View Returns';
 
   @override
+  String get purchasesReturnno => 'Return No';
+
+  @override
   String get purchasesReturnnoitems => 'No returns found';
 
   @override
@@ -1417,6 +1650,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get purchasesReturnqty => 'Return Qty';
+
+  @override
+  String get purchasesReturnqtyexceeds =>
+      'Return quantity exceeds the available quantity';
+
+  @override
+  String get purchasesReturnqtyinvalid => 'Enter a valid return quantity';
 
   @override
   String get purchasesReturndate => 'Return Date';
@@ -1537,6 +1777,71 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get salesReceipt => 'Receipt';
+
+  @override
+  String get salesreturnsAvailableqty => 'Available for Return';
+
+  @override
+  String get salesreturnsDisposition => 'Disposition';
+
+  @override
+  String get salesreturnsDispositionadjust => 'Adjust';
+
+  @override
+  String get salesreturnsDispositioncredit => 'Credit';
+
+  @override
+  String get salesreturnsDispositionrefund => 'Refund';
+
+  @override
+  String get salesreturnsOriginalqty => 'Original Qty';
+
+  @override
+  String get salesreturnsProcessreturn => 'Process Return';
+
+  @override
+  String get salesreturnsReturn => 'Return';
+
+  @override
+  String get salesreturnsReturndate => 'Return Date';
+
+  @override
+  String get salesreturnsReturnno => 'Return No';
+
+  @override
+  String get salesreturnsReturnnoitems => 'No returns found';
+
+  @override
+  String get salesreturnsReturnprocessed => 'Return processed successfully';
+
+  @override
+  String get salesreturnsReturnqty => 'Return Qty';
+
+  @override
+  String get salesreturnsReturnqtyexceeds =>
+      'Return quantity exceeds the available quantity';
+
+  @override
+  String get salesreturnsReturnqtyinvalid => 'Enter a valid return quantity';
+
+  @override
+  String get salesreturnsReturnquantity => 'Return Quantity';
+
+  @override
+  String get salesreturnsReturnreason => 'Reason for Return';
+
+  @override
+  String get salesreturnsReturnreasonplaceholder =>
+      'Enter reason for return...';
+
+  @override
+  String get salesreturnsReturnsubtitle => 'Process a return for this invoice';
+
+  @override
+  String get salesreturnsReturntitle => 'Invoice Return';
+
+  @override
+  String get salesreturnsReturnvalue => 'Total Return Value';
 
   @override
   String get inventoryItems => 'Items';
@@ -1772,6 +2077,51 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get navQuotations => 'Quotations';
+
+  @override
+  String get physicalcountsCancelconfirm =>
+      'Cancel this count? It cannot be completed afterward.';
+
+  @override
+  String get physicalcountsCancelcount => 'Cancel Count';
+
+  @override
+  String get physicalcountsCancelledmsg => 'Count cancelled';
+
+  @override
+  String get physicalcountsCompleteconfirm =>
+      'Complete this count? Adjustments will be posted for any items with variances.';
+
+  @override
+  String get physicalcountsCompletecount => 'Complete Count';
+
+  @override
+  String get physicalcountsCompletedmsg => 'Count completed';
+
+  @override
+  String get physicalcountsRecordhint => 'Counted quantity';
+
+  @override
+  String get physicalcountsRecordinvalid => 'Enter a valid quantity';
+
+  @override
+  String get physicalcountsRecorditems => 'Record Items';
+
+  @override
+  String get physicalcountsRecordnone => 'Enter at least one counted quantity';
+
+  @override
+  String get physicalcountsRecordedmsg => 'Counts recorded';
+
+  @override
+  String get physicalcountsRecordsave => 'Save Counts';
+
+  @override
+  String get warehousesDeletedmsg => 'Warehouse deleted';
+
+  @override
+  String get warehousesDeleteconfirm =>
+      'Delete this warehouse? It cannot be undone.';
 
   @override
   String get navSalesorders => 'Sales Orders';
@@ -2750,6 +3100,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get inventoryStockbywarehouse => 'Stock by Warehouse';
 
   @override
+  String get inventoryStockledger => 'Stock Ledger';
+
+  @override
+  String get inventoryStockledgerType => 'Type';
+
+  @override
+  String get inventoryStockledgerIn => 'In';
+
+  @override
+  String get inventoryStockledgerOut => 'Out';
+
+  @override
+  String get inventoryStockledgerBalance => 'Balance';
+
+  @override
+  String get inventoryStockledgerNoentries => 'No stock movements found';
+
+  @override
+  String get inventoryStockledgerAllwarehouses => 'All Warehouses';
+
+  @override
+  String get inventoryStockledgerExportcsv => 'Export to CSV';
+
+  @override
+  String get inventoryStockledgerExported => 'Stock ledger exported';
+
+  @override
+  String get inventoryStockledgerExportfailed =>
+      'Failed to export stock ledger';
+
+  @override
   String get inventoryRack => 'Rack';
 
   @override
@@ -2880,4 +3261,64 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get inventoryErrorNonnegative => 'Must be 0 or more';
+
+  @override
+  String get salesClicktoadditem => 'Click to add item...';
+
+  @override
+  String get salesNoproductsfound => 'No products found';
+
+  @override
+  String get salesPayment => 'Payment';
+
+  @override
+  String get salesRecordpaymentnow => 'Record payment now';
+
+  @override
+  String get salesPaymenthistory => 'Payment History';
+
+  @override
+  String get salesPaymentdate => 'Payment Date';
+
+  @override
+  String get salesPaymentmethods => 'Payment Methods';
+
+  @override
+  String get salesAddmethod => 'Add Method';
+
+  @override
+  String get salesMethod => 'Method';
+
+  @override
+  String get salesReference => 'Reference';
+
+  @override
+  String get salesPaymenttotal => 'Payment Total';
+
+  @override
+  String get paymentsErrorAmountGreaterThanZero =>
+      'Payment amount must be greater than zero';
+
+  @override
+  String paymentsErrorAmountExceedsBalance(Object balance) {
+    return 'Payment exceeds the remaining balance of $balance';
+  }
+
+  @override
+  String get salesPaymentrecorded => 'Payment recorded';
+
+  @override
+  String get salesEditpayment => 'Edit Payment';
+
+  @override
+  String get salesPaymentupdated => 'Payment updated';
+
+  @override
+  String get salesDiscountscope => 'Discount Scope';
+
+  @override
+  String get salesInvoice => 'Invoice';
+
+  @override
+  String get salesPeritem => 'Per Item';
 }

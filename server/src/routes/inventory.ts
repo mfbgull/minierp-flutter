@@ -24,6 +24,7 @@ router.put('/warehouses/:id', requirePermission('inventory', 'update'), sensitiv
 router.delete('/warehouses/:id', requirePermission('inventory', 'delete'), sensitiveOperationLimiter, inventoryController.deleteWarehouse);
 
 router.get('/stock-movements', requirePermission('inventory', 'read'), inventoryController.getStockMovements);
+router.get('/stock-movements/:id', requirePermission('inventory', 'read'), inventoryController.getStockMovement);
 router.post('/stock-movements', requirePermission('inventory', 'create'), sensitiveOperationLimiter, inventoryController.createStockMovement);
 
 router.get('/stock-summary', requirePermission('inventory', 'read'), inventoryController.getStockSummary);

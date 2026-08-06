@@ -67,14 +67,18 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     final item = widget.item;
     _codeController = TextEditingController(text: item?.itemCode ?? '');
     _nameController = TextEditingController(text: item?.itemName ?? '');
-    _descriptionController =
-        TextEditingController(text: item?.description ?? '');
-    _reorderController =
-        TextEditingController(text: numText(item?.reorderLevel ?? 0));
-    _costController =
-        TextEditingController(text: numText(item?.standardCost ?? 0));
-    _priceController =
-        TextEditingController(text: numText(item?.standardSellingPrice ?? 0));
+    _descriptionController = TextEditingController(
+      text: item?.description ?? '',
+    );
+    _reorderController = TextEditingController(
+      text: numText(item?.reorderLevel ?? 0),
+    );
+    _costController = TextEditingController(
+      text: numText(item?.standardCost ?? 0),
+    );
+    _priceController = TextEditingController(
+      text: numText(item?.standardSellingPrice ?? 0),
+    );
     _category = item?.category;
     _uom = item?.unitOfMeasure;
     _saleType = item?.saleType ?? SaleType.packed;
@@ -156,14 +160,16 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     final categories = ref.watch(itemCategoriesProvider);
     final uoms = ref.watch(itemUomsProvider);
     String? validateNumber(String? v) => nonNegativeNumberValidator(
-          v,
-          emptyMessage: l10n.inventoryRequired,
-          invalidMessage: l10n.inventoryErrorNumber,
-          nonNegativeMessage: l10n.inventoryErrorNonnegative,
-        );
+      v,
+      emptyMessage: l10n.inventoryRequired,
+      invalidMessage: l10n.inventoryErrorNumber,
+      nonNegativeMessage: l10n.inventoryErrorNonnegative,
+    );
 
-    final categoryItems =
-        _withCurrent(categories.valueOrNull ?? const [], _category);
+    final categoryItems = _withCurrent(
+      categories.valueOrNull ?? const [],
+      _category,
+    );
     final uomItems = _withCurrent(uoms.valueOrNull ?? const [], _uom);
 
     return Dialog(
@@ -241,8 +247,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
                                 selected: _category,
                                 labelBuilder: (v) => v,
                                 enabled: !_submitting,
-                                onChanged: (v) =>
-                                    setState(() => _category = v),
+                                onChanged: (v) => setState(() => _category = v),
                               ),
                             ),
                           ),
@@ -277,8 +282,8 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                                      decimal: true,
+                                    ),
                                 decoration: formInputDecoration(),
                                 validator: validateNumber,
                               ),
@@ -293,8 +298,8 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                                      decimal: true,
+                                    ),
                                 decoration: formInputDecoration(),
                                 validator: validateNumber,
                               ),
@@ -309,8 +314,8 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                                      decimal: true,
+                                    ),
                                 decoration: formInputDecoration(),
                                 validator: validateNumber,
                               ),
@@ -399,8 +404,9 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : Text(l10n.commonSave),
                         ),
@@ -432,9 +438,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
             controlAffinity: ListTileControlAffinity.leading,
             title: Text(label, style: Theme.of(context).textTheme.bodyMedium),
             value: value,
-            onChanged: _submitting
-                ? null
-                : (v) => onChanged(v ?? false),
+            onChanged: _submitting ? null : (v) => onChanged(v ?? false),
           ),
         );
     return Row(
@@ -445,4 +449,3 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     );
   }
 }
-
