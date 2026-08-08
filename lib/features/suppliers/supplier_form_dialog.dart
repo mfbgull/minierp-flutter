@@ -21,7 +21,10 @@ import '../../widgets/form_helpers.dart';
 import 'supplier_providers.dart';
 
 /// Opens the create ([supplier] == null) or edit form dialog.
-Future<void> showSupplierFormDialog(BuildContext context, {Supplier? supplier}) {
+Future<void> showSupplierFormDialog(
+  BuildContext context, {
+  Supplier? supplier,
+}) {
   return showDialog<void>(
     context: context,
     builder: (dialogContext) => SupplierFormDialog(supplier: supplier),
@@ -62,18 +65,18 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
   void initState() {
     super.initState();
     final supplier = widget.supplier;
-    _codeController =
-        TextEditingController(text: supplier?.supplierCode ?? '');
-    _nameController =
-        TextEditingController(text: supplier?.supplierName ?? '');
-    _contactController =
-        TextEditingController(text: supplier?.contactPerson ?? '');
+    _codeController = TextEditingController(text: supplier?.supplierCode ?? '');
+    _nameController = TextEditingController(text: supplier?.supplierName ?? '');
+    _contactController = TextEditingController(
+      text: supplier?.contactPerson ?? '',
+    );
     _emailController = TextEditingController(text: supplier?.email ?? '');
     _phoneController = TextEditingController(text: supplier?.phone ?? '');
     _addressController = TextEditingController(text: supplier?.address ?? '');
     // The web form defaults payment terms to 'Net 30'.
-    _termsController =
-        TextEditingController(text: supplier?.paymentTerms ?? 'Net 30');
+    _termsController = TextEditingController(
+      text: supplier?.paymentTerms ?? 'Net 30',
+    );
     _isActive = supplier?.isActive ?? true;
   }
 
@@ -206,9 +209,9 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
                                 validator: _isEdit
                                     ? null
                                     : (v) => requiredValidator(
-                                          v,
-                                          l10n.suppliersErrorCodeRequired,
-                                        ),
+                                        v,
+                                        l10n.suppliersErrorCodeRequired,
+                                      ),
                               ),
                             ),
                           ),
@@ -342,8 +345,9 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : Text(l10n.commonSave),
                         ),

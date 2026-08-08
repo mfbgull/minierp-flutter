@@ -19,44 +19,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/utils/csv_export.dart';
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
+import '../../core/utils/invoice_status.dart';
 import '../../data/models/invoice.dart' show Invoice;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/status_badge.dart';
 import 'invoice_providers.dart';
-
-/// Localized label for an invoice status value, falling back to the raw
-/// server value when there's no key (defensive — the server owns the
-/// status vocabulary).
-String _statusLabel(AppLocalizations l10n, String status) => switch (status) {
-      'Draft' => l10n.statusDraft,
-      'Sent' => l10n.statusSent,
-      'Paid' => l10n.statusPaid,
-      'Unpaid' => l10n.statusUnpaid,
-      'Overdue' => l10n.statusOverdue,
-      'Cancelled' => l10n.statusCancelled,
-      'Partially Paid' => l10n.statusPartiallypaid,
-      'Returned' => l10n.statusReturned,
-      'Partially Returned' => l10n.statusPartiallyreturned,
-      _ => status,
-    };
-
-/// Status chip color (light) — port of the statusColors conventions in
-/// PORTING.md §6.
-Color _statusColor(String status) => switch (status) {
-      'Draft' => Colors.blueGrey,
-      'Sent' => Colors.lightBlue,
-      'Unpaid' => Colors.orange,
-      'Partially Paid' => Colors.amber,
-      'Paid' => Colors.green,
-      'Overdue' => Colors.red,
-      'Cancelled' => Colors.grey,
-      'Returned' => Colors.purple,
-      'Partially Returned' => Colors.deepPurple,
-      _ => Colors.blueGrey,
-    };
 
 /// Invoice-status options for the filter dropdown (display → server
 /// value; `All` = null = param omitted).
@@ -135,30 +108,10 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         return false;
       }
       final iso = inv.invoiceDate;
-      if (from != null && iso.compareTo(_isoDate(from)) < 0) return false;
-      if (to != null && iso.compareTo(_isoDate(to)) > 0) return false;
+      if (from != null && iso.compareTo(isoDate(from)) < 0) return false;
+      if (to != null && iso.compareTo(isoDate(to)) > 0) return false;
       return true;
     }).toList();
-  }
-
-  static String _isoDate(DateTime d) =>
-      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-
-  Future<void> _pickDate({required bool isFrom}) async {
-    final current = isFrom
-        ? ref.read(invoicesFromDateProvider)
-        : ref.read(invoicesToDateProvider);
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: current ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
-    );
-    if (picked == null || !mounted) return;
-    ref
-        .read((isFrom ? invoicesFromDateProvider : invoicesToDateProvider)
-            .notifier)
-        .state = picked;
   }
 
   /// Pushes the provider state into the grid manager (clear + append,
@@ -171,17 +124,19 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     manager.removeAllRows();
     manager.appendRows([
       for (final inv in rows)
-        PlutoRow(cells: {
-          'id': PlutoCell(value: inv.id),
-          'invoice_no': PlutoCell(value: inv.invoiceNo),
-          'invoice_date': PlutoCell(value: inv.invoiceDate),
-          'customer_name': PlutoCell(value: inv.customerName ?? ''),
-          'status': PlutoCell(value: inv.status),
-          'total_amount': PlutoCell(value: inv.totalAmount),
-          'paid_amount': PlutoCell(value: inv.paidAmount),
-          'balance_amount': PlutoCell(value: inv.balanceAmount),
-          'created_by': PlutoCell(value: inv.createdByUsername ?? ''),
-        }),
+        PlutoRow(
+          cells: {
+            'id': PlutoCell(value: inv.id),
+            'invoice_no': PlutoCell(value: inv.invoiceNo),
+            'invoice_date': PlutoCell(value: inv.invoiceDate),
+            'customer_name': PlutoCell(value: inv.customerName ?? ''),
+            'status': PlutoCell(value: inv.status),
+            'total_amount': PlutoCell(value: inv.totalAmount),
+            'paid_amount': PlutoCell(value: inv.paidAmount),
+            'balance_amount': PlutoCell(value: inv.balanceAmount),
+            'created_by': PlutoCell(value: inv.createdByUsername ?? ''),
+          },
+        ),
     ]);
     manager.setShowLoading(value.isLoading);
   }
@@ -217,22 +172,10 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     );
   }
 
-  Widget _dateButton({required String label, required VoidCallback onTap}) {
-    return SizedBox(
-      width: 120,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.calendar_today_outlined, size: 15),
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          textStyle: Theme.of(context).textTheme.bodyMedium,
-        ),
-      ),
-    );
-  }
-
-  Widget _summaryStrip(AppLocalizations l10n, AsyncValue<List<Invoice>> invoices) {
+  Widget _summaryStrip(
+    AppLocalizations l10n,
+    AsyncValue<List<Invoice>> invoices,
+  ) {
     final scheme = Theme.of(context).colorScheme;
     final rows = _filteredRows(invoices);
     final totalSales = rows.fold<num>(0, (sum, i) => sum + i.totalAmount);
@@ -245,10 +188,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           children: [
             Text(
               label,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelLarge
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: scheme.onSurfaceVariant),
             ),
             const SizedBox(width: 6),
             Flexible(
@@ -256,9 +198,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 Formatters.currency(value),
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                    ),
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
               ),
             ),
           ],
@@ -396,8 +338,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             return Align(
               alignment: Alignment.centerLeft,
               child: StatusBadge(
-                status: _statusLabel(l10n, status),
-                color: _statusColor(status),
+                status: invoiceStatusLabel(l10n, status),
+                color: invoiceStatusColor(status),
               ),
             );
           },
@@ -516,22 +458,33 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 ),
               ),
               _statusDropdown(l10n),
-              _dateButton(
-                label: ref.watch(invoicesFromDateProvider) == null
-                    ? l10n.commonFrom
-                    : Formatters.date(_isoDate(ref.watch(invoicesFromDateProvider)!)),
-                onTap: () => _pickDate(isFrom: true),
-              ),
-              _dateButton(
-                label: ref.watch(invoicesToDateProvider) == null
-                    ? l10n.commonTo
-                    : Formatters.date(_isoDate(ref.watch(invoicesToDateProvider)!)),
-                onTap: () => _pickDate(isFrom: false),
+              DateRangeFilter(
+                width: 120,
+                fromProvider: invoicesFromDateProvider,
+                toProvider: invoicesToDateProvider,
               ),
               IconButton(
                 icon: const Icon(Icons.refresh),
                 tooltip: l10n.commonRefresh,
                 onPressed: _refresh,
+              ),
+              const SizedBox(width: 12),
+              // CSV export — mirrors the orders grids: the pure builder
+              // runs over the currently-filtered rows and the shared
+              // save helper owns the FilePicker + toast. Disabled until
+              // rows are loaded.
+              TextButton.icon(
+                onPressed: invoices.isLoading || _filteredRows(invoices).isEmpty
+                    ? null
+                    : () => saveCsv(
+                        context,
+                        suggestedName: csvSuggestedName('invoices'),
+                        csv: buildInvoicesCsv(l10n, _filteredRows(invoices)),
+                        successMessage: l10n.salesExported,
+                        errorMessage: l10n.salesExportfailed,
+                      ),
+                icon: const Icon(Icons.file_download_outlined, size: 18),
+                label: Text(l10n.salesExportcsv),
               ),
               const SizedBox(width: 12),
               FilledButton.icon(

@@ -12,13 +12,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/csv_export.dart';
+import '../../core/utils/purchase_return_type.dart';
 import '../../data/models/purchase_return.dart' show PurchaseReturn;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/status_badge.dart';
 import 'purchase_return_detail_dialog.dart';
 import 'purchase_return_providers.dart';
-import 'purchase_return_type.dart';
 
 class PurchaseReturnsScreen extends ConsumerStatefulWidget {
   const PurchaseReturnsScreen({super.key});
@@ -78,6 +79,27 @@ class _PurchaseReturnsScreenState extends ConsumerState<PurchaseReturnsScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              // CSV export — mirrors the invoice-returns grid: the pure
+              // builder runs here and the shared save helper owns the
+              // FilePicker + toast. Disabled until rows are loaded.
+              TextButton.icon(
+                onPressed:
+                    returns.isLoading || (returns.valueOrNull?.isEmpty ?? true)
+                    ? null
+                    : () => saveCsv(
+                        context,
+                        suggestedName: csvSuggestedName('purchase-returns'),
+                        csv: buildPurchaseReturnsCsv(
+                          l10n,
+                          returns.valueOrNull!,
+                        ),
+                        successMessage: l10n.purchasesExported,
+                        errorMessage: l10n.purchasesExportfailed,
+                      ),
+                icon: const Icon(Icons.file_download_outlined, size: 18),
+                label: Text(l10n.purchasesExportcsv),
+              ),
+              const SizedBox(width: 4),
               IconButton(
                 tooltip: l10n.commonRefresh,
                 icon: const Icon(Icons.refresh),

@@ -79,8 +79,10 @@ LedgerTotals calculateLedgerTotals(
   }).toList();
 
   final totalDebit = mainEntries.fold<num>(0, (sum, item) => sum + item.debit);
-  final totalCredit =
-      mainEntries.fold<num>(0, (sum, item) => sum + item.credit);
+  final totalCredit = mainEntries.fold<num>(
+    0,
+    (sum, item) => sum + item.credit,
+  );
 
   // Balance from ALL entries (including returns & returned invoices)
   // so true AR is reflected regardless of sort order.
@@ -125,8 +127,7 @@ num calculateCreditUtilization(num balance, num? creditLimit) {
 /// Overdue invoices (status === 'Overdue' and balance > 0).
 List<Invoice> calculateOverdueInvoices(List<Invoice> invoices) {
   return invoices
-      .where((inv) =>
-          inv.status == 'Overdue' && (inv.balanceAmount) > 0)
+      .where((inv) => inv.status == 'Overdue' && (inv.balanceAmount) > 0)
       .toList();
 }
 
@@ -138,8 +139,7 @@ int countPaidInvoices(List<Invoice> invoices) {
 /// Count unpaid/pending invoices.
 int countUnpaidInvoices(List<Invoice> invoices) {
   return invoices
-      .where((inv) =>
-          inv.status == 'Unpaid' || inv.status == 'Partially Paid')
+      .where((inv) => inv.status == 'Unpaid' || inv.status == 'Partially Paid')
       .length;
 }
 
@@ -153,8 +153,7 @@ num calculateAverageDaysToPay(List<Invoice> invoices) {
 
   final totalDays = paidInvoicesWithPayments.fold<num>(0, (sum, inv) {
     final invoiceDate = DateTime.parse(inv.invoiceDate);
-    final paidDate =
-        DateTime.parse(inv.updatedAt ?? inv.invoiceDate);
+    final paidDate = DateTime.parse(inv.updatedAt ?? inv.invoiceDate);
     final diffDays =
         paidDate.difference(invoiceDate).inMilliseconds / (1000 * 60 * 60 * 24);
     return sum + math.max(0, diffDays);
@@ -166,16 +165,20 @@ num calculateAverageDaysToPay(List<Invoice> invoices) {
 /// Sort invoices by date descending and return the top N.
 List<Invoice> getRecentInvoices(List<Invoice> invoices, {int count = 5}) {
   final sorted = [...invoices];
-  sorted.sort((a, b) => DateTime.parse(b.invoiceDate)
-      .compareTo(DateTime.parse(a.invoiceDate)));
+  sorted.sort(
+    (a, b) =>
+        DateTime.parse(b.invoiceDate).compareTo(DateTime.parse(a.invoiceDate)),
+  );
   return sorted.take(count).toList();
 }
 
 /// Sort payments by date descending and return the top N.
 List<Payment> getRecentPayments(List<Payment> payments, {int count = 5}) {
   final sorted = [...payments];
-  sorted.sort((a, b) => DateTime.parse(b.paymentDate)
-      .compareTo(DateTime.parse(a.paymentDate)));
+  sorted.sort(
+    (a, b) =>
+        DateTime.parse(b.paymentDate).compareTo(DateTime.parse(a.paymentDate)),
+  );
   return sorted.take(count).toList();
 }
 
@@ -189,7 +192,10 @@ CustomerMetrics computeCustomerMetrics(
       .where((inv) => inv.status == 'Returned')
       .map((inv) => inv.invoiceNo)
       .toSet();
-  final totals = calculateLedgerTotals(ledger, returnedInvoiceNos: returnedInvoiceNos);
+  final totals = calculateLedgerTotals(
+    ledger,
+    returnedInvoiceNos: returnedInvoiceNos,
+  );
   final totalInvoiced = calculateTotalInvoiced(invoices);
   final totalPaid = calculateTotalPaid(invoices);
   final overdue = calculateOverdueInvoices(invoices);
@@ -201,7 +207,10 @@ CustomerMetrics computeCustomerMetrics(
     totalInvoiced: totalInvoiced,
     totalPaid: totalPaid,
     totalOutstanding: calculateTotalOutstanding(invoices),
-    creditUtilization: calculateCreditUtilization(totals.balance, customer?.creditLimit),
+    creditUtilization: calculateCreditUtilization(
+      totals.balance,
+      customer?.creditLimit,
+    ),
     overdueInvoicesCount: overdue.length,
     paidInvoicesCount: countPaidInvoices(invoices),
     unpaidInvoicesCount: countUnpaidInvoices(invoices),
@@ -217,7 +226,9 @@ CustomerMetrics computeCustomerMetrics(
 /// formatting use `core/utils/formatters.dart` (`Formatters.currency`) —
 /// the settings-driven symbol is applied by the UI layer.
 String formatAsCurrency(Object? value) {
-  final parsed = value is num ? value : double.tryParse(value?.toString() ?? '');
+  final parsed = value is num
+      ? value
+      : double.tryParse(value?.toString() ?? '');
   if (parsed == null) return r'$0.00';
   return NumberFormat.currency(locale: 'en_US', symbol: r'$').format(parsed);
 }

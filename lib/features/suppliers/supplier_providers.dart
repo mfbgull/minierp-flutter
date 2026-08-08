@@ -69,28 +69,32 @@ final supplierDetailProvider = FutureProvider.autoDispose.family<Supplier, int>(
       ApiFailure(:final error) => throw error,
     };
   },
-);/// The supplier's AP ledger (`GET /suppliers/:id/ledger`, enveloped array,
+);
+
+/// The supplier's AP ledger (`GET /suppliers/:id/ledger`, enveloped array,
 /// newest-first by transaction_date). autoDispose: each ledger dialog owns
 /// its fetch, so closing it frees the state.
-final supplierLedgerProvider =
-    FutureProvider.autoDispose.family<List<LedgerEntry>, int>(
-        (ref, supplierId) async {
-  final result = await ref.watch(supplierRepositoryProvider).ledger(supplierId);
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
+final supplierLedgerProvider = FutureProvider.autoDispose
+    .family<List<LedgerEntry>, int>((ref, supplierId) async {
+      final result = await ref
+          .watch(supplierRepositoryProvider)
+          .ledger(supplierId);
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
 
 /// The supplier's account statement (`GET /suppliers/:id/statement`,
 /// enveloped object with opening/closing balance + oldest-first
 /// transactions). autoDispose: each statement dialog owns its fetch.
-final supplierStatementProvider =
-    FutureProvider.autoDispose.family<StatementData, int>(
-        (ref, supplierId) async {
-  final result = await ref.watch(supplierRepositoryProvider).statement(supplierId);
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
+final supplierStatementProvider = FutureProvider.autoDispose
+    .family<StatementData, int>((ref, supplierId) async {
+      final result = await ref
+          .watch(supplierRepositoryProvider)
+          .statement(supplierId);
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });

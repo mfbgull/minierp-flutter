@@ -163,6 +163,15 @@ class RepositoryClient {
     required T Function(Object?) parse,
   }) => _parseRaw(_guard(() => _dio.put(path, data: body)), parse);
 
+  /// PATCH returning the updated object directly (BOM toggle-active).
+  /// The standard helpers cover the server's GET/POST/PUT/DELETE verbs;
+  /// this one exists for the handful of PATCH endpoints.
+  Future<ApiResult<T>> patchRaw<T>(
+    String path, {
+    Object? body,
+    required T Function(Object?) parse,
+  }) => _parseRaw(_guard(() => _dio.patch(path, data: body)), parse);
+
   /// DELETE returning a bare body (invoice delete: `{message}` — no
   /// envelope, unlike the enveloped `delete` used by items/customers).
   Future<ApiResult<void>> deleteRaw(String path) async {

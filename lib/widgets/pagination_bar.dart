@@ -45,9 +45,7 @@ class ServerPaginationBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         border: Border.all(color: scheme.outlineVariant),
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(8),
-        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
       ),
       child: Row(
         children: [
@@ -58,10 +56,9 @@ class ServerPaginationBar extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             '· $totalItems $itemLabel',
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: scheme.onSurfaceVariant),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
           const Spacer(),
           Text(

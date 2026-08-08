@@ -32,9 +32,7 @@ final invoicesProvider = FutureProvider<List<Invoice>>((ref) async {
   final status = ref.watch(invoicesStatusProvider);
   final repo = ref.watch(invoiceRepositoryProvider);
 
-  final result = await repo.invoices(
-    filters: InvoiceFilters(status: status),
-  );
+  final result = await repo.invoices(filters: InvoiceFilters(status: status));
 
   return switch (result) {
     ApiSuccess(:final data) => data,
@@ -45,13 +43,9 @@ final invoicesProvider = FutureProvider<List<Invoice>>((ref) async {
 /// All customers for the invoice form's customer select (the customers
 /// endpoint paginates; the form needs the full list in one dropdown).
 final invoiceCustomersProvider = FutureProvider<List<Customer>>((ref) async {
-  final result = await ref.watch(customerRepositoryProvider).list(
-        const PagedRequest(
-          page: 1,
-          limit: 1000,
-          sortBy: 'customer_name',
-        ),
-      );
+  final result = await ref
+      .watch(customerRepositoryProvider)
+      .list(const PagedRequest(page: 1, limit: 1000, sortBy: 'customer_name'));
   return switch (result) {
     ApiSuccess(:final data) => data.items,
     ApiFailure(:final error) => throw error,

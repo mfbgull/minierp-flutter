@@ -1,0 +1,42 @@
+[
+ {
+  "customer_name": "Awees Super Store",
+  "customer_code": "CUST-006",
+  "total_outstanding": 50000,
+  "outstanding_balance": 50000,
+  "total_invoiced": 50000,
+  "invoice_count": 1
+ },
+ {
+  "customer_name": "Gulhaji Plaza",
+  "customer_code": "CUST-002",
+  "total_outstanding": 18000,
+  "outstanding_balance": 18000,
+  "total_invoiced": 70000,
+  "invoice_count": 1
+ },
+ {
+  "customer_name": "HAQ Electronics",
+  "customer_code": "CUST-001",
+  "total_outstanding": 9595,
+  "outstanding_balance": 9595,
+  "total_invoiced": 70000,
+  "invoice_count": 1
+ },
+ {
+  "customer_name": "Imtiaz Mega",
+  "customer_code": "CUST-004",
+  "total_outstanding": 2000,
+  "outstanding_balance": 2000,
+  "total_invoiced": 6000,
+  "invoice_count": 1
+ },
+ {
+  "customer_name": "Alam Said General Store",
+  "customer_code": "CUST-010",
+  "total_outstanding": 400,
+  "outstanding_balance": 400,
+  "total_invoiced": 1400,
+  "invoice_count": 1
+ }
+]

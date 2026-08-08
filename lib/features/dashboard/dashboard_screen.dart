@@ -1,11 +1,12 @@
 import 'dart:math' as math;
 
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/dashboard_summary.dart'
-    show DashboardSummary, DayTotal, LowStockItem;
+    show DashboardSummary, DayTotal, LowStockItem, StockByCategory;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import 'dashboard_providers.dart';
@@ -76,11 +77,22 @@ class _DashboardBody extends StatelessWidget {
                   value: Formatters.number(summary.warehouseStockCount),
                   icon: Icons.warehouse_outlined,
                 ),
+                _KpiCard(
+                  label: l10n.dashboardRecentproductions,
+                  value: Formatters.number(summary.recentProductions),
+                  // NOT Icons.factory_outlined — that's the Production
+                  // rail icon tests tap to navigate.
+                  icon: Icons.precision_manufacturing_outlined,
+                ),
               ],
             ),
           ),
           const SizedBox(height: 16),
+          // Two stacked rows: (sales vs purchases + stock by category)
+          // on top, low-stock alerts full-width below (mirrors the web
+          // default layout grid).
           Expanded(
+            flex: 3,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -94,10 +106,17 @@ class _DashboardBody extends StatelessWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   flex: 2,
-                  child: _LowStockPanel(items: summary.lowStockItems),
+                  child: _StockByCategoryPanel(
+                    categories: summary.stockByCategory,
+                  ),
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            flex: 2,
+            child: _LowStockPanel(items: summary.lowStockItems),
           ),
         ],
       ),
@@ -137,8 +156,8 @@ class _KpiCard extends StatelessWidget {
                     child: Text(
                       label,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
+                        color: scheme.onSurfaceVariant,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -152,10 +171,9 @@ class _KpiCard extends StatelessWidget {
                 child: Text(
                   value,
                   maxLines: 1,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -179,8 +197,7 @@ class _SalesVsPurchasesPanel extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final dates = {
       for (final d in [...sales, ...purchases]) d.date,
-    }.toList()
-      ..sort();
+    }.toList()..sort();
 
     return Card(
       child: Padding(
@@ -208,11 +225,17 @@ class _SalesVsPurchasesPanel extends StatelessWidget {
               children: [
                 _LegendDot(color: scheme.primary),
                 const SizedBox(width: 6),
-                Text(l10n.commonSales, style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  l10n.commonSales,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 const SizedBox(width: 16),
                 _LegendDot(color: scheme.secondary),
                 const SizedBox(width: 6),
-                Text(l10n.commonPurchases, style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  l10n.commonPurchases,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ],
             ),
           ],
@@ -269,12 +292,16 @@ class _DayBars extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           _Bar(
-                            height: (_totalFor(sales, date) / safeMax) * barAreaHeight,
+                            height:
+                                (_totalFor(sales, date) / safeMax) *
+                                barAreaHeight,
                             color: scheme.primary,
                           ),
                           const SizedBox(width: 3),
                           _Bar(
-                            height: (_totalFor(purchases, date) / safeMax) * barAreaHeight,
+                            height:
+                                (_totalFor(purchases, date) / safeMax) *
+                                barAreaHeight,
                             color: scheme.secondary,
                           ),
                         ],
@@ -338,6 +365,159 @@ class _LegendDot extends StatelessWidget {
   }
 }
 
+/// Donut chart of stock value split by item category
+/// (`GET /dashboard/summary` → `stockByCategory`; web visual spec:
+/// `StockByCategoryBlock.tsx`).
+class _StockByCategoryPanel extends StatelessWidget {
+  const _StockByCategoryPanel({required this.categories});
+
+  final List<StockByCategory> categories;
+
+  // Matches the web block's palette (rgba 0.6 fills).
+  static const List<Color> _palette = [
+    Color(0xFF36A2EB),
+    Color(0xFFFF6384),
+    Color(0xFFFFCE56),
+    Color(0xFF4BC0C0),
+    Color(0xFF9966FF),
+    Color(0xFFFF9F40),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    final total = categories.fold<num>(0, (sum, c) => sum + c.totalStock);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.dashboardStockbycategory,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: categories.isEmpty
+                  ? Center(
+                      child: Text(
+                        l10n.commonNodata,
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        // Never overflow narrow windows: the donut scales
+                        // with the panel (168 desktop, ~45% of the inner
+                        // width down to a 40px floor — small enough that
+                        // the 16px legend gap can't overflow).
+                        final donutSize = math.min(
+                          168.0,
+                          math.max(40.0, constraints.maxWidth * 0.45),
+                        );
+                        return Row(
+                          children: [
+                            SizedBox(
+                              width: donutSize,
+                              height: donutSize,
+                              child: PieChart(
+                                PieChartData(
+                                  sections: [
+                                    for (var i = 0; i < categories.length; i++)
+                                      PieChartSectionData(
+                                        value: categories[i].totalStock
+                                            .toDouble(),
+                                        color: _palette[i % _palette.length],
+                                        radius: donutSize * 0.27,
+                                        showTitle: false,
+                                      ),
+                                  ],
+                                  centerSpaceRadius: donutSize * 0.24,
+                                  sectionsSpace: 2,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ListView(
+                                children: [
+                                  for (var i = 0; i < categories.length; i++)
+                                    _CategoryLegendRow(
+                                      color: _palette[i % _palette.length],
+                                      category: categories[i].category,
+                                      total: categories[i].totalStock,
+                                      pct: total > 0
+                                          ? (categories[i].totalStock / total)
+                                          : 0,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryLegendRow extends StatelessWidget {
+  const _CategoryLegendRow({
+    required this.color,
+    required this.category,
+    required this.total,
+    required this.pct,
+  });
+
+  final Color color;
+  final String category;
+  final num total;
+  final double pct;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              category,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              '${Formatters.number(total)}'
+              ' (${(pct * 100).toStringAsFixed(0)}%)',
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _LowStockPanel extends StatelessWidget {
   const _LowStockPanel({required this.items});
 
@@ -364,14 +544,15 @@ class _LowStockPanel extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.check_circle_outline,
-                              color: scheme.primary),
+                          Icon(
+                            Icons.check_circle_outline,
+                            color: scheme.primary,
+                          ),
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
                               l10n.dashboardWellstocked,
-                              style:
-                                  TextStyle(color: scheme.onSurfaceVariant),
+                              style: TextStyle(color: scheme.onSurfaceVariant),
                             ),
                           ),
                         ],
@@ -405,8 +586,11 @@ class _LowStockPanel extends StatelessWidget {
                           trailing: Text(
                             '${Formatters.number(item.currentStock)} / '
                             '${Formatters.number(item.reorderLevel)}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: urgent ? scheme.error : scheme.onSurfaceVariant,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: urgent
+                                      ? scheme.error
+                                      : scheme.onSurfaceVariant,
                                   fontWeight: urgent ? FontWeight.w600 : null,
                                 ),
                           ),

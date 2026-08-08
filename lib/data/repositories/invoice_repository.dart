@@ -4,21 +4,28 @@ import '../../core/api/api_client.dart';
 import '../../core/api/endpoints.dart';
 import '../models/price_history.dart' show ItemPriceHistory;
 import '../models/invoice.dart' show Invoice, InvoicePaymentRecord;
+import '../models/payment.dart' show Payment;
 import '../models/sales_return.dart' show SalesReturn, SalesReturnResult;
 import 'api_result.dart';
+import 'paged_request.dart' show PagedRequest, PagedResponse;
 import 'repository_client.dart';
 
-/// Filters for `GET /invoices`. Only `status` is a server-side filter
-/// (comma-separated values); search/date filtering happens client-side
-/// over the full list (the endpoint has no search/date params).
+/// Filters for `GET /invoices`. Only `status` (comma-separated values)
+/// and `customer_id` are server-side filters; search/date filtering
+/// happens client-side over the full list.
 class InvoiceFilters {
-  const InvoiceFilters({this.status});
+  const InvoiceFilters({this.status, this.customerId});
 
   /// Comma-separated status values (`Paid,Partially Paid`).
   final String? status;
 
+  /// Narrow to one customer's invoices (the Record Payment dialog uses
+  /// it to load open invoices for allocation).
+  final int? customerId;
+
   Map<String, dynamic> toQuery() => {
     if (status != null && status!.isNotEmpty) 'status': status,
+    if (customerId != null) 'customer_id': customerId,
   };
 }
 
@@ -72,6 +79,28 @@ class InvoiceRepository {
     parse: (Object? json) =>
         InvoicePaymentRecord.fromJson(json as Map<String, dynamic>),
   );
+
+  /// One page of the payments module (`GET /payments`) — server-paginated
+  /// like customers/suppliers (enveloped + `pagination` block; PORTING.md
+  /// §2). Default sort is `payment_date DESC` server-side.
+  Future<ApiResult<PagedResponse<Payment>>> payments(PagedRequest request) =>
+      _api.getPaged(
+        ApiEndpoints.payments,
+        queryParameters: request.toQuery(),
+        parseItem: (Object? json) =>
+            Payment.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// One payment (`GET /payments/:id`, enveloped object).
+  Future<ApiResult<Payment>> payment(int id) => _api.get(
+    '${ApiEndpoints.payments}/$id',
+    parse: (Object? json) => Payment.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// Delete a payment (`DELETE /payments/:id`). Enveloped
+  /// `{success, message}` — `delete` (not `deleteRaw`).
+  Future<ApiResult<void>> deletePayment(int id) =>
+      _api.delete('${ApiEndpoints.payments}/$id');
 
   /// Selling-price history for an item/customer pair, used by the rate
   /// cell's advisory hint. Enveloped; the caller treats any failure as

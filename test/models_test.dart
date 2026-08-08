@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:minierp_app/data/models/bom.dart';
 import 'package:minierp_app/data/models/customer.dart';
 import 'package:minierp_app/data/models/expense.dart';
 import 'package:minierp_app/data/models/invoice.dart';
 import 'package:minierp_app/data/models/item.dart';
+import 'package:minierp_app/data/models/production.dart';
 import 'package:minierp_app/data/models/supplier.dart';
 
 void main() {
@@ -436,6 +438,154 @@ void main() {
       final o = ExpenseOption.fromJson({'value': 'Cash', 'label': 'Cash'});
       expect(o.value, 'Cash');
       expect(o.label, 'Cash');
+    });
+  });
+
+  group('Production', () {
+    test('parses a server list row with joined warehouse names', () {
+      final p = Production.fromJson({
+        'id': 7,
+        'production_no': 'PROD-2026-009',
+        'output_item_id': 3,
+        'output_quantity': 25,
+        'warehouse_id': 1,
+        'raw_materials_warehouse_id': 2,
+        'production_date': '2026-08-14',
+        'batch_no': 'BATCH-26-PRD-0009',
+        'unit_cost': 112.5,
+        'total_material_cost': 2500,
+        'total_batch_cost': 2812.5,
+        'output_item_name': 'Mango Juice',
+        'output_uom': 'Carton',
+        'finished_goods_warehouse_name': 'FG Warehouse',
+        'raw_materials_warehouse_name': 'RM Warehouse',
+        'created_by_username': 'admin',
+      });
+      expect(p.id, 7);
+      expect(p.productionNo, 'PROD-2026-009');
+      expect(p.outputQuantity, 25);
+      expect(p.unitCost, 112.5);
+      expect(p.totalBatchCost, 2812.5);
+      expect(p.outputItemName, 'Mango Juice');
+    });
+
+    test('tolerates missing optionals and defaults overhead to 0', () {
+      final p = Production.fromJson({
+        'id': 8,
+        'production_no': 'PROD-2026-010',
+        'output_item_id': 4,
+        'output_quantity': 10,
+        'warehouse_id': 1,
+        'production_date': '2026-08-12',
+      });
+      expect(p.batchNo, isNull);
+      expect(p.remarks, isNull);
+      expect(p.overheadCost, 0);
+      expect(p.inputs, isEmpty);
+      expect(p.outputItemName, isNull);
+    });
+
+    test('parses detail inputs', () {
+      final p = Production.fromJson({
+        'id': 7,
+        'production_no': 'PROD-2026-009',
+        'output_item_id': 3,
+        'output_quantity': 25,
+        'warehouse_id': 1,
+        'production_date': '2026-08-11',
+        'inputs': [
+          {
+            'id': 31,
+            'production_id': 7,
+            'item_id': 12,
+            'quantity': 8.5,
+            'warehouse_id': 2,
+            'item_code': 'RM-012',
+            'item_name': 'Sugar',
+            'unit_of_measure': 'kg',
+            'warehouse_code': 'RM-01',
+            'warehouse_name': 'RM Warehouse',
+          },
+        ],
+      });
+      final input = p.inputs.single;
+      expect(input.itemCode, 'RM-012');
+      expect(input.itemName, 'Sugar');
+      expect(input.quantity, 8.5);
+      expect(input.warehouseName, 'RM Warehouse');
+    });
+  });
+
+  group('Bom', () {
+    test('parses a list row with aggregates and 0/1 is_active', () {
+      final b = Bom.fromJson({
+        'id': 1,
+        'bom_no': 'BOM-2026-001',
+        'bom_name': 'Juice Kit',
+        'finished_item_id': 3,
+        'finished_item_code': 'FG-003',
+        'finished_item_name': 'Colour Juice',
+        'finished_uom': 'Carton',
+        'quantity': 10,
+        'description': 'Standard batch',
+        'is_active': 1,
+        'item_count': 3,
+        'total_material_cost': 850.5,
+      });
+      expect(b.bomNo, 'BOM-2026-001');
+      expect(b.finishedItemName, 'Colour Juice');
+      expect(b.quantity, 10);
+      expect(b.isActive, isTrue);
+      expect(b.itemCount, 3);
+      expect(b.totalMaterialCost, 850.5);
+    });
+
+    test('tolerates boolean is_active and missing aggregates', () {
+      final b = Bom.fromJson({
+        'id': 2,
+        'bom_no': 'BOM-2026-002',
+        'bom_name': 'Gadget Kit',
+        'finished_item_id': 9,
+        'quantity': 5,
+        'is_active': false,
+      });
+      expect(b.isActive, isFalse);
+      expect(b.itemCount, isNull);
+      expect(b.totalMaterialCost, isNull);
+    });
+  });
+
+  group('BomDetail', () {
+    test('parses items and keeps the header aggregates', () {
+      final d = BomDetail.fromJson({
+        'id': 1,
+        'bom_no': 'BOM-2026-001',
+        'bom_name': 'Juice Kit',
+        'finished_item_id': 3,
+        'quantity': 10,
+        'is_active': 1,
+        'total_material_cost': 850.5,
+        'items': [
+          {
+            'id': 11,
+            'item_id': 12,
+            'item_code': 'RM-012',
+            'item_name': 'Sugar',
+            'unit_of_measure': 'kg',
+            'current_stock': 40,
+            'quantity': 2,
+            'standard_cost': 208.5,
+            'line_cost': 417,
+          },
+        ],
+      });
+      expect(d.totalMaterialCost, 850.5);
+      final item = d.items.single;
+      expect(item.itemCode, 'RM-012');
+      expect(item.quantity, 2);
+      expect(item.standardCost, 208.5);
+      expect(item.lineCost, 417);
+      expect(item.currentStock, 40);
     });
   });
 }

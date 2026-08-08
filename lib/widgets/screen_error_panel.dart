@@ -8,7 +8,11 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 
 class ScreenErrorPanel extends StatelessWidget {
-  const ScreenErrorPanel({super.key, required this.message, required this.onRetry});
+  const ScreenErrorPanel({
+    super.key,
+    required this.message,
+    required this.onRetry,
+  });
 
   final String message;
   final VoidCallback onRetry;
@@ -31,8 +35,9 @@ class ScreenErrorPanel extends StatelessWidget {
             child: Text(
               message,
               textAlign: TextAlign.center,
-              style: textTheme.bodySmall
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+              style: textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ),
           const SizedBox(height: 12),

@@ -9,6 +9,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../data/models/invoice.dart'
     show InvoicePaymentRecord, PaymentMethod;
@@ -98,9 +99,8 @@ class _PaymentPanelState extends State<PaymentPanel> {
   TextEditingController _amountController(PaymentMethod m) =>
       _amountControllers.putIfAbsent(
         m.id,
-        () => TextEditingController(
-          text: m.amount == 0 ? '' : _plain(m.amount),
-        ),
+        () =>
+            TextEditingController(text: m.amount == 0 ? '' : _plain(m.amount)),
       );
 
   TextEditingController _referenceController(PaymentMethod m) =>
@@ -201,34 +201,39 @@ class _PaymentPanelState extends State<PaymentPanel> {
         ),
         const SizedBox(height: 8),
         _summaryLine(l10n.salesGrandtotal, widget.total, null),
-        _summaryLine(l10n.salesTotalpaid, widget.paidAmount,
-            const Color(0xff16a34a)),
+        _summaryLine(
+          l10n.salesTotalpaid,
+          widget.paidAmount,
+          const Color(0xff16a34a),
+        ),
         _summaryLine(
           l10n.salesBalance,
           widget.balance,
-          widget.balance > 0 ? theme.colorScheme.error : const Color(0xff16a34a),
+          widget.balance > 0
+              ? theme.colorScheme.error
+              : const Color(0xff16a34a),
         ),
       ],
     );
   }
 
   Widget _summaryLine(String label, num value, Color? color) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 1),
-        child: Row(
-          children: [
-            Text(label, style: const TextStyle(fontSize: 12)),
-            const Spacer(),
-            Text(
-              Formatters.currency(value),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
-            ),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 1),
+    child: Row(
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12)),
+        const Spacer(),
+        Text(
+          Formatters.currency(value),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   // ── Existing payments (edit mode) ──────────────────────────────
 
@@ -272,8 +277,9 @@ class _PaymentPanelState extends State<PaymentPanel> {
                 visualDensity: VisualDensity.compact,
                 iconSize: 15,
                 icon: const Icon(Icons.delete_outline),
-                onPressed:
-                    widget.saving ? null : () => widget.onDeletePayment(p),
+                onPressed: widget.saving
+                    ? null
+                    : () => widget.onDeletePayment(p),
               ),
             ],
           ),
@@ -294,7 +300,7 @@ class _PaymentPanelState extends State<PaymentPanel> {
             onPressed: widget.saving ? null : widget.onPickPaymentDate,
             icon: const Icon(Icons.calendar_today_outlined, size: 14),
             label: Text(
-              Formatters.date(_isoDate(widget.paymentDate)),
+              Formatters.date(isoDate(widget.paymentDate)),
               style: const TextStyle(fontSize: 12),
             ),
           ),
@@ -305,8 +311,10 @@ class _PaymentPanelState extends State<PaymentPanel> {
             Expanded(
               child: Text(
                 l10n.salesPaymentmethods,
-                style:
-                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
               ),
             ),
             TextButton.icon(
@@ -342,8 +350,9 @@ class _PaymentPanelState extends State<PaymentPanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DropdownButtonFormField<String>(
-            initialValue:
-                kPaymentMethods.contains(m.method) ? m.method : kPaymentMethods.first,
+            initialValue: kPaymentMethods.contains(m.method)
+                ? m.method
+                : kPaymentMethods.first,
             isExpanded: true,
             style: const TextStyle(fontSize: 12),
             decoration: _fieldDecoration(l10n.salesMethod),
@@ -365,8 +374,9 @@ class _PaymentPanelState extends State<PaymentPanel> {
                 child: TextField(
                   controller: _amountController(m),
                   enabled: !widget.saving,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   style: const TextStyle(fontSize: 12),
                   decoration: _fieldDecoration(l10n.fieldsAmount),
                   onChanged: (v) => widget.onUpdateMethod(
@@ -409,19 +419,13 @@ class _PaymentPanelState extends State<PaymentPanel> {
   }
 
   InputDecoration _fieldDecoration(String label) => InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(fontSize: 11),
-        isDense: true,
-        border: const OutlineInputBorder(),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      );
+    labelText: label,
+    labelStyle: const TextStyle(fontSize: 11),
+    isDense: true,
+    border: const OutlineInputBorder(),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+  );
 
   static String _plain(num value) =>
       value == value.roundToDouble() ? value.toInt().toString() : '$value';
-
-  static String _isoDate(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
 }

@@ -29,7 +29,9 @@ final expensesProvider = FutureProvider<List<Expense>>((ref) async {
   final from = ref.watch(expensesFromDateProvider);
   final to = ref.watch(expensesToDateProvider);
 
-  final result = await ref.watch(expenseRepositoryProvider).expenses(
+  final result = await ref
+      .watch(expenseRepositoryProvider)
+      .expenses(
         ExpenseFilters(
           search: search.isEmpty ? null : search,
           category: category,
@@ -46,35 +48,36 @@ final expensesProvider = FutureProvider<List<Expense>>((ref) async {
 
 /// Categories for the filter dropdown and the expense form
 /// (`GET /expenses/categories`).
-final expenseCategoriesProvider = FutureProvider<List<ExpenseCategory>>(
-  (ref) async {
-    final result = await ref.watch(expenseRepositoryProvider).categories();
-    return switch (result) {
-      ApiSuccess(:final data) => data,
-      ApiFailure(:final error) => throw error,
-    };
-  },
-);
+final expenseCategoriesProvider = FutureProvider<List<ExpenseCategory>>((
+  ref,
+) async {
+  final result = await ref.watch(expenseRepositoryProvider).categories();
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
 
 /// Status options (Draft/Submitted/Approved/Paid/Cancelled).
-final expenseStatusOptionsProvider = FutureProvider<List<ExpenseOption>>(
-  (ref) async {
-    final result = await ref.watch(expenseRepositoryProvider).statusOptions();
-    return switch (result) {
-      ApiSuccess(:final data) => data,
-      ApiFailure(:final error) => throw error,
-    };
-  },
-);
+final expenseStatusOptionsProvider = FutureProvider<List<ExpenseOption>>((
+  ref,
+) async {
+  final result = await ref.watch(expenseRepositoryProvider).statusOptions();
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
 
 /// Payment method options (Cash/Check/Bank Transfer/…).
-final expensePaymentMethodsProvider = FutureProvider<List<ExpenseOption>>(
-  (ref) async {
-    final result =
-        await ref.watch(expenseRepositoryProvider).paymentMethodOptions();
-    return switch (result) {
-      ApiSuccess(:final data) => data,
-      ApiFailure(:final error) => throw error,
-    };
-  },
-);
+final expensePaymentMethodsProvider = FutureProvider<List<ExpenseOption>>((
+  ref,
+) async {
+  final result = await ref
+      .watch(expenseRepositoryProvider)
+      .paymentMethodOptions();
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});

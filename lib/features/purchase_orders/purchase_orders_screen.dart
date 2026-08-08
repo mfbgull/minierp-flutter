@@ -10,12 +10,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/po_status.dart';
 import '../../data/models/purchase_order.dart' show PurchaseOrder;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/status_badge.dart';
-import 'po_status.dart';
 import 'purchase_order_detail_dialog.dart';
 import 'purchase_order_form_dialog.dart';
 import 'purchase_order_providers.dart';
@@ -69,6 +70,24 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
                 onPressed: () => showPurchaseOrderFormDialog(context),
                 icon: const Icon(Icons.add, size: 18),
                 label: Text(l10n.purchaseordersNewpurchaseorder),
+              ),
+              const SizedBox(width: 4),
+              // CSV export — mirrors the sales-orders/returns grids: the
+              // pure builder runs here and the shared save helper owns
+              // the FilePicker + toast. Disabled until rows are loaded.
+              TextButton.icon(
+                onPressed:
+                    orders.isLoading || (orders.valueOrNull?.isEmpty ?? true)
+                    ? null
+                    : () => saveCsv(
+                        context,
+                        suggestedName: csvSuggestedName('purchase-orders'),
+                        csv: buildPurchaseOrdersCsv(l10n, orders.valueOrNull!),
+                        successMessage: l10n.purchaseordersExported,
+                        errorMessage: l10n.purchaseordersExportfailed,
+                      ),
+                icon: const Icon(Icons.file_download_outlined, size: 18),
+                label: Text(l10n.purchaseordersExportcsv),
               ),
               const SizedBox(width: 4),
               IconButton(

@@ -12,13 +12,13 @@ class LowStockItem {
   });
 
   factory LowStockItem.fromJson(Map<String, dynamic> json) => LowStockItem(
-        id: asInt(json['id']) ?? 0,
-        itemCode: asString(json['item_code']) ?? '',
-        itemName: asString(json['item_name']) ?? '',
-        currentStock: asNum(json['current_stock']) ?? 0,
-        reorderLevel: asNum(json['reorder_level']) ?? 0,
-        category: asString(json['category']),
-      );
+    id: asInt(json['id']) ?? 0,
+    itemCode: asString(json['item_code']) ?? '',
+    itemName: asString(json['item_name']) ?? '',
+    currentStock: asNum(json['current_stock']) ?? 0,
+    reorderLevel: asNum(json['reorder_level']) ?? 0,
+    category: asString(json['category']),
+  );
 
   final int id;
   final String itemCode;
@@ -47,9 +47,9 @@ class DayTotal {
   const DayTotal({required this.date, required this.total});
 
   factory DayTotal.fromJson(Map<String, dynamic> json) => DayTotal(
-        date: asString(json['date']) ?? '',
-        total: asNum(json['total']) ?? 0,
-      );
+    date: asString(json['date']) ?? '',
+    total: asNum(json['total']) ?? 0,
+  );
 
   final String date;
   final num total;
@@ -79,8 +79,10 @@ class DashboardSummary {
         totalPurchases: asNum(json['totalPurchases']) ?? 0,
         warehouseStockCount: asInt(json['warehouseStockCount']) ?? 0,
         lowStockItems: _parseList(json['lowStockItems'], LowStockItem.fromJson),
-        stockByCategory:
-            _parseList(json['stockByCategory'], StockByCategory.fromJson),
+        stockByCategory: _parseList(
+          json['stockByCategory'],
+          StockByCategory.fromJson,
+        ),
         salesByDay: _parseList(json['salesByDay'], DayTotal.fromJson),
         purchasesByDay: _parseList(json['purchasesByDay'], DayTotal.fromJson),
         recentProductions: asInt(json['recentProductions']) ?? 0,

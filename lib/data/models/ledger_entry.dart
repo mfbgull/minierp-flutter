@@ -18,16 +18,16 @@ class LedgerEntry {
   });
 
   factory LedgerEntry.fromJson(Map<String, dynamic> json) => LedgerEntry(
-        id: asInt(json['id']) ?? 0,
-        transactionDate: asString(json['transaction_date']) ?? '',
-        transactionType: asString(json['transaction_type']) ?? '',
-        referenceNo: asString(json['reference_no']) ?? '',
-        description: asString(json['description']) ?? '',
-        debit: asNum(json['debit']) ?? 0,
-        credit: asNum(json['credit']) ?? 0,
-        balance: asNum(json['balance']) ?? 0,
-        linkedInvoiceNo: asString(json['linked_invoice_no']),
-      );
+    id: asInt(json['id']) ?? 0,
+    transactionDate: asString(json['transaction_date']) ?? '',
+    transactionType: asString(json['transaction_type']) ?? '',
+    referenceNo: asString(json['reference_no']) ?? '',
+    description: asString(json['description']) ?? '',
+    debit: asNum(json['debit']) ?? 0,
+    credit: asNum(json['credit']) ?? 0,
+    balance: asNum(json['balance']) ?? 0,
+    linkedInvoiceNo: asString(json['linked_invoice_no']),
+  );
 
   final int id;
   final String transactionDate;
@@ -40,14 +40,14 @@ class LedgerEntry {
   final String? linkedInvoiceNo;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'transaction_date': transactionDate,
-        'transaction_type': transactionType,
-        'reference_no': referenceNo,
-        'description': description,
-        'debit': debit,
-        'credit': credit,
-        'balance': balance,
-        if (linkedInvoiceNo != null) 'linked_invoice_no': linkedInvoiceNo,
-      };
+    'id': id,
+    'transaction_date': transactionDate,
+    'transaction_type': transactionType,
+    'reference_no': referenceNo,
+    'description': description,
+    'debit': debit,
+    'credit': credit,
+    'balance': balance,
+    if (linkedInvoiceNo != null) 'linked_invoice_no': linkedInvoiceNo,
+  };
 }

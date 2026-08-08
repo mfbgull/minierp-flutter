@@ -14,7 +14,23 @@ import 'features/dashboard/dashboard_screen.dart';
 import 'features/inventory/inventory_shell.dart';
 import 'features/purchases/purchasing_shell.dart';
 import 'features/expenses/expenses_screen.dart';
+import 'features/payments/payments_screen.dart';
+import 'features/production/production_shell.dart';
 import 'data/models/invoice.dart' show Invoice;
+import 'features/reports/ar_aging_report_screen.dart';
+import 'features/reports/cash_flow_report_screen.dart';
+import 'features/reports/dso_report_screen.dart';
+import 'features/reports/inventory_movement_report_screen.dart';
+import 'features/reports/low_stock_report_screen.dart';
+import 'features/reports/profit_loss_report_screen.dart';
+import 'features/reports/purchase_summary_report_screen.dart';
+import 'features/reports/top_debtors_report_screen.dart';
+import 'features/reports/reports_dashboard_screen.dart'
+    show ReportsDashboardScreen, reportTitles;
+import 'features/reports/sales_by_customer_report_screen.dart';
+import 'features/reports/sales_summary_report_screen.dart';
+import 'features/reports/stock_level_report_screen.dart';
+import 'features/reports/stock_valuation_report_screen.dart';
 import 'features/sales/sales_invoice_form_page.dart';
 import 'features/sales_orders/sales_shell.dart';
 import 'features/shell/app_shell.dart';
@@ -97,13 +113,56 @@ final routerProvider = Provider<GoRouter>((ref) {
                     '/suppliers' => const SuppliersScreen(),
                     '/purchasing' => const PurchasingShell(),
                     '/expenses' => const ExpensesScreen(),
+                    '/payments' => const PaymentsScreen(),
+                    '/production' => const ProductionShell(),
                     // Sales module shell: invoices grid (branch root) +
                     // sales-orders grid as tabs (web: /sales-orders).
                     '/sales' => const SalesShell(),
+                    // Reports hub (PORTING.md §11) — one card per report
+                    // in the hub; the :report sub-route below resolves
+                    // each card to its screen (placeholder until ported).
+                    '/reports' => const ReportsDashboardScreen(),
                     _ => ModulePlaceholderScreen(
                       title: dest.label(AppLocalizations.of(context)!),
                     ),
                   },
+                  // Report screens live as sub-routes under the hub.
+                  routes: dest.path == '/reports'
+                      ? [
+                          GoRoute(
+                            path: ':report',
+                            builder: (context, state) {
+                              final slug = state.pathParameters['report'] ?? '';
+                              return switch (slug) {
+                                'ar-aging' => const ArAgingReportScreen(),
+                                'sales-summary' =>
+                                  const SalesSummaryReportScreen(),
+                                'low-stock' => const LowStockReportScreen(),
+                                'stock-level' => const StockLevelReportScreen(),
+                                'stock-valuation' =>
+                                  const StockValuationReportScreen(),
+                                'sales-by-customer' =>
+                                  const SalesByCustomerReportScreen(),
+                                'dso' => const DsoReportScreen(),
+                                'cash-flow' => const CashFlowReportScreen(),
+                                'profit-loss' => const ProfitLossReportScreen(),
+                                'inventory-movement' =>
+                                  const InventoryMovementReportScreen(),
+                                'purchase-summary' =>
+                                  const PurchaseSummaryReportScreen(),
+                                'top-debtors' => const TopDebtorsReportScreen(),
+                                _ => ModulePlaceholderScreen(
+                                  title:
+                                      reportTitles[slug]?.call(
+                                        AppLocalizations.of(context)!,
+                                      ) ??
+                                      slug,
+                                ),
+                              };
+                            },
+                          ),
+                        ]
+                      : const [],
                 ),
               ],
             ),

@@ -15,16 +15,16 @@ class Warehouse {
   });
 
   factory Warehouse.fromJson(Map<String, dynamic> json) => Warehouse(
-        id: asInt(json['id']) ?? 0,
-        warehouseCode: asString(json['warehouse_code']) ?? '',
-        warehouseName: asString(json['warehouse_name']),
-        location: asString(json['location']),
-        isActive: asBool(json['is_active'], fallback: true),
-        createdAt: asString(json['created_at']),
-        updatedAt: asString(json['updated_at']),
-        totalItems: asNum(json['total_items']) ?? 0,
-        uniqueItems: asNum(json['unique_items']) ?? 0,
-      );
+    id: asInt(json['id']) ?? 0,
+    warehouseCode: asString(json['warehouse_code']) ?? '',
+    warehouseName: asString(json['warehouse_name']),
+    location: asString(json['location']),
+    isActive: asBool(json['is_active'], fallback: true),
+    createdAt: asString(json['created_at']),
+    updatedAt: asString(json['updated_at']),
+    totalItems: asNum(json['total_items']) ?? 0,
+    uniqueItems: asNum(json['unique_items']) ?? 0,
+  );
 
   final int id;
   final String warehouseCode;
@@ -37,12 +37,12 @@ class Warehouse {
   final num uniqueItems;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'warehouse_code': warehouseCode,
-        if (warehouseName != null) 'warehouse_name': warehouseName,
-        if (location != null) 'location': location,
-        'is_active': isActive ? 1 : 0,
-        if (createdAt != null) 'created_at': createdAt,
-        if (updatedAt != null) 'updated_at': updatedAt,
-      };
+    'id': id,
+    'warehouse_code': warehouseCode,
+    if (warehouseName != null) 'warehouse_name': warehouseName,
+    if (location != null) 'location': location,
+    'is_active': isActive ? 1 : 0,
+    if (createdAt != null) 'created_at': createdAt,
+    if (updatedAt != null) 'updated_at': updatedAt,
+  };
 }

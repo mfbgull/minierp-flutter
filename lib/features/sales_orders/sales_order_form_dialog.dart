@@ -12,6 +12,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/item.dart' show Item;
@@ -22,6 +23,7 @@ import '../../data/repositories/sales_order_repository.dart'
     show salesOrderRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/date_picker_helpers.dart' show pickDate;
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart' show numText;
 import '../../widgets/searchable_select.dart';
@@ -124,17 +126,10 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
     (sum, line) => sum + line.quantity * line.unitPrice,
   );
 
-  static String _isoDate(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
-
   Future<void> _pickDate({required bool delivery}) async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await pickDate(
+      context,
       initialDate: delivery ? (_deliveryDate ?? _soDate) : _soDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -150,9 +145,9 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
     final notes = _notesController.text.trim();
     return {
       'customer_id': _customerId!,
-      'so_date': _isoDate(_soDate),
+      'so_date': isoDate(_soDate),
       if (!_isEdit) 'status': 'Draft',
-      if (_deliveryDate != null) 'delivery_date': _isoDate(_deliveryDate!),
+      if (_deliveryDate != null) 'delivery_date': isoDate(_deliveryDate!),
       if (_warehouseId != null) 'warehouse_id': _warehouseId,
       if (notes.isNotEmpty) 'notes': notes,
       // The server replaces the line set wholesale on PUT and validates
@@ -215,7 +210,7 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
       child: OutlinedButton.icon(
         onPressed: _submitting ? null : () => _pickDate(delivery: false),
         icon: const Icon(Icons.calendar_today_outlined, size: 16),
-        label: Text(Formatters.date(_isoDate(value))),
+        label: Text(Formatters.date(isoDate(value))),
       ),
     );
   }
@@ -233,7 +228,7 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
               label: Text(
                 value == null
                     ? l10n.salesordersDeliverydate
-                    : Formatters.date(_isoDate(value)),
+                    : Formatters.date(isoDate(value)),
                 style: TextStyle(
                   color: value == null
                       ? Theme.of(context).colorScheme.onSurfaceVariant

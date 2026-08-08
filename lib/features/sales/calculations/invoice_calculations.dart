@@ -9,7 +9,8 @@
 // color lookup — the Flutter equivalent is the `StatusBadge` widget, see
 // `widgets/status_badge.dart`; calculation code stays UI-free).
 
-import '../../../data/models/invoice.dart' show Discount, DiscountType, PaymentMethod;
+import '../../../data/models/invoice.dart'
+    show Discount, DiscountType, PaymentMethod;
 import '../../../data/models/item.dart' show SaleType;
 import '../models/sales_forms.dart'
     show
@@ -45,11 +46,14 @@ num calculateItemDiscount(CalculableLine item) {
 }
 
 /// Total for a single item (subtotal − discount + tax).
-num calculateItemTotal(CalculableLine item,
-    {DiscountScope discountScope = DiscountScope.item}) {
+num calculateItemTotal(
+  CalculableLine item, {
+  DiscountScope discountScope = DiscountScope.item,
+}) {
   final subtotal = calculateItemBase(item);
-  final discount =
-      discountScope == DiscountScope.item ? calculateItemDiscount(item) : 0;
+  final discount = discountScope == DiscountScope.item
+      ? calculateItemDiscount(item)
+      : 0;
   final afterDiscount = subtotal - discount;
   final taxAmount = (afterDiscount * item.tax) / 100;
   return afterDiscount + taxAmount;
@@ -63,12 +67,15 @@ num calculateSubtotal(List<CalculableLine> items) {
 }
 
 /// Total tax across all items.
-num calculateTax(List<CalculableLine> items,
-    {DiscountScope discountScope = DiscountScope.item}) {
+num calculateTax(
+  List<CalculableLine> items, {
+  DiscountScope discountScope = DiscountScope.item,
+}) {
   return items.fold<num>(0, (sum, item) {
     final subtotal = calculateItemBase(item);
-    final discount =
-        discountScope == DiscountScope.item ? calculateItemDiscount(item) : 0;
+    final discount = discountScope == DiscountScope.item
+        ? calculateItemDiscount(item)
+        : 0;
     final afterDiscount = subtotal - discount;
     return sum + (afterDiscount * item.tax) / 100;
   });
@@ -155,26 +162,30 @@ InvoiceFormItem createEmptyItemRow(int index) {
   );
 }
 
-List<CalculableLine> padItemsToMinimum(List<CalculableLine> items,
-    {int min = 1}) {
+List<CalculableLine> padItemsToMinimum(
+  List<CalculableLine> items, {
+  int min = 1,
+}) {
   if (items.length >= min) return items;
   final padded = [...items];
   final now = _now();
   for (var i = items.length; i < min; i++) {
-    padded.add(InvoiceFormItem(
-      id: now + i + 1000,
-      itemId: '',
-      description: '',
-      quantity: 0,
-      rate: 0,
-      tax: 0,
-      discount: flatZeroDiscount,
-      saleType: SaleType.packed,
-      amount: 0,
-      lastEditedField: null,
-      qtyDecimalPrecision: 0,
-      roundingStep: null,
-    ));
+    padded.add(
+      InvoiceFormItem(
+        id: now + i + 1000,
+        itemId: '',
+        description: '',
+        quantity: 0,
+        rate: 0,
+        tax: 0,
+        discount: flatZeroDiscount,
+        saleType: SaleType.packed,
+        amount: 0,
+        lastEditedField: null,
+        qtyDecimalPrecision: 0,
+        roundingStep: null,
+      ),
+    );
   }
   return padded;
 }
@@ -193,8 +204,10 @@ String getExpectedStatus(
   if (invoiceId == null || invoiceId.isEmpty) {
     if (recordPayment) {
       final total = calculateTotal(items, discountScope, invoiceDiscount);
-      final paymentAmount =
-          paymentMethods.fold<num>(0, (sum, m) => sum + m.amount);
+      final paymentAmount = paymentMethods.fold<num>(
+        0,
+        (sum, m) => sum + m.amount,
+      );
       if (paymentAmount >= total) return 'Paid';
       if (paymentAmount > 0) return 'Partially Paid';
     }
@@ -239,12 +252,7 @@ InvoiceFormState createDefaultInvoice() {
       paymentNotes: '',
     ),
     paymentMethods: [
-      PaymentMethod(
-        id: _now(),
-        method: 'Cash',
-        amount: 0,
-        referenceNo: '',
-      ),
+      PaymentMethod(id: _now(), method: 'Cash', amount: 0, referenceNo: ''),
     ],
   );
 }

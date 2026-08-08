@@ -17,37 +17,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/utils/csv_export.dart';
+import '../../core/utils/expense_status.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/expense.dart' show Expense;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/status_badge.dart';
 import 'expense_form_dialog.dart';
 import 'expense_providers.dart';
-
-/// Localized label for an expense status value, falling back to the raw
-/// server value when there's no key (defensive — the server owns the
-/// status vocabulary).
-String _statusLabel(AppLocalizations l10n, String status) => switch (status) {
-      'Draft' => l10n.statusDraft,
-      'Submitted' => l10n.statusSubmitted,
-      'Approved' => l10n.statusApproved,
-      'Paid' => l10n.statusPaid,
-      'Cancelled' => l10n.statusCancelled,
-      _ => status,
-    };
-
-/// Status chip color (light) — port of the statusColors conventions in
-/// PORTING.md §6.
-Color _statusColor(String status) => switch (status) {
-      'Draft' => Colors.blueGrey,
-      'Submitted' => Colors.blue,
-      'Approved' => Colors.green,
-      'Paid' => Colors.teal,
-      'Cancelled' => Colors.red,
-      _ => Colors.blueGrey,
-    };
 
 class ExpensesScreen extends ConsumerStatefulWidget {
   const ExpensesScreen({super.key});
@@ -100,23 +80,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     ref.read(expensesToDateProvider.notifier).state = null;
   }
 
-  Future<void> _pickDate({required bool isFrom}) async {
-    final current = isFrom
-        ? ref.read(expensesFromDateProvider)
-        : ref.read(expensesToDateProvider);
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: current ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
-    );
-    if (picked == null || !mounted) return;
-    ref
-        .read((isFrom ? expensesFromDateProvider : expensesToDateProvider)
-            .notifier)
-        .state = picked;
-  }
-
   /// Pushes the provider state into the grid manager (clear + append,
   /// with the loading overlay toggled). No-op until `onLoaded`.
   void _applyExpenses(AsyncValue<List<Expense>> value) {
@@ -132,20 +95,22 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     }
   }
 
-  static PlutoRow _rowFor(Expense expense) => PlutoRow(cells: {
-        'id': PlutoCell(value: expense.id),
-        'expense_no': PlutoCell(value: expense.expenseNo),
-        'expense_date': PlutoCell(value: expense.expenseDate),
-        'category': PlutoCell(value: expense.expenseCategory),
-        'description': PlutoCell(value: expense.description ?? ''),
-        'vendor': PlutoCell(value: expense.vendorName ?? ''),
-        'reference_no': PlutoCell(value: expense.referenceNo ?? ''),
-        'payment_method': PlutoCell(value: expense.paymentMethod ?? ''),
-        'project': PlutoCell(value: expense.project ?? ''),
-        'amount': PlutoCell(value: expense.amount),
-        'status': PlutoCell(value: expense.status),
-        'created_by': PlutoCell(value: expense.createdByName ?? ''),
-      });
+  static PlutoRow _rowFor(Expense expense) => PlutoRow(
+    cells: {
+      'id': PlutoCell(value: expense.id),
+      'expense_no': PlutoCell(value: expense.expenseNo),
+      'expense_date': PlutoCell(value: expense.expenseDate),
+      'category': PlutoCell(value: expense.expenseCategory),
+      'description': PlutoCell(value: expense.description ?? ''),
+      'vendor': PlutoCell(value: expense.vendorName ?? ''),
+      'reference_no': PlutoCell(value: expense.referenceNo ?? ''),
+      'payment_method': PlutoCell(value: expense.paymentMethod ?? ''),
+      'project': PlutoCell(value: expense.project ?? ''),
+      'amount': PlutoCell(value: expense.amount),
+      'status': PlutoCell(value: expense.status),
+      'created_by': PlutoCell(value: expense.createdByName ?? ''),
+    },
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -159,7 +124,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: _toolbar(l10n),
+          child: _toolbar(l10n, expenses),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -170,8 +135,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     );
   }
 
-  Widget _toolbar(AppLocalizations l10n) {
-    final scheme = Theme.of(context).colorScheme;
+  Widget _toolbar(AppLocalizations l10n, AsyncValue<List<Expense>> expenses) {
     return Row(
       children: [
         Expanded(
@@ -191,7 +155,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                           icon: const Icon(Icons.clear, size: 18),
                           onPressed: () {
                             _searchController.clear();
-                            ref.read(expensesSearchProvider.notifier).state = '';
+                            ref.read(expensesSearchProvider.notifier).state =
+                                '';
                           },
                         ),
                   isDense: true,
@@ -230,34 +195,34 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                     const [])
               option.value,
           ],
-          labelBuilder: (v) =>
-              v == null ? l10n.expensesAllstatuses : _statusLabel(l10n, v),
+          labelBuilder: (v) => v == null
+              ? l10n.expensesAllstatuses
+              : expenseStatusLabel(l10n, v),
           onChanged: (v) => ref.read(expensesStatusProvider.notifier).state = v,
           width: 150,
         ),
         const SizedBox(width: 8),
-        _dateButton(
-          label: ref.watch(expensesFromDateProvider) == null
-              ? l10n.commonFrom
-              : Formatters.date(
-                  _isoDate(ref.read(expensesFromDateProvider)!)),
-          onTap: () => _pickDate(isFrom: true),
+        DateRangeFilter(
+          height: 40,
+          fromProvider: expensesFromDateProvider,
+          toProvider: expensesToDateProvider,
+          onClear: _clearFilters,
+          showClear: () => _hasActiveFilters,
         ),
         const SizedBox(width: 8),
-        _dateButton(
-          label: ref.watch(expensesToDateProvider) == null
-              ? l10n.commonTo
-              : Formatters.date(_isoDate(ref.read(expensesToDateProvider)!)),
-          onTap: () => _pickDate(isFrom: false),
+        TextButton.icon(
+          onPressed: expenses.isLoading || _hasNoRows
+              ? null
+              : () => saveCsv(
+                  context,
+                  suggestedName: csvSuggestedName('expenses'),
+                  csv: buildExpensesCsv(l10n, _filteredRows),
+                  successMessage: l10n.expensesExported,
+                  errorMessage: l10n.expensesExportfailed,
+                ),
+          icon: const Icon(Icons.file_download_outlined, size: 18),
+          label: Text(l10n.expensesExportcsv),
         ),
-        if (_hasActiveFilters) ...[
-          const SizedBox(width: 4),
-          IconButton(
-            tooltip: l10n.commonClear,
-            icon: Icon(Icons.filter_alt_off_outlined, size: 20, color: scheme.outline),
-            onPressed: _clearFilters,
-          ),
-        ],
         const SizedBox(width: 8),
         FilledButton.tonalIcon(
           onPressed: () => showExpenseFormDialog(context),
@@ -273,11 +238,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       ],
     );
   }
-
-  static String _isoDate(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
 
   /// Compact filter dropdown (All-category / All-status / form selects).
   Widget _filterDropdown<T>({
@@ -306,29 +266,28 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         onChanged: onChanged,
         decoration: InputDecoration(
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
     );
   }
 
-  Widget _dateButton({required String label, required VoidCallback onTap}) {
-    return SizedBox(
-      height: 40,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.calendar_today_outlined, size: 15),
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          textStyle: Theme.of(context).textTheme.bodyMedium,
-        ),
-      ),
-    );
-  }
+  /// Rows currently visible in the grid — the provider's loaded value
+  /// (empty while loading or on error). The export mirrors exactly what
+  /// the grid shows under the active filters.
+  List<Expense> get _filteredRows =>
+      ref.read(expensesProvider).valueOrNull ?? const <Expense>[];
 
-  Widget _summaryStrip(AppLocalizations l10n, AsyncValue<List<Expense>> expenses) {
+  bool get _hasNoRows => _filteredRows.isEmpty;
+
+  Widget _summaryStrip(
+    AppLocalizations l10n,
+    AsyncValue<List<Expense>> expenses,
+  ) {
     final scheme = Theme.of(context).colorScheme;
     final rows = expenses.valueOrNull ?? const <Expense>[];
     final total = rows.fold<num>(0, (sum, e) => sum + e.amount);
@@ -343,25 +302,21 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         children: [
           Icon(Icons.receipt_long_outlined, size: 18, color: scheme.primary),
           const SizedBox(width: 8),
-          Text(
-            l10n.commonTotal,
-            style: Theme.of(context).textTheme.labelLarge,
-          ),
+          Text(l10n.commonTotal, style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(width: 6),
           Text(
             Formatters.currency(total),
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: scheme.primary,
-                ),
+              fontWeight: FontWeight.w700,
+              color: scheme.primary,
+            ),
           ),
           const SizedBox(width: 14),
           Text(
             '${rows.length} ${l10n.expensesCount}',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: scheme.onSurfaceVariant),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -406,8 +361,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
           if (id == null || id <= 0) return;
           // The grid row only exists when the provider has data, so the
           // lookup always succeeds (defensive no-op otherwise).
-          final expenses = ref.read(expensesProvider).valueOrNull ??
-              const <Expense>[];
+          final expenses =
+              ref.read(expensesProvider).valueOrNull ?? const <Expense>[];
           final matches = expenses.where((e) => e.id == id);
           if (matches.isEmpty) return;
           showExpenseFormDialog(context, expense: matches.first);
@@ -499,8 +454,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
             return Align(
               alignment: Alignment.centerLeft,
               child: StatusBadge(
-                status: _statusLabel(l10n, status),
-                color: _statusColor(status),
+                status: expenseStatusLabel(l10n, status),
+                color: expenseStatusColor(status),
               ),
             );
           },

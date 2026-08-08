@@ -10,7 +10,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/so_status.dart';
 import '../../data/models/sales_order.dart' show SalesOrder;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
@@ -18,7 +20,6 @@ import '../../widgets/status_badge.dart';
 import 'sales_order_detail_dialog.dart';
 import 'sales_order_form_dialog.dart';
 import 'sales_order_providers.dart';
-import 'so_status.dart';
 
 class SalesOrdersScreen extends ConsumerStatefulWidget {
   const SalesOrdersScreen({super.key});
@@ -68,6 +69,24 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
                 onPressed: () => showSalesOrderFormDialog(context),
                 icon: const Icon(Icons.add, size: 18),
                 label: Text(l10n.salesordersNewsalesorder),
+              ),
+              const SizedBox(width: 4),
+              // CSV export — mirrors the returns grids: the pure builder
+              // runs here and the shared save helper owns the FilePicker
+              // + toast. Disabled until rows are loaded.
+              TextButton.icon(
+                onPressed:
+                    orders.isLoading || (orders.valueOrNull?.isEmpty ?? true)
+                    ? null
+                    : () => saveCsv(
+                        context,
+                        suggestedName: csvSuggestedName('sales-orders'),
+                        csv: buildSalesOrdersCsv(l10n, orders.valueOrNull!),
+                        successMessage: l10n.salesordersExported,
+                        errorMessage: l10n.salesordersExportfailed,
+                      ),
+                icon: const Icon(Icons.file_download_outlined, size: 18),
+                label: Text(l10n.salesordersExportcsv),
               ),
               const SizedBox(width: 4),
               IconButton(

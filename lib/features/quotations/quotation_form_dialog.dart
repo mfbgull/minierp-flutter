@@ -12,6 +12,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/item.dart' show Item;
@@ -22,6 +23,7 @@ import '../../data/repositories/quotation_repository.dart'
     show quotationRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/date_picker_helpers.dart' show pickDate;
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart' show numText;
 import '../../widgets/searchable_select.dart';
@@ -130,17 +132,10 @@ class _QuotationFormDialogState extends ConsumerState<QuotationFormDialog> {
     (sum, line) => sum + line.quantity * line.unitPrice,
   );
 
-  static String _isoDate(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
-
   Future<void> _pickDate({required bool expiry}) async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await pickDate(
+      context,
       initialDate: expiry ? (_expiryDate ?? _quotationDate) : _quotationDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -157,9 +152,9 @@ class _QuotationFormDialogState extends ConsumerState<QuotationFormDialog> {
     final terms = _termsController.text.trim();
     return {
       'customer_id': _customerId!,
-      'quotation_date': _isoDate(_quotationDate),
+      'quotation_date': isoDate(_quotationDate),
       if (!_isEdit) 'status': 'Draft',
-      if (_expiryDate != null) 'expiry_date': _isoDate(_expiryDate!),
+      if (_expiryDate != null) 'expiry_date': isoDate(_expiryDate!),
       if (_warehouseId != null) 'warehouse_id': _warehouseId,
       if (notes.isNotEmpty) 'notes': notes,
       if (terms.isNotEmpty) 'terms': terms,
@@ -223,7 +218,7 @@ class _QuotationFormDialogState extends ConsumerState<QuotationFormDialog> {
       child: OutlinedButton.icon(
         onPressed: _submitting ? null : () => _pickDate(expiry: false),
         icon: const Icon(Icons.calendar_today_outlined, size: 16),
-        label: Text(Formatters.date(_isoDate(value))),
+        label: Text(Formatters.date(isoDate(value))),
       ),
     );
   }
@@ -241,7 +236,7 @@ class _QuotationFormDialogState extends ConsumerState<QuotationFormDialog> {
               label: Text(
                 value == null
                     ? l10n.quotationsExpirydate
-                    : Formatters.date(_isoDate(value)),
+                    : Formatters.date(isoDate(value)),
                 style: TextStyle(
                   color: value == null
                       ? Theme.of(context).colorScheme.onSurfaceVariant

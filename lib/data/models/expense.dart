@@ -26,21 +26,21 @@ class Expense {
   });
 
   factory Expense.fromJson(Map<String, dynamic> json) => Expense(
-        id: asInt(json['id']) ?? 0,
-        expenseNo: asString(json['expense_no']) ?? '',
-        expenseCategory: asString(json['expense_category']) ?? '',
-        description: asString(json['description']),
-        amount: asNum(json['amount']) ?? 0,
-        expenseDate: asString(json['expense_date']) ?? '',
-        paymentMethod: asString(json['payment_method']),
-        referenceNo: asString(json['reference_no']),
-        vendorName: asString(json['vendor_name']),
-        project: asString(json['project']),
-        status: asString(json['status']) ?? 'Approved',
-        createdAt: asString(json['created_at']),
-        updatedAt: asString(json['updated_at']),
-        createdByName: asString(json['created_by_name']),
-      );
+    id: asInt(json['id']) ?? 0,
+    expenseNo: asString(json['expense_no']) ?? '',
+    expenseCategory: asString(json['expense_category']) ?? '',
+    description: asString(json['description']),
+    amount: asNum(json['amount']) ?? 0,
+    expenseDate: asString(json['expense_date']) ?? '',
+    paymentMethod: asString(json['payment_method']),
+    referenceNo: asString(json['reference_no']),
+    vendorName: asString(json['vendor_name']),
+    project: asString(json['project']),
+    status: asString(json['status']) ?? 'Approved',
+    createdAt: asString(json['created_at']),
+    updatedAt: asString(json['updated_at']),
+    createdByName: asString(json['created_by_name']),
+  );
 
   final int id;
   final String expenseNo;
@@ -64,21 +64,21 @@ class Expense {
   final String? createdByName;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'expense_no': expenseNo,
-        'expense_category': expenseCategory,
-        if (description != null) 'description': description,
-        'amount': amount,
-        'expense_date': expenseDate,
-        if (paymentMethod != null) 'payment_method': paymentMethod,
-        if (referenceNo != null) 'reference_no': referenceNo,
-        if (vendorName != null) 'vendor_name': vendorName,
-        if (project != null) 'project': project,
-        'status': status,
-        if (createdAt != null) 'created_at': createdAt,
-        if (updatedAt != null) 'updated_at': updatedAt,
-        if (createdByName != null) 'created_by_name': createdByName,
-      };
+    'id': id,
+    'expense_no': expenseNo,
+    'expense_category': expenseCategory,
+    if (description != null) 'description': description,
+    'amount': amount,
+    'expense_date': expenseDate,
+    if (paymentMethod != null) 'payment_method': paymentMethod,
+    if (referenceNo != null) 'reference_no': referenceNo,
+    if (vendorName != null) 'vendor_name': vendorName,
+    if (project != null) 'project': project,
+    'status': status,
+    if (createdAt != null) 'created_at': createdAt,
+    if (updatedAt != null) 'updated_at': updatedAt,
+    if (createdByName != null) 'created_by_name': createdByName,
+  };
 }
 
 /// One row of `GET /expenses/categories` — the predefined categories
@@ -118,9 +118,9 @@ class ExpenseOption {
   const ExpenseOption({required this.value, required this.label});
 
   factory ExpenseOption.fromJson(Map<String, dynamic> json) => ExpenseOption(
-        value: asString(json['value']) ?? '',
-        label: asString(json['label']) ?? '',
-      );
+    value: asString(json['value']) ?? '',
+    label: asString(json['label']) ?? '',
+  );
 
   final String value;
   final String label;

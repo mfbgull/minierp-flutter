@@ -89,6 +89,9 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
             for (final item in items)
               if (item.quantity - item.returnedQty > 0) item,
           ];
+          for (final c in _qtyControllers) {
+            c.dispose();
+          }
           _qtyControllers
             ..clear()
             ..addAll([
@@ -110,14 +113,16 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
     final l10n = AppLocalizations.of(context)!;
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    final items = <Map<String, dynamic>>[
-      for (var i = 0; i < _returnableItems.length; i++)
-        if ((double.tryParse(_qtyControllers[i].text.trim()) ?? 0) > 0)
-          {
-            'invoice_item_id': _returnableItems[i].id,
-            'return_quantity': double.parse(_qtyControllers[i].text.trim()),
-          },
-    ];
+    final items = <Map<String, dynamic>>[];
+    for (var i = 0; i < _returnableItems.length; i++) {
+      final qty = double.tryParse(_qtyControllers[i].text.trim()) ?? 0;
+      if (qty > 0) {
+        items.add({
+          'invoice_item_id': _returnableItems[i].id,
+          'return_quantity': qty,
+        });
+      }
+    }
     if (items.isEmpty) {
       setState(() => _error = l10n.salesreturnsReturnqtyinvalid);
       return;
@@ -128,7 +133,9 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
       _error = null;
     });
 
-    final result = await ref.read(invoiceRepositoryProvider).processReturn(
+    final result = await ref
+        .read(invoiceRepositoryProvider)
+        .processReturn(
           widget.invoiceId,
           items: items,
           reason: _reasonController.text,
@@ -175,9 +182,9 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
               const SizedBox(height: 2),
               Text(
                 l10n.salesreturnsReturnsubtitle,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 12),
               Flexible(child: _buildBody(l10n)),
@@ -327,9 +334,9 @@ class _ReturnLineRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
     final available = item.quantity - item.returnedQty;
-    final muted = Theme.of(context).textTheme.bodySmall?.copyWith(
-      color: scheme.onSurfaceVariant,
-    );
+    final muted = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -338,7 +345,10 @@ class _ReturnLineRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(item.itemName ?? '', style: Theme.of(context).textTheme.bodyMedium),
+              Text(
+                item.itemName ?? '',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
               if ((item.itemCode ?? '').isNotEmpty)
                 Text(item.itemCode!, style: muted),
               const SizedBox(height: 2),

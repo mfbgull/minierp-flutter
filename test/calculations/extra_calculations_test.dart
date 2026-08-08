@@ -20,7 +20,12 @@ import 'package:minierp_app/features/sales/calculations/quotation_calculations.d
 import 'package:minierp_app/features/sales/calculations/sales_order_calculations.dart'
     as sales_order;
 import 'package:minierp_app/features/sales/models/sales_forms.dart'
-    show DiscountScope, InvoiceFormItem, QuotationFormItem, SOFormItem, filterFilledItems;
+    show
+        DiscountScope,
+        InvoiceFormItem,
+        QuotationFormItem,
+        SOFormItem,
+        filterFilledItems;
 
 const flatZero = Discount(type: DiscountType.flat, value: 0);
 
@@ -39,14 +44,21 @@ void main() {
     });
 
     test('field order follows the discount scope', () {
-      expect(
-        getFieldOrder(DiscountScope.item),
-        ['description', 'quantity', 'rate', 'discountValue', 'tax', 'amount'],
-      );
-      expect(
-        getFieldOrder(DiscountScope.invoice),
-        ['description', 'quantity', 'rate', 'tax', 'amount'],
-      );
+      expect(getFieldOrder(DiscountScope.item), [
+        'description',
+        'quantity',
+        'rate',
+        'discountValue',
+        'tax',
+        'amount',
+      ]);
+      expect(getFieldOrder(DiscountScope.invoice), [
+        'description',
+        'quantity',
+        'rate',
+        'tax',
+        'amount',
+      ]);
       expect(getNextField('quantity', DiscountScope.item), 'rate');
       expect(getNextField('amount', DiscountScope.item), null);
       expect(getNextField('unknown', DiscountScope.item), null);
@@ -96,24 +108,48 @@ void main() {
         PaymentMethod(id: 1, method: 'Cash', amount: 50, referenceNo: ''),
       ];
       expect(
-        getExpectedStatus(null, true, overpay, items,
-            DiscountScope.invoice, flatZero),
+        getExpectedStatus(
+          null,
+          true,
+          overpay,
+          items,
+          DiscountScope.invoice,
+          flatZero,
+        ),
         'Paid',
       );
       expect(
-        getExpectedStatus(null, true, underpay, items,
-            DiscountScope.invoice, flatZero),
+        getExpectedStatus(
+          null,
+          true,
+          underpay,
+          items,
+          DiscountScope.invoice,
+          flatZero,
+        ),
         'Partially Paid',
       );
       expect(
-        getExpectedStatus(null, false, const [], items,
-            DiscountScope.invoice, flatZero),
+        getExpectedStatus(
+          null,
+          false,
+          const [],
+          items,
+          DiscountScope.invoice,
+          flatZero,
+        ),
         'Unpaid',
       );
       expect(
-        getExpectedStatus('7', true, const [], items,
-            DiscountScope.invoice, flatZero,
-            currentStatus: 'Paid'),
+        getExpectedStatus(
+          '7',
+          true,
+          const [],
+          items,
+          DiscountScope.invoice,
+          flatZero,
+          currentStatus: 'Paid',
+        ),
         'Paid',
       );
     });
@@ -143,7 +179,10 @@ void main() {
 
     test('totals', () {
       expect(quotation.calculateItemTotal(flat), 110);
-      expect(quotation.calculateItemTotal(pct), 99); // 100 − 10% + tax on the remainder
+      expect(
+        quotation.calculateItemTotal(pct),
+        99,
+      ); // 100 − 10% + tax on the remainder
       expect(quotation.calculateTotal([pct]), 99);
       expect(quotation.calculateSubtotal([flat]), 100);
       expect(quotation.calculateDiscount([pct]), 10);
@@ -153,9 +192,17 @@ void main() {
       final row = quotation.createEmptyItemRow(0);
       expect(row.quantity, 1);
       expect(row.itemId, '');
-      expect(quotation.padItemsToMinimum(const <QuotationFormItem>[], min: 2).length, 2);
-      expect(quotation.getFieldOrder(),
-          ['description', 'quantity', 'rate', 'discountValue', 'tax']);
+      expect(
+        quotation.padItemsToMinimum(const <QuotationFormItem>[], min: 2).length,
+        2,
+      );
+      expect(quotation.getFieldOrder(), [
+        'description',
+        'quantity',
+        'rate',
+        'discountValue',
+        'tax',
+      ]);
       expect(quotation.getNextField('rate'), 'discountValue');
       expect(quotation.getNextField('tax'), null);
     });
@@ -182,8 +229,24 @@ void main() {
     });
 
     test('filterFilledItems keeps rows with item id or description', () {
-      const empty = QuotationFormItem(id: 1, itemId: '', description: '', quantity: 1, rate: 0, tax: 0, discount: flatZero);
-      const filled = QuotationFormItem(id: 2, itemId: '5', description: 'X', quantity: 1, rate: 0, tax: 0, discount: flatZero);
+      const empty = QuotationFormItem(
+        id: 1,
+        itemId: '',
+        description: '',
+        quantity: 1,
+        rate: 0,
+        tax: 0,
+        discount: flatZero,
+      );
+      const filled = QuotationFormItem(
+        id: 2,
+        itemId: '5',
+        description: 'X',
+        quantity: 1,
+        rate: 0,
+        tax: 0,
+        discount: flatZero,
+      );
       expect(filterFilledItems([empty, filled]), [filled]);
     });
   });
@@ -218,13 +281,21 @@ void main() {
     });
 
     test('field order and rows', () {
-      expect(sales_order.getFieldOrder(),
-          ['name', 'quantity', 'unitPrice', 'discountValue', 'taxRate']);
+      expect(sales_order.getFieldOrder(), [
+        'name',
+        'quantity',
+        'unitPrice',
+        'discountValue',
+        'taxRate',
+      ]);
       expect(sales_order.getNextField('unitPrice'), 'discountValue');
       final row = sales_order.createEmptyItemRow(0);
       expect(row.quantity, 1);
       expect(row.name, '');
-      expect(sales_order.padItemsToMinimum(const <SOFormItem>[], min: 2).length, 2);
+      expect(
+        sales_order.padItemsToMinimum(const <SOFormItem>[], min: 2).length,
+        2,
+      );
     });
   });
 
@@ -265,8 +336,9 @@ void main() {
       expect(result.first['reference_no'], null);
       expect(result.first['description'], 'Payment for INV-2026-000001');
       expect(result.first['notes'], 'note');
-      expect(result.first['invoice_allocations'],
-          [{'invoice_id': 42, 'amount': 100}]);
+      expect(result.first['invoice_allocations'], [
+        {'invoice_id': 42, 'amount': 100},
+      ]);
     });
 
     test('delete/cancel guards', () {
@@ -370,19 +442,28 @@ void main() {
     ];
 
     test('ledger totals exclude returns and returned-invoice entries', () {
-      final totals =
-          calculateLedgerTotals(ledgerEntries, returnedInvoiceNos: {'INV-1'});
+      final totals = calculateLedgerTotals(
+        ledgerEntries,
+        returnedInvoiceNos: {'INV-1'},
+      );
       expect(totals.debit, 0);
       expect(totals.credit, 0);
       // balance still counts ALL entries for true AR
       expect(totals.balance, 100);
 
-      final withoutReturns = calculateLedgerTotals([ledgerEntries[0], ledgerEntries[1]]);
+      final withoutReturns = calculateLedgerTotals([
+        ledgerEntries[0],
+        ledgerEntries[1],
+      ]);
       expect(withoutReturns.debit, 100);
       expect(withoutReturns.credit, 0);
       expect(withoutReturns.balance, 200);
 
-      expect(calculateLedgerTotals(const []), (debit: 0, credit: 0, balance: 0));
+      expect(calculateLedgerTotals(const []), (
+        debit: 0,
+        credit: 0,
+        balance: 0,
+      ));
     });
 
     test('invoice aggregates and credit utilization', () {
@@ -428,8 +509,10 @@ void main() {
       expect(countPaidInvoices(invoices), 1);
       expect(countUnpaidInvoices(invoices), 1);
       expect(calculateAverageDaysToPay(invoices), 4);
-      expect(getRecentInvoices(invoices, count: 2).map((i) => i.invoiceNo),
-          ['INV-3', 'INV-2']);
+      expect(getRecentInvoices(invoices, count: 2).map((i) => i.invoiceNo), [
+        'INV-3',
+        'INV-2',
+      ]);
     });
 
     test('computeCustomerMetrics aggregates everything', () {
@@ -467,10 +550,46 @@ void main() {
         ),
       ];
       const ledger = [
-        LedgerEntry(id: 1, transactionDate: '2026-07-01', transactionType: 'INVOICE', referenceNo: 'INV-1', description: '', debit: 100, credit: 0, balance: 100),
-        LedgerEntry(id: 2, transactionDate: '2026-07-05', transactionType: 'PAYMENT', referenceNo: 'PAY-1', description: '', debit: 0, credit: 100, balance: 0),
-        LedgerEntry(id: 3, transactionDate: '2026-07-10', transactionType: 'INVOICE', referenceNo: 'INV-2', description: '', debit: 50, credit: 0, balance: 50),
-        LedgerEntry(id: 4, transactionDate: '2026-07-12', transactionType: 'INVOICE', referenceNo: 'INV-3', description: '', debit: 30, credit: 0, balance: 80),
+        LedgerEntry(
+          id: 1,
+          transactionDate: '2026-07-01',
+          transactionType: 'INVOICE',
+          referenceNo: 'INV-1',
+          description: '',
+          debit: 100,
+          credit: 0,
+          balance: 100,
+        ),
+        LedgerEntry(
+          id: 2,
+          transactionDate: '2026-07-05',
+          transactionType: 'PAYMENT',
+          referenceNo: 'PAY-1',
+          description: '',
+          debit: 0,
+          credit: 100,
+          balance: 0,
+        ),
+        LedgerEntry(
+          id: 3,
+          transactionDate: '2026-07-10',
+          transactionType: 'INVOICE',
+          referenceNo: 'INV-2',
+          description: '',
+          debit: 50,
+          credit: 0,
+          balance: 50,
+        ),
+        LedgerEntry(
+          id: 4,
+          transactionDate: '2026-07-12',
+          transactionType: 'INVOICE',
+          referenceNo: 'INV-3',
+          description: '',
+          debit: 30,
+          credit: 0,
+          balance: 80,
+        ),
       ];
       const customer = Customer(
         id: 1,
@@ -497,11 +616,27 @@ void main() {
 
     test('recent payments sort by date desc', () {
       const payments = [
-        Payment(id: 1, paymentNo: 'PAY001', customerId: 1, paymentDate: '2026-07-01', amount: 100, paymentMethod: 'Cash'),
-        Payment(id: 2, paymentNo: 'PAY002', customerId: 1, paymentDate: '2026-07-15', amount: 50, paymentMethod: 'Cash'),
+        Payment(
+          id: 1,
+          paymentNo: 'PAY001',
+          customerId: 1,
+          paymentDate: '2026-07-01',
+          amount: 100,
+          paymentMethod: 'Cash',
+        ),
+        Payment(
+          id: 2,
+          paymentNo: 'PAY002',
+          customerId: 1,
+          paymentDate: '2026-07-15',
+          amount: 50,
+          paymentMethod: 'Cash',
+        ),
       ];
-      expect(getRecentPayments(payments).map((p) => p.paymentNo),
-          ['PAY002', 'PAY001']);
+      expect(getRecentPayments(payments).map((p) => p.paymentNo), [
+        'PAY002',
+        'PAY001',
+      ]);
     });
 
     test('legacy formatters', () {

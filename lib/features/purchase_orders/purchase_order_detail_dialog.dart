@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/po_status.dart';
 import '../../data/models/purchase_order.dart'
     show PurchaseOrderDetail, PurchaseOrderItem;
 import '../../data/repositories/api_result.dart'
@@ -22,7 +23,6 @@ import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
-import 'po_status.dart';
 import 'purchase_order_form_dialog.dart';
 import 'purchase_order_providers.dart';
 

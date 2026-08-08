@@ -18,6 +18,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboardWarehousestocks => 'warehouse stocks';
 
   @override
+  String get dashboardRecentproductions => 'Recent Productions';
+
+  @override
   String get dashboardStockvalue => 'Stock Value';
 
   @override
@@ -484,6 +487,223 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsAccountsreceivablereports => 'Accounts Receivable Reports';
 
   @override
+  String get reportsAsOf => 'As of';
+
+  @override
+  String get reportsAvginvoicevalue => 'Avg. Invoice Value';
+
+  @override
+  String get reportsBomusage => 'BOM Usage';
+
+  @override
+  String get reportsCategoryAr => 'Accounts Receivable';
+
+  @override
+  String get reportsCategoryFinancial => 'Financial Reports';
+
+  @override
+  String get reportsCategoryInventory => 'Inventory Reports';
+
+  @override
+  String get reportsCategoryProduction => 'Production Reports';
+
+  @override
+  String get reportsCategoryPurchase => 'Purchase Reports';
+
+  @override
+  String get reportsCategorySales => 'Sales Reports';
+
+  @override
+  String get reportsCurrent => 'Current';
+
+  @override
+  String get reportsDashboardSubtitle =>
+      'Comprehensive business analytics and reporting';
+
+  @override
+  String get reportsDays1_30 => '1-30 Days';
+
+  @override
+  String get reportsDays31_60 => '31-60 Days';
+
+  @override
+  String get reportsDays61_90 => '61-90 Days';
+
+  @override
+  String get reportsDays90plus => '90+ Days';
+
+  @override
+  String get reportsItems => 'Items';
+
+  @override
+  String get reportsItemssold => 'Items Sold';
+
+  @override
+  String get reportsLowstockcount => 'low stock items';
+
+  @override
+  String get reportsMinimumstock => 'Minimum Stock';
+
+  @override
+  String get reportsSellingprice => 'Selling Price';
+
+  @override
+  String get reportsShortage => 'Shortage';
+
+  @override
+  String get reportsShortagetotal => 'Shortage total';
+
+  @override
+  String get reportsStockstatus => 'Stock Status';
+
+  @override
+  String get reportsTotalinvoices => 'Total Invoices';
+
+  @override
+  String get reportsTotaloutstanding => 'Total Outstanding';
+
+  @override
+  String get reportsTotalreceivables => 'Total Receivables';
+
+  @override
+  String get reportsTotalsales => 'Total Sales';
+
+  @override
+  String get reportsTotalitems => 'Total Items';
+
+  @override
+  String get reportsTotalinventoryvalue => 'Total Inventory Value';
+
+  @override
+  String get reportsUnitcost => 'Unit Cost';
+
+  @override
+  String get reportsTotalvalue => 'Total Value';
+
+  @override
+  String get reportsValuationmethod => 'Valuation Method';
+
+  @override
+  String get reportsBatchtracked => 'Batch Tracked';
+
+  @override
+  String get reportsLegacyitems => 'Legacy Items';
+
+  @override
+  String get reportsAvgordervalue => 'Avg. Order Value';
+
+  @override
+  String get reportsLastpurchase => 'Last Purchase';
+
+  @override
+  String get reportsExportcsv => 'Export to CSV';
+
+  @override
+  String get reportsExported => 'Report exported';
+
+  @override
+  String get reportsExportfailed => 'Failed to export report';
+
+  @override
+  String get fieldsMetric => 'Metric';
+
+  @override
+  String get fieldsValue => 'Value';
+
+  @override
+  String get reportsDsodays => 'Days Sales Outstanding';
+
+  @override
+  String get reportsDsounit => 'days';
+
+  @override
+  String get reportsDsosubtitle =>
+      'Measure of the average number of days it takes to collect payment after a sale.';
+
+  @override
+  String get reportsPeriod => 'Period';
+
+  @override
+  String get reportsTotalar => 'Total AR';
+
+  @override
+  String get reportsTotalinflow => 'Total Cash Inflow';
+
+  @override
+  String get reportsTotaloutflow => 'Total Cash Outflow';
+
+  @override
+  String get reportsNetcashflow => 'Net Cash Flow';
+
+  @override
+  String get reportsCashflowpositive =>
+      'This period shows a positive cash flow, indicating good liquidity.';
+
+  @override
+  String get reportsCashflownegative =>
+      'This period shows a negative cash flow, consider reviewing expenses and cash outflows.';
+
+  @override
+  String get reportsTotalrevenue => 'Total Revenue';
+
+  @override
+  String get reportsTotalcogs => 'Cost of Goods Sold (COGS)';
+
+  @override
+  String get reportsGrossprofit => 'Gross Profit';
+
+  @override
+  String get reportsTotalexpenses => 'Total Expenses';
+
+  @override
+  String get reportsNetprofit => 'Net Profit';
+
+  @override
+  String get reportsGrossprofitmargin => 'Gross Profit Margin';
+
+  @override
+  String get reportsNetprofitmargin => 'Net Profit Margin';
+
+  @override
+  String get reportsExpensesbycategory => 'Expenses by Category';
+
+  @override
+  String get reportsTotalinbound => 'Total Inbound';
+
+  @override
+  String get reportsTotaloutbound => 'Total Outbound';
+
+  @override
+  String get reportsNetmovement => 'Net Movement';
+
+  @override
+  String get reportsMovementno => 'Movement No';
+
+  @override
+  String get reportsMovementtype => 'Movement Type';
+
+  @override
+  String get reportsTotalorders => 'Total Orders';
+
+  @override
+  String get reportsTotalcost => 'Total Cost';
+
+  @override
+  String get reportsReceived => 'Received Amount';
+
+  @override
+  String get reportsBalance => 'Balance';
+
+  @override
+  String get reportsReturnvalue => 'Returns Value';
+
+  @override
+  String get reportsTotalinvoiced => 'Total Invoiced';
+
+  @override
+  String get reportsInvoicecount => 'Invoice Count';
+
+  @override
   String get quotationsQuotations => 'Quotations';
 
   @override
@@ -509,6 +729,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get quotationsExpirydate => 'Expiry Date';
+
+  @override
+  String get quotationsExportcsv => 'Export to CSV';
+
+  @override
+  String get quotationsExported => 'Quotations exported';
+
+  @override
+  String get quotationsExportfailed => 'Failed to export quotations';
 
   @override
   String get quotationsItem => 'Item';
@@ -606,6 +835,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get purchaseordersNewpurchaseorder => 'New Purchase Order';
+
+  @override
+  String get purchaseordersExportcsv => 'Export to CSV';
+
+  @override
+  String get purchaseordersExported => 'Purchase orders exported';
+
+  @override
+  String get purchaseordersExportfailed => 'Failed to export purchase orders';
 
   @override
   String get purchaseordersPono => 'PO No';
@@ -707,6 +945,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get salesordersEdit => 'Edit';
+
+  @override
+  String get salesordersExportcsv => 'Export to CSV';
+
+  @override
+  String get salesordersExported => 'Sales orders exported';
+
+  @override
+  String get salesordersExportfailed => 'Failed to export sales orders';
 
   @override
   String get salesordersConverttoinvoice => 'Convert to Invoice';
@@ -1239,6 +1486,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get expensesExpenseno => 'Expense No';
 
   @override
+  String get expensesExportcsv => 'Export to CSV';
+
+  @override
+  String get expensesExported => 'Expenses exported';
+
+  @override
+  String get expensesExportfailed => 'Failed to export expenses';
+
+  @override
   String get expensesPaymentmethod => 'Payment Method';
 
   @override
@@ -1525,6 +1781,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchasesExport => 'Export';
 
   @override
+  String get purchasesExportcsv => 'Export to CSV';
+
+  @override
+  String get purchasesExported => 'Purchase returns exported';
+
+  @override
+  String get purchasesExportfailed => 'Failed to export purchase returns';
+
+  @override
   String get purchasesSummary => 'Summary';
 
   @override
@@ -1680,6 +1945,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get salesEditinvoice => 'Edit Invoice';
 
   @override
+  String get salesExportcsv => 'Export to CSV';
+
+  @override
+  String get salesExported => 'Invoices exported';
+
+  @override
+  String get salesExportfailed => 'Failed to export invoices';
+
+  @override
   String get salesInvoiceno => 'Invoice No';
 
   @override
@@ -1794,6 +2068,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get salesreturnsDispositionrefund => 'Refund';
 
   @override
+  String get salesreturnsExportcsv => 'Export to CSV';
+
+  @override
+  String get salesreturnsExported => 'Invoice returns exported';
+
+  @override
+  String get salesreturnsExportfailed => 'Failed to export invoice returns';
+
+  @override
   String get salesreturnsOriginalqty => 'Original Qty';
 
   @override
@@ -1863,6 +2146,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get inventoryAggregateqty => 'Aggregate quantity';
+
+  @override
+  String get inventoryInstock => 'In Stock';
 
   @override
   String get inventoryLowstock => 'Low Stock';
@@ -2022,6 +2308,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get paymentsSubtitle => 'Manage customer payments';
 
   @override
+  String get paymentsPaymentdetails => 'Payment Details';
+
+  @override
+  String get paymentsPaymentno => 'Payment No';
+
+  @override
+  String get paymentsBalance => 'Balance';
+
+  @override
+  String get paymentsAllocation => 'Allocation';
+
+  @override
+  String get paymentsTotalallocated => 'Total Allocated';
+
+  @override
+  String get paymentsOpeninvoices => 'Open Invoices';
+
+  @override
+  String get paymentsNoopeninvoices => 'No open invoices for this customer';
+
+  @override
+  String get paymentsSelectinvoices =>
+      'Allocate the payment to this customer\'s open invoices';
+
+  @override
+  String get paymentsRecordedsuccess => 'Payment recorded successfully';
+
+  @override
+  String get paymentsReferencehint => 'Check number, transaction ID, etc.';
+
+  @override
+  String get paymentsNoteshint => 'Optional notes...';
+
+  @override
   String get navDashboard => 'Dashboard';
 
   @override
@@ -2050,6 +2370,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get navExpenses => 'Expenses';
+
+  @override
+  String get navManufacturing => 'Manufacturing';
 
   @override
   String get navProduction => 'Production';
@@ -2200,9 +2523,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get navInventorymovement => 'Inventory Movement';
-
-  @override
-  String get navManufacturing => 'Manufacturing';
 
   @override
   String get navPurchasereturns => 'Purchase Returns';
@@ -2679,6 +2999,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fieldsCustomer => 'Customer';
+
+  @override
+  String get fieldsCustomerCode => 'Customer Code';
 
   @override
   String get fieldsItem => 'Item';
@@ -3321,4 +3644,209 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get salesPeritem => 'Per Item';
+
+  @override
+  String get bomActivate => 'Activate';
+
+  @override
+  String get bomActivated => 'BOM activated';
+
+  @override
+  String get bomAddmaterial => 'Add Material';
+
+  @override
+  String get bomCreated => 'Created';
+
+  @override
+  String get bomCurrentstock => 'Current Stock';
+
+  @override
+  String get bomDeactivate => 'Deactivate';
+
+  @override
+  String get bomDeactivated => 'BOM deactivated';
+
+  @override
+  String get bomDeleteconfirm =>
+      'Delete this BOM? Materials referencing it will remain untouched. Note: BOMs already used in production records cannot be deleted.';
+
+  @override
+  String get bomDeleted => 'BOM deleted';
+
+  @override
+  String get bomDescription => 'Description';
+
+  @override
+  String get bomDetailstitle => 'Bill of Materials';
+
+  @override
+  String get bomEdittitle => 'Edit BOM';
+
+  @override
+  String get bomErrorFinisheditem =>
+      'Select the finished item this BOM produces.';
+
+  @override
+  String get bomErrorItemsrequired => 'Add at least one material line';
+
+  @override
+  String get bomExportcsv => 'Export CSV';
+
+  @override
+  String get bomExported => 'BOMs exported';
+
+  @override
+  String get bomExportfailed => 'Export failed';
+
+  @override
+  String get bomFinisheditem => 'Finished Item';
+
+  @override
+  String get bomItems => 'Materials';
+
+  @override
+  String get bomMaterialcost => 'Material Cost';
+
+  @override
+  String get bomMaterials => 'Materials';
+
+  @override
+  String get bomName => 'BOM Name';
+
+  @override
+  String get bomNo => 'BOM No';
+
+  @override
+  String get bomNoMaterials => 'No material lines';
+
+  @override
+  String get bomQuantity => 'Batch Quantity';
+
+  @override
+  String get bomSaved => 'BOM saved';
+
+  @override
+  String get bomUnitcost => 'Std Cost';
+
+  @override
+  String get productionAddinput => 'Add Input';
+
+  @override
+  String get productionBatchno => 'Batch No';
+
+  @override
+  String get productionBom => 'BOM';
+
+  @override
+  String get productionBomwarningMismatch =>
+      'The selected BOM produces a different item. Change the BOM or the output item.';
+
+  @override
+  String get productionBomwarningPickoutput =>
+      'Pick an output item first — the BOM auto-fills the inputs for its finished product.';
+
+  @override
+  String get productionCostperunit => 'Cost per Unit';
+
+  @override
+  String get productionCostpreview => 'Batch Cost Preview';
+
+  @override
+  String get productionCreatedby => 'Created by';
+
+  @override
+  String get productionDeleteconfirm =>
+      'Delete this production run? Stock movements and the GL entry will be reversed.';
+
+  @override
+  String get productionDeleted => 'Production deleted';
+
+  @override
+  String get productionDetailstitle => 'Production Details';
+
+  @override
+  String get productionErrorInputsrequired =>
+      'Add at least one input material.';
+
+  @override
+  String get productionErrorBomrequired =>
+      'Select a BOM to load its material inputs.';
+
+  @override
+  String get productionAvailable => 'Available';
+
+  @override
+  String get productionErrorInvalidqty =>
+      'Input quantities must be greater than zero.';
+
+  @override
+  String get productionErrorOutputrequired => 'Output item is required.';
+
+  @override
+  String get productionErrorWarehouserequired =>
+      'Finished-goods warehouse is required.';
+
+  @override
+  String get productionExportcsv => 'Export CSV';
+
+  @override
+  String get productionExported => 'Productions exported.';
+
+  @override
+  String get productionExportfailed => 'Export failed';
+
+  @override
+  String get productionInputqty => 'Quantity';
+
+  @override
+  String get productionInputs => 'Inputs';
+
+  @override
+  String get productionInputsBomhint =>
+      'Select a BOM — its material lines appear here.';
+
+  @override
+  String get productionMaterialcost => 'Material Cost';
+
+  @override
+  String get productionNo => 'Production No';
+
+  @override
+  String get productionNoinputs => 'No input materials recorded for this run.';
+
+  @override
+  String get productionOutputitem => 'Output Item';
+
+  @override
+  String get productionOutputquantity => 'Output Quantity';
+
+  @override
+  String get productionOverhead => 'Overhead Cost';
+
+  @override
+  String get productionRawmaterialsWarehouse => 'Raw Materials Warehouse';
+
+  @override
+  String get productionSaved => 'Production recorded';
+
+  @override
+  String productionShortfallLine(
+    Object available,
+    Object name,
+    Object required,
+  ) {
+    return '$name: $available available, $required required';
+  }
+
+  @override
+  String get productionShortfallTitle => 'Insufficient stock for these inputs';
+
+  @override
+  String get productionTotalcost => 'Total Cost';
+
+  @override
+  String get productionUnitcost => 'Unit Cost';
+
+  @override
+  String get productionWarehouse => 'Finished Goods Warehouse';
 }

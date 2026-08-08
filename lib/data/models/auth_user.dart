@@ -14,14 +14,14 @@ class AuthUser {
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
-        id: asInt(json['id']) ?? 0,
-        username: asString(json['username']) ?? '',
-        email: asString(json['email']),
-        fullName: asString(json['full_name']),
-        role: asString(json['role']),
-        isActive: asBool(json['is_active'], fallback: true),
-        createdAt: asString(json['created_at']),
-      );
+    id: asInt(json['id']) ?? 0,
+    username: asString(json['username']) ?? '',
+    email: asString(json['email']),
+    fullName: asString(json['full_name']),
+    role: asString(json['role']),
+    isActive: asBool(json['is_active'], fallback: true),
+    createdAt: asString(json['created_at']),
+  );
 
   final int id;
   final String username;
@@ -37,12 +37,12 @@ class AuthUser {
       (fullName != null && fullName!.isNotEmpty) ? fullName! : username;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'username': username,
-        if (email != null) 'email': email,
-        if (fullName != null) 'full_name': fullName,
-        if (role != null) 'role': role,
-        'is_active': isActive ? 1 : 0,
-        if (createdAt != null) 'created_at': createdAt,
-      };
+    'id': id,
+    'username': username,
+    if (email != null) 'email': email,
+    if (fullName != null) 'full_name': fullName,
+    if (role != null) 'role': role,
+    'is_active': isActive ? 1 : 0,
+    if (createdAt != null) 'created_at': createdAt,
+  };
 }

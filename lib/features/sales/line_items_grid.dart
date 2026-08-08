@@ -31,7 +31,8 @@ import '../../data/models/item.dart' show SaleType;
 import 'calculations/invoice_calculations.dart' show getFieldOrder;
 import 'calculations/invoice_line_calc.dart'
     show applyLineFieldUpdate, CalcItemLineInput, LineField;
-import 'models/sales_forms.dart' show CalculableLine, DiscountScope, EditedField, FillableLine;
+import 'models/sales_forms.dart'
+    show CalculableLine, DiscountScope, EditedField, FillableLine;
 
 /// The editable columns of a line row, in web-client field-order naming.
 /// Mirrors `FIELD_ORDER_ITEM` / `FIELD_ORDER_INVOICE` (invoice_calculations.dart
@@ -46,28 +47,28 @@ enum LineColumn {
 
   /// PlutoGrid column/cell field key.
   String get field => switch (this) {
-        LineColumn.description => 'description',
-        LineColumn.quantity => 'qty',
-        LineColumn.rate => 'rate',
-        LineColumn.discountValue => 'discount',
-        LineColumn.tax => 'tax',
-        LineColumn.amount => 'amount',
-      };
+    LineColumn.description => 'description',
+    LineColumn.quantity => 'qty',
+    LineColumn.rate => 'rate',
+    LineColumn.discountValue => 'discount',
+    LineColumn.tax => 'tax',
+    LineColumn.amount => 'amount',
+  };
 
   bool get isNumber => switch (this) {
-        LineColumn.description => false,
-        _ => true,
-      };
+    LineColumn.description => false,
+    _ => true,
+  };
 
   static LineColumn? fromField(String field) => switch (field) {
-        'description' => LineColumn.description,
-        'qty' => LineColumn.quantity,
-        'rate' => LineColumn.rate,
-        'discount' => LineColumn.discountValue,
-        'tax' => LineColumn.tax,
-        'amount' => LineColumn.amount,
-        _ => null,
-      };
+    'description' => LineColumn.description,
+    'qty' => LineColumn.quantity,
+    'rate' => LineColumn.rate,
+    'discount' => LineColumn.discountValue,
+    'tax' => LineColumn.tax,
+    'amount' => LineColumn.amount,
+    _ => null,
+  };
 }
 
 /// Result of a navigation move — target row index + column (`null` = no-op).
@@ -168,8 +169,7 @@ class LineRowData implements CalculableLine, FillableLine {
       _setCell('last_edited', value?.value);
 
   @override
-  Discount get discount =>
-      Discount(type: discountType, value: discountValue);
+  Discount get discount => Discount(type: discountType, value: discountValue);
 
   DiscountType get discountType =>
       DiscountType.fromString(_cell('discount_type') ?? 'flat');
@@ -247,8 +247,8 @@ class GridNavController extends ChangeNotifier {
   /// The cell currently in edit mode (`null` = display mode).
   (PlutoRow, LineColumn)? get editingKey =>
       _editingRow == null || _editingColumn == null
-          ? null
-          : (_editingRow!, _editingColumn!);
+      ? null
+      : (_editingRow!, _editingColumn!);
 
   (PlutoRow, LineColumn)? _displayTarget;
 
@@ -412,8 +412,9 @@ class GridNavController extends ChangeNotifier {
           return KeyEventResult.handled;
         }
         final current = _parseNum(_editor?.text ?? '');
-        var newValue =
-            key == LogicalKeyboardKey.arrowUp ? current + 1 : current - 1;
+        var newValue = key == LogicalKeyboardKey.arrowUp
+            ? current + 1
+            : current - 1;
         if (column == LineColumn.tax && newValue > 100) newValue = 100;
         if (newValue < 0) newValue = 0;
         if (column == LineColumn.tax) {
@@ -655,11 +656,11 @@ class GridNavController extends ChangeNotifier {
   static num _parseNum(String text) => num.tryParse(text.trim()) ?? 0;
 
   static LineField _driverFor(LineColumn column) => switch (column) {
-        LineColumn.quantity => LineField.quantity,
-        LineColumn.rate => LineField.rate,
-        LineColumn.amount => LineField.amount,
-        _ => LineField.quantity,
-      };
+    LineColumn.quantity => LineField.quantity,
+    LineColumn.rate => LineField.rate,
+    LineColumn.amount => LineField.amount,
+    _ => LineField.quantity,
+  };
 }
 
 /// Pure target resolution (spec §5.2). `null` = no-op direction.

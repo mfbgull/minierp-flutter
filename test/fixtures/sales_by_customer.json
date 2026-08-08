@@ -1,0 +1,24 @@
+[
+ {
+  "customer_name": "Gulhaji Plaza",
+  "customer_code": "CUST-002",
+  "email": "info@gulhaji.com",
+  "phone": "0333-7891234",
+  "total_invoices": 2,
+  "total_sales": 55685,
+  "average_order_value": 13921.25,
+  "total_items": 4,
+  "last_purchase_date": "2026-08-08"
+ },
+ {
+  "customer_name": "Awees Super Store",
+  "customer_code": "CUST-006",
+  "email": "aweessuperstore@gmail.com",
+  "phone": "091-2345678",
+  "total_invoices": 1,
+  "total_sales": 50000,
+  "average_order_value": 50000,
+  "total_items": 1,
+  "last_purchase_date": "2026-08-06"
+ }
+]

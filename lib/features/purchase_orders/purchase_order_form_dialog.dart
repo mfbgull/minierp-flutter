@@ -13,6 +13,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../data/models/item.dart' show Item;
 import '../../data/models/purchase_order.dart' show PurchaseOrderDetail;
@@ -23,6 +24,7 @@ import '../../data/repositories/purchase_order_repository.dart'
     show purchaseOrderRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/date_picker_helpers.dart' show pickDate;
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart' show numText;
@@ -131,17 +133,10 @@ class _PurchaseOrderFormDialogState
     (sum, line) => sum + line.quantity * line.unitPrice,
   );
 
-  static String _isoDate(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
-
   Future<void> _pickDate({required bool expected}) async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await pickDate(
+      context,
       initialDate: expected ? (_expectedDate ?? _poDate) : _poDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -159,10 +154,10 @@ class _PurchaseOrderFormDialogState
     final notes = _notesController.text.trim();
     return {
       'supplier_id': _supplierId!,
-      'po_date': _isoDate(_poDate),
+      'po_date': isoDate(_poDate),
       if (!_isEdit) 'status': 'Draft',
       if (_expectedDate != null)
-        'expected_delivery_date': _isoDate(_expectedDate!),
+        'expected_delivery_date': isoDate(_expectedDate!),
       if (_warehouseId != null) 'warehouse_id': _warehouseId,
       if (notes.isNotEmpty) 'notes': notes,
     };
@@ -347,7 +342,7 @@ class _PurchaseOrderFormDialogState
       child: OutlinedButton.icon(
         onPressed: _submitting ? null : () => _pickDate(expected: false),
         icon: const Icon(Icons.calendar_today_outlined, size: 16),
-        label: Text(Formatters.date(_isoDate(value))),
+        label: Text(Formatters.date(isoDate(value))),
       ),
     );
   }
@@ -365,7 +360,7 @@ class _PurchaseOrderFormDialogState
               label: Text(
                 value == null
                     ? l10n.purchaseordersExpecteddelivery
-                    : Formatters.date(_isoDate(value)),
+                    : Formatters.date(isoDate(value)),
                 style: TextStyle(
                   color: value == null
                       ? Theme.of(context).colorScheme.onSurfaceVariant

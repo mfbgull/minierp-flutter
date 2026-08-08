@@ -19,7 +19,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
+import '../../core/utils/invoice_status.dart';
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/invoice.dart'
     show
@@ -37,6 +39,7 @@ import '../../data/repositories/invoice_repository.dart'
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/date_picker_helpers.dart' show pickDate;
 import '../../widgets/form_field.dart';
 import '../../widgets/searchable_select.dart';
 import 'calculations/invoice_calculations.dart'
@@ -178,40 +181,37 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   /// column per row (`row.cells[field]!`), so the discount/amount cells
   /// are always present even when the column is hidden/read-only.
   Map<String, PlutoCell> _emptyCells() => {
-        'serial': PlutoCell(value: ''),
-        'description': PlutoCell(value: ''),
-        'qty': PlutoCell(value: 1),
-        'rate': PlutoCell(value: 0),
-        'discount': PlutoCell(value: 0),
-        'discount_type': PlutoCell(value: 'none'),
-        'tax': PlutoCell(value: 0),
-        'amount': PlutoCell(value: 0),
-        'item': PlutoCell(value: ''),
-        'sale_type': PlutoCell(value: SaleType.packed.value),
-        'uom': PlutoCell(value: ''),
-        'qty_prec': PlutoCell(value: 0),
-        'round_step': PlutoCell(value: ''),
-        'last_edited': PlutoCell(value: ''),
-        'remove': PlutoCell(value: ''),
-      };
+    'serial': PlutoCell(value: ''),
+    'description': PlutoCell(value: ''),
+    'qty': PlutoCell(value: 1),
+    'rate': PlutoCell(value: 0),
+    'discount': PlutoCell(value: 0),
+    'discount_type': PlutoCell(value: 'none'),
+    'tax': PlutoCell(value: 0),
+    'amount': PlutoCell(value: 0),
+    'item': PlutoCell(value: ''),
+    'sale_type': PlutoCell(value: SaleType.packed.value),
+    'uom': PlutoCell(value: ''),
+    'qty_prec': PlutoCell(value: 0),
+    'round_step': PlutoCell(value: ''),
+    'last_edited': PlutoCell(value: ''),
+    'remove': PlutoCell(value: ''),
+  };
 
   PlutoRow _emptyLineRow() => PlutoRow(cells: _emptyCells());
 
   PlutoRow _lineRow(InvoiceItem item) => PlutoRow(
-        cells: {
-          ..._emptyCells(),
-          'item': PlutoCell(value: item.itemId),
-          'qty': PlutoCell(value: item.quantity),
-          'rate': PlutoCell(value: item.unitPrice),
-          'tax': PlutoCell(value: item.taxRate),
-        },
-      );
+    cells: {
+      ..._emptyCells(),
+      'item': PlutoCell(value: item.itemId),
+      'qty': PlutoCell(value: item.quantity),
+      'rate': PlutoCell(value: item.unitPrice),
+      'tax': PlutoCell(value: item.taxRate),
+    },
+  );
 
   void _setLines(List<InvoiceItem> items) {
-    final rows = [
-      for (final item in items)
-        _lineRow(item),
-    ];
+    final rows = [for (final item in items) _lineRow(item)];
     if (rows.isEmpty) rows.add(_emptyLineRow());
     final manager = _gridStateManager;
     if (manager == null) {
@@ -238,7 +238,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   }
 
   Future<void> _loadExistingPayments(int id) async {
-    final result = await ref.read(invoiceRepositoryProvider).invoicePayments(id);
+    final result = await ref
+        .read(invoiceRepositoryProvider)
+        .invoicePayments(id);
     switch (result) {
       case ApiSuccess(:final data):
         if (!mounted) return;
@@ -274,10 +276,11 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   }
 
   List<LineRowData> get _filledLines => [
-        for (final row in _rows)
-          if (LineRowData(row).itemId.isNotEmpty || LineRowData(row).description.isNotEmpty)
-            LineRowData(row),
-      ];
+    for (final row in _rows)
+      if (LineRowData(row).itemId.isNotEmpty ||
+          LineRowData(row).description.isNotEmpty)
+        LineRowData(row),
+  ];
 
   /// Writes a selected item's defaults into the line (reference
   /// `onItemSelect`): item id, description, selling price, tax, sale
@@ -334,11 +337,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   // ── Dates / discount ──────────────────────────────────────────
 
   Future<void> _pickDate({required bool isDue}) async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await pickDate(
+      context,
       initialDate: isDue ? _dueDate : _invoiceDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -377,11 +378,13 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
 
   void _addPaymentMethod() {
     setState(() {
-      _paymentMethods.add(PaymentMethod(
-        id: _methodSeq++,
-        method: kPaymentMethods.first,
-        amount: 0,
-      ));
+      _paymentMethods.add(
+        PaymentMethod(
+          id: _methodSeq++,
+          method: kPaymentMethods.first,
+          amount: 0,
+        ),
+      );
     });
   }
 
@@ -421,12 +424,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   }
 
   Future<void> _pickPaymentDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _paymentDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
+    final picked = await pickDate(context, initialDate: _paymentDate);
     if (picked != null && mounted) setState(() => _paymentDate = picked);
   }
 
@@ -478,26 +476,26 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   }
 
   List<Map<String, dynamic>> _paymentBodies() => [
-        for (final m in _paymentMethods)
-          if (m.amount > 0)
+    for (final m in _paymentMethods)
+      if (m.amount > 0)
+        {
+          'customer_id': _customerId!,
+          'payment_date': isoDate(_paymentDate),
+          'amount': m.amount,
+          'payment_method': m.method,
+          if (m.referenceNo != null && m.referenceNo!.isNotEmpty)
+            'reference_no': m.referenceNo,
+          'description': 'Payment for ${widget.invoice?.invoiceNo ?? ''}',
+          if (_paymentNotes.text.trim().isNotEmpty)
+            'notes': _paymentNotes.text.trim(),
+          'invoice_allocations': [
             {
-              'customer_id': _customerId!,
-              'payment_date': _isoDate(_paymentDate),
+              'invoice_id': _isEdit ? widget.invoice!.id : 0,
               'amount': m.amount,
-              'payment_method': m.method,
-              if (m.referenceNo != null && m.referenceNo!.isNotEmpty)
-                'reference_no': m.referenceNo,
-              'description': 'Payment for ${widget.invoice?.invoiceNo ?? ''}',
-              if (_paymentNotes.text.trim().isNotEmpty)
-                'notes': _paymentNotes.text.trim(),
-              'invoice_allocations': [
-                {
-                  'invoice_id': _isEdit ? widget.invoice!.id : 0,
-                  'amount': m.amount,
-                },
-              ],
             },
-      ];
+          ],
+        },
+  ];
 
   void _onDeletePayment(InvoicePaymentRecord p) {
     setState(() => _deletedPayments.add(p.id));
@@ -505,10 +503,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
 
   Future<void> _onEditPayment(InvoicePaymentRecord p) async {
     final l10n = AppLocalizations.of(context)!;
-    final amountController =
-        TextEditingController(text: _numText(p.amount));
-    final refController =
-        TextEditingController(text: p.referenceNo ?? '');
+    final amountController = TextEditingController(text: _numText(p.amount));
+    final refController = TextEditingController(text: p.referenceNo ?? '');
     final updated = await showDialog<(num, String)>(
       context: context,
       builder: (context) => AlertDialog(
@@ -518,8 +514,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
           children: [
             TextField(
               controller: amountController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: InputDecoration(labelText: l10n.fieldsAmount),
             ),
             const SizedBox(height: 8),
@@ -549,12 +546,13 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     if (updated == null || !mounted) return;
 
     setState(() => _recordingPayment = true);
-    final result = await ref
-        .read(invoiceRepositoryProvider)
-        .updatePayment(p.id, {
-          'amount': updated.$1,
-          if (updated.$2.isNotEmpty) 'reference_no': updated.$2,
-        });
+    final result = await ref.read(invoiceRepositoryProvider).updatePayment(
+      p.id,
+      {
+        'amount': updated.$1,
+        if (updated.$2.isNotEmpty) 'reference_no': updated.$2,
+      },
+    );
     if (!mounted) return;
     setState(() => _recordingPayment = false);
     switch (result) {
@@ -575,8 +573,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     return {
       if (!_isEdit) 'invoice_no': generateInvoiceNo(),
       'customer_id': _customerId!,
-      'invoice_date': _isoDate(_invoiceDate),
-      'due_date': _isoDate(_dueDate),
+      'invoice_date': isoDate(_invoiceDate),
+      'due_date': isoDate(_dueDate),
       'status': _status!,
       'discount_scope': scope,
       'discount_type': 'flat',
@@ -633,13 +631,15 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       case ApiSuccess(:final data):
         // Create mode: record any positive payment methods against the
         // fresh invoice, sequentially.
-        if (!_isEdit && _recordPayment && _paymentMethods.any((m) => m.amount > 0)) {
+        if (!_isEdit &&
+            _recordPayment &&
+            _paymentMethods.any((m) => m.amount > 0)) {
           final bodies = [
             for (final m in _paymentMethods)
               if (m.amount > 0)
                 {
                   'customer_id': _customerId!,
-                  'payment_date': _isoDate(_paymentDate),
+                  'payment_date': isoDate(_paymentDate),
                   'amount': m.amount,
                   'payment_method': m.method,
                   if (m.referenceNo != null && m.referenceNo!.isNotEmpty)
@@ -687,8 +687,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       _submitting = true;
       _error = null;
     });
-    final result =
-        await ref.read(invoiceRepositoryProvider).delete(widget.invoice!.id);
+    final result = await ref
+        .read(invoiceRepositoryProvider)
+        .delete(widget.invoice!.id);
     if (!mounted) return;
 
     switch (result) {
@@ -714,55 +715,78 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       PlutoColumnRenderer renderer, {
       PlutoColumnTextAlign align = PlutoColumnTextAlign.left,
     }) => PlutoColumn(
-          title: title,
-          field: field,
-          type: PlutoColumnType.text(),
-          enableEditingMode: false,
-          enableContextMenu: false,
-          width: width,
-          textAlign: align,
-          renderer: renderer,
-        );
+      title: title,
+      field: field,
+      type: PlutoColumnType.text(),
+      enableEditingMode: false,
+      enableContextMenu: false,
+      width: width,
+      textAlign: align,
+      renderer: renderer,
+    );
 
     final result = <PlutoColumn>[
       column('serial', '#', 44, (ctx) => SerialCell(index: ctx.rowIdx)),
-      column('description', l10n.fieldsItem, 240, (ctx) => DescriptionCell(
-            nav: _nav,
-            row: ctx.row,
-            items: _searchPool,
-            formatCurrency: Formatters.currency,
-            onItemSelected: _onItemSelected,
-          )),
-      column('qty', l10n.fieldsQuantity, 96, (ctx) => LineCell(
-            nav: _nav,
-            row: ctx.row,
-            column: LineColumn.quantity,
-          ), align: PlutoColumnTextAlign.end),
-      column('rate', l10n.salesRate, 110, (ctx) => LineCell(
-            nav: _nav,
-            row: ctx.row,
-            column: LineColumn.rate,
-            onBeginEdit: _onRateEdit,
-            overlayBuilder: () => _priceHintFor(ctx.row),
-          ), align: PlutoColumnTextAlign.end),
-      column('discount', l10n.fieldsDiscount, 96, (ctx) => LineCell(
-            nav: _nav,
-            row: ctx.row,
-            column: LineColumn.discountValue,
-          ), align: PlutoColumnTextAlign.end),
-      column('tax', l10n.salesTax, 80, (ctx) => LineCell(
-            nav: _nav,
-            row: ctx.row,
-            column: LineColumn.tax,
-          ), align: PlutoColumnTextAlign.end),
-      column('amount', l10n.fieldsAmount, 120, (ctx) => LineCell(
-            nav: _nav,
-            row: ctx.row,
-            column: LineColumn.amount,
-          ), align: PlutoColumnTextAlign.end),
-      column('remove', '', 52, (ctx) => RemoveCell(
-            onRemove: () => _removeLine(ctx.row),
-          )),
+      column(
+        'description',
+        l10n.fieldsItem,
+        240,
+        (ctx) => DescriptionCell(
+          nav: _nav,
+          row: ctx.row,
+          items: _searchPool,
+          formatCurrency: Formatters.currency,
+          onItemSelected: _onItemSelected,
+        ),
+      ),
+      column(
+        'qty',
+        l10n.fieldsQuantity,
+        96,
+        (ctx) => LineCell(nav: _nav, row: ctx.row, column: LineColumn.quantity),
+        align: PlutoColumnTextAlign.end,
+      ),
+      column(
+        'rate',
+        l10n.salesRate,
+        110,
+        (ctx) => LineCell(
+          nav: _nav,
+          row: ctx.row,
+          column: LineColumn.rate,
+          onBeginEdit: _onRateEdit,
+          overlayBuilder: () => _priceHintFor(ctx.row),
+        ),
+        align: PlutoColumnTextAlign.end,
+      ),
+      column(
+        'discount',
+        l10n.fieldsDiscount,
+        96,
+        (ctx) =>
+            LineCell(nav: _nav, row: ctx.row, column: LineColumn.discountValue),
+        align: PlutoColumnTextAlign.end,
+      ),
+      column(
+        'tax',
+        l10n.salesTax,
+        80,
+        (ctx) => LineCell(nav: _nav, row: ctx.row, column: LineColumn.tax),
+        align: PlutoColumnTextAlign.end,
+      ),
+      column(
+        'amount',
+        l10n.fieldsAmount,
+        120,
+        (ctx) => LineCell(nav: _nav, row: ctx.row, column: LineColumn.amount),
+        align: PlutoColumnTextAlign.end,
+      ),
+      column(
+        'remove',
+        '',
+        52,
+        (ctx) => RemoveCell(onRemove: () => _removeLine(ctx.row)),
+      ),
     ];
     for (final c in result) {
       if (c.field == 'discount') _discountColumn = c;
@@ -774,10 +798,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     final history = _priceHistory;
     final data = LineRowData(row);
     if (history == null || _hintRow != row) return null;
-    return PriceHistoryHint(
-      history: history,
-      currentPrice: data.rate,
-    );
+    return PriceHistoryHint(history: history, currentPrice: data.rate);
   }
 
   // ── Layout ────────────────────────────────────────────────────
@@ -835,9 +856,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       label: Text(label, style: const TextStyle(fontSize: 12)),
       selected: selected,
       visualDensity: VisualDensity.compact,
-      onSelected: _submitting
-          ? null
-          : (_) => _setScope(scope),
+      onSelected: _submitting ? null : (_) => _setScope(scope),
     );
   }
 
@@ -903,9 +922,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                             items: customerItems,
                             selected: _customerId,
                             labelBuilder: (id) {
-                              final match = (customers.valueOrNull ??
-                                      const <Customer>[])
-                                  .where((c) => c.id == id);
+                              final match =
+                                  (customers.valueOrNull ?? const <Customer>[])
+                                      .where((c) => c.id == id);
                               return match.isEmpty
                                   ? '$id'
                                   : match.first.customerName;
@@ -955,8 +974,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                             decoration: const InputDecoration(
                               isDense: true,
                               border: OutlineInputBorder(),
-                              contentPadding:
-                                  EdgeInsets.symmetric(horizontal: 10),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
                             ),
                             items: [
                               for (final s in _statusValues)
@@ -1003,8 +1023,14 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final wide = constraints.maxWidth >= 720;
-                      final grid = _totalsAndGrid(l10n, subtotal, tax,
-                          discount, total, filled);
+                      final grid = _totalsAndGrid(
+                        l10n,
+                        subtotal,
+                        tax,
+                        discount,
+                        total,
+                        filled,
+                      );
                       final panel = PaymentPanel(
                         isEdit: _isEdit,
                         recordPayment: _recordPayment,
@@ -1014,15 +1040,12 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                         deletedPayments: _deletedPayments,
                         total: total,
                         paidAmount: widget.invoice?.paidAmount ?? 0,
-                        balance: _remainingBalance < 0
-                            ? 0
-                            : _remainingBalance,
+                        balance: _remainingBalance < 0 ? 0 : _remainingBalance,
                         saving: _submitting || _recordingPayment,
                         onRecordChanged: (v) =>
                             setState(() => _recordPayment = v),
                         onPickPaymentDate: _pickPaymentDate,
-                        onPaymentNotesChanged: (v) =>
-                            _paymentNotes.text = v,
+                        onPaymentNotesChanged: (v) => _paymentNotes.text = v,
                         onAddMethod: _addPaymentMethod,
                         onRemoveMethod: _removePaymentMethod,
                         onUpdateMethod: _updatePaymentMethod,
@@ -1060,10 +1083,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .errorContainer
-                            .withValues(alpha: 0.6),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.errorContainer.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1083,8 +1105,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                           icon: const Icon(Icons.delete_outline, size: 18),
                           label: Text(l10n.commonDelete),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor:
-                                Theme.of(context).colorScheme.error,
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.error,
                           ),
                         ),
                       const Spacer(),
@@ -1101,8 +1124,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                             ? const SizedBox(
                                 width: 14,
                                 height: 14,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.save_outlined, size: 18),
                         label: Text(l10n.commonSave),
@@ -1128,31 +1152,31 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     List<LineRowData> filled,
   ) {
     Widget totalsRow(String label, num value, {bool bold = false}) => Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                textAlign: TextAlign.right,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            textAlign: TextAlign.right,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(width: 10),
-            SizedBox(
-              width: 110,
-              child: Text(
-                Formatters.currency(value),
-                textAlign: TextAlign.right,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-                    ),
-              ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 110,
+          child: Text(
+            Formatters.currency(value),
+            textAlign: TextAlign.right,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
             ),
-          ],
-        );
+          ),
+        ),
+      ],
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1160,10 +1184,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest
-                .withValues(alpha: 0.5),
+            color: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -1174,8 +1197,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                   child: TextFormField(
                     controller: _discountController,
                     enabled: !_submitting,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: InputDecoration(
                       isDense: true,
                       border: OutlineInputBorder(),
@@ -1210,18 +1234,15 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   }
 
   List<Item> get _searchPool {
-    final items = ref.read(invoiceItemsProvider).valueOrNull ??
-        const <Item>[];
+    final items = ref.read(invoiceItemsProvider).valueOrNull ?? const <Item>[];
     return [
       for (final it in items)
         if (it.isFinishedGood || it.isPurchased) it,
     ];
   }
 
-  InputDecoration _decoration() => const InputDecoration(
-        isDense: true,
-        border: OutlineInputBorder(),
-      );
+  InputDecoration _decoration() =>
+      const InputDecoration(isDense: true, border: OutlineInputBorder());
 
   Widget _dateField(String label, DateTime value, {required bool isDue}) {
     return SizedBox(
@@ -1229,7 +1250,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       child: OutlinedButton.icon(
         onPressed: _submitting ? null : () => _pickDate(isDue: isDue),
         icon: const Icon(Icons.calendar_today_outlined, size: 16),
-        label: Text(Formatters.date(_isoDate(value))),
+        label: Text(Formatters.date(isoDate(value))),
       ),
     );
   }
@@ -1237,11 +1258,6 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   static String _numText(num value) => value == value.roundToDouble()
       ? value.toInt().toString()
       : value.toString();
-
-  static String _isoDate(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
 }
 
 /// All invoice statuses offered in the form dropdown (server vocabulary —
@@ -1259,18 +1275,7 @@ const List<String> _statusValues = [
 ];
 
 String _statusLabel(AppLocalizations l10n, String status) =>
-    switch (status) {
-      'Draft' => l10n.statusDraft,
-      'Sent' => l10n.statusSent,
-      'Paid' => l10n.statusPaid,
-      'Unpaid' => l10n.statusUnpaid,
-      'Overdue' => l10n.statusOverdue,
-      'Cancelled' => l10n.statusCancelled,
-      'Partially Paid' => l10n.statusPartiallypaid,
-      'Returned' => l10n.statusReturned,
-      'Partially Returned' => l10n.statusPartiallyreturned,
-      _ => status,
-    };
+    invoiceStatusLabel(l10n, status);
 
 /// Quantity must be positive — shown in the error banner when a filled
 /// line has a zero/empty qty. No l10n key exists for this phrasing.

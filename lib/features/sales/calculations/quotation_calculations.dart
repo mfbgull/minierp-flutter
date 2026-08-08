@@ -25,21 +25,25 @@ QuotationFormItem createEmptyItemRow(int index) {
   );
 }
 
-List<QuotationFormItem> padItemsToMinimum(List<QuotationFormItem> items,
-    {int min = 1}) {
+List<QuotationFormItem> padItemsToMinimum(
+  List<QuotationFormItem> items, {
+  int min = 1,
+}) {
   if (items.length >= min) return items;
   final padded = [...items];
   final now = _now();
   for (var i = items.length; i < min; i++) {
-    padded.add(QuotationFormItem(
-      id: now + i + 1000,
-      itemId: '',
-      description: '',
-      quantity: 1,
-      rate: 0,
-      tax: 0,
-      discount: flatZeroDiscount,
-    ));
+    padded.add(
+      QuotationFormItem(
+        id: now + i + 1000,
+        itemId: '',
+        description: '',
+        quantity: 1,
+        rate: 0,
+        tax: 0,
+        discount: flatZeroDiscount,
+      ),
+    );
   }
   return padded;
 }
@@ -63,8 +67,7 @@ num calculateItemTotal(QuotationFormItem item) {
 }
 
 num calculateSubtotal(List<QuotationFormItem> items) {
-  return items.fold<num>(
-      0, (sum, item) => sum + (item.quantity * item.rate));
+  return items.fold<num>(0, (sum, item) => sum + (item.quantity * item.rate));
 }
 
 num calculateDiscount(List<QuotationFormItem> items) {
@@ -81,7 +84,9 @@ num calculateTax(List<QuotationFormItem> items) {
 }
 
 num calculateTotal(List<QuotationFormItem> items) {
-  return calculateSubtotal(items) - calculateDiscount(items) + calculateTax(items);
+  return calculateSubtotal(items) -
+      calculateDiscount(items) +
+      calculateTax(items);
 }
 
 /* ── Field navigation ───────────────────────────────────────────── */
@@ -110,9 +115,10 @@ String? getNextField(String currentField) {
 /// slices to 10; Dart returns the (superset) `Item` models.
 List<Item> getSellableItems(List<Item> items) {
   return items
-      .where((item) =>
-          !item.isRawMaterial &&
-          (item.isFinishedGood || item.isPurchased))
+      .where(
+        (item) =>
+            !item.isRawMaterial && (item.isFinishedGood || item.isPurchased),
+      )
       .take(10)
       .toList();
 }

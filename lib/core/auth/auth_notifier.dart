@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/auth_user.dart' show AuthUser;
-import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
+import '../../data/repositories/api_result.dart'
+    show ApiError, ApiFailure, ApiSuccess;
 import '../../data/repositories/auth_repository.dart'
     show AuthLoginResult, AuthRepository, authRepositoryProvider;
 import 'token_storage.dart' show TokenStorage, tokenStorageProvider;
@@ -15,7 +16,7 @@ import 'token_storage.dart' show TokenStorage, tokenStorageProvider;
 /// notifier is the single source of truth for the whole app.
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._repo, this._storage)
-      : super(const AuthState(status: AuthStatus.unknown)) {
+    : super(const AuthState(status: AuthStatus.unknown)) {
     unawaited(restoreSession());
   }
 
@@ -32,8 +33,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
     final result = await _repo.me();
     state = switch (result) {
-      ApiSuccess(:final data) =>
-        AuthState(status: AuthStatus.authenticated, user: data),
+      ApiSuccess(:final data) => AuthState(
+        status: AuthStatus.authenticated,
+        user: data,
+      ),
       ApiFailure() => const AuthState(status: AuthStatus.unauthenticated),
     };
   }

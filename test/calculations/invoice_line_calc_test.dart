@@ -21,55 +21,72 @@ void main() {
   group('calcItemLine', () {
     test('packed items: quantity drives amount', () {
       expect(
-        calcItemLine(const CalcItemLineInput(
-            saleType: SaleType.packed, quantity: 5, rate: 150)),
+        calcItemLine(
+          const CalcItemLineInput(
+            saleType: SaleType.packed,
+            quantity: 5,
+            rate: 150,
+          ),
+        ),
         (quantity: 5, amount: 750, error: null),
       );
       expect(
-        calcItemLine(const CalcItemLineInput(
-            saleType: SaleType.packed, quantity: 3, rate: 10.33)),
+        calcItemLine(
+          const CalcItemLineInput(
+            saleType: SaleType.packed,
+            quantity: 3,
+            rate: 10.33,
+          ),
+        ),
         (quantity: 3, amount: 30.99, error: null),
       );
       // sale_type omitted defaults to packed
-      expect(
-        calcItemLine(const CalcItemLineInput(quantity: 2, rate: 4)),
-        (quantity: 2, amount: 8, error: null),
-      );
+      expect(calcItemLine(const CalcItemLineInput(quantity: 2, rate: 4)), (
+        quantity: 2,
+        amount: 8,
+        error: null,
+      ));
     });
 
     test('loose: amount drives quantity', () {
       expect(
-        calcItemLine(const CalcItemLineInput(
-          saleType: SaleType.loose,
-          amount: 100,
-          rate: 150,
-          lastEditedField: EditedField.amount,
-          qtyDecimalPrecision: 3,
-        )),
+        calcItemLine(
+          const CalcItemLineInput(
+            saleType: SaleType.loose,
+            amount: 100,
+            rate: 150,
+            lastEditedField: EditedField.amount,
+            qtyDecimalPrecision: 3,
+          ),
+        ),
         (quantity: 0.667, amount: 100, error: null),
       );
     });
 
     test('loose: amount with zero rate errors', () {
-      final res = calcItemLine(const CalcItemLineInput(
-        saleType: SaleType.loose,
-        amount: 100,
-        rate: 0,
-        lastEditedField: EditedField.amount,
-        qtyDecimalPrecision: 3,
-      ));
+      final res = calcItemLine(
+        const CalcItemLineInput(
+          saleType: SaleType.loose,
+          amount: 100,
+          rate: 0,
+          lastEditedField: EditedField.amount,
+          qtyDecimalPrecision: 3,
+        ),
+      );
       expect(res.error?.code, LineErrorCode.zeroRate);
       expect(res.error?.severity, LineErrorSeverity.error);
     });
 
     test('loose: amount too small warns about zero quantity', () {
-      final res = calcItemLine(const CalcItemLineInput(
-        saleType: SaleType.loose,
-        amount: 1,
-        rate: 150,
-        lastEditedField: EditedField.amount,
-        qtyDecimalPrecision: 1,
-      ));
+      final res = calcItemLine(
+        const CalcItemLineInput(
+          saleType: SaleType.loose,
+          amount: 1,
+          rate: 150,
+          lastEditedField: EditedField.amount,
+          qtyDecimalPrecision: 1,
+        ),
+      );
       expect(res.quantity, 0);
       expect(res.error?.code, LineErrorCode.zeroQuantity);
       expect(res.error?.severity, LineErrorSeverity.warning);
@@ -77,11 +94,14 @@ void main() {
 
     test('loose: quantity drives amount', () {
       expect(
-        calcItemLine(const CalcItemLineInput(
+        calcItemLine(
+          const CalcItemLineInput(
             saleType: SaleType.loose,
             quantity: 5,
             rate: 150,
-            lastEditedField: EditedField.quantity)),
+            lastEditedField: EditedField.quantity,
+          ),
+        ),
         (quantity: 5, amount: 750, error: null),
       );
     });
@@ -89,48 +109,58 @@ void main() {
     test('loose: rate change keeps the driver fixed', () {
       // amount-driven → quantity recomputed
       expect(
-        calcItemLine(const CalcItemLineInput(
-          saleType: SaleType.loose,
-          amount: 100,
-          rate: 200,
-          lastEditedField: EditedField.amount,
-          qtyDecimalPrecision: 3,
-        )),
+        calcItemLine(
+          const CalcItemLineInput(
+            saleType: SaleType.loose,
+            amount: 100,
+            rate: 200,
+            lastEditedField: EditedField.amount,
+            qtyDecimalPrecision: 3,
+          ),
+        ),
         (quantity: 0.5, amount: 100, error: null),
       );
       // quantity-driven → amount recomputed
       expect(
-        calcItemLine(const CalcItemLineInput(
+        calcItemLine(
+          const CalcItemLineInput(
             saleType: SaleType.loose,
             quantity: 2,
             rate: 200,
-            lastEditedField: EditedField.quantity)),
+            lastEditedField: EditedField.quantity,
+          ),
+        ),
         (quantity: 2, amount: 400, error: null),
       );
     });
 
     test('loose: fresh row is a no-op', () {
       expect(
-        calcItemLine(const CalcItemLineInput(
+        calcItemLine(
+          const CalcItemLineInput(
             saleType: SaleType.loose,
             quantity: 0,
             amount: 0,
             rate: 150,
-            lastEditedField: null)),
+            lastEditedField: null,
+          ),
+        ),
         (quantity: 0, amount: 0, error: null),
       );
     });
 
     test('loose: explicit rounding_step overrides precision', () {
       expect(
-        calcItemLine(const CalcItemLineInput(
-          saleType: SaleType.loose,
-          amount: 100,
-          rate: 150,
-          lastEditedField: EditedField.amount,
-          qtyDecimalPrecision: 3,
-          roundingStep: 0.5,
-        )),
+        calcItemLine(
+          const CalcItemLineInput(
+            saleType: SaleType.loose,
+            amount: 100,
+            rate: 150,
+            lastEditedField: EditedField.amount,
+            qtyDecimalPrecision: 3,
+            roundingStep: 0.5,
+          ),
+        ),
         (quantity: 0.5, amount: 100, error: null),
       );
     });
@@ -139,26 +169,23 @@ void main() {
   group('applyLineFieldUpdate', () {
     test('editing a field makes it the driver', () {
       const loose = CalcItemLineInput(
-          saleType: SaleType.loose, qtyDecimalPrecision: 3, rate: 150);
+        saleType: SaleType.loose,
+        qtyDecimalPrecision: 3,
+        rate: 150,
+      );
 
-      expect(
-        applyLineFieldUpdate(loose, LineField.amount, 100),
-        (
-          quantity: 0.667,
-          amount: 100,
-          rate: 150,
-          lastEditedField: EditedField.amount,
-        ),
-      );
-      expect(
-        applyLineFieldUpdate(loose, LineField.quantity, 2),
-        (
-          quantity: 2,
-          amount: 300,
-          rate: 150,
-          lastEditedField: EditedField.quantity,
-        ),
-      );
+      expect(applyLineFieldUpdate(loose, LineField.amount, 100), (
+        quantity: 0.667,
+        amount: 100,
+        rate: 150,
+        lastEditedField: EditedField.amount,
+      ));
+      expect(applyLineFieldUpdate(loose, LineField.quantity, 2), (
+        quantity: 2,
+        amount: 300,
+        rate: 150,
+        lastEditedField: EditedField.quantity,
+      ));
     });
 
     test('rate edit keeps the existing driver', () {
@@ -170,45 +197,66 @@ void main() {
         quantity: 0.667,
         lastEditedField: EditedField.amount,
       );
-      expect(
-        applyLineFieldUpdate(amountDriven, LineField.rate, 200),
-        (
-          quantity: 0.5,
-          amount: 100,
-          rate: 200,
-          lastEditedField: EditedField.amount,
-        ),
-      );
+      expect(applyLineFieldUpdate(amountDriven, LineField.rate, 200), (
+        quantity: 0.5,
+        amount: 100,
+        rate: 200,
+        lastEditedField: EditedField.amount,
+      ));
     });
 
     test('packed lines never set a driver', () {
-      const packed =
-          CalcItemLineInput(saleType: SaleType.packed, rate: 10, quantity: 3);
-      expect(
-        applyLineFieldUpdate(packed, LineField.quantity, 4),
-        (quantity: 4, amount: 40, rate: 10, lastEditedField: null),
+      const packed = CalcItemLineInput(
+        saleType: SaleType.packed,
+        rate: 10,
+        quantity: 3,
       );
+      expect(applyLineFieldUpdate(packed, LineField.quantity, 4), (
+        quantity: 4,
+        amount: 40,
+        rate: 10,
+        lastEditedField: null,
+      ));
     });
   });
 
   group('lineIssue', () {
     test('only flags loose lines with a positive amount', () {
-      expect(lineIssue(const CalcItemLineInput(
-          saleType: SaleType.packed, amount: 100, rate: 0)), null);
-      expect(lineIssue(const CalcItemLineInput(
-          saleType: SaleType.loose, amount: 0, rate: 0)), null);
       expect(
-        lineIssue(const CalcItemLineInput(
-            saleType: SaleType.loose, amount: 100, rate: 0))?.code,
+        lineIssue(
+          const CalcItemLineInput(
+            saleType: SaleType.packed,
+            amount: 100,
+            rate: 0,
+          ),
+        ),
+        null,
+      );
+      expect(
+        lineIssue(
+          const CalcItemLineInput(saleType: SaleType.loose, amount: 0, rate: 0),
+        ),
+        null,
+      );
+      expect(
+        lineIssue(
+          const CalcItemLineInput(
+            saleType: SaleType.loose,
+            amount: 100,
+            rate: 0,
+          ),
+        )?.code,
         LineErrorCode.zeroRate,
       );
       expect(
-        lineIssue(const CalcItemLineInput(
-          saleType: SaleType.loose,
-          amount: 1,
-          rate: 150,
-          qtyDecimalPrecision: 1,
-        ))?.code,
+        lineIssue(
+          const CalcItemLineInput(
+            saleType: SaleType.loose,
+            amount: 1,
+            rate: 150,
+            qtyDecimalPrecision: 1,
+          ),
+        )?.code,
         LineErrorCode.zeroQuantity,
       );
     });

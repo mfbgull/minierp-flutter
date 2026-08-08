@@ -22,7 +22,10 @@ import '../../widgets/form_helpers.dart';
 import 'customer_providers.dart';
 
 /// Opens the create ([customer] == null) or edit form dialog.
-Future<void> showCustomerFormDialog(BuildContext context, {Customer? customer}) {
+Future<void> showCustomerFormDialog(
+  BuildContext context, {
+  Customer? customer,
+}) {
   return showDialog<void>(
     context: context,
     builder: (dialogContext) => CustomerFormDialog(customer: customer),
@@ -65,22 +68,30 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
     super.initState();
     final customer = widget.customer;
     _nameController = TextEditingController(text: customer?.customerName ?? '');
-    _contactController =
-        TextEditingController(text: customer?.contactPerson ?? '');
+    _contactController = TextEditingController(
+      text: customer?.contactPerson ?? '',
+    );
     _emailController = TextEditingController(text: customer?.email ?? '');
     _phoneController = TextEditingController(text: customer?.phone ?? '');
-    _termsController = TextEditingController(text: customer?.paymentTerms ?? '');
+    _termsController = TextEditingController(
+      text: customer?.paymentTerms ?? '',
+    );
     // Zod defaults: payment_terms_days 14, credit_limit 0, opening_balance 0.
-    _termsDaysController =
-        TextEditingController(text: numText(customer?.paymentTermsDays ?? 14));
-    _creditLimitController =
-        TextEditingController(text: numText(customer?.creditLimit ?? 0));
-    _openingBalanceController =
-        TextEditingController(text: numText(customer?.openingBalance ?? 0));
-    _billingController =
-        TextEditingController(text: customer?.billingAddress ?? '');
-    _shippingController =
-        TextEditingController(text: customer?.shippingAddress ?? '');
+    _termsDaysController = TextEditingController(
+      text: numText(customer?.paymentTermsDays ?? 14),
+    );
+    _creditLimitController = TextEditingController(
+      text: numText(customer?.creditLimit ?? 0),
+    );
+    _openingBalanceController = TextEditingController(
+      text: numText(customer?.openingBalance ?? 0),
+    );
+    _billingController = TextEditingController(
+      text: customer?.billingAddress ?? '',
+    );
+    _shippingController = TextEditingController(
+      text: customer?.shippingAddress ?? '',
+    );
   }
 
   @override
@@ -146,7 +157,9 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
       case ApiSuccess():
         // Refresh the list; if editing, also refresh the (possibly open)
         // detail dialog's data for this customer.
-        if (_isEdit) ref.invalidate(customerDetailProvider(widget.customer!.id));
+        if (_isEdit) {
+          ref.invalidate(customerDetailProvider(widget.customer!.id));
+        }
         ref.invalidate(customersProvider);
         Navigator.of(context).pop();
       case ApiFailure(:final error):
@@ -161,11 +174,11 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     String? validateNumber(String? v) => nonNegativeNumberValidator(
-          v,
-          emptyMessage: l10n.customersErrorNumber,
-          invalidMessage: l10n.customersErrorNumber,
-          nonNegativeMessage: l10n.customersErrorNonnegative,
-        );
+      v,
+      emptyMessage: l10n.customersErrorNumber,
+      invalidMessage: l10n.customersErrorNumber,
+      nonNegativeMessage: l10n.customersErrorNonnegative,
+    );
 
     return Dialog(
       child: ConstrainedBox(
@@ -290,8 +303,8 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                                      decimal: true,
+                                    ),
                                 decoration: formInputDecoration(),
                                 validator: validateNumber,
                               ),
@@ -306,8 +319,8 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                                      decimal: true,
+                                    ),
                                 decoration: formInputDecoration(),
                                 validator: validateNumber,
                               ),
@@ -322,8 +335,8 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                                      decimal: true,
+                                    ),
                                 decoration: formInputDecoration(),
                                 validator: validateNumber,
                               ),
@@ -383,8 +396,9 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : Text(l10n.commonSave),
                         ),
@@ -399,5 +413,4 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
       ),
     );
   }
-
 }

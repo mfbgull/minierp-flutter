@@ -23,27 +23,27 @@ abstract final class AppTheme {
   static const Color _errorDark = Color(0xFFEF4444);
 
   static ThemeData get light => _build(
-        brightness: Brightness.light,
-        background: _bgLight,
-        surface: _surfaceLight,
-        border: _borderLight,
-        textPrimary: _textPrimaryLight,
-        textSecondary: _textSecondaryLight,
-        accent: _accentLight,
-        error: _errorLight,
-      );
+    brightness: Brightness.light,
+    background: _bgLight,
+    surface: _surfaceLight,
+    border: _borderLight,
+    textPrimary: _textPrimaryLight,
+    textSecondary: _textSecondaryLight,
+    accent: _accentLight,
+    error: _errorLight,
+  );
 
   static ThemeData get dark => _build(
-        brightness: Brightness.dark,
-        background: _bgDark,
-        surface: _surfaceDark,
-        border: _borderDark,
-        textPrimary: _textPrimaryDark,
-        textSecondary: _textSecondaryDark,
-        accent: _accentDark,
-        error: _errorDark,
-        elevatedSurface: _surfaceElevatedDark,
-      );
+    brightness: Brightness.dark,
+    background: _bgDark,
+    surface: _surfaceDark,
+    border: _borderDark,
+    textPrimary: _textPrimaryDark,
+    textSecondary: _textSecondaryDark,
+    accent: _accentDark,
+    error: _errorDark,
+    elevatedSurface: _surfaceElevatedDark,
+  );
 
   static ThemeData _build({
     required Brightness brightness,
@@ -101,7 +101,10 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: accent, width: 1.6),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -109,10 +112,9 @@ abstract final class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
       ),
-      textTheme: ThemeData(brightness: brightness).textTheme.apply(
-            bodyColor: textPrimary,
-            displayColor: textPrimary,
-          ),
+      textTheme: ThemeData(
+        brightness: brightness,
+      ).textTheme.apply(bodyColor: textPrimary, displayColor: textPrimary),
     );
   }
 }

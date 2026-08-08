@@ -25,6 +25,7 @@ import 'package:minierp_app/features/auth/change_password_screen.dart';
 import 'package:minierp_app/features/customers/customer_ledger_dialog.dart';
 import 'package:minierp_app/features/suppliers/supplier_ledger_dialog.dart';
 import 'package:minierp_app/features/suppliers/supplier_statement_dialog.dart';
+import 'package:minierp_app/features/reports/reports_dashboard_screen.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 class _FakeTokenStorage implements TokenStorage {
@@ -214,6 +215,17 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   /// How many times the movement detail GET ran (dialog fetch assertions).
   int movementDetailFetchCount = 0;
 
+  /// Production module capture + state fields.
+  Map<String, dynamic>? lastProductionPostBody;
+  int productionDeleteCount = 0;
+  bool production4Deleted = false;
+  int productionDetailFetchCount = 0;
+  Map<String, dynamic>? lastBomPostBody;
+  Map<String, dynamic>? lastBomPutBody;
+  Map<String, dynamic>? lastBomToggleBody;
+  int bomDeleteCount = 0;
+  int bomDetailFetchCount = 0;
+
   /// Captured query params of the last movements list GET (filter tests).
   Map<String, dynamic>? lastMovementQuery;
 
@@ -286,6 +298,16 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   Map<String, dynamic>? lastInvoicesQuery;
   Map<String, dynamic>? lastInvoicePostBody;
   Map<String, dynamic>? lastInvoicePutBody;
+  Map<String, dynamic>? lastInvoiceReturnBody;
+  num invoice1ReturnedQty = 0;
+  bool rejectInvoiceReturn = false;
+
+  /// Captured payments-module request state: paged list query, create/
+  /// update bodies, and a delete counter.
+  Map<String, dynamic>? lastPaymentsQuery;
+  Map<String, dynamic>? lastPaymentPostBody;
+  Map<String, dynamic>? lastPaymentPutBody;
+  int paymentDeleteCount = 0;
 
   /// Last /sales-orders query params (sales-orders grid tests).
   Map<String, dynamic>? lastSalesOrdersQuery;
@@ -1586,6 +1608,350 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       pc1Status = 'Cancelled';
       return _json({'id': 1, 'count_no': 'PC-2026-001', 'status': pc1Status});
     }
+    if (options.path == '/reports/ar-aging') {
+      // Enveloped — the real ReportsModel.getARAgingReport shape.
+      return _json({
+        'success': true,
+        'data': {
+          'asOfDate': '2026-08-08',
+          'agingBuckets': [
+            {
+              'customer_name': 'Acme Corp',
+              'customer_code': 'CUST001',
+              'total_outstanding': 120.5,
+              'current_amount': 50.0,
+              'days_1_30': 70.5,
+              'days_31_60': 0.0,
+              'days_61_90': 0.0,
+              'days_over_90': 0.0,
+            },
+            {
+              'customer_name': 'Beta Ltd',
+              'customer_code': 'CUST002',
+              'total_outstanding': 300.0,
+              'current_amount': 0.0,
+              'days_1_30': 0.0,
+              'days_31_60': 100.0,
+              'days_61_90': 0.0,
+              'days_over_90': 200.0,
+            },
+          ],
+          'summary': {
+            'totalReceivables': 420.5,
+            'current_amount': 50.0,
+            'total_1_30': 70.5,
+            'total_31_60': 100.0,
+            'total_61_90': 0.0,
+            'total_over_90': 200.0,
+          },
+        },
+      });
+    }
+    if (options.path == '/reports/sales-summary') {
+      // Enveloped — the real ReportsModel.getSalesSummary shape (stats +
+      // per-invoice detail).
+      return _json({
+        'success': true,
+        'data': {
+          'period': {'startDate': '2026-07-08', 'endDate': '2026-08-08'},
+          'summary': {
+            'totalInvoices': 2,
+            'totalSales': 1500.0,
+            'totalItemsSold': 110.0,
+            'averageInvoiceValue': 750.0,
+            'totalPaid': 500.0,
+            'totalBalance': 1000.0,
+          },
+          'sales': [
+            {
+              'invoice_date': '2026-08-01',
+              'invoice_no': 'INV-2026-001',
+              'customer_name': 'Acme Corp',
+              'total_sales': 1000.0,
+              'total_items': 100.0,
+              'paid_amount': 500.0,
+              'balance_amount': 500.0,
+              'status': 'Partially Paid',
+            },
+            {
+              'invoice_date': '2026-07-15',
+              'invoice_no': 'INV-2026-002',
+              'customer_name': 'Beta Ltd',
+              'total_sales': 500.0,
+              'total_items': 10.0,
+              'paid_amount': 0.0,
+              'balance_amount': 500.0,
+              'status': 'Unpaid',
+            },
+          ],
+        },
+      });
+    }
+    if (options.path == '/reports/low-stock') {
+      // Enveloped — the real ReportsModel.getLowStockReport shape.
+      return _json({
+        'success': true,
+        'data': [
+          {
+            'id': 1,
+            'item_code': 'FG001',
+            'item_name': 'Widget A',
+            'item_category': 'Parts',
+            'unit_of_measure': 'pcs',
+            'current_stock': 5.0,
+            'minimum_stock': 10.0,
+            'shortage': 5.0,
+            'reorder_level': 8.0,
+            'standard_selling_price': 45.0,
+            'stock_status': 'Low Stock',
+          },
+          {
+            'id': 2,
+            'item_code': 'RM002',
+            'item_name': 'Bolt',
+            'item_category': 'Raw',
+            'unit_of_measure': 'box',
+            'current_stock': 0.0,
+            'minimum_stock': 50.0,
+            'shortage': 50.0,
+            'reorder_level': 50.0,
+            'standard_selling_price': 5.0,
+            'stock_status': 'Out of Stock',
+          },
+        ],
+      });
+    }
+    if (options.path == '/reports/stock-level') {
+      // Enveloped — the real ReportsModel.getStockLevelReport shape.
+      return _json({
+        'success': true,
+        'data': {
+          'stockLevels': [
+            {
+              'id': 1,
+              'item_code': 'FG001',
+              'item_name': 'Widget A',
+              'item_category': 'Parts',
+              'unit_of_measure': 'pcs',
+              'current_stock': 25.0,
+              'minimum_stock': 10.0,
+              'reorder_level': 8.0,
+              'standard_selling_price': 45.0,
+              'stock_status': 'In Stock',
+            },
+            {
+              'id': 2,
+              'item_code': 'RM002',
+              'item_name': 'Bolt',
+              'item_category': 'Raw',
+              'unit_of_measure': 'box',
+              'current_stock': 0.0,
+              'minimum_stock': 50.0,
+              'reorder_level': 50.0,
+              'standard_selling_price': 5.0,
+              'stock_status': 'Out of Stock',
+            },
+          ],
+          'summary': {
+            'totalItems': 2,
+            'inStock': 1,
+            'lowStock': 0,
+            'outOfStock': 1,
+          },
+        },
+      });
+    }
+    if (options.path == '/reports/stock-valuation') {
+      // Enveloped — the real ReportsModel.getStockValuationReport shape
+      // (the SQL aliases quantity as total_stock and cost as
+      // standard_cost, exactly as served).
+      return _json({
+        'success': true,
+        'data': {
+          'stockValuation': [
+            {
+              'id': 1,
+              'item_code': 'FG001',
+              'item_name': 'Widget A',
+              'category': 'Parts',
+              'unit_of_measure': 'pcs',
+              'total_stock': 25.0,
+              'standard_cost': 30.0,
+              'total_value': 750.0,
+              'valuation_method': 'batch',
+            },
+            {
+              'id': 2,
+              'item_code': 'RM002',
+              'item_name': 'Bolt',
+              'category': 'Raw',
+              'unit_of_measure': 'box',
+              'total_stock': 40.0,
+              'standard_cost': 2.0,
+              'total_value': 80.0,
+              'valuation_method': 'standard_cost_fallback',
+            },
+          ],
+          'summary': {
+            'totalValue': 830.0,
+            'totalItems': 2,
+            'batchTrackedItems': 1,
+            'legacyItems': 1,
+          },
+        },
+      });
+    }
+    if (options.path == '/reports/sales-by-customer') {
+      // Bare array (not wrapped in an object) — the real
+      // ReportsModel.getSalesByCustomer shape.
+      return _json({
+        'success': true,
+        'data': [
+          {
+            'customer_name': 'Acme Corp',
+            'customer_code': 'CUST001',
+            'email': 'billing@acme.test',
+            'phone': '555-0100',
+            'total_invoices': 3,
+            'total_sales': 2400.0,
+            'total_items': 60,
+            'average_order_value': 800.0,
+            'last_purchase_date': '2026-08-01',
+          },
+          {
+            'customer_name': 'Beta Ltd',
+            'customer_code': 'CUST002',
+            'email': 'ap@beta.test',
+            'phone': '555-0200',
+            'total_invoices': 1,
+            'total_sales': 500.0,
+            'total_items': 10,
+            'average_order_value': 500.0,
+            'last_purchase_date': '2026-07-15',
+          },
+        ],
+      });
+    }
+    if (options.path == '/reports/dso') {
+      return _json({
+        'success': true,
+        'data': {
+          'dso': 18.65,
+          'avgReceivables': 50000,
+          'totalCreditSales': 101895,
+          'totalSales': 101895,
+          'totalAR': 50000,
+          'avgInvoiceValue': 33965,
+          'period': {'startDate': '2026-07-01', 'endDate': '2026-08-08'},
+        },
+      });
+    }
+    if (options.path == '/reports/cash-flow') {
+      return _json({
+        'success': true,
+        'data': {
+          'startDate': '2026-07-01',
+          'endDate': '2026-08-08',
+          'totalInflow': 52895,
+          'totalOutflow': 1000,
+          'netCashFlow': 51895,
+        },
+      });
+    }
+    if (options.path == '/reports/profit-loss') {
+      return _json({
+        'success': true,
+        'data': {
+          'startDate': '2026-07-01',
+          'endDate': '2026-08-08',
+          'totalRevenue': 101895,
+          'totalCogs': 271315.5,
+          'grossProfit': -169420.5,
+          'expenses': [
+            {'expense_category': 'Marketing', 'total': 2000},
+          ],
+          'totalExpenses': 2000,
+          'netProfit': -171420.5,
+          'grossProfitMargin': -166.27,
+          'netProfitMargin': -168.23,
+        },
+      });
+    }
+    if (options.path == '/reports/inventory-movement') {
+      return _json({
+        'success': true,
+        'data': {
+          'movements': [
+            {
+              'movement_no': 'STK-2026-0001',
+              'movement_type': 'SALE',
+              'quantity': -2,
+              'unit_cost': 35.5,
+              'movement_date': '2026-08-08',
+              'reference_doctype': 'INVOICE',
+              'reference_docno': 'INV-2026-0001',
+              'remarks': 'Sold via invoice',
+              'item_code': 'RM-008',
+              'item_name': 'Cardboard Box (Small)',
+              'warehouse_name': 'Main Warehouse',
+            },
+          ],
+          'summary': {'totalInbound': 0, 'totalOutbound': 1, 'netMovement': -1},
+        },
+      });
+    }
+    if (options.path == '/reports/purchase-summary') {
+      return _json({
+        'success': true,
+        'data': {
+          'purchases': [
+            {
+              'po_id': 6,
+              'purchase_order_number': 'PO-2026-0004',
+              'purchase_date': '2026-08-02',
+              'supplier_name': 'Haier Distributors',
+              'total_cost': 400000,
+              'status': 'Completed',
+              'total_items': 1,
+              'received_amount': 400000,
+              'balance_amount': 0,
+            },
+          ],
+          'summary': {
+            'totalOrders': 1,
+            'totalCost': 400000,
+            'totalItems': 1,
+            'averageOrderValue': 400000,
+            'returnCount': 0,
+            'returnQuantity': 0,
+            'returnValue': 0,
+          },
+        },
+      });
+    }
+    if (options.path == '/reports/top-debtors') {
+      return _json({
+        'success': true,
+        'data': [
+          {
+            'customer_name': 'Awees Super Store',
+            'customer_code': 'CUST-006',
+            'total_outstanding': 50000,
+            'outstanding_balance': 50000,
+            'total_invoiced': 50000,
+            'invoice_count': 1,
+          },
+          {
+            'customer_name': 'Gulhaji Plaza',
+            'customer_code': 'CUST-002',
+            'total_outstanding': 18000,
+            'outstanding_balance': 18000,
+            'total_invoiced': 70000,
+            'invoice_count': 1,
+          },
+        ],
+      });
+    }
     if (options.path == '/expenses' && options.method == 'POST') {
       final body = options.data as Map<String, dynamic>;
       lastExpensePostBody = body;
@@ -1820,10 +2186,197 @@ class _AuthFakeAdapter implements HttpClientAdapter {
             'tax_rate': 0,
             'discount_type': 'none',
             'discount_value': 0,
-            'returned_qty': 0,
+            'returned_qty': invoice1ReturnedQty,
           },
         ],
       });
+    }
+    if (options.path == '/invoices/1/return' && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastInvoiceReturnBody = body;
+      if (rejectInvoiceReturn) {
+        return _json({
+          'error': 'Cannot return a cancelled invoice',
+        }, status: 400);
+      }
+      final items = body['items'] as List;
+      final qty = ((items.single as Map)['return_quantity'] as num).toDouble();
+      invoice1ReturnedQty += qty;
+      // Enveloped — the real returnInvoiceItems shape.
+      return _json({
+        'success': true,
+        'message': 'Return processed successfully',
+        'data': {
+          'returnedItems': [
+            {
+              'invoice_item_id': 10,
+              'item_name': 'Widget A',
+              'return_quantity': qty,
+              'return_amount': qty * 100.0,
+            },
+          ],
+          'totalItems': 1,
+          'disposition': body['disposition'],
+          'returnAmount': qty * 100.0,
+          'netReturn': qty * 100.0,
+          'deduction': 0,
+        },
+      });
+    }
+    if (options.path == '/invoices/returns' && options.method == 'GET') {
+      // Bare array — the real InvoiceModel.getReturnHistory shape
+      // (positive-quantity RETURN stock movements; no envelope, no
+      // pagination).
+      return _json([
+        {
+          'id': 1,
+          'movement_no': 'SM-2026-0031',
+          'item_id': 1,
+          'item_code': 'FG001',
+          'item_name': 'Widget A',
+          'unit_of_measure': 'pcs',
+          'warehouse_id': 1,
+          'warehouse_code': 'WH-MAIN',
+          'warehouse_name': 'Main Warehouse',
+          'quantity': 4.0,
+          'unit_cost': 100.0,
+          'reference_doctype': 'RETURN',
+          'reference_docno': 'INV-2026-440955',
+          'invoice_no': 'INV-2026-440955',
+          'remarks': 'Damaged on delivery',
+          'return_date': '2026-05-25',
+          'created_at': '2026-05-25 14:00:00',
+          'created_by': 1,
+          'created_by_username': 'Fawad',
+          'customer_id': 1,
+          'customer_name': 'Acme Corp',
+        },
+        {
+          'id': 2,
+          'movement_no': 'SM-2026-0034',
+          'item_id': 2,
+          'item_code': 'FG002',
+          'item_name': 'Widget B',
+          'unit_of_measure': 'pcs',
+          'warehouse_id': 2,
+          'warehouse_code': 'WH-2',
+          'warehouse_name': 'Store 2',
+          'quantity': 2.0,
+          'unit_cost': 45.0,
+          'reference_doctype': 'RETURN',
+          'reference_docno': 'INV-2026-440956',
+          'invoice_no': 'INV-2026-440956',
+          'remarks': null,
+          'return_date': '2026-05-20',
+          'created_at': '2026-05-20 09:00:00',
+          'created_by': 1,
+          'created_by_username': 'Fawad',
+          'customer_id': 2,
+          'customer_name': 'Beta Ltd',
+        },
+      ]);
+    }
+    if (options.path == '/payments' && options.method == 'GET') {
+      final q = options.queryParameters;
+      lastPaymentsQuery = q;
+      final page = int.tryParse('${q['page']}') ?? 1;
+      const all = [
+        {
+          'id': 1,
+          'payment_no': 'PAY-2026-0001',
+          'customer_id': 1,
+          'customer_name': 'Acme Corp',
+          'payment_date': '2026-05-25',
+          'amount': 500,
+          'payment_method': 'Cash',
+          'reference_no': 'CHK-1001',
+          'notes': 'Partial payment',
+          'created_at': '2026-05-25 10:00:00',
+        },
+        {
+          'id': 2,
+          'payment_no': 'PAY-2026-0002',
+          'customer_id': 2,
+          'customer_name': 'Beta Ltd',
+          'payment_date': '2026-05-28',
+          'amount': 800,
+          'payment_method': 'Bank Transfer',
+          'reference_no': null,
+          'notes': null,
+          'created_at': '2026-05-28 12:00:00',
+        },
+      ];
+      return _json({
+        'success': true,
+        'data': all,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': 1,
+          'totalItems': all.length,
+          'hasNext': false,
+          'hasPrev': false,
+        },
+      });
+    }
+    if (options.path == '/payments/1' && options.method == 'PUT') {
+      final body = options.data as Map<String, dynamic>;
+      lastPaymentPutBody = body;
+      return _json({
+        'success': true,
+        'data': {
+          'id': 1,
+          'payment_no': 'PAY-2026-0001',
+          'customer_id': 1,
+          'customer_name': 'Acme Corp',
+          'payment_date': body['payment_date'],
+          'amount': 500,
+          'payment_method': body['payment_method'],
+          'reference_no': body['reference_no'],
+          'notes': body['notes'],
+        },
+      });
+    }
+    if (options.path == '/payments/1' && options.method == 'DELETE') {
+      paymentDeleteCount++;
+      return _json({
+        'success': true,
+        'message': 'Payment deleted successfully',
+      });
+    }
+    if (options.path == '/payments/1') {
+      // Enveloped detail — the real getPayment shape.
+      return _json({
+        'success': true,
+        'data': {
+          'id': 1,
+          'payment_no': 'PAY-2026-0001',
+          'customer_id': 1,
+          'customer_name': 'Acme Corp',
+          'payment_date': '2026-05-25',
+          'amount': 500,
+          'payment_method': 'Cash',
+          'reference_no': 'CHK-1001',
+          'notes': 'Partial payment',
+          'created_at': '2026-05-25 10:00:00',
+        },
+      });
+    }
+    if (options.path == '/payments' && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastPaymentPostBody = body;
+      return _json({
+        'success': true,
+        'data': {
+          'id': 9,
+          'payment_no': 'PAY-2026-0009',
+          'customer_id': body['customer_id'],
+          'payment_date': body['payment_date'],
+          'amount': body['amount'],
+          'payment_method': body['payment_method'],
+          'reference_no': body['reference_no'],
+          'notes': body['notes'],
+        },
+      }, status: 201);
     }
     if (options.path == '/invoices') {
       final q = options.queryParameters;
@@ -2264,6 +2817,205 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         },
       });
     }
+    // ── Production module (PORTING.md §13) ────────────────────────
+    if (options.path == '/productions' && options.method == 'GET') {
+      // Bare array — the ProductionModel.getAll shape.
+      final rows = <Map<String, dynamic>>[
+        {
+          'id': 4,
+          'production_no': 'PROD-2026-0044',
+          'output_item_id': 41,
+          'output_quantity': 10,
+          'warehouse_id': 3,
+          'production_date': '2026-08-10',
+          'created_by': 1,
+          'created_at': '2026-08-10 09:00:00',
+          'updated_at': '2026-08-10 09:00:00',
+          'raw_materials_warehouse_id': 2,
+          'overhead_cost': 100,
+          'bom_id': 1,
+          'batch_id': 9,
+          'batch_no': 'BATCH-26-PRD-0044',
+          'unit_cost': 310.5,
+          'total_material_cost': 3000,
+          'total_batch_cost': 3105,
+          'output_item_code': 'AC1.5TON',
+          'output_item_name': '1.5 Ton Split AC Carton Box',
+          'output_uom': 'Nos',
+          'finished_goods_warehouse_code': 'WH-003',
+          'finished_goods_warehouse_name': 'UOP Store',
+          'raw_materials_warehouse_code': 'WH-002',
+          'raw_materials_warehouse_name': 'Karkhano Warehouse',
+          'created_by_username': 'admin',
+        },
+      ];
+      if (production4Deleted) rows.removeAt(0);
+      return _json(rows);
+    }
+    if (options.path == '/productions/4' && options.method == 'GET') {
+      productionDetailFetchCount++;
+      if (production4Deleted) {
+        return _json({'error': 'Production not found'}, status: 404);
+      }
+      return _json({
+        'id': 4,
+        'production_no': 'PROD-2026-0044',
+        'output_item_id': 41,
+        'output_quantity': 10,
+        'warehouse_id': 3,
+        'production_date': '2026-08-10',
+        'created_by': 1,
+        'created_at': '2026-08-10 09:00:00',
+        'updated_at': '2026-08-10 09:00:00',
+        'raw_materials_warehouse_id': 2,
+        'overhead_cost': 100,
+        'bom_id': 1,
+        'batch_id': 9,
+        'batch_no': 'BATCH-26-PRD-0044',
+        'unit_cost': 110.5,
+        'total_material_cost': 3000,
+        'total_batch_cost': 3105,
+        'output_item_code': 'FO1.5TON',
+        'output_item_name': '1.5 Ton Split AC Carton Box',
+        'output_uom': 'Nos',
+        'finished_goods_warehouse_code': 'WH-003',
+        'finished_goods_warehouse_name': 'UOP Store',
+        'raw_materials_warehouse_code': 'WH-002',
+        'raw_materials_warehouse_name': 'Karkhano Warehouse',
+        'created_by_username': 'admin',
+        'inputs': [
+          {
+            'id': 4,
+            'production_id': 4,
+            'item_id': 2,
+            'quantity': 20,
+            'warehouse_id': 2,
+            'item_code': 'RM002',
+            'item_name': 'Bolt',
+            'unit_of_measure': 'box',
+            'warehouse_code': 'WH-002',
+            'warehouse_name': 'Karkhano Warehouse',
+          },
+        ],
+      });
+    }
+    if (options.path == '/productions' && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastProductionPostBody = body;
+      return _json({
+        'id': 42,
+        'production_no': 'PROD-2026-0045',
+        'output_item_id': body['output_item_id'],
+        'output_quantity': body['output_quantity'],
+        'warehouse_id': body['warehouse_id'],
+        'production_date': body['production_date'],
+        'overhead_cost': body['overhead_cost'] ?? 0,
+        'input_items': body['input_items'],
+        'output_item_name': 'Widget A',
+        'output_uom': 'pcs',
+      }, status: 201);
+    }
+    if (RegExp(r'^/productions/\d+$').hasMatch(options.path) &&
+        options.method == 'DELETE') {
+      productionDeleteCount++;
+      production4Deleted = true;
+      return _json({'success': true, 'message': 'Production deleted'});
+    }
+
+    if (options.path == '/boms' && options.method == 'GET') {
+      return _json([
+        {
+          'id': 1,
+          'bom_no': 'BOM-2026-0001',
+          'bom_name': 'Box BOM',
+          'finished_item_id': 1,
+          'finished_item_code': 'FG001',
+          'finished_item_name': 'Widget A',
+          'finished_uom': 'pcs',
+          'quantity': 1,
+          'description': 'Standard carton',
+          'is_active': 1,
+          'created_at': '2026-08-01 10:00:00',
+          'updated_at': '2026-08-01 10:00:00',
+          'item_count': 2,
+          'total_material_cost': 27.5,
+        },
+      ]);
+    }
+    if (options.path == '/boms/1' && options.method == 'GET') {
+      bomDetailFetchCount++;
+      return _json({
+        'id': 1,
+        'bom_no': 'BOM-2026-0001',
+        'bom_name': 'Box BOM',
+        'finished_item_id': 1,
+        'finished_item_code': 'FG001',
+        'finished_item_name': 'Widget A',
+        'finished_uom': 'pcs',
+        'quantity': 1,
+        'description': 'Standard carton',
+        'is_active': 1,
+        'created_at': '2026-08-01 10:00:00',
+        'updated_at': '2026-08-01 10:00:00',
+        'total_material_cost': 27.5,
+        'items': [
+          {
+            'id': 2,
+            'item_id': 2,
+            'item_code': 'RM002',
+            'item_name': 'Bolt',
+            'unit_of_measure': 'box',
+            'current_stock': 120,
+            'quantity': 3,
+            'standard_cost': 2.5,
+            'line_cost': 7.5,
+          },
+          {
+            'id': 3,
+            'item_id': 4,
+            'item_code': 'RM001',
+            'item_name': 'Raw Material A',
+            'unit_of_measure': 'kg',
+            'current_stock': 30,
+            'quantity': 2,
+            'standard_cost': 10.0,
+            'line_cost': 20.0,
+          },
+        ],
+      });
+    }
+    if (options.path == '/boms' && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastBomPostBody = body;
+      return _json({
+        'id': 2,
+        'bom_no': 'BOM-2026-0002',
+        'bom_name': body['bom_name'],
+        'finished_item_id': body['finished_item_id'],
+        'quantity': body['quantity'],
+        'is_active': 1,
+        'items': body['items'],
+      }, status: 201);
+    }
+    if (options.path == '/boms/1' && options.method == 'PUT') {
+      lastBomPutBody = options.data as Map<String, dynamic>;
+      return _json({
+        'id': 1,
+        'bom_no': 'BOM-2026-0001',
+        'bom_name': 'Box BOM',
+        'finished_item_id': 1,
+        'quantity': 1,
+        'is_active': 1,
+      });
+    }
+    if (options.path == '/boms/1/toggle-active' && options.method == 'PATCH') {
+      lastBomToggleBody = options.data as Map<String, dynamic>;
+      return _json({'id': 1, 'bom_no': 'BOM-2026-0001', 'is_active': 0});
+    }
+    if (options.path == '/boms/1' && options.method == 'DELETE') {
+      bomDeleteCount++;
+      return _json({'message': 'BOM deleted successfully'});
+    }
     return _json({
       'success': false,
       'error': {'code': 'NOT_FOUND', 'message': 'Not found'},
@@ -2305,6 +3057,10 @@ void main() {
   testWidgets('login persists the token and navigates to the dashboard shell', (
     tester,
   ) async {
+    // A wide surface so all 6 KPI cards fit the horizontal strip.
+    tester.view.physicalSize = const Size(1600, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     final storage = _FakeTokenStorage();
     final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
     dio.httpClientAdapter = _AuthFakeAdapter();
@@ -2332,6 +3088,15 @@ void main() {
     expect(find.text('Fawad'), findsOneWidget); // logged-in user shown
     expect(find.byIcon(Icons.logout), findsOneWidget);
     expect(storage.token, 'test-token'); // JWT persisted
+
+    // The two summary fields rendered on top of the base KPI strip:
+    // the recentProductions KPI card (last in the strip) + the
+    // stock-by-category donut legend.
+    expect(find.text('Recent Productions'), findsOneWidget);
+    expect(find.text('12'), findsOneWidget); // recentProductions value
+    expect(find.text('Stock by Category'), findsOneWidget);
+    expect(find.text('Parts'), findsOneWidget); // legend category
+    expect(find.text('500 (100%)'), findsOneWidget); // total + share
   });
 
   testWidgets('stored token + valid /auth/me restores the session at boot', (
@@ -2991,6 +3756,657 @@ void main() {
     expect(find.text('2 expenses'), findsOneWidget);
   });
 
+  testWidgets('expenses grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    await bootToExpenses(tester);
+
+    // Stub the file_picker save channel to return a real temp path; the
+    // shared save helper then writes the CSV there (same pattern as the
+    // sales-orders and returns export tests).
+    final target = '${Directory.systemTemp.path}/minierp-expenses-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    // The save helper does real async file I/O (File.writeAsBytes) that
+    // never completes under the test's fake-async zone — drive it inside
+    // runAsync so the write finishes and the toast can appear.
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    // Success toast + the CSV file exists with the expense rows (header
+    // columns, both fixture rows with their formatted amounts and the
+    // localized status labels).
+    expect(find.text('Expenses exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Expense No'));
+    expect(content, contains('EXP-2605-0001'));
+    expect(content, contains('Generator diesel'));
+    expect(content, contains('Approved'));
+    expect(content, contains('1,000.00'));
+  });
+
+  // Reports module — hub + the first report screens (PORTING.md §11).
+  Future<void> bootToReports(WidgetTester tester) async {
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = _AuthFakeAdapter();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reports'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('reports hub lists the report categories and cards', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    // Hub headline + the first (Sales) category — the hub ListView only
+    // builds the cards that fit the window.
+    expect(find.text('Reports Dashboard'), findsOneWidget);
+    expect(find.text('Sales Reports'), findsOneWidget);
+    expect(find.text('Sales Summary Report'), findsOneWidget);
+    expect(find.text('Sales by Customer Report'), findsOneWidget);
+    expect(find.text('Sales by Item Report'), findsOneWidget);
+  });
+
+  testWidgets('reports hub navigates to the AR aging grid', (tester) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    // Scroll the hub to the Accounts Receivable category and open it.
+    await tester.dragUntilVisible(
+      find.text('AR Aging'),
+      find.byType(ReportsDashboardScreen),
+      const Offset(0, -250),
+    );
+    await tester.tap(find.text('AR Aging'));
+    await tester.pumpAndSettle();
+
+    // Summary strip totals + per-customer buckets from the fake payload.
+    // "1-30 Days" appears twice (strip label + grid column header) and
+    // "70.50" twice (strip total + Acme's grid cell) now that the rows
+    // render.
+    expect(find.text('Acme Corp'), findsOneWidget);
+    expect(find.text('Beta Ltd'), findsOneWidget);
+    expect(find.text('1-30 Days'), findsNWidgets(2));
+    expect(find.text('420.50'), findsOneWidget); // total receivables
+    expect(find.text('70.50'), findsNWidgets(2)); // strip + Acme cell
+  });
+
+  testWidgets('sales summary report renders stats and detail rows', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Sales Summary Report'));
+    await tester.pumpAndSettle();
+
+    // Stat cards from the summary block.
+    expect(find.text('2'), findsOneWidget); // total invoices
+    expect(find.text('1,500.00'), findsOneWidget); // total sales
+    expect(find.text('110'), findsOneWidget); // items sold
+    expect(find.text('750.00'), findsOneWidget); // avg invoice value
+    // Detail grid rows.
+    expect(find.text('INV-2026-001'), findsOneWidget);
+    expect(find.text('INV-2026-002'), findsOneWidget);
+    expect(find.text('Partially Paid'), findsOneWidget);
+    expect(find.text('Unpaid'), findsOneWidget);
+  });
+
+  testWidgets('low stock report renders rows and opens the detail dialog', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Low Stock Alert Report'));
+    await tester.pumpAndSettle();
+
+    // Summary strip (2 items, shortage 5 + 50) + rows from the payload.
+    expect(find.text('2 low stock items'), findsOneWidget);
+    expect(find.text('Shortage total: 55'), findsOneWidget);
+    expect(find.text('Widget A'), findsOneWidget);
+    expect(find.text('Bolt'), findsOneWidget);
+
+    // Double-tap the Widget A row (within the double-tap window) → the
+    // detail dialog with the full field set (incl. stock status + price).
+    await tester.tap(find.text('Widget A'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Widget A'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('10 pcs'), findsOneWidget); // minimum stock value
+    expect(find.text('8 pcs'), findsOneWidget); // reorder level
+    expect(find.text('45.00'), findsOneWidget); // selling price
+    expect(find.text('Low Stock'), findsOneWidget); // stock status row
+  });
+
+  testWidgets('stock level report renders the summary strip and rows', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Stock Level Report'));
+    await tester.pumpAndSettle();
+
+    // Summary strip: 2 items / 1 in stock / 1 out of stock (the "1"
+    // appears exactly twice — the in-stock and out-of-stock counts).
+    expect(find.text('2'), findsOneWidget); // total items
+    expect(find.text('1'), findsNWidgets(2)); // in stock + out of stock
+    // Grid rows from the payload.
+    expect(find.text('Widget A'), findsOneWidget);
+    expect(find.text('Bolt'), findsOneWidget);
+
+    // Double-tap the Widget A row → the detail dialog.
+    await tester.tap(find.text('Widget A'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Widget A'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('25 pcs'), findsOneWidget); // current stock
+    // "In Stock" ×3 — summary-strip label + grid badge + dialog row.
+    expect(find.text('In Stock'), findsNWidgets(3));
+  });
+
+  testWidgets('stock valuation report renders value rows and summary', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Stock Valuation Report'));
+    await tester.pumpAndSettle();
+
+    // Summary strip: total value 830.00 + item counts.
+    expect(find.text('830.00'), findsOneWidget);
+    expect(find.text('Widget A'), findsOneWidget);
+    expect(find.text('750.00'), findsOneWidget); // Widget A total value
+    expect(find.text('Bolt'), findsOneWidget);
+
+    // Double-tap the Widget A row → the detail dialog with unit cost.
+    await tester.tap(find.text('Widget A'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Widget A'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    // "30.00" ×2 and "batch" ×2 — grid cell + dialog row each.
+    expect(find.text('30.00'), findsNWidgets(2)); // unit cost
+    expect(find.text('batch'), findsNWidgets(2)); // valuation method
+  });
+
+  testWidgets('sales by customer report renders rows over the date range', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Sales by Customer Report'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Acme Corp'), findsOneWidget);
+    expect(find.text('2,400.00'), findsOneWidget); // total sales
+    expect(find.text('Beta Ltd'), findsOneWidget);
+
+    // Double-tap the Acme Corp row → the detail dialog.
+    await tester.tap(find.text('Acme Corp'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Acme Corp'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    // "billing@acme.test" ×2 and "800.00" ×2 — grid cell + dialog row
+    // each.
+    expect(find.text('billing@acme.test'), findsNWidgets(2)); // email
+    expect(find.text('800.00'), findsNWidgets(2)); // avg order value
+  });
+
+  testWidgets('stock level grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Stock Level Report'));
+    await tester.pumpAndSettle();
+
+    final target = '${Directory.systemTemp.path}/minierp-stock-level-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text('Report exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Item Name'));
+    expect(content, contains('Widget A'));
+    expect(content, contains('Bolt'));
+    expect(content, contains('In Stock')); // localized status
+    expect(content, contains('Out of Stock'));
+    expect(content, contains('45.00')); // selling price
+  });
+
+  testWidgets('stock valuation grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Stock Valuation Report'));
+    await tester.pumpAndSettle();
+
+    final target =
+        '${Directory.systemTemp.path}/minierp-stock-valuation-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text('Report exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Total Value'));
+    expect(content, contains('Widget A'));
+    expect(content, contains('750.00')); // Widget A total value
+    expect(content, contains('batch')); // valuation method
+  });
+
+  testWidgets('sales by customer grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Sales by Customer Report'));
+    await tester.pumpAndSettle();
+
+    final target =
+        '${Directory.systemTemp.path}/minierp-sales-by-customer-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text('Report exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Avg. Order Value'));
+    expect(content, contains('Acme Corp'));
+    expect(content, contains('billing@acme.test'));
+    expect(content, contains('2,400.00')); // total sales
+    expect(content, contains('800.00')); // avg order value
+  });
+
+  testWidgets('DSO report renders the metric cards and exports', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Days Sales Outstanding (DSO) Report'));
+    await tester.pumpAndSettle();
+
+    // Headline DSO card + the three metric cards.
+    expect(find.text('18.65 days'), findsOneWidget);
+    expect(find.text('Total AR'), findsOneWidget);
+    expect(find.text('50,000.00'), findsOneWidget); // total AR value
+
+    final target = '${Directory.systemTemp.path}/minierp-dso-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text('Report exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Days Sales Outstanding'));
+    expect(content, contains('101,895.00')); // total sales
+    expect(content, contains('50,000.00')); // total AR
+  });
+
+  testWidgets('cash flow report renders the metrics and analysis', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Cash Flow Report'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Total Cash Inflow'), findsOneWidget);
+    expect(find.text('52,895.00'), findsOneWidget); // inflow value
+    expect(find.text('1,000.00'), findsOneWidget); // outflow value
+    expect(find.text('51,895.00'), findsOneWidget); // net cash flow
+    // Positive-flow analysis note.
+    expect(find.textContaining('positive cash flow'), findsOneWidget);
+  });
+
+  testWidgets('profit & loss report renders metrics and expense breakdown', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Profit & Loss Report'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Total Revenue'), findsOneWidget);
+    expect(find.text('101,895.00'), findsOneWidget); // revenue value
+    expect(find.text('Cost of Goods Sold (COGS)'), findsOneWidget);
+    expect(find.text('Net Profit'), findsOneWidget);
+    expect(find.text('-171,420.50'), findsOneWidget); // net profit
+    // Margins combo card renders both percentages.
+    expect(find.textContaining('-166.27%'), findsOneWidget);
+    expect(find.textContaining('-168.23%'), findsOneWidget);
+    // Expenses-by-category breakdown from the payload — 2,000.00
+    // appears twice (Total Expenses card + Marketing breakdown row).
+    expect(find.text('Expenses by Category'), findsOneWidget);
+    expect(find.text('Marketing'), findsOneWidget);
+    expect(find.text('2,000.00'), findsNWidgets(2)); // expenses card + row
+  });
+
+  testWidgets('inventory movement report renders grid and summary', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Inventory Movement Report'));
+    await tester.pumpAndSettle();
+
+    // Summary strip.
+    expect(find.text('Total Inbound'), findsOneWidget);
+    expect(find.text('Total Outbound'), findsOneWidget);
+    expect(find.text('Net Movement'), findsOneWidget);
+    // Row data from the fake payload.
+    expect(find.text('Cardboard Box (Small)'), findsOneWidget);
+    expect(find.text('Main Warehouse'), findsOneWidget);
+    expect(find.text('Sale'), findsOneWidget); // localized movement type
+  });
+
+  testWidgets('purchase summary report renders grid and summary', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Purchase Summary Report'));
+    await tester.pumpAndSettle();
+
+    // Summary strip — 'Total Cost' also appears as a grid column header.
+    expect(find.text('Total Orders'), findsOneWidget);
+    expect(find.text('Total Cost'), findsWidgets);
+    // Row data from the fake payload.
+    expect(find.text('PO-2026-0004'), findsOneWidget);
+    expect(find.text('Haier Distributors'), findsOneWidget);
+    expect(find.text('Completed'), findsWidgets);
+  });
+
+  testWidgets('top debtors report renders debtor rows', (tester) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Top Debtors Report'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Awees Super Store'), findsOneWidget);
+    expect(find.text('Gulhaji Plaza'), findsOneWidget);
+    expect(find.text('CUST-006'), findsOneWidget);
+    expect(find.text('Total Outstanding'), findsWidgets); // column + header
+  });
+
+  testWidgets('AR aging grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('AR Aging'));
+    await tester.pumpAndSettle();
+
+    // Stub the file_picker save channel to return a real temp path; the
+    // shared save helper then writes the CSV there (same pattern as the
+    // expenses export test).
+    final target = '${Directory.systemTemp.path}/minierp-ar-aging-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text('Report exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Total Outstanding'));
+    expect(content, contains('Acme Corp'));
+    expect(content, contains('Beta Ltd'));
+    // Per-bucket row values (the summary strip total 420.50 is not part
+    // of the grid export).
+    expect(content, contains('120.50')); // Acme total outstanding
+    expect(content, contains('200.00')); // Beta 90+ bucket
+  });
+
+  testWidgets('low stock grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Low Stock Alert Report'));
+    await tester.pumpAndSettle();
+
+    final target = '${Directory.systemTemp.path}/minierp-low-stock-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text('Report exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Minimum Stock'));
+    expect(content, contains('Widget A'));
+    expect(content, contains('Bolt'));
+    expect(content, contains('Shortage'));
+  });
+
+  testWidgets('sales summary grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Sales Summary Report'));
+    await tester.pumpAndSettle();
+
+    final target =
+        '${Directory.systemTemp.path}/minierp-sales-summary-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text('Report exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Invoice No'));
+    expect(content, contains('INV-2026-001'));
+    expect(content, contains('INV-2026-002'));
+    expect(content, contains('Partially Paid'));
+    expect(content, contains('Unpaid'));
+  });
+
   testWidgets('expenses screen search sends the server search param', (
     tester,
   ) async {
@@ -3158,6 +4574,62 @@ void main() {
     expect(find.text('1,700.00'), findsOneWidget);
   });
 
+  testWidgets('sales grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSales(tester, adapter);
+
+    // Stub the file_picker save channel to return a real temp path; the
+    // shared save helper then writes the CSV there (same pattern as the
+    // orders and returns export tests).
+    final target = '${Directory.systemTemp.path}/minierp-invoices-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    // Real async file I/O — drive it inside runAsync so the write
+    // finishes and the toast can appear.
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    // Success toast + the CSV file exists with the invoices rows
+    // (header columns, all three fixture rows with their formatted
+    // totals and the localized status labels).
+    expect(find.text('Invoices exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Invoice No'));
+    expect(content, contains('INV-2026-440955'));
+    expect(content, contains('Acme Corp'));
+    expect(content, contains('Unpaid'));
+    expect(content, contains('1,500.00'));
+    expect(content, contains('INV-2026-440956'));
+    expect(content, contains('800.00'));
+    expect(content, contains('INV-2026-440957'));
+    expect(content, contains('Overdue'));
+    expect(content, contains('300.00'));
+    if (file.existsSync()) file.deleteSync();
+  });
+
   testWidgets('sales screen search filters client-side (no server param)', (
     tester,
   ) async {
@@ -3294,6 +4766,505 @@ void main() {
     expect(items.single['unit_price'], 100);
   });
 
+  // Invoice returns (PORTING.md §5/§6) — bare-array endpoint (no search
+  // or page params), read-only grid tab of the sales shell; the
+  // process-return dialog lives on the invoice edit form's bottom bar.
+  Future<void> bootToInvoiceReturns(
+    WidgetTester tester,
+    _AuthFakeAdapter adapter,
+  ) async {
+    await bootToSales(tester, adapter);
+    // Switch the sales shell to the returns tab (invoices is default).
+    await tester.tap(find.text('Invoice Returns'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('invoice returns screen renders the returns grid', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSales(tester, adapter);
+
+    // Offstage returns tab is skipped by the default finders.
+    expect(find.text('SM-2026-0031'), findsNothing);
+    await tester.tap(find.text('Invoice Returns'));
+    await tester.pumpAndSettle();
+
+    // Rows from the bare-array fake: return no, item, qty magnitudes and
+    // the currency-formatted values.
+    expect(find.text('SM-2026-0031'), findsOneWidget);
+    expect(find.text('SM-2026-0034'), findsOneWidget);
+    expect(find.text('Widget A'), findsOneWidget);
+    expect(find.text('Widget B'), findsOneWidget);
+    expect(find.text('4'), findsOneWidget); // qty, row 1
+    expect(find.text('2'), findsOneWidget); // qty, row 2
+    expect(find.text('100.00'), findsOneWidget); // unit cost, row 1
+    expect(find.text('400.00'), findsOneWidget); // 4 × 100 return value
+    expect(find.text('45.00'), findsOneWidget); // unit cost, row 2
+    expect(find.text('90.00'), findsOneWidget); // 2 × 45 return value
+    // Grid column headers.
+    expect(find.text('Return No'), findsOneWidget);
+    expect(find.text('Return Date'), findsOneWidget);
+    expect(find.text('Return Qty'), findsOneWidget);
+  });
+
+  testWidgets('invoice returns screen shows the keyboard hint status bar', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToInvoiceReturns(tester, adapter);
+
+    // The same AG-Grid-style status bar the other grids render (the
+    // offstage grids' bars are skipped by the default finders).
+    expect(find.text('↑ ↓ ← →'), findsOneWidget);
+    expect(find.text('Enter / F2'), findsOneWidget);
+    expect(find.text('Navigate'), findsOneWidget);
+    expect(find.text('Open'), findsOneWidget);
+  });
+
+  testWidgets('invoice returns screen F2 opens the return detail dialog', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToInvoiceReturns(tester, adapter);
+
+    // Same current-cell + focus setup as the other grids' F2 tests —
+    // fired through the REAL key pipeline (FocusScope → keyManager →
+    // configuration.shortcut → rowDetailShortcutActions).
+    final sm = tester
+        .state<PlutoGridState>(find.byType(PlutoGrid))
+        .stateManager;
+    sm.setCurrentCell(sm.firstCell, 0);
+    sm.gridFocusNode.requestFocus();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.f2);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
+    await tester.pumpAndSettle();
+
+    // The read-only detail dialog renders from the in-memory row (no
+    // per-row fetch): header, RETURN badge, info rows + value tile.
+    final dialog = find.byType(Dialog);
+    expect(find.text('Invoice Return'), findsOneWidget);
+    expect(
+      find.descendant(of: dialog, matching: find.text('SM-2026-0031')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Return')),
+      findsOneWidget, // type badge
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Acme Corp')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Widget A')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('400.00')),
+      findsOneWidget,
+    );
+
+    // Close returns to the grid.
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('Invoice Return'), findsNothing);
+  });
+
+  testWidgets('invoice returns grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToInvoiceReturns(tester, adapter);
+
+    // Stub the file_picker save channel to return a real temp path; the
+    // shared save helper then writes the CSV there (same pattern as the
+    // stock ledger export test).
+    final target = '${Directory.systemTemp.path}/minierp-returns-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    // The save helper does real async file I/O (File.writeAsBytes) that
+    // never completes under the test's fake-async zone — drive it inside
+    // runAsync so the write finishes and the toast can appear.
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    // Success toast + the CSV file exists with the returns rows (header
+    // columns, both fixture rows with their formatted values).
+    expect(find.text('Invoice returns exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Return No'));
+    expect(content, contains('SM-2026-0031'));
+    expect(content, contains('Widget A'));
+    expect(content, contains('Acme Corp'));
+    expect(content, contains('400.00')); // 4 × 100 return value
+    expect(content, contains('SM-2026-0034'));
+    expect(content, contains('90.00')); // 2 × 45 return value
+    if (file.existsSync()) file.deleteSync();
+  });
+
+  testWidgets('invoice form: process return posts qty + reason and refetches', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSales(tester, adapter);
+
+    // Double-tap the row pushes the routed edit page; its bottom bar has
+    // the Process Return action.
+    await tester.tap(find.text('INV-2026-440955'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('INV-2026-440955'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Invoice'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Process Return'));
+    await tester.tap(find.text('Process Return'));
+    await tester.pumpAndSettle();
+
+    // The dialog fetches fresh detail (qty 10, returned 0 → 10 available)
+    // and defaults the disposition to credit (balance still owed).
+    expect(find.text('Invoice Return'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Widget A')),
+      findsOneWidget,
+    );
+
+    final dialogFields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(dialogFields.first, '4');
+    await tester.enterText(dialogFields.at(1), 'Damaged');
+    await tester.tap(find.widgetWithText(FilledButton, 'Return'));
+    await tester.pumpAndSettle();
+
+    final body = adapter.lastInvoiceReturnBody!;
+    final items = body['items'] as List;
+    expect((items.single as Map)['invoice_item_id'], 10);
+    expect((items.single as Map)['return_quantity'], 4);
+    expect(body['reason'], 'Damaged');
+    expect(body['disposition'], 'credit');
+    // Toast with the net return from the enveloped data payload; the
+    // dialog popped itself.
+    expect(
+      find.textContaining('Return processed successfully'),
+      findsOneWidget,
+    );
+    expect(find.text('Invoice Return'), findsNothing);
+  });
+
+  testWidgets('invoice form: process return validates qty against available', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSales(tester, adapter);
+
+    await tester.tap(find.text('INV-2026-440955'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('INV-2026-440955'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Process Return'));
+    await tester.tap(find.text('Process Return'));
+    await tester.pumpAndSettle();
+
+    // 500 exceeds the 10 available — the validator blocks the POST.
+    final dialogFields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(dialogFields.first, '500');
+    await tester.tap(find.widgetWithText(FilledButton, 'Return'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Return quantity exceeds the available quantity'),
+      findsOneWidget,
+    );
+    expect(adapter.lastInvoiceReturnBody, isNull);
+  });
+
+  testWidgets('invoice form: process return surfaces a server rejection', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectInvoiceReturn = true;
+    await bootToSales(tester, adapter);
+
+    await tester.tap(find.text('INV-2026-440955'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('INV-2026-440955'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Process Return'));
+    await tester.tap(find.text('Process Return'));
+    await tester.pumpAndSettle();
+
+    final dialogFields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(dialogFields.first, '4');
+    await tester.tap(find.widgetWithText(FilledButton, 'Return'));
+    await tester.pumpAndSettle();
+
+    // The enveloped 400 error surfaces in the dialog's error banner and
+    // the dialog stays open.
+    expect(find.text('Cannot return a cancelled invoice'), findsOneWidget);
+    expect(find.text('Invoice Return'), findsOneWidget);
+  });
+
+  // Payments module (PORTING.md §5/§6) — the second server-paginated
+  // endpoint after customers: `GET /payments` returns one page plus a
+  // `pagination` block. The Record Payment dialog is the invoice-payment
+  // flow (`POST /payments` with `invoice_allocations` — there is no
+  // `POST /invoices/:id/pay`; the server validates each allocation
+  // against the invoice's balance and the total against the amount).
+  Future<void> bootToPayments(
+    WidgetTester tester,
+    _AuthFakeAdapter adapter,
+  ) async {
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // Tap the rail item by its unique icon (the Payments label also
+    // names the dashboard KPI card).
+    await tester.tap(find.byIcon(Icons.account_balance_wallet_outlined));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('payments screen renders the paged grid with server data', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPayments(tester, adapter);
+
+    // Default server-pagination query (page 1, limit 10) + the server's
+    // default payment_date DESC ordering.
+    expect(adapter.lastPaymentsQuery?['page'], 1);
+    expect(adapter.lastPaymentsQuery?['limit'], 10);
+    expect(adapter.lastPaymentsQuery?['sortOrder'], 'DESC');
+
+    // Rows + column headers from the fake /payments payload.
+    expect(find.text('PAY-2026-0001'), findsOneWidget);
+    expect(find.text('PAY-2026-0002'), findsOneWidget);
+    expect(find.text('Acme Corp'), findsOneWidget);
+    expect(find.text('Beta Ltd'), findsOneWidget);
+    expect(find.text('500.00'), findsOneWidget); // amount, row 1
+    expect(find.text('800.00'), findsOneWidget); // amount, row 2
+    expect(find.text('Cash'), findsOneWidget);
+    expect(find.text('Bank Transfer'), findsOneWidget);
+    expect(find.text('Payment No'), findsOneWidget); // column header
+    // Server pagination block → bar (2 payments at limit 10 = 1 page).
+    expect(find.text('Page 1 of 1'), findsOneWidget);
+    expect(find.text('· 2 Payments'), findsOneWidget);
+  });
+
+  testWidgets('payments screen F2 opens the payment detail dialog', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPayments(tester, adapter);
+
+    // Same current-cell + focus setup as the other grids' F2 tests.
+    final sm = tester
+        .state<PlutoGridState>(find.byType(PlutoGrid))
+        .stateManager;
+    sm.setCurrentCell(sm.firstCell, 0);
+    sm.gridFocusNode.requestFocus();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.f2);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
+    await tester.pumpAndSettle();
+
+    // Detail dialog renders the enveloped GET /payments/1 payload.
+    final dialog = find.byType(Dialog);
+    expect(find.text('Payment Details'), findsOneWidget);
+    expect(
+      find.descendant(of: dialog, matching: find.text('PAY-2026-0001')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Acme Corp')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('500.00')),
+      findsOneWidget, // amount tile
+    );
+
+    // Close returns to the grid.
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('Payment Details'), findsNothing);
+  });
+
+  testWidgets('record payment allocates to open invoices and posts', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPayments(tester, adapter);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Record Payment'));
+    await tester.pumpAndSettle();
+
+    // Pick Acme Corp from the customer picker (dropdown over all
+    // customers — CUST001 — Acme Corp).
+    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CUST001 — Acme Corp').last);
+    await tester.pumpAndSettle();
+
+    // Open invoices load from /invoices (balance > 0 filtered client-
+    // side): INV-2026-440955 (1,500.00) + INV-2026-440957 (200.00).
+    expect(find.text('INV-2026-440955'), findsOneWidget);
+    expect(find.text('INV-2026-440957'), findsOneWidget);
+    expect(find.textContaining('1,500.00'), findsOneWidget); // balance
+
+    // Allocate 1000 to the first line, 200 to the second — the amount
+    // fields are the first two TextFormFields in the dialog.
+    final fields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(fields.at(0), '1000');
+    await tester.enterText(fields.at(1), '200');
+    await tester.pump();
+    expect(find.text('Total Allocated: 1,200.00'), findsOneWidget);
+
+    // The submit button sits at the bottom of the dialog's scrollable
+    // body — bring it into view before tapping.
+    final submitBtn = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.widgetWithText(FilledButton, 'Record Payment'),
+    );
+    await tester.ensureVisible(submitBtn);
+    await tester.tap(submitBtn);
+    await tester.pumpAndSettle();
+
+    // POST /payments body — amount == sum of allocations, each line
+    // carrying the invoice_id + amount.
+    final body = adapter.lastPaymentPostBody!;
+    expect(body['customer_id'], 1);
+    expect(body['amount'], 1200);
+    expect(body['payment_method'], 'Cash');
+    expect((body['payment_date'] as String).length, 10); // yyyy-MM-dd
+    final allocs = body['invoice_allocations'] as List;
+    expect((allocs[0] as Map)['invoice_id'], 1);
+    expect((allocs[0] as Map)['amount'], 1000);
+    expect((allocs[1] as Map)['invoice_id'], 3);
+    expect((allocs[1] as Map)['amount'], 200);
+    // Toast with the recorded total; the dialog popped itself.
+    expect(
+      find.textContaining('Payment recorded successfully'),
+      findsOneWidget,
+    );
+    expect(find.text('Select Customer'), findsNothing);
+  });
+
+  testWidgets('record payment caps an allocation at the invoice balance', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPayments(tester, adapter);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Record Payment'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CUST001 — Acme Corp').last);
+    await tester.pumpAndSettle();
+
+    // 2000 exceeds the 1,500.00 balance of the first invoice — the
+    // validator blocks the POST.
+    final fields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(fields.at(0), '2000');
+    await tester.pump(); // rebuild enables the submit button
+    final submitBtn = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.widgetWithText(FilledButton, 'Record Payment'),
+    );
+    await tester.ensureVisible(submitBtn);
+    await tester.tap(submitBtn);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Payment exceeds the remaining balance of 1,500.00'),
+      findsOneWidget,
+    );
+    expect(adapter.lastPaymentPostBody, isNull);
+  });
+
+  testWidgets('payment detail deletes the payment with confirm', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPayments(tester, adapter);
+
+    // Double-tap the row opens the detail dialog.
+    await tester.tap(find.text('PAY-2026-0001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PAY-2026-0001'));
+    await tester.pumpAndSettle();
+    expect(find.text('Payment Details'), findsOneWidget);
+
+    // Detail Delete → confirm (the confirm FilledButton is the only one
+    // labelled Delete).
+    await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.paymentDeleteCount, 1);
+    expect(find.text('Payment deleted successfully!'), findsOneWidget);
+    expect(find.text('Payment Details'), findsNothing);
+  });
+
   // Customers list (PORTING.md §5/§6) — server-paginated (the project's
   // only paged endpoint), reusing the PlutoGrid scaffold.
   Future<void> bootToCustomers(
@@ -3351,6 +5322,28 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> bootToProduction(
+    WidgetTester tester,
+    _AuthFakeAdapter adapter,
+  ) async {
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // The Production rail icon is unique to the production destination.
+    await tester.tap(find.byIcon(Icons.factory_outlined));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('sales orders screen renders the PlutoGrid with server data', (
     tester,
   ) async {
@@ -3373,6 +5366,62 @@ void main() {
     expect(find.text('1,500.00'), findsOneWidget);
     expect(find.text('2,500.00'), findsOneWidget);
     expect(find.text('800.00'), findsOneWidget);
+  });
+
+  testWidgets('sales orders grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSalesOrders(tester, adapter);
+
+    // Stub the file_picker save channel to return a real temp path; the
+    // shared save helper then writes the CSV there (same pattern as the
+    // returns and stock ledger export tests).
+    final target = '${Directory.systemTemp.path}/minierp-salesorders-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    // The save helper does real async file I/O (File.writeAsBytes) that
+    // never completes under the test's fake-async zone — drive it inside
+    // runAsync so the write finishes and the toast can appear.
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    // Success toast + the CSV file exists with the orders rows (header
+    // columns, both fixture rows with their formatted totals and the
+    // localized status labels).
+    expect(find.text('Sales orders exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('SO #'));
+    expect(content, contains('SO-2026-001'));
+    expect(content, contains('Acme Corp'));
+    expect(content, contains('Confirmed')); // so1Status default
+    expect(content, contains('1,500.00'));
+    expect(content, contains('SO-2026-002'));
+    expect(content, contains('2,500.00'));
+    expect(content, contains('SO-2026-003'));
+    expect(content, contains('800.00'));
+    if (file.existsSync()) file.deleteSync();
   });
 
   testWidgets('sales orders screen F2 opens the SO detail dialog', (
@@ -3608,6 +5657,61 @@ void main() {
     expect(find.text('1,200.00'), findsOneWidget);
     expect(find.text('900.00'), findsOneWidget);
     expect(find.text('700.00'), findsOneWidget);
+  });
+
+  testWidgets('quotations grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToQuotations(tester, adapter);
+
+    // Stub the file_picker save channel to return a real temp path; the
+    // shared save helper then writes the CSV there (same pattern as the
+    // orders and returns export tests).
+    final target = '${Directory.systemTemp.path}/minierp-quotations-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    // Real async file I/O — drive it inside runAsync so the write
+    // finishes and the toast can appear.
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    // Success toast + the CSV file exists with the quotations rows
+    // (header columns, all three fixture rows with their formatted
+    // totals and the localized status labels).
+    expect(find.text('Quotations exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Quotation #'));
+    expect(content, contains('QT-2026-001'));
+    expect(content, contains('Acme Corp'));
+    expect(content, contains('Sent')); // quotation1Status default
+    expect(content, contains('1,200.00'));
+    expect(content, contains('QT-2026-002'));
+    expect(content, contains('900.00'));
+    expect(content, contains('QT-2026-003'));
+    expect(content, contains('700.00'));
+    if (file.existsSync()) file.deleteSync();
   });
 
   testWidgets('quotations screen F2 opens the quotation detail dialog', (
@@ -4418,6 +6522,62 @@ void main() {
     expect(find.text('Expected Delivery'), findsOneWidget);
   });
 
+  testWidgets('purchase orders grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    // Stub the file_picker save channel to return a real temp path; the
+    // shared save helper then writes the CSV there (same pattern as the
+    // sales-orders and returns export tests).
+    final target =
+        '${Directory.systemTemp.path}/minierp-purchaseorders-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    // The save helper does real async file I/O (File.writeAsBytes) that
+    // never completes under the test's fake-async zone — drive it inside
+    // runAsync so the write finishes and the toast can appear.
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    // Success toast + the CSV file exists with the orders rows (header
+    // columns, both fixture rows with their formatted totals and the
+    // localized status labels).
+    expect(find.text('Purchase orders exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('PO No'));
+    expect(content, contains('PO-2026-001'));
+    expect(content, contains('Alpha Traders'));
+    expect(content, contains('Draft'));
+    expect(content, contains('1,500.00'));
+    expect(content, contains('PO-2026-002'));
+    expect(content, contains('Beta Suppliers'));
+    expect(content, contains('2,500.00'));
+    if (file.existsSync()) file.deleteSync();
+  });
+
   testWidgets('purchase orders screen F2 opens the PO detail dialog', (
     tester,
   ) async {
@@ -4498,6 +6658,61 @@ void main() {
     expect(find.text('Return No'), findsOneWidget);
     expect(find.text('Return Date'), findsOneWidget);
     expect(find.text('Type'), findsOneWidget);
+  });
+
+  testWidgets('purchase returns grid exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseReturns(tester, adapter);
+
+    // Stub the file_picker save channel to return a real temp path; the
+    // shared save helper then writes the CSV there (same pattern as the
+    // invoice-returns and stock ledger export tests).
+    final target =
+        '${Directory.systemTemp.path}/minierp-purchasereturns-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    // The save helper does real async file I/O (File.writeAsBytes) that
+    // never completes under the test's fake-async zone — drive it inside
+    // runAsync so the write finishes and the toast can appear.
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    // Success toast + the CSV file exists with the returns rows (header
+    // columns, both fixture rows with their formatted values and the
+    // localized type badges).
+    expect(find.text('Purchase returns exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Return No'));
+    expect(content, contains('SM-2026-0018'));
+    expect(content, contains('Raw Material A'));
+    expect(content, contains('Purchase Return'));
+    expect(content, contains('50.00')); // 5 × 10 return value
+    expect(content, contains('SM-2026-0021'));
+    expect(content, contains('80.00')); // 2 × 40 return value
+    if (file.existsSync()) file.deleteSync();
   });
 
   testWidgets('purchase returns screen shows the keyboard hint status bar', (
@@ -6484,5 +8699,300 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Linked Movement'), findsNothing);
+  });
+
+  // Production module (PORTING.md §13) — runs grid + detail + record
+  // form; BOM list + detail + create form.
+  testWidgets('production runs grid renders the bare-endpoint rows', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToProduction(tester, adapter);
+
+    expect(find.text('PROD-2026-0044'), findsOneWidget);
+    expect(find.text('1.5 Ton Split AC Carton Box'), findsOneWidget);
+    expect(find.text('BATCH-26-PRD-0044'), findsOneWidget);
+    expect(find.text('New Production'), findsOneWidget);
+    // Sidebar link is branded "Manufacturing"; the app bar and module
+    // tab keep the feature name "Production" (only the menu link
+    // changed).
+    expect(find.text('Manufacturing'), findsOneWidget);
+    expect(find.text('Production'), findsNWidgets(2));
+  });
+
+  testWidgets('production form has no editable input lines (BOM only)', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToProduction(tester, adapter);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'New Production'));
+    await tester.pumpAndSettle();
+
+    // Exactly the four fixed pickers — no per-material line rows.
+    expect(find.byType(DropdownButtonFormField<int>), findsNWidgets(4));
+    expect(find.text('Add Input'), findsNothing);
+    // The availability table appears only after a BOM is picked.
+    expect(find.byType(DataTable), findsNothing);
+    expect(find.text('Available'), findsNothing);
+    // Hint while no BOM is selected.
+    expect(
+      find.text('Select a BOM \u2014 its material lines appear here.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('production detail double-tap fetches and shows inputs', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToProduction(tester, adapter);
+
+    await tester.tap(find.text('PROD-2026-0044'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PROD-2026-0044'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.productionDetailFetchCount, 1);
+    expect(find.text('Production Details'), findsOneWidget);
+    // The raw-material input line from the fake detail.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('RM002 — Bolt'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Karkhano Warehouse'),
+      ),
+      findsWidgets,
+    );
+  });
+
+  testWidgets('record production: BOM auto-scales lines and posts', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToProduction(tester, adapter);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'New Production'));
+    await tester.pumpAndSettle();
+
+    // Output item = FG001 (Widget A) — the BOM's finished item.
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FG001 — Widget A').last);
+    await tester.pumpAndSettle();
+
+    // Output quantity 2, finished-goods warehouse Main Warehouse.
+    await tester.enterText(find.byType(TextFormField).at(0), '2');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Warehouse').last);
+    await tester.pumpAndSettle();
+
+    // Pick BOM-2026-0001 → detail fetched (GET /boms/1) → lines
+    // auto-scaled to 2 × per-batch quantities (6 × Bolt, 4 × RM A).
+    expect(adapter.bomDetailFetchCount, 0);
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(3));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('BOM-2026-0001 — Widget A').last);
+    await tester.pumpAndSettle();
+    expect(adapter.bomDetailFetchCount, 1);
+    expect(find.text('RM002 — Bolt'), findsOneWidget);
+    expect(find.text('RM001 — Raw Material A'), findsOneWidget);
+
+    // The inputs render as a read-only availability table (no editable
+    // lines, no "Add Input"): scaled 2× (6 × Bolt, 4 × RM A) with the
+    // stock available from the BOM detail join.
+    expect(find.text('Add Input'), findsNothing);
+    final table = find.byType(DataTable);
+    expect(table, findsOneWidget);
+    expect(find.text('Available'), findsOneWidget);
+    expect(
+      find.descendant(of: table, matching: find.text('6')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: table, matching: find.text('4')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: table, matching: find.text('120')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: table, matching: find.text('30')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: table, matching: find.text('box')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: table, matching: find.text('kg')),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Save'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    final body = adapter.lastProductionPostBody!;
+    expect(body['output_item_id'], 1);
+    expect(body['output_quantity'], 2);
+    expect(body['warehouse_id'], 1);
+    expect((body['production_date'] as String).length, 10);
+    expect((body['bom_id'] as int), 1);
+    expect(body['overhead_cost'], 0);
+    final items = body['input_items'] as List;
+    expect(items, hasLength(2));
+    expect((items[0] as Map)['item_id'], 2);
+    expect((items[0] as Map)['quantity'], 6);
+    expect((items[1] as Map)['item_id'], 4);
+    expect((items[1] as Map)['quantity'], 4);
+    expect(find.text('Production recorded'), findsOneWidget);
+    expect(find.text('New Production'), findsOneWidget);
+  });
+
+  testWidgets('record production validates before posting', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToProduction(tester, adapter);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'New Production'));
+    await tester.pumpAndSettle();
+    // Output quantity missing → the required validator blocks save.
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastProductionPostBody, isNull);
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.text('Required'), findsWidgets);
+    // A BOM is now mandatory — the inputs can't be typed by hand.
+    expect(
+      find.text('Select a BOM to load its material inputs.'),
+      findsWidgets,
+    );
+  });
+
+  testWidgets('production detail delete confirms and refetches the list', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToProduction(tester, adapter);
+
+    await tester.tap(find.text('PROD-2026-0044'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PROD-2026-0044'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Delete'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.productionDeleteCount, 1);
+    expect(find.text('Production deleted'), findsOneWidget);
+    // List refetch after the delete returns an empty array.
+    expect(find.text('PROD-2026-0044'), findsNothing);
+  });
+
+  testWidgets('BOM tab lists the BOMs and opens the detail', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToProduction(tester, adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('BOM'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('BOM-2026-0001'), findsOneWidget);
+    expect(find.text('Box BOM'), findsOneWidget);
+    expect(find.text('Widget A'), findsOneWidget);
+
+    await tester.tap(find.text('BOM-2026-0001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('BOM-2026-0001'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.bomDetailFetchCount, 1);
+    expect(find.text('Bill of Materials'), findsOneWidget);
+    // Material lines + line costs from the fake detail.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('RM002 — Bolt'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('RM001 — Raw Material A'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('BOM create posts the new bill of materials', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToProduction(tester, adapter);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('BOM'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'New BOM'));
+    await tester.pumpAndSettle();
+
+    // BOM name + batch quantity.
+    await tester.enterText(find.byType(TextFormField).at(0), 'Test BOM');
+    await tester.enterText(find.byType(TextFormField).at(1), '5');
+
+    // Finished item picker.
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FG001 — Widget A').last);
+    await tester.pumpAndSettle();
+
+    // One material line (the form starts with one empty row): Bolt × 3.
+    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('RM002 — Bolt').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).at(3), '3');
+
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Save'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    final body = adapter.lastBomPostBody!;
+    expect(body['bom_name'], 'Test BOM');
+    expect(body['finished_item_id'], 1);
+    expect(body['quantity'], 5.0);
+    expect(body['is_active'], 0);
+    final items = body['items'] as List;
+    expect(items, hasLength(1));
+    expect((items[0] as Map)['item_id'], 2);
+    expect((items[0] as Map)['quantity'], 3);
+    expect(find.text('BOM saved'), findsOneWidget);
   });
 }
