@@ -18,7 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
-import '../../core/utils/ledger_csv_export.dart';
+import '../../core/utils/csv_export.dart';
 import '../../core/utils/movement_type_label.dart';
 import '../../data/models/stock_movement.dart' show StockMovement;
 import '../../data/repositories/api_result.dart' show ApiError;
@@ -194,7 +194,7 @@ class _LedgerBody extends ConsumerWidget {
               TextButton.icon(
                 onPressed: movements.isEmpty
                     ? null
-                    : () => saveLedgerCsv(
+                    : () => saveCsv(
                         context,
                         suggestedName: '${_fileNameBase(itemLabel)}.csv',
                         csv: buildStockLedgerCsv(l10n, movements),

@@ -55,7 +55,9 @@ class PriceHistoryHint extends StatelessWidget {
                           ? 'Price history'
                           : 'Price history · ${history.customerName}',
                       style: const TextStyle(
-                          fontSize: 11, fontWeight: FontWeight.w600),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -93,8 +95,11 @@ class PriceHistoryHint extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded,
-                        size: 13, color: theme.colorScheme.error),
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 13,
+                      color: theme.colorScheme.error,
+                    ),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -120,27 +125,26 @@ class PriceHistoryHint extends StatelessWidget {
     String value, {
     Widget? trailing,
     String? subtitle,
-  }) =>
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 1),
-        child: Row(
-          children: [
-            Text(label, style: const TextStyle(fontSize: 11)),
-            if (subtitle != null && subtitle.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Text(
-                  Formatters.date(subtitle),
-                  style: const TextStyle(fontSize: 9, color: Colors.black54),
-                ),
-              ),
-            const Spacer(),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+  }) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 1),
+    child: Row(
+      children: [
+        Text(label, style: const TextStyle(fontSize: 11)),
+        if (subtitle != null && subtitle.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Text(
+              Formatters.date(subtitle),
+              style: const TextStyle(fontSize: 9, color: Colors.black54),
             ),
-            if (trailing != null) ...[const SizedBox(width: 6), trailing],
-          ],
+          ),
+        const Spacer(),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
         ),
-      );
+        if (trailing != null) ...[const SizedBox(width: 6), trailing],
+      ],
+    ),
+  );
 }

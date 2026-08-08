@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../models/expense.dart' show Expense, ExpenseCategory, ExpenseOption;
 import 'api_result.dart';
 import 'repository_client.dart';
@@ -52,14 +53,9 @@ class ExpenseFilters {
     if (search != null && search!.isNotEmpty) 'search': search,
     if (category != null && category!.isNotEmpty) 'category': category,
     if (status != null && status!.isNotEmpty) 'status': status,
-    if (fromDate != null) 'from_date': _isoDate(fromDate!),
-    if (toDate != null) 'to_date': _isoDate(toDate!),
+    if (fromDate != null) 'from_date': isoDate(fromDate!),
+    if (toDate != null) 'to_date': isoDate(toDate!),
   };
-
-  static String _isoDate(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
 }
 
 class ExpenseRepository {

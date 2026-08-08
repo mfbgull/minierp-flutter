@@ -54,7 +54,10 @@ class _InvoiceReturnDetailDialog extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        detailSectionLabel(context, l10n.salesreturnsReturntitle),
+                        detailSectionLabel(
+                          context,
+                          l10n.salesreturnsReturntitle,
+                        ),
                         const SizedBox(height: 2),
                         Text(
                           salesReturn.movementNo,

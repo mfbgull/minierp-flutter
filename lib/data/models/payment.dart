@@ -23,20 +23,20 @@ class Payment {
   });
 
   factory Payment.fromJson(Map<String, dynamic> json) => Payment(
-        id: asInt(json['id']) ?? 0,
-        paymentNo: asString(json['payment_no']) ?? '',
-        customerId: asInt(json['customer_id']) ?? 0,
-        customerName: asString(json['customer_name']),
-        supplierId: asInt(json['supplier_id']),
-        invoiceId: asInt(json['invoice_id']),
-        invoiceNo: asString(json['invoice_no']),
-        paymentDate: asString(json['payment_date']) ?? '',
-        amount: asNum(json['amount']) ?? 0,
-        paymentMethod: asString(json['payment_method']) ?? '',
-        referenceNo: asString(json['reference_no']),
-        notes: asString(json['notes']),
-        createdAt: asString(json['created_at']),
-      );
+    id: asInt(json['id']) ?? 0,
+    paymentNo: asString(json['payment_no']) ?? '',
+    customerId: asInt(json['customer_id']) ?? 0,
+    customerName: asString(json['customer_name']),
+    supplierId: asInt(json['supplier_id']),
+    invoiceId: asInt(json['invoice_id']),
+    invoiceNo: asString(json['invoice_no']),
+    paymentDate: asString(json['payment_date']) ?? '',
+    amount: asNum(json['amount']) ?? 0,
+    paymentMethod: asString(json['payment_method']) ?? '',
+    referenceNo: asString(json['reference_no']),
+    notes: asString(json['notes']),
+    createdAt: asString(json['created_at']),
+  );
 
   final int id;
   final String paymentNo;
@@ -53,18 +53,18 @@ class Payment {
   final String? createdAt;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'payment_no': paymentNo,
-        'customer_id': customerId,
-        if (customerName != null) 'customer_name': customerName,
-        if (supplierId != null) 'supplier_id': supplierId,
-        if (invoiceId != null) 'invoice_id': invoiceId,
-        if (invoiceNo != null) 'invoice_no': invoiceNo,
-        'payment_date': paymentDate,
-        'amount': amount,
-        'payment_method': paymentMethod,
-        if (referenceNo != null) 'reference_no': referenceNo,
-        if (notes != null) 'notes': notes,
-        if (createdAt != null) 'created_at': createdAt,
-      };
+    'id': id,
+    'payment_no': paymentNo,
+    'customer_id': customerId,
+    if (customerName != null) 'customer_name': customerName,
+    if (supplierId != null) 'supplier_id': supplierId,
+    if (invoiceId != null) 'invoice_id': invoiceId,
+    if (invoiceNo != null) 'invoice_no': invoiceNo,
+    'payment_date': paymentDate,
+    'amount': amount,
+    'payment_method': paymentMethod,
+    if (referenceNo != null) 'reference_no': referenceNo,
+    if (notes != null) 'notes': notes,
+    if (createdAt != null) 'created_at': createdAt,
+  };
 }

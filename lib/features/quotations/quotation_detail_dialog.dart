@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/quotation_status.dart';
 import '../../data/models/quotation.dart' show QuotationDetail, QuotationItem;
 import '../../data/repositories/api_result.dart'
     show ApiError, ApiFailure, ApiSuccess;
@@ -24,7 +25,6 @@ import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'quotation_form_dialog.dart';
 import 'quotation_providers.dart';
-import 'quotation_status.dart';
 
 /// Opens the read-only detail dialog for [quotationId].
 Future<void> showQuotationDetailDialog(

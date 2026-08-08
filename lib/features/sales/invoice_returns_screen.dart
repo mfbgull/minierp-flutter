@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/csv_export.dart';
 import '../../data/models/sales_return.dart' show SalesReturn;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
@@ -76,6 +77,24 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              // CSV export — mirrors the stock ledger dialog: the pure
+              // builder runs here and the shared save helper owns the
+              // FilePicker + toast. Disabled until rows are loaded.
+              TextButton.icon(
+                onPressed:
+                    returns.isLoading || (returns.valueOrNull?.isEmpty ?? true)
+                    ? null
+                    : () => saveCsv(
+                        context,
+                        suggestedName: csvSuggestedName('invoice-returns'),
+                        csv: buildInvoiceReturnsCsv(l10n, returns.valueOrNull!),
+                        successMessage: l10n.salesreturnsExported,
+                        errorMessage: l10n.salesreturnsExportfailed,
+                      ),
+                icon: const Icon(Icons.file_download_outlined, size: 18),
+                label: Text(l10n.salesreturnsExportcsv),
+              ),
+              const SizedBox(width: 4),
               IconButton(
                 tooltip: l10n.commonRefresh,
                 icon: const Icon(Icons.refresh),

@@ -10,7 +10,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/quotation_status.dart';
 import '../../data/models/quotation.dart' show Quotation;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
@@ -18,7 +20,6 @@ import '../../widgets/status_badge.dart';
 import 'quotation_detail_dialog.dart';
 import 'quotation_form_dialog.dart';
 import 'quotation_providers.dart';
-import 'quotation_status.dart';
 
 class QuotationsScreen extends ConsumerStatefulWidget {
   const QuotationsScreen({super.key});
@@ -68,6 +69,25 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
                 onPressed: () => showQuotationFormDialog(context),
                 icon: const Icon(Icons.add, size: 18),
                 label: Text(l10n.quotationsNewquotation),
+              ),
+              const SizedBox(width: 4),
+              // CSV export — mirrors the orders grids: the pure builder
+              // runs here and the shared save helper owns the FilePicker
+              // + toast. Disabled until rows are loaded.
+              TextButton.icon(
+                onPressed:
+                    quotations.isLoading ||
+                        (quotations.valueOrNull?.isEmpty ?? true)
+                    ? null
+                    : () => saveCsv(
+                        context,
+                        suggestedName: csvSuggestedName('quotations'),
+                        csv: buildQuotationsCsv(l10n, quotations.valueOrNull!),
+                        successMessage: l10n.quotationsExported,
+                        errorMessage: l10n.quotationsExportfailed,
+                      ),
+                icon: const Icon(Icons.file_download_outlined, size: 18),
+                label: Text(l10n.quotationsExportcsv),
               ),
               const SizedBox(width: 4),
               IconButton(

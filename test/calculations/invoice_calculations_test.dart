@@ -66,12 +66,14 @@ void main() {
     expect(calculateTax(items, discountScope: DiscountScope.item), 10);
     expect(
       calculateTotal(
-          items, DiscountScope.invoice, const Discount(type: DiscountType.flat, value: 0)),
+        items,
+        DiscountScope.invoice,
+        const Discount(type: DiscountType.flat, value: 0),
+      ),
       210,
     );
     // Sum of line totals matches subtotal + tax − discount
-    final lineSum =
-        items.fold<num>(0, (s, i) => s + calculateItemTotal(i));
+    final lineSum = items.fold<num>(0, (s, i) => s + calculateItemTotal(i));
     expect(lineSum, 210);
   });
 
@@ -90,8 +92,11 @@ void main() {
     );
     expect(calculateItemTotal(discounted), 90);
     expect(
-      calculateDiscount([discounted], DiscountScope.item,
-          const Discount(type: DiscountType.flat, value: 0)),
+      calculateDiscount(
+        [discounted],
+        DiscountScope.item,
+        const Discount(type: DiscountType.flat, value: 0),
+      ),
       10,
     );
   });

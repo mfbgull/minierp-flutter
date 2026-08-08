@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
-import '../../data/repositories/auth_repository.dart' show authRepositoryProvider;
+import '../../data/repositories/api_result.dart'
+    show ApiError, ApiFailure, ApiSuccess;
+import '../../data/repositories/auth_repository.dart'
+    show authRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 
 /// Change-password screen — completes the auth module (PORTING.md §3).
@@ -56,9 +58,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     switch (result) {
       case ApiSuccess():
         final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.changePasswordSuccess)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.changePasswordSuccess)));
         // go('/') rather than pop(): the screen is deep-linkable (the auth
         // redirect permits it), so pop() on the initial route would leave a
         // blank navigator. Session stays valid either way.
@@ -111,9 +113,11 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                         controller: _current,
                         label: l10n.changePasswordCurrent,
                         visible: _showCurrent,
-                        onToggle: () => setState(() => _showCurrent = !_showCurrent),
-                        validator: (value) =>
-                            (value == null || value.isEmpty) ? l10n.commonRequired : null,
+                        onToggle: () =>
+                            setState(() => _showCurrent = !_showCurrent),
+                        validator: (value) => (value == null || value.isEmpty)
+                            ? l10n.commonRequired
+                            : null,
                       ),
                       const SizedBox(height: 16),
                       _passwordField(
@@ -125,7 +129,9 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                           if (value == null || value.isEmpty) {
                             return l10n.commonRequired;
                           }
-                          if (value.length < 6) return l10n.changePasswordTooShort;
+                          if (value.length < 6) {
+                            return l10n.changePasswordTooShort;
+                          }
                           if (value == _current.text) {
                             return l10n.changePasswordSameAsCurrent;
                           }
@@ -137,7 +143,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                         controller: _confirm,
                         label: l10n.changePasswordConfirm,
                         visible: _showConfirm,
-                        onToggle: () => setState(() => _showConfirm = !_showConfirm),
+                        onToggle: () =>
+                            setState(() => _showConfirm = !_showConfirm),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return l10n.commonRequired;
@@ -160,11 +167,15 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.lock_reset),
                         label: Text(
-                          _busy ? l10n.changePasswordUpdating : l10n.changePasswordButton,
+                          _busy
+                              ? l10n.changePasswordUpdating
+                              : l10n.changePasswordButton,
                         ),
                       ),
                     ],
@@ -188,27 +199,27 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   }) {
     final l10n = AppLocalizations.of(context)!;
     return TextFormField(
-        controller: controller,
-        enabled: !_busy,
-        obscureText: !visible,
-        textInputAction: onSubmitted == null
-            ? TextInputAction.next
-            : TextInputAction.done,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: const Icon(Icons.lock_outline),
-          border: const OutlineInputBorder(),
-          suffixIcon: IconButton(
-            tooltip: visible ? l10n.commonHide : l10n.commonShow,
-            icon: Icon(
-              visible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-            ),
-            onPressed: onToggle,
+      controller: controller,
+      enabled: !_busy,
+      obscureText: !visible,
+      textInputAction: onSubmitted == null
+          ? TextInputAction.next
+          : TextInputAction.done,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: const Icon(Icons.lock_outline),
+        border: const OutlineInputBorder(),
+        suffixIcon: IconButton(
+          tooltip: visible ? l10n.commonHide : l10n.commonShow,
+          icon: Icon(
+            visible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
           ),
+          onPressed: onToggle,
         ),
-        validator: validator,
-        onFieldSubmitted: onSubmitted,
-      );
+      ),
+      validator: validator,
+      onFieldSubmitted: onSubmitted,
+    );
   }
 }
 
@@ -231,7 +242,10 @@ class _ErrorBanner extends StatelessWidget {
           Icon(Icons.error_outline, size: 18, color: scheme.onErrorContainer),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(message, style: TextStyle(color: scheme.onErrorContainer)),
+            child: Text(
+              message,
+              style: TextStyle(color: scheme.onErrorContainer),
+            ),
           ),
         ],
       ),

@@ -72,11 +72,7 @@ class CalcItemLineInput {
 
 /// Which field an edit targets (`applyLineFieldUpdate`). Broader than
 /// `EditedField` because rate edits are possible too.
-enum LineField {
-  quantity,
-  rate,
-  amount,
-}
+enum LineField { quantity, rate, amount }
 
 /// `({quantity, amount, error?})` — structural type, equality-ready for tests.
 typedef CalcItemLineResult = ({
@@ -145,11 +141,7 @@ CalcItemLineResult calcItemLine(CalcItemLineInput input) {
   }
 
   if (input.lastEditedField == EditedField.quantity) {
-    return (
-      quantity: quantity,
-      amount: _round2(quantity * rate),
-      error: null,
-    );
+    return (quantity: quantity, amount: _round2(quantity * rate), error: null);
   }
 
   // Fresh row — nothing driven yet
@@ -177,8 +169,9 @@ LineFieldPatch applyLineFieldUpdate(
   if (field == LineField.rate) {
     lastEditedField = item.lastEditedField ?? EditedField.quantity;
   } else {
-    lastEditedField =
-        field == LineField.quantity ? EditedField.quantity : EditedField.amount;
+    lastEditedField = field == LineField.quantity
+        ? EditedField.quantity
+        : EditedField.amount;
   }
 
   final result = calcItemLine(
@@ -197,8 +190,7 @@ LineFieldPatch applyLineFieldUpdate(
     quantity: result.quantity,
     amount: result.amount,
     rate: field == LineField.rate ? value : item.rate ?? 0,
-    lastEditedField:
-        item.saleType == SaleType.loose ? lastEditedField : null,
+    lastEditedField: item.saleType == SaleType.loose ? lastEditedField : null,
   );
 }
 

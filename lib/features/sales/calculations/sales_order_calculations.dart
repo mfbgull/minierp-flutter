@@ -43,20 +43,23 @@ List<SOFormItem> padItemsToMinimum(List<SOFormItem> items, {int min = 1}) {
   final padded = [...items];
   final now = _now();
   for (var i = items.length; i < min; i++) {
-    padded.add(SOFormItem(
-      id: now + i + 1000,
-      itemId: '',
-      name: '',
-      quantity: 1,
-      unitPrice: 0,
-      taxRate: 0,
-      discount: flatZeroDiscount,
-    ));
+    padded.add(
+      SOFormItem(
+        id: now + i + 1000,
+        itemId: '',
+        name: '',
+        quantity: 1,
+        unitPrice: 0,
+        taxRate: 0,
+        discount: flatZeroDiscount,
+      ),
+    );
   }
   return padded;
 }
 
-num calculateItemDiscount(SOFormItem item) {    final subtotal = (item.quantity) * (item.unitPrice);
+num calculateItemDiscount(SOFormItem item) {
+  final subtotal = (item.quantity) * (item.unitPrice);
   if (item.discount.type == DiscountType.percentage) {
     return (subtotal * item.discount.value) / 100;
   }
@@ -73,7 +76,9 @@ num calculateItemTotal(SOFormItem item) {
 
 num calculateSubtotal(List<SOFormItem> items) {
   return items.fold<num>(
-      0, (sum, item) => sum + (item.quantity) * (item.unitPrice));
+    0,
+    (sum, item) => sum + (item.quantity) * (item.unitPrice),
+  );
 }
 
 num calculateDiscount(List<SOFormItem> items) {
@@ -90,5 +95,7 @@ num calculateTax(List<SOFormItem> items) {
 }
 
 num calculateTotal(List<SOFormItem> items) {
-  return calculateSubtotal(items) - calculateDiscount(items) + calculateTax(items);
+  return calculateSubtotal(items) -
+      calculateDiscount(items) +
+      calculateTax(items);
 }

@@ -39,25 +39,25 @@ class SalesReturn {
   });
 
   factory SalesReturn.fromJson(Map<String, dynamic> json) => SalesReturn(
-        id: asInt(json['id']) ?? 0,
-        movementNo: asString(json['movement_no']) ?? '',
-        itemId: asInt(json['item_id']) ?? 0,
-        itemName: asString(json['item_name']) ?? '',
-        itemCode: asString(json['item_code']) ?? '',
-        unitOfMeasure: asString(json['unit_of_measure']) ?? '',
-        warehouseId: asInt(json['warehouse_id']) ?? 0,
-        warehouseName: asString(json['warehouse_name']) ?? '',
-        quantity: asNum(json['quantity']) ?? 0,
-        unitCost: asNum(json['unit_cost']) ?? 0,
-        referenceDocType: asString(json['reference_doctype']) ?? '',
-        invoiceNo: asString(json['invoice_no']),
-        remarks: asString(json['remarks']),
-        returnDate: asString(json['return_date']) ?? '',
-        createdAt: asString(json['created_at']),
-        createdByUsername: asString(json['created_by_username']),
-        customerName: asString(json['customer_name']),
-        customerId: asInt(json['customer_id']),
-      );
+    id: asInt(json['id']) ?? 0,
+    movementNo: asString(json['movement_no']) ?? '',
+    itemId: asInt(json['item_id']) ?? 0,
+    itemName: asString(json['item_name']) ?? '',
+    itemCode: asString(json['item_code']) ?? '',
+    unitOfMeasure: asString(json['unit_of_measure']) ?? '',
+    warehouseId: asInt(json['warehouse_id']) ?? 0,
+    warehouseName: asString(json['warehouse_name']) ?? '',
+    quantity: asNum(json['quantity']) ?? 0,
+    unitCost: asNum(json['unit_cost']) ?? 0,
+    referenceDocType: asString(json['reference_doctype']) ?? '',
+    invoiceNo: asString(json['invoice_no']),
+    remarks: asString(json['remarks']),
+    returnDate: asString(json['return_date']) ?? '',
+    createdAt: asString(json['created_at']),
+    createdByUsername: asString(json['created_by_username']),
+    customerName: asString(json['customer_name']),
+    customerId: asInt(json['customer_id']),
+  );
 
   final int id;
   final String movementNo;

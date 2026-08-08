@@ -26,9 +26,11 @@ class DetailError extends StatelessWidget {
           children: [
             Icon(Icons.cloud_off_outlined, size: 36, color: scheme.outline),
             const SizedBox(height: 10),
-            Text(message,
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center),
+            Text(
+              message,
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 10),
             FilledButton.tonalIcon(
               onPressed: onRetry,

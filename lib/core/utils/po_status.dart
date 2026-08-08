@@ -1,6 +1,8 @@
-// Shared PO status helpers — used by both the list grid and the detail
-// dialog (PORTING.md §6: status text plus colors come from the web's
-// `references/utils/statusColors.ts`).
+// Shared PO status helpers — used by the list grid, the detail dialog,
+// and the CSV export builder (PORTING.md §6: status text plus colors
+// come from the web's `references/utils/statusColors.ts`). Lives in
+// core/utils (mirroring `movement_type_label.dart` / `so_status.dart`)
+// so the core CSV export can reuse it without importing from features.
 
 import 'package:flutter/material.dart';
 

@@ -15,8 +15,8 @@ import 'endpoints.dart' show ApiEndpoints;
 /// - On 401 the stored token is cleared so the UI can route to login.
 class ApiClient {
   ApiClient({Dio? dio, TokenStorage? tokenStorage, this.sessionEvents})
-      : tokenStorage = tokenStorage ?? const SecureTokenStorage(),
-        dio = dio ?? Dio(_baseOptions()) {
+    : tokenStorage = tokenStorage ?? const SecureTokenStorage(),
+      dio = dio ?? Dio(_baseOptions()) {
     _attachInterceptors();
   }
 
@@ -30,13 +30,13 @@ class ApiClient {
   );
 
   static BaseOptions _baseOptions() => BaseOptions(
-        baseUrl: baseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
-        sendTimeout: const Duration(seconds: 10),
-        responseType: ResponseType.json,
-        headers: const {'Accept': 'application/json'},
-      );
+    baseUrl: baseUrl,
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
+    sendTimeout: const Duration(seconds: 10),
+    responseType: ResponseType.json,
+    headers: const {'Accept': 'application/json'},
+  );
 
   void _attachInterceptors() {
     dio.interceptors.add(
@@ -97,7 +97,7 @@ class ApiClient {
 /// replaces axios; 401 → login redirection is handled by the auth feature).
 final dioProvider = Provider<Dio>(
   (ref) => ApiClient(
-        tokenStorage: ref.watch(tokenStorageProvider),
-        sessionEvents: ref.watch(sessionEventsProvider),
-      ).dio,
+    tokenStorage: ref.watch(tokenStorageProvider),
+    sessionEvents: ref.watch(sessionEventsProvider),
+  ).dio,
 );

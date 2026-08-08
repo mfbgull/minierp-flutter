@@ -29,9 +29,8 @@ class SerialCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Text('${index + 1}',
-            style: const TextStyle(color: Colors.black54)),
-      );
+    child: Text('${index + 1}', style: const TextStyle(color: Colors.black54)),
+  );
 }
 
 /// Read-only remove (trash) cell.
@@ -42,13 +41,13 @@ class RemoveCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: IconButton(
-          tooltip: AppLocalizations.of(context)!.commonRemove,
-          visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.remove_circle_outline, size: 18),
-          onPressed: onRemove,
-        ),
-      );
+    child: IconButton(
+      tooltip: AppLocalizations.of(context)!.commonRemove,
+      visualDensity: VisualDensity.compact,
+      icon: const Icon(Icons.remove_circle_outline, size: 18),
+      onPressed: onRemove,
+    ),
+  );
 }
 
 /// A number / text line cell (qty, rate, tax, discount, amount).
@@ -98,8 +97,12 @@ class _LineCellState extends State<LineCell> {
     _focus.onKeyEvent = (node, event) {
       final e = event is KeyDownEvent ? event : null;
       if (e == null) return KeyEventResult.ignored;
-      return nav
-          .handleDisplayKey(row, column, e, isLastRow: nav.isLastRow(row));
+      return nav.handleDisplayKey(
+        row,
+        column,
+        e,
+        isLastRow: nav.isLastRow(row),
+      );
     };
     _editFocus = FocusNode(
       onKeyEvent: (node, event) => _onEditKey(node, event, _editor),
@@ -186,8 +189,10 @@ class _LineCellState extends State<LineCell> {
     final controller = _editor ??= TextEditingController(text: _displayText());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      controller.selection =
-          TextSelection(baseOffset: 0, extentOffset: controller.text.length);
+      controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: controller.text.length,
+      );
       nav.attachEditor(controller);
     });
     return Container(
@@ -211,7 +216,10 @@ class _LineCellState extends State<LineCell> {
   }
 
   KeyEventResult _onEditKey(
-      FocusNode node, KeyEvent event, TextEditingController? controller) {
+    FocusNode node,
+    KeyEvent event,
+    TextEditingController? controller,
+  ) {
     final e = event is KeyDownEvent ? event : null;
     if (e == null || controller == null) return KeyEventResult.ignored;
     final sel = controller.selection;
@@ -245,10 +253,9 @@ class _LineCellState extends State<LineCell> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
               color: highlight
-                  ? Theme.of(context)
-                      .colorScheme
-                      .primaryContainer
-                      .withValues(alpha: 0.35)
+                  ? Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer.withValues(alpha: 0.35)
                   : null,
             ),
             child: Text(_displayText(), style: const TextStyle(fontSize: 13)),
@@ -280,15 +287,17 @@ class _LineCellState extends State<LineCell> {
     final loose = data.isLoose;
     if (_editing && loose) return _editorInput();
     final issue = loose
-        ? lineIssue(CalcItemLineInput(
-            saleType: data.saleType,
-            quantity: data.quantity,
-            amount: data.amount,
-            rate: data.rate,
-            qtyDecimalPrecision: data.qtyDecimalPrecision,
-            roundingStep: data.roundingStep,
-            lastEditedField: EditedField.amount,
-          ))
+        ? lineIssue(
+            CalcItemLineInput(
+              saleType: data.saleType,
+              quantity: data.quantity,
+              amount: data.amount,
+              rate: data.rate,
+              qtyDecimalPrecision: data.qtyDecimalPrecision,
+              roundingStep: data.roundingStep,
+              lastEditedField: EditedField.amount,
+            ),
+          )
         : null;
     final display = _display(context);
     return Column(
@@ -468,19 +477,16 @@ class _DescriptionCellState extends State<DescriptionCell> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
               color: highlight
-                  ? Theme.of(context)
-                      .colorScheme
-                      .primaryContainer
-                      .withValues(alpha: 0.35)
+                  ? Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer.withValues(alpha: 0.35)
                   : null,
             ),
             child: Text(
               isEmpty ? l10n.salesClicktoadditem : _displayDescription,
               style: TextStyle(
                 fontSize: 13,
-                color: isEmpty
-                    ? Theme.of(context).colorScheme.outline
-                    : null,
+                color: isEmpty ? Theme.of(context).colorScheme.outline : null,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -496,12 +502,15 @@ class _DescriptionCellState extends State<DescriptionCell> {
   // ── Editor + dropdown ──────────────────────────────────────────
 
   Widget _editor() {
-    final controller = _controller ??=
-        TextEditingController(text: LineRowData(row).description);
+    final controller = _controller ??= TextEditingController(
+      text: LineRowData(row).description,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      controller.selection =
-          TextSelection(baseOffset: 0, extentOffset: controller.text.length);
+      controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: controller.text.length,
+      );
       nav.attachEditor(controller);
     });
     return Container(
@@ -526,7 +535,10 @@ class _DescriptionCellState extends State<DescriptionCell> {
   }
 
   KeyEventResult _onEditKey(
-      FocusNode node, KeyEvent event, TextEditingController? controller) {
+    FocusNode node,
+    KeyEvent event,
+    TextEditingController? controller,
+  ) {
     final e = event is KeyDownEvent ? event : null;
     if (e == null || controller == null) return KeyEventResult.ignored;
     final key = e.logicalKey;
@@ -534,8 +546,7 @@ class _DescriptionCellState extends State<DescriptionCell> {
     if (_open && _filtered.isNotEmpty) {
       switch (key) {
         case LogicalKeyboardKey.arrowDown:
-          _selectedIndex =
-              (_selectedIndex + 1) % _filtered.length;
+          _selectedIndex = (_selectedIndex + 1) % _filtered.length;
           _scrollToSelected();
           setState(() {});
           return KeyEventResult.handled;
@@ -666,9 +677,7 @@ class _DescriptionCellState extends State<DescriptionCell> {
         constraints: const BoxConstraints(maxHeight: 300),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant,
-          ),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
           borderRadius: BorderRadius.circular(4),
         ),
         child: _filtered.isEmpty
@@ -716,7 +725,9 @@ class _DescriptionCellState extends State<DescriptionCell> {
                   child: Text(
                     item.itemName,
                     style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -757,7 +768,8 @@ class _DescriptionCellState extends State<DescriptionCell> {
     final position = _scroll.position;
     if (target < position.pixels) {
       _scroll.jumpTo(target);
-    } else if (target + _itemExtent > position.pixels + position.viewportDimension) {
+    } else if (target + _itemExtent >
+        position.pixels + position.viewportDimension) {
       _scroll.jumpTo(target - position.viewportDimension + _itemExtent);
     }
   }

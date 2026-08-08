@@ -4,7 +4,8 @@ import 'json_helpers.dart';
 enum PhysicalCountStatus { draft, inProgress, completed, cancelled }
 
 extension PhysicalCountStatusX on PhysicalCountStatus {
-  static PhysicalCountStatus fromString(String value) => switch (value.toLowerCase()) {
+  static PhysicalCountStatus fromString(String value) =>
+      switch (value.toLowerCase()) {
         'completed' => PhysicalCountStatus.completed,
         'in progress' => PhysicalCountStatus.inProgress,
         'cancelled' => PhysicalCountStatus.cancelled,
@@ -12,11 +13,11 @@ extension PhysicalCountStatusX on PhysicalCountStatus {
       };
 
   String get value => switch (this) {
-        PhysicalCountStatus.draft => 'Draft',
-        PhysicalCountStatus.inProgress => 'In Progress',
-        PhysicalCountStatus.completed => 'Completed',
-        PhysicalCountStatus.cancelled => 'Cancelled',
-      };
+    PhysicalCountStatus.draft => 'Draft',
+    PhysicalCountStatus.inProgress => 'In Progress',
+    PhysicalCountStatus.completed => 'Completed',
+    PhysicalCountStatus.cancelled => 'Cancelled',
+  };
 }
 
 class PhysicalCount {
@@ -42,25 +43,27 @@ class PhysicalCount {
   });
 
   factory PhysicalCount.fromJson(Map<String, dynamic> json) => PhysicalCount(
-        id: asInt(json['id']) ?? 0,
-        countNo: asString(json['count_no']) ?? '',
-        countDate: asString(json['count_date']) ?? '',
-        warehouseId: asInt(json['warehouse_id']) ?? 0,
-        status: PhysicalCountStatusX.fromString(asString(json['status']) ?? 'Draft').value,
-        notes: asString(json['notes']),
-        createdBy: asInt(json['created_by']) ?? 0,
-        completedBy: asInt(json['completed_by']),
-        completedAt: asString(json['completed_at']),
-        createdAt: asString(json['created_at']),
-        updatedAt: asString(json['updated_at']),
-        warehouseCode: asString(json['warehouse_code']),
-        warehouseName: asString(json['warehouse_name']),
-        createdByName: asString(json['created_by_name']),
-        completedByName: asString(json['completed_by_name']),
-        totalItems: asNum(json['total_items']),
-        countedItems: asNum(json['counted_items']),
-        varianceItems: asNum(json['variance_items']),
-      );
+    id: asInt(json['id']) ?? 0,
+    countNo: asString(json['count_no']) ?? '',
+    countDate: asString(json['count_date']) ?? '',
+    warehouseId: asInt(json['warehouse_id']) ?? 0,
+    status: PhysicalCountStatusX.fromString(
+      asString(json['status']) ?? 'Draft',
+    ).value,
+    notes: asString(json['notes']),
+    createdBy: asInt(json['created_by']) ?? 0,
+    completedBy: asInt(json['completed_by']),
+    completedAt: asString(json['completed_at']),
+    createdAt: asString(json['created_at']),
+    updatedAt: asString(json['updated_at']),
+    warehouseCode: asString(json['warehouse_code']),
+    warehouseName: asString(json['warehouse_name']),
+    createdByName: asString(json['created_by_name']),
+    completedByName: asString(json['completed_by_name']),
+    totalItems: asNum(json['total_items']),
+    countedItems: asNum(json['counted_items']),
+    varianceItems: asNum(json['variance_items']),
+  );
 
   final int id;
   final String countNo;
@@ -87,18 +90,18 @@ class PhysicalCount {
   bool get isCancelled => status == PhysicalCountStatus.cancelled.value;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'count_no': countNo,
-        'count_date': countDate,
-        'warehouse_id': warehouseId,
-        'status': status,
-        if (notes != null) 'notes': notes,
-        'created_by': createdBy,
-        if (completedBy != null) 'completed_by': completedBy,
-        if (completedAt != null) 'completed_at': completedAt,
-        if (createdAt != null) 'created_at': createdAt,
-        if (updatedAt != null) 'updated_at': updatedAt,
-      };
+    'id': id,
+    'count_no': countNo,
+    'count_date': countDate,
+    'warehouse_id': warehouseId,
+    'status': status,
+    if (notes != null) 'notes': notes,
+    'created_by': createdBy,
+    if (completedBy != null) 'completed_by': completedBy,
+    if (completedAt != null) 'completed_at': completedAt,
+    if (createdAt != null) 'created_at': createdAt,
+    if (updatedAt != null) 'updated_at': updatedAt,
+  };
 }
 
 class PhysicalCountItem {
@@ -134,7 +137,8 @@ class PhysicalCountItem {
         variance: asNum(json['variance']),
         unitCost: asNum(json['unit_cost']),
         varianceValue: asNum(json['variance_value']),
-        adjustmentPosted: json['adjustment_posted'] == true || json['adjustment_posted'] == 1,
+        adjustmentPosted:
+            json['adjustment_posted'] == true || json['adjustment_posted'] == 1,
         adjustmentMovementId: asInt(json['adjustment_movement_id']),
         countedAt: asString(json['counted_at']),
         countedBy: asInt(json['counted_by']),
@@ -168,19 +172,20 @@ class PhysicalCountItem {
   final String? countedByName;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'count_id': countId,
-        'item_id': itemId,
-        'system_quantity': systemQuantity,
-        if (countedQuantity != null) 'counted_quantity': countedQuantity,
-        if (variance != null) 'variance': variance,
-        if (unitCost != null) 'unit_cost': unitCost,
-        if (varianceValue != null) 'variance_value': varianceValue,
-        'adjustment_posted': adjustmentPosted ? 1 : 0,
-        if (adjustmentMovementId != null) 'adjustment_movement_id': adjustmentMovementId,
-        if (countedAt != null) 'counted_at': countedAt,
-        if (countedBy != null) 'counted_by': countedBy,
-        if (notes != null) 'notes': notes,
-        if (createdAt != null) 'created_at': createdAt,
-      };
+    'id': id,
+    'count_id': countId,
+    'item_id': itemId,
+    'system_quantity': systemQuantity,
+    if (countedQuantity != null) 'counted_quantity': countedQuantity,
+    if (variance != null) 'variance': variance,
+    if (unitCost != null) 'unit_cost': unitCost,
+    if (varianceValue != null) 'variance_value': varianceValue,
+    'adjustment_posted': adjustmentPosted ? 1 : 0,
+    if (adjustmentMovementId != null)
+      'adjustment_movement_id': adjustmentMovementId,
+    if (countedAt != null) 'counted_at': countedAt,
+    if (countedBy != null) 'counted_by': countedBy,
+    if (notes != null) 'notes': notes,
+    if (createdAt != null) 'created_at': createdAt,
+  };
 }

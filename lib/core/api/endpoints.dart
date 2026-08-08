@@ -13,7 +13,8 @@ abstract final class ApiEndpoints {
   static const dashboardSalesSummary = '/dashboard/sales-summary';
   static const dashboardExpenseSummary = '/dashboard/expense-summary';
   static const dashboardProductionStatus = '/dashboard/production-status';
-  static const dashboardStockMovementSummary = '/dashboard/stock-movement-summary';
+  static const dashboardStockMovementSummary =
+      '/dashboard/stock-movement-summary';
   static const dashboardKpi = '/dashboard/kpi';
   static const dashboardArSummary = '/dashboard/ar-summary';
 
@@ -48,17 +49,37 @@ abstract final class ApiEndpoints {
   static const suppliers = '/suppliers';
   static const purchaseOrders = '/purchase-orders';
 
+  // Reports (§11) — first batch; add each endpoint as its report screen
+  // is ported.
+  static const reportsBase = '/reports';
+  static const reportArAging = '/reports/ar-aging';
+  static const reportSalesSummary = '/reports/sales-summary';
+  static const reportLowStock = '/reports/low-stock';
+  static const reportStockLevel = '/reports/stock-level';
+  static const reportStockValuation = '/reports/stock-valuation';
+  static const reportSalesByCustomer = '/reports/sales-by-customer';
+  static const reportDso = '/reports/dso';
+  static const reportCashFlow = '/reports/cash-flow';
+  static const reportProfitLoss = '/reports/profit-loss';
+  static const reportInventoryMovement = '/reports/inventory-movement';
+  static const reportPurchaseSummary = '/reports/purchase-summary';
+  static const reportTopDebtors = '/reports/top-debtors';
+
   // Misc
   static const customers = '/customers';
   static const payments = '/payments';
   static const expenses = '/expenses';
   static const expensesCategories = '/expenses/categories';
   static const expensesStatusOptions = '/expenses/status-options';
-  static const expensesPaymentMethodOptions = '/expenses/payment-method-options';
+  static const expensesPaymentMethodOptions =
+      '/expenses/payment-method-options';
   static const expensesSummary = '/expenses/summary';
   static const employees = '/employees';
-  static const production = '/production';
-  static const bom = '/bom';
+  // Production (§Production) — note the BOM mount is `/api/boms`
+  // (`app.use('/api/boms', bomRoutes)`) while productions live flat on
+  // `/api/productions` (`app.use('/api', productionRoutes)`).
+  static const boms = '/boms';
+  static const productions = '/productions';
   static const settings = '/settings';
   static const activityLog = '/activity-logs';
   static const integrations = '/integrations';

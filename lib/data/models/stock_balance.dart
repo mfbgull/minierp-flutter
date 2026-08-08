@@ -15,15 +15,15 @@ class StockBalance {
   });
 
   factory StockBalance.fromJson(Map<String, dynamic> json) => StockBalance(
-        itemId: asInt(json['item_id']) ?? 0,
-        itemCode: asString(json['item_code']) ?? '',
-        itemName: asString(json['item_name']) ?? '',
-        warehouseId: asInt(json['warehouse_id']) ?? 0,
-        warehouseCode: asString(json['warehouse_code']) ?? '',
-        warehouseName: asString(json['warehouse_name']) ?? '',
-        quantity: (json['quantity'] as num?) ?? 0,
-        lastUpdated: asString(json['last_updated']),
-      );
+    itemId: asInt(json['item_id']) ?? 0,
+    itemCode: asString(json['item_code']) ?? '',
+    itemName: asString(json['item_name']) ?? '',
+    warehouseId: asInt(json['warehouse_id']) ?? 0,
+    warehouseCode: asString(json['warehouse_code']) ?? '',
+    warehouseName: asString(json['warehouse_name']) ?? '',
+    quantity: (json['quantity'] as num?) ?? 0,
+    lastUpdated: asString(json['last_updated']),
+  );
 
   final int itemId;
   final String itemCode;
@@ -35,13 +35,13 @@ class StockBalance {
   final String? lastUpdated;
 
   Map<String, dynamic> toJson() => {
-        'item_id': itemId,
-        'item_code': itemCode,
-        'item_name': itemName,
-        'warehouse_id': warehouseId,
-        'warehouse_code': warehouseCode,
-        'warehouse_name': warehouseName,
-        'quantity': quantity,
-        if (lastUpdated != null) 'last_updated': lastUpdated,
-      };
+    'item_id': itemId,
+    'item_code': itemCode,
+    'item_name': itemName,
+    'warehouse_id': warehouseId,
+    'warehouse_code': warehouseCode,
+    'warehouse_name': warehouseName,
+    'quantity': quantity,
+    if (lastUpdated != null) 'last_updated': lastUpdated,
+  };
 }

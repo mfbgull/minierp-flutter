@@ -1,0 +1,202 @@
+// Production runs list — a read-only grid over `GET /productions`
+// (**bare array** — no search/page params, so sorting and filtering
+// stay client-side like the items screen). Rendered with PlutoGrid
+// via the shared [PlutoGridScreen] mixin: F2/Enter + double-tap open
+// the production detail; the keyboard-hint status bar sits beneath
+// the grid. Sits on the shell branch `/production` (the web app
+// hosts the production list at `/production`).
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pluto_grid/pluto_grid.dart';
+
+import '../../core/utils/csv_export.dart';
+import '../../core/utils/formatters.dart';
+import '../../data/models/production.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/pluto_grid_screen.dart';
+import 'production_detail_dialog.dart';
+import 'production_form_dialog.dart';
+import 'production_providers.dart';
+
+class ProductionScreen extends ConsumerStatefulWidget {
+  const ProductionScreen({super.key});
+
+  @override
+  ConsumerState<ProductionScreen> createState() => _ProductionScreenState();
+}
+
+class _ProductionScreenState extends ConsumerState<ProductionScreen>
+    with PlutoGridScreen<Production, ProductionScreen> {
+  @override
+  void openRowDetail(int productionId) {
+    if (!mounted) return;
+    showProductionDetailDialog(context, productionId: productionId);
+  }
+
+  @override
+  PlutoRow gridRowFor(Production p) => PlutoRow(
+    cells: {
+      'id': PlutoCell(value: p.id),
+      'productionNo': PlutoCell(value: p.productionNo),
+      'date': PlutoCell(value: p.productionDate),
+      'output': PlutoCell(value: p.outputItemName ?? p.outputItemCode ?? ''),
+      'qty': PlutoCell(value: p.outputQuantity),
+      'uom': PlutoCell(value: p.outputUom ?? ''),
+      'warehouse': PlutoCell(value: p.finishedGoodsWarehouseName ?? ''),
+      'unitCost': PlutoCell(value: p.unitCost ?? 0),
+      'totalCost': PlutoCell(value: p.totalBatchCost ?? 0),
+      'batchNo': PlutoCell(value: p.batchNo ?? ''),
+      'remarks': PlutoCell(value: p.remarks ?? ''),
+    },
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final productions = ref.watch(productionsProvider);
+    final l10n = AppLocalizations.of(context)!;
+
+    // Keep the grid in sync with provider transitions (loading → data).
+    watchGridProvider(productionsProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: () => showProductionFormDialog(context),
+                icon: const Icon(Icons.add, size: 18),
+                label: Text(l10n.productionNewproduction),
+              ),
+              const SizedBox(width: 4),
+              TextButton.icon(
+                onPressed:
+                    productions.isLoading ||
+                        (productions.valueOrNull?.isEmpty ?? true)
+                    ? null
+                    : () => saveCsv(
+                        context,
+                        suggestedName: csvSuggestedName('productions'),
+                        csv: buildProductionsCsv(
+                          l10n,
+                          productions.valueOrNull!,
+                        ),
+                        successMessage: l10n.productionExported,
+                        errorMessage: l10n.productionExportfailed,
+                      ),
+                icon: const Icon(Icons.file_download_outlined, size: 18),
+                label: Text(l10n.productionExportcsv),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                tooltip: l10n.commonRefresh,
+                icon: const Icon(Icons.refresh),
+                onPressed: () => ref.invalidate(productionsProvider),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: gridScreenBody(productions, provider: productionsProvider),
+        ),
+      ],
+    );
+  }
+
+  @override
+  List<PlutoColumn> buildGridColumns(AppLocalizations l10n) {
+    PlutoColumn textColumn(String field, String title, double width) =>
+        PlutoColumn(
+          title: title,
+          field: field,
+          type: PlutoColumnType.text(),
+          width: width,
+          readOnly: true,
+          enableContextMenu: false,
+        );
+
+    return [
+      PlutoColumn(
+        title: '',
+        field: 'id',
+        type: PlutoColumnType.number(),
+        width: 80,
+        readOnly: true,
+        renderer: (ctx) => const SizedBox.shrink(),
+        enableContextMenu: false,
+        enableFilterMenuItem: false,
+        enableHideColumnMenuItem: false,
+        enableSetColumnsMenuItem: false,
+      ),
+      textColumn('productionNo', l10n.productionNo, 130),
+      PlutoColumn(
+        title: l10n.commonDate,
+        field: 'date',
+        type: PlutoColumnType.text(),
+        width: 110,
+        readOnly: true,
+        enableContextMenu: false,
+        renderer: (ctx) => Builder(
+          builder: (cellContext) => Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              Formatters.date(ctx.cell.value as String? ?? ''),
+              style: Theme.of(cellContext).textTheme.bodyMedium,
+            ),
+          ),
+        ),
+      ),
+      textColumn('output', l10n.productionOutputitem, 240),
+      PlutoColumn(
+        title: l10n.commonQuantity,
+        field: 'qty',
+        type: PlutoColumnType.number(format: '#,###.000'),
+        width: 100,
+        readOnly: true,
+        textAlign: PlutoColumnTextAlign.end,
+        titleTextAlign: PlutoColumnTextAlign.end,
+        enableContextMenu: false,
+        renderer: (ctx) => Align(
+          alignment: Alignment.centerRight,
+          child: Text(Formatters.number(ctx.cell.value as num? ?? 0)),
+        ),
+      ),
+      textColumn('uom', l10n.commonUom, 80),
+      textColumn('warehouse', l10n.productionWarehouse, 180),
+      PlutoColumn(
+        title: l10n.productionUnitcost,
+        field: 'unitCost',
+        type: PlutoColumnType.number(format: '#,###.00'),
+        width: 110,
+        readOnly: true,
+        textAlign: PlutoColumnTextAlign.right,
+        titleTextAlign: PlutoColumnTextAlign.right,
+        enableContextMenu: false,
+        renderer: (ctx) => Align(
+          alignment: Alignment.centerRight,
+          child: Text(Formatters.currency(ctx.cell.value as num? ?? 0)),
+        ),
+      ),
+      PlutoColumn(
+        title: l10n.productionTotalcost,
+        field: 'totalCost',
+        type: PlutoColumnType.number(format: '#,###.00'),
+        width: 120,
+        readOnly: true,
+        textAlign: PlutoColumnTextAlign.right,
+        titleTextAlign: PlutoColumnTextAlign.right,
+        enableContextMenu: false,
+        renderer: (ctx) => Align(
+          alignment: Alignment.centerRight,
+          child: Text(Formatters.currency(ctx.cell.value as num? ?? 0)),
+        ),
+      ),
+      textColumn('batchNo', l10n.productionBatchno, 130),
+      textColumn('remarks', l10n.purchasesRemarks, 240),
+    ];
+  }
+}

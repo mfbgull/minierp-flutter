@@ -1,0 +1,15 @@
+[
+ {
+  "id": 39,
+  "item_code": "MODEL-TEST-1779339271467",
+  "item_name": "Updated Model Item",
+  "item_category": "Updated",
+  "unit_of_measure": "Kg",
+  "current_stock": 0,
+  "minimum_stock": 50,
+  "shortage": 50,
+  "reorder_level": 50,
+  "standard_selling_price": 30,
+  "stock_status": "Out of Stock"
+ }
+]

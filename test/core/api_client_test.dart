@@ -40,31 +40,30 @@ class _Adapter implements HttpClientAdapter {
     RequestOptions options,
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
-  ) async =>
-      handler(options);
+  ) async => handler(options);
 
   @override
   void close({bool force = false}) {}
 }
 
 ResponseBody _json(Object body, {int status = 200}) => ResponseBody.fromString(
-      jsonEncode(body),
-      status,
-      headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
-    );
+  jsonEncode(body),
+  status,
+  headers: {
+    Headers.contentTypeHeader: [Headers.jsonContentType],
+  },
+);
 
 /// The change-password handler's wrong-current-password 401 (`sendError`
 /// envelope: `error` is a map with `message`).
 ResponseBody _wrongPassword401() => _json({
-      'success': false,
-      'error': {'code': 'UNAUTHORIZED', 'message': 'Current password is incorrect'},
-    }, status: 401);
+  'success': false,
+  'error': {'code': 'UNAUTHORIZED', 'message': 'Current password is incorrect'},
+}, status: 401);
 
 /// The auth middleware's expired-token 401 (`error` is a string).
-ResponseBody _expiredToken401() => _json({
-      'error': 'Token expired',
-      'code': 'TOKEN_EXPIRED',
-    }, status: 401);
+ResponseBody _expiredToken401() =>
+    _json({'error': 'Token expired', 'code': 'TOKEN_EXPIRED'}, status: 401);
 
 void main() {
   group('dio 401 interceptor', () {
@@ -83,31 +82,39 @@ void main() {
       ApiClient(dio: dio, tokenStorage: storage, sessionEvents: events);
     });
 
-    test('401 from /auth/change-password (wrong password) keeps token + session',
-        () async {
-      dio.httpClientAdapter = _Adapter((_) => _wrongPassword401());
-      await expectLater(
-        dio.post(ApiEndpoints.changePassword,
-            data: {'currentPassword': 'x', 'newPassword': 'y'}),
-        throwsA(isA<DioException>()),
-      );
-      await Future<void>.delayed(Duration.zero);
-      expect(storage.token, 'valid-token');
-      expect(unauthorizedFires, isEmpty);
-    });
+    test(
+      '401 from /auth/change-password (wrong password) keeps token + session',
+      () async {
+        dio.httpClientAdapter = _Adapter((_) => _wrongPassword401());
+        await expectLater(
+          dio.post(
+            ApiEndpoints.changePassword,
+            data: {'currentPassword': 'x', 'newPassword': 'y'},
+          ),
+          throwsA(isA<DioException>()),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(storage.token, 'valid-token');
+        expect(unauthorizedFires, isEmpty);
+      },
+    );
 
-    test('401 from /auth/change-password (expired token) still expires session',
-        () async {
-      dio.httpClientAdapter = _Adapter((_) => _expiredToken401());
-      await expectLater(
-        dio.post(ApiEndpoints.changePassword,
-            data: {'currentPassword': 'x', 'newPassword': 'y'}),
-        throwsA(isA<DioException>()),
-      );
-      await Future<void>.delayed(Duration.zero);
-      expect(storage.token, isNull);
-      expect(unauthorizedFires, hasLength(1));
-    });
+    test(
+      '401 from /auth/change-password (expired token) still expires session',
+      () async {
+        dio.httpClientAdapter = _Adapter((_) => _expiredToken401());
+        await expectLater(
+          dio.post(
+            ApiEndpoints.changePassword,
+            data: {'currentPassword': 'x', 'newPassword': 'y'},
+          ),
+          throwsA(isA<DioException>()),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(storage.token, isNull);
+        expect(unauthorizedFires, hasLength(1));
+      },
+    );
 
     test('401 from /auth/login keeps the token and session', () async {
       dio.httpClientAdapter = _Adapter((_) => _wrongPassword401());
@@ -120,13 +127,15 @@ void main() {
       expect(unauthorizedFires, isEmpty);
     });
 
-    test('401 from a regular API call clears the token and fires the event',
-        () async {
-      dio.httpClientAdapter = _Adapter((_) => _expiredToken401());
-      await expectLater(dio.get('/invoices'), throwsA(isA<DioException>()));
-      await Future<void>.delayed(Duration.zero);
-      expect(storage.token, isNull);
-      expect(unauthorizedFires, hasLength(1));
-    });
+    test(
+      '401 from a regular API call clears the token and fires the event',
+      () async {
+        dio.httpClientAdapter = _Adapter((_) => _expiredToken401());
+        await expectLater(dio.get('/invoices'), throwsA(isA<DioException>()));
+        await Future<void>.delayed(Duration.zero);
+        expect(storage.token, isNull);
+        expect(unauthorizedFires, hasLength(1));
+      },
+    );
   });
 }

@@ -13,6 +13,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../data/models/expense.dart'
     show Expense, ExpenseCategory, ExpenseOption;
@@ -22,6 +23,7 @@ import '../../data/repositories/expense_repository.dart'
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/date_picker_helpers.dart' show pickDate;
 import '../../widgets/form_field.dart';
 import '../../widgets/searchable_select.dart';
 import 'expense_providers.dart';
@@ -67,20 +69,22 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
   void initState() {
     super.initState();
     final expense = widget.expense;
-    _descriptionController =
-        TextEditingController(text: expense?.description ?? '');
+    _descriptionController = TextEditingController(
+      text: expense?.description ?? '',
+    );
     _amountController = TextEditingController(
       text: expense == null ? '' : _numText(expense.amount),
     );
-    _referenceNoController =
-        TextEditingController(text: expense?.referenceNo ?? '');
+    _referenceNoController = TextEditingController(
+      text: expense?.referenceNo ?? '',
+    );
     _vendorController = TextEditingController(text: expense?.vendorName ?? '');
     _projectController = TextEditingController(text: expense?.project ?? '');
     _category = expense?.expenseCategory;
     _paymentMethod = expense?.paymentMethod;
     _status = expense?.status ?? 'Approved';
-    _expenseDate = DateTime.tryParse(expense?.expenseDate ?? '') ??
-        DateTime.now();
+    _expenseDate =
+        DateTime.tryParse(expense?.expenseDate ?? '') ?? DateTime.now();
   }
 
   @override
@@ -116,18 +120,8 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
     return null;
   }
 
-  static String _isoDate(DateTime date) =>
-      '${date.year.toString().padLeft(4, '0')}-'
-      '${date.month.toString().padLeft(2, '0')}-'
-      '${date.day.toString().padLeft(2, '0')}';
-
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _expenseDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
+    final picked = await pickDate(context, initialDate: _expenseDate);
     if (picked == null || !mounted) return;
     setState(() => _expenseDate = picked);
   }
@@ -141,7 +135,7 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
       'expense_category': _category!,
       if (description.isNotEmpty) 'description': description,
       'amount': double.parse(_amountController.text),
-      'expense_date': _isoDate(_expenseDate),
+      'expense_date': isoDate(_expenseDate),
       if (_paymentMethod != null) 'payment_method': _paymentMethod,
       if (referenceNo.isNotEmpty) 'reference_no': referenceNo,
       if (vendor.isNotEmpty) 'vendor_name': vendor,
@@ -198,8 +192,9 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
       _submitting = true;
       _error = null;
     });
-    final result =
-        await ref.read(expenseRepositoryProvider).delete(widget.expense!.id);
+    final result = await ref
+        .read(expenseRepositoryProvider)
+        .delete(widget.expense!.id);
     if (!mounted) return;
 
     switch (result) {
@@ -250,9 +245,7 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                   children: [
                     Expanded(
                       child: Text(
-                        _isEdit
-                            ? l10n.expensesEdit
-                            : l10n.expensesNewexpense,
+                        _isEdit ? l10n.expensesEdit : l10n.expensesNewexpense,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
@@ -285,8 +278,7 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                                 items: categoryItems,
                                 selected: _category,
                                 labelBuilder: (v) => v,
-                                onChanged: (v) =>
-                                    setState(() => _category = v),
+                                onChanged: (v) => setState(() => _category = v),
                               ),
                             ),
                           ),
@@ -301,10 +293,11 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                                 child: OutlinedButton.icon(
                                   onPressed: _submitting ? null : _pickDate,
                                   icon: const Icon(
-                                      Icons.calendar_today_outlined,
-                                      size: 16),
+                                    Icons.calendar_today_outlined,
+                                    size: 16,
+                                  ),
                                   label: Text(
-                                    Formatters.date(_isoDate(_expenseDate)),
+                                    Formatters.date(isoDate(_expenseDate)),
                                   ),
                                 ),
                               ),
@@ -319,8 +312,7 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                         child: TextFormField(
                           controller: _amountController,
                           enabled: !_submitting,
-                          keyboardType:
-                              const TextInputType.numberWithOptions(
+                          keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
                           decoration: _decoration(),
@@ -337,8 +329,7 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                               child: SearchableSelect<String?>(
                                 items: [null, ...paymentItems],
                                 selected: _paymentMethod,
-                                labelBuilder: (v) =>
-                                    v ?? l10n.commonNone,
+                                labelBuilder: (v) => v ?? l10n.commonNone,
                                 onChanged: (v) =>
                                     setState(() => _paymentMethod = v),
                               ),
@@ -353,8 +344,7 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                                 items: statusItems,
                                 selected: _status,
                                 labelBuilder: (v) => v,
-                                onChanged: (v) =>
-                                    setState(() => _status = v),
+                                onChanged: (v) => setState(() => _status = v),
                               ),
                             ),
                           ),
@@ -427,8 +417,9 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                           TextButton.icon(
                             onPressed: _submitting ? null : _delete,
                             style: TextButton.styleFrom(
-                              foregroundColor:
-                                  Theme.of(context).colorScheme.error,
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.error,
                             ),
                             icon: const Icon(Icons.delete_outline, size: 18),
                             label: Text(l10n.commonDelete),
@@ -447,8 +438,9 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : Text(l10n.commonSave),
                         ),
@@ -465,10 +457,10 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
   }
 
   InputDecoration _decoration() => InputDecoration(
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-      );
+    isDense: true,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+  );
 }
 
 class _ErrorBanner extends StatelessWidget {

@@ -14,9 +14,9 @@ enum MovementType {
   final String value;
 
   static MovementType fromString(Object? value) => values.firstWhere(
-        (e) => e.value == value,
-        orElse: () => MovementType.adjustment,
-      );
+    (e) => e.value == value,
+    orElse: () => MovementType.adjustment,
+  );
 }
 
 /// Port of `StockMovement` (server `StockMovementModel`).
@@ -44,26 +44,26 @@ class StockMovement {
   });
 
   factory StockMovement.fromJson(Map<String, dynamic> json) => StockMovement(
-        id: asInt(json['id']) ?? 0,
-        movementNo: asString(json['movement_no']) ?? '',
-        itemId: asInt(json['item_id']) ?? 0,
-        warehouseId: asInt(json['warehouse_id']) ?? 0,
-        movementType: MovementType.fromString(json['movement_type']).value,
-        quantity: (json['quantity'] as num?) ?? 0,
-        unitCost: asNum(json['unit_cost']),
-        referenceDocType: asString(json['reference_doctype']),
-        referenceDocNo: asString(json['reference_docno']),
-        remarks: asString(json['remarks']),
-        movementDate: asString(json['movement_date']) ?? '',
-        createdBy: asInt(json['created_by']),
-        createdAt: asString(json['created_at']),
-        itemCode: asString(json['item_code']),
-        itemName: asString(json['item_name']),
-        unitOfMeasure: asString(json['unit_of_measure']),
-        warehouseCode: asString(json['warehouse_code']),
-        warehouseName: asString(json['warehouse_name']),
-        createdByName: asString(json['created_by_name']),
-      );
+    id: asInt(json['id']) ?? 0,
+    movementNo: asString(json['movement_no']) ?? '',
+    itemId: asInt(json['item_id']) ?? 0,
+    warehouseId: asInt(json['warehouse_id']) ?? 0,
+    movementType: MovementType.fromString(json['movement_type']).value,
+    quantity: (json['quantity'] as num?) ?? 0,
+    unitCost: asNum(json['unit_cost']),
+    referenceDocType: asString(json['reference_doctype']),
+    referenceDocNo: asString(json['reference_docno']),
+    remarks: asString(json['remarks']),
+    movementDate: asString(json['movement_date']) ?? '',
+    createdBy: asInt(json['created_by']),
+    createdAt: asString(json['created_at']),
+    itemCode: asString(json['item_code']),
+    itemName: asString(json['item_name']),
+    unitOfMeasure: asString(json['unit_of_measure']),
+    warehouseCode: asString(json['warehouse_code']),
+    warehouseName: asString(json['warehouse_name']),
+    createdByName: asString(json['created_by_name']),
+  );
 
   final int id;
   final String movementNo;
@@ -86,18 +86,18 @@ class StockMovement {
   final String? createdByName;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'movement_no': movementNo,
-        'item_id': itemId,
-        'warehouse_id': warehouseId,
-        'movement_type': movementType,
-        'quantity': quantity,
-        if (unitCost != null) 'unit_cost': unitCost,
-        if (referenceDocType != null) 'reference_doctype': referenceDocType,
-        if (referenceDocNo != null) 'reference_docno': referenceDocNo,
-        if (remarks != null) 'remarks': remarks,
-        'movement_date': movementDate,
-        if (createdBy != null) 'created_by': createdBy,
-        if (createdAt != null) 'created_at': createdAt,
-      };
+    'id': id,
+    'movement_no': movementNo,
+    'item_id': itemId,
+    'warehouse_id': warehouseId,
+    'movement_type': movementType,
+    'quantity': quantity,
+    if (unitCost != null) 'unit_cost': unitCost,
+    if (referenceDocType != null) 'reference_doctype': referenceDocType,
+    if (referenceDocNo != null) 'reference_docno': referenceDocNo,
+    if (remarks != null) 'remarks': remarks,
+    'movement_date': movementDate,
+    if (createdBy != null) 'created_by': createdBy,
+    if (createdAt != null) 'created_at': createdAt,
+  };
 }

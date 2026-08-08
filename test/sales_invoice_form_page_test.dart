@@ -14,7 +14,8 @@ import 'package:minierp_app/data/repositories/api_result.dart';
 import 'package:minierp_app/data/repositories/invoice_repository.dart';
 import 'package:minierp_app/data/repositories/repository_client.dart';
 import 'package:minierp_app/features/sales/invoice_providers.dart';
-import 'package:minierp_app/features/sales/line_cells.dart' show DescriptionCell;
+import 'package:minierp_app/features/sales/line_cells.dart'
+    show DescriptionCell;
 import 'package:minierp_app/features/sales/sales_invoice_form_page.dart';
 import 'package:minierp_app/l10n/app_localizations.dart';
 import 'package:pluto_grid/pluto_grid.dart';
@@ -102,8 +103,7 @@ void main() {
   testWidgets('line-items grid survives customer selection', (tester) async {
     await _pumpPage(tester);
 
-    expect(gridRows(tester).length, 1,
-        reason: 'starts with one empty line');
+    expect(gridRows(tester).length, 1, reason: 'starts with one empty line');
 
     // Select the customer → setState rebuild of the whole page.
     await tester.tap(find.byType(DropdownButtonFormField<int>));
@@ -111,10 +111,16 @@ void main() {
     await tester.tap(find.text('Acme Corp').last);
     await tester.pumpAndSettle();
 
-    expect(gridRows(tester).length, 1,
-        reason: 'rows must survive the customer-select rebuild');
-    expect(gridRows(tester).first.cells['item']?.value, '',
-        reason: 'the empty line must still be present');
+    expect(
+      gridRows(tester).length,
+      1,
+      reason: 'rows must survive the customer-select rebuild',
+    );
+    expect(
+      gridRows(tester).first.cells['item']?.value,
+      '',
+      reason: 'the empty line must still be present',
+    );
   });
 
   testWidgets('Add Item inserts a row', (tester) async {
@@ -124,8 +130,11 @@ void main() {
 
     await tester.tap(find.text('Add Item'));
     await tester.pumpAndSettle();
-    expect(gridRows(tester).length, 2,
-        reason: 'Add Item must insert a second line');
+    expect(
+      gridRows(tester).length,
+      2,
+      reason: 'Add Item must insert a second line',
+    );
 
     // The new line autofocuses its description cell, opening the item
     // dropdown (intended). Focus the editor, then Escape to dismiss it so
@@ -152,8 +161,7 @@ void main() {
   // Repro for: "No products found" appears below the cell after selecting an
   // item — the editor's 50ms open timer must not reopen the dropdown after a
   // selection commit.
-  testWidgets('selecting an item closes the dropdown for good',
-      (tester) async {
+  testWidgets('selecting an item closes the dropdown for good', (tester) async {
     await _pumpPage(tester);
 
     // Enter the description cell (edit mode → dropdown opens).
@@ -161,8 +169,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 80));
     await tester.pump();
-    expect(find.text('Widget'), findsOneWidget,
-        reason: 'pool option listed');
+    expect(find.text('Widget'), findsOneWidget, reason: 'pool option listed');
 
     // Filter and select.
     await tester.enterText(find.byType(TextField).first, 'Wid');
@@ -174,9 +181,15 @@ void main() {
     // symptom of the dropdown reopening with a cleared/stale filter, and
     // Gadget (present only in the dropdown, not selected) proves the popup
     // is gone. 'Widget' itself legitimately appears as the selected cell.
-    expect(find.text('No products found'), findsNothing,
-        reason: 'dropdown must not reopen after selection');
-    expect(find.text('Gadget'), findsNothing,
-        reason: 'dropdown must be closed after selection');
+    expect(
+      find.text('No products found'),
+      findsNothing,
+      reason: 'dropdown must not reopen after selection',
+    );
+    expect(
+      find.text('Gadget'),
+      findsNothing,
+      reason: 'dropdown must be closed after selection',
+    );
   });
 }

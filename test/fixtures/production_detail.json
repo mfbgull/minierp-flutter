@@ -1,0 +1,42 @@
+{
+ "id": 4,
+ "production_no": "PROD-2026-0004",
+ "output_item_id": 41,
+ "output_quantity": 10,
+ "warehouse_id": 3,
+ "production_date": "2026-05-28",
+ "remarks": null,
+ "created_by": 1,
+ "created_at": "2026-05-28 19:38:14",
+ "updated_at": "2026-05-28 19:38:14",
+ "raw_materials_warehouse_id": 2,
+ "overhead_cost": 100,
+ "bom_id": 1,
+ "batch_id": 9,
+ "batch_no": "BATCH-26-PRD-0006",
+ "unit_cost": 310,
+ "total_material_cost": 3000,
+ "total_batch_cost": 3100,
+ "output_item_code": "AC1.5TON",
+ "output_item_name": "1.5 Ton Split AC Carton Box",
+ "output_uom": "Nos",
+ "finished_goods_warehouse_code": "WH-003",
+ "finished_goods_warehouse_name": "UOP Store",
+ "raw_materials_warehouse_code": "WH-002",
+ "raw_materials_warehouse_name": "Karkhano Warehouse",
+ "created_by_username": "admin",
+ "inputs": [
+  {
+   "id": 4,
+   "production_id": 4,
+   "item_id": 37,
+   "quantity": 20,
+   "warehouse_id": 2,
+   "item_code": "RM-009",
+   "item_name": "Cardboard Box (Large)",
+   "unit_of_measure": "piece",
+   "warehouse_code": "WH-002",
+   "warehouse_name": "Karkhano Warehouse"
+  }
+ ]
+}

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/so_status.dart';
 import '../../data/models/sales_order.dart'
     show SalesOrderDetail, SalesOrderItem;
 import '../../data/repositories/api_result.dart'
@@ -24,7 +25,6 @@ import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'sales_order_form_dialog.dart';
 import 'sales_order_providers.dart';
-import 'so_status.dart';
 
 /// Opens the read-only detail dialog for [soId].
 Future<void> showSalesOrderDetailDialog(

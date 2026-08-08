@@ -1,7 +1,9 @@
-// Shared purchase-return type helpers — used by both the list grid and
-// the detail dialog. The server's `reference_doctype` is one of
-// 'PURCHASE_RETURN' (return against a direct purchase) or 'PO_RETURN'
-// (return against a purchase order); unknown values render as-is.
+// Shared purchase-return type helpers — used by the list grid, the detail
+// dialog, and the CSV export builder. The server's `reference_doctype` is
+// one of 'PURCHASE_RETURN' (return against a direct purchase) or
+// 'PO_RETURN' (return against a purchase order); unknown values render
+// as-is. Lives in core/utils (mirroring `movement_type_label.dart`) so
+// the core CSV export can reuse it without importing from features.
 
 import 'package:flutter/material.dart';
 

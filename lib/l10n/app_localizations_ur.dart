@@ -18,6 +18,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get dashboardWarehousestocks => 'گودام اسٹاک';
 
   @override
+  String get dashboardRecentproductions => 'حالیہ پروڈکشنز';
+
+  @override
   String get dashboardStockvalue => 'اسٹاک کی قیمت';
 
   @override
@@ -483,6 +486,222 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsAccountsreceivablereports => 'اے آر رپورٹس';
 
   @override
+  String get reportsAsOf => 'بمطابق';
+
+  @override
+  String get reportsAvginvoicevalue => 'اوسط انوائس ویلیو';
+
+  @override
+  String get reportsBomusage => 'بی او ایم استعمال';
+
+  @override
+  String get reportsCategoryAr => 'وصولیاں';
+
+  @override
+  String get reportsCategoryFinancial => 'مالی رپورٹس';
+
+  @override
+  String get reportsCategoryInventory => 'انوینٹری رپورٹس';
+
+  @override
+  String get reportsCategoryProduction => 'پروڈکشن رپورٹس';
+
+  @override
+  String get reportsCategoryPurchase => 'خریداری رپورٹس';
+
+  @override
+  String get reportsCategorySales => 'فروخت رپورٹس';
+
+  @override
+  String get reportsCurrent => 'موجودہ';
+
+  @override
+  String get reportsDashboardSubtitle => 'جامع کاروباری تجزیہ اور رپورٹنگ';
+
+  @override
+  String get reportsDays1_30 => '1-30 دن';
+
+  @override
+  String get reportsDays31_60 => '31-60 دن';
+
+  @override
+  String get reportsDays61_90 => '61-90 دن';
+
+  @override
+  String get reportsDays90plus => '90+ دن';
+
+  @override
+  String get reportsItems => 'آئٹمز';
+
+  @override
+  String get reportsItemssold => 'فروخت شدہ آئٹمز';
+
+  @override
+  String get reportsLowstockcount => 'کم اسٹاک آئٹمز';
+
+  @override
+  String get reportsMinimumstock => 'کم از کم اسٹاک';
+
+  @override
+  String get reportsSellingprice => 'فروخت قیمت';
+
+  @override
+  String get reportsShortage => 'کمی';
+
+  @override
+  String get reportsShortagetotal => 'کمی کا کل';
+
+  @override
+  String get reportsStockstatus => 'اسٹاک سٹیٹس';
+
+  @override
+  String get reportsTotalinvoices => 'کل انوائسز';
+
+  @override
+  String get reportsTotaloutstanding => 'کل بقایا';
+
+  @override
+  String get reportsTotalreceivables => 'کل وصولیاں';
+
+  @override
+  String get reportsTotalsales => 'کل فروخت';
+
+  @override
+  String get reportsTotalitems => 'کل آئٹمز';
+
+  @override
+  String get reportsTotalinventoryvalue => 'کل انوینٹری ویلیو';
+
+  @override
+  String get reportsUnitcost => 'یونٹ لاگت';
+
+  @override
+  String get reportsTotalvalue => 'کل ویلیو';
+
+  @override
+  String get reportsValuationmethod => 'ویلیوایشن طریقہ';
+
+  @override
+  String get reportsBatchtracked => 'بیچ ٹریک شدہ';
+
+  @override
+  String get reportsLegacyitems => 'لیگیسی آئٹمز';
+
+  @override
+  String get reportsAvgordervalue => 'اوسط آرڈر ویلیو';
+
+  @override
+  String get reportsLastpurchase => 'آخری خریداری';
+
+  @override
+  String get reportsExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get reportsExported => 'رپورٹ ایکسپورٹ ہو گئی';
+
+  @override
+  String get reportsExportfailed => 'رپورٹ ایکسپورٹ ناکام';
+
+  @override
+  String get fieldsMetric => 'پیمائش';
+
+  @override
+  String get fieldsValue => 'قیمت';
+
+  @override
+  String get reportsDsodays => 'وصولی کے دن (DSO)';
+
+  @override
+  String get reportsDsounit => 'دن';
+
+  @override
+  String get reportsDsosubtitle =>
+      'فروخت کے بعد وصولی میں لگنے والے اوسط دنوں کی پیمائش۔';
+
+  @override
+  String get reportsPeriod => 'دورانیہ';
+
+  @override
+  String get reportsTotalar => 'کل وصولیاں';
+
+  @override
+  String get reportsTotalinflow => 'کل نقد آمد';
+
+  @override
+  String get reportsTotaloutflow => 'کل نقد اخراج';
+
+  @override
+  String get reportsNetcashflow => 'خالص نقد بہاؤ';
+
+  @override
+  String get reportsCashflowpositive =>
+      'اس دورانیے میں مثبت نقد بہاؤ ہے، جو اچھی لیکویڈیٹی ظاہر کرتا ہے۔';
+
+  @override
+  String get reportsCashflownegative =>
+      'اس دورانیے میں منفی نقد بہاؤ ہے، اخراجات پر نظر ثانی کریں۔';
+
+  @override
+  String get reportsTotalrevenue => 'کل آمدنی';
+
+  @override
+  String get reportsTotalcogs => 'فروخت شدہ سامان کی لاگت (COGS)';
+
+  @override
+  String get reportsGrossprofit => 'مجموعی منافع';
+
+  @override
+  String get reportsTotalexpenses => 'کل اخراجات';
+
+  @override
+  String get reportsNetprofit => 'خالص منافع';
+
+  @override
+  String get reportsGrossprofitmargin => 'مجموعی منافع کا مارجن';
+
+  @override
+  String get reportsNetprofitmargin => 'خالص منافع کا مارجن';
+
+  @override
+  String get reportsExpensesbycategory => 'زمرے کے لحاظ سے اخراجات';
+
+  @override
+  String get reportsTotalinbound => 'کل آمد';
+
+  @override
+  String get reportsTotaloutbound => 'کل اخراج';
+
+  @override
+  String get reportsNetmovement => 'خالص حرکت';
+
+  @override
+  String get reportsMovementno => 'حرکت نمبر';
+
+  @override
+  String get reportsMovementtype => 'حرکت کی قسم';
+
+  @override
+  String get reportsTotalorders => 'کل آرڈرز';
+
+  @override
+  String get reportsTotalcost => 'کل لاگت';
+
+  @override
+  String get reportsReceived => 'وصول شدہ رقم';
+
+  @override
+  String get reportsBalance => 'بقیہ';
+
+  @override
+  String get reportsReturnvalue => 'واپسی کی مالیت';
+
+  @override
+  String get reportsTotalinvoiced => 'کل انوائس شدہ';
+
+  @override
+  String get reportsInvoicecount => 'انوائس کی تعداد';
+
+  @override
   String get quotationsQuotations => 'کوٹیشنز';
 
   @override
@@ -508,6 +727,15 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get quotationsExpirydate => 'تاریخ انقضا';
+
+  @override
+  String get quotationsExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get quotationsExported => 'کوٹیشنز ایکسپورٹ ہو گئے';
+
+  @override
+  String get quotationsExportfailed => 'کوٹیشنز ایکسپورٹ ناکام';
 
   @override
   String get quotationsItem => 'آئٹم';
@@ -605,6 +833,15 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get purchaseordersNewpurchaseorder => 'نیا خریداری آرڈر';
+
+  @override
+  String get purchaseordersExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get purchaseordersExported => 'خریداری آرڈرز ایکسپورٹ ہو گئے';
+
+  @override
+  String get purchaseordersExportfailed => 'خریداری آرڈرز ایکسپورٹ ناکام';
 
   @override
   String get purchaseordersPono => 'پی او نمبر';
@@ -708,6 +945,15 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesordersEdit => 'ترمیم';
 
   @override
+  String get salesordersExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get salesordersExported => 'سیلز آرڈرز ایکسپورٹ ہو گئے';
+
+  @override
+  String get salesordersExportfailed => 'سیلز آرڈرز ایکسپورٹ ناکام';
+
+  @override
   String get salesordersConverttoinvoice => 'بل میں تبدیل کریں';
 
   @override
@@ -776,7 +1022,7 @@ class AppLocalizationsUr extends AppLocalizations {
   String get productionProduction => 'پروڈکشن';
 
   @override
-  String get productionNewproduction => 'نیا پروڈکشن';
+  String get productionNewproduction => 'نئی پیداوار';
 
   @override
   String get warehousesWarehouses => 'گودام';
@@ -1237,6 +1483,15 @@ class AppLocalizationsUr extends AppLocalizations {
   String get expensesExpenseno => 'خرچہ نمبر';
 
   @override
+  String get expensesExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get expensesExported => 'خرچے ایکسپورٹ ہو گئے';
+
+  @override
+  String get expensesExportfailed => 'خرچے ایکسپورٹ ناکام';
+
+  @override
   String get expensesPaymentmethod => 'ادائیگی کا طریقہ';
 
   @override
@@ -1525,6 +1780,15 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesExport => 'ایکسپورٹ';
 
   @override
+  String get purchasesExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get purchasesExported => 'خریداری واپسی ایکسپورٹ ہو گئی';
+
+  @override
+  String get purchasesExportfailed => 'خریداری واپسی ایکسپورٹ ناکام';
+
+  @override
   String get purchasesSummary => 'خلاصہ';
 
   @override
@@ -1680,6 +1944,15 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesEditinvoice => 'بل ترمیم';
 
   @override
+  String get salesExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get salesExported => 'بلز ایکسپورٹ ہو گئے';
+
+  @override
+  String get salesExportfailed => 'بلز ایکسپورٹ ناکام';
+
+  @override
   String get salesInvoiceno => 'بل نمبر';
 
   @override
@@ -1794,6 +2067,15 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesreturnsDispositionrefund => 'ریفنڈ';
 
   @override
+  String get salesreturnsExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get salesreturnsExported => 'انوائس واپسی ایکسپورٹ ہو گئی';
+
+  @override
+  String get salesreturnsExportfailed => 'انوائس واپسی ایکسپورٹ ناکام';
+
+  @override
   String get salesreturnsOriginalqty => 'اصل مقدار';
 
   @override
@@ -1862,6 +2144,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get inventoryAggregateqty => 'مجموعی مقدار';
+
+  @override
+  String get inventoryInstock => 'اسٹاک میں';
 
   @override
   String get inventoryLowstock => 'کم اسٹاک';
@@ -2021,6 +2306,40 @@ class AppLocalizationsUr extends AppLocalizations {
   String get paymentsSubtitle => 'گاہک کی ادائیگیوں کا نظم کریں';
 
   @override
+  String get paymentsPaymentdetails => 'ادائیگی کی تفصیلات';
+
+  @override
+  String get paymentsPaymentno => 'ادائیگی نمبر';
+
+  @override
+  String get paymentsBalance => 'باقی رقم';
+
+  @override
+  String get paymentsAllocation => 'اختصاص';
+
+  @override
+  String get paymentsTotalallocated => 'کل مختص کردہ';
+
+  @override
+  String get paymentsOpeninvoices => 'کھلے انوائسز';
+
+  @override
+  String get paymentsNoopeninvoices => 'اس گاہک کے لیے کوئی کھلا انوائس نہیں';
+
+  @override
+  String get paymentsSelectinvoices =>
+      'ادائیگی کو اس گاہک کے کھلے انوائسز پر مختص کریں';
+
+  @override
+  String get paymentsRecordedsuccess => 'ادائیگی کامیابی سے ریکارڈ ہوگئی';
+
+  @override
+  String get paymentsReferencehint => 'چیک نمبر، ٹرانزیکشن آئی ڈی وغیرہ';
+
+  @override
+  String get paymentsNoteshint => 'اختیاری نوٹس...';
+
+  @override
   String get navDashboard => 'ڈیش باورڈ';
 
   @override
@@ -2049,6 +2368,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get navExpenses => 'خرچے';
+
+  @override
+  String get navManufacturing => 'مینوفیکچرنگ';
 
   @override
   String get navProduction => 'پروڈکشن';
@@ -2199,9 +2521,6 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get navInventorymovement => 'انوینٹری موومنٹ';
-
-  @override
-  String get navManufacturing => 'مینوفیکچرنگ';
 
   @override
   String get navPurchasereturns => 'خریداری واپسیاں';
@@ -2677,6 +2996,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get fieldsCustomer => 'گاہک';
+
+  @override
+  String get fieldsCustomerCode => 'گاہک کوڈ';
 
   @override
   String get fieldsItem => 'آئٹم';
@@ -3319,4 +3641,208 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get salesPeritem => 'فی آئٹم';
+
+  @override
+  String get bomActivate => 'فعال کریں';
+
+  @override
+  String get bomActivated => 'BOM فعال کیا گیا';
+
+  @override
+  String get bomAddmaterial => 'مواد شامل کریں';
+
+  @override
+  String get bomCreated => 'تاریخ تخلیق';
+
+  @override
+  String get bomCurrentstock => 'موجودہ اسٹاک';
+
+  @override
+  String get bomDeactivate => 'غیر فعال کریں';
+
+  @override
+  String get bomDeactivated => 'BOM غیر فعال کیا گیا';
+
+  @override
+  String get bomDeleteconfirm =>
+      'کیا یہ BOM حذف کریں؟ نوٹ: پیداوار میں استعمال شدہ BOM حذف نہیں ہو سکتا۔';
+
+  @override
+  String get bomDeleted => 'BOM حذف کر دیا گیا';
+
+  @override
+  String get bomDescription => 'وضاحت';
+
+  @override
+  String get bomDetailstitle => 'مصنوعات کا اجزاء نامہ';
+
+  @override
+  String get bomEdittitle => 'BOM میں ترمیم';
+
+  @override
+  String get bomErrorFinisheditem =>
+      'وہ تیار کنندہ مصنوع منتخب کریں جس کے لیے یہ BOM ہے۔';
+
+  @override
+  String get bomErrorItemsrequired => 'کم از کم ایک مواد کی لائن شامل کریں';
+
+  @override
+  String get bomExportcsv => 'CSV برآمد کریں';
+
+  @override
+  String get bomExported => 'BOMs برآمد ہو گئیں';
+
+  @override
+  String get bomExportfailed => 'برآمد ناکام رہی';
+
+  @override
+  String get bomFinisheditem => 'تیار شدہ مصنوع';
+
+  @override
+  String get bomItems => 'پرزے';
+
+  @override
+  String get bomMaterialcost => 'مواد کی لاگت';
+
+  @override
+  String get bomMaterials => 'مواد';
+
+  @override
+  String get bomName => 'BOM کا نام';
+
+  @override
+  String get bomNo => 'BOM نمبر';
+
+  @override
+  String get bomNoMaterials => 'کوئی مواد کی لائن نہیں';
+
+  @override
+  String get bomQuantity => 'بیچ مقدار';
+
+  @override
+  String get bomSaved => 'BOM محفوظ';
+
+  @override
+  String get bomUnitcost => 'معیاری لاگت';
+
+  @override
+  String get productionAddinput => 'ان پٹ شامل کریں';
+
+  @override
+  String get productionBatchno => 'بیچ نمبر';
+
+  @override
+  String get productionBom => 'BOM';
+
+  @override
+  String get productionBomwarningMismatch =>
+      'منتخب BOM مختلف مصنوع بناتا ہے۔ BOM یا مصنوع تبدیل کریں۔';
+
+  @override
+  String get productionBomwarningPickoutput =>
+      'پہلے تیار شدہ مصنوع منتخب کریں — BOM خود بخود مواد بھر دے گا۔';
+
+  @override
+  String get productionCostperunit => 'فی یونٹ لاگت';
+
+  @override
+  String get productionCostpreview => 'بیچ لاگت کا تخمینہ';
+
+  @override
+  String get productionCreatedby => 'تخلیق کنندہ';
+
+  @override
+  String get productionDeleteconfirm =>
+      'کیا یہ پیداوار حذف کریں؟ اسٹاک اور کھاتہ نوشتہ الٹ دیا جائے گا۔';
+
+  @override
+  String get productionDeleted => 'پیداوار حذف کر دی گئی';
+
+  @override
+  String get productionDetailstitle => 'پیداوار کی تفصیلات';
+
+  @override
+  String get productionErrorInputsrequired => 'کم از کم ایک مواد درج کریں۔';
+
+  @override
+  String get productionErrorBomrequired =>
+      'مٹیریل ان پٹس لوڈ کرنے کے لیے BOM منتخب کریں۔';
+
+  @override
+  String get productionAvailable => 'دستیاب';
+
+  @override
+  String get productionErrorInvalidqty =>
+      'مواد کی مقدار صفر سے زیادہ ہونی چاہیے۔';
+
+  @override
+  String get productionErrorOutputrequired => 'آؤٹ پٹ مصنوع لازمی ہے۔';
+
+  @override
+  String get productionErrorWarehouserequired =>
+      'تیار شدہ مصنوع کا گودام لازمی ہے۔';
+
+  @override
+  String get productionExportcsv => 'CSV برآمد کریں';
+
+  @override
+  String get productionExported => 'پیداوار CSV برآمد ہوئی۔';
+
+  @override
+  String get productionExportfailed => 'برآمد ناکام رہی';
+
+  @override
+  String get productionInputqty => 'مقدار';
+
+  @override
+  String get productionInputs => 'ان پٹ';
+
+  @override
+  String get productionInputsBomhint =>
+      'ایک BOM منتخب کریں — اس کی مٹیریل لائنیں یہاں دکھائی دیں گی۔';
+
+  @override
+  String get productionMaterialcost => 'مواد کی لاگت';
+
+  @override
+  String get productionNo => 'پیداوار نمبر';
+
+  @override
+  String get productionNoinputs => 'اس پیداوار میں کوئی مواد درج نہیں۔';
+
+  @override
+  String get productionOutputitem => 'آؤٹ پٹ مصنوع';
+
+  @override
+  String get productionOutputquantity => 'آؤٹ پٹ مقدار';
+
+  @override
+  String get productionOverhead => 'اضافی لاگت';
+
+  @override
+  String get productionRawmaterialsWarehouse => 'خام مال کا گودام';
+
+  @override
+  String get productionSaved => 'پیداوار محفوظ ہو گئی';
+
+  @override
+  String productionShortfallLine(
+    Object available,
+    Object name,
+    Object required,
+  ) {
+    return '$name: $available دستیاب، $required درکار';
+  }
+
+  @override
+  String get productionShortfallTitle => 'ان اشیاء کا اسٹاک ناکافی ہے';
+
+  @override
+  String get productionTotalcost => 'کل لاگت';
+
+  @override
+  String get productionUnitcost => 'فی یونٹ لاگت';
+
+  @override
+  String get productionWarehouse => 'تیار مال کا گودام';
 }

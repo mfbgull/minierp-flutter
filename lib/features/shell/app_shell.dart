@@ -14,34 +14,109 @@ class ShellDestination {
     required this.label,
     required this.icon,
     this.adminOnly = false,
+    this.title,
   });
 
   final String path;
   final String Function(AppLocalizations) label;
   final IconData icon;
   final bool adminOnly;
+
+  /// App-bar title; defaults to [label] so modules whose rail label is
+  /// branded differently (e.g. "Manufacturing" vs "Production") can keep
+  /// the feature name in the app bar.
+  final String Function(AppLocalizations)? title;
 }
 
 /// Single source of truth for the shell's module list — `app.dart` builds
 /// the router branches from this and [AppShell] builds the rail from it,
 /// so a module added here appears in both automatically.
 final List<ShellDestination> shellDestinations = [
-  ShellDestination(path: '/', label: (l) => l.navDashboard, icon: Icons.space_dashboard_outlined),
-  ShellDestination(path: '/inventory', label: (l) => l.navInventory, icon: Icons.inventory_2_outlined),
-  ShellDestination(path: '/customers', label: (l) => l.navCustomers, icon: Icons.people_outline),
-  ShellDestination(path: '/sales', label: (l) => l.navSales, icon: Icons.point_of_sale_outlined),
-  ShellDestination(path: '/purchasing', label: (l) => l.navPurchases, icon: Icons.shopping_cart_outlined),
-  ShellDestination(path: '/suppliers', label: (l) => l.navSuppliers, icon: Icons.local_shipping_outlined),
-  ShellDestination(path: '/production', label: (l) => l.navProduction, icon: Icons.factory_outlined),
-  ShellDestination(path: '/payments', label: (l) => l.navPayments, icon: Icons.account_balance_wallet_outlined),
-  ShellDestination(path: '/expenses', label: (l) => l.navExpenses, icon: Icons.receipt_long_outlined),
-  ShellDestination(path: '/hr', label: (l) => l.navEmployees, icon: Icons.badge_outlined),
-  ShellDestination(path: '/reports', label: (l) => l.navReports, icon: Icons.assessment_outlined),
-  ShellDestination(path: '/forecasts', label: (l) => l.navForecasts, icon: Icons.insights_outlined),
-  ShellDestination(path: '/activity-log', label: (l) => l.navActivitylog, icon: Icons.history),
-  ShellDestination(path: '/admin', label: (l) => l.navUsers, icon: Icons.admin_panel_settings_outlined, adminOnly: true),
-  ShellDestination(path: '/integrations', label: (l) => l.navIntegrations, icon: Icons.extension_outlined, adminOnly: true),
-  ShellDestination(path: '/settings', label: (l) => l.navSettings, icon: Icons.settings_outlined),
+  ShellDestination(
+    path: '/',
+    label: (l) => l.navDashboard,
+    icon: Icons.space_dashboard_outlined,
+  ),
+  ShellDestination(
+    path: '/inventory',
+    label: (l) => l.navInventory,
+    icon: Icons.inventory_2_outlined,
+  ),
+  ShellDestination(
+    path: '/customers',
+    label: (l) => l.navCustomers,
+    icon: Icons.people_outline,
+  ),
+  ShellDestination(
+    path: '/sales',
+    label: (l) => l.navSales,
+    icon: Icons.point_of_sale_outlined,
+  ),
+  ShellDestination(
+    path: '/purchasing',
+    label: (l) => l.navPurchases,
+    icon: Icons.shopping_cart_outlined,
+  ),
+  ShellDestination(
+    path: '/suppliers',
+    label: (l) => l.navSuppliers,
+    icon: Icons.local_shipping_outlined,
+  ),
+  ShellDestination(
+    path: '/production',
+    // The sidebar link reads "Manufacturing" (product naming) while the
+    // module's internal tab keeps the feature name.
+    label: (l) => l.navManufacturing,
+    title: (l) => l.navProduction,
+    icon: Icons.factory_outlined,
+  ),
+  ShellDestination(
+    path: '/payments',
+    label: (l) => l.navPayments,
+    icon: Icons.account_balance_wallet_outlined,
+  ),
+  ShellDestination(
+    path: '/expenses',
+    label: (l) => l.navExpenses,
+    icon: Icons.receipt_long_outlined,
+  ),
+  ShellDestination(
+    path: '/hr',
+    label: (l) => l.navEmployees,
+    icon: Icons.badge_outlined,
+  ),
+  ShellDestination(
+    path: '/reports',
+    label: (l) => l.navReports,
+    icon: Icons.assessment_outlined,
+  ),
+  ShellDestination(
+    path: '/forecasts',
+    label: (l) => l.navForecasts,
+    icon: Icons.insights_outlined,
+  ),
+  ShellDestination(
+    path: '/activity-log',
+    label: (l) => l.navActivitylog,
+    icon: Icons.history,
+  ),
+  ShellDestination(
+    path: '/admin',
+    label: (l) => l.navUsers,
+    icon: Icons.admin_panel_settings_outlined,
+    adminOnly: true,
+  ),
+  ShellDestination(
+    path: '/integrations',
+    label: (l) => l.navIntegrations,
+    icon: Icons.extension_outlined,
+    adminOnly: true,
+  ),
+  ShellDestination(
+    path: '/settings',
+    label: (l) => l.navSettings,
+    icon: Icons.settings_outlined,
+  ),
 ];
 
 /// Authenticated shell — navigation rail + shared app bar wrapping the
@@ -90,7 +165,7 @@ class AppShell extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(current.label(l10n)),
+        title: Text((current.title ?? current.label)(l10n)),
         actions: [
           if (auth.user != null)
             Center(
@@ -228,8 +303,9 @@ class _NavItem extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: (selected ? textTheme.titleSmall : textTheme.bodyMedium)
-                      ?.copyWith(color: foreground),
+                  style:
+                      (selected ? textTheme.titleSmall : textTheme.bodyMedium)
+                          ?.copyWith(color: foreground),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

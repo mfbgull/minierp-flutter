@@ -7,12 +7,12 @@
 import 'package:flutter/material.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/purchase_return_type.dart';
 import '../../data/models/purchase_return.dart' show PurchaseReturn;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
-import 'purchase_return_type.dart';
 
 /// Opens the read-only detail dialog for a return row.
 Future<void> showPurchaseReturnDetailDialog(

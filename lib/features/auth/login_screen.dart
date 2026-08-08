@@ -38,8 +38,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _busy = true;
       _error = null;
     });
-    final error =
-        await ref.read(authProvider.notifier).login(_username.text.trim(), _password.text);
+    final error = await ref
+        .read(authProvider.notifier)
+        .login(_username.text.trim(), _password.text);
     if (!mounted) return;
     setState(() {
       _busy = false;
@@ -48,8 +49,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _error = error.isNetwork
             ? l10n.loginServerUnreachable
             : error.statusCode == 401
-                ? l10n.loginInvalidCredentials
-                : error.message;
+            ? l10n.loginInvalidCredentials
+            : error.message;
       }
     });
   }
@@ -74,8 +75,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(Icons.inventory_2_outlined,
-                          size: 48, color: scheme.primary),
+                      Icon(
+                        Icons.inventory_2_outlined,
+                        size: 48,
+                        color: scheme.primary,
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         'MiniERP',
@@ -86,10 +90,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Text(
                         l10n.commonLogin,
                         textAlign: TextAlign.center,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: scheme.onSurfaceVariant),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                       const SizedBox(height: 24),
                       TextFormField(
@@ -102,7 +105,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           prefixIcon: const Icon(Icons.person_outline),
                           border: const OutlineInputBorder(),
                         ),
-                        validator: (value) => (value == null || value.trim().isEmpty)
+                        validator: (value) =>
+                            (value == null || value.trim().isEmpty)
                             ? l10n.commonRequired
                             : null,
                       ),
@@ -117,8 +121,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           prefixIcon: const Icon(Icons.lock_outline),
                           border: const OutlineInputBorder(),
                         ),
-                        validator: (value) =>
-                            (value == null || value.isEmpty) ? l10n.commonRequired : null,
+                        validator: (value) => (value == null || value.isEmpty)
+                            ? l10n.commonRequired
+                            : null,
                         onFieldSubmitted: (_) => _submit(),
                       ),
                       if (_error != null) ...[
@@ -135,7 +140,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   const SizedBox(
                                     width: 18,
                                     height: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
                                   ),
                                   const SizedBox(width: 12),
                                   Text(l10n.loginSigningIn),
@@ -147,10 +154,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Text(
                         l10n.loginDevHint,
                         textAlign: TextAlign.center,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: scheme.onSurfaceVariant),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -183,7 +189,10 @@ class _ErrorBanner extends StatelessWidget {
           Icon(Icons.error_outline, size: 18, color: scheme.onErrorContainer),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(message, style: TextStyle(color: scheme.onErrorContainer)),
+            child: Text(
+              message,
+              style: TextStyle(color: scheme.onErrorContainer),
+            ),
           ),
         ],
       ),

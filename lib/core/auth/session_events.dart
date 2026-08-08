@@ -9,7 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// direct dependency would be circular — so it emits here instead, and the
 /// app (which sits above both) reacts by expiring the session.
 class SessionEvents {
-  final StreamController<void> _unauthorized = StreamController<void>.broadcast();
+  final StreamController<void> _unauthorized =
+      StreamController<void>.broadcast();
 
   /// Fires once per 401 response observed by the shared dio client.
   Stream<void> get unauthorized => _unauthorized.stream;

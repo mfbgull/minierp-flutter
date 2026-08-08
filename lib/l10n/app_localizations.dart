@@ -116,6 +116,12 @@ abstract class AppLocalizations {
   /// **'warehouse stocks'**
   String get dashboardWarehousestocks;
 
+  /// No description provided for @dashboardRecentproductions.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Productions'**
+  String get dashboardRecentproductions;
+
   /// No description provided for @dashboardStockvalue.
   ///
   /// In en, this message translates to:
@@ -998,6 +1004,432 @@ abstract class AppLocalizations {
   /// **'Accounts Receivable Reports'**
   String get reportsAccountsreceivablereports;
 
+  /// No description provided for @reportsAsOf.
+  ///
+  /// In en, this message translates to:
+  /// **'As of'**
+  String get reportsAsOf;
+
+  /// No description provided for @reportsAvginvoicevalue.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg. Invoice Value'**
+  String get reportsAvginvoicevalue;
+
+  /// No description provided for @reportsBomusage.
+  ///
+  /// In en, this message translates to:
+  /// **'BOM Usage'**
+  String get reportsBomusage;
+
+  /// No description provided for @reportsCategoryAr.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounts Receivable'**
+  String get reportsCategoryAr;
+
+  /// No description provided for @reportsCategoryFinancial.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial Reports'**
+  String get reportsCategoryFinancial;
+
+  /// No description provided for @reportsCategoryInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory Reports'**
+  String get reportsCategoryInventory;
+
+  /// No description provided for @reportsCategoryProduction.
+  ///
+  /// In en, this message translates to:
+  /// **'Production Reports'**
+  String get reportsCategoryProduction;
+
+  /// No description provided for @reportsCategoryPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase Reports'**
+  String get reportsCategoryPurchase;
+
+  /// No description provided for @reportsCategorySales.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales Reports'**
+  String get reportsCategorySales;
+
+  /// No description provided for @reportsCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get reportsCurrent;
+
+  /// No description provided for @reportsDashboardSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Comprehensive business analytics and reporting'**
+  String get reportsDashboardSubtitle;
+
+  /// No description provided for @reportsDays1_30.
+  ///
+  /// In en, this message translates to:
+  /// **'1-30 Days'**
+  String get reportsDays1_30;
+
+  /// No description provided for @reportsDays31_60.
+  ///
+  /// In en, this message translates to:
+  /// **'31-60 Days'**
+  String get reportsDays31_60;
+
+  /// No description provided for @reportsDays61_90.
+  ///
+  /// In en, this message translates to:
+  /// **'61-90 Days'**
+  String get reportsDays61_90;
+
+  /// No description provided for @reportsDays90plus.
+  ///
+  /// In en, this message translates to:
+  /// **'90+ Days'**
+  String get reportsDays90plus;
+
+  /// No description provided for @reportsItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Items'**
+  String get reportsItems;
+
+  /// No description provided for @reportsItemssold.
+  ///
+  /// In en, this message translates to:
+  /// **'Items Sold'**
+  String get reportsItemssold;
+
+  /// No description provided for @reportsLowstockcount.
+  ///
+  /// In en, this message translates to:
+  /// **'low stock items'**
+  String get reportsLowstockcount;
+
+  /// No description provided for @reportsMinimumstock.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum Stock'**
+  String get reportsMinimumstock;
+
+  /// No description provided for @reportsSellingprice.
+  ///
+  /// In en, this message translates to:
+  /// **'Selling Price'**
+  String get reportsSellingprice;
+
+  /// No description provided for @reportsShortage.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortage'**
+  String get reportsShortage;
+
+  /// No description provided for @reportsShortagetotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortage total'**
+  String get reportsShortagetotal;
+
+  /// No description provided for @reportsStockstatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock Status'**
+  String get reportsStockstatus;
+
+  /// No description provided for @reportsTotalinvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Invoices'**
+  String get reportsTotalinvoices;
+
+  /// No description provided for @reportsTotaloutstanding.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Outstanding'**
+  String get reportsTotaloutstanding;
+
+  /// No description provided for @reportsTotalreceivables.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Receivables'**
+  String get reportsTotalreceivables;
+
+  /// No description provided for @reportsTotalsales.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Sales'**
+  String get reportsTotalsales;
+
+  /// No description provided for @reportsTotalitems.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Items'**
+  String get reportsTotalitems;
+
+  /// No description provided for @reportsTotalinventoryvalue.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Inventory Value'**
+  String get reportsTotalinventoryvalue;
+
+  /// No description provided for @reportsUnitcost.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit Cost'**
+  String get reportsUnitcost;
+
+  /// No description provided for @reportsTotalvalue.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Value'**
+  String get reportsTotalvalue;
+
+  /// No description provided for @reportsValuationmethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Valuation Method'**
+  String get reportsValuationmethod;
+
+  /// No description provided for @reportsBatchtracked.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch Tracked'**
+  String get reportsBatchtracked;
+
+  /// No description provided for @reportsLegacyitems.
+  ///
+  /// In en, this message translates to:
+  /// **'Legacy Items'**
+  String get reportsLegacyitems;
+
+  /// No description provided for @reportsAvgordervalue.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg. Order Value'**
+  String get reportsAvgordervalue;
+
+  /// No description provided for @reportsLastpurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Purchase'**
+  String get reportsLastpurchase;
+
+  /// No description provided for @reportsExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to CSV'**
+  String get reportsExportcsv;
+
+  /// No description provided for @reportsExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Report exported'**
+  String get reportsExported;
+
+  /// No description provided for @reportsExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export report'**
+  String get reportsExportfailed;
+
+  /// No description provided for @fieldsMetric.
+  ///
+  /// In en, this message translates to:
+  /// **'Metric'**
+  String get fieldsMetric;
+
+  /// No description provided for @fieldsValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Value'**
+  String get fieldsValue;
+
+  /// No description provided for @reportsDsodays.
+  ///
+  /// In en, this message translates to:
+  /// **'Days Sales Outstanding'**
+  String get reportsDsodays;
+
+  /// No description provided for @reportsDsounit.
+  ///
+  /// In en, this message translates to:
+  /// **'days'**
+  String get reportsDsounit;
+
+  /// No description provided for @reportsDsosubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Measure of the average number of days it takes to collect payment after a sale.'**
+  String get reportsDsosubtitle;
+
+  /// No description provided for @reportsPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Period'**
+  String get reportsPeriod;
+
+  /// No description provided for @reportsTotalar.
+  ///
+  /// In en, this message translates to:
+  /// **'Total AR'**
+  String get reportsTotalar;
+
+  /// No description provided for @reportsTotalinflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Cash Inflow'**
+  String get reportsTotalinflow;
+
+  /// No description provided for @reportsTotaloutflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Cash Outflow'**
+  String get reportsTotaloutflow;
+
+  /// No description provided for @reportsNetcashflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Net Cash Flow'**
+  String get reportsNetcashflow;
+
+  /// No description provided for @reportsCashflowpositive.
+  ///
+  /// In en, this message translates to:
+  /// **'This period shows a positive cash flow, indicating good liquidity.'**
+  String get reportsCashflowpositive;
+
+  /// No description provided for @reportsCashflownegative.
+  ///
+  /// In en, this message translates to:
+  /// **'This period shows a negative cash flow, consider reviewing expenses and cash outflows.'**
+  String get reportsCashflownegative;
+
+  /// No description provided for @reportsTotalrevenue.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Revenue'**
+  String get reportsTotalrevenue;
+
+  /// No description provided for @reportsTotalcogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost of Goods Sold (COGS)'**
+  String get reportsTotalcogs;
+
+  /// No description provided for @reportsGrossprofit.
+  ///
+  /// In en, this message translates to:
+  /// **'Gross Profit'**
+  String get reportsGrossprofit;
+
+  /// No description provided for @reportsTotalexpenses.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Expenses'**
+  String get reportsTotalexpenses;
+
+  /// No description provided for @reportsNetprofit.
+  ///
+  /// In en, this message translates to:
+  /// **'Net Profit'**
+  String get reportsNetprofit;
+
+  /// No description provided for @reportsGrossprofitmargin.
+  ///
+  /// In en, this message translates to:
+  /// **'Gross Profit Margin'**
+  String get reportsGrossprofitmargin;
+
+  /// No description provided for @reportsNetprofitmargin.
+  ///
+  /// In en, this message translates to:
+  /// **'Net Profit Margin'**
+  String get reportsNetprofitmargin;
+
+  /// No description provided for @reportsExpensesbycategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Expenses by Category'**
+  String get reportsExpensesbycategory;
+
+  /// No description provided for @reportsTotalinbound.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Inbound'**
+  String get reportsTotalinbound;
+
+  /// No description provided for @reportsTotaloutbound.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Outbound'**
+  String get reportsTotaloutbound;
+
+  /// No description provided for @reportsNetmovement.
+  ///
+  /// In en, this message translates to:
+  /// **'Net Movement'**
+  String get reportsNetmovement;
+
+  /// No description provided for @reportsMovementno.
+  ///
+  /// In en, this message translates to:
+  /// **'Movement No'**
+  String get reportsMovementno;
+
+  /// No description provided for @reportsMovementtype.
+  ///
+  /// In en, this message translates to:
+  /// **'Movement Type'**
+  String get reportsMovementtype;
+
+  /// No description provided for @reportsTotalorders.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Orders'**
+  String get reportsTotalorders;
+
+  /// No description provided for @reportsTotalcost.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Cost'**
+  String get reportsTotalcost;
+
+  /// No description provided for @reportsReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Received Amount'**
+  String get reportsReceived;
+
+  /// No description provided for @reportsBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get reportsBalance;
+
+  /// No description provided for @reportsReturnvalue.
+  ///
+  /// In en, this message translates to:
+  /// **'Returns Value'**
+  String get reportsReturnvalue;
+
+  /// No description provided for @reportsTotalinvoiced.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Invoiced'**
+  String get reportsTotalinvoiced;
+
+  /// No description provided for @reportsInvoicecount.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice Count'**
+  String get reportsInvoicecount;
+
   /// No description provided for @quotationsQuotations.
   ///
   /// In en, this message translates to:
@@ -1051,6 +1483,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Expiry Date'**
   String get quotationsExpirydate;
+
+  /// No description provided for @quotationsExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to CSV'**
+  String get quotationsExportcsv;
+
+  /// No description provided for @quotationsExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Quotations exported'**
+  String get quotationsExported;
+
+  /// No description provided for @quotationsExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export quotations'**
+  String get quotationsExportfailed;
 
   /// No description provided for @quotationsItem.
   ///
@@ -1237,6 +1687,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New Purchase Order'**
   String get purchaseordersNewpurchaseorder;
+
+  /// No description provided for @purchaseordersExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to CSV'**
+  String get purchaseordersExportcsv;
+
+  /// No description provided for @purchaseordersExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase orders exported'**
+  String get purchaseordersExported;
+
+  /// No description provided for @purchaseordersExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export purchase orders'**
+  String get purchaseordersExportfailed;
 
   /// No description provided for @purchaseordersPono.
   ///
@@ -1435,6 +1903,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edit'**
   String get salesordersEdit;
+
+  /// No description provided for @salesordersExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to CSV'**
+  String get salesordersExportcsv;
+
+  /// No description provided for @salesordersExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales orders exported'**
+  String get salesordersExported;
+
+  /// No description provided for @salesordersExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export sales orders'**
+  String get salesordersExportfailed;
 
   /// No description provided for @salesordersConverttoinvoice.
   ///
@@ -2468,6 +2954,24 @@ abstract class AppLocalizations {
   /// **'Expense No'**
   String get expensesExpenseno;
 
+  /// No description provided for @expensesExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to CSV'**
+  String get expensesExportcsv;
+
+  /// No description provided for @expensesExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Expenses exported'**
+  String get expensesExported;
+
+  /// No description provided for @expensesExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export expenses'**
+  String get expensesExportfailed;
+
   /// No description provided for @expensesPaymentmethod.
   ///
   /// In en, this message translates to:
@@ -3032,6 +3536,24 @@ abstract class AppLocalizations {
   /// **'Export'**
   String get purchasesExport;
 
+  /// No description provided for @purchasesExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to CSV'**
+  String get purchasesExportcsv;
+
+  /// No description provided for @purchasesExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase returns exported'**
+  String get purchasesExported;
+
+  /// No description provided for @purchasesExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export purchase returns'**
+  String get purchasesExportfailed;
+
   /// No description provided for @purchasesSummary.
   ///
   /// In en, this message translates to:
@@ -3338,6 +3860,24 @@ abstract class AppLocalizations {
   /// **'Edit Invoice'**
   String get salesEditinvoice;
 
+  /// No description provided for @salesExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to CSV'**
+  String get salesExportcsv;
+
+  /// No description provided for @salesExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoices exported'**
+  String get salesExported;
+
+  /// No description provided for @salesExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export invoices'**
+  String get salesExportfailed;
+
   /// No description provided for @salesInvoiceno.
   ///
   /// In en, this message translates to:
@@ -3566,6 +4106,24 @@ abstract class AppLocalizations {
   /// **'Refund'**
   String get salesreturnsDispositionrefund;
 
+  /// No description provided for @salesreturnsExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to CSV'**
+  String get salesreturnsExportcsv;
+
+  /// No description provided for @salesreturnsExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice returns exported'**
+  String get salesreturnsExported;
+
+  /// No description provided for @salesreturnsExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export invoice returns'**
+  String get salesreturnsExportfailed;
+
   /// No description provided for @salesreturnsOriginalqty.
   ///
   /// In en, this message translates to:
@@ -3703,6 +4261,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Aggregate quantity'**
   String get inventoryAggregateqty;
+
+  /// No description provided for @inventoryInstock.
+  ///
+  /// In en, this message translates to:
+  /// **'In Stock'**
+  String get inventoryInstock;
 
   /// No description provided for @inventoryLowstock.
   ///
@@ -4016,6 +4580,72 @@ abstract class AppLocalizations {
   /// **'Manage customer payments'**
   String get paymentsSubtitle;
 
+  /// No description provided for @paymentsPaymentdetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Details'**
+  String get paymentsPaymentdetails;
+
+  /// No description provided for @paymentsPaymentno.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment No'**
+  String get paymentsPaymentno;
+
+  /// No description provided for @paymentsBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get paymentsBalance;
+
+  /// No description provided for @paymentsAllocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Allocation'**
+  String get paymentsAllocation;
+
+  /// No description provided for @paymentsTotalallocated.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Allocated'**
+  String get paymentsTotalallocated;
+
+  /// No description provided for @paymentsOpeninvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Invoices'**
+  String get paymentsOpeninvoices;
+
+  /// No description provided for @paymentsNoopeninvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'No open invoices for this customer'**
+  String get paymentsNoopeninvoices;
+
+  /// No description provided for @paymentsSelectinvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Allocate the payment to this customer\'s open invoices'**
+  String get paymentsSelectinvoices;
+
+  /// No description provided for @paymentsRecordedsuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment recorded successfully'**
+  String get paymentsRecordedsuccess;
+
+  /// No description provided for @paymentsReferencehint.
+  ///
+  /// In en, this message translates to:
+  /// **'Check number, transaction ID, etc.'**
+  String get paymentsReferencehint;
+
+  /// No description provided for @paymentsNoteshint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional notes...'**
+  String get paymentsNoteshint;
+
   /// No description provided for @navDashboard.
   ///
   /// In en, this message translates to:
@@ -4075,6 +4705,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Expenses'**
   String get navExpenses;
+
+  /// No description provided for @navManufacturing.
+  ///
+  /// In en, this message translates to:
+  /// **'Manufacturing'**
+  String get navManufacturing;
 
   /// No description provided for @navProduction.
   ///
@@ -4369,12 +5005,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Inventory Movement'**
   String get navInventorymovement;
-
-  /// No description provided for @navManufacturing.
-  ///
-  /// In en, this message translates to:
-  /// **'Manufacturing'**
-  String get navManufacturing;
 
   /// No description provided for @navPurchasereturns.
   ///
@@ -5299,6 +5929,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Customer'**
   String get fieldsCustomer;
+
+  /// No description provided for @fieldsCustomerCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Code'**
+  String get fieldsCustomerCode;
 
   /// No description provided for @fieldsItem.
   ///
@@ -6571,6 +7207,388 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Per Item'**
   String get salesPeritem;
+
+  /// No description provided for @bomActivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate'**
+  String get bomActivate;
+
+  /// No description provided for @bomActivated.
+  ///
+  /// In en, this message translates to:
+  /// **'BOM activated'**
+  String get bomActivated;
+
+  /// No description provided for @bomAddmaterial.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Material'**
+  String get bomAddmaterial;
+
+  /// No description provided for @bomCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get bomCreated;
+
+  /// No description provided for @bomCurrentstock.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Stock'**
+  String get bomCurrentstock;
+
+  /// No description provided for @bomDeactivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Deactivate'**
+  String get bomDeactivate;
+
+  /// No description provided for @bomDeactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'BOM deactivated'**
+  String get bomDeactivated;
+
+  /// No description provided for @bomDeleteconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this BOM? Materials referencing it will remain untouched. Note: BOMs already used in production records cannot be deleted.'**
+  String get bomDeleteconfirm;
+
+  /// No description provided for @bomDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'BOM deleted'**
+  String get bomDeleted;
+
+  /// No description provided for @bomDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get bomDescription;
+
+  /// No description provided for @bomDetailstitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bill of Materials'**
+  String get bomDetailstitle;
+
+  /// No description provided for @bomEdittitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit BOM'**
+  String get bomEdittitle;
+
+  /// No description provided for @bomErrorFinisheditem.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the finished item this BOM produces.'**
+  String get bomErrorFinisheditem;
+
+  /// No description provided for @bomErrorItemsrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least one material line'**
+  String get bomErrorItemsrequired;
+
+  /// No description provided for @bomExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export CSV'**
+  String get bomExportcsv;
+
+  /// No description provided for @bomExported.
+  ///
+  /// In en, this message translates to:
+  /// **'BOMs exported'**
+  String get bomExported;
+
+  /// No description provided for @bomExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed'**
+  String get bomExportfailed;
+
+  /// No description provided for @bomFinisheditem.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished Item'**
+  String get bomFinisheditem;
+
+  /// No description provided for @bomItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Materials'**
+  String get bomItems;
+
+  /// No description provided for @bomMaterialcost.
+  ///
+  /// In en, this message translates to:
+  /// **'Material Cost'**
+  String get bomMaterialcost;
+
+  /// No description provided for @bomMaterials.
+  ///
+  /// In en, this message translates to:
+  /// **'Materials'**
+  String get bomMaterials;
+
+  /// No description provided for @bomName.
+  ///
+  /// In en, this message translates to:
+  /// **'BOM Name'**
+  String get bomName;
+
+  /// No description provided for @bomNo.
+  ///
+  /// In en, this message translates to:
+  /// **'BOM No'**
+  String get bomNo;
+
+  /// No description provided for @bomNoMaterials.
+  ///
+  /// In en, this message translates to:
+  /// **'No material lines'**
+  String get bomNoMaterials;
+
+  /// No description provided for @bomQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch Quantity'**
+  String get bomQuantity;
+
+  /// No description provided for @bomSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'BOM saved'**
+  String get bomSaved;
+
+  /// No description provided for @bomUnitcost.
+  ///
+  /// In en, this message translates to:
+  /// **'Std Cost'**
+  String get bomUnitcost;
+
+  /// No description provided for @productionAddinput.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Input'**
+  String get productionAddinput;
+
+  /// No description provided for @productionBatchno.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch No'**
+  String get productionBatchno;
+
+  /// No description provided for @productionBom.
+  ///
+  /// In en, this message translates to:
+  /// **'BOM'**
+  String get productionBom;
+
+  /// No description provided for @productionBomwarningMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected BOM produces a different item. Change the BOM or the output item.'**
+  String get productionBomwarningMismatch;
+
+  /// No description provided for @productionBomwarningPickoutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an output item first — the BOM auto-fills the inputs for its finished product.'**
+  String get productionBomwarningPickoutput;
+
+  /// No description provided for @productionCostperunit.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost per Unit'**
+  String get productionCostperunit;
+
+  /// No description provided for @productionCostpreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch Cost Preview'**
+  String get productionCostpreview;
+
+  /// No description provided for @productionCreatedby.
+  ///
+  /// In en, this message translates to:
+  /// **'Created by'**
+  String get productionCreatedby;
+
+  /// No description provided for @productionDeleteconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this production run? Stock movements and the GL entry will be reversed.'**
+  String get productionDeleteconfirm;
+
+  /// No description provided for @productionDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Production deleted'**
+  String get productionDeleted;
+
+  /// No description provided for @productionDetailstitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Production Details'**
+  String get productionDetailstitle;
+
+  /// No description provided for @productionErrorInputsrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least one input material.'**
+  String get productionErrorInputsrequired;
+
+  /// No description provided for @productionErrorBomrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a BOM to load its material inputs.'**
+  String get productionErrorBomrequired;
+
+  /// No description provided for @productionAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get productionAvailable;
+
+  /// No description provided for @productionErrorInvalidqty.
+  ///
+  /// In en, this message translates to:
+  /// **'Input quantities must be greater than zero.'**
+  String get productionErrorInvalidqty;
+
+  /// No description provided for @productionErrorOutputrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Output item is required.'**
+  String get productionErrorOutputrequired;
+
+  /// No description provided for @productionErrorWarehouserequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished-goods warehouse is required.'**
+  String get productionErrorWarehouserequired;
+
+  /// No description provided for @productionExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export CSV'**
+  String get productionExportcsv;
+
+  /// No description provided for @productionExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Productions exported.'**
+  String get productionExported;
+
+  /// No description provided for @productionExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed'**
+  String get productionExportfailed;
+
+  /// No description provided for @productionInputqty.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get productionInputqty;
+
+  /// No description provided for @productionInputs.
+  ///
+  /// In en, this message translates to:
+  /// **'Inputs'**
+  String get productionInputs;
+
+  /// No description provided for @productionInputsBomhint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a BOM — its material lines appear here.'**
+  String get productionInputsBomhint;
+
+  /// No description provided for @productionMaterialcost.
+  ///
+  /// In en, this message translates to:
+  /// **'Material Cost'**
+  String get productionMaterialcost;
+
+  /// No description provided for @productionNo.
+  ///
+  /// In en, this message translates to:
+  /// **'Production No'**
+  String get productionNo;
+
+  /// No description provided for @productionNoinputs.
+  ///
+  /// In en, this message translates to:
+  /// **'No input materials recorded for this run.'**
+  String get productionNoinputs;
+
+  /// No description provided for @productionOutputitem.
+  ///
+  /// In en, this message translates to:
+  /// **'Output Item'**
+  String get productionOutputitem;
+
+  /// No description provided for @productionOutputquantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Output Quantity'**
+  String get productionOutputquantity;
+
+  /// No description provided for @productionOverhead.
+  ///
+  /// In en, this message translates to:
+  /// **'Overhead Cost'**
+  String get productionOverhead;
+
+  /// No description provided for @productionRawmaterialsWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw Materials Warehouse'**
+  String get productionRawmaterialsWarehouse;
+
+  /// No description provided for @productionSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Production recorded'**
+  String get productionSaved;
+
+  /// No description provided for @productionShortfallLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: {available} available, {required} required'**
+  String productionShortfallLine(
+    Object available,
+    Object name,
+    Object required,
+  );
+
+  /// No description provided for @productionShortfallTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient stock for these inputs'**
+  String get productionShortfallTitle;
+
+  /// No description provided for @productionTotalcost.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Cost'**
+  String get productionTotalcost;
+
+  /// No description provided for @productionUnitcost.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit Cost'**
+  String get productionUnitcost;
+
+  /// No description provided for @productionWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished Goods Warehouse'**
+  String get productionWarehouse;
 }
 
 class _AppLocalizationsDelegate

@@ -24,10 +24,9 @@ class ModulePlaceholderScreen extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             l10n.errorsComingsoon,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: scheme.onSurfaceVariant),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
       ),

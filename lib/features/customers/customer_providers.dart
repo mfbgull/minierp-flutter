@@ -5,7 +5,8 @@ import '../../data/models/ledger_entry.dart' show LedgerEntry;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/customer_repository.dart'
     show customerRepositoryProvider;
-import '../../data/repositories/paged_request.dart' show PagedRequest, PagedResponse;
+import '../../data/repositories/paged_request.dart'
+    show PagedRequest, PagedResponse;
 
 /// Server-side sort — the API column name (from the server's
 /// `CUSTOMER_SORT_COLUMNS` whitelist) plus the order.
@@ -40,7 +41,9 @@ final customersProvider = FutureProvider<PagedResponse<Customer>>((ref) async {
   final limit = ref.watch(customersLimitProvider);
   final sort = ref.watch(customersSortProvider);
 
-  final result = await ref.watch(customerRepositoryProvider).list(
+  final result = await ref
+      .watch(customerRepositoryProvider)
+      .list(
         PagedRequest(
           page: page,
           limit: limit,
@@ -58,25 +61,26 @@ final customersProvider = FutureProvider<PagedResponse<Customer>>((ref) async {
 
 /// Detail for one customer (`GET /customers/:id`, bare object). autoDispose:
 /// each dialog instance owns its fetch, so closing it frees the state.
-final customerDetailProvider =
-    FutureProvider.autoDispose.family<Customer, int>((ref, customerId) async {
-  final result = await ref.watch(customerRepositoryProvider).get(customerId);
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
+final customerDetailProvider = FutureProvider.autoDispose.family<Customer, int>(
+  (ref, customerId) async {
+    final result = await ref.watch(customerRepositoryProvider).get(customerId);
+    return switch (result) {
+      ApiSuccess(:final data) => data,
+      ApiFailure(:final error) => throw error,
+    };
+  },
+);
 
 /// The customer's AR ledger (`GET /customers/:id/ledger`, enveloped array,
 /// newest-first by transaction_date). autoDispose: each ledger dialog owns
 /// its fetch, so closing it frees the state.
-final customerLedgerProvider =
-    FutureProvider.autoDispose.family<List<LedgerEntry>, int>(
-        (ref, customerId) async {
-  final result =
-      await ref.watch(customerRepositoryProvider).ledger(customerId);
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
+final customerLedgerProvider = FutureProvider.autoDispose
+    .family<List<LedgerEntry>, int>((ref, customerId) async {
+      final result = await ref
+          .watch(customerRepositoryProvider)
+          .ledger(customerId);
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });

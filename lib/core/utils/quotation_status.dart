@@ -1,6 +1,7 @@
-// Shared quotation status helpers — used by the list grid and (later)
-// the detail dialog (PORTING.md §6: status text plus colors come from
-// the web's `references/utils/statusColors.ts` conventions).
+// Shared quotation status helpers — used by the list grid, the detail
+// dialog, and the quotations CSV export (PORTING.md §6: status text
+// plus colors come from the web's `references/utils/statusColors.ts`
+// conventions).
 
 import 'package:flutter/material.dart';
 
