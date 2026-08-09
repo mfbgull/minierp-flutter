@@ -1073,6 +1073,63 @@ void main() {
     expect(csv, contains('Completed')); // localized status
   });
 
+  test(
+    'buildExpensesReportCsv emits the report columns and sanitizes cells',
+    () {
+      final l10n = lookupAppLocalizations(const Locale('en'));
+      final csv = buildExpensesReportCsv(
+        l10n,
+        ExpensesReport(
+          rows: [
+            ExpensesReportRow(
+              id: 3,
+              expenseNo: 'EXP-2026-0003',
+              expenseCategory: 'Utilities',
+              description: '=Electricity bill', // sanitized
+              amount: 25000,
+              expenseDate: '2026-08-05',
+              paymentMethod: 'Bank Transfer',
+              referenceNo: 'TRF-2231',
+              vendorName: 'LESCO',
+              project: 'Head Office',
+              status: 'Approved',
+            ),
+          ],
+          summary: const ExpensesReportSummary(
+            totalAmount: 25000,
+            totalExpenses: 1,
+            averageAmount: 25000,
+          ),
+          categoryBreakdown: const [
+            ExpenseCategoryBreakdown(
+              category: 'Utilities',
+              count: 1,
+              totalAmount: 25000,
+            ),
+          ],
+        ),
+      );
+      final lines = csv.trim().split('\r\n');
+
+      expect(lines.length, 2);
+      expect(lines.first, contains('Expense No'));
+      expect(lines.first, contains('Date'));
+      expect(lines.first, contains('Category'));
+      expect(lines.first, contains('Description'));
+      expect(lines.first, contains('Vendor'));
+      expect(lines.first, contains('Reference No'));
+      expect(lines.first, contains('Payment Method'));
+      expect(lines.first, contains('Project'));
+      expect(lines.first, contains('Amount'));
+      expect(lines.first, contains('Status'));
+      expect(csv, contains('EXP-2026-0003'));
+      expect(csv, contains('Electricity bill'));
+      expect(csv, isNot(contains('=Electricity bill')));
+      expect(csv, contains('25,000.00'));
+      expect(csv, contains('Approved')); // localized status
+    },
+  );
+
   test('buildTopDebtorsCsv emits debtor columns', () {
     final l10n = lookupAppLocalizations(const Locale('en'));
     final csv = buildTopDebtorsCsv(l10n, [

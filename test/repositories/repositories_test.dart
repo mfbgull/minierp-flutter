@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:minierp_app/data/repositories/api_result.dart';
 import 'package:minierp_app/data/repositories/auth_repository.dart';
 import 'package:minierp_app/data/repositories/customer_repository.dart';
+import 'package:minierp_app/data/repositories/dashboard_repository.dart';
 import 'package:minierp_app/data/repositories/expense_repository.dart';
 import 'package:minierp_app/data/repositories/inventory_repository.dart';
 import 'package:minierp_app/data/repositories/invoice_repository.dart';
@@ -961,6 +962,142 @@ void main() {
         expect(result.requireData.status, 'Cancelled');
       },
     );
+  });
+
+  group('DashboardRepository', () {
+    late DashboardRepository repo;
+
+    setUp(() => repo = DashboardRepository(api));
+
+    test('topCustomers parses the array and forwards limit', () async {
+      Map<String, dynamic>? seenQuery;
+      handler = (o) {
+        seenQuery = o.queryParameters;
+        return jsonBody({
+          'success': true,
+          'data': [
+            {
+              'customer_name': 'Alpha Traders',
+              'total_revenue': 452300.50,
+              'invoice_count': 18,
+            },
+            {
+              'customer_name': 'Beta Stores',
+              'total_revenue': 99000,
+              'invoice_count': 5,
+            },
+          ],
+        });
+      };
+      final result = await repo.topCustomers(limit: 5);
+      final rows = result.requireData;
+      expect(rows, hasLength(2));
+      expect(rows.first.customerName, 'Alpha Traders');
+      expect(rows.first.totalRevenue, 452300.50);
+      expect(rows.last.invoiceCount, 5);
+      expect(seenQuery!['limit'], 5);
+    });
+
+    test('salesSummary forwards period and parses totals', () async {
+      Map<String, dynamic>? seenQuery;
+      handler = (o) {
+        seenQuery = o.queryParameters;
+        return jsonBody({
+          'success': true,
+          'data': {'period_total': 123456.75, 'count': 9},
+        });
+      };
+      final result = await repo.salesSummary(period: 'week');
+      expect(result.requireData.periodTotal, 123456.75);
+      expect(result.requireData.count, 9);
+      expect(seenQuery!['period'], 'week');
+    });
+
+    test('expenseSummary forwards period', () async {
+      Map<String, dynamic>? seenQuery;
+      handler = (o) {
+        seenQuery = o.queryParameters;
+        return jsonBody({
+          'success': true,
+          'data': {'period_total': 6543.25, 'count': 4},
+        });
+      };
+      final result = await repo.expenseSummary(period: 'month');
+      expect(result.requireData.periodTotal, 6543.25);
+      expect(seenQuery!['period'], 'month');
+    });
+
+    test('productionStatus parses the status counts', () async {
+      handler = (o) => jsonBody({
+        'success': true,
+        'data': {'total': 20, 'active': 5, 'completed': 12, 'cancelled': 3},
+      });
+      final row = (await repo.productionStatus()).requireData;
+      expect(row.total, 20);
+      expect(row.active, 5);
+      expect(row.completed, 12);
+      expect(row.cancelled, 3);
+    });
+
+    test('stockMovementSummary forwards days and parses qty', () async {
+      Map<String, dynamic>? seenQuery;
+      handler = (o) {
+        seenQuery = o.queryParameters;
+        return jsonBody({
+          'success': true,
+          'data': {'inbound_qty': 850, 'outbound_qty': 320, 'net': 530},
+        });
+      };
+      final row = (await repo.stockMovementSummary(days: 14)).requireData;
+      expect(row.inboundQty, 850);
+      expect(row.outboundQty, 320);
+      expect(row.net, 530);
+      expect(seenQuery!['days'], 14);
+    });
+
+    test('kpi forwards metric and parses the gauge', () async {
+      Map<String, dynamic>? seenQuery;
+      handler = (o) {
+        seenQuery = o.queryParameters;
+        return jsonBody({
+          'success': true,
+          'data': {
+            'metric': 'stock_health',
+            'value': 87.5,
+            'unit': '%',
+            'label': 'Stock Health',
+          },
+        });
+      };
+      final row = (await repo.kpi(metric: 'stock_health')).requireData;
+      expect(row.metric, 'stock_health');
+      expect(row.value, 87.5);
+      expect(row.unit, '%');
+      expect(seenQuery!['metric'], 'stock_health');
+    });
+
+    test('arSummary parses total + aging buckets', () async {
+      handler = (o) => jsonBody({
+        'success': true,
+        'data': {
+          'total_ar': 250000,
+          'current_amount': 80000,
+          'amount_1_30': 60000,
+          'amount_31_60': 50000,
+          'amount_61_90': 40000,
+          'amount_over_90': 20000,
+          'customer_count': 7,
+        },
+      });
+      final row = (await repo.arSummary()).requireData;
+      expect(row.totalAr, 250000);
+      expect(row.currentAmount, 80000);
+      expect(row.amount130, 60000);
+      expect(row.amount3160, 50000);
+      expect(row.amount6190, 40000);
+      expect(row.amountOver90, 20000);
+      expect(row.customerCount, 7);
+    });
   });
 
   group('ProductionRepository', () {

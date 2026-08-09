@@ -49,6 +49,7 @@ import '../../data/models/report.dart'
         ArAgingReport,
         CashFlowReport,
         DSOMetric,
+        ExpensesReport,
         InventoryMovementReport,
         LowStockReportRow,
         ProfitLossReport,
@@ -356,6 +357,42 @@ String buildExpensesCsv(AppLocalizations l10n, List<Expense> expenses) {
 /// Builds the CSV text for the AR aging report (Customer | Code | Total
 /// Outstanding | Current | 1-30 | 31-60 | 61-90 | 90+ — mirroring the
 /// grid's columns).
+/// Builds the CSV text for the expenses report (Expense No | Date |
+/// Category | Description | Vendor | Reference No | Payment Method |
+/// Project | Amount | Status — mirroring the report grid's columns;
+/// the status uses the same localized label as the grid's badge).
+String buildExpensesReportCsv(AppLocalizations l10n, ExpensesReport report) {
+  return _buildGridCsv(
+    [
+      l10n.expensesExpenseno,
+      l10n.fieldsDate,
+      l10n.fieldsCategory,
+      l10n.expensesDescription,
+      l10n.expensesVendor,
+      l10n.expensesReferenceno,
+      l10n.expensesPaymentmethod,
+      l10n.expensesProject,
+      l10n.fieldsAmount,
+      l10n.fieldsStatus,
+    ],
+    report.rows,
+    (r) => [
+      sanitizeCsvCell(r.expenseNo.isEmpty ? '—' : r.expenseNo),
+      r.expenseDate.isEmpty ? '—' : Formatters.date(r.expenseDate),
+      sanitizeCsvCell(r.expenseCategory.isEmpty ? '—' : r.expenseCategory),
+      sanitizeCsvCell((r.description?.isEmpty ?? true) ? '—' : r.description!),
+      sanitizeCsvCell((r.vendorName?.isEmpty ?? true) ? '—' : r.vendorName!),
+      sanitizeCsvCell((r.referenceNo?.isEmpty ?? true) ? '—' : r.referenceNo!),
+      sanitizeCsvCell(
+        (r.paymentMethod?.isEmpty ?? true) ? '—' : r.paymentMethod!,
+      ),
+      sanitizeCsvCell((r.project?.isEmpty ?? true) ? '—' : r.project!),
+      Formatters.currency(r.amount),
+      sanitizeCsvCell(expenseStatusLabel(l10n, r.status)),
+    ],
+  );
+}
+
 String buildArAgingCsv(AppLocalizations l10n, ArAgingReport report) {
   return _buildGridCsv(
     [
