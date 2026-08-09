@@ -12,6 +12,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get dashboardWelcome => 'خوش آمدید';
 
   @override
+  String get dashboardArsummary => 'وصولیات کا خلاصہ';
+
+  @override
   String get dashboardTotalitems => 'کل مصنوعات';
 
   @override
@@ -27,7 +30,16 @@ class AppLocalizationsUr extends AppLocalizations {
   String get dashboardCurrentinventoryworth => 'موجودہ انوینٹری کی قیمت';
 
   @override
+  String get dashboardCustomers => 'کسٹمرز';
+
+  @override
+  String get dashboardInvoices => 'انوائسز';
+
+  @override
   String get dashboardSalesrevenue => 'فروخت آمدنی';
+
+  @override
+  String get dashboardTopcustomers => 'ٹاپ کسٹمرز';
 
   @override
   String get dashboardTotalsales => 'کل فروخت';
@@ -451,6 +463,30 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get reportsPurchasesummaryreport => 'خریداری خلاصہ رپورٹ';
+
+  @override
+  String get reportsOpeningbalance => 'Opening Balance';
+
+  @override
+  String get reportsTotaldebits => 'Total Debits';
+
+  @override
+  String get reportsTotalcredits => 'Total Credits';
+
+  @override
+  String get reportsClosingbalance => 'Closing Balance';
+
+  @override
+  String get reportsTotalamount => 'Total Amount';
+
+  @override
+  String get reportsPaidamount => 'Paid Amount';
+
+  @override
+  String get reportsLastinvoicedate => 'Last Invoice Date';
+
+  @override
+  String get reportsAllcustomers => 'All Customers';
 
   @override
   String get reportsProductionsummaryreport => 'پروڈکشن خلاصہ رپورٹ';

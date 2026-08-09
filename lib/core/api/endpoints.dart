@@ -65,6 +65,7 @@ abstract final class ApiEndpoints {
   static const reportPurchaseSummary = '/reports/purchase-summary';
   static const reportTopDebtors = '/reports/top-debtors';
   static const reportExpenses = '/reports/expenses';
+  static const reportCustomerStatements = '/reports/customer-statements';
 
   // Misc
   static const customers = '/customers';

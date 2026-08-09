@@ -732,6 +732,34 @@ String buildTopDebtorsCsv(AppLocalizations l10n, List<TopDebtorRow> rows) {
   );
 }
 
+/// Builds the CSV text for the customer statements report (Customer |
+/// Code | Opening Balance | Total Debits | Total Credits | Closing
+/// Balance — mirroring the grid's columns).
+String buildCustomerStatementsCsv(
+  AppLocalizations l10n,
+  List<CustomerStatementRow> rows,
+) {
+  return _buildGridCsv(
+    [
+      l10n.fieldsCustomer,
+      l10n.fieldsCustomerCode,
+      l10n.reportsOpeningbalance,
+      l10n.reportsTotaldebits,
+      l10n.reportsTotalcredits,
+      l10n.reportsClosingbalance,
+    ],
+    rows,
+    (r) => [
+      sanitizeCsvCell(r.customerName.isEmpty ? '—' : r.customerName),
+      sanitizeCsvCell(r.customerCode.isEmpty ? '—' : r.customerCode),
+      Formatters.currency(r.openingBalance),
+      Formatters.currency(r.totalDebits),
+      Formatters.currency(r.totalCredits),
+      Formatters.currency(r.closingBalance),
+    ],
+  );
+}
+
 String buildInvoicesCsv(AppLocalizations l10n, List<Invoice> invoices) {
   return _buildGridCsv(
     [

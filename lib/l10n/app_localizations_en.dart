@@ -12,6 +12,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboardWelcome => 'Welcome back';
 
   @override
+  String get dashboardArsummary => 'AR Summary';
+
+  @override
   String get dashboardTotalitems => 'Total Items';
 
   @override
@@ -27,7 +30,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboardCurrentinventoryworth => 'Current inventory worth';
 
   @override
+  String get dashboardCustomers => 'customers';
+
+  @override
+  String get dashboardInvoices => 'invoices';
+
+  @override
   String get dashboardSalesrevenue => 'Sales Revenue';
+
+  @override
+  String get dashboardTopcustomers => 'Top Customers';
 
   @override
   String get dashboardTotalsales => 'Total sales';
@@ -452,6 +464,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reportsPurchasesummaryreport => 'Purchase Summary Report';
+
+  @override
+  String get reportsOpeningbalance => 'Opening Balance';
+
+  @override
+  String get reportsTotaldebits => 'Total Debits';
+
+  @override
+  String get reportsTotalcredits => 'Total Credits';
+
+  @override
+  String get reportsClosingbalance => 'Closing Balance';
+
+  @override
+  String get reportsTotalamount => 'Total Amount';
+
+  @override
+  String get reportsPaidamount => 'Paid Amount';
+
+  @override
+  String get reportsLastinvoicedate => 'Last Invoice Date';
+
+  @override
+  String get reportsAllcustomers => 'All Customers';
 
   @override
   String get reportsProductionsummaryreport => 'Production Summary Report';

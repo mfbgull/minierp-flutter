@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
+import '../../data/models/customer.dart' show Customer;
 import '../../data/models/report.dart'
     show
         ArAgingReport,
         CashFlowReport,
+        CustomerStatementRow,
         DSOMetric,
         ExpensesReport,
         InventoryMovementReport,
@@ -17,6 +19,10 @@ import '../../data/models/report.dart'
         StockValuationReport,
         TopDebtorRow;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
+import '../../data/repositories/customer_repository.dart'
+    show customerRepositoryProvider;
+import '../../data/repositories/paged_request.dart'
+    show PagedRequest;
 import '../../data/repositories/report_repository.dart'
     show reportRepositoryProvider;
 
@@ -323,6 +329,57 @@ final expensesReportProvider = FutureProvider<ExpensesReport>((ref) async {
         fromDate: isoDate(from),
         toDate: isoDate(to),
         category: category,
+      );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+// ── Customer statements ─────────────────────────────────────────────
+
+/// Date-range filters for the customer statements report. Defaults mirror
+/// the web app's `CustomerStatementsReport` initial state: last 3 months
+/// → today (the endpoint tolerates omitted dates, but the port always
+/// sends them).
+final reportStatementsFromDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month - 3, now.day);
+});
+final reportStatementsToDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+});
+
+/// Active customer filter for the customer statements report — null means
+/// "All Customers" (the `customerId` query param is omitted).
+final reportStatementsCustomerIdProvider = StateProvider<int?>((ref) => null);
+
+/// All customers for the customer statements customer picker (reuses the
+/// same large-page pattern as the payments dialog).
+final customersForReportProvider = FutureProvider<List<Customer>>((ref) async {
+  final result = await ref
+      .watch(customerRepositoryProvider)
+      .list(const PagedRequest(limit: 500));
+  return switch (result) {
+    ApiSuccess(:final data) => data.items,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+/// Loads GET /reports/customer-statements, re-running when the date range
+/// or selected customer changes.
+final customerStatementsReportProvider =
+    FutureProvider<List<CustomerStatementRow>>((ref) async {
+  final from = ref.watch(reportStatementsFromDateProvider);
+  final to = ref.watch(reportStatementsToDateProvider);
+  final customerId = ref.watch(reportStatementsCustomerIdProvider);
+  final result = await ref
+      .watch(reportRepositoryProvider)
+      .customerStatements(
+        fromDate: isoDate(from),
+        toDate: isoDate(to),
+        customerId: customerId,
       );
   return switch (result) {
     ApiSuccess(:final data) => data,

@@ -8,10 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
-import '../models/report.dart'
+import '../../data/models/report.dart'
     show
         ArAgingReport,
         CashFlowReport,
+        CustomerStatementRow,
         DSOMetric,
         ExpensesReport,
         InventoryMovementReport,
@@ -167,6 +168,24 @@ class ReportRepository {
     },
     parse: (Object? json) =>
         ExpensesReport.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// GET /reports/customer-statements — per-customer statement summary
+  /// over a date range, optionally narrowed by customer. Returns
+  /// `{ statements: [...] }`.
+  Future<ApiResult<List<CustomerStatementRow>>> customerStatements({
+    String? fromDate,
+    String? toDate,
+    int? customerId,
+  }) => _api.getList(
+    ApiEndpoints.reportCustomerStatements,
+    queryParameters: {
+      'fromDate': ?fromDate,
+      'toDate': ?toDate,
+      'customerId': ?customerId,
+    },
+    parseItem: (Object? json) =>
+        CustomerStatementRow.fromJson(json as Map<String, dynamic>),
   );
 
   /// GET /reports/top-debtors — customers with the highest outstanding
