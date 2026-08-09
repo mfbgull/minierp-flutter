@@ -15,6 +15,7 @@ import 'package:pluto_grid/pluto_grid.dart';
 import '../../data/models/stock_movement.dart' show StockMovement;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/searchable_select.dart';
 import '../../widgets/status_badge.dart';
 import 'inventory_providers.dart'
     show movementTypeFilterProvider, stockMovementsProvider;
@@ -87,24 +88,29 @@ class _StockMovementScreenState extends ConsumerState<StockMovementScreen>
               SizedBox(
                 width: 210,
                 height: 40,
-                child: DropdownButtonFormField<String>(
-                  initialValue: filter ?? '',
-                  isExpanded: true,
+                child: SearchableSelect<String>(
+                  items: [
+                    for (final option in _movementFilterOptions(l10n))
+                      option.$1,
+                  ],
+                  selected: filter ?? '',
+                  labelBuilder: (value) {
+                    for (final option in _movementFilterOptions(l10n)) {
+                      if (option.$1 == value) return option.$2;
+                    }
+                    return value;
+                  },
                   isDense: true,
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.filter_alt_outlined, size: 20),
+                    prefixIcon: const Icon(
+                      Icons.filter_alt_outlined,
+                      size: 20,
+                    ),
                     contentPadding: EdgeInsets.zero,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  items: [
-                    for (final option in _movementFilterOptions(l10n))
-                      DropdownMenuItem(
-                        value: option.$1,
-                        child: Text(option.$2),
-                      ),
-                  ],
                   onChanged: (value) {
                     final newFilter = (value == null || value.isEmpty)
                         ? null

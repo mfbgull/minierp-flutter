@@ -9,6 +9,84 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get activitylogCleanup => 'Cleanup';
+
+  @override
+  String get activitylogCleanupdays => 'Retention (days)';
+
+  @override
+  String get activitylogCleanupdesc =>
+      'Permanently deletes log entries older than the retention period. This cannot be undone.';
+
+  @override
+  String get activitylogCleanupinvalid => 'Enter a valid number of days';
+
+  @override
+  String activitylogCleanupsuccess(Object count) {
+    return 'Cleaned up $count log entries';
+  }
+
+  @override
+  String get activitylogCleanuptitle => 'Clean up old logs';
+
+  @override
+  String get activitylogAction => 'Action';
+
+  @override
+  String get activitylogAllactions => 'All actions';
+
+  @override
+  String get activitylogAllentities => 'All entity types';
+
+  @override
+  String get activitylogAllusers => 'All users';
+
+  @override
+  String get activitylogCount => 'logs';
+
+  @override
+  String get activitylogDetailtitle => 'Activity Detail';
+
+  @override
+  String get activitylogDuration => 'Duration';
+
+  @override
+  String get activitylogEntity => 'Entity';
+
+  @override
+  String get activitylogExportcsv => 'Export CSV';
+
+  @override
+  String get activitylogExported => 'Activity log exported';
+
+  @override
+  String get activitylogExportfailed => 'Export failed';
+
+  @override
+  String get activitylogIp => 'IP Address';
+
+  @override
+  String get activitylogLevel => 'Level';
+
+  @override
+  String get activitylogMetadata => 'Metadata';
+
+  @override
+  String get activitylogTimestamp => 'Timestamp';
+
+  @override
+  String get activitylogToday => 'Today';
+
+  @override
+  String get activitylogTotal => 'Total logs';
+
+  @override
+  String get activitylogUser => 'User';
+
+  @override
+  String get activitylogUseragent => 'User Agent';
+
+  @override
   String get dashboardWelcome => 'Welcome back';
 
   @override
@@ -1471,6 +1549,77 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSettings => 'Settings';
+
+  @override
+  String get settingsSubtitle =>
+      'Company profile, currency, tax rates and document numbering.';
+
+  @override
+  String get settingsSectionCompany => 'Company';
+
+  @override
+  String get settingsSectionCurrency => 'Currency & Formatting';
+
+  @override
+  String get settingsSectionTax => 'Tax';
+
+  @override
+  String get settingsSectionNumbering => 'Document Numbering';
+
+  @override
+  String get settingsSectionOther => 'Other Settings';
+
+  @override
+  String get settingsKeyCompanyName => 'Company Name';
+
+  @override
+  String get settingsKeyCompanyEmail => 'Company Email';
+
+  @override
+  String get settingsKeyCompanyPhone => 'Company Phone';
+
+  @override
+  String get settingsKeyCompanyAddress => 'Company Address';
+
+  @override
+  String get settingsKeyCompanyTaxId => 'Company Tax ID';
+
+  @override
+  String get settingsKeyCurrencySymbol => 'Currency Symbol';
+
+  @override
+  String get settingsKeyCurrencyCode => 'Currency Code';
+
+  @override
+  String get settingsKeyCurrency => 'Currency';
+
+  @override
+  String get settingsKeyDecimalPlaces => 'Decimal Places';
+
+  @override
+  String get settingsKeyDateFormat => 'Date Format';
+
+  @override
+  String get settingsKeyTooltipTimeout => 'Tooltip Timeout (s)';
+
+  @override
+  String get settingsKeyTaxRate => 'Default Tax Rate (%)';
+
+  @override
+  String get settingsSaved => 'Settings saved';
+
+  @override
+  String get settingsSaveFailed => 'Failed to save settings';
+
+  @override
+  String get settingsUnsaved => 'Unsaved changes';
+
+  @override
+  String get settingsNumberingHelper =>
+      'Server-managed document counter — edit with care.';
+
+  @override
+  String get settingsEmpty => 'No settings to display';
 
   @override
   String get integrationsIntegrations => 'Integrations';

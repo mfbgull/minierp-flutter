@@ -12,6 +12,7 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart' show ArAgingBucket, ArAgingReport;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import 'report_providers.dart';
 
@@ -66,6 +67,7 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
   );
 
   static List<PlutoColumn> _buildColumns(AppLocalizations l10n) => [
+    serialGridColumn(),
     PlutoColumn(
       title: l10n.fieldsCustomer,
       field: 'customer',
@@ -102,6 +104,7 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
         for (final bucket in buckets)
           PlutoRow(
             cells: {
+              'serial': PlutoCell(value: 0),
               'customer': PlutoCell(
                 value: bucket.customerName.isEmpty
                     ? bucket.customerCode

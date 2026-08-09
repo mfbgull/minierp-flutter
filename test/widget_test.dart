@@ -21,11 +21,17 @@ import 'package:go_router/go_router.dart';
 import 'package:minierp_app/app.dart';
 import 'package:minierp_app/core/api/api_client.dart';
 import 'package:minierp_app/core/auth/token_storage.dart';
+import 'package:minierp_app/features/activity_log/activity_log_providers.dart'
+    show activityLogFromDateProvider, activityLogToDateProvider;
+import 'package:minierp_app/features/activity_log/activity_log_screen.dart'
+    show ActivityLogScreen;
 import 'package:minierp_app/features/auth/change_password_screen.dart';
 import 'package:minierp_app/features/customers/customer_ledger_dialog.dart';
 import 'package:minierp_app/features/suppliers/supplier_ledger_dialog.dart';
 import 'package:minierp_app/features/suppliers/supplier_statement_dialog.dart';
 import 'package:minierp_app/features/reports/reports_dashboard_screen.dart';
+import 'package:minierp_app/widgets/status_badge.dart' show StatusBadge;
+import 'package:minierp_app/widgets/searchable_select.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 class _FakeTokenStorage implements TokenStorage {
@@ -293,6 +299,99 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   /// Captured create/update bodies for the expense form tests.
   Map<String, dynamic>? lastExpensePostBody;
   Map<String, dynamic>? lastExpensePutBody;
+
+  /// Captured body of the last /activity-logs/cleanup POST.
+  Map<String, dynamic>? lastCleanupBody;
+
+  /// When true, the cleanup POST rejects with a 400 (failure-path test).
+  bool rejectCleanup = false;
+
+  /// When true, the /settings/bulk POST rejects with a 400 (failure-path
+  /// test).
+  bool rejectSettingsSave = false;
+
+  /// Captured body of the last /settings/bulk POST (bare key → value map).
+  Map<String, dynamic>? lastSettingsBulkBody;
+
+  /// Mutable settings store backing GET /settings + POST /settings/bulk
+  /// (bare `{key: {value, description, updated_at}}` — no envelope).
+  Map<String, dynamic> settingsStore = {
+    'company_name': {
+      'value': 'Mini ERP',
+      'description': 'Company name',
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    'company_email': {
+      'value': 'support@minierp.com',
+      'description': 'Company email',
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    'company_phone': {
+      'value': '+1234567890',
+      'description': 'Company phone',
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    'company_address': {
+      'value': '123 Main St',
+      'description': 'Company address',
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    'company_tax_id': {
+      'value': 'TAX-123456789',
+      'description': 'Company tax ID for invoices',
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    'currency_symbol': {
+      'value': 'Rs.',
+      'description': 'Currency symbol displayed throughout the application',
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    'currency_code': {
+      'value': 'PKR',
+      'description': 'Currency code (e.g., USD, EUR, PKR)',
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    'decimal_places': {
+      'value': '2',
+      'description': 'Number of decimal places for currency',
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    'date_format': {
+      'value': 'MM/DD/YYYY',
+      'description': 'Date format preference',
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    'tooltip_timeout': {
+      'value': '1',
+      'description': 'Tooltip timeout (seconds)',
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    'tax_rate': {
+      'value': '0',
+      'description': 'Default tax rate (%)',
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    'STK_last_no_2026': {
+      'value': '114',
+      'description': null,
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    'PAY_last_no': {
+      'value': '35',
+      'description': null,
+      'updated_at': '2026-08-09 10:00:00',
+    },
+    // Integration key — must NOT surface on the settings screen (it
+    // belongs to the Integrations module).
+    'sendgrid_enabled': {
+      'value': 'false',
+      'description': 'Enable SendGrid email service',
+      'updated_at': '2026-08-09 10:00:00',
+    },
+  };
+
+  /// Captured query params of the last /activity-logs list GET.
+  Map<String, dynamic>? lastActivityLogsQuery;
 
   /// Last /invoices query params + captured create/update bodies.
   Map<String, dynamic>? lastInvoicesQuery;
@@ -3102,6 +3201,135 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       bomDeleteCount++;
       return _json({'message': 'BOM deleted successfully'});
     }
+    if (options.path == '/activity-logs' && options.method == 'GET') {
+      lastActivityLogsQuery = options.queryParameters;
+      final search =
+          (options.queryParameters['search'] as String?)?.toLowerCase() ?? '';
+      final entity = options.queryParameters['entity_type'] as String?;
+      final action = options.queryParameters['action'] as String?;
+      var rows = <Map<String, dynamic>>[
+        {
+          'id': 1,
+          'user_id': 1,
+          'username': 'admin',
+          'action': 'CREATE',
+          'entity_type': 'Invoice',
+          'entity_id': 12,
+          'description': 'Created invoice INV-2608-0012',
+          'log_level': 'INFO',
+          'ip_address': '127.0.0.1',
+          'user_agent': 'MiniERP/1.0',
+          'metadata': null,
+          'duration_ms': 12,
+          'created_at': '2026-08-09 10:30:00',
+        },
+        {
+          'id': 2,
+          'user_id': null,
+          'username': null,
+          'action': 'ERROR',
+          'entity_type': 'User',
+          'entity_id': null,
+          'description': 'Failed login attempt from unknown host',
+          'log_level': 'ERROR',
+          'ip_address': '10.0.0.5',
+          'user_agent': null,
+          'metadata': null,
+          'duration_ms': null,
+          'created_at': '2026-08-08 22:15:00',
+        },
+      ];
+      if (search.isNotEmpty) {
+        rows = [
+          for (final row in rows)
+            if ((row['description'] as String).toLowerCase().contains(search) ||
+                (row['entity_type'] as String).toLowerCase().contains(search))
+              row,
+        ];
+      }
+      if (entity != null && entity.isNotEmpty) {
+        rows = [
+          for (final row in rows)
+            if (row['entity_type'] == entity) row,
+        ];
+      }
+      if (action != null && action.isNotEmpty) {
+        rows = [
+          for (final row in rows)
+            if (row['action'] == action) row,
+        ];
+      }
+      return _json({
+        'success': true,
+        'data': rows,
+        'total': rows.length,
+        'limit': options.queryParameters['limit'] ?? 50,
+        'offset': options.queryParameters['offset'] ?? 0,
+      });
+    }
+    if (options.path == '/activity-logs/stats') {
+      return _json({
+        'success': true,
+        'data': {
+          'totalLogs': 125,
+          'actions': [
+            {'action': 'LOGIN', 'count': 40},
+            {'action': 'CREATE', 'count': 25},
+          ],
+          'users': [
+            {'username': 'admin', 'count': 90},
+          ],
+          'dailyActivity': [
+            {'date': '2026-08-09', 'count': 12},
+          ],
+        },
+      });
+    }
+    if (options.path == '/activity-logs/entity-types') {
+      return _json({
+        'success': true,
+        'data': ['Invoice', 'Customer'],
+      });
+    }
+    if (options.path == '/activity-logs/actions') {
+      return _json({
+        'success': true,
+        'data': ['LOGIN', 'CREATE', 'ERROR'],
+      });
+    }
+    if (options.path == '/activity-logs/users') {
+      return _json({
+        'success': true,
+        'data': [
+          {'id': 1, 'username': 'admin', 'full_name': 'Fawad'},
+        ],
+      });
+    }
+    if (options.path == '/activity-logs/cleanup' && options.method == 'POST') {
+      lastCleanupBody = options.data as Map<String, dynamic>;
+      if (rejectCleanup) {
+        return _json({'error': 'Cleanup not permitted'}, status: 400);
+      }
+      return _json({
+        'success': true,
+        'message': 'Cleaned up 3 old log entries',
+        'deletedCount': 3,
+      });
+    }
+    if (options.path == '/settings' && options.method == 'GET') {
+      return _json(settingsStore); // bare object, no envelope
+    }
+    if (options.path == '/settings/bulk' && options.method == 'POST') {
+      lastSettingsBulkBody = options.data as Map<String, dynamic>;
+      if (rejectSettingsSave) {
+        return _json({'error': 'Settings update rejected'}, status: 400);
+      }
+      for (final entry in lastSettingsBulkBody!.entries) {
+        final row = settingsStore[entry.key];
+        if (row is Map<String, dynamic>) row['value'] = entry.value;
+      }
+      return _json(settingsStore);
+    }
     return _json({
       'success': false,
       'error': {'code': 'NOT_FOUND', 'message': 'Not found'},
@@ -3616,7 +3844,7 @@ void main() {
 
     // Pick the Raw Materials warehouse (WH-RAW, id 2) from the filter
     // dropdown; only the TRANSFER row remains.
-    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.tap(find.byType(SearchableSelect<int>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('WH-RAW · Raw Materials').last);
     await tester.pumpAndSettle();
@@ -3643,7 +3871,7 @@ void main() {
     );
 
     // Back to All Warehouses restores the full ledger.
-    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.tap(find.byType(SearchableSelect<int>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('All Warehouses').last);
     await tester.pumpAndSettle();
@@ -3753,7 +3981,7 @@ void main() {
     await tester.enterText(find.byType(TextFormField).at(1), 'New Widget');
     // Pick a unit of measure (2nd dropdown: code/name fields, then
     // category, uom, sale-type).
-    await tester.tap(find.byType(DropdownButtonFormField<String>).at(1));
+    await tester.tap(find.byType(SearchableSelect<String>).at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nos').last);
     await tester.pumpAndSettle();
@@ -3903,6 +4131,300 @@ void main() {
     expect(content, contains('1,000.00'));
   });
 
+  // Activity log (PORTING.md §5) — offset-paginated grid over
+  // GET /activity-logs with the stats strip and filter dropdowns.
+  Future<void> bootToActivityLog(
+    WidgetTester tester, {
+    _AuthFakeAdapter? adapter,
+  }) async {
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter ?? _AuthFakeAdapter();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Activity Log'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> bootToSettings(
+    WidgetTester tester, {
+    _AuthFakeAdapter? adapter,
+  }) async {
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter ?? _AuthFakeAdapter();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('activity log screen renders the grid with server data', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToActivityLog(tester);
+
+    // Rows + column headers from the fake /activity-logs payload.
+    expect(find.text('Created invoice INV-2608-0012'), findsOneWidget);
+    expect(find.text('Failed login attempt from unknown host'), findsOneWidget);
+    expect(find.text('Invoice #12'), findsOneWidget);
+    expect(find.text('Timestamp'), findsOneWidget);
+    expect(find.text('Description'), findsOneWidget);
+    // Log-level badges render for both rows (scoped to the badges: the
+    // actions dropdown's unselected item widgets also hold these strings).
+    expect(
+      find.descendant(
+        of: find.byType(StatusBadge),
+        matching: find.text('INFO'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(StatusBadge),
+        matching: find.text('ERROR'),
+      ),
+      findsOneWidget,
+    );
+    // Stats strip totals from the fake /activity-logs/stats payload.
+    expect(find.text('Total logs'), findsOneWidget);
+    expect(find.text('125'), findsOneWidget);
+    // Offset envelope → pagination bar (2 rows at limit 50 = 1 page).
+    expect(find.text('Page 1 of 1'), findsOneWidget);
+    expect(find.text('· 2 logs'), findsOneWidget);
+    // Keyboard hint status bar (shared GridStatusBar, like the other
+    // read-only grid screens).
+    expect(find.text('↑ ↓ ← →'), findsOneWidget);
+    expect(find.text('Enter / F2'), findsOneWidget);
+  });
+
+  testWidgets('activity log search filters the grid server-side', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToActivityLog(tester);
+
+    await tester.enterText(find.byType(TextField), 'failed');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Failed login attempt from unknown host'), findsOneWidget);
+    expect(find.text('Created invoice INV-2608-0012'), findsNothing);
+  });
+
+  testWidgets('activity log F2 opens the detail dialog', (tester) async {
+    useWideSurface(tester);
+    await bootToActivityLog(tester);
+
+    // Same current-cell + focus setup as the suppliers F2 test — fired
+    // through the REAL key pipeline (FocusScope → keyManager →
+    // configuration.shortcut → rowDetailShortcutActions).
+    final sm = tester
+        .state<PlutoGridState>(find.byType(PlutoGrid))
+        .stateManager;
+    sm.setCurrentCell(sm.firstCell, 0);
+    sm.gridFocusNode.requestFocus();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.f2);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
+    await tester.pumpAndSettle();
+
+    // Detail dialog renders the focused row's fields (scoped to the
+    // dialog: the description and username also exist in the grid behind
+    // the modal).
+    Finder inDialog(String text) =>
+        find.descendant(of: find.byType(Dialog), matching: find.text(text));
+    expect(inDialog('Activity Detail'), findsOneWidget);
+    expect(inDialog('Created invoice INV-2608-0012'), findsOneWidget);
+    expect(inDialog('admin'), findsOneWidget);
+    expect(inDialog('127.0.0.1'), findsOneWidget);
+
+    // Close returns to the grid.
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('Activity Detail'), findsNothing);
+  });
+
+  testWidgets(
+    'activity log cleanup (admin) confirms retention days and posts',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToActivityLog(tester, adapter: adapter);
+
+      await tester.tap(find.text('Cleanup'));
+      await tester.pumpAndSettle();
+      expect(find.text('Clean up old logs'), findsOneWidget);
+
+      // Default retention is 90 days — just confirm.
+      await tester.tap(find.widgetWithText(FilledButton, 'Cleanup'));
+      await tester.pumpAndSettle();
+
+      expect(adapter.lastCleanupBody?['days'], 90);
+      // Success toast carries the server's deleted count.
+      expect(find.text('Cleaned up 3 log entries'), findsOneWidget);
+    },
+  );
+
+  testWidgets('activity log hides the cleanup action for non-admin users', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToActivityLog(tester, adapter: _AuthFakeAdapter(role: 'user'));
+
+    expect(find.text('Cleanup'), findsNothing);
+    // The rest of the toolbar is still available.
+    expect(find.text('Export CSV'), findsOneWidget);
+  });
+
+  testWidgets('activity log cleanup failure keeps the dialog open', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectCleanup = true;
+    await bootToActivityLog(tester, adapter: adapter);
+
+    await tester.tap(find.text('Cleanup'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Cleanup'));
+    await tester.pumpAndSettle();
+
+    // Error toast with the server's message; the dialog stays open so the
+    // user can adjust the retention period and retry.
+    expect(find.text('Cleanup not permitted'), findsOneWidget);
+    expect(find.text('Clean up old logs'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Clean up old logs'), findsNothing);
+  });
+
+  testWidgets('settings screen renders the grouped editor with server values', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToSettings(tester);
+
+    // Section cards split the key store by domain.
+    expect(find.text('Company'), findsOneWidget);
+    expect(find.text('Currency & Formatting'), findsOneWidget);
+    expect(find.text('Tax'), findsOneWidget);
+    expect(find.text('Document Numbering'), findsOneWidget);
+    // Integration keys are hidden (they belong to the Integrations module).
+    expect(find.text('Enable SendGrid email service'), findsNothing);
+
+    // Fields prefill from the fake /settings payload.
+    expect(find.widgetWithText(TextFormField, 'Mini ERP'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'PKR'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, '0'), findsOneWidget); // tax_rate
+    expect(find.widgetWithText(TextFormField, '114'), findsOneWidget); // STK counter
+  });
+
+  testWidgets('settings screen posts bulk save for changed fields only', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSettings(tester, adapter: adapter);
+
+    // Edit the company name field.
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Mini ERP'),
+      'Acme Industries',
+    );
+    await tester.pumpAndSettle();
+
+    // The Company card marks itself unsaved; Save posts only that change.
+    expect(find.text('Unsaved changes'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Save').first);
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastSettingsBulkBody, {'company_name': 'Acme Industries'});
+    expect(find.text('Settings saved'), findsOneWidget);
+    expect(find.text('Unsaved changes'), findsNothing);
+
+    // The refetched/returned store now carries the new value.
+    expect(adapter.settingsStore['company_name'], isA<Map<String, dynamic>>());
+  });
+
+  testWidgets('settings screen surfaces a failed bulk save', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectSettingsSave = true;
+    await bootToSettings(tester, adapter: adapter);
+
+    // Save a field change against a rejecting server.
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Mini ERP'),
+      'Renamed',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save').first);
+    await tester.pumpAndSettle();
+
+    // Error toast with the server's message; the chip stays (still dirty).
+    expect(find.text('Settings update rejected'), findsOneWidget);
+    expect(find.text('Unsaved changes'), findsOneWidget);
+  });
+
+  testWidgets('activity log date-range filter sends start_date/end_date', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToActivityLog(tester, adapter: adapter);
+
+    // From/To buttons from the shared DateRangeFilter render in the
+    // toolbar.
+    expect(find.text('From'), findsOneWidget);
+    expect(find.text('To'), findsOneWidget);
+
+    // Set the range through the providers (the filter's own date-picker
+    // interaction is covered by date_picker_helpers_test.dart).
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(ActivityLogScreen)),
+    );
+    container.read(activityLogFromDateProvider.notifier).state = DateTime(
+      2026,
+      8,
+      1,
+    );
+    await tester.pumpAndSettle();
+    container.read(activityLogToDateProvider.notifier).state = DateTime(
+      2026,
+      8,
+      9,
+    );
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastActivityLogsQuery?['start_date'], '2026-08-01');
+    expect(adapter.lastActivityLogsQuery?['end_date'], '2026-08-09');
+
+    // The clear button resets the range and refetches without dates.
+    await tester.tap(find.byTooltip('Clear'));
+    await tester.pumpAndSettle();
+    expect(adapter.lastActivityLogsQuery?['start_date'], isNull);
+    expect(adapter.lastActivityLogsQuery?['end_date'], isNull);
+  });
+
   // Reports module — hub + the first report screens (PORTING.md §11).
   Future<void> bootToReports(WidgetTester tester) async {
     final storage = _FakeTokenStorage()..token = 'test-token';
@@ -3970,8 +4492,10 @@ void main() {
     await tester.tap(find.text('Sales Summary Report'));
     await tester.pumpAndSettle();
 
-    // Stat cards from the summary block.
-    expect(find.text('2'), findsOneWidget); // total invoices
+    // Stat cards from the summary block. The grid's two rows render
+    // serial `#1`/`#2`, so the total-invoices stat matches the serial
+    // cell too.
+    expect(find.text('2'), findsNWidgets(2)); // total invoices + #2
     expect(find.text('1,500.00'), findsOneWidget); // total sales
     expect(find.text('110'), findsOneWidget); // items sold
     expect(find.text('750.00'), findsOneWidget); // avg invoice value
@@ -4020,10 +4544,12 @@ void main() {
     await tester.tap(find.text('Stock Level Report'));
     await tester.pumpAndSettle();
 
-    // Summary strip: 2 items / 1 in stock / 1 out of stock (the "1"
-    // appears exactly twice — the in-stock and out-of-stock counts).
-    expect(find.text('2'), findsOneWidget); // total items
-    expect(find.text('1'), findsNWidgets(2)); // in stock + out of stock
+    // Summary strip: 2 items / 1 in stock / 1 out of stock. The grid's
+    // two rows render serial `#1`/`#2`, so those stats match the serial
+    // cells too (the "1" appears as #1 + both counts).
+    expect(find.text('2'), findsNWidgets(2)); // total items + #2
+    expect(find.text('1'), findsNWidgets(3)); // #1 + in stock + out
+
     // Grid rows from the payload.
     expect(find.text('Widget A'), findsOneWidget);
     expect(find.text('Bolt'), findsOneWidget);
@@ -4632,7 +5158,7 @@ void main() {
 
     // Pick the category (first String dropdown; the payment-method
     // dropdown is DropdownButtonFormField<String?> — a different type).
-    await tester.tap(find.byType(DropdownButtonFormField<String>).at(0));
+    await tester.tap(find.byType(SearchableSelect<String>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fuel').last);
     await tester.pumpAndSettle();
@@ -4826,7 +5352,7 @@ void main() {
     final adapter = _AuthFakeAdapter();
     await bootToSales(tester, adapter);
 
-    await tester.tap(find.byType(DropdownButtonFormField<String?>));
+    await tester.tap(find.byType(SearchableSelect<String?>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Paid').last);
     await tester.pumpAndSettle();
@@ -4865,9 +5391,9 @@ void main() {
     // Pick a customer; without a line item the submit still blocks.
     // (Scroll-safe: the Save tap above scrolled the page down, and the
     // always-visible payment panel makes the form tall.)
-    await tester.ensureVisible(find.byType(DropdownButtonFormField<int>).first);
+    await tester.ensureVisible(find.byType(SearchableSelect<int>).first);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).first);
+    await tester.tap(find.byType(SearchableSelect<int>).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Acme Corp').last);
     await tester.pumpAndSettle();
@@ -4966,7 +5492,9 @@ void main() {
     expect(find.text('Widget A'), findsOneWidget);
     expect(find.text('Widget B'), findsOneWidget);
     expect(find.text('4'), findsOneWidget); // qty, row 1
-    expect(find.text('2'), findsOneWidget); // qty, row 2
+    // Row 2's serial `#` is also rendered as '2', so the qty assert
+    // matches the serial cell too.
+    expect(find.text('2'), findsNWidgets(2)); // qty, row 2 + serial #2
     expect(find.text('100.00'), findsOneWidget); // unit cost, row 1
     expect(find.text('400.00'), findsOneWidget); // 4 × 100 return value
     expect(find.text('45.00'), findsOneWidget); // unit cost, row 2
@@ -5318,7 +5846,7 @@ void main() {
 
     // Pick Acme Corp from the customer picker (dropdown over all
     // customers — CUST001 — Acme Corp).
-    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.tap(find.byType(SearchableSelect<int>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('CUST001 — Acme Corp').last);
     await tester.pumpAndSettle();
@@ -5379,7 +5907,7 @@ void main() {
 
     await tester.tap(find.widgetWithText(FilledButton, 'Record Payment'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.tap(find.byType(SearchableSelect<int>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('CUST001 — Acme Corp').last);
     await tester.pumpAndSettle();
@@ -5645,7 +6173,7 @@ void main() {
 
     // Pick a customer (first int dropdown; the line's item select comes
     // after). Menu label is '<code> — <name>' like the PO form.
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.tap(find.byType(SearchableSelect<int>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('CUST001').last);
     await tester.pumpAndSettle();
@@ -5653,7 +6181,7 @@ void main() {
     // Fill the first line: item select (int dropdown #2 — #0 is the
     // customer, #1 the warehouse, #2 the line's item), quantity, unit
     // price.
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.tap(find.byType(SearchableSelect<int>).at(2));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('FG001').last);
     await tester.pumpAndSettle();
@@ -5934,14 +6462,14 @@ void main() {
     expect(adapter.lastQuotationPostBody, isNull);
 
     // Pick a customer (dropdown #0; the line's item select is #2).
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.tap(find.byType(SearchableSelect<int>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('CUST001').last);
     await tester.pumpAndSettle();
 
     // Fill the first line: item select, quantity, unit price. Notes is
     // TextFormField #0 and terms #1; the line's qty/price are #2/#3.
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.tap(find.byType(SearchableSelect<int>).at(2));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('FG001').last);
     await tester.pumpAndSettle();
@@ -6944,14 +7472,14 @@ void main() {
 
     // Supplier (first int dropdown; the item/warehouse selects come
     // after). Menu label is '<code> — <name>'.
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.tap(find.byType(SearchableSelect<int>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.text('SUP001 — Alpha Traders').last);
     await tester.pumpAndSettle();
 
     // Pick the line's item (third int dropdown: supplier, warehouse,
     // then the line).
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.tap(find.byType(SearchableSelect<int>).at(2));
     await tester.pumpAndSettle();
     await tester.tap(find.text('FG001 — Widget A').last);
     await tester.pumpAndSettle();
@@ -7035,7 +7563,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Switch the first line's item (supplier, warehouse, then the line).
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.tap(find.byType(SearchableSelect<int>).at(2));
     await tester.pumpAndSettle();
     await tester.tap(find.text('FG002 — Finished Good B').last);
     await tester.pumpAndSettle();
@@ -8232,13 +8760,13 @@ void main() {
     await tester.pumpAndSettle();
 
     // Item (first int dropdown; menu label is '<code> — <name>').
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.tap(find.byType(SearchableSelect<int>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.text('FG001 — Widget A').last);
     await tester.pumpAndSettle();
 
     // Warehouse (second int dropdown).
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.tap(find.byType(SearchableSelect<int>).at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Main Warehouse').last);
     await tester.pumpAndSettle();
@@ -8311,11 +8839,11 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'New Adjustment'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.tap(find.byType(SearchableSelect<int>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.text('FG001 — Widget A').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.tap(find.byType(SearchableSelect<int>).at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Main Warehouse').last);
     await tester.pumpAndSettle();
@@ -8353,15 +8881,15 @@ void main() {
     await tester.pumpAndSettle();
 
     // Item, source, destination (the three int dropdowns in order).
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.tap(find.byType(SearchableSelect<int>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.text('FG001 — Widget A').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.tap(find.byType(SearchableSelect<int>).at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Main Warehouse').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.tap(find.byType(SearchableSelect<int>).at(2));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Raw Materials').last);
     await tester.pumpAndSettle();
@@ -8420,15 +8948,15 @@ void main() {
     expect(adapter.movementPostCount, 0);
 
     // Same source and destination is rejected up front.
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.tap(find.byType(SearchableSelect<int>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.text('FG001 — Widget A').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.tap(find.byType(SearchableSelect<int>).at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Main Warehouse').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.tap(find.byType(SearchableSelect<int>).at(2));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Main Warehouse').last);
     await tester.pumpAndSettle();
@@ -8442,7 +8970,7 @@ void main() {
     expect(adapter.movementPostCount, 0);
 
     // A non-positive quantity is rejected.
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.tap(find.byType(SearchableSelect<int>).at(2));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Raw Materials').last);
     await tester.pumpAndSettle();
@@ -8468,15 +8996,15 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'New Transfer'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.tap(find.byType(SearchableSelect<int>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.text('FG001 — Widget A').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.tap(find.byType(SearchableSelect<int>).at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Main Warehouse').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.tap(find.byType(SearchableSelect<int>).at(2));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Raw Materials').last);
     await tester.pumpAndSettle();
@@ -8506,15 +9034,15 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'New Transfer'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.tap(find.byType(SearchableSelect<int>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.text('FG001 — Widget A').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.tap(find.byType(SearchableSelect<int>).at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Main Warehouse').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.tap(find.byType(SearchableSelect<int>).at(2));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Raw Materials').last);
     await tester.pumpAndSettle();
@@ -8550,15 +9078,15 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'New Transfer'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.tap(find.byType(SearchableSelect<int>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.text('FG001 — Widget A').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.tap(find.byType(SearchableSelect<int>).at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Main Warehouse').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(2));
+    await tester.tap(find.byType(SearchableSelect<int>).at(2));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Raw Materials').last);
     await tester.pumpAndSettle();
@@ -8740,7 +9268,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('SM-2026-0100'), findsOneWidget);
 
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.tap(find.byType(SearchableSelect<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Adjustment').last);
     await tester.pumpAndSettle();
@@ -8766,14 +9294,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.tap(find.byType(SearchableSelect<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Adjustment').last);
     await tester.pumpAndSettle();
     expect(adapter.lastMovementQuery, {'movement_type': 'ADJUSTMENT'});
 
     // Back to All — the refetch drops the query param.
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.tap(find.byType(SearchableSelect<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('All Movements').last);
     await tester.pumpAndSettle();
@@ -8900,7 +9428,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Exactly the four fixed pickers — no per-material line rows.
-    expect(find.byType(DropdownButtonFormField<int>), findsNWidgets(4));
+    expect(find.byType(SearchableSelect<int>), findsNWidgets(4));
     expect(find.text('Add Input'), findsNothing);
     // The availability table appears only after a BOM is picked.
     expect(find.byType(DataTable), findsNothing);
@@ -8954,7 +9482,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Output item = FG001 (Widget A) — the BOM's finished item.
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.tap(find.byType(SearchableSelect<int>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.text('FG001 — Widget A').last);
     await tester.pumpAndSettle();
@@ -8962,7 +9490,7 @@ void main() {
     // Output quantity 2, finished-goods warehouse Main Warehouse.
     await tester.enterText(find.byType(TextFormField).at(0), '2');
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.tap(find.byType(SearchableSelect<int>).at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Main Warehouse').last);
     await tester.pumpAndSettle();
@@ -8970,7 +9498,7 @@ void main() {
     // Pick BOM-2026-0001 → detail fetched (GET /boms/1) → lines
     // auto-scaled to 2 × per-batch quantities (6 × Bolt, 4 × RM A).
     expect(adapter.bomDetailFetchCount, 0);
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(3));
+    await tester.tap(find.byType(SearchableSelect<int>).at(3));
     await tester.pumpAndSettle();
     await tester.tap(find.text('BOM-2026-0001 — Widget A').last);
     await tester.pumpAndSettle();
@@ -9136,13 +9664,13 @@ void main() {
     await tester.enterText(find.byType(TextFormField).at(1), '5');
 
     // Finished item picker.
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(0));
+    await tester.tap(find.byType(SearchableSelect<int>).at(0));
     await tester.pumpAndSettle();
     await tester.tap(find.text('FG001 — Widget A').last);
     await tester.pumpAndSettle();
 
     // One material line (the form starts with one empty row): Bolt × 3.
-    await tester.tap(find.byType(DropdownButtonFormField<int>).at(1));
+    await tester.tap(find.byType(SearchableSelect<int>).at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('RM002 — Bolt').last);
     await tester.pumpAndSettle();

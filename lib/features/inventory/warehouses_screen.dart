@@ -98,11 +98,16 @@ class _WarehousesScreenState extends ConsumerState<WarehousesScreen>
 
     // Search re-applies rows from the derived filtered provider (the
     // source provider is unchanged, so the mixin's listener doesn't fire).
+    // Rows still need the `serial` cell — the grid carries the shared
+    // `#` column, and PlutoGrid requires a cell per column per row.
     ref.listen(warehousesSearchFilteredProvider, (previous, next) {
       final manager = gridStateManager;
       if (manager == null) return;
       manager.removeAllRows();
-      manager.appendRows([for (final w in next) gridRowFor(w)]);
+      manager.appendRows([
+        for (final (index, w) in next.indexed)
+          withSerialCell(gridRowFor(w), index),
+      ]);
     });
 
     return Column(

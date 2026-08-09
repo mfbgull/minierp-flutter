@@ -25,6 +25,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
+import '../../widgets/searchable_select.dart';
 import 'inventory_providers.dart';
 
 /// Opens the stock ledger for [itemId]; [itemLabel] is the item
@@ -139,38 +140,45 @@ class _LedgerBody extends ConsumerWidget {
               SizedBox(
                 width: 220,
                 height: 44,
-                child: DropdownButtonFormField<int>(
-                  initialValue: warehouseId ?? -1,
-                  isExpanded: true,
+                child: SearchableSelect<int>(
+                  items: [
+                    -1,
+                    // Inactive warehouses are intentionally included — a
+                    // historical ledger may reference a deactivated one.
+                    if (warehouses case AsyncData(:final value))
+                      for (final w in value) w.id,
+                  ],
+                  selected: warehouseId ?? -1,
+                  labelBuilder: (id) {
+                    if (id == -1) {
+                      return l10n.inventoryStockledgerAllwarehouses;
+                    }
+                    if (warehouses case AsyncData(:final value)) {
+                      for (final w in value) {
+                        if (w.id == id) {
+                          return w.warehouseName?.isNotEmpty ?? false
+                              ? '${w.warehouseCode} · ${w.warehouseName}'
+                              : w.warehouseCode;
+                        }
+                      }
+                    }
+                    return '$id';
+                  },
                   isDense: true,
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.warehouse_outlined, size: 20),
+                    prefixIcon: const Icon(
+                      Icons.warehouse_outlined,
+                      size: 20,
+                    ),
                     contentPadding: EdgeInsets.zero,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  items: [
-                    DropdownMenuItem<int>(
-                      value: -1,
-                      child: Text(l10n.inventoryStockledgerAllwarehouses),
-                    ),
-                    // Inactive warehouses are intentionally included — a
-                    // historical ledger may reference a deactivated one.
-                    if (warehouses case AsyncData(:final value))
-                      for (final w in value)
-                        DropdownMenuItem<int>(
-                          value: w.id,
-                          child: Text(
-                            w.warehouseName?.isNotEmpty ?? false
-                                ? '${w.warehouseCode} · ${w.warehouseName}'
-                                : w.warehouseCode,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                  ],
                   onChanged: (value) =>
-                      onWarehouseChanged(value == -1 ? null : value),
+                      onWarehouseChanged(value == null || value == -1
+                          ? null
+                          : value),
                 ),
               ),
             ],

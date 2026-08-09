@@ -98,6 +98,156 @@ abstract class AppLocalizations {
     Locale('ur'),
   ];
 
+  /// No description provided for @activitylogCleanup.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleanup'**
+  String get activitylogCleanup;
+
+  /// No description provided for @activitylogCleanupdays.
+  ///
+  /// In en, this message translates to:
+  /// **'Retention (days)'**
+  String get activitylogCleanupdays;
+
+  /// No description provided for @activitylogCleanupdesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently deletes log entries older than the retention period. This cannot be undone.'**
+  String get activitylogCleanupdesc;
+
+  /// No description provided for @activitylogCleanupinvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid number of days'**
+  String get activitylogCleanupinvalid;
+
+  /// No description provided for @activitylogCleanupsuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleaned up {count} log entries'**
+  String activitylogCleanupsuccess(Object count);
+
+  /// No description provided for @activitylogCleanuptitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean up old logs'**
+  String get activitylogCleanuptitle;
+
+  /// No description provided for @activitylogAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Action'**
+  String get activitylogAction;
+
+  /// No description provided for @activitylogAllactions.
+  ///
+  /// In en, this message translates to:
+  /// **'All actions'**
+  String get activitylogAllactions;
+
+  /// No description provided for @activitylogAllentities.
+  ///
+  /// In en, this message translates to:
+  /// **'All entity types'**
+  String get activitylogAllentities;
+
+  /// No description provided for @activitylogAllusers.
+  ///
+  /// In en, this message translates to:
+  /// **'All users'**
+  String get activitylogAllusers;
+
+  /// No description provided for @activitylogCount.
+  ///
+  /// In en, this message translates to:
+  /// **'logs'**
+  String get activitylogCount;
+
+  /// No description provided for @activitylogDetailtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity Detail'**
+  String get activitylogDetailtitle;
+
+  /// No description provided for @activitylogDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get activitylogDuration;
+
+  /// No description provided for @activitylogEntity.
+  ///
+  /// In en, this message translates to:
+  /// **'Entity'**
+  String get activitylogEntity;
+
+  /// No description provided for @activitylogExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export CSV'**
+  String get activitylogExportcsv;
+
+  /// No description provided for @activitylogExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity log exported'**
+  String get activitylogExported;
+
+  /// No description provided for @activitylogExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed'**
+  String get activitylogExportfailed;
+
+  /// No description provided for @activitylogIp.
+  ///
+  /// In en, this message translates to:
+  /// **'IP Address'**
+  String get activitylogIp;
+
+  /// No description provided for @activitylogLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Level'**
+  String get activitylogLevel;
+
+  /// No description provided for @activitylogMetadata.
+  ///
+  /// In en, this message translates to:
+  /// **'Metadata'**
+  String get activitylogMetadata;
+
+  /// No description provided for @activitylogTimestamp.
+  ///
+  /// In en, this message translates to:
+  /// **'Timestamp'**
+  String get activitylogTimestamp;
+
+  /// No description provided for @activitylogToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get activitylogToday;
+
+  /// No description provided for @activitylogTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total logs'**
+  String get activitylogTotal;
+
+  /// No description provided for @activitylogUser.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get activitylogUser;
+
+  /// No description provided for @activitylogUseragent.
+  ///
+  /// In en, this message translates to:
+  /// **'User Agent'**
+  String get activitylogUseragent;
+
   /// No description provided for @dashboardWelcome.
   ///
   /// In en, this message translates to:
@@ -2929,6 +3079,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Settings'**
   String get settingsSettings;
+
+  /// No description provided for @settingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Company profile, currency, tax rates and document numbering.'**
+  String get settingsSubtitle;
+
+  /// No description provided for @settingsSectionCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'Company'**
+  String get settingsSectionCompany;
+
+  /// No description provided for @settingsSectionCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency & Formatting'**
+  String get settingsSectionCurrency;
+
+  /// No description provided for @settingsSectionTax.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax'**
+  String get settingsSectionTax;
+
+  /// No description provided for @settingsSectionNumbering.
+  ///
+  /// In en, this message translates to:
+  /// **'Document Numbering'**
+  String get settingsSectionNumbering;
+
+  /// No description provided for @settingsSectionOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other Settings'**
+  String get settingsSectionOther;
+
+  /// No description provided for @settingsKeyCompanyName.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Name'**
+  String get settingsKeyCompanyName;
+
+  /// No description provided for @settingsKeyCompanyEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Email'**
+  String get settingsKeyCompanyEmail;
+
+  /// No description provided for @settingsKeyCompanyPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Phone'**
+  String get settingsKeyCompanyPhone;
+
+  /// No description provided for @settingsKeyCompanyAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Address'**
+  String get settingsKeyCompanyAddress;
+
+  /// No description provided for @settingsKeyCompanyTaxId.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Tax ID'**
+  String get settingsKeyCompanyTaxId;
+
+  /// No description provided for @settingsKeyCurrencySymbol.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency Symbol'**
+  String get settingsKeyCurrencySymbol;
+
+  /// No description provided for @settingsKeyCurrencyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency Code'**
+  String get settingsKeyCurrencyCode;
+
+  /// No description provided for @settingsKeyCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get settingsKeyCurrency;
+
+  /// No description provided for @settingsKeyDecimalPlaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Decimal Places'**
+  String get settingsKeyDecimalPlaces;
+
+  /// No description provided for @settingsKeyDateFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Date Format'**
+  String get settingsKeyDateFormat;
+
+  /// No description provided for @settingsKeyTooltipTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Tooltip Timeout (s)'**
+  String get settingsKeyTooltipTimeout;
+
+  /// No description provided for @settingsKeyTaxRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Tax Rate (%)'**
+  String get settingsKeyTaxRate;
+
+  /// No description provided for @settingsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings saved'**
+  String get settingsSaved;
+
+  /// No description provided for @settingsSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save settings'**
+  String get settingsSaveFailed;
+
+  /// No description provided for @settingsUnsaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsaved changes'**
+  String get settingsUnsaved;
+
+  /// No description provided for @settingsNumberingHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Server-managed document counter — edit with care.'**
+  String get settingsNumberingHelper;
+
+  /// No description provided for @settingsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No settings to display'**
+  String get settingsEmpty;
 
   /// No description provided for @integrationsIntegrations.
   ///

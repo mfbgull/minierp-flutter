@@ -7,9 +7,14 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:minierp_app/data/models/dashboard_layout.dart'
+    show DashboardBlock;
 import 'package:minierp_app/data/repositories/api_result.dart';
+import 'package:minierp_app/data/models/activity_log.dart' show ActivityLog;
+import 'package:minierp_app/data/repositories/activity_log_repository.dart';
 import 'package:minierp_app/data/repositories/auth_repository.dart';
 import 'package:minierp_app/data/repositories/customer_repository.dart';
+import 'package:minierp_app/data/repositories/dashboard_layout_repository.dart';
 import 'package:minierp_app/data/repositories/dashboard_repository.dart';
 import 'package:minierp_app/data/repositories/expense_repository.dart';
 import 'package:minierp_app/data/repositories/inventory_repository.dart';
@@ -1100,6 +1105,118 @@ void main() {
     });
   });
 
+  group('DashboardLayoutRepository', () {
+    late DashboardLayoutRepository repo;
+
+    setUp(() => repo = DashboardLayoutRepository(api));
+
+    test('activeLayout parses the saved layout', () async {
+      handler = (o) => jsonBody({
+        'success': true,
+        'data': {
+          'id': 3,
+          'user_id': 1,
+          'layout_name': 'My Dashboard',
+          'is_active': true,
+          'created_at': '2026-01-01',
+          'updated_at': '2026-02-01',
+          'blocks': [
+            {
+              'id': 'blk-1',
+              'type': 'stat_cards',
+              'title': 'Stat Cards',
+              'x': 0,
+              'y': 0,
+              'width': 2,
+              'height': 1,
+              'visible': true,
+              'version': 1,
+              'config': {'refreshInterval': 30},
+            },
+          ],
+        },
+      });
+      final layout = (await repo.activeLayout()).requireData;
+      expect(layout, isNotNull);
+      expect(layout!.layoutName, 'My Dashboard');
+      expect(layout.blocks.single.type, 'stat_cards');
+      expect(layout.blocks.single.config.refreshInterval, 30);
+    });
+
+    test('activeLayout 404 (no saved layout) normalizes to null', () async {
+      handler = (o) => jsonBody({'success': true, 'data': null}, status: 404);
+      final result = await repo.activeLayout();
+      expect(result, isA<ApiSuccess>());
+      expect(result.requireData, isNull);
+    });
+
+    test(
+      'createLayout posts name/blocks and parses the created layout',
+      () async {
+        Map<String, dynamic>? seenBody;
+        handler = (o) {
+          seenBody = o.data as Map<String, dynamic>?;
+          return jsonBody({
+            'success': true,
+            'data': {
+              'id': 9,
+              'user_id': 1,
+              'layout_name': seenBody?['layout_name'],
+              'blocks': seenBody?['blocks'] ?? [],
+              'is_active': true,
+            },
+          }, status: 201);
+        };
+        final layout = (await repo.createLayout(
+          layoutName: 'Ops',
+          blocks: [
+            DashboardBlock(
+              id: 'b1',
+              type: 'stat_cards',
+              title: 'Stat Cards',
+              x: 0,
+              y: 0,
+              width: 2,
+              height: 1,
+            ),
+          ],
+        )).requireData;
+        expect(layout.id, 9);
+        expect(layout.layoutName, 'Ops');
+        expect(seenBody!['layout_name'], 'Ops');
+        expect((seenBody!['blocks'] as List), hasLength(1));
+        final postedBlock =
+            (seenBody!['blocks'] as List).first as Map<String, dynamic>;
+        expect(postedBlock['type'], 'stat_cards');
+      },
+    );
+
+    test('updateLayout PUTs name/blocks to the layout id', () async {
+      String? seenPath;
+      Map<String, dynamic>? seenBody;
+      handler = (o) {
+        seenPath = o.path;
+        seenBody = o.data as Map<String, dynamic>?;
+        return jsonBody({'success': true, 'message': 'Layout updated'});
+      };
+      final result = await repo.updateLayout(3, layoutName: 'Renamed');
+      expect(result, isA<ApiSuccess>());
+      expect(seenPath, '/dashboard/layout/3');
+      expect(seenBody!['layout_name'], 'Renamed');
+    });
+
+    test('deleteLayout DELETEs the layout id', () async {
+      String? seenPath;
+      handler = (o) {
+        seenPath = o.path;
+        return jsonBody({'success': true, 'message': 'Layout deleted'});
+      };
+      final result = await repo.deleteLayout(3);
+      expect(result, isA<ApiSuccess>());
+      expect(seenPath, '/dashboard/layout/3');
+    });
+  });
+
   group('ProductionRepository', () {
     late ProductionRepository repo;
 
@@ -1366,6 +1483,186 @@ void main() {
       final result = await repo.deleteBom(1);
       expect(seenPath, '/boms/1');
       expect(result, isA<ApiSuccess<void>>());
+    });
+  });
+
+  group('ActivityLogRepository', () {
+    late ActivityLogRepository repo;
+
+    setUp(() => repo = ActivityLogRepository(api));
+
+    test(
+      'logs sends snake_case filters and parses the total/limit/offset envelope',
+      () async {
+        Map<String, dynamic>? seenQuery;
+        handler = (o) {
+          seenQuery = o.queryParameters;
+          return jsonBody({
+            'success': true,
+            'data': [
+              {
+                'id': 1,
+                'action': 'LOGIN',
+                'entity_type': 'User',
+                'description': 'Signed in',
+                'log_level': 'INFO',
+                'created_at': '2026-08-09 10:00:00',
+              },
+              {
+                'id': 2,
+                'username': 'admin',
+                'action': 'CREATE',
+                'entity_type': 'Invoice',
+                'entity_id': 9,
+                'description': 'Created invoice',
+                'log_level': 'INFO',
+                'created_at': '2026-08-09 09:00:00',
+              },
+            ],
+            'total': 25,
+            'limit': 50,
+            'offset': 0,
+          });
+        };
+        final result = await repo.logs(
+          ActivityLogFilters(
+            search: 'invoice',
+            entityType: 'Invoice',
+            action: 'CREATE',
+            userId: 1,
+            startDate: '2026-08-01',
+            endDate: '2026-08-09',
+            limit: 50,
+            offset: 50,
+          ),
+        );
+        expect(seenQuery!['search'], 'invoice');
+        expect(seenQuery!['entity_type'], 'Invoice');
+        expect(seenQuery!['action'], 'CREATE');
+        expect(seenQuery!['user_id'], 1);
+        expect(seenQuery!['start_date'], '2026-08-01');
+        expect(seenQuery!['end_date'], '2026-08-09');
+        expect(seenQuery!['limit'], 50);
+        expect(seenQuery!['offset'], 50);
+        final page = result.requireData;
+        expect(page.items, hasLength(2));
+        expect(page.items.first, isA<ActivityLog>());
+        expect(page.items[1].entityLabel, 'Invoice #9');
+        expect(page.total, 25);
+        expect(page.limit, 50);
+        expect(page.offset, 0);
+        expect(page.totalPages, 1);
+        expect(page.page, 1);
+        // 2 of 25 rows on the first page → there is a next page.
+        expect(page.hasNext, isTrue);
+        expect(page.hasPrev, isFalse);
+      },
+    );
+
+    test(
+      'logs omits empty filters and derives paging from the offset',
+      () async {
+        Map<String, dynamic>? seenQuery;
+        handler = (o) {
+          seenQuery = o.queryParameters;
+          return jsonBody({
+            'success': true,
+            'data': [
+              {
+                'id': 1,
+                'action': 'X',
+                'entity_type': '',
+                'description': '',
+                'log_level': 'INFO',
+                'created_at': '2026-08-09 10:00:00',
+              },
+            ],
+            'total': 120,
+            'limit': 50,
+            'offset': 100,
+          });
+        };
+        final result = await repo.logs(
+          const ActivityLogFilters(limit: 50, offset: 100),
+        );
+        expect(seenQuery!.containsKey('search'), isFalse);
+        expect(seenQuery!.containsKey('entity_type'), isFalse);
+        expect(seenQuery!.containsKey('user_id'), isFalse);
+        final page = result.requireData;
+        expect(page.page, 3);
+        expect(page.totalPages, 3);
+        expect(page.hasNext, isTrue);
+        expect(page.hasPrev, isTrue);
+      },
+    );
+
+    test('stats parses the action/user/daily buckets', () async {
+      handler = (o) => jsonBody({
+        'success': true,
+        'data': {
+          'totalLogs': 125,
+          'actions': [
+            {'action': 'LOGIN', 'count': 40},
+          ],
+          'users': [
+            {'username': 'admin', 'count': 90},
+          ],
+          'dailyActivity': [
+            {'date': '2026-08-09', 'count': 12},
+          ],
+        },
+      });
+      final stats = (await repo.stats()).requireData;
+      expect(stats.totalLogs, 125);
+      expect(stats.actions.single.count, 40);
+      expect(stats.users.single.label, 'admin');
+      expect(stats.dailyActivity.single.count, 12);
+    });
+
+    test(
+      'entityTypes/actions parse bare string arrays; users parse rows',
+      () async {
+        handler = (o) => jsonBody({
+          'success': true,
+          'data': ['Invoice', 'Customer'],
+        });
+        expect((await repo.entityTypes()).requireData, ['Invoice', 'Customer']);
+        expect((await repo.actions()).requireData, ['Invoice', 'Customer']);
+
+        handler = (o) => jsonBody({
+          'success': true,
+          'data': [
+            {'id': 1, 'username': 'admin', 'full_name': 'Fawad'},
+          ],
+        });
+        final users = (await repo.users()).requireData;
+        expect(users.single.username, 'admin');
+        expect(users.single.fullName, 'Fawad');
+      },
+    );
+
+    test('cleanup posts the retention days and parses deletedCount', () async {
+      Map<String, dynamic>? seenBody;
+      handler = (o) {
+        seenBody = o.data as Map<String, dynamic>;
+        return jsonBody({
+          'success': true,
+          'message': 'Cleaned up 12 old log entries',
+          'deletedCount': 12,
+        });
+      };
+      final result = await repo.cleanup(days: 30);
+      expect(seenBody!['days'], 30);
+      expect(result.requireData, 12);
+    });
+
+    test('cleanup surfaces a {success:false} envelope as a failure', () async {
+      handler = (o) => jsonBody({
+        'success': false,
+        'error': {'code': 'FORBIDDEN', 'message': 'Admin only'},
+      });
+      final result = await repo.cleanup();
+      expect(result, isA<ApiFailure<int>>());
     });
   });
 }

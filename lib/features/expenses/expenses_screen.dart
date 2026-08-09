@@ -24,7 +24,9 @@ import '../../data/models/expense.dart' show Expense;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn, withSerialCell;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/searchable_select.dart';
 import '../../widgets/status_badge.dart';
 import 'expense_form_dialog.dart';
 import 'expense_providers.dart';
@@ -89,27 +91,31 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     if (value.hasValue) {
       manager.removeAllRows();
       manager.appendRows([
-        for (final expense in value.value ?? const <Expense>[])
-          _rowFor(expense),
+        for (final (index, expense)
+            in (value.value ?? const <Expense>[]).indexed)
+          _rowFor(expense, index),
       ]);
     }
   }
 
-  static PlutoRow _rowFor(Expense expense) => PlutoRow(
-    cells: {
-      'id': PlutoCell(value: expense.id),
-      'expense_no': PlutoCell(value: expense.expenseNo),
-      'expense_date': PlutoCell(value: expense.expenseDate),
-      'category': PlutoCell(value: expense.expenseCategory),
-      'description': PlutoCell(value: expense.description ?? ''),
-      'vendor': PlutoCell(value: expense.vendorName ?? ''),
-      'reference_no': PlutoCell(value: expense.referenceNo ?? ''),
-      'payment_method': PlutoCell(value: expense.paymentMethod ?? ''),
-      'project': PlutoCell(value: expense.project ?? ''),
-      'amount': PlutoCell(value: expense.amount),
-      'status': PlutoCell(value: expense.status),
-      'created_by': PlutoCell(value: expense.createdByName ?? ''),
-    },
+  PlutoRow _rowFor(Expense expense, int index) => withSerialCell(
+    PlutoRow(
+      cells: {
+        'id': PlutoCell(value: expense.id),
+        'expense_no': PlutoCell(value: expense.expenseNo),
+        'expense_date': PlutoCell(value: expense.expenseDate),
+        'category': PlutoCell(value: expense.expenseCategory),
+        'description': PlutoCell(value: expense.description ?? ''),
+        'vendor': PlutoCell(value: expense.vendorName ?? ''),
+        'reference_no': PlutoCell(value: expense.referenceNo ?? ''),
+        'payment_method': PlutoCell(value: expense.paymentMethod ?? ''),
+        'project': PlutoCell(value: expense.project ?? ''),
+        'amount': PlutoCell(value: expense.amount),
+        'status': PlutoCell(value: expense.status),
+        'created_by': PlutoCell(value: expense.createdByName ?? ''),
+      },
+    ),
+    index,
   );
 
   @override
@@ -173,6 +179,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         _filterDropdown<String?>(
           key: const ValueKey('expense-category-filter'),
           value: ref.watch(expensesCategoryProvider),
+          hint: l10n.expensesAllcategories,
           items: [
             null,
             for (final category
@@ -188,6 +195,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         _filterDropdown<String?>(
           key: const ValueKey('expense-status-filter'),
           value: ref.watch(expensesStatusProvider),
+          hint: l10n.expensesAllstatuses,
           items: [
             null,
             for (final option
@@ -239,10 +247,11 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     );
   }
 
-  /// Compact filter dropdown (All-category / All-status / form selects).
+  /// Compact searchable filter dropdown (All-category / All-status).
   Widget _filterDropdown<T>({
     required Key key,
     required T value,
+    String? hint,
     required List<T> items,
     required String Function(T) labelBuilder,
     required ValueChanged<T?> onChanged,
@@ -251,18 +260,13 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     return SizedBox(
       width: width,
       height: 40,
-      child: DropdownButtonFormField<T>(
+      child: SearchableSelect<T>(
         key: key,
-        initialValue: value,
+        items: items,
+        selected: value,
+        hint: hint,
+        labelBuilder: labelBuilder,
         isDense: true,
-        // Without isExpanded the internal selected-value Row keeps its
-        // intrinsic width and overflows the SizedBox on narrow toolbar
-        // layouts (and in widget tests at 1600px).
-        isExpanded: true,
-        items: [
-          for (final item in items)
-            DropdownMenuItem(value: item, child: Text(labelBuilder(item))),
-        ],
         onChanged: onChanged,
         decoration: InputDecoration(
           isDense: true,
@@ -392,6 +396,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         );
 
     return [
+      serialGridColumn(),
       PlutoColumn(
         title: '',
         field: 'id',

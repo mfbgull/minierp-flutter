@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minierp_app/data/models/bom.dart';
 import 'package:minierp_app/data/models/customer.dart';
+import 'package:minierp_app/data/models/dashboard_summary.dart';
 import 'package:minierp_app/data/models/invoice.dart';
 import 'package:minierp_app/data/models/item.dart';
 import 'package:minierp_app/data/models/production.dart';
@@ -34,6 +35,14 @@ import 'package:minierp_app/data/models/supplier.dart';
 ///   GET /api/reports/purchase-summary?...   -> purchase_summary.json
 ///   GET /api/reports/top-debtors?limit=10   -> top_debtors.json
 ///                                          (saved as the bare data array)
+///   GET /api/dashboard/top-customers?limit=5 -> dashboard_top_customers.json
+///   GET /api/dashboard/sales-summary?period=week -> dashboard_sales_summary.json
+///   GET /api/dashboard/expense-summary?period=month -> dashboard_expense_summary.json
+///   GET /api/dashboard/production-status  -> dashboard_production_status.json
+///   GET /api/dashboard/stock-movement-summary?days=30
+///                                          -> dashboard_stock_movement_summary.json
+///   GET /api/dashboard/kpi?metric=stock_health -> dashboard_kpi.json
+///   GET /api/dashboard/ar-summary          -> dashboard_ar_summary.json
 ///
 /// NOTE: list endpoints wrap rows in `{success, data}` while
 /// `GET /api/invoices/:id` returns the bare object — repositories must
@@ -74,6 +83,13 @@ void main() {
         'inventory_movement.json',
         'purchase_summary.json',
         'top_debtors.json',
+        'dashboard_top_customers.json',
+        'dashboard_sales_summary.json',
+        'dashboard_expense_summary.json',
+        'dashboard_production_status.json',
+        'dashboard_stock_movement_summary.json',
+        'dashboard_kpi.json',
+        'dashboard_ar_summary.json',
       ]) {
         expect(
           File('test/fixtures/$name').existsSync(),
@@ -499,5 +515,117 @@ void main() {
         reason: 'top debtors must be sorted by outstanding desc',
       );
     }
+  });
+
+  // ── Dashboard block endpoints (PORTING.md §10) ─────────────────────
+
+  test('dashboard_top_customers.json parses rows sorted by revenue', () {
+    final json = loadFixture('dashboard_top_customers.json');
+    final rows = json['data'] as List;
+    final customers = [
+      for (final r in rows) TopCustomer.fromJson(r as Map<String, dynamic>),
+    ];
+
+    expect(customers, isNotEmpty);
+    expect(customers.length, rows.length);
+    for (final c in customers) {
+      expect(c.totalRevenue, greaterThanOrEqualTo(0));
+      expect(c.invoiceCount, greaterThanOrEqualTo(0));
+    }
+    // Rows are ordered by revenue descending (server GROUP BY ... ORDER
+    // BY total_revenue DESC).
+    for (var i = 1; i < customers.length; i++) {
+      expect(
+        customers[i - 1].totalRevenue >= customers[i].totalRevenue,
+        isTrue,
+        reason: 'top customers must be sorted by revenue desc',
+      );
+    }
+  });
+
+  test('dashboard_top_customers tolerates a null customer_name', () {
+    final json = loadFixture('dashboard_top_customers.json');
+    final rows = json['data'] as List;
+    // This snapshot groups invoices by customer_name; a row with NULL
+    // customer_name is legal (asString → '').
+    for (final r in rows) {
+      final c = TopCustomer.fromJson(r as Map<String, dynamic>);
+      expect(c.customerName, isA<String>());
+    }
+  });
+
+  test('dashboard_sales_summary.json parses period totals', () {
+    final json = loadFixture('dashboard_sales_summary.json');
+    final row = SalesSummaryResult.fromJson(
+      json['data'] as Map<String, dynamic>,
+    );
+
+    expect(row.periodTotal, greaterThan(0));
+    expect(row.count, greaterThan(0));
+  });
+
+  test('dashboard_expense_summary.json parses period totals', () {
+    final json = loadFixture('dashboard_expense_summary.json');
+    final row = ExpenseSummaryResult.fromJson(
+      json['data'] as Map<String, dynamic>,
+    );
+
+    expect(row.periodTotal, greaterThanOrEqualTo(0));
+    expect(row.count, greaterThanOrEqualTo(0));
+  });
+
+  test(
+    'dashboard_production_status.json parses counts that partition total',
+    () {
+      final json = loadFixture('dashboard_production_status.json');
+      final row = ProductionStatusResult.fromJson(
+        json['data'] as Map<String, dynamic>,
+      );
+
+      expect(row.total, greaterThan(0));
+      // active + completed + cancelled partition the total (cancelled is
+      // hard-coded 0 on the server).
+      expect(row.active + row.completed + row.cancelled, row.total);
+    },
+  );
+
+  test('dashboard_stock_movement_summary.json parses net tie-out', () {
+    final json = loadFixture('dashboard_stock_movement_summary.json');
+    final row = StockMovementSummaryResult.fromJson(
+      json['data'] as Map<String, dynamic>,
+    );
+
+    expect(row.inboundQty, greaterThanOrEqualTo(0));
+    expect(row.outboundQty, greaterThanOrEqualTo(0));
+    // net = inbound - outbound (server sums positive/negative legs).
+    expect(row.net, closeTo(row.inboundQty - row.outboundQty, 0.01));
+  });
+
+  test('dashboard_kpi.json parses the gauge', () {
+    final json = loadFixture('dashboard_kpi.json');
+    final row = KpiResult.fromJson(json['data'] as Map<String, dynamic>);
+
+    expect(row.metric, isNotEmpty);
+    expect(row.label, isNotEmpty);
+    expect(row.unit, isNotEmpty);
+    expect(row.value, isA<num>());
+  });
+
+  test('dashboard_ar_summary.json parses buckets within the AR total', () {
+    final json = loadFixture('dashboard_ar_summary.json');
+    final row = ArSummaryResult.fromJson(json['data'] as Map<String, dynamic>);
+
+    expect(row.totalAr, greaterThan(0));
+    expect(row.customerCount, greaterThan(0));
+    final bucketSum =
+        row.currentAmount +
+        row.amount130 +
+        row.amount3160 +
+        row.amount6190 +
+        row.amountOver90;
+    // Buckets can't exceed the total; an invoice with a NULL due_date
+    // lands in total_ar but in no aging bucket, so <= is the invariant.
+    expect(bucketSum, lessThanOrEqualTo(row.totalAr));
+    expect(bucketSum, greaterThan(0));
   });
 }

@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:minierp_app/data/models/activity_log.dart';
 import 'package:minierp_app/data/models/bom.dart';
 import 'package:minierp_app/data/models/customer.dart';
+import 'package:minierp_app/data/models/dashboard_layout.dart';
 import 'package:minierp_app/data/models/dashboard_summary.dart';
 import 'package:minierp_app/data/models/expense.dart';
 import 'package:minierp_app/data/models/invoice.dart';
@@ -656,6 +658,132 @@ void main() {
     });
   });
 
+  group('Dashboard layout', () {
+    test('parses a full layout with blocks and config', () {
+      final layout = DashboardLayout.fromJson({
+        'id': 3,
+        'user_id': 1,
+        'layout_name': 'My Dashboard',
+        'is_active': 1,
+        'created_at': '2026-01-01',
+        'updated_at': '2026-02-01',
+        'blocks': [
+          {
+            'id': 'blk-1',
+            'type': 'stat_cards',
+            'title': 'Stat Cards',
+            'x': 0,
+            'y': 0,
+            'width': 2,
+            'height': 1,
+            'visible': true,
+            'version': 1,
+            'config': {'refreshInterval': 30, 'limit': 5},
+          },
+          {
+            'id': 'blk-2',
+            'type': 'custom_text',
+            'title': 'Notes',
+            'x': 2,
+            'y': 1,
+            'width': 1,
+            'height': 1,
+            'visible': false,
+            'version': 2,
+            'config': {'text': 'Hello'},
+          },
+        ],
+      });
+
+      expect(layout.id, 3);
+      expect(layout.userId, 1);
+      expect(layout.layoutName, 'My Dashboard');
+      expect(layout.isActive, isTrue);
+      expect(layout.blocks, hasLength(2));
+
+      final first = layout.blocks.first;
+      expect(first.id, 'blk-1');
+      expect(first.type, 'stat_cards');
+      expect(first.x, 0);
+      expect(first.width, 2);
+      expect(first.visible, isTrue);
+      expect(first.config.refreshInterval, 30);
+      expect(first.config.limit, 5);
+
+      final second = layout.blocks.last;
+      expect(second.visible, isFalse);
+      expect(second.config.text, 'Hello');
+    });
+
+    test('is_active parses boolean/1/0 and missing blocks default empty', () {
+      final layout = DashboardLayout.fromJson({
+        'id': 1,
+        'user_id': 1,
+        'layout_name': 'Default',
+        'is_active': false,
+      });
+      expect(layout.isActive, isFalse);
+      expect(layout.blocks, isEmpty);
+      expect(layout.createdAt, '');
+    });
+
+    test('block config preserves unknown keys and toJson round-trips', () {
+      final block = DashboardBlock.fromJson({
+        'id': 'blk-9',
+        'type': 'kpi_gauge',
+        'title': 'Stock Health',
+        'x': 1.5,
+        'y': 0,
+        'width': 1,
+        'height': 1,
+        'visible': 1, // SQLite int, not bool
+        'version': 1,
+        'config': {'metric': 'stock_health', 'customKey': 'kept'},
+      });
+      expect(block.x, 1.5);
+      expect(block.visible, isTrue);
+      expect(block.config.metric, 'stock_health');
+      expect(block.config.extras['customKey'], 'kept');
+
+      final json = block.toJson();
+      expect(json['visible'], isTrue);
+      expect((json['config'] as Map<String, dynamic>)['customKey'], 'kept');
+    });
+
+    test('layout toJson round-trips blocks and flags', () {
+      final layout = DashboardLayout(
+        id: 5,
+        userId: 1,
+        layoutName: 'Round Trip',
+        isActive: true,
+        createdAt: '2026-01-01',
+        updatedAt: '2026-02-01',
+        blocks: [
+          DashboardBlock(
+            id: 'b1',
+            type: 'stat_cards',
+            title: 'Stat Cards',
+            x: 0,
+            y: 0,
+            width: 2,
+            height: 1,
+            config: const DashboardBlockConfig(refreshInterval: 60),
+          ),
+        ],
+      );
+
+      final json = layout.toJson();
+      expect(json['layout_name'], 'Round Trip');
+      expect(json['is_active'], isTrue);
+      expect((json['blocks'] as List), hasLength(1));
+
+      final parsed = DashboardLayout.fromJson(json);
+      expect(parsed.id, 5);
+      expect(parsed.isActive, isTrue);
+      expect(parsed.blocks.single.config.refreshInterval, 60);
+    });
+  });
+
   group('BomDetail', () {
     test('parses items and keeps the header aggregates', () {
       final d = BomDetail.fromJson({
@@ -687,6 +815,87 @@ void main() {
       expect(item.standardCost, 208.5);
       expect(item.lineCost, 417);
       expect(item.currentStock, 40);
+    });
+  });
+
+  group('Activity log', () {
+    test('parses a full log row with the joined username', () {
+      final log = ActivityLog.fromJson({
+        'id': 3,
+        'user_id': 1,
+        'username': 'admin',
+        'action': 'CREATE',
+        'entity_type': 'Invoice',
+        'entity_id': 12,
+        'description': 'Created invoice INV-2608-0012',
+        'log_level': 'INFO',
+        'ip_address': '127.0.0.1',
+        'user_agent': 'MiniERP/1.0',
+        'metadata': '{"amount": 250}',
+        'duration_ms': 12,
+        'created_at': '2026-08-09 10:30:00',
+      });
+      expect(log.id, 3);
+      expect(log.username, 'admin');
+      expect(log.action, 'CREATE');
+      expect(log.entityLabel, 'Invoice #12');
+      expect(log.description, contains('INV-2608-0012'));
+      expect(log.logLevel, 'INFO');
+      expect(log.ipAddress, '127.0.0.1');
+      expect(log.userAgent, 'MiniERP/1.0');
+      expect(log.metadata, contains('amount'));
+      expect(log.durationMs, 12);
+      expect(log.createdAt, '2026-08-09 10:30:00');
+    });
+
+    test('tolerates null user/entity/technical fields', () {
+      final log = ActivityLog.fromJson({
+        'id': 4,
+        'user_id': null,
+        'username': null,
+        'action': 'LOGIN',
+        'entity_type': '',
+        'entity_id': null,
+        'description': '',
+        'log_level': 'INFO',
+        'created_at': '2026-08-09 11:00:00',
+      });
+      expect(log.username, isNull);
+      expect(log.entityLabel, '—');
+      expect(log.description, isEmpty);
+      expect(log.ipAddress, isNull);
+      expect(log.durationMs, isNull);
+    });
+
+    test('parses stats buckets and user dropdown rows', () {
+      final stats = ActivityStats.fromJson({
+        'totalLogs': 125,
+        'actions': [
+          {'action': 'LOGIN', 'count': 40},
+          {'action': 'CREATE', 'count': 25},
+        ],
+        'users': [
+          {'username': 'admin', 'count': 90},
+        ],
+        'dailyActivity': [
+          {'date': '2026-08-09', 'count': 12},
+        ],
+      });
+      expect(stats.totalLogs, 125);
+      expect(stats.actions, hasLength(2));
+      expect(stats.actions.first.label, 'LOGIN');
+      expect(stats.actions.first.count, 40);
+      expect(stats.users.single.count, 90);
+      expect(stats.dailyActivity.single.label, '2026-08-09');
+
+      final user = ActivityLogUser.fromJson({
+        'id': 2,
+        'username': 'sarah',
+        'full_name': 'Sarah Khan',
+      });
+      expect(user.id, 2);
+      expect(user.username, 'sarah');
+      expect(user.fullName, 'Sarah Khan');
     });
   });
 }

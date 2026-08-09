@@ -177,15 +177,22 @@ class ReportRepository {
     String? fromDate,
     String? toDate,
     int? customerId,
-  }) => _api.getList(
+  }) => _api.get(
     ApiEndpoints.reportCustomerStatements,
     queryParameters: {
       'fromDate': ?fromDate,
       'toDate': ?toDate,
       'customerId': ?customerId,
     },
-    parseItem: (Object? json) =>
-        CustomerStatementRow.fromJson(json as Map<String, dynamic>),
+    parse: (Object? json) =>
+        (json as Map<String, dynamic>)['statements'] == null
+            ? <CustomerStatementRow>[]
+            : [
+                for (final item in json['statements'] as List)
+                  CustomerStatementRow.fromJson(
+                    item as Map<String, dynamic>,
+                  ),
+              ],
   );
 
   /// GET /reports/top-debtors — customers with the highest outstanding

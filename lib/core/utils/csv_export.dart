@@ -37,6 +37,7 @@ import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../../data/models/activity_log.dart' show ActivityLog;
 import '../../data/models/bom.dart' show Bom;
 import '../../data/models/expense.dart' show Expense;
 import '../../data/models/invoice.dart' show Invoice;
@@ -48,6 +49,7 @@ import '../../data/models/report.dart'
     show
         ArAgingReport,
         CashFlowReport,
+        CustomerStatementRow,
         DSOMetric,
         ExpensesReport,
         InventoryMovementReport,
@@ -315,6 +317,31 @@ String buildQuotationsCsv(AppLocalizations l10n, List<Quotation> quotations) {
 /// the grid's badge).
 /// Builds the CSV text for the expenses grid (Expense No | Date |
 /// Category | Description | Vendor | Reference No | Payment Method |
+/// Activity-log export — Timestamp | User | Action | Entity | Description
+/// | Level, mirroring the activity grid's columns (description and the
+/// free-text fields go through the CSV-injection sanitizer).
+String buildActivityLogCsv(AppLocalizations l10n, List<ActivityLog> logs) {
+  return _buildGridCsv(
+    [
+      l10n.activitylogTimestamp,
+      l10n.activitylogUser,
+      l10n.activitylogAction,
+      l10n.activitylogEntity,
+      l10n.commonDescription,
+      l10n.activitylogLevel,
+    ],
+    logs,
+    (log) => [
+      sanitizeCsvCell(log.createdAt.isEmpty ? '—' : log.createdAt),
+      sanitizeCsvCell(log.username?.isEmpty ?? true ? '—' : log.username!),
+      sanitizeCsvCell(log.action.isEmpty ? '—' : log.action),
+      sanitizeCsvCell(log.entityLabel),
+      sanitizeCsvCell(log.description.isEmpty ? '—' : log.description),
+      sanitizeCsvCell(log.logLevel.isEmpty ? '—' : log.logLevel),
+    ],
+  );
+}
+
 /// Project | Amount | Status | Created By — mirroring the grid's
 /// columns; the Status column uses the same localized label as the
 /// grid's badge).

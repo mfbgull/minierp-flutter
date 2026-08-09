@@ -293,8 +293,9 @@ class _DayBars extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Leave room for the date labels; never negative on tiny windows.
-        final barAreaHeight = math.max(0.0, constraints.maxHeight - 28);
+        // Leave a little room for the date labels (which are Flexible
+        // and can shrink); never negative on tiny windows.
+        final barAreaHeight = math.max(0.0, constraints.maxHeight - 20);
         return Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -325,11 +326,17 @@ class _DayBars extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _shortDate(date),
-                      style: textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
+                    // Flexible so a very short chart panel (e.g. the
+                    // dashboard's 3-row layout on a small window) clips
+                    // the label instead of overflowing the Column.
+                    Flexible(
+                      child: Text(
+                        _shortDate(date),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ],

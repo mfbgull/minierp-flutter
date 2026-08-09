@@ -14,6 +14,7 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/invoice.dart'
     show InvoicePaymentRecord, PaymentMethod;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/searchable_select.dart';
 
 /// Payment methods offered by the reference dropdown.
 const List<String> kPaymentMethods = [
@@ -349,23 +350,18 @@ class _PaymentPanelState extends State<PaymentPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          DropdownButtonFormField<String>(
-            initialValue: kPaymentMethods.contains(m.method)
+          SearchableSelect<String>(
+            items: kPaymentMethods,
+            selected: kPaymentMethods.contains(m.method)
                 ? m.method
                 : kPaymentMethods.first,
-            isExpanded: true,
-            style: const TextStyle(fontSize: 12),
+            labelBuilder: (method) => method,
+            textStyle: const TextStyle(fontSize: 12),
+            enabled: !widget.saving,
             decoration: _fieldDecoration(l10n.salesMethod),
-            items: [
-              for (final method in kPaymentMethods)
-                DropdownMenuItem(
-                  value: method,
-                  child: Text(method, style: const TextStyle(fontSize: 12)),
-                ),
-            ],
-            onChanged: widget.saving
-                ? null
-                : (v) => widget.onUpdateMethod(m.id, 'method', v),
+            onChanged: (v) {
+              if (v != null) widget.onUpdateMethod(m.id, 'method', v);
+            },
           ),
           const SizedBox(height: 4),
           Row(

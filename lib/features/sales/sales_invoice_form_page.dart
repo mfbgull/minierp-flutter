@@ -968,9 +968,11 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                       Expanded(
                         child: FormFieldShell(
                           label: l10n.fieldsStatus,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _status,
-                            isExpanded: true,
+                          child: SearchableSelect<String>(
+                            items: _statusValues,
+                            selected: _status,
+                            labelBuilder: (s) => _statusLabel(l10n, s),
+                            enabled: !_submitting,
                             decoration: const InputDecoration(
                               isDense: true,
                               border: OutlineInputBorder(),
@@ -978,16 +980,11 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                                 horizontal: 10,
                               ),
                             ),
-                            items: [
-                              for (final s in _statusValues)
-                                DropdownMenuItem(
-                                  value: s,
-                                  child: Text(_statusLabel(l10n, s)),
-                                ),
-                            ],
-                            onChanged: _submitting
-                                ? null
-                                : (value) => setState(() => _status = value),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _status = value);
+                              }
+                            },
                           ),
                         ),
                       ),

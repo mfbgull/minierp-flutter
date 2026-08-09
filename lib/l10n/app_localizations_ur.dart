@@ -9,6 +9,84 @@ class AppLocalizationsUr extends AppLocalizations {
   AppLocalizationsUr([String locale = 'ur']) : super(locale);
 
   @override
+  String get activitylogCleanup => 'صفائی';
+
+  @override
+  String get activitylogCleanupdays => 'ریٹینشن (دن)';
+
+  @override
+  String get activitylogCleanupdesc =>
+      'ریٹینشن مدت سے پرانی لاگز مستقل طور پر حذف ہو جائیں گی۔ اسے واپس نہیں کیا جا سکتا۔';
+
+  @override
+  String get activitylogCleanupinvalid => 'دنوں کی درست تعداد درج کریں';
+
+  @override
+  String activitylogCleanupsuccess(Object count) {
+    return '$count لاگ اندراجات صاف ہو گئے';
+  }
+
+  @override
+  String get activitylogCleanuptitle => 'پرانی لاگز صاف کریں';
+
+  @override
+  String get activitylogAction => 'عمل';
+
+  @override
+  String get activitylogAllactions => 'تمام اعمال';
+
+  @override
+  String get activitylogAllentities => 'تمام اقسام';
+
+  @override
+  String get activitylogAllusers => 'تمام صارفین';
+
+  @override
+  String get activitylogCount => 'لاگز';
+
+  @override
+  String get activitylogDetailtitle => 'سرگرمی کی تفصیل';
+
+  @override
+  String get activitylogDuration => 'دورانیہ';
+
+  @override
+  String get activitylogEntity => 'ہستی';
+
+  @override
+  String get activitylogExportcsv => 'CSV برآمد کریں';
+
+  @override
+  String get activitylogExported => 'سرگرمی لاگ برآمد ہو گیا';
+
+  @override
+  String get activitylogExportfailed => 'برآمد ناکام ہوئی';
+
+  @override
+  String get activitylogIp => 'آئی پی ایڈریس';
+
+  @override
+  String get activitylogLevel => 'سطح';
+
+  @override
+  String get activitylogMetadata => 'میٹا ڈیٹا';
+
+  @override
+  String get activitylogTimestamp => 'وقت';
+
+  @override
+  String get activitylogToday => 'آج';
+
+  @override
+  String get activitylogTotal => 'کل لاگز';
+
+  @override
+  String get activitylogUser => 'صارف';
+
+  @override
+  String get activitylogUseragent => 'یوزر ایجنٹ';
+
+  @override
   String get dashboardWelcome => 'خوش آمدید';
 
   @override
@@ -465,28 +543,28 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsPurchasesummaryreport => 'خریداری خلاصہ رپورٹ';
 
   @override
-  String get reportsOpeningbalance => 'Opening Balance';
+  String get reportsOpeningbalance => 'ابتدائی بیلنس';
 
   @override
-  String get reportsTotaldebits => 'Total Debits';
+  String get reportsTotaldebits => 'کل ڈیبٹ';
 
   @override
-  String get reportsTotalcredits => 'Total Credits';
+  String get reportsTotalcredits => 'کل کریڈٹ';
 
   @override
-  String get reportsClosingbalance => 'Closing Balance';
+  String get reportsClosingbalance => 'اختتامی بیلنس';
 
   @override
-  String get reportsTotalamount => 'Total Amount';
+  String get reportsTotalamount => 'کل رقم';
 
   @override
-  String get reportsPaidamount => 'Paid Amount';
+  String get reportsPaidamount => 'ادا شدہ رقم';
 
   @override
-  String get reportsLastinvoicedate => 'Last Invoice Date';
+  String get reportsLastinvoicedate => 'آخری انوائس کی تاریخ';
 
   @override
-  String get reportsAllcustomers => 'All Customers';
+  String get reportsAllcustomers => 'تمام گاہک';
 
   @override
   String get reportsProductionsummaryreport => 'پروڈکشن خلاصہ رپورٹ';
@@ -1468,6 +1546,77 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get settingsSettings => 'سیٹینگز';
+
+  @override
+  String get settingsSubtitle =>
+      'کمپنی پروفائل، کرنسی، ٹیکس کی شرح اور دستاویز نمبرنگ۔';
+
+  @override
+  String get settingsSectionCompany => 'کمپنی';
+
+  @override
+  String get settingsSectionCurrency => 'کرنسی اور فارمیٹنگ';
+
+  @override
+  String get settingsSectionTax => 'ٹیکس';
+
+  @override
+  String get settingsSectionNumbering => 'دستاویز نمبرنگ';
+
+  @override
+  String get settingsSectionOther => 'دیگر ترتیبات';
+
+  @override
+  String get settingsKeyCompanyName => 'کمپنی کا نام';
+
+  @override
+  String get settingsKeyCompanyEmail => 'کمپنی ای میل';
+
+  @override
+  String get settingsKeyCompanyPhone => 'کمپنی فون';
+
+  @override
+  String get settingsKeyCompanyAddress => 'کمپنی کا پتہ';
+
+  @override
+  String get settingsKeyCompanyTaxId => 'کمپنی ٹیکس شناخت';
+
+  @override
+  String get settingsKeyCurrencySymbol => 'کرنسی علامت';
+
+  @override
+  String get settingsKeyCurrencyCode => 'کرنسی کوڈ';
+
+  @override
+  String get settingsKeyCurrency => 'کرنسی';
+
+  @override
+  String get settingsKeyDecimalPlaces => 'اعشاریہ مقامات';
+
+  @override
+  String get settingsKeyDateFormat => 'تاریخ فارمیٹ';
+
+  @override
+  String get settingsKeyTooltipTimeout => 'ٹول ٹپ ٹائم آؤٹ (سیکنڈ)';
+
+  @override
+  String get settingsKeyTaxRate => 'ڈیفالٹ ٹیکس شرح (٪)';
+
+  @override
+  String get settingsSaved => 'ترتیبات محفوظ ہو گئیں';
+
+  @override
+  String get settingsSaveFailed => 'ترتیبات محفوظ کرنے میں ناکامی';
+
+  @override
+  String get settingsUnsaved => 'غیر محفوظ تبدیلیاں';
+
+  @override
+  String get settingsNumberingHelper =>
+      'سرور کے زیر انتظام دستاویز کاؤنٹر — احتیاط سے ترمیم کریں۔';
+
+  @override
+  String get settingsEmpty => 'دکھانے کے لیے کوئی ترتیبات نہیں';
 
   @override
   String get integrationsIntegrations => 'انٹیگریشنز';
