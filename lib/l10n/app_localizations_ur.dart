@@ -654,6 +654,12 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsTotalexpenses => 'کل اخراجات';
 
   @override
+  String get reportsTotalrecords => 'کل ریکارڈز';
+
+  @override
+  String get reportsAverageexpense => 'اوسط خرچہ';
+
+  @override
   String get reportsNetprofit => 'خالص منافع';
 
   @override

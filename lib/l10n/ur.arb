@@ -205,6 +205,8 @@
   "reportsTotalcogs": "فروخت شدہ سامان کی لاگت (COGS)",
   "reportsGrossprofit": "مجموعی منافع",
   "reportsTotalexpenses": "کل اخراجات",
+  "reportsTotalrecords": "کل ریکارڈز",
+  "reportsAverageexpense": "اوسط خرچہ",
   "reportsNetprofit": "خالص منافع",
   "reportsGrossprofitmargin": "مجموعی منافع کا مارجن",
   "reportsNetprofitmargin": "خالص منافع کا مارجن",

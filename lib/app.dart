@@ -20,6 +20,7 @@ import 'data/models/invoice.dart' show Invoice;
 import 'features/reports/ar_aging_report_screen.dart';
 import 'features/reports/cash_flow_report_screen.dart';
 import 'features/reports/dso_report_screen.dart';
+import 'features/reports/expenses_report_screen.dart';
 import 'features/reports/inventory_movement_report_screen.dart';
 import 'features/reports/low_stock_report_screen.dart';
 import 'features/reports/profit_loss_report_screen.dart';
@@ -144,6 +145,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                                 'sales-by-customer' =>
                                   const SalesByCustomerReportScreen(),
                                 'dso' => const DsoReportScreen(),
+                                'expenses' => const ExpensesReportScreen(),
                                 'cash-flow' => const CashFlowReportScreen(),
                                 'profit-loss' => const ProfitLossReportScreen(),
                                 'inventory-movement' =>

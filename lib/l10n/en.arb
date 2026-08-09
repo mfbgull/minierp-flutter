@@ -205,6 +205,8 @@
   "reportsTotalcogs": "Cost of Goods Sold (COGS)",
   "reportsGrossprofit": "Gross Profit",
   "reportsTotalexpenses": "Total Expenses",
+  "reportsTotalrecords": "Total Records",
+  "reportsAverageexpense": "Average Expense",
   "reportsNetprofit": "Net Profit",
   "reportsGrossprofitmargin": "Gross Profit Margin",
   "reportsNetprofitmargin": "Net Profit Margin",

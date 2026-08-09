@@ -796,3 +796,121 @@ class TopDebtorRow {
   final num totalInvoiced;
   final num invoiceCount;
 }
+
+// ── Expenses report (GET /reports/expenses) ─────────────────────────
+
+/// One expense row of the expenses report grid — the report's own
+/// immutable row shape. Field names match the API JSON exactly
+/// (snake_case); unlike the CRUD [Expense] model there is no
+/// created_at/updated_at/created_by_name (the report never returns
+/// them).
+class ExpensesReportRow {
+  const ExpensesReportRow({
+    required this.id,
+    required this.expenseNo,
+    required this.expenseCategory,
+    this.description,
+    required this.amount,
+    required this.expenseDate,
+    this.paymentMethod,
+    this.referenceNo,
+    this.vendorName,
+    this.project,
+    required this.status,
+  });
+
+  factory ExpensesReportRow.fromJson(Map<String, dynamic> json) =>
+      ExpensesReportRow(
+        id: asInt(json['id']) ?? 0,
+        expenseNo: asString(json['expense_no']) ?? '',
+        expenseCategory: asString(json['expense_category']) ?? '',
+        description: asString(json['description']),
+        amount: asNum(json['amount']) ?? 0,
+        expenseDate: asString(json['expense_date']) ?? '',
+        paymentMethod: asString(json['payment_method']),
+        referenceNo: asString(json['reference_no']),
+        vendorName: asString(json['vendor_name']),
+        project: asString(json['project']),
+        status: asString(json['status']) ?? 'Approved',
+      );
+
+  final int id;
+  final String expenseNo;
+  final String expenseCategory;
+  final String? description;
+  final num amount;
+  final String expenseDate;
+  final String? paymentMethod;
+  final String? referenceNo;
+  final String? vendorName;
+  final String? project;
+  final String status;
+}
+
+/// One category bucket of the report's `categoryBreakdown` — name,
+/// expense count and summed amount (server-computed).
+class ExpenseCategoryBreakdown {
+  const ExpenseCategoryBreakdown({
+    required this.category,
+    required this.count,
+    required this.totalAmount,
+  });
+
+  factory ExpenseCategoryBreakdown.fromJson(Map<String, dynamic> json) =>
+      ExpenseCategoryBreakdown(
+        category: asString(json['expense_category']) ?? '',
+        count: asNum(json['count']) ?? 0,
+        totalAmount: asNum(json['total_amount']) ?? 0,
+      );
+
+  final String category;
+  final num count;
+  final num totalAmount;
+}
+
+/// Summary block of the expenses report (camelCase keys; the server
+/// computes these from the same rows its grid shows).
+class ExpensesReportSummary {
+  const ExpensesReportSummary({
+    required this.totalAmount,
+    required this.totalExpenses,
+    required this.averageAmount,
+  });
+
+  factory ExpensesReportSummary.fromJson(Map<String, dynamic> json) =>
+      ExpensesReportSummary(
+        totalAmount: asNum(json['totalAmount']) ?? 0,
+        totalExpenses: asNum(json['totalExpenses']) ?? 0,
+        averageAmount: asNum(json['averageAmount']) ?? 0,
+      );
+
+  final num totalAmount;
+  final num totalExpenses;
+  final num averageAmount;
+}
+
+class ExpensesReport {
+  const ExpensesReport({
+    required this.rows,
+    required this.summary,
+    required this.categoryBreakdown,
+  });
+
+  factory ExpensesReport.fromJson(Map<String, dynamic> json) => ExpensesReport(
+    rows: [
+      for (final row in json['expenses'] as List? ?? const [])
+        ExpensesReportRow.fromJson(row as Map<String, dynamic>),
+    ],
+    summary: ExpensesReportSummary.fromJson(
+      json['summary'] as Map<String, dynamic>? ?? const {},
+    ),
+    categoryBreakdown: [
+      for (final row in json['categoryBreakdown'] as List? ?? const [])
+        ExpenseCategoryBreakdown.fromJson(row as Map<String, dynamic>),
+    ],
+  );
+
+  final List<ExpensesReportRow> rows;
+  final ExpensesReportSummary summary;
+  final List<ExpenseCategoryBreakdown> categoryBreakdown;
+}

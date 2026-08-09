@@ -1929,6 +1929,58 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         },
       });
     }
+    if (options.path == '/reports/expenses') {
+      return _json({
+        'success': true,
+        'data': {
+          'summary': {
+            'totalAmount': 27500,
+            'totalExpenses': 2,
+            'averageAmount': 13750,
+          },
+          'expenses': [
+            {
+              'id': 3,
+              'expense_no': 'EXP-2026-0003',
+              'expense_category': 'Utilities',
+              'description': 'Electricity bill',
+              'amount': 25000,
+              'expense_date': '2026-08-05',
+              'payment_method': 'Bank Transfer',
+              'reference_no': 'TRF-2231',
+              'vendor_name': 'LESCO',
+              'project': 'Head Office',
+              'status': 'Approved',
+            },
+            {
+              'id': 4,
+              'expense_no': 'EXP-2026-0004',
+              'expense_category': 'Office Supplies',
+              'description': 'Printer paper',
+              'amount': 2500,
+              'expense_date': '2026-08-07',
+              'payment_method': 'Cash',
+              'reference_no': null,
+              'vendor_name': null,
+              'project': null,
+              'status': 'Draft',
+            },
+          ],
+          'categoryBreakdown': [
+            {
+              'expense_category': 'Utilities',
+              'count': 1,
+              'total_amount': 25000,
+            },
+            {
+              'expense_category': 'Office Supplies',
+              'count': 1,
+              'total_amount': 2500,
+            },
+          ],
+        },
+      });
+    }
     if (options.path == '/reports/top-debtors') {
       return _json({
         'success': true,
@@ -4257,6 +4309,31 @@ void main() {
     expect(find.text('Completed'), findsWidgets);
   });
 
+  testWidgets('expenses report renders grid, KPI strip and breakdown', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Expenses Report'));
+    await tester.pumpAndSettle();
+
+    // KPI strip from the fake summary (server values verbatim).
+    expect(find.text('Total Expenses'), findsWidgets);
+    expect(find.text('Total Records'), findsOneWidget);
+    expect(find.text('27,500.00'), findsWidgets);
+    expect(find.text('Average Expense'), findsOneWidget);
+    expect(find.text('13,750.00'), findsOneWidget);
+    // Category breakdown label + chips.
+    expect(find.text('Expenses by Category'), findsOneWidget);
+    expect(find.textContaining('Utilities'), findsWidgets);
+    // Grid rows from the fake payload.
+    expect(find.text('EXP-2026-0003'), findsOneWidget);
+    expect(find.text('EXP-2026-0004'), findsOneWidget);
+    expect(find.text('LESCO'), findsOneWidget);
+    // Category dropdown rendered with the shared "All Categories" label.
+    expect(find.text('All Categories'), findsOneWidget);
+  });
   testWidgets('top debtors report renders debtor rows', (tester) async {
     useWideSurface(tester);
     await bootToReports(tester);
@@ -4319,6 +4396,52 @@ void main() {
     expect(content, contains('200.00')); // Beta 90+ bucket
   });
 
+  testWidgets('expenses report exports the rows to CSV', (tester) async {
+    useWideSurface(tester);
+    await bootToReports(tester);
+
+    await tester.tap(find.text('Expenses Report'));
+    await tester.pumpAndSettle();
+
+    // Stub the file_picker save channel to return a real temp path; the
+    // shared save helper then writes the CSV there.
+    final target =
+        '${Directory.systemTemp.path}/minierp-expenses-report-test.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text('Report exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('EXP-2026-0003'));
+    expect(content, contains('EXP-2026-0004'));
+    expect(content, contains('Utilities'));
+    expect(content, contains('25,000.00'));
+    expect(content, contains('Approved')); // localized status label
+  });
   testWidgets('low stock grid exports the rows to CSV', (tester) async {
     useWideSurface(tester);
     await bootToReports(tester);

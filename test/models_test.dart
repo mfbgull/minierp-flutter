@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minierp_app/data/models/bom.dart';
 import 'package:minierp_app/data/models/customer.dart';
+import 'package:minierp_app/data/models/dashboard_summary.dart';
 import 'package:minierp_app/data/models/expense.dart';
 import 'package:minierp_app/data/models/invoice.dart';
 import 'package:minierp_app/data/models/item.dart';
@@ -552,6 +553,106 @@ void main() {
       expect(b.isActive, isFalse);
       expect(b.itemCount, isNull);
       expect(b.totalMaterialCost, isNull);
+    });
+  });
+
+  group('Dashboard blocks', () {
+    test('TopCustomer parses the top-customers row', () {
+      final row = TopCustomer.fromJson({
+        'customer_name': 'Alpha Traders',
+        'total_revenue': 452300.50,
+        'invoice_count': 18,
+      });
+      expect(row.customerName, 'Alpha Traders');
+      expect(row.totalRevenue, 452300.50);
+      expect(row.invoiceCount, 18);
+    });
+
+    test('SalesSummaryResult parses period totals', () {
+      final row = SalesSummaryResult.fromJson({
+        'period_total': 123456.75,
+        'count': 9,
+      });
+      expect(row.periodTotal, 123456.75);
+      expect(row.count, 9);
+    });
+
+    test('ExpenseSummaryResult parses period totals', () {
+      final row = ExpenseSummaryResult.fromJson({
+        'period_total': 6543.25,
+        'count': 4,
+      });
+      expect(row.periodTotal, 6543.25);
+      expect(row.count, 4);
+    });
+
+    test('ProductionStatusResult parses the status counts', () {
+      final row = ProductionStatusResult.fromJson({
+        'total': 20,
+        'active': 5,
+        'completed': 12,
+        'cancelled': 3,
+      });
+      expect(row.total, 20);
+      expect(row.active, 5);
+      expect(row.completed, 12);
+      expect(row.cancelled, 3);
+    });
+
+    test('StockMovementSummaryResult parses inbound/outbound/net', () {
+      final row = StockMovementSummaryResult.fromJson({
+        'inbound_qty': 850,
+        'outbound_qty': 320,
+        'net': 530,
+      });
+      expect(row.inboundQty, 850);
+      expect(row.outboundQty, 320);
+      expect(row.net, 530);
+    });
+
+    test('KpiResult parses metric/value/unit/label', () {
+      final row = KpiResult.fromJson({
+        'metric': 'stock_health',
+        'value': 87.5,
+        'unit': '%',
+        'label': 'Stock Health',
+      });
+      expect(row.metric, 'stock_health');
+      expect(row.value, 87.5);
+      expect(row.unit, '%');
+      expect(row.label, 'Stock Health');
+    });
+
+    test('ArSummaryResult parses total + aging buckets', () {
+      final row = ArSummaryResult.fromJson({
+        'total_ar': 250000,
+        'current_amount': 80000,
+        'amount_1_30': 60000,
+        'amount_31_60': 50000,
+        'amount_61_90': 40000,
+        'amount_over_90': 20000,
+        'customer_count': 7,
+      });
+      expect(row.totalAr, 250000);
+      expect(row.currentAmount, 80000);
+      expect(row.amount130, 60000);
+      expect(row.amount3160, 50000);
+      expect(row.amount6190, 40000);
+      expect(row.amountOver90, 20000);
+      expect(row.customerCount, 7);
+    });
+
+    test('block models tolerate missing/string keys', () {
+      final top = TopCustomer.fromJson({'customer_name': 'X'});
+      expect(top.totalRevenue, 0);
+      expect(top.invoiceCount, 0);
+
+      final kpi = KpiResult.fromJson({
+        'metric': 'stock_health',
+        'value': '88', // numeric string
+      });
+      expect(kpi.value, 88);
+      expect(kpi.unit, '');
     });
   });
 

@@ -1334,6 +1334,18 @@ abstract class AppLocalizations {
   /// **'Total Expenses'**
   String get reportsTotalexpenses;
 
+  /// No description provided for @reportsTotalrecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Records'**
+  String get reportsTotalrecords;
+
+  /// No description provided for @reportsAverageexpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Average Expense'**
+  String get reportsAverageexpense;
+
   /// No description provided for @reportsNetprofit.
   ///
   /// In en, this message translates to:

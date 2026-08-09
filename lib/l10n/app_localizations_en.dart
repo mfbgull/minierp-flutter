@@ -656,6 +656,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsTotalexpenses => 'Total Expenses';
 
   @override
+  String get reportsTotalrecords => 'Total Records';
+
+  @override
+  String get reportsAverageexpense => 'Average Expense';
+
+  @override
   String get reportsNetprofit => 'Net Profit';
 
   @override

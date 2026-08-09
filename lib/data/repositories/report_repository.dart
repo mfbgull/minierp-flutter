@@ -13,6 +13,7 @@ import '../models/report.dart'
         ArAgingReport,
         CashFlowReport,
         DSOMetric,
+        ExpensesReport,
         InventoryMovementReport,
         LowStockReportRow,
         ProfitLossReport,
@@ -148,6 +149,24 @@ class ReportRepository {
     queryParameters: {'fromDate': fromDate, 'toDate': toDate},
     parse: (Object? json) =>
         PurchaseSummaryReport.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// GET /reports/expenses — expense rows over a date range, optionally
+  /// narrowed to one category. The endpoint requires both dates (the
+  /// server returns a 400 without either).
+  Future<ApiResult<ExpensesReport>> expenses({
+    required String fromDate,
+    required String toDate,
+    String? category,
+  }) => _api.get(
+    ApiEndpoints.reportExpenses,
+    queryParameters: {
+      'fromDate': fromDate,
+      'toDate': toDate,
+      'category': ?category,
+    },
+    parse: (Object? json) =>
+        ExpensesReport.fromJson(json as Map<String, dynamic>),
   );
 
   /// GET /reports/top-debtors — customers with the highest outstanding

@@ -6,6 +6,7 @@ import '../../data/models/report.dart'
         ArAgingReport,
         CashFlowReport,
         DSOMetric,
+        ExpensesReport,
         InventoryMovementReport,
         LowStockReportRow,
         ProfitLossReport,
@@ -286,6 +287,43 @@ final topDebtorsReportProvider = FutureProvider<List<TopDebtorRow>>((
   final result = await ref
       .watch(reportRepositoryProvider)
       .topDebtors(limit: limit);
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+// ── Expenses report ─────────────────────────────────────────────────
+
+/// Date-range filters for the expenses report (the endpoint requires
+/// both dates). Defaults mirror the web app's `ExpensesReport` initial
+/// state: last month → today.
+final reportExpensesFromDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month - 1, now.day);
+});
+final reportExpensesToDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+});
+
+/// Active category filter for the expenses report — null means "all
+/// categories" (the `category` query param is omitted).
+final reportExpensesCategoryProvider = StateProvider<String?>((ref) => null);
+
+/// Loads GET /reports/expenses, re-running when the date range or the
+/// selected category changes.
+final expensesReportProvider = FutureProvider<ExpensesReport>((ref) async {
+  final from = ref.watch(reportExpensesFromDateProvider);
+  final to = ref.watch(reportExpensesToDateProvider);
+  final category = ref.watch(reportExpensesCategoryProvider);
+  final result = await ref
+      .watch(reportRepositoryProvider)
+      .expenses(
+        fromDate: isoDate(from),
+        toDate: isoDate(to),
+        category: category,
+      );
   return switch (result) {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,
