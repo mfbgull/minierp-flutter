@@ -10,12 +10,14 @@ import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
+import '../../data/models/customer.dart' show Customer;
 import '../../data/models/report.dart' show CustomerStatementRow;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/screen_error_panel.dart';
 import '../../widgets/date_picker_helpers.dart';
-import '../customers/customer_providers.dart' show Customer;
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
+import '../../widgets/screen_error_panel.dart';
+import '../../widgets/searchable_select.dart';
 import 'customer_statement_detail_dialog.dart';
 import 'report_providers.dart';
 
@@ -61,6 +63,7 @@ class _CustomerStatementsReportScreenState
     _rowsById[index] = row;
     return PlutoRow(
       cells: {
+        'serial': PlutoCell(value: index + 1),
         'key': PlutoCell(value: row.customerId),
         'customerName': PlutoCell(value: row.customerName),
         'customerCode': PlutoCell(value: row.customerCode),
@@ -89,6 +92,7 @@ class _CustomerStatementsReportScreenState
       );
 
   static List<PlutoColumn> _buildColumns(AppLocalizations l10n) => [
+    serialGridColumn(),
     PlutoColumn(
       title: l10n.fieldsCustomer,
       field: 'customerName',
@@ -164,9 +168,7 @@ class _CustomerStatementsReportScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          spacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        Row(
           children: [
             Expanded(
               child: Text(
@@ -182,28 +184,29 @@ class _CustomerStatementsReportScreenState
             SizedBox(
               width: 220,
               child: SearchableSelect<int>(
-                items: customers.valueOrNull ?? const <int>[],
+                items:
+                    customers.valueOrNull?.map((c) => c.id).toList() ??
+                    const <int>[],
                 selected: selectedCustomerId,
                 onChanged: (customerId) {
                   if (customerId == null) {
-                    ref.read(reportStatementsCustomerIdProvider.notifier).state =
+                    ref
+                            .read(reportStatementsCustomerIdProvider.notifier)
+                            .state =
                         null;
                   } else {
                     ref
                             .read(reportStatementsCustomerIdProvider.notifier)
-                            .state = customerId;
+                            .state =
+                        customerId;
                   }
                 },
                 labelBuilder: (id) {
                   final customer = customers.valueOrNull
                       ?.cast<Customer?>()
-                      .firstWhere(
-                        (c) => c?.id == id,
-                        orElse: () => null,
-                      );
+                      .firstWhere((c) => c?.id == id, orElse: () => null);
                   return customer?.customerName ?? id.toString();
                 },
-                hint: l10n.reportsAllcustomers,
               ),
             ),
             const SizedBox(width: 8),

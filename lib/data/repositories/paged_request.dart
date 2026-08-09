@@ -55,3 +55,35 @@ class PagedResponse<T> {
   final bool hasNext;
   final bool hasPrev;
 }
+
+/// Enveloped list result carrying the server's raw `total/limit/offset`
+/// counters instead of a `pagination` block (the `GET /activity-logs`
+/// shape — see `activityLogController.getActivityLogs`). Page math is
+/// derived here so screens can render a [ServerPaginationBar] without
+/// their own arithmetic.
+class OffsetPagedResponse<T> {
+  const OffsetPagedResponse({
+    required this.items,
+    required this.total,
+    required this.limit,
+    required this.offset,
+  });
+
+  final List<T> items;
+  final int total;
+  final int limit;
+  final int offset;
+
+  /// 1-based page number for the current offset.
+  int get page => limit <= 0 ? 1 : (offset ~/ limit) + 1;
+
+  /// `0` results still render as a single page (matches the web's empty
+  /// grid + "Page 1 of 1" convention). Guards `limit <= 0` the same way
+  /// [page] does — a response omitting `limit` (client defaults it to 0)
+  /// must not divide by zero.
+  int get totalPages =>
+      total <= 0 || limit <= 0 ? 1 : (total + limit - 1) ~/ limit;
+
+  bool get hasNext => offset + items.length < total;
+  bool get hasPrev => offset > 0;
+}

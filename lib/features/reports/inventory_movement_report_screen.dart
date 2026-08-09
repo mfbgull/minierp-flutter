@@ -20,6 +20,7 @@ import '../../data/models/report.dart'
         InventoryMovementSummary;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import 'inventory_movement_detail_dialog.dart';
 import 'report_providers.dart';
@@ -77,6 +78,7 @@ class _InventoryMovementReportScreenState
     _rowsByKey[row.movementNo] = row;
     return PlutoRow(
       cells: {
+        'serial': PlutoCell(value: 0),
         'key': PlutoCell(value: row.movementNo),
         'movementDate': PlutoCell(value: row.movementDate),
         'itemName': PlutoCell(value: row.itemName),
@@ -122,6 +124,7 @@ class _InventoryMovementReportScreenState
       );
 
   static List<PlutoColumn> _buildColumns(AppLocalizations l10n) => [
+    serialGridColumn(),
     PlutoColumn(
       title: l10n.fieldsDate,
       field: 'movementDate',

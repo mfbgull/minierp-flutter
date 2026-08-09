@@ -17,6 +17,7 @@ import '../../data/models/report.dart'
     show StockLevelReport, StockLevelRow, StockLevelSummary;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/status_badge.dart';
 import 'report_providers.dart';
@@ -75,6 +76,7 @@ class _StockLevelReportScreenState
     _rowsById[row.id] = row;
     return PlutoRow(
       cells: {
+        'serial': PlutoCell(value: 0),
         'id': PlutoCell(value: row.id),
         'itemName': PlutoCell(value: row.itemName),
         'itemCode': PlutoCell(value: row.itemCode),
@@ -106,6 +108,7 @@ class _StockLevelReportScreenState
       );
 
   static List<PlutoColumn> _buildColumns(AppLocalizations l10n) => [
+    serialGridColumn(),
     PlutoColumn(
       title: l10n.inventoryItemname,
       field: 'itemName',

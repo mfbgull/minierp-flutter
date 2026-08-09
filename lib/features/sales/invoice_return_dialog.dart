@@ -21,6 +21,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
+import '../../widgets/searchable_select.dart';
 import 'invoice_providers.dart';
 import 'invoice_return_providers.dart' show invoiceReturnsProvider;
 
@@ -259,22 +260,19 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
             const SizedBox(height: 10),
             FormFieldShell(
               label: l10n.salesreturnsDisposition,
-              child: DropdownButtonFormField<String>(
-                initialValue: _disposition,
+              child: SearchableSelect<String>(
+                items: const ['refund', 'credit', 'adjust'],
+                selected: _disposition,
+                labelBuilder: (value) => switch (value) {
+                  'refund' => l10n.salesreturnsDispositionrefund,
+                  'credit' => l10n.salesreturnsDispositioncredit,
+                  _ => l10n.salesreturnsDispositionadjust,
+                },
+                enabled: !_submitting,
                 decoration: formInputDecoration(),
-                items: [
-                  for (final (value, label) in [
-                    ('refund', l10n.salesreturnsDispositionrefund),
-                    ('credit', l10n.salesreturnsDispositioncredit),
-                    ('adjust', l10n.salesreturnsDispositionadjust),
-                  ])
-                    DropdownMenuItem(value: value, child: Text(label)),
-                ],
-                onChanged: _submitting
-                    ? null
-                    : (value) {
-                        if (value != null) setState(() => _disposition = value);
-                      },
+                onChanged: (value) {
+                  if (value != null) setState(() => _disposition = value);
+                },
               ),
             ),
             if (_error != null) ...[

@@ -18,6 +18,7 @@ import '../../widgets/app_toast.dart';
 import '../../widgets/date_picker_helpers.dart' show pickDate;
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
+import '../../widgets/searchable_select.dart';
 import '../sales/payment_panel.dart' show kPaymentMethods;
 
 /// Opens the edit dialog for [payment]. [onSaved] runs after a successful
@@ -186,13 +187,11 @@ class _PaymentEditDialogState extends ConsumerState<PaymentEditDialog> {
                       Expanded(
                         child: FormFieldShell(
                           label: l10n.expensesPaymentmethod,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _paymentMethod,
+                          child: SearchableSelect<String>(
+                            items: kPaymentMethods,
+                            selected: _paymentMethod,
+                            labelBuilder: (m) => m,
                             decoration: formInputDecoration(),
-                            items: [
-                              for (final m in kPaymentMethods)
-                                DropdownMenuItem(value: m, child: Text(m)),
-                            ],
                             onChanged: (value) {
                               if (value != null) {
                                 setState(() => _paymentMethod = value);

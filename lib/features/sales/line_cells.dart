@@ -83,6 +83,10 @@ class _LineCellState extends State<LineCell> {
   late final FocusNode _editFocus;
   OverlayEntry? _overlay;
   bool _announcedEdit = false;
+
+  /// Set once the hint is dismissed via click-outside; suppresses the
+  /// per-frame re-insert of the overlay while this edit session lives.
+  bool _dismissed = false;
   TextEditingController? _editor;
 
   GridNavController get nav => widget.nav;
@@ -140,6 +144,7 @@ class _LineCellState extends State<LineCell> {
   void _syncEditSideEffects() {
     if (_editing && !_announcedEdit) {
       _announcedEdit = true;
+      _dismissed = false;
       final notify = widget.onBeginEdit;
       if (notify != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -154,7 +159,7 @@ class _LineCellState extends State<LineCell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final content = _editing ? widget.overlayBuilder!() : null;
-      if (content == null) {
+      if (content == null || _dismissed) {
         _removeOverlay();
       } else if (_overlay == null) {
         _insertOverlay(content);
@@ -169,10 +174,24 @@ class _LineCellState extends State<LineCell> {
     if (box == null || !box.attached) return;
     final topLeft = box.localToGlobal(Offset.zero);
     _overlay = OverlayEntry(
-      builder: (context) => Positioned(
-        left: topLeft.dx,
-        top: topLeft.dy + box.size.height + 2,
-        child: widget.overlayBuilder?.call() ?? const SizedBox.shrink(),
+      // Full-screen translucent barrier closes the hint on click-outside
+      // without stealing the editor's focus (no focus node; the hint body
+      // is IgnorePointer). Taps land on the barrier, so a second click is
+      // needed to edit elsewhere — matches the reference's close-on-leave.
+      builder: (context) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _dismissOverlay,
+            ),
+          ),
+          Positioned(
+            left: topLeft.dx,
+            top: topLeft.dy + box.size.height + 2,
+            child: widget.overlayBuilder?.call() ?? const SizedBox.shrink(),
+          ),
+        ],
       ),
     );
     Overlay.of(context).insert(_overlay!);
@@ -181,6 +200,13 @@ class _LineCellState extends State<LineCell> {
   void _removeOverlay() {
     _overlay?.remove();
     _overlay = null;
+  }
+
+  /// User dismissed the hint by tapping outside — remember for this edit
+  /// session so the per-frame sync does not re-insert it.
+  void _dismissOverlay() {
+    _dismissed = true;
+    _removeOverlay();
   }
 
   // ── Editor ─────────────────────────────────────────────────────

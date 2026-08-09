@@ -26,6 +26,30 @@ import 'grid_status_bar.dart';
 import 'pluto_grid_shortcuts.dart';
 import 'screen_error_panel.dart';
 
+/// The shared `#` serial-number column prepended to every grid (the
+/// invoice line grid's `#` column is the in-app convention). The renderer
+/// reads the cell's current row index, so the numbers stay correct under
+/// client-side sorting/filtering; the `serial` cell value is never read.
+PlutoColumn serialGridColumn() => PlutoColumn(
+  title: '#',
+  field: 'serial',
+  type: PlutoColumnType.number(),
+  width: 48,
+  readOnly: true,
+  enableContextMenu: false,
+  renderer: (ctx) => Center(
+    child: Text(
+      '${ctx.rowIdx + 1}',
+      style: const TextStyle(color: Colors.black54, fontSize: 13),
+    ),
+  ),
+);
+
+/// Adds the row's `serial` cell (PlutoGrid requires a cell per column;
+/// the renderer ignores the value and shows the live row index).
+PlutoRow withSerialCell(PlutoRow row, int index) =>
+    row..cells['serial'] = PlutoCell(value: index + 1);
+
 /// Mixin over any [ConsumerState] providing the read-only grid skeleton.
 /// `T` is the provider's row type; `S` the concrete screen widget — the
 /// mixin's `on` clause must carry the *same* type argument as the state's
@@ -78,7 +102,12 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
     // Column titles are localized — build them once here (lookups of
     // inherited widgets are not allowed before initState completes).
     if (!_columnsReady) {
-      gridColumns = buildGridColumns(AppLocalizations.of(context)!);
+      // The shared `#` column is prepended here so screens don't repeat
+      // the plumbing (their `buildGridColumns` stays focused on data).
+      gridColumns = [
+        serialGridColumn(),
+        ...buildGridColumns(AppLocalizations.of(context)!),
+      ];
       _columnsReady = true;
     }
     // Same for the grid configuration: F2/Enter open the focused row's
@@ -110,7 +139,8 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
     if (value.hasValue) {
       manager.removeAllRows();
       manager.appendRows([
-        for (final row in gridRowsFrom(value.value)) gridRowFor(row),
+        for (final (index, row) in gridRowsFrom(value.value).indexed)
+          withSerialCell(gridRowFor(row), index),
       ]);
     }
   }

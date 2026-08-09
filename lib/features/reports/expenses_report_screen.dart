@@ -23,7 +23,9 @@ import '../../data/models/report.dart'
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_picker_helpers.dart' show ReportDateRangeFilter;
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/searchable_select.dart';
 import '../../widgets/status_badge.dart';
 import '../expenses/expense_providers.dart' show expenseCategoriesProvider;
 import 'report_providers.dart';
@@ -72,6 +74,7 @@ class _ExpensesReportScreenState extends ConsumerState<ExpensesReportScreen> {
   PlutoRow _rowFor(ExpensesReportRow row) {
     return PlutoRow(
       cells: {
+        'serial': PlutoCell(value: 0),
         'expenseNo': PlutoCell(value: row.expenseNo),
         'category': PlutoCell(value: row.expenseCategory),
         'description': PlutoCell(value: row.description),
@@ -103,6 +106,7 @@ class _ExpensesReportScreenState extends ConsumerState<ExpensesReportScreen> {
       );
 
   static List<PlutoColumn> _buildColumns(AppLocalizations l10n) => [
+    serialGridColumn(),
     PlutoColumn(
       title: l10n.expensesExpenseno,
       field: 'expenseNo',
@@ -274,26 +278,18 @@ class _ExpensesReportScreenState extends ConsumerState<ExpensesReportScreen> {
     return SizedBox(
       width: 160,
       height: 40,
-      child: DropdownButtonFormField<String?>(
+      child: SearchableSelect<String?>(
         key: const ValueKey('expenses-report-category-filter'),
-        initialValue: ref.watch(reportExpensesCategoryProvider),
+        items: [
+          null,
+          for (final category
+              in ref.watch(expenseCategoriesProvider).valueOrNull ?? const [])
+            category.categoryName,
+        ],
+        selected: ref.watch(reportExpensesCategoryProvider),
+        hint: l10n.expensesAllcategories,
+        labelBuilder: (v) => v ?? l10n.expensesAllcategories,
         isDense: true,
-        isExpanded: true,
-        items:
-            [
-                  null,
-                  for (final category
-                      in ref.watch(expenseCategoriesProvider).valueOrNull ??
-                          const [])
-                    category.categoryName,
-                ]
-                .map(
-                  (v) => DropdownMenuItem<String?>(
-                    value: v,
-                    child: Text(v ?? l10n.expensesAllcategories),
-                  ),
-                )
-                .toList(),
         onChanged: (v) =>
             ref.read(reportExpensesCategoryProvider.notifier).state = v,
         decoration: InputDecoration(

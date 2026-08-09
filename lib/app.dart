@@ -6,9 +6,11 @@ import 'package:go_router/go_router.dart';
 import 'core/auth/auth_notifier.dart';
 import 'core/auth/session_events.dart';
 import 'core/theme/app_theme.dart';
+import 'features/activity_log/activity_log_screen.dart';
 import 'features/auth/change_password_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/splash_screen.dart';
+import 'features/settings/settings_screen.dart';
 import 'features/customers/customers_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/inventory/inventory_shell.dart';
@@ -124,6 +126,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                     // in the hub; the :report sub-route below resolves
                     // each card to its screen (placeholder until ported).
                     '/reports' => const ReportsDashboardScreen(),
+                    // Activity log (PORTING.md §5): offset-paged read-only
+                    // grid over GET /activity-logs with filters + stats.
+                    '/activity-log' => const ActivityLogScreen(),
+                    // Settings (PORTING.md §13): grouped key-value editor
+                    // over GET/POST /settings (company, currency, tax,
+                    // document numbering).
+                    '/settings' => const SettingsScreen(),
                     _ => ModulePlaceholderScreen(
                       title: dest.label(AppLocalizations.of(context)!),
                     ),

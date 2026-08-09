@@ -141,7 +141,66 @@ class RepositoryClient {
     }
   }
 
-  /* ── Bare requests (no envelope) ─────────────────────────────── */
+  /// Enveloped POST whose result lives in the envelope body itself
+  /// rather than `data` — e.g. `{success: true, message, deletedCount}`
+  /// (the activity-log cleanup shape). The envelope is still validated
+  /// like [post], so a `{success: false, error}` body surfaces as an
+  /// [ApiFailure] instead of silently parsing to a default.
+  Future<ApiResult<T>> postEnvelope<T>(
+    String path, {
+    Object? body,
+    required T Function(Map<String, dynamic> envelope) parse,
+  }) async {
+    final guarded = await _guard(() => _dio.post(path, data: body));
+    try {
+      return guarded.map((response) {
+        final raw = response.data;
+        if (raw is! Map<String, dynamic>) {
+          throw ApiResponseException(
+            'Expected an enveloped response',
+            response.statusCode,
+          );
+        }
+        _envelopeData(response); // throws on {success: false, error}
+        return parse(raw);
+      });
+    } on ApiResponseException catch (e) {
+      return ApiFailure(ApiError(message: e.message, statusCode: e.statusCode));
+    }
+  }
+
+  /// Enveloped array + top-level `total/limit/offset` counters
+  /// (`GET /activity-logs` shape — no `pagination` block).
+  Future<ApiResult<OffsetPagedResponse<T>>> getOffsetPaged<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    required T Function(Object?) parseItem,
+  }) async {
+    final guarded = await _guard(
+      () => _dio.get(path, queryParameters: queryParameters),
+    );
+    try {
+      return guarded.map((response) {
+        final body = response.data;
+        final data = _envelopeData(response);
+        if (data is! List) {
+          throw ApiResponseException(
+            'Expected a list response',
+            response.statusCode,
+          );
+        }
+        final meta = body is Map<String, dynamic> ? body : const {};
+        return OffsetPagedResponse(
+          items: _parseItems(data, parseItem),
+          total: _asInt(meta['total']) ?? 0,
+          limit: _asInt(meta['limit']) ?? 0,
+          offset: _asInt(meta['offset']) ?? 0,
+        );
+      });
+    } on ApiResponseException catch (e) {
+      return ApiFailure(ApiError(message: e.message, statusCode: e.statusCode));
+    }
+  }
 
   /// GET a bare object (item detail: `{...item, stock_by_warehouse}`).
   Future<ApiResult<T>> getRaw<T>(

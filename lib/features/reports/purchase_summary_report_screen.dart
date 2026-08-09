@@ -19,6 +19,7 @@ import '../../data/models/report.dart'
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_picker_helpers.dart' show ReportDateRangeFilter;
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/status_badge.dart';
 import 'purchase_summary_detail_dialog.dart';
@@ -76,6 +77,7 @@ class _PurchaseSummaryReportScreenState
     _rowsById[row.poId] = row;
     return PlutoRow(
       cells: {
+        'serial': PlutoCell(value: 0),
         'id': PlutoCell(value: row.poId),
         'purchaseDate': PlutoCell(value: row.purchaseDate),
         'poNumber': PlutoCell(value: row.purchaseOrderNumber),
@@ -122,6 +124,7 @@ class _PurchaseSummaryReportScreenState
       );
 
   static List<PlutoColumn> _buildColumns(AppLocalizations l10n) => [
+    serialGridColumn(),
     PlutoColumn(
       title: l10n.fieldsDate,
       field: 'purchaseDate',

@@ -27,7 +27,9 @@ import '../../data/models/invoice.dart' show Invoice;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn, withSerialCell;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/searchable_select.dart';
 import '../../widgets/status_badge.dart';
 import 'invoice_providers.dart';
 
@@ -123,19 +125,22 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     final rows = _filteredRows(value);
     manager.removeAllRows();
     manager.appendRows([
-      for (final inv in rows)
-        PlutoRow(
-          cells: {
-            'id': PlutoCell(value: inv.id),
-            'invoice_no': PlutoCell(value: inv.invoiceNo),
-            'invoice_date': PlutoCell(value: inv.invoiceDate),
-            'customer_name': PlutoCell(value: inv.customerName ?? ''),
-            'status': PlutoCell(value: inv.status),
-            'total_amount': PlutoCell(value: inv.totalAmount),
-            'paid_amount': PlutoCell(value: inv.paidAmount),
-            'balance_amount': PlutoCell(value: inv.balanceAmount),
-            'created_by': PlutoCell(value: inv.createdByUsername ?? ''),
-          },
+      for (final (index, inv) in rows.indexed)
+        withSerialCell(
+          PlutoRow(
+            cells: {
+              'id': PlutoCell(value: inv.id),
+              'invoice_no': PlutoCell(value: inv.invoiceNo),
+              'invoice_date': PlutoCell(value: inv.invoiceDate),
+              'customer_name': PlutoCell(value: inv.customerName ?? ''),
+              'status': PlutoCell(value: inv.status),
+              'total_amount': PlutoCell(value: inv.totalAmount),
+              'paid_amount': PlutoCell(value: inv.paidAmount),
+              'balance_amount': PlutoCell(value: inv.balanceAmount),
+              'created_by': PlutoCell(value: inv.createdByUsername ?? ''),
+            },
+          ),
+          index,
         ),
     ]);
     manager.setShowLoading(value.isLoading);
@@ -153,18 +158,22 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: scheme.outlineVariant),
       ),
-      child: DropdownButtonFormField<String?>(
-        initialValue: current,
-        isExpanded: true,
+      child: SearchableSelect<String?>(
+        items: [for (final (_, value) in _statusOptions) value],
+        selected: current,
+        hint: _statusOptions.first.$1,
+        labelBuilder: (value) {
+          for (final (label, option) in _statusOptions) {
+            if (option == value) return label;
+          }
+          return value ?? '';
+        },
+        isDense: true,
         decoration: const InputDecoration(
           isDense: true,
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(horizontal: 10),
         ),
-        items: [
-          for (final (label, value) in _statusOptions)
-            DropdownMenuItem<String?>(value: value, child: Text(label)),
-        ],
         onChanged: (value) {
           ref.read(invoicesStatusProvider.notifier).state = value;
         },
@@ -298,6 +307,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         );
 
     return [
+      serialGridColumn(),
       PlutoColumn(
         title: '',
         field: 'id',

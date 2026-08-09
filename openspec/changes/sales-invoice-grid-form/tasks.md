@@ -36,7 +36,7 @@
 ## 6. Price history (spec: sales-invoice-price-history)
 
 - [x] 6.1 On rate-cell edit (item+customer present) fetch `GET /sales/item-customer-history`; if `transaction_count > 0` show anchored overlay (past prices/lowest/count) without stealing focus.
-- [ ] 6.2 Add gesture-barrier click-outside close that does not steal grid focus.
+- [x] 6.2 Add gesture-barrier click-outside close that does not steal grid focus.
 
 ## 7. Validation, i18n & integration
 
@@ -46,8 +46,8 @@
 
 ## 8. Tests & verification
 
-- [ ] 8.1 Extend `test/sales_invoice_form_page_test.dart` with scenario-per-spec widget tests (keyboard walk, search, payment, loose-line, scope, price-hint).
-- [ ] 8.2 Port/confirm calc test parity for field-order, loose driver-field, lineIssue, payment rules.
+- [x] 8.1 Extend `test/sales_invoice_form_page_test.dart` with scenario-per-spec widget tests (keyboard walk, search, payment, loose-line, scope, price-hint).
+- [x] 8.2 Port/confirm calc test parity for field-order, loose driver-field, lineIssue, payment rules.
 - [ ] 8.3 `dart analyze` clean; run the app against the live server; create an invoice end-to-end keyboard-only (Alt+I add → search → Enter → qty → rate → … → save) and confirm it appears via `GET /api/invoices`.
 - [ ] 8.4 Walk the reference matrix side-by-side against `http://localhost:3010/sales/invoice`; record which behaviors match and any deviation with justification.
 

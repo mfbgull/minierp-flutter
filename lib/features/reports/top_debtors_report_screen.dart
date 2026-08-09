@@ -13,6 +13,7 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart' show TopDebtorRow;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import 'report_providers.dart';
 import 'top_debtor_detail_dialog.dart';
@@ -72,6 +73,7 @@ class _TopDebtorsReportScreenState
     _rowsById[index] = row;
     return PlutoRow(
       cells: {
+        'serial': PlutoCell(value: index + 1),
         'key': PlutoCell(value: index),
         'customerName': PlutoCell(value: row.customerName),
         'customerCode': PlutoCell(value: row.customerCode),
@@ -115,6 +117,7 @@ class _TopDebtorsReportScreenState
       );
 
   static List<PlutoColumn> _buildColumns(AppLocalizations l10n) => [
+    serialGridColumn(),
     PlutoColumn(
       title: l10n.fieldsCustomer,
       field: 'customerName',

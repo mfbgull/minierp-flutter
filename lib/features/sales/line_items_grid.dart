@@ -270,10 +270,16 @@ class GridNavController extends ChangeNotifier {
   List<PlutoRow> get rows => rowsOf();
 
   /// Field order for the current scope, as columns (the "walk" order).
+  /// The calc layer emits calc names (`quantity`, `discountValue`); map
+  /// them to the grid's column fields (`qty`, `discount`).
   List<LineColumn> fieldOrder() {
+    const alias = {
+      'quantity': 'qty',
+      'discountValue': 'discount',
+    };
     final result = <LineColumn>[];
     for (final f in getFieldOrder(scope)) {
-      final c = LineColumn.fromField(f);
+      final c = LineColumn.fromField(alias[f] ?? f);
       if (c != null) result.add(c);
     }
     return result;
@@ -467,11 +473,12 @@ class GridNavController extends ChangeNotifier {
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.tab:
+        final isLast = _rowIndex == rows.length - 1;
         commitCurrent();
         final next = nextField(column);
         if (next != null) {
           _schedule(row: row, column: next);
-        } else if (_rowIndex == rows.length - 1) {
+        } else if (isLast) {
           onAppendRow?.call();
         } else if (_rowIndex >= 0) {
           final first = firstNavigable(rows[_rowIndex + 1]);
@@ -584,11 +591,12 @@ class GridNavController extends ChangeNotifier {
   /// Commit + Enter semantics of the searchable cell: next field, else
   /// append (last row) / next row's first field.
   void commitEnterSearchable(PlutoRow row, LineColumn column) {
+    final isLast = _rowIndex == rows.length - 1;
     commitCurrent();
     final next = nextField(column);
     if (next != null) {
       _schedule(row: row, column: next);
-    } else if (_rowIndex == rows.length - 1) {
+    } else if (isLast) {
       onAppendRow?.call();
     } else if (_rowIndex >= 0) {
       final first = firstNavigable(rows[_rowIndex + 1]);

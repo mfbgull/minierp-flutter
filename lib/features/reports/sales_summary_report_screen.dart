@@ -16,6 +16,7 @@ import '../../data/models/report.dart' show SalesSummaryReport;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_picker_helpers.dart' show ReportDateRangeFilter;
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/status_badge.dart';
 import 'report_providers.dart';
@@ -202,6 +203,7 @@ class _SalesSummaryReportScreenState
         for (final row in rows)
           PlutoRow(
             cells: {
+              'serial': PlutoCell(value: 0),
               'date': PlutoCell(value: row.invoiceDate),
               'invoiceNo': PlutoCell(value: row.invoiceNo),
               'customer': PlutoCell(value: row.customerName),
@@ -222,6 +224,7 @@ class _SalesSummaryReportScreenState
 
     return PlutoGrid(
       columns: [
+        serialGridColumn(),
         PlutoColumn(
           title: l10n.fieldsDate,
           field: 'date',
