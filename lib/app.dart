@@ -26,6 +26,7 @@ import 'features/reports/low_stock_report_screen.dart';
 import 'features/reports/profit_loss_report_screen.dart';
 import 'features/reports/purchase_summary_report_screen.dart';
 import 'features/reports/top_debtors_report_screen.dart';
+import 'features/reports/customer_statements_report_screen.dart';
 import 'features/reports/reports_dashboard_screen.dart'
     show ReportsDashboardScreen, reportTitles;
 import 'features/reports/sales_by_customer_report_screen.dart';
@@ -153,6 +154,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                                 'purchase-summary' =>
                                   const PurchaseSummaryReportScreen(),
                                 'top-debtors' => const TopDebtorsReportScreen(),
+                                'customer-statements' =>
+                                  const CustomerStatementsReportScreen(),
                                 _ => ModulePlaceholderScreen(
                                   title:
                                       reportTitles[slug]?.call(

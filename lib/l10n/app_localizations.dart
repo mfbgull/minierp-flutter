@@ -104,6 +104,12 @@ abstract class AppLocalizations {
   /// **'Welcome back'**
   String get dashboardWelcome;
 
+  /// No description provided for @dashboardArsummary.
+  ///
+  /// In en, this message translates to:
+  /// **'AR Summary'**
+  String get dashboardArsummary;
+
   /// No description provided for @dashboardTotalitems.
   ///
   /// In en, this message translates to:
@@ -134,11 +140,29 @@ abstract class AppLocalizations {
   /// **'Current inventory worth'**
   String get dashboardCurrentinventoryworth;
 
+  /// No description provided for @dashboardCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'customers'**
+  String get dashboardCustomers;
+
+  /// No description provided for @dashboardInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'invoices'**
+  String get dashboardInvoices;
+
   /// No description provided for @dashboardSalesrevenue.
   ///
   /// In en, this message translates to:
   /// **'Sales Revenue'**
   String get dashboardSalesrevenue;
+
+  /// No description provided for @dashboardTopcustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'Top Customers'**
+  String get dashboardTopcustomers;
 
   /// No description provided for @dashboardTotalsales.
   ///
@@ -937,6 +961,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Purchase Summary Report'**
   String get reportsPurchasesummaryreport;
+
+  /// No description provided for @reportsOpeningbalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening Balance'**
+  String get reportsOpeningbalance;
+
+  /// No description provided for @reportsTotaldebits.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Debits'**
+  String get reportsTotaldebits;
+
+  /// No description provided for @reportsTotalcredits.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Credits'**
+  String get reportsTotalcredits;
+
+  /// No description provided for @reportsClosingbalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing Balance'**
+  String get reportsClosingbalance;
+
+  /// No description provided for @reportsTotalamount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Amount'**
+  String get reportsTotalamount;
+
+  /// No description provided for @reportsPaidamount.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid Amount'**
+  String get reportsPaidamount;
+
+  /// No description provided for @reportsLastinvoicedate.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Invoice Date'**
+  String get reportsLastinvoicedate;
+
+  /// No description provided for @reportsAllcustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'All Customers'**
+  String get reportsAllcustomers;
 
   /// No description provided for @reportsProductionsummaryreport.
   ///

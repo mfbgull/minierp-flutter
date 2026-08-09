@@ -2869,6 +2869,40 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         },
       });
     }
+    if (options.path == '/dashboard/top-customers' && options.method == 'GET') {
+      // Enveloped array — the real DashboardModel.getTopCustomers shape.
+      return _json({
+        'success': true,
+        'data': [
+          {
+            'customer_name': 'Acme Corp',
+            'total_revenue': 120000.0,
+            'invoice_count': 12,
+          },
+          {
+            'customer_name': 'Beta Ltd',
+            'total_revenue': 80000.0,
+            'invoice_count': 8,
+          },
+        ],
+      });
+    }
+    if (options.path == '/dashboard/ar-summary' && options.method == 'GET') {
+      // Enveloped — the real DashboardModel.getARSummary shape (total +
+      // five aging buckets + customer count).
+      return _json({
+        'success': true,
+        'data': {
+          'total_ar': 420000.0,
+          'current_amount': 120000.0,
+          'amount_1_30': 90000.0,
+          'amount_31_60': 80000.0,
+          'amount_61_90': 60000.0,
+          'amount_over_90': 70000.0,
+          'customer_count': 25,
+        },
+      });
+    }
     // ── Production module (PORTING.md §13) ────────────────────────
     if (options.path == '/productions' && options.method == 'GET') {
       // Bare array — the ProductionModel.getAll shape.
@@ -3149,6 +3183,17 @@ void main() {
     expect(find.text('Stock by Category'), findsOneWidget);
     expect(find.text('Parts'), findsOneWidget); // legend category
     expect(find.text('500 (100%)'), findsOneWidget); // total + share
+
+    // The two block panels (GET /dashboard/ar-summary + top-customers)
+    // render their data next to the summary-driven panels.
+    expect(find.text('AR Summary'), findsOneWidget);
+    expect(find.text('420,000.00'), findsOneWidget); // total AR
+    expect(find.text('25 customers'), findsOneWidget);
+    expect(find.text('Top Customers'), findsOneWidget);
+    expect(find.text('Acme Corp'), findsOneWidget); // top customer row
+    expect(find.text('12 invoices'), findsOneWidget); // invoice count meta
+    expect(find.text('Current'), findsOneWidget); // first aging bucket
+    expect(find.text('1-30 Days'), findsOneWidget); // second aging bucket
   });
 
   testWidgets('stored token + valid /auth/me restores the session at boot', (

@@ -6,7 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/dashboard_summary.dart'
-    show DashboardSummary, DayTotal, LowStockItem, StockByCategory;
+    show
+        ArSummaryResult,
+        DashboardSummary,
+        DayTotal,
+        LowStockItem,
+        StockByCategory,
+        TopCustomer;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import 'dashboard_providers.dart';
@@ -88,9 +94,9 @@ class _DashboardBody extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          // Two stacked rows: (sales vs purchases + stock by category)
-          // on top, low-stock alerts full-width below (mirrors the web
-          // default layout grid).
+          // Row 1: sales vs purchases + AR aging buckets; row 2: stock
+          // by category + top customers; low-stock alerts full-width at
+          // the bottom (mirrors the web default block grid).
           Expanded(
             flex: 3,
             child: Row(
@@ -104,12 +110,24 @@ class _DashboardBody extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
+                Expanded(flex: 2, child: const _ArSummaryPanel()),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            flex: 2,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 Expanded(
                   flex: 2,
                   child: _StockByCategoryPanel(
                     categories: summary.stockByCategory,
                   ),
                 ),
+                const SizedBox(width: 16),
+                Expanded(flex: 3, child: const _TopCustomersPanel()),
               ],
             ),
           ),
@@ -514,6 +532,358 @@ class _CategoryLegendRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Compact inline error + retry used inside a single dashboard panel
+/// (the full-screen `_DashboardError` is only for the summary fetch).
+class _PanelError extends StatelessWidget {
+  const _PanelError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.cloud_off_outlined, size: 32, color: scheme.outline),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+              style: TextStyle(color: scheme.onSurfaceVariant),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh, size: 16),
+            label: Text(l10n.commonRefresh),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Accounts-receivable aging buckets (`GET /dashboard/ar-summary`; web
+/// visual spec: `ARSummaryBlock.tsx`).
+class _ArSummaryPanel extends ConsumerWidget {
+  const _ArSummaryPanel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final ar = ref.watch(dashboardArSummaryProvider);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.dashboardArsummary,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ar.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => _PanelError(
+                  message: error is ApiError ? error.message : error.toString(),
+                  onRetry: () => ref.invalidate(dashboardArSummaryProvider),
+                ),
+                data: (data) => _ArSummaryBody(ar: data),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ArSummaryBody extends StatelessWidget {
+  const _ArSummaryBody({required this.ar});
+
+  final ArSummaryResult ar;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    // Matches the web block's bucket colors (green → dark red as the
+    // age increases).
+    final buckets = [
+      (
+        label: l10n.reportsCurrent,
+        amount: ar.currentAmount,
+        color: const Color(0xFF22C55E),
+      ),
+      (
+        label: l10n.reportsDays1_30,
+        amount: ar.amount130,
+        color: const Color(0xFFEAB308),
+      ),
+      (
+        label: l10n.reportsDays31_60,
+        amount: ar.amount3160,
+        color: const Color(0xFFF97316),
+      ),
+      (
+        label: l10n.reportsDays61_90,
+        amount: ar.amount6190,
+        color: const Color(0xFFEF4444),
+      ),
+      (
+        label: l10n.reportsDays90plus,
+        amount: ar.amountOver90,
+        color: const Color(0xFFDC2626),
+      ),
+    ];
+    final maxAmount = buckets.fold<num>(
+      0,
+      (m, b) => b.amount > m ? b.amount : m,
+    );
+    final safeMax = maxAmount <= 0 ? 1.0 : maxAmount.toDouble();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  Formatters.currency(ar.totalAr),
+                  maxLines: 1,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: Text(
+                '${Formatters.number(ar.customerCount)} ${l10n.dashboardCustomers}',
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: ListView(
+            children: [
+              for (final bucket in buckets)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          bucket.label,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(5),
+                          child: LinearProgressIndicator(
+                            value: (bucket.amount / safeMax)
+                                .clamp(0, 1)
+                                .toDouble(),
+                            minHeight: 10,
+                            backgroundColor: scheme.surfaceContainerHighest,
+                            valueColor: AlwaysStoppedAnimation(bucket.color),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          Formatters.currency(bucket.amount),
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Ranked list of top customers by revenue (`GET /dashboard/top-customers`,
+/// default limit 5; web visual spec: `TopCustomersBlock.tsx`).
+class _TopCustomersPanel extends ConsumerWidget {
+  const _TopCustomersPanel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final customers = ref.watch(dashboardTopCustomersProvider(5));
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.dashboardTopcustomers,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: customers.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => _PanelError(
+                  message: error is ApiError ? error.message : error.toString(),
+                  onRetry: () =>
+                      ref.invalidate(dashboardTopCustomersProvider(5)),
+                ),
+                data: (data) => _TopCustomersBody(customers: data),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopCustomersBody extends StatelessWidget {
+  const _TopCustomersBody({required this.customers});
+
+  final List<TopCustomer> customers;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    if (customers.isEmpty) {
+      return Center(
+        child: Text(
+          l10n.commonNodata,
+          style: TextStyle(color: scheme.onSurfaceVariant),
+        ),
+      );
+    }
+    final maxRevenue = customers.fold<num>(
+      0,
+      (m, c) => c.totalRevenue > m ? c.totalRevenue : m,
+    );
+    final safeMax = maxRevenue <= 0 ? 1.0 : maxRevenue.toDouble();
+
+    return ListView.separated(
+      itemCount: customers.length,
+      separatorBuilder: (_, _) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final customer = customers[index];
+        final isTop = index == 0;
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              // Rank badge — gold for #1, neutral otherwise (web spec).
+              Container(
+                width: 20,
+                height: 20,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isTop
+                      ? const Color(0xFFEAB308)
+                      : scheme.surfaceContainerHighest,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '${index + 1}',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: isTop ? Colors.white : scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customer.customerName,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: (customer.totalRevenue / safeMax)
+                            .clamp(0, 1)
+                            .toDouble(),
+                        minHeight: 6,
+                        backgroundColor: scheme.surfaceContainerHighest,
+                        valueColor: AlwaysStoppedAnimation(scheme.primary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      Formatters.currency(customer.totalRevenue),
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '${Formatters.number(customer.invoiceCount)} '
+                      '${l10n.dashboardInvoices}',
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

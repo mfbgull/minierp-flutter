@@ -765,6 +765,57 @@ class PurchaseSummaryReport {
   final PurchaseSummaryStats summary;
 }
 
+// ── Customer statements (GET /reports/customer-statements) ──────────
+
+/// One customer row of the customer statements report — the endpoint
+/// returns `{ statements: [...] }`, so the model is a single row and
+/// the repository parses `data['statements']` into a list.
+class CustomerStatementRow {
+  const CustomerStatementRow({
+    required this.customerId,
+    required this.customerName,
+    required this.customerCode,
+    required this.openingBalance,
+    required this.totalDebits,
+    required this.totalCredits,
+    required this.closingBalance,
+    required this.invoiceCount,
+    required this.totalAmount,
+    required this.paidAmount,
+    required this.balance,
+    required this.lastInvoiceDate,
+  });
+
+  factory CustomerStatementRow.fromJson(Map<String, dynamic> json) =>
+      CustomerStatementRow(
+        customerId: asInt(json['customer_id']) ?? 0,
+        customerName: asString(json['customer_name']) ?? '',
+        customerCode: asString(json['customer_code']) ?? '',
+        openingBalance: asNum(json['opening_balance']) ?? 0,
+        totalDebits: asNum(json['total_debits']) ?? 0,
+        totalCredits: asNum(json['total_credits']) ?? 0,
+        closingBalance: asNum(json['closing_balance']) ?? 0,
+        invoiceCount: asInt(json['invoice_count']) ?? 0,
+        totalAmount: asNum(json['total_amount']) ?? 0,
+        paidAmount: asNum(json['paid_amount']) ?? 0,
+        balance: asNum(json['balance']) ?? 0,
+        lastInvoiceDate: asString(json['last_invoice_date']),
+      );
+
+  final int customerId;
+  final String customerName;
+  final String customerCode;
+  final num openingBalance;
+  final num totalDebits;
+  final num totalCredits;
+  final num closingBalance;
+  final int invoiceCount;
+  final num totalAmount;
+  final num paidAmount;
+  final num balance;
+  final String? lastInvoiceDate;
+}
+
 // ── Top debtors (GET /reports/top-debtors) ──────────────────────────
 
 /// One customer row of the top-debtors report — the endpoint returns a
