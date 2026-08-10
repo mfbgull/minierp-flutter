@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/item.dart' show Item;
 import '../../data/models/purchase_order.dart'
-    show PurchaseOrder, PurchaseOrderDetail;
+    show GoodsReceipt, PurchaseOrder, PurchaseOrderDetail;
 import '../../data/models/supplier.dart' show Supplier;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/inventory_repository.dart'
@@ -24,6 +24,10 @@ final purchaseOrdersProvider = FutureProvider<List<PurchaseOrder>>((ref) async {
     ApiFailure(:final error) => throw error,
   };
 });
+
+/// Client-side search term for the PO grid (the endpoint has no search
+/// param — the screen filters the loaded rows).
+final purchaseOrdersSearchProvider = StateProvider<String>((ref) => '');
 
 /// All suppliers for the PO form's supplier picker — the screen's
 /// `suppliersProvider` only holds one page, so the form pulls a large
@@ -57,6 +61,20 @@ final purchaseOrderDetailProvider = FutureProvider.autoDispose
       final result = await ref
           .watch(purchaseOrderRepositoryProvider)
           .detail(poId);
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+/// Goods-receipt history for one PO (`GET /purchase-orders/:id/receipts`,
+/// bare array). autoDispose: each dialog instance owns its fetch, so
+/// closing it frees the state.
+final purchaseOrderReceiptsProvider = FutureProvider.autoDispose
+    .family<List<GoodsReceipt>, int>((ref, poId) async {
+      final result = await ref
+          .watch(purchaseOrderRepositoryProvider)
+          .receipts(poId);
       return switch (result) {
         ApiSuccess(:final data) => data,
         ApiFailure(:final error) => throw error,

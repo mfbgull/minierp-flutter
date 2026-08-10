@@ -3,12 +3,14 @@
 // `GET /sales-orders/:id` (bare object with the `items` array) via
 // [salesOrderDetailProvider]; the grid row's hidden `id` cell supplies
 // the SO id. Renders the header (SO no + status), an info grid, the
-// total tile, and the line-items table. Draft SOs get Edit + Delete.
+// total tile, and the line-items table. Draft SOs get Edit + Delete;
+// every status gets Print A4.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/print_utils.dart' show printPdfBytes;
 import '../../core/utils/so_status.dart';
 import '../../data/models/sales_order.dart'
     show SalesOrderDetail, SalesOrderItem;
@@ -24,6 +26,7 @@ import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'sales_order_form_dialog.dart';
+import 'sales_order_pdf.dart' show buildA4SalesOrderPdf;
 import 'sales_order_providers.dart';
 
 /// Opens the read-only detail dialog for [soId].
@@ -170,8 +173,14 @@ class _DetailBody extends StatelessWidget {
         const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.all(12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          child: Wrap(
+            // Draft packs Edit + Delete + Print A4 + Cancel + Close, which
+            // overflows a fixed Row at this width — wrap so actions flow
+            // to a second line instead of overflowing.
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 4,
+            runSpacing: 4,
             children: [
               if (detail.status == 'Draft') ...[
                 TextButton.icon(
@@ -180,13 +189,13 @@ class _DetailBody extends StatelessWidget {
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   label: Text(l10n.commonEdit),
                 ),
-                const SizedBox(width: 4),
               ],
               if (detail.status == 'Draft') _DeleteSoButton(detail: detail),
               // Any order except Cancelled can be cancelled — the server
               // rejects an already-Cancelled order and reverses linked-
               // invoice stock for Invoiced/Completed.
               if (detail.status != 'Cancelled') _CancelSoButton(detail: detail),
+              _PrintSalesOrderButton(detail: detail),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(l10n.commonClose),
@@ -335,6 +344,56 @@ class _ItemRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Print A4 action — builds the PDF from the already-fetched detail (the
+/// dialog IS the saved order, so unlike the edit form there is no
+/// refetch) and opens the native print dialog, falling back to the
+/// share/save-as-PDF sheet when the platform has no print backend (e.g.
+/// some Linux setups). Available for every status.
+class _PrintSalesOrderButton extends StatefulWidget {
+  const _PrintSalesOrderButton({required this.detail});
+
+  final SalesOrderDetail detail;
+
+  @override
+  State<_PrintSalesOrderButton> createState() => _PrintSalesOrderButtonState();
+}
+
+class _PrintSalesOrderButtonState extends State<_PrintSalesOrderButton> {
+  bool _printing = false;
+
+  Future<void> _print() async {
+    final l10n = AppLocalizations.of(context)!;
+    setState(() => _printing = true);
+    try {
+      final bytes = await buildA4SalesOrderPdf(salesOrder: widget.detail);
+      if (!mounted) return;
+      await printPdfBytes(bytes, '${widget.detail.soNo}.pdf', context);
+    } catch (error) {
+      if (mounted) {
+        showAppToast(context, '${l10n.errorsFailed}: $error', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return TextButton.icon(
+      onPressed: _printing ? null : _print,
+      icon: _printing
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.print_outlined, size: 18),
+      label: Text(l10n.salesordersPrinta4),
     );
   }
 }

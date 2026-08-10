@@ -26,7 +26,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn, withSerialCell;
 import '../../widgets/screen_error_panel.dart';
-import '../../widgets/searchable_select.dart';
+import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'expense_form_dialog.dart';
 import 'expense_providers.dart';
@@ -142,41 +142,16 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   }
 
   Widget _toolbar(AppLocalizations l10n, AsyncValue<List<Expense>> expenses) {
-    return Row(
-      children: [
-        Expanded(
-          child: SizedBox(
-            height: 40,
-            child: ValueListenableBuilder<TextEditingValue>(
-              valueListenable: _searchController,
-              builder: (context, value, _) => TextField(
-                controller: _searchController,
-                onChanged: _onSearchChanged,
-                decoration: InputDecoration(
-                  hintText: l10n.commonSearch,
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: value.text.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            ref.read(expensesSearchProvider.notifier).state =
-                                '';
-                          },
-                        ),
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        _filterDropdown<String?>(
+    return ScreenToolbar(
+      searchController: _searchController,
+      searchHint: l10n.commonSearch,
+      onSearchChanged: _onSearchChanged,
+      onClearSearch: () {
+        _searchController.clear();
+        ref.read(expensesSearchProvider.notifier).state = '';
+      },
+      filters: [
+        ScreenToolbarDropdown<String?>(
           key: const ValueKey('expense-category-filter'),
           value: ref.watch(expensesCategoryProvider),
           hint: l10n.expensesAllcategories,
@@ -187,12 +162,11 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
               category.categoryName,
           ],
           labelBuilder: (v) => v ?? l10n.expensesAllcategories,
+          width: 170,
           onChanged: (v) =>
               ref.read(expensesCategoryProvider.notifier).state = v,
-          width: 170,
         ),
-        const SizedBox(width: 8),
-        _filterDropdown<String?>(
+        ScreenToolbarDropdown<String?>(
           key: const ValueKey('expense-status-filter'),
           value: ref.watch(expensesStatusProvider),
           hint: l10n.expensesAllstatuses,
@@ -206,10 +180,9 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
           labelBuilder: (v) => v == null
               ? l10n.expensesAllstatuses
               : expenseStatusLabel(l10n, v),
-          onChanged: (v) => ref.read(expensesStatusProvider.notifier).state = v,
           width: 150,
+          onChanged: (v) => ref.read(expensesStatusProvider.notifier).state = v,
         ),
-        const SizedBox(width: 8),
         DateRangeFilter(
           height: 40,
           fromProvider: expensesFromDateProvider,
@@ -217,7 +190,9 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
           onClear: _clearFilters,
           showClear: () => _hasActiveFilters,
         ),
-        const SizedBox(width: 8),
+      ],
+      onRefresh: () => ref.invalidate(expensesProvider),
+      actions: [
         TextButton.icon(
           onPressed: expenses.isLoading || _hasNoRows
               ? null
@@ -231,52 +206,14 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
           icon: const Icon(Icons.file_download_outlined, size: 18),
           label: Text(l10n.expensesExportcsv),
         ),
-        const SizedBox(width: 8),
+      ],
+      primaryActions: [
         FilledButton.tonalIcon(
           onPressed: () => showExpenseFormDialog(context),
           icon: const Icon(Icons.add, size: 18),
           label: Text(l10n.expensesNewexpense),
         ),
-        const SizedBox(width: 8),
-        IconButton(
-          tooltip: l10n.commonRefresh,
-          icon: const Icon(Icons.refresh),
-          onPressed: () => ref.invalidate(expensesProvider),
-        ),
       ],
-    );
-  }
-
-  /// Compact searchable filter dropdown (All-category / All-status).
-  Widget _filterDropdown<T>({
-    required Key key,
-    required T value,
-    String? hint,
-    required List<T> items,
-    required String Function(T) labelBuilder,
-    required ValueChanged<T?> onChanged,
-    required double width,
-  }) {
-    return SizedBox(
-      width: width,
-      height: 40,
-      child: SearchableSelect<T>(
-        key: key,
-        items: items,
-        selected: value,
-        hint: hint,
-        labelBuilder: labelBuilder,
-        isDense: true,
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 8,
-          ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      ),
     );
   }
 

@@ -15,7 +15,7 @@ import 'package:pluto_grid/pluto_grid.dart';
 import '../../data/models/stock_movement.dart' show StockMovement;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
-import '../../widgets/searchable_select.dart';
+import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'inventory_providers.dart'
     show movementTypeFilterProvider, stockMovementsProvider;
@@ -79,74 +79,53 @@ class _StockMovementScreenState extends ConsumerState<StockMovementScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            children: [
-              // Movement-type filter — the endpoint accepts a
-              // `movement_type` query param (no free-text search exists).
-              SizedBox(
-                width: 210,
-                height: 40,
-                child: SearchableSelect<String>(
-                  items: [
-                    for (final option in _movementFilterOptions(l10n))
-                      option.$1,
-                  ],
-                  selected: filter ?? '',
-                  labelBuilder: (value) {
-                    for (final option in _movementFilterOptions(l10n)) {
-                      if (option.$1 == value) return option.$2;
-                    }
-                    return value;
-                  },
-                  isDense: true,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(
-                      Icons.filter_alt_outlined,
-                      size: 20,
-                    ),
-                    contentPadding: EdgeInsets.zero,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  onChanged: (value) {
-                    final newFilter = (value == null || value.isEmpty)
-                        ? null
-                        : value;
-                    ref.read(movementTypeFilterProvider.notifier).state =
-                        newFilter;
-                    // Switching back to All must refetch: the null-keyed
-                    // family instance may be stale from an earlier load
-                    // (and a movement posted under a filter won't appear
-                    // in it otherwise).
-                    if (newFilter == null) {
-                      ref.invalidate(stockMovementsProvider(null));
-                    }
-                  },
-                ),
-              ),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: () => showStockTransferDialog(context),
-                icon: const Icon(Icons.swap_horiz, size: 18),
-                label: Text(l10n.stockmovementsNewtransfer),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: () => showStockAdjustmentDialog(context),
-                icon: const Icon(Icons.tune, size: 18),
-                label: Text(l10n.stockmovementsNewadjustment),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: l10n.commonRefresh,
-                icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(stockMovementsProvider(filter)),
-              ),
-            ],
-          ),
+        // Toolbar: movement-type filter + New transfer/adjustment + refresh.
+        ScreenToolbar(
+          filters: [
+            // Movement-type filter — the endpoint accepts a
+            // `movement_type` query param (no free-text search exists).
+            ScreenToolbarDropdown<String>(
+              value: filter ?? '',
+              items: [
+                for (final option in _movementFilterOptions(l10n)) option.$1,
+              ],
+              labelBuilder: (value) {
+                for (final option in _movementFilterOptions(l10n)) {
+                  if (option.$1 == value) return option.$2;
+                }
+                return value;
+              },
+              prefixIcon: Icons.filter_alt_outlined,
+              width: 210,
+              onChanged: (value) {
+                final newFilter = (value == null || value.isEmpty)
+                    ? null
+                    : value;
+                ref.read(movementTypeFilterProvider.notifier).state =
+                    newFilter;
+                // Switching back to All must refetch: the null-keyed
+                // family instance may be stale from an earlier load
+                // (and a movement posted under a filter won't appear
+                // in it otherwise).
+                if (newFilter == null) {
+                  ref.invalidate(stockMovementsProvider(null));
+                }
+              },
+            ),
+          ],
+          onRefresh: () => ref.invalidate(stockMovementsProvider(filter)),
+          primaryActions: [
+            FilledButton.icon(
+              onPressed: () => showStockTransferDialog(context),
+              icon: const Icon(Icons.swap_horiz, size: 18),
+              label: Text(l10n.stockmovementsNewtransfer),
+            ),
+            FilledButton.icon(
+              onPressed: () => showStockAdjustmentDialog(context),
+              icon: const Icon(Icons.tune, size: 18),
+              label: Text(l10n.stockmovementsNewadjustment),
+            ),
+          ],
         ),
         Expanded(
           child: gridScreenBody(

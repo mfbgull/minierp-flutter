@@ -2,25 +2,33 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/customer.dart' show Customer;
+import '../../data/models/item.dart' show Item;
 import '../../data/models/report.dart'
     show
         ArAgingReport,
+        ArSummaryReport,
+        BomUsageReport,
         CashFlowReport,
         CustomerStatementRow,
         DSOMetric,
         ExpensesReport,
         InventoryMovementReport,
         LowStockReportRow,
+        ProductionSummaryReport,
         ProfitLossReport,
         PurchaseSummaryReport,
         SalesByCustomerRow,
+        SalesByItemRow,
         SalesSummaryReport,
         StockLevelReport,
         StockValuationReport,
+        SupplierAnalysisRow,
         TopDebtorRow;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/customer_repository.dart'
     show customerRepositoryProvider;
+import '../../data/repositories/inventory_repository.dart'
+    show inventoryRepositoryProvider;
 import '../../data/repositories/paged_request.dart'
     show PagedRequest;
 import '../../data/repositories/report_repository.dart'
@@ -380,6 +388,156 @@ final customerStatementsReportProvider =
         fromDate: isoDate(from),
         toDate: isoDate(to),
         customerId: customerId,
+      );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+// ── Sales by item ────────────────────────────────────────────────────
+
+/// Date-range filters for the sales-by-item report. Defaults mirror the
+/// web app's `SalesByItemReport` initial state: last month → today (the
+/// endpoint requires both dates).
+final reportSalesByItemFromDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month - 1, now.day);
+});
+final reportSalesByItemToDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+});
+
+/// Loads GET /reports/sales-by-item, re-running when the date range
+/// changes.
+final salesByItemReportProvider = FutureProvider<List<SalesByItemRow>>((
+  ref,
+) async {
+  final from = ref.watch(reportSalesByItemFromDateProvider);
+  final to = ref.watch(reportSalesByItemToDateProvider);
+  final result = await ref
+      .watch(reportRepositoryProvider)
+      .salesByItem(fromDate: isoDate(from), toDate: isoDate(to));
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+// ── Supplier analysis ────────────────────────────────────────────────
+
+/// Date-range filters for the supplier-analysis report. Defaults mirror
+/// the web app's `SupplierAnalysisReport` initial state: last 3 months
+/// → today (the endpoint requires both dates).
+final reportSupplierFromDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month - 3, now.day);
+});
+final reportSupplierToDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+});
+
+/// Loads GET /reports/supplier-analysis, re-running when the date range
+/// changes.
+final supplierAnalysisReportProvider = FutureProvider<List<SupplierAnalysisRow>>(
+  (ref) async {
+    final from = ref.watch(reportSupplierFromDateProvider);
+    final to = ref.watch(reportSupplierToDateProvider);
+    final result = await ref
+        .watch(reportRepositoryProvider)
+        .supplierAnalysis(fromDate: isoDate(from), toDate: isoDate(to));
+    return switch (result) {
+      ApiSuccess(:final data) => data,
+      ApiFailure(:final error) => throw error,
+    };
+  },
+);
+
+// ── Production summary ───────────────────────────────────────────────
+
+/// Date-range filters for the production-summary report. Defaults mirror
+/// the web app's `ProductionSummaryReport` initial state: last month →
+/// today (the endpoint requires both dates).
+final reportProductionFromDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month - 1, now.day);
+});
+final reportProductionToDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+});
+
+/// Loads GET /reports/production-summary, re-running when the date range
+/// changes.
+final productionSummaryReportProvider =
+    FutureProvider<ProductionSummaryReport>((ref) async {
+  final from = ref.watch(reportProductionFromDateProvider);
+  final to = ref.watch(reportProductionToDateProvider);
+  final result = await ref
+      .watch(reportRepositoryProvider)
+      .productionSummary(fromDate: isoDate(from), toDate: isoDate(to));
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+// ── AR summary ───────────────────────────────────────────────────────
+
+/// Loads GET /reports/ar-summary (server default: as of today).
+final arSummaryProvider = FutureProvider<ArSummaryReport>((ref) async {
+  final result = await ref.watch(reportRepositoryProvider).arSummary();
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+// ── BOM usage ────────────────────────────────────────────────────────
+
+/// Date-range filters for the bom-usage report. Defaults mirror the web
+/// app's `BOMUsageReport` initial state: last month → today (the
+/// endpoint tolerates omitted dates, but the port always sends them).
+final reportBomFromDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month - 1, now.day);
+});
+final reportBomToDateProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+});
+
+/// Active finished-item filter for the bom-usage report — null means
+/// "All Items" (the `itemId` query param is omitted).
+final reportBomItemIdProvider = StateProvider<int?>((ref) => null);
+
+/// All finished items for the bom-usage parent-item picker (reuses the
+/// inventory repository's items list — the same source the web page's
+/// `/inventory/items` select uses).
+final finishedItemsForReportProvider = FutureProvider<List<Item>>((ref) async {
+  final result = await ref
+      .watch(inventoryRepositoryProvider)
+      .items(isFinishedGood: true);
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+/// Loads GET /reports/bom-usage, re-running when the date range or the
+/// selected finished item changes.
+final bomUsageReportProvider = FutureProvider<BomUsageReport>((ref) async {
+  final from = ref.watch(reportBomFromDateProvider);
+  final to = ref.watch(reportBomToDateProvider);
+  final itemId = ref.watch(reportBomItemIdProvider);
+  final result = await ref
+      .watch(reportRepositoryProvider)
+      .bomUsage(
+        fromDate: isoDate(from),
+        toDate: isoDate(to),
+        itemId: itemId,
       );
   return switch (result) {
     ApiSuccess(:final data) => data,

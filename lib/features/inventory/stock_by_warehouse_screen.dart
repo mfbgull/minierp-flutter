@@ -8,6 +8,8 @@
 // [hiddenGridColumnFields] hides them alongside the record-id column; the
 // hidden `id` cell carries the balance's item id for the drill-down.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
@@ -16,7 +18,8 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/stock_balance.dart' show StockBalance;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
-import 'inventory_providers.dart' show stockBalancesProvider;
+import '../../widgets/screen_toolbar.dart';
+import 'inventory_providers.dart' show stockBalancesProvider, stockBalancesSearchProvider;
 import 'item_detail_dialog.dart';
 
 class StockByWarehouseScreen extends ConsumerStatefulWidget {
@@ -29,6 +32,56 @@ class StockByWarehouseScreen extends ConsumerStatefulWidget {
 
 class _StockByWarehouseScreenState extends ConsumerState<StockByWarehouseScreen>
     with PlutoGridScreen<StockBalance, StockByWarehouseScreen> {
+  Timer? _debounce;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      ref.read(stockBalancesSearchProvider.notifier).state = value.trim();
+    });
+  }
+
+  /// Client-side search over the loaded rows (the endpoint has no search
+  /// param) — overrides the mixin's unfiltered clear+append.
+  List<StockBalance> _filteredRows(List<StockBalance> balances) {
+    final search = ref.read(stockBalancesSearchProvider).toLowerCase();
+    if (search.isEmpty) return balances;
+    return balances
+        .where(
+          (b) =>
+              b.itemCode.toLowerCase().contains(search) ||
+              b.itemName.toLowerCase().contains(search) ||
+              b.warehouseName.toLowerCase().contains(search),
+        )
+        .toList();
+  }
+
+  @override
+  void syncGridRows(AsyncValue<Object?> value) {
+    final manager = gridStateManager;
+    if (manager == null) return;
+    manager.setShowLoading(value.isLoading);
+    if (value.hasValue) {
+      final rows = _filteredRows(value.value as List<StockBalance>);
+      manager.removeAllRows();
+      manager.appendRows([
+        for (final (index, row) in rows.indexed)
+          withSerialCell(gridRowFor(row), index),
+      ]);
+    }
+  }
+
+  void _refilter() => syncGridRows(ref.read(stockBalancesProvider));
+
   @override
   List<String> get hiddenGridColumnFields => const ['id', 'code', 'codeWh'];
 
@@ -55,40 +108,23 @@ class _StockByWarehouseScreenState extends ConsumerState<StockByWarehouseScreen>
     final balances = ref.watch(stockBalancesProvider);
     final l10n = AppLocalizations.of(context)!;
 
+    // Keep the grid in sync with provider transitions (loading → data).
+    // The mixin listener routes through the overridden syncGridRows, so
+    // the client-side search applies on every load/refresh too.
     watchGridProvider(stockBalancesProvider);
+    // Client-side search re-runs the filter over the loaded rows without
+    // refetching.
+    ref.listen(stockBalancesSearchProvider, (previous, next) => _refilter());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: TextField(
-                    enabled: false,
-                    decoration: InputDecoration(
-                      hintText: l10n.commonSearch,
-                      prefixIcon: const Icon(Icons.search, size: 20),
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: l10n.commonRefresh,
-                icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(stockBalancesProvider),
-              ),
-            ],
-          ),
+        // Toolbar: client-side search (item code/name, warehouse) + refresh.
+        ScreenToolbar(
+          searchController: _searchController,
+          searchHint: l10n.commonSearch,
+          onSearchChanged: _onSearchChanged,
+          onRefresh: () => ref.invalidate(stockBalancesProvider),
         ),
         Expanded(
           child: gridScreenBody(balances, provider: stockBalancesProvider),

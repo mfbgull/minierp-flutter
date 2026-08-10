@@ -20,6 +20,11 @@ class ForecastDemandFilters {
   final String? trend;
   final String? recommendation;
 
+  /// True when any filter narrows the list (drives the reset button's
+  /// visibility on the demand screen).
+  bool get hasFilters =>
+      category != null || trend != null || recommendation != null;
+
   Map<String, dynamic> toQuery() => {
     if (category != null && category!.isNotEmpty) 'category': category,
     if (trend != null && trend!.isNotEmpty) 'trend': trend,
@@ -55,7 +60,7 @@ class ForecastRepository {
   /// volume breakdown. `itemId == null` → the top 10 active items.
   Future<ApiResult<ForecastTrendData>> trends(int? itemId) => _api.get(
     '${ApiEndpoints.forecasts}/trends',
-    queryParameters: {if (itemId != null) 'itemId': itemId},
+    queryParameters: {'itemId': ?itemId},
     parse: (Object? json) =>
         ForecastTrendData.fromJson(json as Map<String, dynamic>),
   );

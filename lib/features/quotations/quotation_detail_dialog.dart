@@ -4,12 +4,14 @@
 // [quotationDetailProvider]; the grid row's hidden `id` cell supplies
 // the quotation id. Renders the header (quotation no + status), an info
 // grid, the total tile, and the line-items table. Draft quotations get
-// Edit + Delete; Accepted quotations get the Convert-to-SO action.
+// Edit + Delete; Accepted quotations get the Convert-to-SO action; every
+// status gets Print A4.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/print_utils.dart' show printPdfBytes;
 import '../../core/utils/quotation_status.dart';
 import '../../data/models/quotation.dart' show QuotationDetail, QuotationItem;
 import '../../data/repositories/api_result.dart'
@@ -24,6 +26,7 @@ import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'quotation_form_dialog.dart';
+import 'quotation_pdf.dart' show buildA4QuotationPdf;
 import 'quotation_providers.dart';
 
 /// Opens the read-only detail dialog for [quotationId].
@@ -180,8 +183,14 @@ class _DetailBody extends StatelessWidget {
         const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.all(12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          child: Wrap(
+            // Draft packs Edit + Delete + Print A4 + Close (Convert adds
+            // more on Accepted) — wrap so actions flow to a second line
+            // instead of overflowing the fixed-width dialog.
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 4,
+            runSpacing: 4,
             children: [
               if (detail.status == 'Draft') ...[
                 TextButton.icon(
@@ -190,13 +199,13 @@ class _DetailBody extends StatelessWidget {
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   label: Text(l10n.commonEdit),
                 ),
-                const SizedBox(width: 4),
                 _DeleteQuotationButton(detail: detail),
               ],
               // Accepted quotations convert into a Confirmed sales order
               // (the server also blocks already-Converted/Expired).
               if (detail.status == 'Accepted')
                 _ConvertQuotationButton(detail: detail),
+              _PrintQuotationButton(detail: detail),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(l10n.commonClose),
@@ -410,6 +419,56 @@ class _DeleteQuotationButtonState
       style: TextButton.styleFrom(
         foregroundColor: Theme.of(context).colorScheme.error,
       ),
+    );
+  }
+}
+
+/// Print A4 action — builds the PDF from the already-fetched detail (the
+/// dialog IS the saved quotation, so unlike the edit form there is no
+/// refetch) and opens the native print dialog, falling back to the
+/// share/save-as-PDF sheet when the platform has no print backend (e.g.
+/// some Linux setups). Available for every status.
+class _PrintQuotationButton extends StatefulWidget {
+  const _PrintQuotationButton({required this.detail});
+
+  final QuotationDetail detail;
+
+  @override
+  State<_PrintQuotationButton> createState() => _PrintQuotationButtonState();
+}
+
+class _PrintQuotationButtonState extends State<_PrintQuotationButton> {
+  bool _printing = false;
+
+  Future<void> _print() async {
+    final l10n = AppLocalizations.of(context)!;
+    setState(() => _printing = true);
+    try {
+      final bytes = await buildA4QuotationPdf(quotation: widget.detail);
+      if (!mounted) return;
+      await printPdfBytes(bytes, '${widget.detail.quotationNo}.pdf', context);
+    } catch (error) {
+      if (mounted) {
+        showAppToast(context, '${l10n.errorsFailed}: $error', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return TextButton.icon(
+      onPressed: _printing ? null : _print,
+      icon: _printing
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.print_outlined, size: 18),
+      label: Text(l10n.quotationsPrinta4),
     );
   }
 }

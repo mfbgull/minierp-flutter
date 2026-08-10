@@ -7,6 +7,7 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/production.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/screen_toolbar.dart';
 import 'production_detail_dialog.dart';
 import 'production_form_dialog.dart';
 import 'production_providers.dart';
@@ -23,6 +24,14 @@ class ProductionScreen extends ConsumerStatefulWidget {
 
 class _ProductionScreenState extends ConsumerState<ProductionScreen>
     with PlutoGridScreen<Production, ProductionScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   void openRowDetail(int productionId) {
     if (!mounted) return;
@@ -73,75 +82,52 @@ class _ProductionScreenState extends ConsumerState<ProductionScreen>
   Widget build(BuildContext context) {
     final productions = ref.watch(productionsProvider);
     final l10n = AppLocalizations.of(context)!;
-    final showClear = ref.watch(searchTextProvider).isNotEmpty;
 
+    // Keep the grid in sync with provider transitions (loading → data).
     watchGridProvider(productionsProvider);
+    // The client-side search re-runs the filter over the loaded rows
+    // without refetching (gridRowsFrom reads the provider directly).
+    ref.listen(searchTextProvider, (previous, next) {
+      syncGridRows(ref.read(productionsProvider));
+    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // Search bar
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: SearchBar(
-                    controller: TextEditingController(
-                      text: ref.watch(searchTextProvider),
-                    ),
-                    onChanged: (text) =>
-                        ref.read(searchTextProvider.notifier).state = text,
-                    hintText: l10n.commonSearch,
-                    leading: const Icon(Icons.search),
-                    trailing: [
-                      if (showClear)
-                        IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () =>
-                              ref.read(searchTextProvider.notifier).state = '',
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Toolbar buttons
-              FilledButton.tonalIcon(
-                onPressed: () => showProductionFormDialog(context),
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(l10n.productionNewproduction),
-              ),
-              const SizedBox(width: 4),
-              TextButton.icon(
-                onPressed:
-                    productions.isLoading ||
-                        (productions.valueOrNull?.isEmpty ?? true)
-                    ? null
-                    : () => saveCsv(
-                        context,
-                        suggestedName: csvSuggestedName('productions'),
-                        csv: buildProductionsCsv(
-                          l10n,
-                          productions.valueOrNull!,
-                        ),
-                        successMessage: l10n.productionExported,
-                        errorMessage: l10n.productionExportfailed,
+        // Toolbar: search + CSV export + refresh + New production.
+        ScreenToolbar(
+          searchController: _searchController,
+          searchHint: l10n.commonSearch,
+          onSearchChanged: (text) =>
+              ref.read(searchTextProvider.notifier).state = text,
+          onRefresh: () => ref.invalidate(productionsProvider),
+          actions: [
+            TextButton.icon(
+              onPressed:
+                  productions.isLoading ||
+                      (productions.valueOrNull?.isEmpty ?? true)
+                  ? null
+                  : () => saveCsv(
+                      context,
+                      suggestedName: csvSuggestedName('productions'),
+                      csv: buildProductionsCsv(
+                        l10n,
+                        productions.valueOrNull!,
                       ),
-                icon: const Icon(Icons.file_download_outlined, size: 18),
-                label: Text(l10n.productionExportcsv),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                tooltip: l10n.commonRefresh,
-                icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(productionsProvider),
-              ),
-            ],
-          ),
+                      successMessage: l10n.productionExported,
+                      errorMessage: l10n.productionExportfailed,
+                    ),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: Text(l10n.productionExportcsv),
+            ),
+          ],
+          primaryActions: [
+            FilledButton.tonalIcon(
+              onPressed: () => showProductionFormDialog(context),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(l10n.productionNewproduction),
+            ),
+          ],
         ),
         Expanded(
           child: gridScreenBody(productions, provider: productionsProvider),

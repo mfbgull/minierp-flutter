@@ -133,6 +133,10 @@ final stockMovementsProvider =
 
 // --- Stock balance providers ---
 
+/// Client-side search term for the stock-balances grid (no search param
+/// on the endpoint — the screen filters the loaded rows).
+final stockBalancesSearchProvider = StateProvider<String>((ref) => '');
+
 final stockBalancesProvider = FutureProvider<List<StockBalance>>((ref) async {
   final repo = ref.watch(inventoryRepositoryProvider);
   final result = await repo.stockBalances();
@@ -158,6 +162,10 @@ final stockLedgerProvider = FutureProvider.autoDispose
     });
 
 // --- Physical count providers ---
+
+/// Client-side search term for the physical-counts grid (no search
+/// param — the screen filters the loaded rows).
+final physicalCountsSearchProvider = StateProvider<String>((ref) => '');
 
 final physicalCountsProvider = FutureProvider<List<PhysicalCount>>((ref) async {
   final result = await ref.watch(inventoryRepositoryProvider).physicalCounts();

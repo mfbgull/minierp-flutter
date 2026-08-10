@@ -23,6 +23,7 @@ import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/screen_toolbar.dart';
 import 'payment_detail_dialog.dart';
 import 'payments_providers.dart';
 import 'record_payment_dialog.dart';
@@ -123,66 +124,29 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _searchController,
-                    builder: (context, value, _) => TextField(
-                      controller: _searchController,
-                      onChanged: _onSearchChanged,
-                      decoration: InputDecoration(
-                        hintText: l10n.paymentsSearchplaceholder,
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        suffixIcon: value.text.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () {
-                                  // Cancel any pending debounce so a stale
-                                  // timer can't resurrect the old term.
-                                  _debounce?.cancel();
-                                  _searchController.clear();
-                                  ref
-                                          .read(paymentsSearchProvider.notifier)
-                                          .state =
-                                      '';
-                                  if (ref.read(paymentsPageProvider) != 1) {
-                                    ref
-                                            .read(paymentsPageProvider.notifier)
-                                            .state =
-                                        1;
-                                  }
-                                },
-                              ),
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.tonalIcon(
-                onPressed: () => showRecordPaymentDialog(context),
-                icon: const Icon(Icons.account_balance_wallet, size: 18),
-                label: Text(l10n.paymentsRecordpayment),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                tooltip: l10n.commonRefresh,
-                icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(paymentsProvider),
-              ),
-            ],
-          ),
+        ScreenToolbar(
+          searchController: _searchController,
+          searchHint: l10n.paymentsSearchplaceholder,
+          onSearchChanged: _onSearchChanged,
+          onClearSearch: () {
+            // Cancel any pending debounce so a stale timer can't
+            // resurrect the old term, and reset to page 1 (the
+            // server-paginated search re-runs from the first page).
+            _debounce?.cancel();
+            _searchController.clear();
+            ref.read(paymentsSearchProvider.notifier).state = '';
+            if (ref.read(paymentsPageProvider) != 1) {
+              ref.read(paymentsPageProvider.notifier).state = 1;
+            }
+          },
+          onRefresh: () => ref.invalidate(paymentsProvider),
+          primaryActions: [
+            FilledButton.tonalIcon(
+              onPressed: () => showRecordPaymentDialog(context),
+              icon: const Icon(Icons.account_balance_wallet, size: 18),
+              label: Text(l10n.paymentsRecordpayment),
+            ),
+          ],
         ),
         Expanded(child: gridScreenBody(payments, provider: paymentsProvider)),
         if (page != null)

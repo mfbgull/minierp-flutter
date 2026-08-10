@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
+import '../../core/utils/print_utils.dart' show printPdfBytes;
 import '../../data/models/item.dart' show Item;
 import '../../data/models/purchase_order.dart' show PurchaseOrderDetail;
 import '../../data/models/supplier.dart' show Supplier;
@@ -30,6 +31,7 @@ import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart' show numText;
 import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show warehousesProvider;
+import 'purchase_order_pdf.dart' show buildA4PurchaseOrderPdf;
 import 'purchase_order_providers.dart';
 
 /// Opens the create ([detail] == null) or edit form dialog.
@@ -92,6 +94,7 @@ class _PurchaseOrderFormDialogState
   DateTime? _expectedDate;
 
   bool _submitting = false;
+  bool _printing = false;
   String? _error;
 
   bool get _isEdit => widget.detail != null;
@@ -331,6 +334,44 @@ class _PurchaseOrderFormDialogState
           _error = error.message;
         });
     }
+  }
+
+  /// Builds the A4 purchase order PDF from the *saved* order (fresh
+  /// `GET /purchase-orders/:id`, PORTING.md §12) and shows the native
+  /// print dialog — same pattern as the invoice/quotation/SO forms.
+  Future<void> _printPurchaseOrder() async {
+    final l10n = AppLocalizations.of(context)!;
+    final poId = widget.detail!.id;
+    setState(() => _printing = true);
+    try {
+      final result = await ref
+          .read(purchaseOrderRepositoryProvider)
+          .detail(poId);
+      if (!mounted) return;
+      final purchaseOrder = switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => _printError(
+          '${l10n.errorsFailed}: ${error.message}',
+        ),
+      };
+      if (purchaseOrder == null) return;
+
+      final bytes = await buildA4PurchaseOrderPdf(
+        purchaseOrder: purchaseOrder,
+      );
+      if (!mounted) return;
+      await printPdfBytes(bytes, '${purchaseOrder.poNo}.pdf', context);
+    } catch (error) {
+      if (mounted) _printError('${l10n.errorsFailed}: $error');
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  /// Shows the print error toast and signals the caller to abort.
+  PurchaseOrderDetail? _printError(String message) {
+    showAppToast(context, message, isError: true);
+    return null;
   }
 
   InputDecoration _decoration() =>
@@ -653,6 +694,20 @@ class _PurchaseOrderFormDialogState
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     if (_isEdit) ...[
+                      TextButton.icon(
+                        onPressed: _printing || _submitting
+                            ? null
+                            : _printPurchaseOrder,
+                        icon: _printing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.print_outlined, size: 18),
+                        label: Text(l10n.purchaseordersPrinta4),
+                      ),
+                      const SizedBox(width: 8),
                       OutlinedButton.icon(
                         onPressed: _submitting ? null : _delete,
                         icon: const Icon(Icons.delete_outline, size: 18),

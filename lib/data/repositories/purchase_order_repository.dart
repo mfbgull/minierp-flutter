@@ -12,7 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/purchase_order.dart'
-    show PurchaseOrder, PurchaseOrderDetail, PurchaseOrderItem;
+    show GoodsReceipt, PurchaseOrder, PurchaseOrderDetail, PurchaseOrderItem;
 import 'api_result.dart';
 import 'repository_client.dart';
 
@@ -101,6 +101,30 @@ class PurchaseOrderRepository {
   /// allows Draft deletions (and cascades the line items).
   Future<ApiResult<void>> deletePo(int id) =>
       _api.delete('${ApiEndpoints.purchaseOrders}/$id');
+
+  /// Goods-receipt history for a PO — **bare array** of `GoodsReceipt`
+  /// (receipt_no, date, warehouse, per-receipt qty/value aggregates).
+  Future<ApiResult<List<GoodsReceipt>>> receipts(int poId) =>
+      _api.getRawList(
+        '${ApiEndpoints.purchaseOrders}/$poId/receipts',
+        parseItem: (Object? json) =>
+            GoodsReceipt.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// Record a goods receipt — **bare 201** `GoodsReceipt`. The body is
+  /// `{receipt_date, warehouse_id, remarks?, items: [{po_item_id,
+  /// received_quantity}]}`; the server validates each quantity against
+  /// the line's pending balance, posts the stock movement, and updates
+  /// the PO status (Partially Received / Completed) itself.
+  Future<ApiResult<GoodsReceipt>> createReceipt(
+    int poId,
+    Map<String, dynamic> body,
+  ) => _api.postRaw(
+    '${ApiEndpoints.purchaseOrders}/$poId/receipts',
+    body: body,
+    parse: (Object? json) =>
+        GoodsReceipt.fromJson(json as Map<String, dynamic>),
+  );
 }
 
 final purchaseOrderRepositoryProvider = Provider<PurchaseOrderRepository>(

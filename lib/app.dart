@@ -16,15 +16,22 @@ import 'features/dashboard/dashboard_screen.dart';
 import 'features/inventory/inventory_shell.dart';
 import 'features/purchases/purchasing_shell.dart';
 import 'features/expenses/expenses_screen.dart';
+import 'features/forecasts/forecast_shell.dart';
+import 'features/integrations/integrations_screen.dart';
+import 'features/employees/employees_screen.dart';
+import 'features/admin/admin_shell.dart';
 import 'features/payments/payments_screen.dart';
 import 'features/production/production_shell.dart';
 import 'data/models/invoice.dart' show Invoice;
 import 'features/reports/ar_aging_report_screen.dart';
+import 'features/reports/ar_summary_report_screen.dart';
+import 'features/reports/bom_usage_report_screen.dart';
 import 'features/reports/cash_flow_report_screen.dart';
 import 'features/reports/dso_report_screen.dart';
 import 'features/reports/expenses_report_screen.dart';
 import 'features/reports/inventory_movement_report_screen.dart';
 import 'features/reports/low_stock_report_screen.dart';
+import 'features/reports/production_summary_report_screen.dart';
 import 'features/reports/profit_loss_report_screen.dart';
 import 'features/reports/purchase_summary_report_screen.dart';
 import 'features/reports/top_debtors_report_screen.dart';
@@ -32,7 +39,9 @@ import 'features/reports/customer_statements_report_screen.dart';
 import 'features/reports/reports_dashboard_screen.dart'
     show ReportsDashboardScreen, reportTitles;
 import 'features/reports/sales_by_customer_report_screen.dart';
+import 'features/reports/sales_by_item_report_screen.dart';
 import 'features/reports/sales_summary_report_screen.dart';
+import 'features/reports/supplier_analysis_report_screen.dart';
 import 'features/reports/stock_level_report_screen.dart';
 import 'features/reports/stock_valuation_report_screen.dart';
 import 'features/sales/sales_invoice_form_page.dart';
@@ -126,6 +135,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                     // in the hub; the :report sub-route below resolves
                     // each card to its screen (placeholder until ported).
                     '/reports' => const ReportsDashboardScreen(),
+                    // Forecasts (PORTING.md §12): four-tab shell over the
+                    // /forecasts endpoints (dashboard, demand, trends,
+                    // accuracy).
+                    '/forecasts' => const ForecastShell(),
                     // Activity log (PORTING.md §5): offset-paged read-only
                     // grid over GET /activity-logs with filters + stats.
                     '/activity-log' => const ActivityLogScreen(),
@@ -133,6 +146,17 @@ final routerProvider = Provider<GoRouter>((ref) {
                     // over GET/POST /settings (company, currency, tax,
                     // document numbering).
                     '/settings' => const SettingsScreen(),
+                    // Integrations: per-service enable/configure cards
+                    // over GET /integrations/settings + PUT
+                    // /integrations/settings/:service.
+                    '/integrations' => const IntegrationsScreen(),
+                    // Employees (PORTING.md §5): server-paginated grid
+                    // over GET /employees + CRUD, salary pay modal,
+                    // detail dialog (documents + salary history).
+                    '/hr' => const EmployeesScreen(),
+                    // User management (PORTING.md §5): admin-only shell
+                    // with Users and Roles tabs over /users + /roles.
+                    '/admin' => const AdminShell(),
                     _ => ModulePlaceholderScreen(
                       title: dest.label(AppLocalizations.of(context)!),
                     ),
@@ -145,6 +169,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                             builder: (context, state) {
                               final slug = state.pathParameters['report'] ?? '';
                               return switch (slug) {
+                                'ar-summary' => const ArSummaryReportScreen(),
                                 'ar-aging' => const ArAgingReportScreen(),
                                 'sales-summary' =>
                                   const SalesSummaryReportScreen(),
@@ -165,6 +190,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                                 'top-debtors' => const TopDebtorsReportScreen(),
                                 'customer-statements' =>
                                   const CustomerStatementsReportScreen(),
+                                'sales-by-item' =>
+                                  const SalesByItemReportScreen(),
+                                'supplier-analysis' =>
+                                  const SupplierAnalysisReportScreen(),
+                                'production-summary' =>
+                                  const ProductionSummaryReportScreen(),
+                                'bom-usage' => const BomUsageReportScreen(),
                                 _ => ModulePlaceholderScreen(
                                   title:
                                       reportTitles[slug]?.call(

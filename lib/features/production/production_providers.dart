@@ -19,6 +19,10 @@ import '../../data/repositories/production_repository.dart'
 
 /// All BOMs (`GET /boms`, bare array). The screen invalidates it on
 /// refresh; the BOM form/detail dialogs invalidate it after writes.
+/// Client-side search term for the BOM grid (no search param — the
+/// screen filters the loaded rows).
+final bomsSearchProvider = StateProvider<String>((ref) => '');
+
 final bomsProvider = FutureProvider<List<Bom>>((ref) async {
   final result = await ref.watch(productionRepositoryProvider).boms();
   return switch (result) {

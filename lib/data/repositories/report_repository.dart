@@ -11,18 +11,23 @@ import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../data/models/report.dart'
     show
         ArAgingReport,
+        ArSummaryReport,
+        BomUsageReport,
         CashFlowReport,
         CustomerStatementRow,
         DSOMetric,
         ExpensesReport,
         InventoryMovementReport,
         LowStockReportRow,
+        ProductionSummaryReport,
         ProfitLossReport,
         PurchaseSummaryReport,
         SalesByCustomerRow,
+        SalesByItemRow,
         SalesSummaryReport,
         StockLevelReport,
         StockValuationReport,
+        SupplierAnalysisRow,
         TopDebtorRow;
 import 'api_result.dart';
 import 'repository_client.dart';
@@ -204,6 +209,72 @@ class ReportRepository {
         parseItem: (Object? json) =>
             TopDebtorRow.fromJson(json as Map<String, dynamic>),
       );
+
+  /// GET /reports/sales-by-item — per-item sales over a date range.
+  /// Returns a **bare array** and requires both dates (the server 400s
+  /// without them).
+  Future<ApiResult<List<SalesByItemRow>>> salesByItem({
+    required String fromDate,
+    required String toDate,
+  }) => _api.getList(
+    ApiEndpoints.reportSalesByItem,
+    queryParameters: {'fromDate': fromDate, 'toDate': toDate},
+    parseItem: (Object? json) =>
+        SalesByItemRow.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// GET /reports/supplier-analysis — per-supplier purchase totals over a
+  /// date range. Returns a **bare array** and requires both dates (the
+  /// server 400s without them).
+  Future<ApiResult<List<SupplierAnalysisRow>>> supplierAnalysis({
+    required String fromDate,
+    required String toDate,
+  }) => _api.getList(
+    ApiEndpoints.reportSupplierAnalysis,
+    queryParameters: {'fromDate': fromDate, 'toDate': toDate},
+    parseItem: (Object? json) =>
+        SupplierAnalysisRow.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// GET /reports/production-summary — production runs + period totals
+  /// over a date range. The endpoint requires both dates.
+  Future<ApiResult<ProductionSummaryReport>> productionSummary({
+    required String fromDate,
+    required String toDate,
+  }) => _api.get(
+    ApiEndpoints.reportProductionSummary,
+    queryParameters: {'fromDate': fromDate, 'toDate': toDate},
+    parse: (Object? json) =>
+        ProductionSummaryReport.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// GET /reports/bom-usage — BOM usage over a date range (all-time when
+  /// dates are omitted), optionally narrowed to one finished item.
+  Future<ApiResult<BomUsageReport>> bomUsage({
+    String? fromDate,
+    String? toDate,
+    int? itemId,
+  }) => _api.get(
+    ApiEndpoints.reportBomUsage,
+    queryParameters: {
+      'fromDate': ?fromDate,
+      'toDate': ?toDate,
+      'itemId': ?itemId,
+    },
+    parse: (Object? json) =>
+        BomUsageReport.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// GET /reports/ar-summary — rolling receivables summary as of a date
+  /// (server default: today). Takes an optional `asOfDate` query param.
+  Future<ApiResult<ArSummaryReport>> arSummary({String? asOfDate}) => _api.get(
+    ApiEndpoints.reportArSummary,
+    queryParameters: asOfDate == null
+        ? null
+        : <String, dynamic>{'asOfDate': asOfDate},
+    parse: (Object? json) =>
+        ArSummaryReport.fromJson(json as Map<String, dynamic>),
+  );
 }
 
 final reportRepositoryProvider = Provider<ReportRepository>(

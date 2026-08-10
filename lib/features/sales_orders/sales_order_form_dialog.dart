@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
+import '../../core/utils/print_utils.dart' show printPdfBytes;
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/item.dart' show Item;
 import '../../data/models/sales_order.dart' show SalesOrderDetail;
@@ -28,6 +29,7 @@ import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart' show numText;
 import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show warehousesProvider;
+import 'sales_order_pdf.dart' show buildA4SalesOrderPdf;
 import 'sales_order_providers.dart';
 
 /// Opens the create ([detail] == null) or edit form dialog.
@@ -85,6 +87,7 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
   DateTime? _deliveryDate;
 
   bool _submitting = false;
+  bool _printing = false;
   String? _error;
 
   bool get _isEdit => widget.detail != null;
@@ -199,6 +202,44 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
           _error = error.message;
         });
     }
+  }
+
+  /// Builds the A4 sales order PDF from the *saved* order (fresh
+  /// `GET /sales-orders/:id`, PORTING.md §12) and shows the native print
+  /// dialog. Falls back to the share/save-as-PDF sheet when the platform
+  /// has no print backend (e.g. some Linux setups) — same pattern as the
+  /// invoice/quotation forms' Print A4.
+  Future<void> _printSalesOrder() async {
+    final l10n = AppLocalizations.of(context)!;
+    final soId = widget.detail!.id;
+    setState(() => _printing = true);
+    try {
+      final result = await ref
+          .read(salesOrderRepositoryProvider)
+          .detail(soId);
+      if (!mounted) return;
+      final salesOrder = switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => _printError(
+          '${l10n.errorsFailed}: ${error.message}',
+        ),
+      };
+      if (salesOrder == null) return;
+
+      final bytes = await buildA4SalesOrderPdf(salesOrder: salesOrder);
+      if (!mounted) return;
+      await printPdfBytes(bytes, '${salesOrder.soNo}.pdf', context);
+    } catch (error) {
+      if (mounted) _printError('${l10n.errorsFailed}: $error');
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  /// Shows the print error toast and signals the caller to abort.
+  SalesOrderDetail? _printError(String message) {
+    showAppToast(context, message, isError: true);
+    return null;
   }
 
   InputDecoration _decoration() =>
@@ -524,6 +565,22 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    if (_isEdit) ...[
+                      TextButton.icon(
+                        onPressed: _printing || _submitting
+                            ? null
+                            : _printSalesOrder,
+                        icon: _printing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.print_outlined, size: 18),
+                        label: Text(l10n.salesordersPrinta4),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     TextButton(
                       onPressed: _submitting
                           ? null

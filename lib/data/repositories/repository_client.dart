@@ -56,6 +56,16 @@ class RepositoryClient {
     required T Function(Object?) parse,
   }) => _parse(_guard(() => _dio.post(path, data: body)), parse);
 
+  /// Enveloped multipart POST — `{success: true, data}` with a
+  /// [FormData] body (the employee-document upload posts the metadata
+  /// fields plus the `file` part). Same envelope handling as [post];
+  /// dio sets the multipart content type from the FormData.
+  Future<ApiResult<T>> postMultipart<T>(
+    String path, {
+    required FormData formData,
+    required T Function(Object?) parse,
+  }) => _parse(_guard(() => _dio.post(path, data: formData)), parse);
+
   Future<ApiResult<T>> put<T>(
     String path, {
     Object? body,
@@ -203,10 +213,19 @@ class RepositoryClient {
   }
 
   /// GET a bare object (item detail: `{...item, stock_by_warehouse}`).
+  /// Unlike [get], the whole response body reaches `parse` unwrapped —
+  /// used for envelopes the standard helpers can't express (e.g. the
+  /// employees list's `{data, pagination: {page, limit, total,
+  /// totalPages}}` block). A `{success: false, error}` body still becomes
+  /// an [ApiFailure] when `parse` throws [ApiResponseException].
   Future<ApiResult<T>> getRaw<T>(
     String path, {
+    Map<String, dynamic>? queryParameters,
     required T Function(Object?) parse,
-  }) => _parseRaw(_guard(() => _dio.get(path)), parse);
+  }) => _parseRaw(
+    _guard(() => _dio.get(path, queryParameters: queryParameters)),
+    parse,
+  );
 
   /// POST returning the created object directly (item create).
   Future<ApiResult<T>> postRaw<T>(

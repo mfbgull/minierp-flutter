@@ -24,6 +24,18 @@ abstract final class Formatters {
   }
 
   /// 1234 → "1,234".
+  /// Compact byte size — e.g. `1.2 MB` / `450 KB` (used by the
+  /// employee-document upload dialog's picked-file label).
+  static String bytes(num value) {
+    if (value >= 1024 * 1024) {
+      return '${(value / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    if (value >= 1024) {
+      return '${(value / 1024).toStringAsFixed(0)} KB';
+    }
+    return '$value B';
+  }
+
   static String number(num value, {String locale = 'en'}) {
     return NumberFormat.decimalPattern(locale).format(value);
   }

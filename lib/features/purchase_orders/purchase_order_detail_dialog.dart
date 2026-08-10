@@ -10,8 +10,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../core/utils/po_status.dart';
+import '../../core/utils/print_utils.dart' show printPdfBytes;
 import '../../data/models/purchase_order.dart'
-    show PurchaseOrderDetail, PurchaseOrderItem;
+    show GoodsReceipt, PurchaseOrderDetail, PurchaseOrderItem;
 import '../../data/repositories/api_result.dart'
     show ApiError, ApiFailure, ApiSuccess;
 import '../../data/repositories/purchase_order_repository.dart'
@@ -24,7 +25,9 @@ import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'purchase_order_form_dialog.dart';
+import 'purchase_order_pdf.dart' show buildA4PurchaseOrderPdf;
 import 'purchase_order_providers.dart';
+import 'receive_goods_dialog.dart';
 
 /// Opens the read-only detail dialog for [poId].
 Future<void> showPurchaseOrderDetailDialog(
@@ -65,13 +68,13 @@ class _PurchaseOrderDetailDialog extends ConsumerWidget {
   }
 }
 
-class _DetailBody extends StatelessWidget {
+class _DetailBody extends ConsumerWidget {
   const _DetailBody({required this.detail});
 
   final PurchaseOrderDetail detail;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final expected = detail.expectedDeliveryDate;
     final (color, darkColor) = poStatusColors(detail.status);
@@ -173,6 +176,10 @@ class _DetailBody extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(detail.notes!),
                 ],
+                if (detail.status != 'Draft' && detail.status != 'Cancelled') ...[
+                  const SizedBox(height: 14),
+                  _ReceiptsSection(detail: detail),
+                ],
               ],
             ),
           ),
@@ -180,20 +187,29 @@ class _DetailBody extends StatelessWidget {
         const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.all(12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          child: Wrap(
+            // Draft packs Submit + Edit + Print A4 + Close, and
+            // Submitted/Partially Received adds Receive Goods — wrap so
+            // actions flow to a second line instead of overflowing.
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 4,
+            runSpacing: 4,
             children: [
               if (detail.status == 'Draft') ...[
                 _SubmitPoButton(detail: detail),
-                const SizedBox(width: 4),
                 TextButton.icon(
                   onPressed: () =>
                       showPurchaseOrderFormDialog(context, detail: detail),
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   label: Text(l10n.commonEdit),
                 ),
-                const SizedBox(width: 4),
               ],
+              if (detail.status == 'Submitted' ||
+                  detail.status == 'Partially Received') ...[
+                _ReceiveGoodsButton(detail: detail),
+              ],
+              _PrintPurchaseOrderButton(detail: detail),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(l10n.commonClose),
@@ -366,6 +382,254 @@ class _ItemRow extends StatelessWidget {
 /// Submit action for Draft POs — confirms, POSTs /:id/status, then
 /// invalidates the detail + list providers (the dialog refetches, the
 /// badge flips to Submitted and this button, plus Edit, disappear).
+/// Goods-receipt history — watches `GET /purchase-orders/:id/receipts`
+/// (via [purchaseOrderReceiptsProvider]) and renders each receipt's
+/// number/date/warehouse/qty/value in a compact table. Shown only for
+/// non-Draft, non-Cancelled POs (receipts can't exist before submission).
+class _ReceiptsSection extends ConsumerWidget {
+  const _ReceiptsSection({required this.detail});
+
+  final PurchaseOrderDetail detail;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final receipts = ref.watch(purchaseOrderReceiptsProvider(detail.id));
+
+    return switch (receipts) {
+      AsyncData(:final value) => value.isEmpty
+          ? Text(
+              l10n.purchaseordersNoreceipts,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                detailSectionLabel(context, l10n.purchaseordersReceipts),
+                const SizedBox(height: 6),
+                _ReceiptsTable(receipts: value),
+              ],
+            ),
+      AsyncError(:final error) => DetailError(
+        message: error is ApiError ? error.message : '$error',
+        onRetry: () =>
+            ref.invalidate(purchaseOrderReceiptsProvider(detail.id)),
+      ),
+      _ => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+    };
+  }
+}
+
+class _ReceiptsTable extends StatelessWidget {
+  const _ReceiptsTable({required this.receipts});
+
+  final List<GoodsReceipt> receipts;
+
+  static const _numWidth = 84.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+      letterSpacing: 0.3,
+    );
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(l10n.purchaseordersReceiptno, style: style),
+                ),
+                SizedBox(
+                  width: 110,
+                  child: Text(
+                    l10n.purchaseordersReceiptdate,
+                    style: style,
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+                SizedBox(
+                  width: _numWidth,
+                  child: Text(
+                    l10n.purchaseordersQtyreceived,
+                    style: style,
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+                SizedBox(
+                  width: _numWidth,
+                  child: Text(
+                    l10n.commonTotal,
+                    style: style,
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          for (final receipt in receipts) ...[const Divider(height: 1), _ReceiptRow(receipt: receipt)],
+        ],
+      ),
+    );
+  }
+}
+
+class _ReceiptRow extends StatelessWidget {
+  const _ReceiptRow({required this.receipt});
+
+  final GoodsReceipt receipt;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final amountStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    final muted = Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(receipt.receiptNo, style: amountStyle),
+                if (receipt.warehouseName?.isNotEmpty ?? false)
+                  Text(receipt.warehouseName!, style: muted),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 110,
+            child: Text(
+              receipt.receiptDate.isEmpty
+                  ? '—'
+                  : Formatters.date(receipt.receiptDate),
+              style: amountStyle,
+              textAlign: TextAlign.end,
+            ),
+          ),
+          SizedBox(
+            width: _ReceiptsTable._numWidth,
+            child: Text(
+              Formatters.number(receipt.totalQuantity),
+              style: amountStyle,
+              textAlign: TextAlign.end,
+            ),
+          ),
+          SizedBox(
+            width: _ReceiptsTable._numWidth,
+            child: Text(
+              Formatters.currency(receipt.totalAmount),
+              style: amountStyle,
+              textAlign: TextAlign.end,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Print A4 action — builds the PDF from the already-fetched detail (the
+/// dialog IS the saved order, so unlike the edit form there is no
+/// refetch) and opens the native print dialog. Available for every
+/// status.
+class _PrintPurchaseOrderButton extends StatefulWidget {
+  const _PrintPurchaseOrderButton({required this.detail});
+
+  final PurchaseOrderDetail detail;
+
+  @override
+  State<_PrintPurchaseOrderButton> createState() =>
+      _PrintPurchaseOrderButtonState();
+}
+
+class _PrintPurchaseOrderButtonState
+    extends State<_PrintPurchaseOrderButton> {
+  bool _printing = false;
+
+  Future<void> _print() async {
+    final l10n = AppLocalizations.of(context)!;
+    setState(() => _printing = true);
+    try {
+      final bytes = await buildA4PurchaseOrderPdf(
+        purchaseOrder: widget.detail,
+      );
+      if (!mounted) return;
+      await printPdfBytes(bytes, '${widget.detail.poNo}.pdf', context);
+    } catch (error) {
+      if (mounted) {
+        showAppToast(context, '${l10n.errorsFailed}: $error', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return TextButton.icon(
+      onPressed: _printing ? null : _print,
+      icon: _printing
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.print_outlined, size: 18),
+      label: Text(l10n.purchaseordersPrinta4),
+    );
+  }
+}
+
+/// Receive-goods action for Submitted / Partially Received POs — opens
+/// the receive dialog, which POSTs /:id/receipts; on success the detail
+/// and receipts providers beneath it are invalidated so the history
+/// table and status badge refresh.
+class _ReceiveGoodsButton extends StatelessWidget {
+  const _ReceiveGoodsButton({required this.detail});
+
+  final PurchaseOrderDetail detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return FilledButton.tonalIcon(
+      onPressed: () => showReceiveGoodsDialog(context, detail: detail),
+      icon: const Icon(Icons.inventory_2_outlined, size: 18),
+      label: Text(l10n.purchaseordersReceivegoods),
+    );
+  }
+}
+
 class _SubmitPoButton extends ConsumerStatefulWidget {
   const _SubmitPoButton({required this.detail});
 

@@ -27,6 +27,7 @@ final Map<String, String Function(AppLocalizations)> reportTitles = {
   'cash-flow': (l) => l.reportsCashflowreport,
   'expenses': (l) => l.reportsExpensesreport,
   'ar-aging': (l) => l.reportsTabsAr_aging,
+  'ar-summary': (l) => l.reportsTabsReceivables_summary,
   'customer-statements': (l) => l.reportsCustomerstatementsreport,
   'top-debtors': (l) => l.reportsTopdebtorsreport,
   'dso': (l) => l.reportsDsoreport,
@@ -82,6 +83,7 @@ final List<_ReportCategory> _reportCategories = [
     (l) => l.reportsCategoryAr,
     Icons.hourglass_bottom_outlined,
     const [
+      _ReportEntry('ar-summary', Icons.account_balance_wallet_outlined),
       _ReportEntry('ar-aging', Icons.schedule_outlined),
       _ReportEntry('customer-statements', Icons.description_outlined),
       _ReportEntry('top-debtors', Icons.people_alt_outlined),

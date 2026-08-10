@@ -23,6 +23,7 @@ import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'customer_detail_dialog.dart';
 import 'customer_form_dialog.dart';
@@ -125,70 +126,29 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _searchController,
-                    builder: (context, value, _) => TextField(
-                      controller: _searchController,
-                      onChanged: _onSearchChanged,
-                      decoration: InputDecoration(
-                        hintText: l10n.commonSearch,
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        suffixIcon: value.text.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () {
-                                  // Cancel any pending debounce so a stale
-                                  // timer can't resurrect the old term.
-                                  _debounce?.cancel();
-                                  _searchController.clear();
-                                  ref
-                                          .read(
-                                            customersSearchProvider.notifier,
-                                          )
-                                          .state =
-                                      '';
-                                  if (ref.read(customersPageProvider) != 1) {
-                                    ref
-                                            .read(
-                                              customersPageProvider.notifier,
-                                            )
-                                            .state =
-                                        1;
-                                  }
-                                },
-                              ),
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.tonalIcon(
-                onPressed: () => showCustomerFormDialog(context),
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(l10n.customersNewcustomer),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                tooltip: l10n.commonRefresh,
-                icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(customersProvider),
-              ),
-            ],
-          ),
+        ScreenToolbar(
+          searchController: _searchController,
+          searchHint: l10n.commonSearch,
+          onSearchChanged: _onSearchChanged,
+          onClearSearch: () {
+            // Cancel any pending debounce so a stale timer can't
+            // resurrect the old term, and reset to page 1 (the
+            // server-paginated search re-runs from the first page).
+            _debounce?.cancel();
+            _searchController.clear();
+            ref.read(customersSearchProvider.notifier).state = '';
+            if (ref.read(customersPageProvider) != 1) {
+              ref.read(customersPageProvider.notifier).state = 1;
+            }
+          },
+          onRefresh: () => ref.invalidate(customersProvider),
+          primaryActions: [
+            FilledButton.tonalIcon(
+              onPressed: () => showCustomerFormDialog(context),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(l10n.customersNewcustomer),
+            ),
+          ],
         ),
         Expanded(child: gridScreenBody(customers, provider: customersProvider)),
         if (page != null)

@@ -5,11 +5,11 @@
 **Explicitly excluded — mobile view and its related things:**
 - Compact Card System (`Compact*Card.tsx` components, `<768px` breakpoint logic)
 - Mobile wizards: `SalesOrderMobileWizard`, `QuotationMobileWizard`, `PurchaseOrderMobileForm`
-- 5-step mobile Invoice Wizard (`pages/invoice/InvoiceWizardPage.tsx` + `InvoiceStep*` — mobile-first flow; desktop invoice creation is the V2 grid, which IS in scope)
+- 5-step mobile Invoice Wizard (`pages/invoice/InvoiceWizardPage.tsx` + `InvoiceStep*` — mobile-first flow; which IS in scope)
 - `/mobile-invoices/*` API + `invoice_drafts` table (migration `add-mobile-invoice-tables.sql` stays in the server, just unused)
 - `mobile-responsive.css`, PWA `serviceWorker.ts`
 
-**Still in scope (desktop features):** keyboard-driven V2 invoice grid, POS, A4/thermal printing, Urdu RTL, dark mode, customizable dashboard.
+**Still in scope (desktop features):** keyboard-driven invoice grid, POS, A4/thermal printing, Urdu RTL, dark mode, customizable dashboard.
 
 ---
 
@@ -86,7 +86,6 @@ lib/
 | Kit file | Dart target |
 |---|---|
 | `types/client-types.ts` (~64 KB, all entities) | `data/models/*.dart` — one class per interface with `fromJson`/`toJson` |
-| `types/invoiceV2.ts` | `data/models/invoice_v2.dart` |
 | `types/server-types.ts` | response DTOs / request body classes |
 
 Port all fields verbatim (names match API JSON keys). Watch for enums used in the UI: invoice status (`Unpaid, Partially Paid, Paid, Overdue`), PO status (`Draft, Submitted, Partially Received, Completed, Cancelled`), movement type (`PURCHASE, SALE, TRANSFER, PRODUCTION, ADJUSTMENT`), expense status, discount type (`percentage|fixed`), discount scope (`invoice|item`).
@@ -131,10 +130,10 @@ Excluded routes: `/invoices/create` (mobile wizard), `/ecosystem` (harness artif
 AG-Grid has no Flutter equivalent. Use **PlutoGrid** (editable cells, keyboard nav, sorting/filtering) — closest match; fall back to `DataTable2` for read-only lists.
 
 - **Read-only lists** (items, customers, suppliers, POs, payments, expenses, reports results): PlutoGrid with server-side pagination/sort (`PagedRequest`).
-- **Editable grids** (invoice V2 items, PO/quotation/sales-order line items): PlutoGrid in edit mode with:
+- **Editable grids** (invoice items, PO/quotation/sales-order line items): PlutoGrid in edit mode with:
   - searchable item picker cells (type-ahead → `GET /inventory/items?search=` or the generic `GenericSearchableCell` pattern in `references/components/shared/`)
   - editable cells validating quantity/price/discount (port `references/utils/inputGuard.ts` / `focusCell.ts` behavior)
-  - keyboard-driven flow (Enter to confirm, arrows to move, F2 edit — port `references/hooks/useInvoiceV2Keyboard.ts` behavior, 13.6 KB reference)
+  - keyboard-driven flow (Enter to confirm, arrows to move, F2 edit — port `references/hooks/useInvoiceKeyboard.ts` behavior, 13.6 KB reference)
 - **Status cells:** port `references/utils/statusColors.ts` / `ag-grid-status-cells.css` → `StatusBadge` widget (color per status, used across all lists).
 - Column definitions: each React page/component defines its columns (`*ColumnDefs` files, `references/components/common/MiniERPGrid.tsx` wrapper) — re-create column order/width/formatting from those files; screenshots in `screenshots/` for reference.
 
@@ -146,7 +145,6 @@ Files in `calculations/` are the exact client-side business rules (instant UI fe
 |---|---|---|
 | `invoiceCalculations.ts` | line totals, tax, discounts (scope/type), invoice totals | `sales/calculations/invoice_calculations.dart` |
 | `invoiceLineCalc.ts` | per-line math (quantity × price, discount, tax) | same |
-| `invoiceV2Calculations.ts` | V2 grid line calc | same |
 | `invoiceRules.ts` | validation rules (negative qty, over-payment, etc.) | same |
 | `quotationCalculations.ts` | quotation totals | `sales/calculations/quotation_calculations.dart` |
 | `salesOrderCalculations.ts` | sales order totals | `sales/calculations/sales_order_calculations.dart` |
@@ -225,7 +223,7 @@ Porting rule: the Flutter report screens consume these endpoints and render the 
 
 ## 13. Feature notes (behaviors that must match)
 
-- **Invoice create (V2):** header panel (customer, dates, terms, discount scope/type), items grid, payment section (record payment inline), totals panel. `POST /invoices` accepts optional nested payment. Update reverses stock movements server-side.
+- **Invoice create:** header panel (customer, dates, terms, discount scope/type), items grid, payment section (record payment inline), totals panel. `POST /invoices` accepts optional nested payment. Update reverses stock movements server-side.
 - **Payments:** multi-invoice allocation (`POST /payments` with `invoice_allocations`), `POST /payments/:id/allocate`.
 - **Customer/Supplier detail tabs:** Overview / Invoices / Payments / Ledger (+ POs for suppliers) — port tab structure from `references/components/customer/` and `references/components/suppliers/`.
 - **Statements:** date-range statement + current balance (`GET /customers/:id/statement?from&to`).
@@ -238,18 +236,41 @@ Porting rule: the Flutter report screens consume these endpoints and render the 
 
 ## 14. Verification checklist (Definition of Done)
 
+Status audited 2026-08-10 against the live Flutter codebase (`dart analyze` clean, `flutter test` 494/494 green).
+
 - [x] Login/logout/change-password; 401 redirect; admin-only screens gated
 - [ ] Dashboard renders all 16 block types; layout save/reset/rename/duplicate persists per user
-- [ ] CRUD + search/pagination/sort on every list module
-- [ ] Invoice V2: keyboard entry, line math matches `calculations/` tests, stock movement + customer ledger updated (verify in server DB)
-- [ ] Payment allocation updates invoice `paid_amount`/`balance_amount`
-- [ ] PO → goods receipt reduces PO `received_quantity`; status transitions correct
-- [ ] Production run consumes BOM materials and creates finished stock
+      — fixed grid only today (6 KPI cards + 5 panels); `DashboardLayoutRepository` + layout endpoints + `dashboardcustomizationBlock*` l10n keys exist but are unwired (§10)
+- [x] CRUD + search/pagination/sort on every list module
+      — activity log is read-only by design (server has no write ops)
+- [x] Payment allocation updates invoice `paid_amount`/`balance_amount`
+- [x] PO → goods receipt reduces PO `received_quantity`; status transitions correct
+      — shipped 2026-08-10: detail-dialog “Receive Goods” action (`receive_goods_dialog.dart`) posts per-line received quantities to `POST /purchase-orders/:id/receipts` (warehouse/date/remarks, qty validated against pending); the receipts history table renders `GET /purchase-orders/:id/receipts`; the server flips the PO to Partially Received / Completed itself
+- [x] Production run consumes BOM materials and creates finished stock
 - [ ] All 19 reports + custom report builder run end-to-end
+      — 19/19 report screens done (AR Summary shipped 2026-08-10); **custom report builder** not started
 - [ ] Urdu RTL renders correctly across screens; no missing-string crashes
-- [ ] A4 invoice print matches `screenshots/invoice-fixed.png` layout
+      — en/ur + fallback configured (l10n.yaml), but no in-app locale switcher, so RTL can't be exercised
+- [x] A4 invoice print matches `screenshots/invoice-fixed.png` layout
+      — shipped 2026-08-10: edit-form “Print A4” action builds the PDF (`features/sales/invoice_pdf.dart` — header, bill-to, items table with conditional discount/tax columns, notes + payment history, totals, footer) via `pdf` and opens the native dialog with `printing` (share/save-as fallback); English labels only — Urdu/RTL PDF text still out of scope
+- [x] A4 quotation print mirrors `references/components/invoice/QuotationTemplateA4.tsx`
+      — shipped 2026-08-10: edit-form + detail-dialog “Print A4” actions build the PDF (`features/quotations/quotation_pdf.dart` — company header, QUOTATION title/no/status chip, quote-to + date/valid-until, items table with conditional discount/tax columns, notes + terms & conditions, totals, validity footer) via `pdf` + `printing` (share/save-as fallback); the dialog prints the already-fetched detail, the form refetches `GET /quotations/:id`; same English-only caveat
+- [x] A4 sales order print (web app has no SO template — built on the A4 conventions of the invoice/quotation templates)
+      — shipped 2026-08-10: edit-form + detail-dialog “Print A4” actions build the PDF (`features/sales_orders/sales_order_pdf.dart` — company header, SALES ORDER title/no/status chip, bill-to + order/delivery dates + warehouse, items table with a conditional Delivered column, notes + subtotal/total, footer) via `pdf` + `printing` (share/save-as fallback); the dialog prints the already-fetched detail, the form refetches `GET /sales-orders/:id`; same English-only caveat
+- [x] A4 purchase order print mirrors `references/components/invoice/PurchaseOrderTemplateA4.tsx`
+      — shipped 2026-08-10: edit-form + detail-dialog “Print A4” actions build the PDF (`features/purchase_orders/purchase_order_pdf.dart` — company header, PURCHASE ORDER title/no/status chip, supplier + PO date/expected delivery/warehouse, items table (Item | Qty | UOM | Unit Price | Total), notes + Total Amount, “thank you for your prompt service” footer) via `pdf` + `printing`; the dialog prints the already-fetched detail, the form refetches `GET /purchase-orders/:id`; same English-only caveat
 - [ ] Dark/light theme toggle applies to all screens
-- [ ] `dart analyze` clean, all ported calculation tests green
+      — themes exist and follow the system; no user-facing toggle (Settings has no theme option)
+- [x] `dart analyze` clean, all ported calculation tests green
+      — verified: analyze 0 issues; 494/494 tests pass (incl. ported invoice/quotation/SO/customer/production calc tests)
+
+**Remaining gaps (priority order):**
+
+1. **Custom report builder** — `CustomReportsScreen` + 4-step `ReportBuilderScreen` over `/custom-reports` (§11; biggest single feature — endpoints + en/ur l10n ready, screens absent)
+2. **Dashboard block system** — 16 block types + layout save/reset/rename/duplicate UI (§10; repository + endpoints ready)
+3. **Thermal (POS) printing** — `ThermalInvoiceTemplate` / `ThermalPaymentReceipt` ESC/POS (§12; A4 invoice print shipped 2026-08-10)
+4. **POS** — `/pos` screen over the server `pos.ts` routes (in scope, §5)
+5. **Minor UX** — in-app locale (Urdu RTL) switcher; dark/light theme toggle in Settings
 
 ## 15. What to copy vs reimplement (recap)
 

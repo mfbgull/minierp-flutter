@@ -717,6 +717,63 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsExportfailed => 'رپورٹ ایکسپورٹ ناکام';
 
   @override
+  String get reportsTotalquantitysold => 'کل فروخت شدہ مقدار';
+
+  @override
+  String get reportsAvgsellingprice => 'اوسط فروخت قیمت';
+
+  @override
+  String get reportsQuantitysold => 'فروخت شدہ مقدار';
+
+  @override
+  String get reportsTotalpurchasevalue => 'کل خریداری ویلیو';
+
+  @override
+  String get reportsOntimedeliveryrate => 'بروقت ترسیل کی شرح';
+
+  @override
+  String get reportsTotalproductionorders => 'کل پروڈکشن آرڈرز';
+
+  @override
+  String get reportsTotaloutputquantity => 'کل آؤٹ پٹ مقدار';
+
+  @override
+  String get reportsCompletedquantity => 'مکمل شدہ مقدار';
+
+  @override
+  String get reportsScrappedquantity => 'ختم شدہ مقدار';
+
+  @override
+  String get reportsProductiondate => 'پروڈکشن تاریخ';
+
+  @override
+  String get reportsProductionorder => 'پروڈکشن آرڈر';
+
+  @override
+  String get reportsOutputitem => 'آؤٹ پٹ آئٹم';
+
+  @override
+  String get reportsOutputquantity => 'آؤٹ پٹ مقدار';
+
+  @override
+  String get reportsPlannedquantity => 'منصوبہ بند مقدار';
+
+  @override
+  String get reportsParentitem => 'بنیادی آئٹم';
+
+  @override
+  String get reportsUsagecount => 'استعمال کی تعداد';
+
+  @override
+  String get reportsLastused => 'آخری استعمال';
+
+  @override
+  String get reportsTotalcomponents => 'کل اجزاء';
+
+  @override
+  String get reportsAllitems => 'تمام آئٹمز';
+
+  @override
   String get fieldsMetric => 'پیمائش';
 
   @override
@@ -837,6 +894,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get quotationsEditsquotation => 'کوٹیشن میں ترمیم';
 
   @override
+  String get quotationsPrinta4 => 'A4 پرنٹ کریں';
+
+  @override
   String get quotationsErrorCustomerrequired => 'گاہک منتخب کریں';
 
   @override
@@ -868,6 +928,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get quotationsSaved => 'کوٹیشن محفوظ ہوگیا';
+
+  @override
+  String get quotationsSearchplaceholder => 'کوٹیشنز تلاش کریں...';
 
   @override
   String get quotationsTerms => 'شرائط';
@@ -955,6 +1018,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchaseordersNewpurchaseorder => 'نیا خریداری آرڈر';
 
   @override
+  String get purchaseordersPrinta4 => 'A4 پرنٹ کریں';
+
+  @override
   String get purchaseordersExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
 
   @override
@@ -1014,10 +1080,51 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchaseordersUnitprice => 'یونٹ قیمت';
 
   @override
+  String get purchaseordersReceivegoods => 'سامان وصول کریں';
+
+  @override
+  String get purchaseordersReceipts => 'رسیدیں';
+
+  @override
+  String get purchaseordersReceiptno => 'رسید نمبر';
+
+  @override
+  String get purchaseordersReceiptdate => 'رسید تاریخ';
+
+  @override
+  String get purchaseordersOrdered => 'آرڈر شدہ';
+
+  @override
+  String get purchaseordersQtyreceived => 'وصول شدہ مقدار';
+
+  @override
+  String get purchaseordersPending => 'زیر التوا';
+
+  @override
+  String get purchaseordersNoreceipts => 'ابھی تک کوئی رسید درج نہیں ہوئی';
+
+  @override
+  String get purchaseordersReceiptsaved => 'سامان کی رسید درج ہو گئی';
+
+  @override
+  String get purchaseordersErrorWarehouserequired => 'گودام منتخب کریں';
+
+  @override
+  String get purchaseordersErrorReceiveditemsrequired =>
+      'کم از کم ایک وصول شدہ مقدار درج کریں';
+
+  @override
+  String get purchaseordersErrorQtyexceeds =>
+      'وصول شدہ مقدار زیر التوا مقدار سے زیادہ نہیں ہو سکتی';
+
+  @override
   String get salesordersSalesorders => 'سیلز آرڈرز';
 
   @override
   String get salesordersNewsalesorder => 'نیا سیلز آرڈر';
+
+  @override
+  String get salesordersPrinta4 => 'A4 پرنٹ کریں';
 
   @override
   String get salesordersSono => 'آرڈر نمبر';
@@ -1131,6 +1238,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get salesordersSaved => 'سیلز آرڈر محفوظ ہوگیا';
+
+  @override
+  String get salesordersSearchplaceholder => 'سیلز آرڈرز تلاش کریں...';
 
   @override
   String get salesordersSodate => 'آرڈر کی تاریخ';
@@ -1539,6 +1649,48 @@ class AppLocalizationsUr extends AppLocalizations {
   String get forecastsSortbymape => 'بہترین (سب سے کم MAPE) پہلے';
 
   @override
+  String get forecastsPredictedweek => 'پیش گوئی (ہفتہ)';
+
+  @override
+  String get forecastsPredictedmonth => 'پیش گوئی (ماہ)';
+
+  @override
+  String get forecastsPredictedquarter => 'پیش گوئی (سہ ماہی)';
+
+  @override
+  String get forecastsRecommendation => 'سفارش';
+
+  @override
+  String get forecastsOrdernow => 'ابھی آرڈر کریں';
+
+  @override
+  String get forecastsOrdersoon => 'جلد آرڈر کریں';
+
+  @override
+  String get forecastsMonitor => 'نگرانی';
+
+  @override
+  String get forecastsAdequate => 'مناسب';
+
+  @override
+  String get forecastsConfidence => 'اعتماد';
+
+  @override
+  String get forecastsPending => 'زیر التوا';
+
+  @override
+  String get forecastsSearchitems => 'اشیاء تلاش کریں...';
+
+  @override
+  String get forecastsCritical => 'نازک';
+
+  @override
+  String get forecastsWarning => 'انتباہ';
+
+  @override
+  String get forecastsOk => 'ٹھیک';
+
+  @override
   String get bomBillofmaterials => 'بل آف میٹریل';
 
   @override
@@ -1622,10 +1774,232 @@ class AppLocalizationsUr extends AppLocalizations {
   String get integrationsIntegrations => 'انٹیگریشنز';
 
   @override
+  String get integrationsSubtitle =>
+      'تیسری پارٹی خدمات ترتیب دیں (ای میل، ایس ایم ایس، موسم، توثیق، کرنسی، ٹیکس)۔ API کلیدز خفیہ رکھی جاتی ہیں اور کبھی ظاہر نہیں ہوتیں۔';
+
+  @override
+  String get integrationsConfigured => 'ترتیب شدہ';
+
+  @override
+  String get integrationsNotconfigured => 'ترتیب شدہ نہیں';
+
+  @override
+  String get integrationsEnabled => 'فعال';
+
+  @override
+  String get integrationsSaved => 'انٹیگریشن ترتیبات محفوظ ہو گئیں';
+
+  @override
+  String get integrationsSaveFailed =>
+      'انٹیگریشن ترتیبات محفوظ کرنے میں ناکامی';
+
+  @override
+  String get integrationsApikey => 'API کلید';
+
+  @override
+  String get integrationsApikeyHelper =>
+      'خفیہ ذخیرہ — موجودہ کلید رکھنے کے لیے خالی چھوڑ دیں۔';
+
+  @override
+  String get integrationsFieldFromemail => 'بھیجنے والا ای میل';
+
+  @override
+  String get integrationsFieldFromname => 'بھیجنے والے کا نام';
+
+  @override
+  String get integrationsFieldAccountsid => 'اکاؤنٹ SID';
+
+  @override
+  String get integrationsFieldPhonenumber => 'فون نمبر';
+
+  @override
+  String get integrationsFieldDefaultlocation => 'ڈیفالٹ مقام';
+
+  @override
+  String get integrationsFieldBase => 'بنیادی کرنسی';
+
+  @override
+  String get integrationsFieldUpdateinterval => 'اپڈیٹ وقفہ (سیکنڈ)';
+
+  @override
+  String get integrationsFieldDefaultcountry => 'ڈیفالٹ ملک';
+
+  @override
+  String get integrationsFieldZipcode => 'زپ کوڈ';
+
+  @override
+  String get integrationsServiceEmail => 'ای میل (SendGrid)';
+
+  @override
+  String get integrationsServiceNotifications => 'ایس ایم ایس اطلاعیں (Twilio)';
+
+  @override
+  String get integrationsServiceWeather => 'موسم (Weatherstack)';
+
+  @override
+  String get integrationsServiceValidation => 'فون توثیق (Numverify)';
+
+  @override
+  String get integrationsServiceCurrency => 'کرنسی ایکسچینج (Fixer)';
+
+  @override
+  String get integrationsServiceTax => 'ٹیکس کیلکولیشن (TaxJar)';
+
+  @override
   String get usermanagementUsermanagement => 'یوزر مینجمنٹ';
 
   @override
   String get usermanagementRolespermissions => 'ردز اینڈ پرمشنز';
+
+  @override
+  String get usermanagementSubtitle =>
+      'سسٹم صارفین، رولز اور پرمیشنز بنائیں اور ان کا نظم کریں';
+
+  @override
+  String get usermanagementUsers => 'صارفین';
+
+  @override
+  String get usermanagementAllroles => 'تمام رولز';
+
+  @override
+  String get usermanagementAllstatus => 'تمام حیثیتیں';
+
+  @override
+  String get usermanagementSearchusers => 'صارفین تلاش کریں...';
+
+  @override
+  String get usermanagementNewuser => 'نیا صارف';
+
+  @override
+  String get usermanagementEdituser => 'صارف میں ترمیم';
+
+  @override
+  String get usermanagementUsername => 'صارف نام';
+
+  @override
+  String get usermanagementEmail => 'ای میل';
+
+  @override
+  String get usermanagementFullname => 'مکمل نام';
+
+  @override
+  String get usermanagementRole => 'رول';
+
+  @override
+  String get usermanagementPassword => 'پاس ورڈ';
+
+  @override
+  String get usermanagementUsercreated => 'صارف کامیابی سے بنایا گیا';
+
+  @override
+  String get usermanagementUserupdated => 'صارف کامیابی سے اپڈیٹ ہوگیا';
+
+  @override
+  String get usermanagementUserdeleted => 'صارف کامیابی سے حذف ہوگیا';
+
+  @override
+  String get usermanagementDeleteconfirm =>
+      'کیا یہ صارف حذف کریں؟ اسے واپس نہیں کیا جا سکتا۔';
+
+  @override
+  String get usermanagementActivate => 'فعال کریں';
+
+  @override
+  String get usermanagementDeactivate => 'غیر فعال کریں';
+
+  @override
+  String get usermanagementActivated => 'صارف فعال ہوگیا';
+
+  @override
+  String get usermanagementDeactivated => 'صارف غیر فعال ہوگیا';
+
+  @override
+  String get usermanagementResetpassword => 'پاس ورڈ دوبارہ ترتیب دیں';
+
+  @override
+  String get usermanagementNewpassword => 'نیا پاس ورڈ';
+
+  @override
+  String get usermanagementResetconfirm =>
+      'کیا اس صارف کا پاس ورڈ دوبارہ ترتیب دیں؟';
+
+  @override
+  String get usermanagementResetdone =>
+      'پاس ورڈ کامیابی سے دوبارہ ترتیب دیا گیا';
+
+  @override
+  String get usermanagementValidationUsernamerequired => 'صارف نام ضروری ہے';
+
+  @override
+  String get usermanagementValidationEmailrequired => 'ای میل ضروری ہے';
+
+  @override
+  String get usermanagementValidationInvalidemail => 'غلط ای میل فارمیٹ';
+
+  @override
+  String get usermanagementValidationFullnamerequired => 'مکمل نام ضروری ہے';
+
+  @override
+  String get usermanagementValidationRolerequired => 'رول منتخب کریں';
+
+  @override
+  String get usermanagementValidationPasswordlength =>
+      'پاس ورڈ کم از کم 6 حروف کا ہونا چاہیے';
+
+  @override
+  String get usermanagementNewrole => 'نیا رول';
+
+  @override
+  String get usermanagementEditrole => 'رول میں ترمیم';
+
+  @override
+  String get usermanagementRolename => 'رول کا نام';
+
+  @override
+  String get usermanagementDescription => 'تفصیل';
+
+  @override
+  String get usermanagementSystemrole => 'سسٹم';
+
+  @override
+  String get usermanagementPermissions => 'پرمیشنز';
+
+  @override
+  String get usermanagementPermissioncount => 'پرمیشنز';
+
+  @override
+  String get usermanagementPermissionstitle => 'رول پرمیشنز';
+
+  @override
+  String usermanagementPermissionsubtitle(Object role) {
+    return '$role کے لیے پرمیشنز تفویض کریں';
+  }
+
+  @override
+  String get usermanagementPermissionsaved => 'پرمیشنز اپڈیٹ ہو گئیں';
+
+  @override
+  String get usermanagementRolevalidationname => 'رول کا نام ضروری ہے';
+
+  @override
+  String get usermanagementRolecreated => 'رول کامیابی سے بنایا گیا';
+
+  @override
+  String get usermanagementRoleupdated => 'رول کامیابی سے اپڈیٹ ہوگیا';
+
+  @override
+  String get usermanagementRoledeleted => 'رول کامیابی سے حذف ہوگیا';
+
+  @override
+  String get usermanagementRoledeleteconfirm =>
+      'کیا یہ رول حذف کریں؟ اس سے منسلک صارفین کو پہلے دوبارہ تفویض کرنا ہوگا۔';
+
+  @override
+  String get usermanagementCantmodifysystem =>
+      'سسٹم رولز میں ترمیم نہیں کی جا سکتی';
+
+  @override
+  String get usermanagementNoresults => 'کوئی صارف نہیں ملا';
 
   @override
   String get expensesExpenses => 'خرچے';
@@ -1869,6 +2243,70 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get employeesDocumentsFile => 'فائل';
+
+  @override
+  String get employeesDocumentsSelectfile => 'فائل منتخب کریں';
+
+  @override
+  String get employeesSearch => 'عملہ تلاش کریں...';
+
+  @override
+  String get employeesAlldepartments => 'تمام محکمے';
+
+  @override
+  String get employeesAllstatus => 'تمام حیثیتیں';
+
+  @override
+  String get employeesFullname => 'مکمل نام';
+
+  @override
+  String get employeesEmploymenttype => 'ملازمت کی قسم';
+
+  @override
+  String get employeesCount => 'عملہ';
+
+  @override
+  String get employeesActivecount => 'فعال';
+
+  @override
+  String get employeesTotalsalary => 'کل تنخواہ';
+
+  @override
+  String get employeesDeleteconfirm =>
+      'کیا یہ عملہ حذف کریں؟ اسے واپس نہیں کیا جا سکتا۔';
+
+  @override
+  String get employeesPaysalary => 'تنخواہ ادا کریں';
+
+  @override
+  String get employeesSalaryamount => 'رقم';
+
+  @override
+  String get employeesPaymentdate => 'ادائیگی کی تاریخ';
+
+  @override
+  String get employeesPaymentmethod => 'ادائیگی کا طریقہ';
+
+  @override
+  String get employeesReferenceno => 'حوالہ نمبر';
+
+  @override
+  String get employeesSalarynotes => 'نوٹس';
+
+  @override
+  String get employeesSalarypaid => 'تنخواہ کی ادائیگی درج ہو گئی';
+
+  @override
+  String get employeesSalaryhistory => 'تنخواہ کی تاریخ';
+
+  @override
+  String get employeesNosalaryhistory => 'ابھی کوئی تنخواہ ادائیگی نہیں';
+
+  @override
+  String get employeesDetailtitle => 'عملے کی تفصیلات';
+
+  @override
+  String get employeesInvalidamount => 'درست رقم درج کریں';
 
   @override
   String get purchasesPurchases => 'خریداری';
@@ -2314,6 +2752,15 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get salesreturnsReturnvalue => 'کل واپسی قیمت';
+
+  @override
+  String get salesreturnsSearchinvoices => 'بلز تلاش کریں...';
+
+  @override
+  String get salesreturnsSearchplaceholder => 'واپسیاں تلاش کریں...';
+
+  @override
+  String get salesreturnsSelectinvoice => 'بل منتخب کریں';
 
   @override
   String get inventoryItems => 'مصنوعات';
