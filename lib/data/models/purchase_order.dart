@@ -20,6 +20,7 @@ class PurchaseOrder {
     required this.poDate,
     required this.supplierId,
     required this.supplierName,
+    this.warehouseId,
     this.warehouseName,
     this.totalAmount = 0,
     this.paidAmount = 0,
@@ -36,6 +37,7 @@ class PurchaseOrder {
     poDate: asString(json['po_date']) ?? '',
     supplierId: asInt(json['supplier_id']) ?? 0,
     supplierName: asString(json['supplier_name']) ?? '',
+    warehouseId: asInt(json['warehouse_id']),
     warehouseName: asString(json['warehouse_name']),
     totalAmount: asNum(json['total_amount']) ?? 0,
     paidAmount: asNum(json['paid_amount']) ?? 0,
@@ -51,6 +53,7 @@ class PurchaseOrder {
   final String poDate;
   final int supplierId;
   final String supplierName;
+  final int? warehouseId;
   final String? warehouseName;
   final num totalAmount;
   final num paidAmount;
@@ -119,6 +122,7 @@ class PurchaseOrderDetail extends PurchaseOrder {
     required super.poDate,
     required super.supplierId,
     required super.supplierName,
+    super.warehouseId,
     super.warehouseName,
     super.totalAmount,
     super.paidAmount,
@@ -138,6 +142,7 @@ class PurchaseOrderDetail extends PurchaseOrder {
       poDate: asString(json['po_date']) ?? '',
       supplierId: asInt(json['supplier_id']) ?? 0,
       supplierName: asString(json['supplier_name']) ?? '',
+      warehouseId: asInt(json['warehouse_id']),
       warehouseName: asString(json['warehouse_name']),
       totalAmount: asNum(json['total_amount']) ?? 0,
       paidAmount: asNum(json['paid_amount']) ?? 0,
@@ -157,4 +162,48 @@ class PurchaseOrderDetail extends PurchaseOrder {
   }
 
   final List<PurchaseOrderItem> items;
+}
+
+/// One goods receipt recorded against a PO — the bare rows of
+/// `GET /purchase-orders/:id/receipts` (the server joins in the
+/// warehouse name, the creator's username, and per-receipt quantity /
+/// value aggregates). `total_quantity` / `total_amount` arrive as
+/// `number | string` (SQLite SUM), so they are normalised with [asNum].
+class GoodsReceipt {
+  const GoodsReceipt({
+    required this.id,
+    required this.receiptNo,
+    this.receiptDate = '',
+    this.warehouseId,
+    this.warehouseName,
+    this.remarks,
+    this.createdByUsername,
+    this.createdAt,
+    this.totalQuantity = 0,
+    this.totalAmount = 0,
+  });
+
+  factory GoodsReceipt.fromJson(Map<String, dynamic> json) => GoodsReceipt(
+    id: asInt(json['id']) ?? 0,
+    receiptNo: asString(json['receipt_no']) ?? '',
+    receiptDate: asString(json['receipt_date']) ?? '',
+    warehouseId: asInt(json['warehouse_id']),
+    warehouseName: asString(json['warehouse_name']),
+    remarks: asString(json['remarks']),
+    createdByUsername: asString(json['created_by_username']),
+    createdAt: asString(json['created_at']),
+    totalQuantity: asNum(json['total_quantity']) ?? 0,
+    totalAmount: asNum(json['total_amount']) ?? 0,
+  );
+
+  final int id;
+  final String receiptNo;
+  final String receiptDate;
+  final int? warehouseId;
+  final String? warehouseName;
+  final String? remarks;
+  final String? createdByUsername;
+  final String? createdAt;
+  final num totalQuantity;
+  final num totalAmount;
 }

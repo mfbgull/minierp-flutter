@@ -965,3 +965,310 @@ class ExpensesReport {
   final ExpensesReportSummary summary;
   final List<ExpenseCategoryBreakdown> categoryBreakdown;
 }
+
+// ── Sales by item (GET /reports/sales-by-item) ──────────────────────
+
+/// One item row of the sales-by-item report — the endpoint returns a
+/// **bare array** (no wrapper object), so the model is a single row and
+/// the repository parses the list directly. Both dates are required
+/// (the server 400s without them).
+class SalesByItemRow {
+  const SalesByItemRow({
+    required this.itemCode,
+    required this.itemName,
+    required this.itemCategory,
+    required this.totalQuantitySold,
+    required this.totalSales,
+    required this.averageSellingPrice,
+  });
+
+  factory SalesByItemRow.fromJson(Map<String, dynamic> json) =>
+      SalesByItemRow(
+        itemCode: asString(json['item_code']) ?? '',
+        itemName: asString(json['item_name']) ?? '',
+        itemCategory: asString(json['item_category']) ?? '',
+        totalQuantitySold: asNum(json['total_quantity_sold']) ?? 0,
+        totalSales: asNum(json['total_sales']) ?? 0,
+        averageSellingPrice: asNum(json['avg_selling_price']) ?? 0,
+      );
+
+  final String itemCode;
+  final String itemName;
+  final String itemCategory;
+  final num totalQuantitySold;
+  final num totalSales;
+  final num averageSellingPrice;
+}
+
+// ── Supplier analysis (GET /reports/supplier-analysis) ──────────────
+
+/// One supplier row of the supplier-analysis report — the endpoint
+/// returns a **bare array** (no wrapper object). Both dates are required
+/// (the server 400s without them). `on_time_delivery_rate` is always 100
+/// server-side (the web's delivery-rate column shows it verbatim).
+class SupplierAnalysisRow {
+  const SupplierAnalysisRow({
+    required this.supplierId,
+    required this.supplierName,
+    required this.supplierCode,
+    required this.email,
+    required this.phone,
+    required this.totalOrders,
+    required this.totalPurchaseValue,
+    required this.averageOrderValue,
+    required this.lastPurchaseDate,
+    required this.totalItems,
+    required this.onTimeDeliveryRate,
+  });
+
+  factory SupplierAnalysisRow.fromJson(Map<String, dynamic> json) =>
+      SupplierAnalysisRow(
+        supplierId: asInt(json['supplier_id']) ?? 0,
+        supplierName: asString(json['supplier_name']) ?? '',
+        supplierCode: asString(json['supplier_code']) ?? '',
+        email: asString(json['email']) ?? '',
+        phone: asString(json['phone']) ?? '',
+        totalOrders: asNum(json['total_orders']) ?? 0,
+        totalPurchaseValue: asNum(json['total_purchase_value']) ?? 0,
+        averageOrderValue: asNum(json['average_order_value']) ?? 0,
+        lastPurchaseDate: asString(json['last_purchase_date']) ?? '',
+        totalItems: asNum(json['total_items']) ?? 0,
+        onTimeDeliveryRate: asNum(json['on_time_delivery_rate']) ?? 0,
+      );
+
+  final int supplierId;
+  final String supplierName;
+  final String supplierCode;
+  final String email;
+  final String phone;
+  final num totalOrders;
+  final num totalPurchaseValue;
+  final num averageOrderValue;
+  final String lastPurchaseDate;
+  final num totalItems;
+  final num onTimeDeliveryRate;
+}
+
+// ── Production summary (GET /reports/production-summary) ────────────
+
+/// One production-run row of the production summary report.
+class ProductionSummaryRow {
+  const ProductionSummaryRow({
+    required this.workOrderNumber,
+    required this.productionDate,
+    required this.productionOrderNumber,
+    required this.outputItemName,
+    required this.outputQuantity,
+    required this.completedQuantity,
+    required this.scrappedQuantity,
+    required this.plannedQuantity,
+    required this.itemName,
+    required this.status,
+  });
+
+  factory ProductionSummaryRow.fromJson(Map<String, dynamic> json) =>
+      ProductionSummaryRow(
+        workOrderNumber: asString(json['work_order_number']) ?? '',
+        productionDate: asString(json['production_date']) ?? '',
+        productionOrderNumber: asString(json['production_order_number']) ?? '',
+        outputItemName: asString(json['output_item_name']) ?? '',
+        outputQuantity: asNum(json['output_quantity']) ?? 0,
+        completedQuantity: asNum(json['completed_quantity']) ?? 0,
+        scrappedQuantity: asNum(json['scrapped_quantity']) ?? 0,
+        plannedQuantity: asNum(json['planned_quantity']) ?? 0,
+        itemName: asString(json['item_name']) ?? '',
+        status: asString(json['status']) ?? '',
+      );
+
+  final String workOrderNumber;
+  final String productionDate;
+  final String productionOrderNumber;
+  final String outputItemName;
+  final num outputQuantity;
+  final num completedQuantity;
+  final num scrappedQuantity;
+  final num plannedQuantity;
+  final String itemName;
+  final String status;
+}
+
+/// Period totals for the production summary report (camelCase keys;
+/// the server computes them from the same rows its grid shows).
+class ProductionSummaryStats {
+  const ProductionSummaryStats({
+    required this.totalProductionOrders,
+    required this.totalOutput,
+    required this.totalCompleted,
+    required this.totalScrapped,
+  });
+
+  factory ProductionSummaryStats.fromJson(Map<String, dynamic> json) =>
+      ProductionSummaryStats(
+        totalProductionOrders: asNum(json['totalProductionOrders']) ?? 0,
+        totalOutput: asNum(json['totalOutput']) ?? 0,
+        totalCompleted: asNum(json['totalCompleted']) ?? 0,
+        totalScrapped: asNum(json['totalScrapped']) ?? 0,
+      );
+
+  final num totalProductionOrders;
+  final num totalOutput;
+  final num totalCompleted;
+  final num totalScrapped;
+}
+
+class ProductionSummaryReport {
+  const ProductionSummaryReport({required this.rows, required this.summary});
+
+  factory ProductionSummaryReport.fromJson(Map<String, dynamic> json) =>
+      ProductionSummaryReport(
+        rows: [
+          for (final row in json['production'] as List? ?? const [])
+            ProductionSummaryRow.fromJson(row as Map<String, dynamic>),
+        ],
+        summary: ProductionSummaryStats.fromJson(
+          json['summary'] as Map<String, dynamic>? ?? const {},
+        ),
+      );
+
+  final List<ProductionSummaryRow> rows;
+  final ProductionSummaryStats summary;
+}
+
+// ── BOM usage (GET /reports/bom-usage) ──────────────────────────────
+
+/// One BOM row of the bom-usage report. The endpoint returns
+/// `{ usage: [...] }`; dates default to all-time and an optional
+/// `itemId` narrows to a finished item.
+class BomUsageRow {
+  const BomUsageRow({
+    required this.bomId,
+    required this.bomName,
+    required this.parentItemName,
+    required this.usageCount,
+    required this.lastUsedDate,
+    required this.totalComponents,
+    required this.status,
+  });
+
+  factory BomUsageRow.fromJson(Map<String, dynamic> json) => BomUsageRow(
+    bomId: asInt(json['bom_id']) ?? 0,
+    bomName: asString(json['bom_name']) ?? '',
+    parentItemName: asString(json['parent_item_name']) ?? '',
+    usageCount: asNum(json['usage_count']) ?? 0,
+    lastUsedDate: asString(json['last_used_date']),
+    totalComponents: asNum(json['total_components']) ?? 0,
+    status: asString(json['status']) ?? '',
+  );
+
+  final int bomId;
+  final String bomName;
+  final String parentItemName;
+  final num usageCount;
+  final String? lastUsedDate;
+  final num totalComponents;
+  final String status;
+}
+
+class BomUsageReport {
+  const BomUsageReport({required this.rows});
+
+  factory BomUsageReport.fromJson(Map<String, dynamic> json) => BomUsageReport(
+    rows: [
+      for (final row in json['usage'] as List? ?? const [])
+        BomUsageRow.fromJson(row as Map<String, dynamic>),
+    ],
+  );
+
+  final List<BomUsageRow> rows;
+}
+
+// ── AR summary (GET /reports/ar-summary) ────────────────────────────
+
+/// One item of the status breakdown (count + amount for a given status).
+class ArSummaryStatusBucket {
+  const ArSummaryStatusBucket({required this.count, required this.amount});
+
+  factory ArSummaryStatusBucket.fromJson(Map<String, dynamic> json) =>
+      ArSummaryStatusBucket(
+        count: asNum(json['count']) ?? 0,
+        amount: asNum(json['amount']) ?? 0,
+      );
+
+  final num count;
+  final num amount;
+}
+
+/// Status breakdown of outstanding invoices (unpaid / partially paid /
+/// overdue). Keys are camelCase (server-side `getReceivablesSummary`).
+class ArSummaryStatusBreakdown {
+  const ArSummaryStatusBreakdown({
+    required this.unpaid,
+    required this.partiallyPaid,
+    required this.overdue,
+  });
+
+  factory ArSummaryStatusBreakdown.fromJson(Map<String, dynamic> json) =>
+      ArSummaryStatusBreakdown(
+        unpaid: ArSummaryStatusBucket.fromJson(
+          json['unpaid'] as Map<String, dynamic>? ?? const {},
+        ),
+        partiallyPaid: ArSummaryStatusBucket.fromJson(
+          json['partiallyPaid'] as Map<String, dynamic>? ?? const {},
+        ),
+        overdue: ArSummaryStatusBucket.fromJson(
+          json['overdue'] as Map<String, dynamic>? ?? const {},
+        ),
+      );
+
+  final ArSummaryStatusBucket unpaid;
+  final ArSummaryStatusBucket partiallyPaid;
+  final ArSummaryStatusBucket overdue;
+}
+
+/// Rolling receivables summary — `getReceivablesSummary` in
+/// `server-reference/Reports.ts`. The endpoint returns an envelope with
+/// `asOfDate` plus the fields below as a flat object.
+class ArSummaryReport {
+  const ArSummaryReport({
+    required this.asOfDate,
+    required this.totalInvoices,
+    required this.totalOutstanding,
+    required this.totalPaid,
+    required this.totalInvoiced,
+    required this.totalCurrent,
+    required this.total130,
+    required this.total3160,
+    required this.total6190,
+    required this.totalOver90,
+    required this.statusBreakdown,
+  });
+
+  factory ArSummaryReport.fromJson(Map<String, dynamic> json) =>
+      ArSummaryReport(
+        asOfDate: asString(json['asOfDate']) ?? '',
+        totalInvoices: asNum(json['total_invoices']) ?? 0,
+        totalOutstanding: asNum(json['total_outstanding']) ?? 0,
+        totalPaid: asNum(json['total_paid']) ?? 0,
+        totalInvoiced: asNum(json['total_invoiced']) ?? 0,
+        totalCurrent: asNum(json['total_current']) ?? 0,
+        total130: asNum(json['total_1_30']) ?? 0,
+        total3160: asNum(json['total_31_60']) ?? 0,
+        total6190: asNum(json['total_61_90']) ?? 0,
+        totalOver90: asNum(json['total_over_90']) ?? 0,
+        statusBreakdown: ArSummaryStatusBreakdown.fromJson(
+          json['statusBreakdown'] as Map<String, dynamic>? ?? const {},
+        ),
+      );
+
+  final String asOfDate;
+  final num totalInvoices;
+  final num totalOutstanding;
+  final num totalPaid;
+  final num totalInvoiced;
+  final num totalCurrent;
+  final num total130;
+  final num total3160;
+  final num total6190;
+  final num totalOver90;
+  final ArSummaryStatusBreakdown statusBreakdown;
+}

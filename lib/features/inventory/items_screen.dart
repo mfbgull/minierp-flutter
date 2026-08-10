@@ -22,6 +22,7 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/item.dart' show Item;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'inventory_providers.dart';
 import 'item_detail_dialog.dart';
@@ -99,72 +100,33 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _searchController,
-                    builder: (context, value, _) => TextField(
-                      controller: _searchController,
-                      onChanged: _onSearchChanged,
-                      // The low-stock endpoint has no search param — the
-                      // field is disabled (and visually dimmed) while it's
-                      // active instead of silently dropping the term.
-                      enabled: !lowStockOnly,
-                      decoration: InputDecoration(
-                        hintText: l10n.commonSearch,
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        suffixIcon: value.text.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () {
-                                  // Cancel any pending debounce so a stale
-                                  // timer can't resurrect the old term.
-                                  _debounce?.cancel();
-                                  _searchController.clear();
-                                  ref.read(itemsSearchProvider.notifier).state =
-                                      '';
-                                },
-                              ),
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.tonalIcon(
-                onPressed: () => showItemFormDialog(context),
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(l10n.inventoryNewitem),
-              ),
-              const SizedBox(width: 8),
-              FilterChip(
-                label: Text(l10n.inventoryLowstock),
-                selected: lowStockOnly,
-                // Setting the state re-runs itemsProvider automatically
-                // (it watches the toggle) — no manual invalidate needed.
-                onSelected: (selected) =>
-                    ref.read(itemsLowStockOnlyProvider.notifier).state =
-                        selected,
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                tooltip: l10n.commonRefresh,
-                icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(itemsProvider),
-              ),
-            ],
-          ),
+        ScreenToolbar(
+          searchController: _searchController,
+          searchHint: l10n.commonSearch,
+          onSearchChanged: _onSearchChanged,
+          // The low-stock endpoint has no search param — the field is
+          // disabled (and visually dimmed) while the toggle is active
+          // instead of silently dropping the term.
+          searchEnabled: !lowStockOnly,
+          filters: [
+            FilterChip(
+              label: Text(l10n.inventoryLowstock),
+              selected: lowStockOnly,
+              // Setting the state re-runs itemsProvider automatically
+              // (it watches the toggle) — no manual invalidate needed.
+              onSelected: (selected) =>
+                  ref.read(itemsLowStockOnlyProvider.notifier).state =
+                      selected,
+            ),
+          ],
+          onRefresh: () => ref.invalidate(itemsProvider),
+          primaryActions: [
+            FilledButton.tonalIcon(
+              onPressed: () => showItemFormDialog(context),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(l10n.inventoryNewitem),
+            ),
+          ],
         ),
         Expanded(
           child: gridScreenBody(

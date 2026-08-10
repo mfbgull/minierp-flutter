@@ -29,6 +29,7 @@ import 'package:minierp_app/features/auth/change_password_screen.dart';
 import 'package:minierp_app/features/customers/customer_ledger_dialog.dart';
 import 'package:minierp_app/features/suppliers/supplier_ledger_dialog.dart';
 import 'package:minierp_app/features/suppliers/supplier_statement_dialog.dart';
+import 'package:minierp_app/features/admin/admin_models.dart' show Role;
 import 'package:minierp_app/features/reports/reports_dashboard_screen.dart';
 import 'package:minierp_app/widgets/status_badge.dart' show StatusBadge;
 import 'package:minierp_app/widgets/searchable_select.dart';
@@ -244,6 +245,17 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   int poItemDeleteCount = 0;
   int poDeleteCount = 0;
 
+  /// Captured goods-receipt POST body (receive-goods flow tests).
+  Map<String, dynamic>? lastPoReceiptBody;
+
+  /// Stateful goods receipts for PO #1 — the /purchase-orders/1/receipts
+  /// GET returns this list, and a receipt POST appends to it so the
+  /// detail dialog's history table refetches the new row.
+  final List<Map<String, dynamic>> po1Receipts = [];
+
+  /// When true, the receipt POST rejects with a 400 (failure-path test).
+  bool rejectPoReceipt = false;
+
   /// Stateful PO #1 workflow status — the detail fake reads it so a
   /// submit POST flips the badge in subsequent GETs.
   String po1Status = 'Draft';
@@ -312,6 +324,26 @@ class _AuthFakeAdapter implements HttpClientAdapter {
 
   /// Captured body of the last /settings/bulk POST (bare key → value map).
   Map<String, dynamic>? lastSettingsBulkBody;
+
+  /// When true, POST /forecasts/compute-accuracy rejects with a 400
+  /// (failure-path test).
+  bool rejectComputeAccuracy = false;
+
+  /// How many times POST /forecasts/compute-accuracy ran.
+  int computeAccuracyCount = 0;
+
+  /// Captured query params of the last /forecasts/demand fetch (filter
+  /// assertions).
+  Map<String, dynamic>? lastForecastDemandQuery;
+
+  /// Captured itemId of the last /forecasts/trends fetch.
+  int? lastTrendsItemId;
+
+  /// When true, the demand GET rejects with a 500 (failure-path test).
+  bool failForecastDemand = false;
+
+  /// When true, the accuracy GET rejects with a 500 (failure-path test).
+  bool failForecastAccuracy = false;
 
   /// Mutable settings store backing GET /settings + POST /settings/bulk
   /// (bare `{key: {value, description, updated_at}}` — no envelope).
@@ -390,8 +422,50 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     },
   };
 
+  /// Per-service `{enabled, configured}` flags backing the bare
+  /// `GET /integrations/settings` body (keys are never returned).
+  Map<String, dynamic> integrationsStore = {
+    'email': {'enabled': false, 'configured': true},
+    'notifications': {'enabled': true, 'configured': false},
+    'weather': {'enabled': false, 'configured': false},
+    'validation': {'enabled': false, 'configured': false},
+    'currency': {'enabled': false, 'configured': false},
+    'tax': {'enabled': false, 'configured': false},
+  };
+
+  /// Captured body of the last `PUT /integrations/settings/:service`.
+  Map<String, dynamic>? lastIntegrationPutBody;
+  String? lastIntegrationPutService;
+
+  /// When true, the integration PUT rejects with a 400 (failure-path
+  /// test).
+  bool rejectIntegrationSave = false;
+
+  /// Captured multipart document upload: the raw FormData, its string
+  /// fields, whether a file part was attached, and the file's filename.
+  FormData? lastDocumentPostForm;
+  Map<String, String>? lastDocumentPostFields;
+  bool lastDocumentPostHasFile = false;
+  String? lastDocumentPostFileName;
+
+  /// When true, the document upload POST rejects with a 500 (failure-
+  /// path test).
+  bool rejectDocumentUpload = false;
+
   /// Captured query params of the last /activity-logs list GET.
   Map<String, dynamic>? lastActivityLogsQuery;
+
+  /// Captured query params of the four newly ported report GETs.
+  Map<String, dynamic>? lastSalesByItemQuery;
+  Map<String, dynamic>? lastSupplierAnalysisQuery;
+  Map<String, dynamic>? lastProductionSummaryQuery;
+  Map<String, dynamic>? lastBomUsageQuery;
+
+  /// When true, the report GETs reject with a 500 (failure-path tests).
+  bool failSalesByItem = false;
+  bool failSupplierAnalysis = false;
+  bool failProductionSummary = false;
+  bool failBomUsage = false;
 
   /// Last /invoices query params + captured create/update bodies.
   Map<String, dynamic>? lastInvoicesQuery;
@@ -432,6 +506,46 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   /// Stateful SO #1 status — the detail fake reads it so a cancel
   /// POST flips the badge on refetch.
   String so1Status = 'Confirmed';
+
+  /// Employees-module capture + state fields.
+  Map<String, dynamic>? lastEmployeesQuery;
+  Map<String, dynamic>? lastEmployeePostBody;
+  Map<String, dynamic>? lastEmployeePutBody;
+  int employeeDeleteCount = 0;
+  int salaryPayCount = 0;
+  Map<String, dynamic>? lastSalaryPayBody;
+  int salaryHistoryFetchCount = 0;
+  int employeeNextCodeFetchCount = 0;
+
+  /// When true, the employees list GET rejects with a 500 (failure-path
+  /// test).
+  bool failEmployees = false;
+
+  /// When true, the salary pay POST rejects with a 422 (failure-path
+  /// test).
+  bool rejectSalaryPay = false;
+
+  /// User-management capture + state fields.
+  Map<String, dynamic>? lastUsersQuery;
+  Map<String, dynamic>? lastUserPostBody;
+  Map<String, dynamic>? lastUserPutBody;
+  int userDeleteCount = 0;
+  int userToggleCount = 0;
+  Map<String, dynamic>? lastToggleBody;
+  String? lastResetPasswordBody;
+  Map<String, dynamic>? lastRolePostBody;
+  Map<String, dynamic>? lastRolePutBody;
+  int roleDeleteCount = 0;
+  List<int>? lastRolePermissionsIds;
+  int rolePermissionsFetchCount = 0;
+
+  /// When true, the user create POST rejects with a 409 (failure-path
+  /// test).
+  bool rejectUserCreate = false;
+
+  /// When true, the role permissions PUT rejects with a 400
+  /// (failure-path test).
+  bool rejectRolePermissionsSave = false;
 
   @override
   Future<ResponseBody> fetch(
@@ -887,6 +1001,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'po_date': '2026-01-20',
         'supplier_id': 1,
         'supplier_name': 'Alpha Traders',
+        'warehouse_id': 1,
         'warehouse_name': 'Main Warehouse',
         'total_amount': 1500.0,
         'paid_amount': 500.0,
@@ -988,6 +1103,42 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       }
       po1Status = body['status'] as String;
       return _json({'id': 1, 'po_no': 'PO-2026-001', 'status': po1Status});
+    }
+    if (options.path == '/purchase-orders/1/receipts' &&
+        options.method == 'GET') {
+      // Bare array — the real getGoodsReceipts shape.
+      return _json(po1Receipts);
+    }
+    if (options.path == '/purchase-orders/1/receipts' &&
+        options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastPoReceiptBody = body;
+      if (rejectPoReceipt) {
+        return _json({'error': 'Cannot receive more than pending quantity'}, status: 400);
+      }
+      // Bare 201 — the real createGoodsReceipt shape (receipt no
+      // generated server-side; the quantity/value aggregates echo the
+      // posted lines like the SQL SUM does).
+      final qty = (body['items'] as List)
+          .fold<num>(0, (sum, item) => sum + (item['received_quantity'] as num));
+      final receipt = {
+        'id': 10,
+        'receipt_no': 'GR-2026-001',
+        'po_id': 1,
+        'receipt_date': body['receipt_date'],
+        'warehouse_id': body['warehouse_id'],
+        'remarks': body['remarks'],
+        'created_at': '2026-08-10 10:00:00',
+        'warehouse_name': 'Main Warehouse',
+        'created_by_username': 'admin',
+        'total_quantity': qty,
+        'total_amount': qty * 10.0,
+      };
+      po1Receipts.add(receipt);
+      // The server's calculateStatus flips the PO based on the received
+      // quantities (Partially Received when any line still has pending).
+      po1Status = 'Partially Received';
+      return _json(receipt, status: 201);
     }
     if (options.path == '/purchases' && options.method == 'GET') {
       // Bare array — the real Purchase.getAll shape (joined item/warehouse/
@@ -2101,6 +2252,171 @@ class _AuthFakeAdapter implements HttpClientAdapter {
             'invoice_count': 1,
           },
         ],
+      });
+    }
+    if (options.path == '/reports/sales-by-item') {
+      lastSalesByItemQuery = options.queryParameters;
+      if (failSalesByItem) {
+        return _json({
+          'success': false,
+          'error': {
+            'code': 'SERVER_ERROR',
+            'message': 'Failed to fetch sales by item',
+          },
+        }, status: 500);
+      }
+      // Bare array (not wrapped in an object) — the real
+      // ReportsModel.getSalesByItem shape.
+      return _json({
+        'success': true,
+        'data': [
+          {
+            'item_code': 'FG001',
+            'item_name': 'Widget A',
+            'item_category': 'Parts',
+            'total_quantity_sold': 120,
+            'total_sales': 24000.0,
+            'avg_selling_price': 200.0,
+          },
+          {
+            'item_code': 'FG003',
+            'item_name': 'Gadget',
+            'item_category': 'Assemblies',
+            'total_quantity_sold': 40,
+            'total_sales': 4000.0,
+            'avg_selling_price': 100.0,
+          },
+        ],
+      });
+    }
+    if (options.path == '/reports/supplier-analysis') {
+      lastSupplierAnalysisQuery = options.queryParameters;
+      if (failSupplierAnalysis) {
+        return _json({
+          'success': false,
+          'error': {
+            'code': 'SERVER_ERROR',
+            'message': 'Failed to fetch supplier analysis',
+          },
+        }, status: 500);
+      }
+      // Bare array — the real ReportsModel.getSupplierAnalysis shape.
+      return _json({
+        'success': true,
+        'data': [
+          {
+            'supplier_id': 1,
+            'supplier_name': 'Al-Fatah Traders',
+            'supplier_code': 'SUP-001',
+            'email': 'sales@alfatah.test',
+            'phone': '555-0101',
+            'total_orders': 4,
+            'total_purchase_value': 180000.0,
+            'average_order_value': 45000.0,
+            'last_purchase_date': '2026-08-05',
+            'total_items': 18,
+            'on_time_delivery_rate': 100,
+          },
+          {
+            'supplier_id': 2,
+            'supplier_name': 'Karachi Steel',
+            'supplier_code': 'SUP-002',
+            'email': 'orders@karachisteel.test',
+            'phone': '555-0102',
+            'total_orders': 2,
+            'total_purchase_value': 60000.0,
+            'average_order_value': 30000.0,
+            'last_purchase_date': '2026-07-20',
+            'total_items': 9,
+            'on_time_delivery_rate': 100,
+          },
+        ],
+      });
+    }
+    if (options.path == '/reports/production-summary') {
+      lastProductionSummaryQuery = options.queryParameters;
+      if (failProductionSummary) {
+        return _json({
+          'success': false,
+          'error': {
+            'code': 'SERVER_ERROR',
+            'message': 'Failed to fetch production summary',
+          },
+        }, status: 500);
+      }
+      return _json({
+        'success': true,
+        'data': {
+          'production': [
+            {
+              'work_order_number': 'WO-001',
+              'production_date': '2026-08-01',
+              'production_order_number': 'WO-001',
+              'output_item_name': 'Widget A',
+              'output_quantity': 50,
+              'completed_quantity': 50,
+              'scrapped_quantity': 0,
+              'planned_quantity': 50,
+              'item_name': 'Widget A',
+              'status': 'Completed',
+            },
+            {
+              'work_order_number': 'WO-002',
+              'production_date': '2026-07-15',
+              'production_order_number': 'WO-002',
+              'output_item_name': 'Gadget',
+              'output_quantity': 30,
+              'completed_quantity': 30,
+              'scrapped_quantity': 2,
+              'planned_quantity': 32,
+              'item_name': 'Gadget',
+              'status': 'Completed',
+            },
+          ],
+          'summary': {
+            'totalProductionOrders': 2,
+            'totalOutput': 80,
+            'totalCompleted': 80,
+            'totalScrapped': 2,
+          },
+        },
+      });
+    }
+    if (options.path == '/reports/bom-usage') {
+      lastBomUsageQuery = options.queryParameters;
+      if (failBomUsage) {
+        return _json({
+          'success': false,
+          'error': {
+            'code': 'SERVER_ERROR',
+            'message': 'Failed to fetch BOM usage',
+          },
+        }, status: 500);
+      }
+      return _json({
+        'success': true,
+        'data': {
+          'usage': [
+            {
+              'bom_id': 1,
+              'bom_name': 'Widget A BOM',
+              'parent_item_name': 'Widget A',
+              'usage_count': 3,
+              'last_used_date': '2026-08-01',
+              'total_components': 4,
+              'status': 'Active',
+            },
+            {
+              'bom_id': 2,
+              'bom_name': 'Gadget BOM',
+              'parent_item_name': 'Gadget',
+              'usage_count': 1,
+              'last_used_date': '2026-07-15',
+              'total_components': 2,
+              'status': 'Active',
+            },
+          ],
+        },
       });
     }
     if (options.path == '/expenses' && options.method == 'POST') {
@@ -3316,6 +3632,223 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'deletedCount': 3,
       });
     }
+    // ── Forecasts (PORTING.md §12) ────────────────────────────────
+    if (options.path == '/forecasts/dashboard') {
+      return _json({
+        'success': true,
+        'data': {
+          'summary': {
+            'totalItems': 8,
+            'itemsNeedingRestock': 3,
+            'avgConfidence': 74,
+            'criticalAlerts': 2,
+          },
+          'alerts': [
+            {
+              'itemId': 1,
+              'itemName': 'Widget A',
+              'currentStock': 5,
+              'predictedDemand': 60,
+              'alertLevel': 'critical',
+              'recommendation': 'order_now',
+            },
+            {
+              'itemId': 2,
+              'itemName': 'Bolt',
+              'currentStock': 40,
+              'predictedDemand': 20,
+              'alertLevel': 'adequate',
+              'recommendation': 'monitor',
+            },
+          ],
+          'topGrowing': [
+            {
+              'itemId': 1,
+              'itemCode': 'FG001',
+              'itemName': 'Widget A',
+              'category': 'Parts',
+              'currentStock': 5,
+              'predictedDemand': {
+                'nextWeek': 12,
+                'nextMonth': 60,
+                'nextQuarter': 180,
+              },
+              'trend': 'growing',
+              'trendPercentage': 42.0,
+              'confidence': 82,
+              'recommendation': 'order_now',
+              'safetyStock': 20,
+              'reorderPoint': 25,
+              'isOverride': false,
+            },
+            {
+              'itemId': 3,
+              'itemCode': 'FG003',
+              'itemName': 'Gadget',
+              'category': 'Assemblies',
+              'currentStock': 90,
+              'predictedDemand': {'nextWeek': 5, 'nextMonth': 10, 'nextQuarter': 30},
+              'trend': 'declining',
+              'trendPercentage': 12.0,
+              'confidence': 70,
+              'recommendation': 'adequate',
+              'safetyStock': 15,
+              'reorderPoint': 20,
+              'isOverride': false,
+            },
+          ],
+          'topDeclining': [],
+        },
+      });
+    }
+    if (options.path == '/forecasts/demand') {
+      lastForecastDemandQuery = options.queryParameters;
+      if (failForecastDemand) {
+        return _json({
+          'success': false,
+          'error': {'code': 'SERVER_ERROR', 'message': 'Failed to fetch forecasts'},
+        }, status: 500);
+      }
+      const demandRows = [
+        {
+          'itemId': 1,
+          'itemCode': 'FG001',
+          'itemName': 'Widget A',
+          'category': 'Parts',
+          'currentStock': 5,
+          'predictedDemand': {'nextWeek': 12, 'nextMonth': 60, 'nextQuarter': 180},
+          'trend': 'growing',
+          'trendPercentage': 42.0,
+          'confidence': 82,
+          'recommendation': 'order_now',
+          'safetyStock': 20,
+          'reorderPoint': 25,
+          'isOverride': false,
+        },
+        {
+          'itemId': 2,
+          'itemCode': 'RM002',
+          'itemName': 'Bolt',
+          'category': 'Raw',
+          'currentStock': 40,
+          'predictedDemand': {'nextWeek': 4, 'nextMonth': 20, 'nextQuarter': 60},
+          'trend': 'stable',
+          'trendPercentage': 0,
+          'confidence': 91,
+          'recommendation': 'monitor',
+          'safetyStock': 10,
+          'reorderPoint': 15,
+          'isOverride': false,
+        },
+      ];
+      final category = lastForecastDemandQuery?['category'];
+      final rows = category == 'Parts'
+          ? [demandRows.first]
+          : demandRows;
+      return _json({'success': true, 'data': rows});
+    }
+    if (options.path == '/forecasts/trends') {
+      lastTrendsItemId = (options.queryParameters['itemId'] as num?)?.toInt();
+      return _json({
+        'success': true,
+        'data': {
+          'historicalTrends': [
+            {'month': '2026-01', 'actual': 120, 'movingAvg': 112.0, 'predicted': null},
+            {'month': '2026-02', 'actual': 135, 'movingAvg': 122.0, 'predicted': null},
+            {'month': '2026-03', 'actual': null, 'movingAvg': 128.0, 'predicted': 150},
+            {'month': '2026-04', 'actual': null, 'movingAvg': null, 'predicted': 162},
+          ],
+          'itemBreakdown': [
+            {'itemName': 'Widget A', 'totalSold': 420, 'trend': 'growing'},
+            {'itemName': 'Bolt', 'totalSold': 130, 'trend': 'stable'},
+            {'itemName': 'Gadget', 'totalSold': 60, 'trend': 'declining'},
+          ],
+        },
+      });
+    }
+    if (options.path == '/forecasts/accuracy') {
+      if (failForecastAccuracy) {
+        return _json({
+          'success': false,
+          'error': {'code': 'SERVER_ERROR', 'message': 'Failed to fetch accuracy'},
+        }, status: 500);
+      }
+      return _json({
+        'success': true,
+        'data': [
+          {
+            'itemId': 1,
+            'itemName': 'Widget A',
+            'itemCode': 'FG001',
+            'mape': 8.0,
+            'mae': 3.0,
+            'smape': 8.0,
+            'sampleSize': 12,
+            'modelType': 'linear_regression',
+            'trend': 'growing',
+          },
+          {
+            'itemId': 2,
+            'itemName': 'Bolt',
+            'itemCode': 'RM002',
+            'mape': 22.0,
+            'mae': 6.0,
+            'smape': 21.9,
+            'sampleSize': 8,
+            'modelType': 'moving_average',
+            'trend': null,
+          },
+        ],
+      });
+    }
+    if (options.path == '/forecasts/compute-accuracy' &&
+        options.method == 'POST') {
+      computeAccuracyCount++;
+      if (rejectComputeAccuracy) {
+        return _json({'error': 'Compute rejected'}, status: 400);
+      }
+      return _json({
+        'success': true,
+        'message': 'Accuracy computed for 14 records',
+        'computed': 14,
+        'errors': 0,
+      });
+    }
+    if (RegExp(r'^/forecasts/accuracy/\d+$').hasMatch(options.path)) {
+      final itemId = int.parse(options.path.split('/').last);
+      final points = itemId == 1
+          ? [
+              {'forecastDate': '2026-04', 'period': 'next_month', 'predicted': 150, 'actual': 141, 'mape': 6.0, 'mae': 9.0},
+              {'forecastDate': '2026-05', 'period': 'next_month', 'predicted': 162, 'actual': 158, 'mape': 2.5, 'mae': 4.0},
+            ]
+          : [
+              {'forecastDate': '2026-04', 'period': 'next_month', 'predicted': 80, 'actual': 95, 'mape': 18.8, 'mae': 15.0},
+            ];
+      return _json({'success': true, 'data': points});
+    }
+    if (options.path == '/integrations/settings' && options.method == 'GET') {
+      return _json(integrationsStore); // bare object, no envelope
+    }
+    final integrationService = RegExp(
+      r'^/integrations/settings/(\w+)$',
+    ).firstMatch(options.path);
+    if (integrationService != null && options.method == 'PUT') {
+      lastIntegrationPutBody = options.data as Map<String, dynamic>;
+      lastIntegrationPutService = integrationService.group(1);
+      if (rejectIntegrationSave) {
+        return _json({'error': 'Invalid API key'}, status: 400);
+      }
+      // Adopt the posted `enabled` flag so the refetched status strip
+      // reflects the save (configured stays put).
+      final row = integrationsStore[integrationService.group(1)];
+      if (row is Map<String, dynamic>) {
+        row['enabled'] = lastIntegrationPutBody!['enabled'];
+      }
+      return _json({
+        'success': true,
+        'message': 'Integration settings updated',
+      });
+    }
     if (options.path == '/settings' && options.method == 'GET') {
       return _json(settingsStore); // bare object, no envelope
     }
@@ -3329,6 +3862,428 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         if (row is Map<String, dynamic>) row['value'] = entry.value;
       }
       return _json(settingsStore);
+    }
+    // ── Employees (PORTING.md §5) ───────────────────────────────
+    if (options.path == '/employees' && options.method == 'GET') {
+      if (failEmployees) {
+        return _json({
+          'success': false,
+          'error': {'code': 'SERVER_ERROR', 'message': 'Failed to fetch employees'},
+        }, status: 500);
+      }
+      lastEmployeesQuery = options.queryParameters;
+      const namedEmployees = [
+        {
+          'id': 1,
+          'employee_code': 'EMP-001',
+          'first_name': 'Ali',
+          'last_name': 'Khan',
+          'email': 'ali@example.com',
+          'phone': '555-0101',
+          'department': 'Production',
+          'designation': 'Operator',
+          'employment_type': 'Full-time',
+          'salary': 45000,
+          'date_of_joining': '2025-01-10',
+          'is_active': 1,
+        },
+        {
+          'id': 2,
+          'employee_code': 'EMP-002',
+          'first_name': 'Sana',
+          'last_name': 'Ahmed',
+          'email': 'sana@example.com',
+          'department': 'Sales',
+          'designation': 'Sales Rep',
+          'employment_type': 'Full-time',
+          'salary': 35000,
+          'is_active': 1,
+        },
+        {
+          'id': 3,
+          'employee_code': 'EMP-003',
+          'first_name': 'Bilal',
+          'last_name': 'Malik',
+          'department': 'Production',
+          'salary': 40000,
+          'is_active': 0,
+        },
+      ];
+      // The server filters on search/department/status and slices
+      // page/limit (defaults: active list, page 1, limit 10).
+      final q = options.queryParameters;
+      final search = (q['search'] as String?) ?? '';
+      final department = q['department'] as String?;
+      final status = q['status'] as String?;
+      final rows = namedEmployees
+          .where(
+            (e) =>
+                search.isEmpty ||
+                (e['first_name'] as String)
+                        .toLowerCase()
+                        .contains(search.toLowerCase()) ||
+                (e['last_name'] as String)
+                    .toLowerCase()
+                    .contains(search.toLowerCase()),
+          )
+          .where((e) => department == null || e['department'] == department)
+          .where((e) {
+        if (status == 'inactive') return e['is_active'] == 0;
+        if (status == 'active') return e['is_active'] == 1;
+        return e['is_active'] == 1; // server default: active list
+      }).toList();
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final totalPages = (rows.length / limit).ceil();
+      final start = (page - 1) * limit;
+      final end = start + limit > rows.length ? rows.length : start + limit;
+      final data = start >= rows.length
+          ? <Map<String, dynamic>>[]
+          : rows.sublist(start, end);
+      return _json({
+        'success': true,
+        'data': data,
+        'pagination': {
+          'page': page,
+          'limit': limit,
+          'total': rows.length,
+          'totalPages': totalPages,
+        },
+      });
+    }
+    if (options.path == '/employees/next-code' && options.method == 'GET') {
+      employeeNextCodeFetchCount++;
+      return _json({'success': true, 'data': {'code': 'EMP-004'}});
+    }
+    if (options.path == '/employees' && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastEmployeePostBody = body;
+      return _json({
+        'success': true,
+        'data': {
+          'id': 99,
+          'employee_code': 'EMP-099',
+          'first_name': body['first_name'],
+          'last_name': body['last_name'],
+          'email': body['email'],
+          'department': body['department'],
+          'salary': body['salary'],
+          'is_active': body['is_active'],
+        },
+      }, status: 201);
+    }
+    final employeeId = RegExp(r'^/employees/(\d+)$').firstMatch(options.path);
+    if (employeeId != null) {
+      final id = int.parse(employeeId.group(1)!);
+      if (options.method == 'GET') {
+        return _json({
+          'success': true,
+          'data': {
+            'id': id,
+            'employee_code': 'EMP-00$id',
+            'first_name': 'Ali',
+            'last_name': 'Khan',
+            'email': 'ali@example.com',
+            'phone': '555-0101',
+            'department': 'Production',
+            'designation': 'Operator',
+            'employment_type': 'Full-time',
+            'salary': 45000,
+            'date_of_joining': '2025-01-10',
+            'is_active': 1,
+          },
+        });
+      }
+      if (options.method == 'PUT') {
+        lastEmployeePutBody = options.data as Map<String, dynamic>;
+        return _json({
+          'success': true,
+          'data': {
+            'id': id,
+            'employee_code': 'EMP-00$id',
+            'first_name': lastEmployeePutBody?['first_name'] ?? 'Ali',
+            'last_name': lastEmployeePutBody?['last_name'] ?? 'Khan',
+            'salary': lastEmployeePutBody?['salary'] ?? 45000,
+            'is_active': lastEmployeePutBody?['is_active'] ?? true,
+          },
+        });
+      }
+      if (options.method == 'DELETE') {
+        employeeDeleteCount++;
+        return ResponseBody.fromString('', 204);
+      }
+    }
+    final salaryPayId = RegExp(
+      r'^/employees/(\d+)/salary/pay$',
+    ).firstMatch(options.path);
+    if (salaryPayId != null && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastSalaryPayBody = body;
+      salaryPayCount++;
+      if (rejectSalaryPay) {
+        return _json({'error': 'Valid amount is required'}, status: 422);
+      }
+      return _json({
+        'success': true,
+        'data': {'id': 7, 'journal_entry_id': 12},
+      }, status: 201);
+    }
+    final salaryHistoryId = RegExp(
+      r'^/employees/(\d+)/salary/history$',
+    ).firstMatch(options.path);
+    if (salaryHistoryId != null && options.method == 'GET') {
+      salaryHistoryFetchCount++;
+      return _json({
+        'success': true,
+        'data': [
+          {
+            'id': 7,
+            'employee_id': int.parse(salaryHistoryId.group(1)!),
+            'amount': 45000,
+            'payment_date': '2026-08-01',
+            'payment_method': 'bank',
+            'reference_no': 'REF-1',
+          },
+        ],
+      });
+    }
+    final employeeDocsId = RegExp(
+      r'^/employees/(\d+)/documents$',
+    ).firstMatch(options.path);
+    if (employeeDocsId != null && options.method == 'POST') {
+      // Multipart upload — dio delivers the FormData as options.data.
+      final form = options.data as FormData;
+      lastDocumentPostForm = form;
+      lastDocumentPostFields = {
+        for (final entry in form.fields) entry.key: entry.value,
+      };
+      lastDocumentPostHasFile = form.files.isNotEmpty;
+      lastDocumentPostFileName =
+          form.files.isEmpty ? null : form.files.single.value.filename;
+      if (rejectDocumentUpload) {
+        return _json({
+          'error': 'File type text/x-custom is not allowed',
+        }, status: 500);
+      }
+      return _json({
+        'success': true,
+        'data': {'id': 11},
+      }, status: 201);
+    }
+    if (employeeDocsId != null && options.method == 'GET') {
+      return _json({
+        'success': true,
+        'data': [
+          {
+            'id': 9,
+            'employee_id': int.parse(employeeDocsId.group(1)!),
+            'document_name': 'CNIC Copy',
+            'document_type': 'ID',
+            'document_number': '42101-1234567-1',
+          },
+        ],
+      });
+    }
+    // ── User management (PORTING.md §5) ─────────────────────────
+    if (options.path == '/users' && options.method == 'GET') {
+      lastUsersQuery = options.queryParameters;
+      const allUsers = [
+        {
+          'id': 1,
+          'username': 'admin',
+          'email': 'admin@minierp.com',
+          'full_name': 'Fawad',
+          'role': 'admin',
+          'role_id': 1,
+          'is_active': 1,
+        },
+        {
+          'id': 2,
+          'username': 'sales1',
+          'email': 'sales@minierp.com',
+          'full_name': 'Sales User',
+          'role': 'user',
+          'role_id': 2,
+          'is_active': 1,
+        },
+        {
+          'id': 3,
+          'username': 'bob',
+          'email': 'bob@minierp.com',
+          'full_name': 'Bob',
+          'role': 'user',
+          'role_id': 2,
+          'is_active': 0,
+        },
+      ];
+      final q = options.queryParameters;
+      final search = (q['search'] as String?) ?? '';
+      final role = q['role'] as String?;
+      final active = q['is_active'];
+      final rows = allUsers
+          .where((u) {
+        if (role == null) return true;
+        return u['role'] == role;
+      }).where((u) {
+        if (active == null) return true;
+        return u['is_active'] == (active == 1 || active == '1');
+      }).where(
+        (u) =>
+            search.isEmpty ||
+            (u['username'] as String)
+                .toLowerCase()
+                .contains(search.toLowerCase()) ||
+            (u['full_name'] as String)
+                .toLowerCase()
+                .contains(search.toLowerCase()),
+      ).toList();
+      return _json({'success': true, 'data': rows});
+    }
+    if (options.path == '/users' && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastUserPostBody = body;
+      if (rejectUserCreate) {
+        return _json({'error': 'Username already exists'}, status: 409);
+      }
+      return _json({
+        'success': true,
+        'data': {
+          'id': 99,
+          'username': body['username'],
+          'email': body['email'],
+          'full_name': body['full_name'],
+          'role': 'user',
+          'role_id': body['role_id'],
+          'is_active': body['is_active'] ?? true,
+        },
+      }, status: 201);
+    }
+    final userId = RegExp(r'^/users/(\d+)$').firstMatch(options.path);
+    if (userId != null && options.method == 'PUT') {
+      lastUserPutBody = options.data as Map<String, dynamic>;
+      return _json({
+        'success': true,
+        'data': {
+          'id': int.parse(userId.group(1)!),
+          'username': 'admin',
+          'email': 'admin@minierp.com',
+          'full_name': lastUserPutBody?['full_name'] ?? 'Fawad',
+          'role': 'admin',
+          'role_id': lastUserPutBody?['role_id'] ?? 1,
+          'is_active': lastUserPutBody?['is_active'] ?? true,
+        },
+      });
+    }
+    final toggleStatusId = RegExp(
+      r'^/users/(\d+)/toggle-status$',
+    ).firstMatch(options.path);
+    if (toggleStatusId != null && options.method == 'PUT') {
+      lastToggleBody = options.data as Map<String, dynamic>;
+      userToggleCount++;
+      return _json({'success': true, 'message': 'User status updated'});
+    }
+    final resetPasswordId = RegExp(
+      r'^/users/(\d+)/reset-password$',
+    ).firstMatch(options.path);
+    if (resetPasswordId != null && options.method == 'PUT') {
+      final body = options.data as Map<String, dynamic>;
+      lastResetPasswordBody = body['newPassword'] as String?;
+      return _json({'success': true, 'message': 'Password reset successfully'});
+    }
+    if (userId != null && options.method == 'DELETE') {
+      userDeleteCount++;
+      return _json({'success': true, 'message': 'User deleted successfully'});
+    }
+    if (options.path == '/roles' && options.method == 'GET') {
+      return _json({
+        'success': true,
+        'data': [
+          {
+            'id': 1,
+            'role_name': 'Admin',
+            'description': 'Full system access',
+            'is_system_role': 1,
+            'is_active': 1,
+            'permission_count': 30,
+          },
+          {
+            'id': 2,
+            'role_name': 'User',
+            'description': 'Standard access',
+            'is_system_role': 1,
+            'is_active': 1,
+            'permission_count': 12,
+          },
+          {
+            'id': 3,
+            'role_name': 'Manager',
+            'description': 'Team management',
+            'is_system_role': 0,
+            'is_active': 1,
+            'permission_count': 8,
+          },
+        ],
+      });
+    }
+    final roleId = RegExp(r'^/roles/(\d+)$').firstMatch(options.path);
+    if (roleId != null && options.method == 'DELETE') {
+      roleDeleteCount++;
+      return _json({'success': true, 'message': 'Role deleted successfully'});
+    }
+    final rolePermissionsId = RegExp(
+      r'^/roles/(\d+)/permissions$',
+    ).firstMatch(options.path);
+    if (rolePermissionsId != null) {
+      if (options.method == 'GET') {
+        rolePermissionsFetchCount++;
+        return _json({
+          'success': true,
+          'data': [
+            {'id': 1, 'permission_name': 'View Users', 'module': 'users', 'action': 'read', 'assigned': 1},
+            {'id': 2, 'permission_name': 'Create Users', 'module': 'users', 'action': 'create', 'assigned': 0},
+            {'id': 3, 'permission_name': 'View Invoices', 'module': 'invoices', 'action': 'read', 'assigned': 1},
+            {'id': 4, 'permission_name': 'Create Invoices', 'module': 'invoices', 'action': 'create', 'assigned': 0},
+          ],
+        });
+      }
+      if (options.method == 'PUT') {
+        final body = options.data as Map<String, dynamic>;
+        lastRolePermissionsIds =
+            (body['permissions'] as List).cast<num>().map((n) => n.toInt()).toList();
+        if (rejectRolePermissionsSave) {
+          return _json({'error': 'Role not found'}, status: 404);
+        }
+        return _json({'success': true, 'message': 'Permissions updated successfully'});
+      }
+    }
+    if (options.path == '/roles' && options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastRolePostBody = body;
+      return _json({
+        'success': true,
+        'data': {
+          'id': 9,
+          'role_name': body['role_name'],
+          'description': body['description'],
+          'is_system_role': 0,
+          'is_active': 1,
+          'permission_count': (body['permissions'] as List?)?.length ?? 0,
+        },
+      }, status: 201);
+    }
+    if (roleId != null && options.method == 'PUT') {
+      lastRolePutBody = options.data as Map<String, dynamic>;
+      return _json({
+        'success': true,
+        'data': {
+          'id': int.parse(roleId.group(1)!),
+          'role_name': 'Manager',
+          'description': lastRolePutBody?['description'],
+          'is_system_role': 0,
+          'is_active': lastRolePutBody?['is_active'] ?? true,
+          'permission_count': 8,
+        },
+      });
     }
     return _json({
       'success': false,
@@ -4175,6 +5130,122 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> bootToForecasts(
+    WidgetTester tester, {
+    _AuthFakeAdapter? adapter,
+    int tab = 0,
+  }) async {
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter ?? _AuthFakeAdapter();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Forecasts'));
+    await tester.pumpAndSettle();
+    if (tab > 0) {
+      final label = switch (tab) {
+        1 => 'Demand Forecast',
+        2 => 'Trends',
+        _ => 'Accuracy',
+      };
+      // The forecast shell's NavigationBar tab — scoped so the
+      // dashboard's headline (also "Demand Forecast", kept alive by the
+      // shell's IndexedStack) doesn't collide with the finder.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text(label),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+  }
+
+  Future<void> bootToIntegrations(
+    WidgetTester tester, {
+    _AuthFakeAdapter? adapter,
+  }) async {
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter ?? _AuthFakeAdapter();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Integrations'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> bootToEmployees(
+    WidgetTester tester, {
+    _AuthFakeAdapter? adapter,
+  }) async {
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter ?? _AuthFakeAdapter();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Employees'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> bootToAdmin(
+    WidgetTester tester, {
+    _AuthFakeAdapter? adapter,
+    int tab = 0,
+  }) async {
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter ?? _AuthFakeAdapter();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Users'));
+    await tester.pumpAndSettle();
+    if (tab > 0) {
+      final label = switch (tab) {
+        1 => 'Roles',
+        _ => 'Users',
+      };
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text(label),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+  }
+
   testWidgets('activity log screen renders the grid with server data', (
     tester,
   ) async {
@@ -4426,10 +5497,13 @@ void main() {
   });
 
   // Reports module — hub + the first report screens (PORTING.md §11).
-  Future<void> bootToReports(WidgetTester tester) async {
+  Future<void> bootToReports(
+    WidgetTester tester, {
+    _AuthFakeAdapter? adapter,
+  }) async {
     final storage = _FakeTokenStorage()..token = 'test-token';
     final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
-    dio.httpClientAdapter = _AuthFakeAdapter();
+    dio.httpClientAdapter = adapter ?? _AuthFakeAdapter();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -4751,6 +5825,140 @@ void main() {
     expect(content, contains('billing@acme.test'));
     expect(content, contains('2,400.00')); // total sales
     expect(content, contains('800.00')); // avg order value
+  });
+
+  testWidgets('sales by item report renders rows over the date range', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToReports(tester, adapter: adapter);
+
+    await tester.tap(find.text('Sales by Item Report'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Widget A'), findsOneWidget);
+    expect(find.text('Gadget'), findsOneWidget);
+    expect(find.text('24,000.00'), findsOneWidget); // total sales
+    expect(find.text('200.00'), findsOneWidget); // avg selling price
+    expect(find.text('120'), findsOneWidget); // quantity sold
+    // The endpoint requires both dates — the port always sends them.
+    expect(adapter.lastSalesByItemQuery?['fromDate'], isNotNull);
+    expect(adapter.lastSalesByItemQuery?['toDate'], isNotNull);
+
+    // Double-tap the Widget A row → the detail dialog.
+    await tester.tap(find.text('Widget A'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Widget A'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('Quantity Sold'), findsOneWidget); // dialog row
+    expect(find.text('FG001'), findsNWidgets(2)); // code: grid + dialog
+  });
+
+  testWidgets('sales by item report surfaces a failed fetch', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..failSalesByItem = true;
+    await bootToReports(tester, adapter: adapter);
+
+    await tester.tap(find.text('Sales by Item Report'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Failed to fetch sales by item'), findsOneWidget);
+  });
+
+  testWidgets('supplier analysis report renders the delivery-rate cells', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToReports(tester, adapter: adapter);
+
+    await tester.tap(find.text('Supplier Analysis Report'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Al-Fatah Traders'), findsOneWidget);
+    expect(find.text('Karachi Steel'), findsOneWidget);
+    expect(find.text('180,000.00'), findsOneWidget); // total purchase value
+    expect(find.text('100%'), findsNWidgets(2)); // both rows at 100
+    expect(adapter.lastSupplierAnalysisQuery?['fromDate'], isNotNull);
+    expect(adapter.lastSupplierAnalysisQuery?['toDate'], isNotNull);
+
+    // Double-tap the Al-Fatah row → the detail dialog.
+    await tester.tap(find.text('Al-Fatah Traders'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Al-Fatah Traders'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    // "18" (total items) appears only in the dialog — the grid has no
+    // total-items column.
+    expect(find.text('18'), findsOneWidget);
+    expect(find.text('4'), findsNWidgets(2)); // orders: grid cell + dialog
+  });
+
+  testWidgets('production summary report renders strip and rows', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToReports(tester, adapter: adapter);
+
+    await tester.tap(find.text('Production Summary Report'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Total Production Orders'), findsOneWidget);
+    // "Completed Quantity" appears twice — summary-strip label + grid
+    // column header.
+    expect(find.text('Completed Quantity'), findsNWidgets(2));
+    expect(find.text('WO-001'), findsOneWidget);
+    expect(find.text('WO-002'), findsOneWidget);
+    expect(find.text('Completed'), findsNWidgets(2)); // status column
+    expect(adapter.lastProductionSummaryQuery?['fromDate'], isNotNull);
+    expect(adapter.lastProductionSummaryQuery?['toDate'], isNotNull);
+
+    // Double-tap the WO-001 row → the detail dialog.
+    await tester.tap(find.text('WO-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('WO-001'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('Planned Quantity'), findsOneWidget); // dialog row
+    // Dialog title + grid cell both show WO-001.
+    expect(find.text('WO-001'), findsNWidgets(2));
+  });
+
+  testWidgets('bom usage report renders rows with the item picker', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToReports(tester, adapter: adapter);
+
+    await tester.tap(find.text('BOM Usage'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Widget A BOM'), findsOneWidget);
+    expect(find.text('Gadget BOM'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget); // usage count
+    expect(find.text('4'), findsOneWidget); // total components
+    expect(find.text('All Items'), findsOneWidget); // picker hint
+    expect(adapter.lastBomUsageQuery?['fromDate'], isNotNull);
+    expect(adapter.lastBomUsageQuery?['toDate'], isNotNull);
+
+    // Double-tap the Widget A BOM row → the detail dialog.
+    await tester.tap(find.text('Widget A BOM'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Widget A BOM'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    // Usage count '3' and components '4' now appear in grid + dialog.
+    expect(find.text('3'), findsNWidgets(2));
+    expect(find.text('4'), findsNWidgets(2));
+    expect(find.text('Active'), findsNWidgets(3)); // 2 grid rows + dialog
   });
 
   testWidgets('DSO report renders the metric cards and exports', (
@@ -6253,6 +7461,85 @@ void main() {
     expect((items.first as Map)['unit_price'], 100);
   });
 
+  testWidgets('sales order form: Print A4 shows only in edit mode', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSalesOrders(tester, adapter);
+
+    // Create mode: nothing saved yet, so no Print A4 action.
+    await tester.tap(find.widgetWithText(FilledButton, 'New Sales Order'));
+    await tester.pumpAndSettle();
+    expect(find.text('New Sales Order'), findsWidgets); // title
+    expect(find.text('Print A4'), findsNothing);
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+
+    // Edit mode (Draft → Edit visible): the Print A4 action appears.
+    adapter.so1Status = 'Draft';
+    await tester.tap(find.text('SO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SO-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Sales Order'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(Dialog).last,
+        matching: find.widgetWithText(TextButton, 'Print A4'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('sales order detail: Print A4 is available for any status', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSalesOrders(tester, adapter);
+
+    // Open the detail dialog (SO-2026-001 defaults to Confirmed).
+    await tester.tap(find.text('SO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SO-2026-001'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sales Order Details'), findsOneWidget);
+    // Print A4 sits in the footer regardless of status.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Print A4'),
+      ),
+      findsOneWidget,
+    );
+
+    // Draft keeps the action next to Edit + Delete.
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+    adapter.so1Status = 'Draft';
+    await tester.tap(find.text('SO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('SO-2026-001'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Print A4'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Edit'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('sales orders detail: Cancel confirms and flips the badge', (
     tester,
   ) async {
@@ -6533,6 +7820,87 @@ void main() {
     expect((items.first as Map)['item_id'], 1);
     expect((items.first as Map)['quantity'], 20);
     expect((items.first as Map)['unit_price'], 100);
+  });
+
+  testWidgets('quotation form: Print A4 shows only in edit mode', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToQuotations(tester, adapter);
+
+    // Create mode: nothing saved yet, so no Print A4 action.
+    await tester.tap(find.widgetWithText(FilledButton, 'New Quotation'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(Dialog, 'New Quotation'), findsOneWidget);
+    expect(find.text('Print A4'), findsNothing);
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+
+    // Edit mode (Draft → Edit visible): the Print A4 action appears.
+    adapter.quotation1Status = 'Draft';
+    await tester.tap(find.text('QT-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('QT-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Quotation'), findsOneWidget);
+    // The detail dialog behind the form also has Print A4 now, so scope
+    // to the topmost (form) dialog.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog).last,
+        matching: find.widgetWithText(TextButton, 'Print A4'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('quotation detail: Print A4 is available for any status', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToQuotations(tester, adapter);
+
+    // Open the detail dialog (QT-2026-001 defaults to Sent).
+    await tester.tap(find.text('QT-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('QT-2026-001'));
+    await tester.pumpAndSettle();
+    expect(find.text('Quotation Details'), findsOneWidget);
+    // Print A4 sits in the footer regardless of status.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Print A4'),
+      ),
+      findsOneWidget,
+    );
+
+    // Draft keeps the action next to Edit + Delete.
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+    adapter.quotation1Status = 'Draft';
+    await tester.tap(find.text('QT-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('QT-2026-001'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Print A4'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Edit'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -7548,6 +8916,85 @@ void main() {
     expect(find.text('Edit Purchase Order'), findsNothing);
   });
 
+  testWidgets('purchase order form: Print A4 shows only in edit mode', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    // Create mode: nothing saved yet, so no Print A4 action.
+    await tester.tap(find.text('New Purchase Order'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(Dialog, 'New Purchase Order'), findsOneWidget);
+    expect(find.text('Print A4'), findsNothing);
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+
+    // Edit mode (Draft → Edit visible): the Print A4 action appears. The
+    // detail dialog behind the form also has it now, so scope to the top.
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit Purchase Order'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(Dialog).last,
+        matching: find.widgetWithText(TextButton, 'Print A4'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('purchase order detail: Print A4 is available for any status', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    // Open the detail dialog (PO-2026-001 defaults to Draft).
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pumpAndSettle();
+    expect(find.text('Purchase Order Details'), findsOneWidget);
+    // Print A4 sits in the footer regardless of status.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Print A4'),
+      ),
+      findsOneWidget,
+    );
+
+    // Submitted keeps the action next to Receive Goods.
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+    adapter.po1Status = 'Submitted';
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Print A4'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Receive Goods'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('purchase order form: item change removes and re-adds the line', (
     tester,
   ) async {
@@ -7676,6 +9123,115 @@ void main() {
     );
     expect(
       find.descendant(of: find.byType(Dialog), matching: find.text('Submit')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('purchase order: receive goods posts the receipt and shows history', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    // Open the detail dialog for PO-2026-001 and submit it first (the
+    // Receive Goods action only exists on non-Draft POs).
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('PO-2026-001'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Submit')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Submit'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Submitted → the footer gains Receive Goods (Submit/Edit gone).
+    expect(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Receive Goods'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('Receive Goods'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The form: warehouse pre-filled from the PO, the receivable line
+    // (item 2 is fully received → no line), qty pre-filled to pending.
+    // Scope to the top dialog — the detail beneath also shows the item.
+    final dialog = find.byType(Dialog).last;
+    expect(find.text('Receive Goods'), findsWidgets); // title + button
+    expect(
+      find.descendant(
+        of: dialog,
+        matching: find.text('WH-MAIN — Main Warehouse'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Raw Material A')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Ordered: 100')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Pending: 100')),
+      findsOneWidget,
+    );
+
+    // Receive 60 of the 100 pending — exercises the editable qty (and
+    // leaves 40 pending, so the PO stays Partially Received). Notes is
+    // the first TextFormField in the dialog; the qty field is the second.
+    await tester.enterText(find.byType(TextFormField).last, '60');
+    await tester.pump();
+
+    // Record the receipt. Scope to the top dialog: the detail dialog's
+    // tonal Receive Goods footer button is still mounted beneath it.
+    await tester.tap(
+      find.descendant(
+        of: dialog,
+        matching: find.widgetWithText(FilledButton, 'Receive Goods'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Receive dialog closed (only the detail dialog remains) + POST body
+    // matches the createGoodsReceipt schema.
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(adapter.lastPoReceiptBody?['warehouse_id'], 1);
+    expect(adapter.lastPoReceiptBody?['items'], [
+      {'po_item_id': 1, 'received_quantity': 60},
+    ]);
+
+    // The detail beneath refetched and now shows the receipt in history
+    // (60 received of 100 — the only '60' in the dialog is the receipt
+    // row's qty; the items table still lists the ordered 100).
+    final detailDialog = find.byType(Dialog);
+    expect(
+      find.descendant(of: detailDialog, matching: find.text('Receipts')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: detailDialog, matching: find.text('GR-2026-001')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: detailDialog, matching: find.text('60')),
       findsOneWidget,
     );
   });
@@ -9690,5 +11246,786 @@ void main() {
     expect((items[0] as Map)['item_id'], 2);
     expect((items[0] as Map)['quantity'], 3);
     expect(find.text('BOM saved'), findsOneWidget);
+  });
+
+  testWidgets('forecast dashboard renders stats, alerts and top growing', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToForecasts(tester);
+
+    // Stat cards from the fake /forecasts/dashboard summary. The value
+    // '8' also appears in the accuracy tab (sampleSize), kept alive by
+    // the shell's IndexedStack — findsWidgets covers both.
+    expect(find.text('Tracked Items'), findsOneWidget);
+    expect(find.text('8'), findsWidgets);
+    expect(find.text('Need Restock'), findsOneWidget);
+    expect(find.text('Critical Alerts'), findsOneWidget);
+    expect(find.text('74%'), findsOneWidget);
+
+    // Alert cards: critical badge + stock-vs-predicted line.
+    expect(find.text('Widget A'), findsWidgets);
+    expect(find.text('Critical'), findsOneWidget);
+    expect(find.text('OK'), findsOneWidget);
+
+    // Top-growing list with the trend badge. The demand grid (kept alive
+    // by the shell's IndexedStack) shows the same 42% value, so the text
+    // finder matches both — findsWidgets covers it.
+    expect(find.text('Top Growing Items'), findsOneWidget);
+    expect(find.text('42%'), findsWidgets);
+    expect(find.text('Gadget'), findsWidgets);
+  });
+
+  testWidgets('forecast demand grid renders rows and filters by category', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToForecasts(tester, adapter: adapter, tab: 1);
+
+    // Demand grid rows from the fake endpoint — scoped to the PlutoGrid
+    // because the dashboard tab (alive in the IndexedStack) also shows
+    // Widget A and Bolt in its alerts list.
+    final grid = find.byType(PlutoGrid);
+    expect(find.descendant(of: grid, matching: find.text('Widget A')), findsOneWidget);
+    expect(find.descendant(of: grid, matching: find.text('Bolt')), findsOneWidget);
+    expect(find.descendant(of: grid, matching: find.text('FG001')), findsOneWidget);
+    // Filter bar selects present.
+    expect(find.text('All Categories'), findsOneWidget);
+    expect(find.text('All Trends'), findsOneWidget);
+    expect(find.text('All Status'), findsOneWidget);
+
+    // Pick the Parts category — the demand endpoint refetches with the
+    // category query and returns only the filtered row.
+    await tester.tap(find.byType(SearchableSelect<String?>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Parts').last);
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastForecastDemandQuery?['category'], 'Parts');
+    // Bolt (Raw category) disappears from the grid; Widget A stays.
+    expect(find.descendant(of: grid, matching: find.text('Widget A')), findsOneWidget);
+    expect(find.descendant(of: grid, matching: find.text('Bolt')), findsNothing);
+  });
+
+  testWidgets('forecast demand reset button clears active filters', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToForecasts(tester, adapter: adapter, tab: 1);
+
+    // The reset button is hidden until a filter is active.
+    expect(
+      find.byKey(const ValueKey('forecast-reset-filters')),
+      findsNothing,
+    );
+
+    // Apply the category filter, then reset.
+    await tester.tap(find.byType(SearchableSelect<String?>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Parts').last);
+    await tester.pumpAndSettle();
+    expect(adapter.lastForecastDemandQuery?['category'], 'Parts');
+
+    await tester.tap(find.byKey(const ValueKey('forecast-reset-filters')));
+    await tester.pumpAndSettle();
+
+    // The refetch dropped the category; both rows are back and the
+    // button hides again.
+    expect(adapter.lastForecastDemandQuery?['category'], isNull);
+    expect(
+      find.byKey(const ValueKey('forecast-reset-filters')),
+      findsNothing,
+    );
+    final grid = find.byType(PlutoGrid);
+    expect(
+      find.descendant(of: grid, matching: find.text('Widget A')),
+      findsOneWidget,
+    );
+    expect(find.descendant(of: grid, matching: find.text('Bolt')), findsOneWidget);
+  });
+
+  testWidgets('forecast dashboard view all resets filters and opens the demand tab', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToForecasts(tester, adapter: adapter, tab: 1);
+
+    // Leave a category filter active on the demand tab.
+    await tester.tap(find.byType(SearchableSelect<String?>).at(0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Parts').last);
+    await tester.pumpAndSettle();
+    expect(adapter.lastForecastDemandQuery?['category'], 'Parts');
+
+    // Jump back to the dashboard tab (nav rail of the forecast shell).
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Dashboard'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // View All from the alerts header — clears the demand filters and
+    // switches to the demand tab.
+    await tester.tap(find.text('View All'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastForecastDemandQuery?['category'], isNull);
+    expect(
+      tester
+          .widget<NavigationBar>(find.byType(NavigationBar))
+          .selectedIndex,
+      1,
+    );
+  });
+
+  testWidgets('forecast accuracy computes and posts to the server', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToForecasts(tester, adapter: adapter, tab: 3);
+
+    // Stat cards computed from the fake /forecasts/accuracy payload.
+    // (8.0 + 22.0) / 2 = 15.0.
+    expect(find.text('Avg MAPE'), findsOneWidget);
+    expect(find.text('15.0%'), findsOneWidget);
+    expect(find.text('Items Tracked'), findsOneWidget);
+    expect(find.text('2 / 2'), findsOneWidget);
+    // The Best Model stat card and the table's model column both render
+    // the underscore-free type.
+    expect(find.text('linear regression'), findsNWidgets(2));
+    expect(find.text('moving average'), findsOneWidget);
+
+    // Compute Accuracy posts and shows the server message.
+    await tester.tap(find.widgetWithText(FilledButton, 'Compute Accuracy'));
+    await tester.pumpAndSettle();
+    expect(adapter.computeAccuracyCount, 1);
+    expect(find.text('Accuracy computed for 14 records'), findsOneWidget);
+
+    // Let the screen's 5s auto-hide banner timer fire so no pending
+    // timer outlives the test.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.text('Accuracy computed for 14 records'), findsNothing);
+  });
+
+  testWidgets('integrations screen renders service cards with server status', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToIntegrations(tester);
+
+    // All six service cards render with their display names.
+    expect(find.text('Email (SendGrid)'), findsOneWidget);
+    expect(find.text('SMS Notifications (Twilio)'), findsOneWidget);
+    expect(find.text('Weather (Weatherstack)'), findsOneWidget);
+    expect(find.text('Phone Validation (Numverify)'), findsOneWidget);
+    expect(find.text('Currency Exchange (Fixer)'), findsOneWidget);
+    expect(find.text('Tax Calculation (TaxJar)'), findsOneWidget);
+
+    // Status strip reflects the bare GET body: email configured but
+    // disabled; notifications enabled but unconfigured.
+    expect(find.text('Configured'), findsOneWidget);
+    expect(find.text('Not configured'), findsNWidgets(5));
+
+    // The email card's switch is off (disabled) while notifications'
+    // is on (enabled) — scoped to each card.
+    final emailCard = find.ancestor(
+      of: find.text('Email (SendGrid)'),
+      matching: find.byType(Card),
+    );
+    final notificationsCard = find.ancestor(
+      of: find.text('SMS Notifications (Twilio)'),
+      matching: find.byType(Card),
+    );
+    expect(
+      tester.widget<SwitchListTile>(
+        find.descendant(
+          of: emailCard,
+          matching: find.byType(SwitchListTile),
+        ),
+      ).value,
+      isFalse,
+    );
+    expect(
+      tester.widget<SwitchListTile>(
+        find.descendant(
+          of: notificationsCard,
+          matching: find.byType(SwitchListTile),
+        ),
+      ).value,
+      isTrue,
+    );
+  });
+
+  testWidgets('integrations screen posts a per-service update for changed fields', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToIntegrations(tester, adapter: adapter);
+
+    // Enable email, type an API key, and save — only non-blank fields
+    // travel with the PUT.
+    final emailCard = find.ancestor(
+      of: find.text('Email (SendGrid)'),
+      matching: find.byType(Card),
+    );
+    await tester.tap(
+      find.descendant(
+        of: emailCard,
+        matching: find.byType(SwitchListTile),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find
+          .descendant(
+            of: emailCard,
+            matching: find.byType(TextFormField),
+          )
+          .first,
+      'SG.abcdef123456',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: emailCard,
+        matching: find.widgetWithText(FilledButton, 'Save'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastIntegrationPutService, 'email');
+    expect(adapter.lastIntegrationPutBody, {
+      'enabled': true,
+      'apiKey': 'SG.abcdef123456',
+    });
+    expect(find.text('Integration settings saved'), findsOneWidget);
+  });
+
+  testWidgets('integrations screen surfaces a failed save', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectIntegrationSave = true;
+    await bootToIntegrations(tester, adapter: adapter);
+
+    final weatherCard = find.ancestor(
+      of: find.text('Weather (Weatherstack)'),
+      matching: find.byType(Card),
+    );
+    await tester.enterText(
+      find
+          .descendant(
+            of: weatherCard,
+            matching: find.byType(TextFormField),
+          )
+          .first,
+      'ws-key',
+    );
+    await tester.pumpAndSettle();
+    // The weather card sits below the fold on the wide test surface —
+    // scroll it into view before tapping Save.
+    final weatherSave = find.descendant(
+      of: weatherCard,
+      matching: find.widgetWithText(FilledButton, 'Save'),
+    );
+    await tester.ensureVisible(weatherSave);
+    await tester.pumpAndSettle();
+    await tester.tap(weatherSave);
+    await tester.pumpAndSettle();
+
+    // The server's 400 message surfaces in the toast; the card keeps its
+    // typed key (still dirty → Save stays enabled).
+    expect(find.text('Invalid API key'), findsOneWidget);
+  });
+
+  testWidgets('employees screen renders the grid with server data', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToEmployees(tester);
+
+    // Active list by default: Ali + Sana (Bilal is inactive and excluded).
+    expect(find.text('EMP-001'), findsOneWidget);
+    expect(find.text('Ali Khan'), findsOneWidget);
+    expect(find.text('EMP-002'), findsOneWidget);
+    expect(find.text('Sana Ahmed'), findsOneWidget);
+    // Column headers from the localized grid.
+    expect(find.text('Full Name'), findsOneWidget);
+    expect(find.text('Department'), findsOneWidget);
+
+    // Summary strip over the loaded rows: 2 employees, 2 active,
+    // 45,000 + 35,000 = 80,000.
+    expect(find.text('2 employees'), findsOneWidget);
+    expect(find.text('2 Active'), findsOneWidget);
+    expect(find.text('80,000.00'), findsOneWidget);
+
+    // Status badges render for both rows.
+    expect(
+      find.descendant(
+        of: find.byType(StatusBadge),
+        matching: find.text('Active'),
+      ),
+      findsNWidgets(2),
+    );
+  });
+
+  testWidgets('employees screen department filter sends the server param', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToEmployees(tester, adapter: adapter);
+
+    // The department options come from the loaded page: Production, Sales.
+    await tester.tap(find.byKey(const ValueKey('employee-department-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Production').last);
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastEmployeesQuery?['department'], 'Production');
+    expect(find.text('Ali Khan'), findsOneWidget);
+    expect(find.text('Sana Ahmed'), findsNothing);
+  });
+
+  testWidgets('employees screen creates an employee through the form', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToEmployees(tester, adapter: adapter);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Add Employee'));
+    await tester.pumpAndSettle();
+
+    // The create form fetches the next code and shows it read-only.
+    expect(adapter.employeeNextCodeFetchCount, 1);
+    expect(find.text('EMP-004'), findsOneWidget);
+
+    // Fill the two required fields (First Name, Last Name).
+    final dialogFields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(dialogFields.at(1), 'Zain');
+    await tester.enterText(dialogFields.at(2), 'Malik');
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastEmployeePostBody?['first_name'], 'Zain');
+    expect(adapter.lastEmployeePostBody?['last_name'], 'Malik');
+    expect(adapter.lastEmployeePostBody?['is_active'], isTrue);
+    expect(find.text('Employee created successfully'), findsOneWidget);
+  });
+
+  testWidgets('employees screen pays salary from the detail dialog', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToEmployees(tester, adapter: adapter);
+
+    // Open the detail dialog, then use its header Pay Salary button
+    // (the grid row menu's popup items aren't reliably tappable inside
+    // the PlutoGrid overlay).
+    await tester.tap(find.text('Ali Khan'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Ali Khan'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog).first,
+        matching: find.widgetWithText(FilledButton, 'Pay Salary'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The salary dialog stacks over the detail dialog — its subtitle
+    // shows the same header text, so scope to the top dialog.
+    expect(
+      find.descendant(
+        of: find.byType(Dialog).last,
+        matching: find.text('EMP-001 · Ali Khan'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Pay Salary').last);
+    await tester.pumpAndSettle();
+
+    expect(adapter.salaryPayCount, 1);
+    expect(adapter.lastSalaryPayBody?['amount'], 45000);
+    expect(adapter.lastSalaryPayBody?['payment_method'], 'Bank Transfer');
+    expect(find.text('Salary payment recorded'), findsOneWidget);
+  });
+
+  testWidgets('employees screen surfaces a failed salary pay', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectSalaryPay = true;
+    await bootToEmployees(tester, adapter: adapter);
+
+    await tester.tap(find.text('Ali Khan'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Ali Khan'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog).first,
+        matching: find.widgetWithText(FilledButton, 'Pay Salary'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Pay Salary').last);
+    await tester.pumpAndSettle();
+
+    // The 422 message surfaces in the salary dialog's banner; the salary
+    // dialog stays open (stacked over the detail dialog).
+    expect(find.text('Valid amount is required'), findsOneWidget);
+    expect(find.byType(Dialog), findsNWidgets(2));
+  });
+
+  testWidgets('employees screen opens the detail with salary history and documents', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToEmployees(tester, adapter: adapter);
+
+    // Double-tap the first row to open the detail dialog.
+    await tester.tap(find.text('Ali Khan'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Ali Khan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('EMP-001 · Ali Khan'), findsOneWidget);
+    expect(find.text('Operator · Production'), findsOneWidget);
+
+    // Salary History tab shows the fetched payment row.
+    await tester.tap(find.text('Salary History'));
+    await tester.pumpAndSettle();
+    expect(adapter.salaryHistoryFetchCount, greaterThanOrEqualTo(1));
+    expect(find.text('REF-1'), findsOneWidget);
+
+    // Documents tab lists the fetched document.
+    await tester.tap(find.text('Documents'));
+    await tester.pumpAndSettle();
+    expect(find.text('CNIC Copy'), findsOneWidget);
+    expect(find.text('ID · 42101-1234567-1'), findsOneWidget);
+  });
+
+  testWidgets('employees screen uploads a document through multipart', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToEmployees(tester, adapter: adapter);
+
+    await tester.tap(find.text('Ali Khan'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Ali Khan'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Documents'));
+    await tester.pumpAndSettle();
+
+    // Stub the file_picker pick channel to return a PDF.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'custom') {
+              return [
+                {
+                  'name': 'passport.pdf',
+                  'path': '/tmp/passport.pdf',
+                  'size': 2048,
+                  'identifier': 'passport',
+                  'bytes': Uint8List.fromList(List.filled(2048, 0)),
+                },
+              ];
+            }
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Add Document'));
+    await tester.pumpAndSettle();
+
+    // Fill the required name and pick the file.
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(TextFormField),
+      ).first,
+      'Passport Copy',
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Select File'));
+    await tester.pumpAndSettle();
+    expect(find.text('passport.pdf'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Document added successfully'), findsOneWidget);
+    expect(adapter.lastDocumentPostHasFile, isTrue);
+    expect(adapter.lastDocumentPostFileName, 'passport.pdf');
+    expect(adapter.lastDocumentPostFields?['document_name'], 'Passport Copy');
+  });
+
+  testWidgets('employees screen surfaces a failed document upload', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectDocumentUpload = true;
+    await bootToEmployees(tester, adapter: adapter);
+
+    await tester.tap(find.text('Ali Khan'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Ali Khan'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Documents'));
+    await tester.pumpAndSettle();
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'custom') {
+              return [
+                {
+                  'name': 'passport.pdf',
+                  'path': '/tmp/passport.pdf',
+                  'size': 2048,
+                  'identifier': 'passport',
+                  'bytes': Uint8List.fromList(List.filled(2048, 0)),
+                },
+              ];
+            }
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Add Document'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(TextFormField),
+      ).first,
+      'Passport Copy',
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Select File'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    // The error surfaces in the upload dialog (which stays open on top
+    // of the detail dialog — 2 Dialogs total).
+    expect(find.text('File type text/x-custom is not allowed'), findsOneWidget);
+    expect(find.byType(Dialog), findsNWidgets(2));
+  });
+
+  testWidgets('employees screen surfaces a failed list load', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..failEmployees = true;
+    await bootToEmployees(tester, adapter: adapter);
+
+    // The grid collapses into the error panel with the server message.
+    expect(find.text('Failed to fetch employees'), findsOneWidget);
+    expect(find.byType(PlutoGrid), findsNothing);
+  });
+
+  testWidgets('admin screen renders the users grid with server data', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToAdmin(tester);
+
+    // 'admin' appears in both the username and role columns; 'Fawad'
+    // shows in the grid row AND the app bar's signed-in user label.
+    expect(find.text('admin'), findsNWidgets(2));
+    expect(find.text('Fawad'), findsNWidgets(2));
+    expect(find.text('sales1'), findsOneWidget);
+    expect(find.text('bob'), findsOneWidget);
+    expect(find.text('bob@minierp.com'), findsOneWidget);
+    // Status badges: admin + sales1 active, bob inactive.
+    expect(
+      find.descendant(
+        of: find.byType(StatusBadge),
+        matching: find.text('Active'),
+      ),
+      findsNWidgets(2),
+    );
+    expect(
+      find.descendant(
+        of: find.byType(StatusBadge),
+        matching: find.text('Inactive'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('admin screen roles tab renders roles with permission counts', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToAdmin(tester, tab: 1);
+
+    expect(find.text('Admin'), findsOneWidget);
+    expect(find.text('Full system access'), findsOneWidget);
+    expect(find.text('Manager'), findsOneWidget);
+    expect(find.text('30'), findsOneWidget);
+    expect(find.text('12'), findsOneWidget);
+  });
+
+  testWidgets('admin screen creates a user through the form dialog', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToAdmin(tester, adapter: adapter);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'New User'));
+    await tester.pumpAndSettle();
+
+    final dialogFields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(dialogFields.at(0), 'zain');
+    await tester.enterText(dialogFields.at(1), 'Zain Malik');
+    await tester.enterText(dialogFields.at(2), 'zain@example.com');
+    await tester.enterText(dialogFields.at(3), 'secret123');
+    await tester.pumpAndSettle();
+
+    // Pick the Manager role from the roles dropdown.
+    await tester.tap(find.byType(SearchableSelect<Role>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manager').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastUserPostBody?['username'], 'zain');
+    expect(adapter.lastUserPostBody?['email'], 'zain@example.com');
+    expect(adapter.lastUserPostBody?['full_name'], 'Zain Malik');
+    expect(adapter.lastUserPostBody?['role_id'], 3);
+    expect(adapter.lastUserPostBody?['password'], 'secret123');
+    expect(find.text('User created successfully'), findsOneWidget);
+  });
+
+  testWidgets('admin screen surfaces a failed user create', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rejectUserCreate = true;
+    await bootToAdmin(tester, adapter: adapter);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'New User'));
+    await tester.pumpAndSettle();
+    final dialogFields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(dialogFields.at(0), 'zain');
+    await tester.enterText(dialogFields.at(1), 'Zain Malik');
+    await tester.enterText(dialogFields.at(2), 'zain@example.com');
+    await tester.enterText(dialogFields.at(3), 'secret123');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(SearchableSelect<Role>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manager').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    // The 409 message surfaces in the banner; the dialog stays open.
+    expect(find.text('Username already exists'), findsOneWidget);
+    expect(find.byType(Dialog), findsOneWidget);
+  });
+
+  testWidgets('admin screen toggles a user status through the row menu', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToAdmin(tester, adapter: adapter);
+
+    // Row menu on the second row (sales1, id 2) — the admin row is the
+    // current user, so its status/delete actions are disabled.
+    // The popup menu opens over the grid. (Tapping popup items inside
+    // PlutoGrid's overlay isn't reliable in the test harness — the grid
+    // rebuilds and closes the popup — so the toggle PUT itself is
+    // asserted in the repository tests; here we assert the menu renders
+    // the status action for a non-self row.)
+    await tester.tap(find.byIcon(Icons.more_vert).at(1));
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(
+      find.widgetWithText(PopupMenuItem<String>, 'Deactivate'),
+      findsOneWidget,
+    );
+
+    // The admin row is the signed-in user (id 1): its status and delete
+    // items render but are disabled (self-actions are server-guarded too).
+    // Escape closes the first popup (the overlay barrier doesn't take
+    // outside taps in the PlutoGrid harness).
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.more_vert).first);
+    await tester.pump(const Duration(milliseconds: 350));
+    final selfDeactivate = tester.widget<PopupMenuItem<String>>(
+      find.widgetWithText(PopupMenuItem<String>, 'Deactivate'),
+    );
+    expect(selfDeactivate.enabled, isFalse);
+    expect(
+      find.widgetWithText(PopupMenuItem<String>, 'Reset Password'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('admin screen saves role permission changes', (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToAdmin(tester, adapter: adapter, tab: 1);
+
+    // Double-tap the Manager row to open the permissions editor
+    // (IndexedStack keeps the hidden Users grid alive, so its row icons
+    // are also findable — the row text scopes to the Roles grid).
+    await tester.tap(find.text('Manager'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Manager'));
+    await tester.pumpAndSettle();
+    expect(adapter.rolePermissionsFetchCount, greaterThanOrEqualTo(1));
+
+    // Assigned by default: View Users + View Invoices (ids 1, 3). Toggle
+    // the second tile (Create Users, id 2) on.
+    await tester.tap(find.byType(CheckboxListTile).at(1));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(
+      adapter.lastRolePermissionsIds,
+      containsAll(<int>[1, 2, 3]),
+    );
+    expect(find.text('Permissions updated'), findsOneWidget);
   });
 }

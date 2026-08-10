@@ -29,7 +29,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn, withSerialCell;
 import '../../widgets/screen_error_panel.dart';
-import '../../widgets/searchable_select.dart';
+import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'invoice_providers.dart';
 
@@ -147,39 +147,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   }
 
   Future<void> _refresh() => ref.refresh(invoicesProvider.future);
-
-  Widget _statusDropdown(AppLocalizations l10n) {
-    final scheme = Theme.of(context).colorScheme;
-    final current = ref.watch(invoicesStatusProvider);
-    return Container(
-      width: 170,
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: SearchableSelect<String?>(
-        items: [for (final (_, value) in _statusOptions) value],
-        selected: current,
-        hint: _statusOptions.first.$1,
-        labelBuilder: (value) {
-          for (final (label, option) in _statusOptions) {
-            if (option == value) return label;
-          }
-          return value ?? '';
-        },
-        isDense: true,
-        decoration: const InputDecoration(
-          isDense: true,
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 10),
-        ),
-        onChanged: (value) {
-          ref.read(invoicesStatusProvider.notifier).state = value;
-        },
-      ),
-    );
-  }
 
   Widget _summaryStrip(
     AppLocalizations l10n,
@@ -438,72 +405,61 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Toolbar: search + status filter + date range + actions.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              SizedBox(
-                width: 260,
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    isDense: true,
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    hintText: l10n.salesSearchplaceholder,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+        ScreenToolbar(
+          searchController: _searchController,
+          searchHint: l10n.salesSearchplaceholder,
+          onSearchChanged: _onSearchChanged,
+          filters: [
+            ScreenToolbarDropdown<String?>(
+              items: [for (final (_, value) in _statusOptions) value],
+              value: ref.watch(invoicesStatusProvider),
+              hint: _statusOptions.first.$1,
+              labelBuilder: (value) {
+                for (final (label, option) in _statusOptions) {
+                  if (option == value) return label;
+                }
+                return value ?? '';
+              },
+              width: 170,
+              onChanged: (v) =>
+                  ref.read(invoicesStatusProvider.notifier).state = v,
+            ),
+            DateRangeFilter(
+              width: 120,
+              fromProvider: invoicesFromDateProvider,
+              toProvider: invoicesToDateProvider,
+            ),
+          ],
+          onRefresh: _refresh,
+          onClearAll: _clearFilters,
+          hasActiveFilters: _hasActiveFilters,
+          actions: [
+            // CSV export — mirrors the orders grids: the pure builder
+            // runs over the currently-filtered rows and the shared
+            // save helper owns the FilePicker + toast. Disabled until
+            // rows are loaded.
+            TextButton.icon(
+              onPressed:
+                  invoices.isLoading || _filteredRows(invoices).isEmpty
+                  ? null
+                  : () => saveCsv(
+                      context,
+                      suggestedName: csvSuggestedName('invoices'),
+                      csv: buildInvoicesCsv(l10n, _filteredRows(invoices)),
+                      successMessage: l10n.salesExported,
+                      errorMessage: l10n.salesExportfailed,
                     ),
-                    suffixIcon: _hasActiveFilters
-                        ? IconButton(
-                            icon: const Icon(Icons.filter_alt_off, size: 18),
-                            tooltip: l10n.commonClear,
-                            onPressed: _clearFilters,
-                          )
-                        : null,
-                  ),
-                  onChanged: _onSearchChanged,
-                ),
-              ),
-              _statusDropdown(l10n),
-              DateRangeFilter(
-                width: 120,
-                fromProvider: invoicesFromDateProvider,
-                toProvider: invoicesToDateProvider,
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                tooltip: l10n.commonRefresh,
-                onPressed: _refresh,
-              ),
-              const SizedBox(width: 12),
-              // CSV export — mirrors the orders grids: the pure builder
-              // runs over the currently-filtered rows and the shared
-              // save helper owns the FilePicker + toast. Disabled until
-              // rows are loaded.
-              TextButton.icon(
-                onPressed: invoices.isLoading || _filteredRows(invoices).isEmpty
-                    ? null
-                    : () => saveCsv(
-                        context,
-                        suggestedName: csvSuggestedName('invoices'),
-                        csv: buildInvoicesCsv(l10n, _filteredRows(invoices)),
-                        successMessage: l10n.salesExported,
-                        errorMessage: l10n.salesExportfailed,
-                      ),
-                icon: const Icon(Icons.file_download_outlined, size: 18),
-                label: Text(l10n.salesExportcsv),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.icon(
-                onPressed: () => context.push('/sales/form'),
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(l10n.salesNewinvoice),
-              ),
-            ],
-          ),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: Text(l10n.salesExportcsv),
+            ),
+          ],
+          primaryActions: [
+            FilledButton.icon(
+              onPressed: () => context.push('/sales/form'),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(l10n.salesNewinvoice),
+            ),
+          ],
         ),
         const SizedBox(height: 10),
         Padding(

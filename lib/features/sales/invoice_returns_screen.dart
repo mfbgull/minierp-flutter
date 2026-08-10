@@ -7,16 +7,22 @@
 // 'Invoice Returns' tab of the sales shell (the web app pairs it with
 // `/sales/returns`).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
-import '../../core/utils/formatters.dart';
 import '../../core/utils/csv_export.dart';
+import '../../core/utils/date_utils.dart' show isoDate;
+import '../../core/utils/formatters.dart';
 import '../../data/models/sales_return.dart' show SalesReturn;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/screen_toolbar.dart';
 import 'invoice_return_detail_dialog.dart';
+import 'invoice_return_picker_dialog.dart' show showInvoiceReturnPicker;
 import 'invoice_return_providers.dart';
 
 class InvoiceReturnsScreen extends ConsumerStatefulWidget {
@@ -29,6 +35,9 @@ class InvoiceReturnsScreen extends ConsumerStatefulWidget {
 
 class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
     with PlutoGridScreen<SalesReturn, InvoiceReturnsScreen> {
+  Timer? _debounce;
+  final TextEditingController _searchController = TextEditingController();
+
   /// Row id → model for the detail dialog — there is no per-row endpoint,
   /// so the dialog renders from the row the grid was built from.
   final Map<int, SalesReturn> _returnsById = {};
@@ -40,6 +49,88 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
     if (salesReturn == null) return;
     showInvoiceReturnDetailDialog(context, salesReturn: salesReturn);
   }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      ref.read(invoiceReturnsSearchProvider.notifier).state = value.trim();
+    });
+  }
+
+  bool get _hasActiveFilters =>
+      ref.read(invoiceReturnsWarehouseProvider) != null ||
+      ref.read(invoiceReturnsFromDateProvider) != null ||
+      ref.read(invoiceReturnsToDateProvider) != null ||
+      ref.read(invoiceReturnsSearchProvider).isNotEmpty;
+
+  void _clearFilters() {
+    _searchController.clear();
+    ref.read(invoiceReturnsWarehouseProvider.notifier).state = null;
+    ref.read(invoiceReturnsFromDateProvider.notifier).state = null;
+    ref.read(invoiceReturnsToDateProvider.notifier).state = null;
+    ref.read(invoiceReturnsSearchProvider.notifier).state = '';
+  }
+
+  /// Client-side filtering (search term + warehouse + date range) over
+  /// the loaded rows — the endpoint only serves the full list, so every
+  /// filter runs here.
+  List<SalesReturn> _filteredRows(List<SalesReturn> returns) {
+    final search = ref.read(invoiceReturnsSearchProvider).toLowerCase();
+    final warehouse = ref.read(invoiceReturnsWarehouseProvider);
+    final from = ref.read(invoiceReturnsFromDateProvider);
+    final to = ref.read(invoiceReturnsToDateProvider);
+    if (search.isEmpty &&
+        warehouse == null &&
+        from == null &&
+        to == null) {
+      return returns;
+    }
+    return returns.where((r) {
+      if (search.isNotEmpty &&
+          !r.movementNo.toLowerCase().contains(search) &&
+          !r.itemName.toLowerCase().contains(search) &&
+          !(r.customerName ?? '').toLowerCase().contains(search)) {
+        return false;
+      }
+      if (warehouse != null && r.warehouseName != warehouse) return false;
+      final iso = r.returnDate;
+      if (from != null && iso.compareTo(isoDate(from)) < 0) return false;
+      if (to != null && iso.compareTo(isoDate(to)) > 0) return false;
+      return true;
+    }).toList();
+  }
+
+  /// Provider → grid sync that honours the active client-side filters
+  /// (overrides the mixin's unfiltered clear+append).
+  @override
+  void syncGridRows(AsyncValue<Object?> value) {
+    final manager = gridStateManager;
+    if (manager == null) return;
+    manager.setShowLoading(value.isLoading);
+    if (value.hasValue) {
+      final rows = _filteredRows(value.value as List<SalesReturn>);
+      // Rebuild the row-id → model map from the rows the grid actually
+      // shows (the detail dialog renders from the in-memory row).
+      _returnsById
+        ..clear()
+        ..addEntries([for (final r in rows) MapEntry(r.id, r)]);
+      manager.removeAllRows();
+      manager.appendRows([
+        for (final (index, row) in rows.indexed)
+          withSerialCell(gridRowFor(row), index),
+      ]);
+    }
+  }
+
+  void _refilter() => syncGridRows(ref.read(invoiceReturnsProvider));
 
   @override
   PlutoRow gridRowFor(SalesReturn salesReturn) {
@@ -67,41 +158,95 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
     final l10n = AppLocalizations.of(context)!;
 
     // Keep the grid in sync with provider transitions (loading → data).
+    // The mixin listener routes through the overridden syncGridRows, so
+    // filtering applies on every load/refresh too.
     watchGridProvider(invoiceReturnsProvider);
+    // Client-side filters re-run the filter over the loaded rows without
+    // refetching.
+    ref.listen(invoiceReturnsSearchProvider, (previous, next) => _refilter());
+    ref.listen(invoiceReturnsWarehouseProvider, (previous, next) => _refilter());
+    ref.listen(invoiceReturnsFromDateProvider, (previous, next) => _refilter());
+    ref.listen(invoiceReturnsToDateProvider, (previous, next) => _refilter());
+
+    // The client-side filters drive the search-clear button and the
+    // warehouse dropdown, so they must be watched here for the build to
+    // re-run.
+    ref.watch(invoiceReturnsSearchProvider);
+    ref.watch(invoiceReturnsWarehouseProvider);
+    ref.watch(invoiceReturnsFromDateProvider);
+    ref.watch(invoiceReturnsToDateProvider);
+
+    final allReturns = returns.valueOrNull ?? const <SalesReturn>[];
+    final filteredRows = _filteredRows(allReturns);
+    // Warehouse filter options — `All` (null) plus the distinct
+    // warehouse names from the loaded rows.
+    final warehouses = <String>[];
+    final seen = <String>{};
+    for (final r in allReturns) {
+      if (r.warehouseName.isNotEmpty && seen.add(r.warehouseName)) {
+        warehouses.add(r.warehouseName);
+      }
+    }
+    warehouses.sort();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // CSV export — mirrors the stock ledger dialog: the pure
-              // builder runs here and the shared save helper owns the
-              // FilePicker + toast. Disabled until rows are loaded.
-              TextButton.icon(
-                onPressed:
-                    returns.isLoading || (returns.valueOrNull?.isEmpty ?? true)
-                    ? null
-                    : () => saveCsv(
-                        context,
-                        suggestedName: csvSuggestedName('invoice-returns'),
-                        csv: buildInvoiceReturnsCsv(l10n, returns.valueOrNull!),
-                        successMessage: l10n.salesreturnsExported,
-                        errorMessage: l10n.salesreturnsExportfailed,
+        // Toolbar: search + warehouse filter + date range + actions —
+        // the same header the invoices tab has (the New slot opens the
+        // Process Return picker, since returns are created against an
+        // invoice).
+        ScreenToolbar(
+          searchController: _searchController,
+          searchHint: l10n.salesreturnsSearchplaceholder,
+          onSearchChanged: _onSearchChanged,
+          filters: [
+            ScreenToolbarDropdown<String?>(
+              items: [null, ...warehouses],
+              value: ref.watch(invoiceReturnsWarehouseProvider),
+              hint: l10n.commonAll,
+              labelBuilder: (v) => v ?? l10n.commonAll,
+              width: 170,
+              onChanged: (v) =>
+                  ref.read(invoiceReturnsWarehouseProvider.notifier).state = v,
+            ),
+            DateRangeFilter(
+              width: 120,
+              fromProvider: invoiceReturnsFromDateProvider,
+              toProvider: invoiceReturnsToDateProvider,
+            ),
+          ],
+          onRefresh: () => ref.invalidate(invoiceReturnsProvider),
+          onClearAll: _clearFilters,
+          hasActiveFilters: _hasActiveFilters,
+          actions: [
+            // CSV export — runs over the currently-filtered rows; the
+            // shared save helper owns the FilePicker + toast. Disabled
+            // until rows are loaded.
+            TextButton.icon(
+              onPressed: returns.isLoading || filteredRows.isEmpty
+                  ? null
+                  : () => saveCsv(
+                      context,
+                      suggestedName: csvSuggestedName('invoice-returns'),
+                      csv: buildInvoiceReturnsCsv(
+                        l10n,
+                        _filteredRows(allReturns),
                       ),
-                icon: const Icon(Icons.file_download_outlined, size: 18),
-                label: Text(l10n.salesreturnsExportcsv),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                tooltip: l10n.commonRefresh,
-                icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(invoiceReturnsProvider),
-              ),
-            ],
-          ),
+                      successMessage: l10n.salesreturnsExported,
+                      errorMessage: l10n.salesreturnsExportfailed,
+                    ),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: Text(l10n.salesreturnsExportcsv),
+            ),
+          ],
+          primaryActions: [
+            FilledButton.tonalIcon(
+              onPressed: () => showInvoiceReturnPicker(context),
+              icon: const Icon(Icons.assignment_return_outlined, size: 18),
+              label: Text(l10n.salesreturnsProcessreturn),
+            ),
+          ],
         ),
         Expanded(
           child: gridScreenBody(returns, provider: invoiceReturnsProvider),

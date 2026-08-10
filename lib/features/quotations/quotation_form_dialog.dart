@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
+import '../../core/utils/print_utils.dart' show printPdfBytes;
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/item.dart' show Item;
 import '../../data/models/quotation.dart' show QuotationDetail;
@@ -30,6 +31,7 @@ import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show warehousesProvider;
 import '../sales_orders/sales_order_providers.dart'
     show salesOrderCustomerOptionsProvider, soItemsProvider;
+import 'quotation_pdf.dart' show buildA4QuotationPdf;
 import 'quotation_providers.dart';
 
 /// Opens the create ([detail] == null) or edit form dialog.
@@ -88,6 +90,7 @@ class _QuotationFormDialogState extends ConsumerState<QuotationFormDialog> {
   DateTime? _expiryDate;
 
   bool _submitting = false;
+  bool _printing = false;
   String? _error;
 
   bool get _isEdit => widget.detail != null;
@@ -207,6 +210,44 @@ class _QuotationFormDialogState extends ConsumerState<QuotationFormDialog> {
           _error = error.message;
         });
     }
+  }
+
+  /// Builds the A4 quotation PDF from the *saved* quotation (fresh
+  /// `GET /quotations/:id`, PORTING.md §12) and shows the native print
+  /// dialog. Falls back to the share/save-as-PDF sheet when the platform
+  /// has no print backend (e.g. some Linux setups) — same pattern as the
+  /// invoice form's Print A4.
+  Future<void> _printQuotation() async {
+    final l10n = AppLocalizations.of(context)!;
+    final quotationId = widget.detail!.id;
+    setState(() => _printing = true);
+    try {
+      final result = await ref
+          .read(quotationRepositoryProvider)
+          .detail(quotationId);
+      if (!mounted) return;
+      final quotation = switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => _printError(
+          '${l10n.errorsFailed}: ${error.message}',
+        ),
+      };
+      if (quotation == null) return;
+
+      final bytes = await buildA4QuotationPdf(quotation: quotation);
+      if (!mounted) return;
+      await printPdfBytes(bytes, '${quotation.quotationNo}.pdf', context);
+    } catch (error) {
+      if (mounted) _printError('${l10n.errorsFailed}: $error');
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  /// Shows the print error toast and signals the caller to abort.
+  QuotationDetail? _printError(String message) {
+    showAppToast(context, message, isError: true);
+    return null;
   }
 
   InputDecoration _decoration() =>
@@ -554,6 +595,22 @@ class _QuotationFormDialogState extends ConsumerState<QuotationFormDialog> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    if (_isEdit) ...[
+                      TextButton.icon(
+                        onPressed: _printing || _submitting
+                            ? null
+                            : _printQuotation,
+                        icon: _printing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.print_outlined, size: 18),
+                        label: Text(l10n.quotationsPrinta4),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     TextButton(
                       onPressed: _submitting
                           ? null

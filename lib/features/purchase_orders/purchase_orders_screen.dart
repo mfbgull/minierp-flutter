@@ -6,6 +6,8 @@
 // grid. Sits at the shell branch `/purchasing` (the web app hosts the PO
 // tab inside the purchasing module).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
@@ -16,6 +18,7 @@ import '../../core/utils/po_status.dart';
 import '../../data/models/purchase_order.dart' show PurchaseOrder;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'purchase_order_detail_dialog.dart';
 import 'purchase_order_form_dialog.dart';
@@ -31,6 +34,55 @@ class PurchaseOrdersScreen extends ConsumerStatefulWidget {
 
 class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
     with PlutoGridScreen<PurchaseOrder, PurchaseOrdersScreen> {
+  Timer? _debounce;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      ref.read(purchaseOrdersSearchProvider.notifier).state = value.trim();
+    });
+  }
+
+  /// Client-side search over the loaded rows (the endpoint has no search
+  /// param) — overrides the mixin's unfiltered clear+append.
+  List<PurchaseOrder> _filteredRows(List<PurchaseOrder> orders) {
+    final search = ref.read(purchaseOrdersSearchProvider).toLowerCase();
+    if (search.isEmpty) return orders;
+    return orders
+        .where(
+          (po) =>
+              po.poNo.toLowerCase().contains(search) ||
+              po.supplierName.toLowerCase().contains(search),
+        )
+        .toList();
+  }
+
+  @override
+  void syncGridRows(AsyncValue<Object?> value) {
+    final manager = gridStateManager;
+    if (manager == null) return;
+    manager.setShowLoading(value.isLoading);
+    if (value.hasValue) {
+      final rows = _filteredRows(value.value as List<PurchaseOrder>);
+      manager.removeAllRows();
+      manager.appendRows([
+        for (final (index, row) in rows.indexed)
+          withSerialCell(gridRowFor(row), index),
+      ]);
+    }
+  }
+
+  void _refilter() => syncGridRows(ref.read(purchaseOrdersProvider));
+
   @override
   void openRowDetail(int poId) {
     if (!mounted) return;
@@ -56,47 +108,51 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
     final l10n = AppLocalizations.of(context)!;
 
     // Keep the grid in sync with provider transitions (loading → data).
+    // The mixin listener routes through the overridden syncGridRows, so
+    // the client-side search applies on every load/refresh too.
     watchGridProvider(purchaseOrdersProvider);
+    // Client-side search re-runs the filter over the loaded rows without
+    // refetching.
+    ref.listen(purchaseOrdersSearchProvider, (previous, next) => _refilter());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              FilledButton.tonalIcon(
-                onPressed: () => showPurchaseOrderFormDialog(context),
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(l10n.purchaseordersNewpurchaseorder),
-              ),
-              const SizedBox(width: 4),
-              // CSV export — mirrors the sales-orders/returns grids: the
-              // pure builder runs here and the shared save helper owns
-              // the FilePicker + toast. Disabled until rows are loaded.
-              TextButton.icon(
-                onPressed:
-                    orders.isLoading || (orders.valueOrNull?.isEmpty ?? true)
-                    ? null
-                    : () => saveCsv(
-                        context,
-                        suggestedName: csvSuggestedName('purchase-orders'),
-                        csv: buildPurchaseOrdersCsv(l10n, orders.valueOrNull!),
-                        successMessage: l10n.purchaseordersExported,
-                        errorMessage: l10n.purchaseordersExportfailed,
+        // Toolbar: search + CSV export + refresh + New PO.
+        ScreenToolbar(
+          searchController: _searchController,
+          searchHint: l10n.commonSearch,
+          onSearchChanged: _onSearchChanged,
+          onRefresh: () => ref.invalidate(purchaseOrdersProvider),
+          actions: [
+            // CSV export — mirrors the sales-orders/returns grids: the
+            // pure builder runs over the currently-filtered rows and
+            // the shared save helper owns the FilePicker + toast.
+            TextButton.icon(
+              onPressed: orders.isLoading ||
+                      _filteredRows(orders.valueOrNull ?? const []).isEmpty
+                  ? null
+                  : () => saveCsv(
+                      context,
+                      suggestedName: csvSuggestedName('purchase-orders'),
+                      csv: buildPurchaseOrdersCsv(
+                        l10n,
+                        _filteredRows(orders.valueOrNull ?? const []),
                       ),
-                icon: const Icon(Icons.file_download_outlined, size: 18),
-                label: Text(l10n.purchaseordersExportcsv),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                tooltip: l10n.commonRefresh,
-                icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(purchaseOrdersProvider),
-              ),
-            ],
-          ),
+                      successMessage: l10n.purchaseordersExported,
+                      errorMessage: l10n.purchaseordersExportfailed,
+                    ),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: Text(l10n.purchaseordersExportcsv),
+            ),
+          ],
+          primaryActions: [
+            FilledButton.tonalIcon(
+              onPressed: () => showPurchaseOrderFormDialog(context),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(l10n.purchaseordersNewpurchaseorder),
+            ),
+          ],
         ),
         Expanded(
           child: gridScreenBody(orders, provider: purchaseOrdersProvider),

@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
+import '../../core/utils/print_utils.dart' show printPdfBytes;
 import '../../core/utils/formatters.dart';
 import '../../core/utils/invoice_status.dart';
 import '../../data/models/customer.dart' show Customer;
@@ -51,6 +52,7 @@ import 'calculations/invoice_calculations.dart'
         generateInvoiceNo;
 import 'calculations/invoice_rules.dart'
     show doesPaymentExceedBalance, isValidPaymentAmount;
+import 'invoice_pdf.dart' show buildA4InvoicePdf;
 import 'invoice_providers.dart';
 import 'invoice_return_dialog.dart' show showInvoiceReturnDialog;
 import 'line_cells.dart' show DescriptionCell, LineCell, RemoveCell, SerialCell;
@@ -100,6 +102,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   DiscountScope _scope = DiscountScope.invoice;
 
   bool _submitting = false;
+  bool _printing = false;
   String? _error;
 
   // Payment state. Matches the reference create page: new invoices start
@@ -564,6 +567,54 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     }
   }
 
+  // ── A4 print (edit mode) ──────────────────────────────────────
+
+  /// Builds the A4 invoice PDF from the *saved* invoice (fresh
+  /// `GET /invoices/:id` detail + payments, PORTING.md §12) and shows the
+  /// native print dialog. Falls back to the share/save-as-PDF sheet when
+  /// the platform has no print backend (e.g. some Linux setups).
+  Future<void> _printInvoice() async {
+    final l10n = AppLocalizations.of(context)!;
+    final invoiceId = widget.invoice!.id;
+    setState(() => _printing = true);
+    try {
+      final repo = ref.read(invoiceRepositoryProvider);
+      final detail = await repo.invoice(invoiceId);
+      if (!mounted) return;
+      final invoice = switch (detail) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => _printError(
+          '${l10n.errorsFailed}: ${error.message}',
+        ),
+      };
+      if (invoice == null) return;
+
+      final paymentsResult = await repo.invoicePayments(invoiceId);
+      if (!mounted) return;
+      final payments = switch (paymentsResult) {
+        ApiSuccess(:final data) => data,
+        ApiFailure() => const <InvoicePaymentRecord>[],
+      };
+
+      final bytes = await buildA4InvoicePdf(
+        invoice: invoice,
+        payments: payments,
+      );
+      if (!mounted) return;
+      await printPdfBytes(bytes, '${invoice.invoiceNo}.pdf', context);
+    } catch (error) {
+      if (mounted) _printError('${l10n.errorsFailed}: $error');
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  /// Shows the print error toast and signals the caller to abort.
+  Invoice? _printError(String message) {
+    showAppToast(context, message, isError: true);
+    return null;
+  }
+
   // ── Submit ────────────────────────────────────────────────────
 
   Map<String, dynamic> _buildBody() {
@@ -885,7 +936,21 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       appBar: AppBar(
         title: Text(_isEdit ? l10n.salesEditinvoice : l10n.salesNewinvoice),
         actions: [
-          if (_isEdit)
+          if (_isEdit) ...[
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                onPressed: _printing || _submitting ? null : _printInvoice,
+                icon: _printing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.print_outlined, size: 18),
+                label: Text(l10n.salesPrinta4),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: TextButton.icon(
@@ -897,6 +962,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                 label: Text(l10n.salesreturnsProcessreturn),
               ),
             ),
+          ],
         ],
       ),
       body: Form(

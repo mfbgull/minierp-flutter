@@ -18,3 +18,7 @@ final purchaseReturnsProvider = FutureProvider<List<PurchaseReturn>>((
     ApiFailure(:final error) => throw error,
   };
 });
+
+/// Client-side search term for the purchase-returns grid (no search
+/// param — the screen filters the loaded rows).
+final purchaseReturnsSearchProvider = StateProvider<String>((ref) => '');

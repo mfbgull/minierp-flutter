@@ -17,6 +17,10 @@ final purchasesProvider = FutureProvider<List<Purchase>>((ref) async {
   };
 });
 
+/// Client-side search term for the purchases grid (no search param on
+/// the endpoint — the screen filters the loaded rows).
+final purchasesSearchProvider = StateProvider<String>((ref) => '');
+
 /// Purchase detail (`GET /purchases/:id`, bare object). autoDispose:
 /// each dialog instance owns its fetch, so closing it frees the state.
 final purchaseDetailProvider = FutureProvider.autoDispose.family<Purchase, int>(

@@ -16,6 +16,7 @@ import 'package:pluto_grid/pluto_grid.dart';
 import '../../data/models/warehouse.dart' show Warehouse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'inventory_providers.dart'
     show
@@ -113,60 +114,23 @@ class _WarehousesScreenState extends ConsumerState<WarehousesScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 40,
-                  child: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _searchController,
-                    builder: (context, value, _) => TextField(
-                      controller: _searchController,
-                      onChanged: _onSearchChanged,
-                      decoration: InputDecoration(
-                        hintText: l10n.commonSearch,
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        suffixIcon: value.text.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () {
-                                  _debounce?.cancel();
-                                  _searchController.clear();
-                                  ref
-                                          .read(
-                                            warehouseSearchProvider.notifier,
-                                          )
-                                          .state =
-                                      '';
-                                },
-                              ),
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.tonalIcon(
-                onPressed: () => _openForm(null),
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(l10n.warehousesNewwarehouse),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: l10n.commonRefresh,
-                icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(warehousesProvider),
-              ),
-            ],
-          ),
+        ScreenToolbar(
+          searchController: _searchController,
+          searchHint: l10n.commonSearch,
+          onSearchChanged: _onSearchChanged,
+          onClearSearch: () {
+            _debounce?.cancel();
+            _searchController.clear();
+            ref.read(warehouseSearchProvider.notifier).state = '';
+          },
+          onRefresh: () => ref.invalidate(warehousesProvider),
+          primaryActions: [
+            FilledButton.tonalIcon(
+              onPressed: () => _openForm(null),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(l10n.warehousesNewwarehouse),
+            ),
+          ],
         ),
         Expanded(
           child: gridScreenBody(warehouses, provider: warehousesProvider),

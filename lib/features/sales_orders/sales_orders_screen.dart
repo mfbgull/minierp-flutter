@@ -6,16 +6,21 @@
 // in the `/sales` branch's Sales Orders tab (the web app hosts the list
 // at `/sales-orders` inside the sales module).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/csv_export.dart';
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../core/utils/so_status.dart';
 import '../../data/models/sales_order.dart' show SalesOrder;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'sales_order_detail_dialog.dart';
 import 'sales_order_form_dialog.dart';
@@ -30,11 +35,87 @@ class SalesOrdersScreen extends ConsumerStatefulWidget {
 
 class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
     with PlutoGridScreen<SalesOrder, SalesOrdersScreen> {
+  Timer? _debounce;
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void openRowDetail(int soId) {
     if (!mounted) return;
     showSalesOrderDetailDialog(context, soId: soId);
   }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      ref.read(salesOrdersSearchProvider.notifier).state = value.trim();
+    });
+  }
+
+  bool get _hasActiveFilters =>
+      ref.read(salesOrdersStatusProvider) != null ||
+      ref.read(salesOrdersFromDateProvider) != null ||
+      ref.read(salesOrdersToDateProvider) != null ||
+      ref.read(salesOrdersSearchProvider).isNotEmpty;
+
+  void _clearFilters() {
+    _searchController.clear();
+    ref.read(salesOrdersStatusProvider.notifier).state = null;
+    ref.read(salesOrdersFromDateProvider.notifier).state = null;
+    ref.read(salesOrdersToDateProvider.notifier).state = null;
+    ref.read(salesOrdersSearchProvider.notifier).state = '';
+  }
+
+  /// Client-side filtering (search term + status + date range) over the
+  /// loaded rows — the endpoint only serves the full list, so every
+  /// filter runs here.
+  List<SalesOrder> _filteredRows(List<SalesOrder> orders) {
+    final search = ref.read(salesOrdersSearchProvider).toLowerCase();
+    final status = ref.read(salesOrdersStatusProvider);
+    final from = ref.read(salesOrdersFromDateProvider);
+    final to = ref.read(salesOrdersToDateProvider);
+    if (search.isEmpty && status == null && from == null && to == null) {
+      return orders;
+    }
+    return orders.where((so) {
+      if (search.isNotEmpty &&
+          !so.soNo.toLowerCase().contains(search) &&
+          !so.customerName.toLowerCase().contains(search)) {
+        return false;
+      }
+      if (status != null && so.status != status) return false;
+      final iso = so.soDate;
+      if (from != null && iso.compareTo(isoDate(from)) < 0) return false;
+      if (to != null && iso.compareTo(isoDate(to)) > 0) return false;
+      return true;
+    }).toList();
+  }
+
+  /// Provider → grid sync that honours the active client-side filters
+  /// (overrides the mixin's unfiltered clear+append).
+  @override
+  void syncGridRows(AsyncValue<Object?> value) {
+    final manager = gridStateManager;
+    if (manager == null) return;
+    manager.setShowLoading(value.isLoading);
+    if (value.hasValue) {
+      final rows = _filteredRows(value.value as List<SalesOrder>);
+      manager.removeAllRows();
+      manager.appendRows([
+        for (final (index, row) in rows.indexed)
+          withSerialCell(gridRowFor(row), index),
+      ]);
+    }
+  }
+
+  void _refilter() => syncGridRows(ref.read(salesOrdersProvider));
 
   @override
   PlutoRow gridRowFor(SalesOrder so) => PlutoRow(
@@ -55,47 +136,97 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
     final l10n = AppLocalizations.of(context)!;
 
     // Keep the grid in sync with provider transitions (loading → data).
+    // The mixin listener routes through the overridden syncGridRows, so
+    // filtering applies on every load/refresh too.
     watchGridProvider(salesOrdersProvider);
+    // Client-side filters re-run the filter over the loaded rows without
+    // refetching.
+    ref.listen(salesOrdersSearchProvider, (previous, next) => _refilter());
+    ref.listen(salesOrdersStatusProvider, (previous, next) => _refilter());
+    ref.listen(salesOrdersFromDateProvider, (previous, next) => _refilter());
+    ref.listen(salesOrdersToDateProvider, (previous, next) => _refilter());
+
+    // The client-side filters drive the search-clear button and the
+    // dropdown, so they must be watched here for the build to re-run.
+    ref.watch(salesOrdersSearchProvider);
+    ref.watch(salesOrdersStatusProvider);
+    ref.watch(salesOrdersFromDateProvider);
+    ref.watch(salesOrdersToDateProvider);
+
+    final filteredRows = _filteredRows(orders.valueOrNull ?? const []);
+    // Status filter options — `(label, server value)` pairs with `All` =
+    // null (localized, so built per build).
+    final statusOptions = <(String, String?)>[
+      (l10n.commonAll, null),
+      (l10n.salesordersDraft, 'Draft'),
+      (l10n.salesordersConfirmed, 'Confirmed'),
+      (l10n.salesordersDelivered, 'Delivered'),
+      (l10n.salesordersInvoiced, 'Invoiced'),
+      (l10n.salesordersCompleted, 'Completed'),
+      (l10n.salesordersCancelled, 'Cancelled'),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              FilledButton.tonalIcon(
-                onPressed: () => showSalesOrderFormDialog(context),
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(l10n.salesordersNewsalesorder),
-              ),
-              const SizedBox(width: 4),
-              // CSV export — mirrors the returns grids: the pure builder
-              // runs here and the shared save helper owns the FilePicker
-              // + toast. Disabled until rows are loaded.
-              TextButton.icon(
-                onPressed:
-                    orders.isLoading || (orders.valueOrNull?.isEmpty ?? true)
-                    ? null
-                    : () => saveCsv(
-                        context,
-                        suggestedName: csvSuggestedName('sales-orders'),
-                        csv: buildSalesOrdersCsv(l10n, orders.valueOrNull!),
-                        successMessage: l10n.salesordersExported,
-                        errorMessage: l10n.salesordersExportfailed,
+        // Toolbar: search + status filter + date range + actions — the
+        // same header the invoices tab has.
+        ScreenToolbar(
+          searchController: _searchController,
+          searchHint: l10n.salesordersSearchplaceholder,
+          onSearchChanged: _onSearchChanged,
+          filters: [
+            ScreenToolbarDropdown<String?>(
+              items: [for (final (_, value) in statusOptions) value],
+              value: ref.watch(salesOrdersStatusProvider),
+              hint: statusOptions.first.$1,
+              labelBuilder: (value) {
+                for (final (label, option) in statusOptions) {
+                  if (option == value) return label;
+                }
+                return value ?? '';
+              },
+              width: 170,
+              onChanged: (v) =>
+                  ref.read(salesOrdersStatusProvider.notifier).state = v,
+            ),
+            DateRangeFilter(
+              width: 120,
+              fromProvider: salesOrdersFromDateProvider,
+              toProvider: salesOrdersToDateProvider,
+            ),
+          ],
+          onRefresh: () => ref.invalidate(salesOrdersProvider),
+          onClearAll: _clearFilters,
+          hasActiveFilters: _hasActiveFilters,
+          actions: [
+            // CSV export — runs over the currently-filtered rows; the
+            // shared save helper owns the FilePicker + toast. Disabled
+            // until rows are loaded.
+            TextButton.icon(
+              onPressed: orders.isLoading || filteredRows.isEmpty
+                  ? null
+                  : () => saveCsv(
+                      context,
+                      suggestedName: csvSuggestedName('sales-orders'),
+                      csv: buildSalesOrdersCsv(
+                        l10n,
+                        _filteredRows(orders.valueOrNull ?? const []),
                       ),
-                icon: const Icon(Icons.file_download_outlined, size: 18),
-                label: Text(l10n.salesordersExportcsv),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                tooltip: l10n.commonRefresh,
-                icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(salesOrdersProvider),
-              ),
-            ],
-          ),
+                      successMessage: l10n.salesordersExported,
+                      errorMessage: l10n.salesordersExportfailed,
+                    ),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: Text(l10n.salesordersExportcsv),
+            ),
+          ],
+          primaryActions: [
+            FilledButton.tonalIcon(
+              onPressed: () => showSalesOrderFormDialog(context),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(l10n.salesordersNewsalesorder),
+            ),
+          ],
         ),
         Expanded(child: gridScreenBody(orders, provider: salesOrdersProvider)),
       ],

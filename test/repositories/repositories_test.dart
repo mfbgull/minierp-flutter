@@ -22,6 +22,8 @@ import 'package:minierp_app/data/repositories/invoice_repository.dart';
 import 'package:minierp_app/data/repositories/production_repository.dart';
 import 'package:minierp_app/data/repositories/paged_request.dart';
 import 'package:minierp_app/data/repositories/repository_client.dart';
+import 'package:minierp_app/features/admin/admin_repository.dart';
+import 'package:minierp_app/features/employees/employee_repository.dart';
 
 /// Canned handler per request: route on method + URI path.
 typedef RouteHandler = ResponseBody Function(RequestOptions options);
@@ -1663,6 +1665,453 @@ void main() {
       });
       final result = await repo.cleanup();
       expect(result, isA<ApiFailure<int>>());
+    });
+  });
+
+  group('EmployeeRepository', () {
+    late EmployeeRepository repo;
+
+    setUp(() => repo = EmployeeRepository(api));
+
+    Map<String, dynamic> employeeRow(int id) => {
+      'id': id,
+      'employee_code': 'EMP-${id.toString().padLeft(3, '0')}',
+      'first_name': 'Ali',
+      'last_name': 'Khan',
+      'email': 'ali@example.com',
+      'phone': '555-0101',
+      'department': 'Production',
+      'designation': 'Operator',
+      'employment_type': 'Full-time',
+      'salary': 45000,
+      'is_active': 1,
+      'created_at': '2026-01-15',
+    };
+
+    test(
+      'list parses the {page,limit,total,totalPages} pagination block',
+      () async {
+        Map<String, dynamic>? seenQuery;
+        handler = (o) {
+          seenQuery = o.queryParameters;
+          return jsonBody({
+            'success': true,
+            'data': [employeeRow(1), employeeRow(2)],
+            'pagination': {'page': 2, 'limit': 10, 'total': 35, 'totalPages': 4},
+          });
+        };
+        final result = await repo.list(
+          const EmployeeFilters(
+            search: 'ali',
+            department: 'Production',
+            status: 'active',
+            page: 2,
+            limit: 10,
+          ),
+        );
+        final page = result.requireData;
+        expect(page.items, hasLength(2));
+        expect(page.items.first.employeeCode, 'EMP-001');
+        expect(page.items.first.fullName, 'Ali Khan');
+        expect(page.items.first.salary, 45000);
+        expect(page.totalItems, 35);
+        expect(page.currentPage, 2);
+        expect(page.totalPages, 4);
+        expect(page.hasNext, isTrue);
+        expect(page.hasPrev, isTrue);
+        expect(seenQuery!['search'], 'ali');
+        expect(seenQuery!['department'], 'Production');
+        expect(seenQuery!['status'], 'active');
+        expect(seenQuery!['page'], 2);
+        expect(seenQuery!['limit'], 10);
+      },
+    );
+
+    test('list derives totalPages when the block omits it', () async {
+      handler = (o) => jsonBody({
+        'success': true,
+        'data': [employeeRow(1)],
+        'pagination': {'page': 1, 'limit': 10, 'total': 3},
+      });
+      final page = (await repo.list(const EmployeeFilters())).requireData;
+      expect(page.totalPages, 1);
+    });
+
+    test('nextCode parses {code}', () async {
+      handler = (o) => jsonBody({'success': true, 'data': {'code': 'EMP-042'}});
+      final code = (await repo.nextCode()).requireData;
+      expect(code, 'EMP-042');
+    });
+
+    test('get parses the enveloped employee detail', () async {
+      String? seenPath;
+      handler = (o) {
+        seenPath = o.path;
+        return jsonBody({'success': true, 'data': employeeRow(7)});
+      };
+      final employee = (await repo.get(7)).requireData;
+      expect(seenPath, '/employees/7');
+      expect(employee.firstName, 'Ali');
+      expect(employee.isActive, isTrue);
+    });
+
+    test('create posts snake_case body and parses the created employee', () async {
+      Map<String, dynamic>? seenBody;
+      handler = (o) {
+        seenBody = o.data as Map<String, dynamic>;
+        return jsonBody({
+          'success': true,
+          'data': {
+            'id': 99,
+            'employee_code': 'EMP-099',
+            'first_name': seenBody!['first_name'],
+            'last_name': seenBody!['last_name'],
+            'salary': seenBody!['salary'],
+            'is_active': true,
+          },
+        }, status: 201);
+      };
+      final employee = (await repo.create({
+        'first_name': 'Sana',
+        'last_name': 'Ahmed',
+        'salary': 50000,
+      })).requireData;
+      expect(seenBody!['first_name'], 'Sana');
+      expect(seenBody!['salary'], 50000);
+      expect(employee.employeeCode, 'EMP-099');
+      expect(employee.isActive, isTrue);
+    });
+
+    test('update PUTs to /employees/:id', () async {
+      String? seenPath;
+      handler = (o) {
+        seenPath = o.path;
+        return jsonBody({'success': true, 'data': employeeRow(1)});
+      };
+      final result = await repo.update(1, {'salary': 48000});
+      expect(seenPath, '/employees/1');
+      expect(result.requireData.salary, 45000);
+    });
+
+    test('delete tolerates the 204 no-body response', () async {
+      String? seenPath;
+      handler = (o) {
+        seenPath = o.path;
+        return ResponseBody.fromString('', 204);
+      };
+      final result = await repo.delete(1);
+      expect(seenPath, '/employees/1');
+      expect(result, isA<ApiSuccess<void>>());
+    });
+
+    test('paySalary posts to /employees/:id/salary/pay', () async {
+      String? seenPath;
+      Map<String, dynamic>? seenBody;
+      handler = (o) {
+        seenPath = o.path;
+        seenBody = o.data as Map<String, dynamic>;
+        return jsonBody({
+          'success': true,
+          'data': {'id': 4, 'journal_entry_id': 12},
+        }, status: 201);
+      };
+      final result = await repo.paySalary(1, {
+        'amount': 45000,
+        'payment_date': '2026-08-01',
+        'payment_method': 'bank',
+      });
+      expect(seenPath, '/employees/1/salary/pay');
+      expect(seenBody!['amount'], 45000);
+      expect(seenBody!['payment_date'], '2026-08-01');
+      expect(result.requireData['journal_entry_id'], 12);
+    });
+
+    test('salaryHistory parses enveloped rows', () async {
+      String? seenPath;
+      handler = (o) {
+        seenPath = o.path;
+        return jsonBody({
+          'success': true,
+          'data': [
+            {
+              'id': 4,
+              'employee_id': 1,
+              'amount': 45000,
+              'payment_date': '2026-08-01',
+              'payment_method': 'bank',
+              'reference_no': 'REF-1',
+            },
+          ],
+        });
+      };
+      final rows = (await repo.salaryHistory(1)).requireData;
+      expect(seenPath, '/employees/1/salary/history');
+      expect(rows.single.amount, 45000);
+      expect(rows.single.paymentMethod, 'bank');
+      expect(rows.single.referenceNo, 'REF-1');
+    });
+
+    test('documents parses enveloped rows', () async {
+      handler = (o) => jsonBody({
+        'success': true,
+        'data': [
+          {
+            'id': 9,
+            'employee_id': 1,
+            'document_name': 'CNIC Copy',
+            'document_type': 'ID',
+          },
+        ],
+      });
+      final rows = (await repo.documents(1)).requireData;
+      expect(rows.single.documentName, 'CNIC Copy');
+    });
+
+    test('addDocument posts multipart fields and parses the id', () async {
+      FormData? seenForm;
+      handler = (o) {
+        seenForm = o.data as FormData;
+        return jsonBody({'success': true, 'data': {'id': 9}}, status: 201);
+      };
+      final id = (await repo.addDocument(
+        1,
+        documentName: 'Passport',
+        documentType: 'ID',
+        fileBytes: Uint8List.fromList([1, 2, 3]),
+        fileName: 'passport.pdf',
+      ))
+          .requireData;
+      final form = seenForm!;
+      final fields = {for (final e in form.fields) e.key: e.value};
+      expect(fields['document_name'], 'Passport');
+      expect(fields['document_type'], 'ID');
+      expect(form.files.single.value.filename, 'passport.pdf');
+      expect(id, 9);
+    });
+
+    test('addDocument skips the file part when no bytes are given',
+        () async {
+      FormData? seenForm;
+      handler = (o) {
+        seenForm = o.data as FormData;
+        return jsonBody({'success': true, 'data': {'id': 9}}, status: 201);
+      };
+      await repo.addDocument(1, documentName: 'Passport');
+      final form = seenForm!;
+      final fields = {for (final e in form.fields) e.key: e.value};
+      expect(fields['document_name'], 'Passport');
+      expect(form.files, isEmpty);
+    });
+
+    test('removeDocument DELETEs /employees/:id/documents/:docId', () async {
+      String? seenPath;
+      handler = (o) {
+        seenPath = o.path;
+        return ResponseBody.fromString('', 204);
+      };
+      final result = await repo.removeDocument(1, 9);
+      expect(seenPath, '/employees/1/documents/9');
+      expect(result, isA<ApiSuccess<void>>());
+    });
+  });
+
+  group('AdminRepository', () {
+    late AdminRepository repo;
+
+    setUp(() => repo = AdminRepository(api));
+
+    Map<String, dynamic> userRow(int id) => {
+      'id': id,
+      'username': 'user$id',
+      'email': 'u$id@example.com',
+      'full_name': 'User $id',
+      'role': 'user',
+      'role_id': 2,
+      'is_active': 1,
+    };
+
+    Map<String, dynamic> roleRow(int id) => {
+      'id': id,
+      'role_name': 'Manager',
+      'description': 'Manages teams',
+      'is_system_role': 0,
+      'is_active': 1,
+      'permission_count': 8,
+    };
+
+    test('users parses rows and forwards filters', () async {
+      Map<String, dynamic>? seenQuery;
+      handler = (o) {
+        seenQuery = o.queryParameters;
+        return jsonBody({
+          'success': true,
+          'data': [userRow(1), userRow(2)],
+        });
+      };
+      final users = (await repo.users(
+        const UserFilters(role: 'admin', isActive: true, search: 'ad'),
+      )).requireData;
+      expect(users, hasLength(2));
+      expect(users.first.username, 'user1');
+      expect(users.first.displayName, 'User 1');
+      expect(users.first.roleId, 2);
+      expect(seenQuery!['role'], 'admin');
+      expect(seenQuery!['is_active'], 1);
+      expect(seenQuery!['search'], 'ad');
+    });
+
+    test('createUser posts the DTO body and parses the created user', () async {
+      Map<String, dynamic>? seenBody;
+      handler = (o) {
+        seenBody = o.data as Map<String, dynamic>;
+        return jsonBody({
+          'success': true,
+          'data': {
+            'id': 9,
+            'username': seenBody!['username'],
+            'full_name': seenBody!['full_name'],
+            'role': 'user',
+            'is_active': seenBody!['is_active'],
+          },
+        }, status: 201);
+      };
+      final user = (await repo.createUser({
+        'username': 'newbie',
+        'email': 'n@example.com',
+        'password': 'secret1',
+        'full_name': 'Newbie',
+        'role_id': 2,
+        'is_active': true,
+      })).requireData;
+      expect(seenBody!['password'], 'secret1');
+      expect(seenBody!['role_id'], 2);
+      expect(user.username, 'newbie');
+    });
+
+    test('updateUser PUTs to /users/:id', () async {
+      String? seenPath;
+      handler = (o) {
+        seenPath = o.path;
+        return jsonBody({'success': true, 'data': userRow(1)});
+      };
+      final result = await repo.updateUser(1, {'full_name': 'Renamed'});
+      expect(seenPath, '/users/1');
+      expect(result.requireData.username, 'user1');
+    });
+
+    test('deleteUser DELETEs /users/:id', () async {
+      String? seenPath;
+      handler = (o) {
+        seenPath = o.path;
+        return jsonBody({'success': true, 'message': 'User deleted'});
+      };
+      final result = await repo.deleteUser(1);
+      expect(seenPath, '/users/1');
+      expect(result, isA<ApiSuccess<void>>());
+    });
+
+    test('toggleUserStatus PUTs the {is_active} body', () async {
+      String? seenPath;
+      Map<String, dynamic>? seenBody;
+      handler = (o) {
+        seenPath = o.path;
+        seenBody = o.data as Map<String, dynamic>;
+        return jsonBody({'success': true, 'message': 'User deactivated'});
+      };
+      final result = await repo.toggleUserStatus(1, false);
+      expect(seenPath, '/users/1/toggle-status');
+      expect(seenBody!['is_active'], isFalse);
+      expect(result, isA<ApiSuccess<void>>());
+    });
+
+    test('resetPassword PUTs the camelCase newPassword body', () async {
+      Map<String, dynamic>? seenBody;
+      handler = (o) {
+        seenBody = o.data as Map<String, dynamic>;
+        return jsonBody({'success': true, 'message': 'Password reset'});
+      };
+      final result = await repo.resetPassword(1, 'newsecret1');
+      expect(seenBody!['newPassword'], 'newsecret1');
+      expect(result, isA<ApiSuccess<void>>());
+    });
+
+    test('roles parses rows with permission_count', () async {
+      handler = (o) => jsonBody({'success': true, 'data': [roleRow(1)]});
+      final roles = (await repo.roles()).requireData;
+      expect(roles.single.roleName, 'Manager');
+      expect(roles.single.permissionCount, 8);
+      expect(roles.single.isSystemRole, isFalse);
+    });
+
+    test('rolePermissions parses the assigned flag', () async {
+      handler = (o) => jsonBody({
+        'success': true,
+        'data': [
+          {'id': 1, 'action': 'read', 'module': 'users', 'assigned': 1},
+          {'id': 2, 'action': 'create', 'module': 'users', 'assigned': 0},
+        ],
+      });
+      final rows = (await repo.rolePermissions(3)).requireData;
+      expect(rows.first.assigned, isTrue);
+      expect(rows.last.assigned, isFalse);
+    });
+
+    test('createRole posts role_name + optional permission ids', () async {
+      Map<String, dynamic>? seenBody;
+      handler = (o) {
+        seenBody = o.data as Map<String, dynamic>;
+        return jsonBody({
+          'success': true,
+          'data': {
+            'id': 9,
+            'role_name': seenBody!['role_name'],
+            'is_system_role': 0,
+            'is_active': 1,
+          },
+        }, status: 201);
+      };
+      final role = (await repo.createRole({
+        'role_name': 'Viewer',
+        'permissions': [1, 2],
+      })).requireData;
+      expect(seenBody!['permissions'], [1, 2]);
+      expect(role.roleName, 'Viewer');
+    });
+
+    test('updateRole PUTs to /roles/:id', () async {
+      String? seenPath;
+      handler = (o) {
+        seenPath = o.path;
+        return jsonBody({'success': true, 'data': roleRow(1)});
+      };
+      final result = await repo.updateRole(1, {'description': 'x'});
+      expect(seenPath, '/roles/1');
+      expect(result.requireData.permissionCount, 8);
+    });
+
+    test('updateRolePermissions PUTs the permission id list', () async {
+      String? seenPath;
+      Map<String, dynamic>? seenBody;
+      handler = (o) {
+        seenPath = o.path;
+        seenBody = o.data as Map<String, dynamic>;
+        return jsonBody({'success': true, 'message': 'Permissions updated'});
+      };
+      final result = await repo.updateRolePermissions(3, [1, 2, 5]);
+      expect(seenPath, '/roles/3/permissions');
+      expect(seenBody!['permissions'], [1, 2, 5]);
+      expect(result, isA<ApiSuccess<void>>());
+    });
+
+    test('deleteRole DELETEs /roles/:id', () async {
+      String? seenPath;
+      handler = (o) {
+        seenPath = o.path;
+        return jsonBody({'success': true, 'message': 'Role deleted'});
+      };
+      final result = await repo.deleteRole(3);
+      expect(seenPath, '/roles/3');
+      expect(result, isA<ApiSuccess<void>>());
     });
   });
 }

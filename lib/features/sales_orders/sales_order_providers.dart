@@ -12,6 +12,19 @@ import '../../data/repositories/paged_request.dart' show PagedRequest;
 import '../../data/repositories/sales_order_repository.dart'
     show salesOrderRepositoryProvider;
 
+/// Client-side status filter for the SO grid (raw status value). null →
+/// all statuses.
+final salesOrdersStatusProvider = StateProvider<String?>((ref) => null);
+
+/// Client-side search term (SO no / customer name) — the sales-orders
+/// endpoint has no `search` param, so filtering happens in the screen.
+final salesOrdersSearchProvider = StateProvider<String>((ref) => '');
+
+/// Client-side date-range filters (ISO strings, applied to `so_date`).
+/// The endpoint has no date params.
+final salesOrdersFromDateProvider = StateProvider<DateTime?>((ref) => null);
+final salesOrdersToDateProvider = StateProvider<DateTime?>((ref) => null);
+
 /// All sales orders (`GET /sales-orders`, **bare array** — the endpoint
 /// has no search/page params, so the grid keeps sorting/filtering
 /// client-side like the items screen). The screen invalidates it on

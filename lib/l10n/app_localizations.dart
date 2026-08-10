@@ -1460,6 +1460,120 @@ abstract class AppLocalizations {
   /// **'Failed to export report'**
   String get reportsExportfailed;
 
+  /// No description provided for @reportsTotalquantitysold.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Quantity Sold'**
+  String get reportsTotalquantitysold;
+
+  /// No description provided for @reportsAvgsellingprice.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg. Selling Price'**
+  String get reportsAvgsellingprice;
+
+  /// No description provided for @reportsQuantitysold.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity Sold'**
+  String get reportsQuantitysold;
+
+  /// No description provided for @reportsTotalpurchasevalue.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Purchase Value'**
+  String get reportsTotalpurchasevalue;
+
+  /// No description provided for @reportsOntimedeliveryrate.
+  ///
+  /// In en, this message translates to:
+  /// **'On-time Delivery Rate'**
+  String get reportsOntimedeliveryrate;
+
+  /// No description provided for @reportsTotalproductionorders.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Production Orders'**
+  String get reportsTotalproductionorders;
+
+  /// No description provided for @reportsTotaloutputquantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Output Quantity'**
+  String get reportsTotaloutputquantity;
+
+  /// No description provided for @reportsCompletedquantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed Quantity'**
+  String get reportsCompletedquantity;
+
+  /// No description provided for @reportsScrappedquantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Scrapped Quantity'**
+  String get reportsScrappedquantity;
+
+  /// No description provided for @reportsProductiondate.
+  ///
+  /// In en, this message translates to:
+  /// **'Production Date'**
+  String get reportsProductiondate;
+
+  /// No description provided for @reportsProductionorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Production Order'**
+  String get reportsProductionorder;
+
+  /// No description provided for @reportsOutputitem.
+  ///
+  /// In en, this message translates to:
+  /// **'Output Item'**
+  String get reportsOutputitem;
+
+  /// No description provided for @reportsOutputquantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Output Quantity'**
+  String get reportsOutputquantity;
+
+  /// No description provided for @reportsPlannedquantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Planned Quantity'**
+  String get reportsPlannedquantity;
+
+  /// No description provided for @reportsParentitem.
+  ///
+  /// In en, this message translates to:
+  /// **'Parent Item'**
+  String get reportsParentitem;
+
+  /// No description provided for @reportsUsagecount.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage Count'**
+  String get reportsUsagecount;
+
+  /// No description provided for @reportsLastused.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Used'**
+  String get reportsLastused;
+
+  /// No description provided for @reportsTotalcomponents.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Components'**
+  String get reportsTotalcomponents;
+
+  /// No description provided for @reportsAllitems.
+  ///
+  /// In en, this message translates to:
+  /// **'All Items'**
+  String get reportsAllitems;
+
   /// No description provided for @fieldsMetric.
   ///
   /// In en, this message translates to:
@@ -1694,6 +1808,12 @@ abstract class AppLocalizations {
   /// **'Edit Quotation'**
   String get quotationsEditsquotation;
 
+  /// No description provided for @quotationsPrinta4.
+  ///
+  /// In en, this message translates to:
+  /// **'Print A4'**
+  String get quotationsPrinta4;
+
   /// No description provided for @quotationsErrorCustomerrequired.
   ///
   /// In en, this message translates to:
@@ -1759,6 +1879,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quotation saved'**
   String get quotationsSaved;
+
+  /// No description provided for @quotationsSearchplaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Search quotations...'**
+  String get quotationsSearchplaceholder;
 
   /// No description provided for @quotationsTerms.
   ///
@@ -1922,6 +2048,12 @@ abstract class AppLocalizations {
   /// **'New Purchase Order'**
   String get purchaseordersNewpurchaseorder;
 
+  /// No description provided for @purchaseordersPrinta4.
+  ///
+  /// In en, this message translates to:
+  /// **'Print A4'**
+  String get purchaseordersPrinta4;
+
   /// No description provided for @purchaseordersExportcsv.
   ///
   /// In en, this message translates to:
@@ -2036,6 +2168,78 @@ abstract class AppLocalizations {
   /// **'Unit Price'**
   String get purchaseordersUnitprice;
 
+  /// No description provided for @purchaseordersReceivegoods.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive Goods'**
+  String get purchaseordersReceivegoods;
+
+  /// No description provided for @purchaseordersReceipts.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipts'**
+  String get purchaseordersReceipts;
+
+  /// No description provided for @purchaseordersReceiptno.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt No'**
+  String get purchaseordersReceiptno;
+
+  /// No description provided for @purchaseordersReceiptdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt Date'**
+  String get purchaseordersReceiptdate;
+
+  /// No description provided for @purchaseordersOrdered.
+  ///
+  /// In en, this message translates to:
+  /// **'Ordered'**
+  String get purchaseordersOrdered;
+
+  /// No description provided for @purchaseordersQtyreceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty Received'**
+  String get purchaseordersQtyreceived;
+
+  /// No description provided for @purchaseordersPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get purchaseordersPending;
+
+  /// No description provided for @purchaseordersNoreceipts.
+  ///
+  /// In en, this message translates to:
+  /// **'No receipts recorded yet'**
+  String get purchaseordersNoreceipts;
+
+  /// No description provided for @purchaseordersReceiptsaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Goods receipt recorded'**
+  String get purchaseordersReceiptsaved;
+
+  /// No description provided for @purchaseordersErrorWarehouserequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a warehouse'**
+  String get purchaseordersErrorWarehouserequired;
+
+  /// No description provided for @purchaseordersErrorReceiveditemsrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter at least one received quantity'**
+  String get purchaseordersErrorReceiveditemsrequired;
+
+  /// No description provided for @purchaseordersErrorQtyexceeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Received quantity cannot exceed the pending quantity'**
+  String get purchaseordersErrorQtyexceeds;
+
   /// No description provided for @salesordersSalesorders.
   ///
   /// In en, this message translates to:
@@ -2047,6 +2251,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New Sales Order'**
   String get salesordersNewsalesorder;
+
+  /// No description provided for @salesordersPrinta4.
+  ///
+  /// In en, this message translates to:
+  /// **'Print A4'**
+  String get salesordersPrinta4;
 
   /// No description provided for @salesordersSono.
   ///
@@ -2269,6 +2479,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sales order saved'**
   String get salesordersSaved;
+
+  /// No description provided for @salesordersSearchplaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Search sales orders...'**
+  String get salesordersSearchplaceholder;
 
   /// No description provided for @salesordersSodate.
   ///
@@ -3062,6 +3278,90 @@ abstract class AppLocalizations {
   /// **'Best (lowest MAPE) first'**
   String get forecastsSortbymape;
 
+  /// No description provided for @forecastsPredictedweek.
+  ///
+  /// In en, this message translates to:
+  /// **'Predicted (Week)'**
+  String get forecastsPredictedweek;
+
+  /// No description provided for @forecastsPredictedmonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Predicted (Month)'**
+  String get forecastsPredictedmonth;
+
+  /// No description provided for @forecastsPredictedquarter.
+  ///
+  /// In en, this message translates to:
+  /// **'Predicted (Quarter)'**
+  String get forecastsPredictedquarter;
+
+  /// No description provided for @forecastsRecommendation.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommendation'**
+  String get forecastsRecommendation;
+
+  /// No description provided for @forecastsOrdernow.
+  ///
+  /// In en, this message translates to:
+  /// **'Order Now'**
+  String get forecastsOrdernow;
+
+  /// No description provided for @forecastsOrdersoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Order Soon'**
+  String get forecastsOrdersoon;
+
+  /// No description provided for @forecastsMonitor.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitor'**
+  String get forecastsMonitor;
+
+  /// No description provided for @forecastsAdequate.
+  ///
+  /// In en, this message translates to:
+  /// **'Adequate'**
+  String get forecastsAdequate;
+
+  /// No description provided for @forecastsConfidence.
+  ///
+  /// In en, this message translates to:
+  /// **'Confidence'**
+  String get forecastsConfidence;
+
+  /// No description provided for @forecastsPending.
+  ///
+  /// In en, this message translates to:
+  /// **'pending'**
+  String get forecastsPending;
+
+  /// No description provided for @forecastsSearchitems.
+  ///
+  /// In en, this message translates to:
+  /// **'Search items...'**
+  String get forecastsSearchitems;
+
+  /// No description provided for @forecastsCritical.
+  ///
+  /// In en, this message translates to:
+  /// **'Critical'**
+  String get forecastsCritical;
+
+  /// No description provided for @forecastsWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get forecastsWarning;
+
+  /// No description provided for @forecastsOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get forecastsOk;
+
   /// No description provided for @bomBillofmaterials.
   ///
   /// In en, this message translates to:
@@ -3224,6 +3524,144 @@ abstract class AppLocalizations {
   /// **'Integrations'**
   String get integrationsIntegrations;
 
+  /// No description provided for @integrationsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure third-party services (email, SMS, weather, validation, currency, tax). API keys are stored encrypted and never displayed.'**
+  String get integrationsSubtitle;
+
+  /// No description provided for @integrationsConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Configured'**
+  String get integrationsConfigured;
+
+  /// No description provided for @integrationsNotconfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Not configured'**
+  String get integrationsNotconfigured;
+
+  /// No description provided for @integrationsEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get integrationsEnabled;
+
+  /// No description provided for @integrationsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Integration settings saved'**
+  String get integrationsSaved;
+
+  /// No description provided for @integrationsSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save integration settings'**
+  String get integrationsSaveFailed;
+
+  /// No description provided for @integrationsApikey.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key'**
+  String get integrationsApikey;
+
+  /// No description provided for @integrationsApikeyHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored encrypted — leave blank to keep the current key.'**
+  String get integrationsApikeyHelper;
+
+  /// No description provided for @integrationsFieldFromemail.
+  ///
+  /// In en, this message translates to:
+  /// **'From Email'**
+  String get integrationsFieldFromemail;
+
+  /// No description provided for @integrationsFieldFromname.
+  ///
+  /// In en, this message translates to:
+  /// **'From Name'**
+  String get integrationsFieldFromname;
+
+  /// No description provided for @integrationsFieldAccountsid.
+  ///
+  /// In en, this message translates to:
+  /// **'Account SID'**
+  String get integrationsFieldAccountsid;
+
+  /// No description provided for @integrationsFieldPhonenumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone Number'**
+  String get integrationsFieldPhonenumber;
+
+  /// No description provided for @integrationsFieldDefaultlocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Location'**
+  String get integrationsFieldDefaultlocation;
+
+  /// No description provided for @integrationsFieldBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Base Currency'**
+  String get integrationsFieldBase;
+
+  /// No description provided for @integrationsFieldUpdateinterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Interval (s)'**
+  String get integrationsFieldUpdateinterval;
+
+  /// No description provided for @integrationsFieldDefaultcountry.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Country'**
+  String get integrationsFieldDefaultcountry;
+
+  /// No description provided for @integrationsFieldZipcode.
+  ///
+  /// In en, this message translates to:
+  /// **'ZIP Code'**
+  String get integrationsFieldZipcode;
+
+  /// No description provided for @integrationsServiceEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email (SendGrid)'**
+  String get integrationsServiceEmail;
+
+  /// No description provided for @integrationsServiceNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS Notifications (Twilio)'**
+  String get integrationsServiceNotifications;
+
+  /// No description provided for @integrationsServiceWeather.
+  ///
+  /// In en, this message translates to:
+  /// **'Weather (Weatherstack)'**
+  String get integrationsServiceWeather;
+
+  /// No description provided for @integrationsServiceValidation.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone Validation (Numverify)'**
+  String get integrationsServiceValidation;
+
+  /// No description provided for @integrationsServiceCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency Exchange (Fixer)'**
+  String get integrationsServiceCurrency;
+
+  /// No description provided for @integrationsServiceTax.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax Calculation (TaxJar)'**
+  String get integrationsServiceTax;
+
   /// No description provided for @usermanagementUsermanagement.
   ///
   /// In en, this message translates to:
@@ -3235,6 +3673,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Roles & Permissions'**
   String get usermanagementRolespermissions;
+
+  /// No description provided for @usermanagementSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and manage system users, roles and permissions'**
+  String get usermanagementSubtitle;
+
+  /// No description provided for @usermanagementUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Users'**
+  String get usermanagementUsers;
+
+  /// No description provided for @usermanagementAllroles.
+  ///
+  /// In en, this message translates to:
+  /// **'All Roles'**
+  String get usermanagementAllroles;
+
+  /// No description provided for @usermanagementAllstatus.
+  ///
+  /// In en, this message translates to:
+  /// **'All Statuses'**
+  String get usermanagementAllstatus;
+
+  /// No description provided for @usermanagementSearchusers.
+  ///
+  /// In en, this message translates to:
+  /// **'Search users...'**
+  String get usermanagementSearchusers;
+
+  /// No description provided for @usermanagementNewuser.
+  ///
+  /// In en, this message translates to:
+  /// **'New User'**
+  String get usermanagementNewuser;
+
+  /// No description provided for @usermanagementEdituser.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit User'**
+  String get usermanagementEdituser;
+
+  /// No description provided for @usermanagementUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get usermanagementUsername;
+
+  /// No description provided for @usermanagementEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get usermanagementEmail;
+
+  /// No description provided for @usermanagementFullname.
+  ///
+  /// In en, this message translates to:
+  /// **'Full Name'**
+  String get usermanagementFullname;
+
+  /// No description provided for @usermanagementRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get usermanagementRole;
+
+  /// No description provided for @usermanagementPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get usermanagementPassword;
+
+  /// No description provided for @usermanagementUsercreated.
+  ///
+  /// In en, this message translates to:
+  /// **'User created successfully'**
+  String get usermanagementUsercreated;
+
+  /// No description provided for @usermanagementUserupdated.
+  ///
+  /// In en, this message translates to:
+  /// **'User updated successfully'**
+  String get usermanagementUserupdated;
+
+  /// No description provided for @usermanagementUserdeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'User deleted successfully'**
+  String get usermanagementUserdeleted;
+
+  /// No description provided for @usermanagementDeleteconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this user? This cannot be undone.'**
+  String get usermanagementDeleteconfirm;
+
+  /// No description provided for @usermanagementActivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate'**
+  String get usermanagementActivate;
+
+  /// No description provided for @usermanagementDeactivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Deactivate'**
+  String get usermanagementDeactivate;
+
+  /// No description provided for @usermanagementActivated.
+  ///
+  /// In en, this message translates to:
+  /// **'User activated'**
+  String get usermanagementActivated;
+
+  /// No description provided for @usermanagementDeactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'User deactivated'**
+  String get usermanagementDeactivated;
+
+  /// No description provided for @usermanagementResetpassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Password'**
+  String get usermanagementResetpassword;
+
+  /// No description provided for @usermanagementNewpassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New Password'**
+  String get usermanagementNewpassword;
+
+  /// No description provided for @usermanagementResetconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset this user\'s password?'**
+  String get usermanagementResetconfirm;
+
+  /// No description provided for @usermanagementResetdone.
+  ///
+  /// In en, this message translates to:
+  /// **'Password reset successfully'**
+  String get usermanagementResetdone;
+
+  /// No description provided for @usermanagementValidationUsernamerequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Username is required'**
+  String get usermanagementValidationUsernamerequired;
+
+  /// No description provided for @usermanagementValidationEmailrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Email is required'**
+  String get usermanagementValidationEmailrequired;
+
+  /// No description provided for @usermanagementValidationInvalidemail.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid email format'**
+  String get usermanagementValidationInvalidemail;
+
+  /// No description provided for @usermanagementValidationFullnamerequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Full name is required'**
+  String get usermanagementValidationFullnamerequired;
+
+  /// No description provided for @usermanagementValidationRolerequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a role'**
+  String get usermanagementValidationRolerequired;
+
+  /// No description provided for @usermanagementValidationPasswordlength.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 6 characters'**
+  String get usermanagementValidationPasswordlength;
+
+  /// No description provided for @usermanagementNewrole.
+  ///
+  /// In en, this message translates to:
+  /// **'New Role'**
+  String get usermanagementNewrole;
+
+  /// No description provided for @usermanagementEditrole.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Role'**
+  String get usermanagementEditrole;
+
+  /// No description provided for @usermanagementRolename.
+  ///
+  /// In en, this message translates to:
+  /// **'Role Name'**
+  String get usermanagementRolename;
+
+  /// No description provided for @usermanagementDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get usermanagementDescription;
+
+  /// No description provided for @usermanagementSystemrole.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get usermanagementSystemrole;
+
+  /// No description provided for @usermanagementPermissions.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions'**
+  String get usermanagementPermissions;
+
+  /// No description provided for @usermanagementPermissioncount.
+  ///
+  /// In en, this message translates to:
+  /// **'permissions'**
+  String get usermanagementPermissioncount;
+
+  /// No description provided for @usermanagementPermissionstitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Role Permissions'**
+  String get usermanagementPermissionstitle;
+
+  /// No description provided for @usermanagementPermissionsubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign permissions for {role}'**
+  String usermanagementPermissionsubtitle(Object role);
+
+  /// No description provided for @usermanagementPermissionsaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions updated'**
+  String get usermanagementPermissionsaved;
+
+  /// No description provided for @usermanagementRolevalidationname.
+  ///
+  /// In en, this message translates to:
+  /// **'Role name is required'**
+  String get usermanagementRolevalidationname;
+
+  /// No description provided for @usermanagementRolecreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Role created successfully'**
+  String get usermanagementRolecreated;
+
+  /// No description provided for @usermanagementRoleupdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Role updated successfully'**
+  String get usermanagementRoleupdated;
+
+  /// No description provided for @usermanagementRoledeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Role deleted successfully'**
+  String get usermanagementRoledeleted;
+
+  /// No description provided for @usermanagementRoledeleteconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this role? Users assigned to it must be reassigned first.'**
+  String get usermanagementRoledeleteconfirm;
+
+  /// No description provided for @usermanagementCantmodifysystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System roles cannot be modified'**
+  String get usermanagementCantmodifysystem;
+
+  /// No description provided for @usermanagementNoresults.
+  ///
+  /// In en, this message translates to:
+  /// **'No users found'**
+  String get usermanagementNoresults;
 
   /// No description provided for @expensesExpenses.
   ///
@@ -3709,6 +4429,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'file'**
   String get employeesDocumentsFile;
+
+  /// No description provided for @employeesDocumentsSelectfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Select File'**
+  String get employeesDocumentsSelectfile;
+
+  /// No description provided for @employeesSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search employees...'**
+  String get employeesSearch;
+
+  /// No description provided for @employeesAlldepartments.
+  ///
+  /// In en, this message translates to:
+  /// **'All Departments'**
+  String get employeesAlldepartments;
+
+  /// No description provided for @employeesAllstatus.
+  ///
+  /// In en, this message translates to:
+  /// **'All Statuses'**
+  String get employeesAllstatus;
+
+  /// No description provided for @employeesFullname.
+  ///
+  /// In en, this message translates to:
+  /// **'Full Name'**
+  String get employeesFullname;
+
+  /// No description provided for @employeesEmploymenttype.
+  ///
+  /// In en, this message translates to:
+  /// **'Employment Type'**
+  String get employeesEmploymenttype;
+
+  /// No description provided for @employeesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'employees'**
+  String get employeesCount;
+
+  /// No description provided for @employeesActivecount.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get employeesActivecount;
+
+  /// No description provided for @employeesTotalsalary.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Salary'**
+  String get employeesTotalsalary;
+
+  /// No description provided for @employeesDeleteconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this employee? This cannot be undone.'**
+  String get employeesDeleteconfirm;
+
+  /// No description provided for @employeesPaysalary.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay Salary'**
+  String get employeesPaysalary;
+
+  /// No description provided for @employeesSalaryamount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get employeesSalaryamount;
+
+  /// No description provided for @employeesPaymentdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Date'**
+  String get employeesPaymentdate;
+
+  /// No description provided for @employeesPaymentmethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Method'**
+  String get employeesPaymentmethod;
+
+  /// No description provided for @employeesReferenceno.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference No'**
+  String get employeesReferenceno;
+
+  /// No description provided for @employeesSalarynotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get employeesSalarynotes;
+
+  /// No description provided for @employeesSalarypaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Salary payment recorded'**
+  String get employeesSalarypaid;
+
+  /// No description provided for @employeesSalaryhistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Salary History'**
+  String get employeesSalaryhistory;
+
+  /// No description provided for @employeesNosalaryhistory.
+  ///
+  /// In en, this message translates to:
+  /// **'No salary payments yet'**
+  String get employeesNosalaryhistory;
+
+  /// No description provided for @employeesDetailtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee Details'**
+  String get employeesDetailtitle;
+
+  /// No description provided for @employeesInvalidamount.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid amount'**
+  String get employeesInvalidamount;
 
   /// No description provided for @purchasesPurchases.
   ///
@@ -4591,6 +5437,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Total Return Value'**
   String get salesreturnsReturnvalue;
+
+  /// No description provided for @salesreturnsSearchinvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Search invoices...'**
+  String get salesreturnsSearchinvoices;
+
+  /// No description provided for @salesreturnsSearchplaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Search returns...'**
+  String get salesreturnsSearchplaceholder;
+
+  /// No description provided for @salesreturnsSelectinvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Select an invoice'**
+  String get salesreturnsSelectinvoice;
 
   /// No description provided for @inventoryItems.
   ///

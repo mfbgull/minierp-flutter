@@ -719,6 +719,63 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsExportfailed => 'Failed to export report';
 
   @override
+  String get reportsTotalquantitysold => 'Total Quantity Sold';
+
+  @override
+  String get reportsAvgsellingprice => 'Avg. Selling Price';
+
+  @override
+  String get reportsQuantitysold => 'Quantity Sold';
+
+  @override
+  String get reportsTotalpurchasevalue => 'Total Purchase Value';
+
+  @override
+  String get reportsOntimedeliveryrate => 'On-time Delivery Rate';
+
+  @override
+  String get reportsTotalproductionorders => 'Total Production Orders';
+
+  @override
+  String get reportsTotaloutputquantity => 'Total Output Quantity';
+
+  @override
+  String get reportsCompletedquantity => 'Completed Quantity';
+
+  @override
+  String get reportsScrappedquantity => 'Scrapped Quantity';
+
+  @override
+  String get reportsProductiondate => 'Production Date';
+
+  @override
+  String get reportsProductionorder => 'Production Order';
+
+  @override
+  String get reportsOutputitem => 'Output Item';
+
+  @override
+  String get reportsOutputquantity => 'Output Quantity';
+
+  @override
+  String get reportsPlannedquantity => 'Planned Quantity';
+
+  @override
+  String get reportsParentitem => 'Parent Item';
+
+  @override
+  String get reportsUsagecount => 'Usage Count';
+
+  @override
+  String get reportsLastused => 'Last Used';
+
+  @override
+  String get reportsTotalcomponents => 'Total Components';
+
+  @override
+  String get reportsAllitems => 'All Items';
+
+  @override
   String get fieldsMetric => 'Metric';
 
   @override
@@ -839,6 +896,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quotationsEditsquotation => 'Edit Quotation';
 
   @override
+  String get quotationsPrinta4 => 'Print A4';
+
+  @override
   String get quotationsErrorCustomerrequired => 'Select a customer';
 
   @override
@@ -870,6 +930,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get quotationsSaved => 'Quotation saved';
+
+  @override
+  String get quotationsSearchplaceholder => 'Search quotations...';
 
   @override
   String get quotationsTerms => 'Terms';
@@ -957,6 +1020,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchaseordersNewpurchaseorder => 'New Purchase Order';
 
   @override
+  String get purchaseordersPrinta4 => 'Print A4';
+
+  @override
   String get purchaseordersExportcsv => 'Export to CSV';
 
   @override
@@ -1016,10 +1082,51 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchaseordersUnitprice => 'Unit Price';
 
   @override
+  String get purchaseordersReceivegoods => 'Receive Goods';
+
+  @override
+  String get purchaseordersReceipts => 'Receipts';
+
+  @override
+  String get purchaseordersReceiptno => 'Receipt No';
+
+  @override
+  String get purchaseordersReceiptdate => 'Receipt Date';
+
+  @override
+  String get purchaseordersOrdered => 'Ordered';
+
+  @override
+  String get purchaseordersQtyreceived => 'Qty Received';
+
+  @override
+  String get purchaseordersPending => 'Pending';
+
+  @override
+  String get purchaseordersNoreceipts => 'No receipts recorded yet';
+
+  @override
+  String get purchaseordersReceiptsaved => 'Goods receipt recorded';
+
+  @override
+  String get purchaseordersErrorWarehouserequired => 'Select a warehouse';
+
+  @override
+  String get purchaseordersErrorReceiveditemsrequired =>
+      'Enter at least one received quantity';
+
+  @override
+  String get purchaseordersErrorQtyexceeds =>
+      'Received quantity cannot exceed the pending quantity';
+
+  @override
   String get salesordersSalesorders => 'Sales Orders';
 
   @override
   String get salesordersNewsalesorder => 'New Sales Order';
+
+  @override
+  String get salesordersPrinta4 => 'Print A4';
 
   @override
   String get salesordersSono => 'SO #';
@@ -1133,6 +1240,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get salesordersSaved => 'Sales order saved';
+
+  @override
+  String get salesordersSearchplaceholder => 'Search sales orders...';
 
   @override
   String get salesordersSodate => 'SO Date';
@@ -1542,6 +1652,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get forecastsSortbymape => 'Best (lowest MAPE) first';
 
   @override
+  String get forecastsPredictedweek => 'Predicted (Week)';
+
+  @override
+  String get forecastsPredictedmonth => 'Predicted (Month)';
+
+  @override
+  String get forecastsPredictedquarter => 'Predicted (Quarter)';
+
+  @override
+  String get forecastsRecommendation => 'Recommendation';
+
+  @override
+  String get forecastsOrdernow => 'Order Now';
+
+  @override
+  String get forecastsOrdersoon => 'Order Soon';
+
+  @override
+  String get forecastsMonitor => 'Monitor';
+
+  @override
+  String get forecastsAdequate => 'Adequate';
+
+  @override
+  String get forecastsConfidence => 'Confidence';
+
+  @override
+  String get forecastsPending => 'pending';
+
+  @override
+  String get forecastsSearchitems => 'Search items...';
+
+  @override
+  String get forecastsCritical => 'Critical';
+
+  @override
+  String get forecastsWarning => 'Warning';
+
+  @override
+  String get forecastsOk => 'OK';
+
+  @override
   String get bomBillofmaterials => 'Bill of Materials (BOM)';
 
   @override
@@ -1625,10 +1777,230 @@ class AppLocalizationsEn extends AppLocalizations {
   String get integrationsIntegrations => 'Integrations';
 
   @override
+  String get integrationsSubtitle =>
+      'Configure third-party services (email, SMS, weather, validation, currency, tax). API keys are stored encrypted and never displayed.';
+
+  @override
+  String get integrationsConfigured => 'Configured';
+
+  @override
+  String get integrationsNotconfigured => 'Not configured';
+
+  @override
+  String get integrationsEnabled => 'Enabled';
+
+  @override
+  String get integrationsSaved => 'Integration settings saved';
+
+  @override
+  String get integrationsSaveFailed => 'Failed to save integration settings';
+
+  @override
+  String get integrationsApikey => 'API Key';
+
+  @override
+  String get integrationsApikeyHelper =>
+      'Stored encrypted — leave blank to keep the current key.';
+
+  @override
+  String get integrationsFieldFromemail => 'From Email';
+
+  @override
+  String get integrationsFieldFromname => 'From Name';
+
+  @override
+  String get integrationsFieldAccountsid => 'Account SID';
+
+  @override
+  String get integrationsFieldPhonenumber => 'Phone Number';
+
+  @override
+  String get integrationsFieldDefaultlocation => 'Default Location';
+
+  @override
+  String get integrationsFieldBase => 'Base Currency';
+
+  @override
+  String get integrationsFieldUpdateinterval => 'Update Interval (s)';
+
+  @override
+  String get integrationsFieldDefaultcountry => 'Default Country';
+
+  @override
+  String get integrationsFieldZipcode => 'ZIP Code';
+
+  @override
+  String get integrationsServiceEmail => 'Email (SendGrid)';
+
+  @override
+  String get integrationsServiceNotifications => 'SMS Notifications (Twilio)';
+
+  @override
+  String get integrationsServiceWeather => 'Weather (Weatherstack)';
+
+  @override
+  String get integrationsServiceValidation => 'Phone Validation (Numverify)';
+
+  @override
+  String get integrationsServiceCurrency => 'Currency Exchange (Fixer)';
+
+  @override
+  String get integrationsServiceTax => 'Tax Calculation (TaxJar)';
+
+  @override
   String get usermanagementUsermanagement => 'User Management';
 
   @override
   String get usermanagementRolespermissions => 'Roles & Permissions';
+
+  @override
+  String get usermanagementSubtitle =>
+      'Create and manage system users, roles and permissions';
+
+  @override
+  String get usermanagementUsers => 'Users';
+
+  @override
+  String get usermanagementAllroles => 'All Roles';
+
+  @override
+  String get usermanagementAllstatus => 'All Statuses';
+
+  @override
+  String get usermanagementSearchusers => 'Search users...';
+
+  @override
+  String get usermanagementNewuser => 'New User';
+
+  @override
+  String get usermanagementEdituser => 'Edit User';
+
+  @override
+  String get usermanagementUsername => 'Username';
+
+  @override
+  String get usermanagementEmail => 'Email';
+
+  @override
+  String get usermanagementFullname => 'Full Name';
+
+  @override
+  String get usermanagementRole => 'Role';
+
+  @override
+  String get usermanagementPassword => 'Password';
+
+  @override
+  String get usermanagementUsercreated => 'User created successfully';
+
+  @override
+  String get usermanagementUserupdated => 'User updated successfully';
+
+  @override
+  String get usermanagementUserdeleted => 'User deleted successfully';
+
+  @override
+  String get usermanagementDeleteconfirm =>
+      'Delete this user? This cannot be undone.';
+
+  @override
+  String get usermanagementActivate => 'Activate';
+
+  @override
+  String get usermanagementDeactivate => 'Deactivate';
+
+  @override
+  String get usermanagementActivated => 'User activated';
+
+  @override
+  String get usermanagementDeactivated => 'User deactivated';
+
+  @override
+  String get usermanagementResetpassword => 'Reset Password';
+
+  @override
+  String get usermanagementNewpassword => 'New Password';
+
+  @override
+  String get usermanagementResetconfirm => 'Reset this user\'s password?';
+
+  @override
+  String get usermanagementResetdone => 'Password reset successfully';
+
+  @override
+  String get usermanagementValidationUsernamerequired => 'Username is required';
+
+  @override
+  String get usermanagementValidationEmailrequired => 'Email is required';
+
+  @override
+  String get usermanagementValidationInvalidemail => 'Invalid email format';
+
+  @override
+  String get usermanagementValidationFullnamerequired =>
+      'Full name is required';
+
+  @override
+  String get usermanagementValidationRolerequired => 'Select a role';
+
+  @override
+  String get usermanagementValidationPasswordlength =>
+      'Password must be at least 6 characters';
+
+  @override
+  String get usermanagementNewrole => 'New Role';
+
+  @override
+  String get usermanagementEditrole => 'Edit Role';
+
+  @override
+  String get usermanagementRolename => 'Role Name';
+
+  @override
+  String get usermanagementDescription => 'Description';
+
+  @override
+  String get usermanagementSystemrole => 'System';
+
+  @override
+  String get usermanagementPermissions => 'Permissions';
+
+  @override
+  String get usermanagementPermissioncount => 'permissions';
+
+  @override
+  String get usermanagementPermissionstitle => 'Role Permissions';
+
+  @override
+  String usermanagementPermissionsubtitle(Object role) {
+    return 'Assign permissions for $role';
+  }
+
+  @override
+  String get usermanagementPermissionsaved => 'Permissions updated';
+
+  @override
+  String get usermanagementRolevalidationname => 'Role name is required';
+
+  @override
+  String get usermanagementRolecreated => 'Role created successfully';
+
+  @override
+  String get usermanagementRoleupdated => 'Role updated successfully';
+
+  @override
+  String get usermanagementRoledeleted => 'Role deleted successfully';
+
+  @override
+  String get usermanagementRoledeleteconfirm =>
+      'Delete this role? Users assigned to it must be reassigned first.';
+
+  @override
+  String get usermanagementCantmodifysystem =>
+      'System roles cannot be modified';
+
+  @override
+  String get usermanagementNoresults => 'No users found';
 
   @override
   String get expensesExpenses => 'Expenses';
@@ -1871,6 +2243,70 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get employeesDocumentsFile => 'file';
+
+  @override
+  String get employeesDocumentsSelectfile => 'Select File';
+
+  @override
+  String get employeesSearch => 'Search employees...';
+
+  @override
+  String get employeesAlldepartments => 'All Departments';
+
+  @override
+  String get employeesAllstatus => 'All Statuses';
+
+  @override
+  String get employeesFullname => 'Full Name';
+
+  @override
+  String get employeesEmploymenttype => 'Employment Type';
+
+  @override
+  String get employeesCount => 'employees';
+
+  @override
+  String get employeesActivecount => 'Active';
+
+  @override
+  String get employeesTotalsalary => 'Total Salary';
+
+  @override
+  String get employeesDeleteconfirm =>
+      'Delete this employee? This cannot be undone.';
+
+  @override
+  String get employeesPaysalary => 'Pay Salary';
+
+  @override
+  String get employeesSalaryamount => 'Amount';
+
+  @override
+  String get employeesPaymentdate => 'Payment Date';
+
+  @override
+  String get employeesPaymentmethod => 'Payment Method';
+
+  @override
+  String get employeesReferenceno => 'Reference No';
+
+  @override
+  String get employeesSalarynotes => 'Notes';
+
+  @override
+  String get employeesSalarypaid => 'Salary payment recorded';
+
+  @override
+  String get employeesSalaryhistory => 'Salary History';
+
+  @override
+  String get employeesNosalaryhistory => 'No salary payments yet';
+
+  @override
+  String get employeesDetailtitle => 'Employee Details';
+
+  @override
+  String get employeesInvalidamount => 'Enter a valid amount';
 
   @override
   String get purchasesPurchases => 'Purchases';
@@ -2316,6 +2752,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get salesreturnsReturnvalue => 'Total Return Value';
+
+  @override
+  String get salesreturnsSearchinvoices => 'Search invoices...';
+
+  @override
+  String get salesreturnsSearchplaceholder => 'Search returns...';
+
+  @override
+  String get salesreturnsSelectinvoice => 'Select an invoice';
 
   @override
   String get inventoryItems => 'Items';

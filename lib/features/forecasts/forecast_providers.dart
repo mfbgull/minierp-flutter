@@ -10,6 +10,11 @@ import 'forecast_models.dart';
 import 'forecast_repository.dart'
     show ForecastDemandFilters, forecastRepositoryProvider;
 
+/// Active tab index of [ForecastShell] (0 dashboard, 1 demand, 2 trends,
+/// 3 accuracy). A provider (not local state) so the dashboard's "View
+/// All" links can switch tabs.
+final forecastShellTabProvider = StateProvider<int>((ref) => 0);
+
 /// Dashboard summary + alerts + top growing/declining.
 final forecastDashboardProvider = FutureProvider<ForecastDashboardData>((
   ref,

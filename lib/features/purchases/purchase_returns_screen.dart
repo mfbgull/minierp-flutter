@@ -7,6 +7,8 @@
 // 'Purchase Returns' tab of the purchasing shell (the web app pairs it
 // with `/purchase-orders`).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
@@ -17,6 +19,7 @@ import '../../core/utils/purchase_return_type.dart';
 import '../../data/models/purchase_return.dart' show PurchaseReturn;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'purchase_return_detail_dialog.dart';
 import 'purchase_return_providers.dart';
@@ -31,9 +34,61 @@ class PurchaseReturnsScreen extends ConsumerStatefulWidget {
 
 class _PurchaseReturnsScreenState extends ConsumerState<PurchaseReturnsScreen>
     with PlutoGridScreen<PurchaseReturn, PurchaseReturnsScreen> {
+  Timer? _debounce;
+  final TextEditingController _searchController = TextEditingController();
+
   /// Row id → model for the detail dialog — there is no per-row endpoint,
   /// so the dialog renders from the row the grid was built from.
   final Map<int, PurchaseReturn> _returnsById = {};
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      ref.read(purchaseReturnsSearchProvider.notifier).state = value.trim();
+    });
+  }
+
+  /// Client-side search over the loaded rows (the endpoint has no search
+  /// param) — overrides the mixin's unfiltered clear+append.
+  List<PurchaseReturn> _filteredRows(List<PurchaseReturn> returns) {
+    final search = ref.read(purchaseReturnsSearchProvider).toLowerCase();
+    if (search.isEmpty) return returns;
+    return returns
+        .where(
+          (r) =>
+              r.movementNo.toLowerCase().contains(search) ||
+              r.itemName.toLowerCase().contains(search) ||
+              (r.itemCode.isNotEmpty &&
+                  r.itemCode.toLowerCase().contains(search)) ||
+              r.warehouseName.toLowerCase().contains(search),
+        )
+        .toList();
+  }
+
+  @override
+  void syncGridRows(AsyncValue<Object?> value) {
+    final manager = gridStateManager;
+    if (manager == null) return;
+    manager.setShowLoading(value.isLoading);
+    if (value.hasValue) {
+      final rows = _filteredRows(value.value as List<PurchaseReturn>);
+      manager.removeAllRows();
+      manager.appendRows([
+        for (final (index, row) in rows.indexed)
+          withSerialCell(gridRowFor(row), index),
+      ]);
+    }
+  }
+
+  void _refilter() => syncGridRows(ref.read(purchaseReturnsProvider));
 
   @override
   void openRowDetail(int returnId) {
@@ -69,44 +124,45 @@ class _PurchaseReturnsScreenState extends ConsumerState<PurchaseReturnsScreen>
     final l10n = AppLocalizations.of(context)!;
 
     // Keep the grid in sync with provider transitions (loading → data).
+    // The mixin listener routes through the overridden syncGridRows, so
+    // the client-side search applies on every load/refresh too.
     watchGridProvider(purchaseReturnsProvider);
+    // Client-side search re-runs the filter over the loaded rows without
+    // refetching.
+    ref.listen(purchaseReturnsSearchProvider, (previous, next) => _refilter());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // CSV export — mirrors the invoice-returns grid: the pure
-              // builder runs here and the shared save helper owns the
-              // FilePicker + toast. Disabled until rows are loaded.
-              TextButton.icon(
-                onPressed:
-                    returns.isLoading || (returns.valueOrNull?.isEmpty ?? true)
-                    ? null
-                    : () => saveCsv(
-                        context,
-                        suggestedName: csvSuggestedName('purchase-returns'),
-                        csv: buildPurchaseReturnsCsv(
-                          l10n,
-                          returns.valueOrNull!,
-                        ),
-                        successMessage: l10n.purchasesExported,
-                        errorMessage: l10n.purchasesExportfailed,
+        // Toolbar: search + CSV export + refresh.
+        ScreenToolbar(
+          searchController: _searchController,
+          searchHint: l10n.commonSearch,
+          onSearchChanged: _onSearchChanged,
+          onRefresh: () => ref.invalidate(purchaseReturnsProvider),
+          actions: [
+            // CSV export — mirrors the invoice-returns grid: the pure
+            // builder runs over the currently-filtered rows and the
+            // shared save helper owns the FilePicker + toast.
+            TextButton.icon(
+              onPressed:
+                  returns.isLoading ||
+                      _filteredRows(returns.valueOrNull ?? const []).isEmpty
+                  ? null
+                  : () => saveCsv(
+                      context,
+                      suggestedName: csvSuggestedName('purchase-returns'),
+                      csv: buildPurchaseReturnsCsv(
+                        l10n,
+                        _filteredRows(returns.valueOrNull ?? const []),
                       ),
-                icon: const Icon(Icons.file_download_outlined, size: 18),
-                label: Text(l10n.purchasesExportcsv),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                tooltip: l10n.commonRefresh,
-                icon: const Icon(Icons.refresh),
-                onPressed: () => ref.invalidate(purchaseReturnsProvider),
-              ),
-            ],
-          ),
+                      successMessage: l10n.purchasesExported,
+                      errorMessage: l10n.purchasesExportfailed,
+                    ),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: Text(l10n.purchasesExportcsv),
+            ),
+          ],
         ),
         Expanded(
           child: gridScreenBody(returns, provider: purchaseReturnsProvider),

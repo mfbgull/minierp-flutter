@@ -48,18 +48,22 @@ import '../../data/models/quotation.dart' show Quotation;
 import '../../data/models/report.dart'
     show
         ArAgingReport,
+        BomUsageReport,
         CashFlowReport,
         CustomerStatementRow,
         DSOMetric,
         ExpensesReport,
         InventoryMovementReport,
         LowStockReportRow,
+        ProductionSummaryReport,
         ProfitLossReport,
         PurchaseSummaryReport,
         SalesByCustomerRow,
+        SalesByItemRow,
         SalesSummaryReport,
         StockLevelReport,
         StockValuationReport,
+        SupplierAnalysisRow,
         TopDebtorRow;
 import '../../data/models/sales_order.dart' show SalesOrder;
 import '../../data/models/sales_return.dart' show SalesReturn;
@@ -783,6 +787,123 @@ String buildCustomerStatementsCsv(
       Formatters.currency(r.totalDebits),
       Formatters.currency(r.totalCredits),
       Formatters.currency(r.closingBalance),
+    ],
+  );
+}
+
+/// Builds the CSV text for the sales-by-item report (Item Name | Code |
+/// Category | Total Quantity Sold | Total Sales | Avg. Selling Price —
+/// mirroring the grid's columns).
+String buildSalesByItemCsv(AppLocalizations l10n, List<SalesByItemRow> rows) {
+  return _buildGridCsv(
+    [
+      l10n.inventoryItemname,
+      l10n.inventoryItemcode,
+      l10n.fieldsCategory,
+      l10n.reportsTotalquantitysold,
+      l10n.reportsTotalsales,
+      l10n.reportsAvgsellingprice,
+    ],
+    rows,
+    (r) => [
+      sanitizeCsvCell(r.itemName.isEmpty ? '—' : r.itemName),
+      sanitizeCsvCell(r.itemCode.isEmpty ? '—' : r.itemCode),
+      sanitizeCsvCell(r.itemCategory.isEmpty ? '—' : r.itemCategory),
+      Formatters.number(r.totalQuantitySold),
+      Formatters.currency(r.totalSales),
+      Formatters.currency(r.averageSellingPrice),
+    ],
+  );
+}
+
+/// Builds the CSV text for the supplier-analysis report (Supplier | Code
+/// | Email | Phone | Total Orders | Total Purchase Value | Avg. Order
+/// Value | On-time Delivery Rate | Last Purchase — mirroring the grid's
+/// columns).
+String buildSupplierAnalysisCsv(
+  AppLocalizations l10n,
+  List<SupplierAnalysisRow> rows,
+) {
+  return _buildGridCsv(
+    [
+      l10n.suppliersSuppliername,
+      l10n.suppliersSuppliercode,
+      l10n.fieldsEmail,
+      l10n.fieldsPhone,
+      l10n.reportsTotalorders,
+      l10n.reportsTotalpurchasevalue,
+      l10n.reportsAvgordervalue,
+      l10n.reportsOntimedeliveryrate,
+      l10n.reportsLastpurchase,
+    ],
+    rows,
+    (r) => [
+      sanitizeCsvCell(r.supplierName.isEmpty ? '—' : r.supplierName),
+      sanitizeCsvCell(r.supplierCode.isEmpty ? '—' : r.supplierCode),
+      sanitizeCsvCell(r.email.isEmpty ? '—' : r.email),
+      sanitizeCsvCell(r.phone.isEmpty ? '—' : r.phone),
+      Formatters.number(r.totalOrders),
+      Formatters.currency(r.totalPurchaseValue),
+      Formatters.currency(r.averageOrderValue),
+      Formatters.number(r.onTimeDeliveryRate),
+      r.lastPurchaseDate.isEmpty ? '—' : Formatters.date(r.lastPurchaseDate),
+    ],
+  );
+}
+
+/// Builds the CSV text for the production-summary report (Date | Order |
+/// Output Item | Output Qty | Completed Qty | Scrapped Qty | Status —
+/// mirroring the grid's columns).
+String buildProductionSummaryCsv(
+  AppLocalizations l10n,
+  ProductionSummaryReport report,
+) {
+  return _buildGridCsv(
+    [
+      l10n.reportsProductiondate,
+      l10n.reportsProductionorder,
+      l10n.reportsOutputitem,
+      l10n.reportsOutputquantity,
+      l10n.reportsCompletedquantity,
+      l10n.reportsScrappedquantity,
+      l10n.fieldsStatus,
+    ],
+    report.rows,
+    (r) => [
+      r.productionDate.isEmpty ? '—' : Formatters.date(r.productionDate),
+      sanitizeCsvCell(r.productionOrderNumber.isEmpty ? '—' : r.productionOrderNumber),
+      sanitizeCsvCell(r.outputItemName.isEmpty ? '—' : r.outputItemName),
+      Formatters.number(r.outputQuantity),
+      Formatters.number(r.completedQuantity),
+      Formatters.number(r.scrappedQuantity),
+      sanitizeCsvCell(r.status.isEmpty ? '—' : r.status),
+    ],
+  );
+}
+
+/// Builds the CSV text for the bom-usage report (BOM Name | Parent Item
+/// | Usage Count | Last Used | Total Components | Status — mirroring the
+/// grid's columns).
+String buildBomUsageCsv(AppLocalizations l10n, BomUsageReport report) {
+  return _buildGridCsv(
+    [
+      l10n.bomName,
+      l10n.reportsParentitem,
+      l10n.reportsUsagecount,
+      l10n.reportsLastused,
+      l10n.reportsTotalcomponents,
+      l10n.fieldsStatus,
+    ],
+    report.rows,
+    (r) => [
+      sanitizeCsvCell(r.bomName.isEmpty ? '—' : r.bomName),
+      sanitizeCsvCell(r.parentItemName.isEmpty ? '—' : r.parentItemName),
+      Formatters.number(r.usageCount),
+      r.lastUsedDate == null || r.lastUsedDate!.isEmpty
+          ? '—'
+          : Formatters.date(r.lastUsedDate!),
+      Formatters.number(r.totalComponents),
+      sanitizeCsvCell(r.status.isEmpty ? '—' : r.status),
     ],
   );
 }
