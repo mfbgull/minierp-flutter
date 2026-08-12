@@ -1,10 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/customer.dart' show Customer;
+import '../../data/models/invoice.dart' show Invoice;
 import '../../data/models/ledger_entry.dart' show LedgerEntry;
+import '../../data/models/payment.dart' show Payment;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/customer_repository.dart'
-    show customerRepositoryProvider;
+    show CustomerStatement, customerRepositoryProvider;
+import '../../data/repositories/invoice_repository.dart'
+    show InvoiceFilters, invoiceRepositoryProvider;
 import '../../data/repositories/paged_request.dart'
     show PagedRequest, PagedResponse;
 
@@ -18,6 +22,11 @@ class CustomerSort {
   /// `ASC` or `DESC`.
   final String order;
 }
+
+/// Server-side status filter (`?status=active` / `?status=inactive`);
+/// null → all customers (param omitted). Mirrors the web customers
+/// page's All/Active/Inactive tabs (the controller's `statusParam`).
+final customersStatusProvider = StateProvider<String?>((ref) => null);
 
 /// Server-side search term; empty omits the param.
 final customersSearchProvider = StateProvider<String>((ref) => '');
@@ -40,6 +49,7 @@ final customersProvider = FutureProvider<PagedResponse<Customer>>((ref) async {
   final page = ref.watch(customersPageProvider);
   final limit = ref.watch(customersLimitProvider);
   final sort = ref.watch(customersSortProvider);
+  final status = ref.watch(customersStatusProvider);
 
   final result = await ref
       .watch(customerRepositoryProvider)
@@ -50,6 +60,9 @@ final customersProvider = FutureProvider<PagedResponse<Customer>>((ref) async {
           search: search.isEmpty ? null : search,
           sortBy: sort?.column,
           sortOrder: sort?.order ?? 'ASC',
+          // Endpoint-specific filter: the customers list endpoint accepts
+          // `?status=active|inactive` (whitelisted server-side).
+          extra: status == null ? null : {'status': status},
         ),
       );
 
@@ -60,7 +73,7 @@ final customersProvider = FutureProvider<PagedResponse<Customer>>((ref) async {
 });
 
 /// Detail for one customer (`GET /customers/:id`, bare object). autoDispose:
-/// each dialog instance owns its fetch, so closing it frees the state.
+/// each detail page owns its fetch, so leaving it frees the state.
 final customerDetailProvider = FutureProvider.autoDispose.family<Customer, int>(
   (ref, customerId) async {
     final result = await ref.watch(customerRepositoryProvider).get(customerId);
@@ -72,8 +85,8 @@ final customerDetailProvider = FutureProvider.autoDispose.family<Customer, int>(
 );
 
 /// The customer's AR ledger (`GET /customers/:id/ledger`, enveloped array,
-/// newest-first by transaction_date). autoDispose: each ledger dialog owns
-/// its fetch, so closing it frees the state.
+/// newest-first by transaction_date). autoDispose: each ledger UI owns
+/// its fetch, so leaving it frees the state.
 final customerLedgerProvider = FutureProvider.autoDispose
     .family<List<LedgerEntry>, int>((ref, customerId) async {
       final result = await ref
@@ -84,3 +97,86 @@ final customerLedgerProvider = FutureProvider.autoDispose
         ApiFailure(:final error) => throw error,
       };
     });
+
+/// The customer's invoices (`GET /invoices?customer_id=<id>` — the server
+/// accepts `customer_id`; the Invoices tab + customer metrics use it).
+/// autoDispose: owned by the detail page.
+final customerInvoicesProvider = FutureProvider.autoDispose
+    .family<List<Invoice>, int>((ref, customerId) async {
+      final result = await ref.watch(invoiceRepositoryProvider).invoices(
+        filters: InvoiceFilters(customerId: customerId),
+      );
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+/// The customer's payments (`GET /payments?customerId=<id>` — the web
+/// Payments tab's query). autoDispose: owned by the detail page.
+final customerPaymentsProvider = FutureProvider.autoDispose
+    .family<List<Payment>, int>((ref, customerId) async {
+      final result = await ref
+          .watch(invoiceRepositoryProvider)
+          .paymentsForCustomer(customerId);
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+/// Statement fetch arguments — the family key (customer id + date range).
+class CustomerStatementArgs {
+  const CustomerStatementArgs({
+    required this.customerId,
+    required this.fromDate,
+    required this.toDate,
+  });
+
+  final int customerId;
+  final String fromDate;
+  final String toDate;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CustomerStatementArgs &&
+      other.customerId == customerId &&
+      other.fromDate == fromDate &&
+      other.toDate == toDate;
+
+  @override
+  int get hashCode => Object.hash(customerId, fromDate, toDate);
+}
+
+/// Bumped by [invalidateCustomerQueries] so an open Statement tab refetches
+/// after a payment/invoice mutation (the statement's own key — the date
+/// range — is invisible to the mutating code).
+final customerStatementVersionProvider = StateProvider<int>((ref) => 0);
+
+/// One customer statement (`GET /customers/:id/statement?fromDate&toDate`).
+/// autoDispose: owned by the Statement tab.
+final customerStatementProvider = FutureProvider.autoDispose
+    .family<CustomerStatement, CustomerStatementArgs>((ref, args) async {
+      ref.watch(customerStatementVersionProvider);
+      final result = await ref.watch(customerRepositoryProvider).statement(
+        args.customerId,
+        fromDate: args.fromDate,
+        toDate: args.toDate,
+      );
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+/// Invalidates every customer-scoped query after a mutation (record/edit/
+/// delete payment, delete/cancel invoice), so every detail tab refetches.
+/// The mutating tabs additionally invalidate the global payments/invoices
+/// lists themselves.
+void invalidateCustomerQueries(WidgetRef ref, int customerId) {
+  ref.invalidate(customerDetailProvider(customerId));
+  ref.invalidate(customerLedgerProvider(customerId));
+  ref.invalidate(customerInvoicesProvider(customerId));
+  ref.invalidate(customerPaymentsProvider(customerId));
+  ref.read(customerStatementVersionProvider.notifier).state++;
+}

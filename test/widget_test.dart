@@ -27,9 +27,6 @@ import 'package:minierp_app/features/activity_log/activity_log_providers.dart'
 import 'package:minierp_app/features/activity_log/activity_log_screen.dart'
     show ActivityLogScreen;
 import 'package:minierp_app/features/auth/change_password_screen.dart';
-import 'package:minierp_app/features/customers/customer_ledger_dialog.dart';
-import 'package:minierp_app/features/suppliers/supplier_ledger_dialog.dart';
-import 'package:minierp_app/features/suppliers/supplier_statement_dialog.dart';
 import 'package:minierp_app/features/admin/admin_models.dart' show Role;
 import 'package:minierp_app/features/reports/reports_dashboard_screen.dart';
 import 'package:minierp_app/widgets/status_badge.dart' show StatusBadge;
@@ -306,12 +303,19 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   Map<String, dynamic>? lastCustomerPostBody;
   Map<String, dynamic>? lastCustomerPutBody;
 
+  /// Last customer id the row-menu Delete flow DELETEed.
+  int? lastCustomerDeleteId;
+
+  /// True once the Fix Balances recalculate POST fires.
+  bool recalculateBalancesCalled = false;
+
   /// Last /suppliers query params (for pagination assertions).
   Map<String, dynamic>? lastSuppliersQuery;
 
   /// Captured create/update bodies for the supplier form tests.
   Map<String, dynamic>? lastSupplierPostBody;
   Map<String, dynamic>? lastSupplierPutBody;
+  int supplierDeleteCount = 0;
 
   /// Captured create/update bodies for the expense form tests.
   Map<String, dynamic>? lastExpensePostBody;
@@ -753,6 +757,22 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'message': 'Customer created successfully',
       }, status: 201);
     }
+    if (options.path == '/customers/recalculate-balances' &&
+        options.method == 'POST') {
+      recalculateBalancesCalled = true;
+      return _json({
+        'success': true,
+        'message': 'Recalculated balances for 25 customers',
+      });
+    }
+    // Row-menu Delete — enveloped success, mirrors the real soft-delete.
+    if (options.method == 'DELETE' && options.path.startsWith('/customers/')) {
+      lastCustomerDeleteId = int.tryParse(options.path.split('/').last);
+      return _json({
+        'success': true,
+        'message': 'Customer deactivated successfully',
+      });
+    }
     if (options.path == '/customers/1' && options.method == 'PUT') {
       final body = options.data as Map<String, dynamic>;
       lastCustomerPutBody = body;
@@ -791,6 +811,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
             'transaction_type': 'PAYMENT',
             'reference_no': 'PAY-2026-005',
             'description': 'Payment received',
+            'linked_invoice_no': 'INV-2026-001',
             'debit': 0.0,
             'credit': 200.0,
             'balance': 120.5,
@@ -964,6 +985,29 @@ class _AuthFakeAdapter implements HttpClientAdapter {
             },
           ],
         },
+      });
+    }
+    if (options.path == '/suppliers/1/balance' && options.method == 'GET') {
+      // Enveloped — the real getSupplierBalance shape.
+      return _json({
+        'success': true,
+        'data': {
+          'supplierId': 1,
+          'supplierName': 'Alpha Traders',
+          'currentBalance': 250.0,
+        },
+      });
+    }
+    if (options.path == '/purchase-orders/summary/supplier/1' &&
+        options.method == 'GET') {
+      // Bare object — the real getSummaryBySupplier shape (no envelope).
+      return _json({
+        'total_pos': 4,
+        'total_value': 9000.0,
+        'draft_pos': 1,
+        'submitted_pos': 1,
+        'partially_received_pos': 1,
+        'completed_pos': 1,
       });
     }
     if (options.path == '/purchase-orders' && options.method == 'GET') {
@@ -1289,6 +1333,13 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         },
         'message': 'Supplier created successfully',
       }, status: 201);
+    }
+    if (options.path == '/suppliers/1' && options.method == 'DELETE') {
+      supplierDeleteCount++;
+      return _json({
+        'success': true,
+        'message': 'Supplier deleted successfully',
+      });
     }
     if (options.path == '/suppliers/1' && options.method == 'PUT') {
       final body = options.data as Map<String, dynamic>;
@@ -2847,6 +2898,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'id': 9,
           'payment_no': 'PAY-2026-0009',
           'customer_id': body['customer_id'],
+          'supplier_id': body['supplier_id'],
           'payment_date': body['payment_date'],
           'amount': body['amount'],
           'payment_method': body['payment_method'],
@@ -8235,7 +8287,8 @@ void main() {
     expect(find.text('Alpha Traders'), findsOneWidget);
     expect(find.text('250.00'), findsOneWidget); // balance formatted
     expect(find.text('Supplier Code'), findsOneWidget); // column header
-    expect(find.text('Inactive'), findsOneWidget); // Gamma Goods
+    // Gamma Goods' badge + the toolbar's Inactive status-filter segment.
+    expect(find.text('Inactive'), findsNWidgets(2));
     // Server pagination block → bar (25 suppliers at limit 10 = 3 pages).
     expect(find.text('Page 1 of 3'), findsOneWidget);
     expect(find.text('· 25 Suppliers'), findsOneWidget);
@@ -8253,7 +8306,8 @@ void main() {
     expect(find.text('Acme Corp'), findsOneWidget);
     expect(find.text('120.50'), findsOneWidget); // balance formatted
     expect(find.text('Customer Code'), findsOneWidget); // column header
-    expect(find.text('Inactive'), findsOneWidget); // Gamma Inc
+    // Gamma Inc's badge + the toolbar's Inactive status-filter segment.
+    expect(find.text('Inactive'), findsNWidgets(2));
     // Server pagination block → bar (25 customers at limit 10 = 3 pages).
     expect(find.text('Page 1 of 3'), findsOneWidget);
     expect(find.text('· 25 Customers'), findsOneWidget);
@@ -8323,7 +8377,130 @@ void main() {
     expect(adapter.lastCustomersQuery?['sortOrder'], 'ASC');
   });
 
-  testWidgets('customers screen F2 opens the customer detail dialog', (
+  testWidgets('customers screen status filter sends the server status param', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToCustomers(tester, adapter);
+
+    // Default (All) omits the status param.
+    expect(adapter.lastCustomersQuery?['status'], isNull);
+
+    // Tap the toolbar's Active segment — the grid re-fetches with
+    // ?status=active. The 'Active' label also appears on status badges in
+    // the grid, so scope the tap to inside the SegmentedButton.
+    final segments = find.bySubtype<SegmentedButton<dynamic>>();
+    await tester.tap(
+      find.descendant(of: segments, matching: find.text('Active')),
+    );
+    await tester.pumpAndSettle();
+    expect(adapter.lastCustomersQuery?['status'], 'active');
+
+    // Inactive segment → ?status=inactive (resets to page 1).
+    await tester.tap(
+      find.descendant(of: segments, matching: find.text('Inactive')),
+    );
+    await tester.pumpAndSettle();
+    expect(adapter.lastCustomersQuery?['status'], 'inactive');
+    expect(adapter.lastCustomersQuery?['page'], 1);
+  });
+
+  testWidgets('customers screen row menu delete confirms and calls DELETE', (
+    tester,
+  ) async {
+    // Wider than [useWideSurface]: the full web-parity column set (~1590px
+    // incl. the hidden cells) plus the 180px nav rail pushes the trailing
+    // actions column past the 1600px surface, so the ⋮ tap would miss.
+    tester.view.physicalSize = const Size(2200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final adapter = _AuthFakeAdapter();
+    await bootToCustomers(tester, adapter);
+
+    // Open the first row's ⋮ menu (the actions cell's Listener + the
+    // grid's more_vert icon — scoped to the grid so other more_vert
+    // icons, e.g. the AppBar's language menu, are excluded).
+    final gridMenuButton = find
+        .descendant(
+          of: find.byType(PlutoGrid),
+          matching: find.byIcon(Icons.more_vert),
+        )
+        .first;
+    await tester.tap(gridMenuButton);
+    await tester.pumpAndSettle();
+    expect(find.text('View'), findsOneWidget);
+    expect(find.text('Edit'), findsOneWidget);
+
+    // Choose Delete → the confirm dialog appears → confirm it.
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    // The soft-delete fired for the first row (Acme Corp, id 1).
+    expect(adapter.lastCustomerDeleteId, 1);
+  });
+
+  testWidgets('customers screen row menu View opens the detail page with '
+      'Record Payment modal', (tester) async {
+    // Wider than [useWideSurface]: the trailing actions column needs the
+    // extra width to be on-screen.
+    tester.view.physicalSize = const Size(2200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final adapter = _AuthFakeAdapter();
+    await bootToCustomers(tester, adapter);
+
+    // ⋮ → View pushes the detail page.
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(PlutoGrid),
+            matching: find.byIcon(Icons.more_vert),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('View'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Record Payment'), findsOneWidget);
+    expect(find.text('Overview'), findsOneWidget);
+
+    // Record Payment opens the web-style modal with the customer pre-bound
+    // and its open invoices listed for allocation.
+    await tester.tap(find.text('Record Payment'));
+    await tester.pumpAndSettle();
+    expect(find.text('CUST001 — Acme Corp'), findsOneWidget);
+    expect(find.text('Available Invoices'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('customers screen Fix Balances confirms and calls recalculate', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToCustomers(tester, adapter);
+
+    // The toolbar's Fix Balances button → confirm dialog.
+    await tester.tap(find.text('Fix Balances'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsOneWidget);
+
+    // Confirm via the dialog's FilledButton (rendered last, above the
+    // toolbar's same-labelled button).
+    await tester.tap(find.widgetWithText(FilledButton, 'Fix Balances').last);
+    await tester.pumpAndSettle();
+
+    expect(adapter.recalculateBalancesCalled, isTrue);
+  });
+
+  testWidgets('customers screen F2 opens the customer detail page', (
     tester,
   ) async {
     useWideSurface(tester);
@@ -8348,20 +8525,22 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
     await tester.pumpAndSettle();
 
-    // Detail dialog renders the fetched customer (header label, contact
-    // person, payment terms, credit limit tile).
-    expect(find.text('Customer Details'), findsOneWidget);
-    expect(find.text('Jane Doe'), findsOneWidget);
-    expect(find.text('Net 30'), findsOneWidget);
-    expect(find.text('5,000.00'), findsOneWidget); // credit limit tile
+    // The full-screen detail page renders: header (name + contact),
+    // quick stats (credit limit stat), Record Payment + the 5 tabs.
+    expect(find.text('Acme Corp'), findsOneWidget);
+    expect(find.text('(Jane Doe)'), findsOneWidget);
+    expect(find.text('5,000.00'), findsOneWidget); // credit-limit stat
+    expect(find.text('Record Payment'), findsOneWidget);
+    expect(find.text('Overview'), findsOneWidget);
+    expect(find.text('Invoices'), findsOneWidget);
 
-    // Close returns to the grid.
-    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    // Back returns to the grid.
+    await tester.tap(find.byIcon(Icons.arrow_back));
     await tester.pumpAndSettle();
-    expect(find.text('Customer Details'), findsNothing);
+    expect(find.text('Overview'), findsNothing);
   });
 
-  testWidgets('customers screen Enter opens the customer detail dialog', (
+  testWidgets('customers screen Enter opens the customer detail page', (
     tester,
   ) async {
     useWideSurface(tester);
@@ -8381,12 +8560,12 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
 
-    expect(find.text('Customer Details'), findsOneWidget);
-    expect(find.text('Jane Doe'), findsOneWidget);
+    expect(find.text('Acme Corp'), findsOneWidget);
+    expect(find.text('Overview'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.tap(find.byIcon(Icons.arrow_back));
     await tester.pumpAndSettle();
-    expect(find.text('Customer Details'), findsNothing);
+    expect(find.text('Overview'), findsNothing);
   });
 
   testWidgets('customers screen F2 with no selected row is a no-op', (
@@ -8408,7 +8587,8 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
     await tester.pumpAndSettle();
 
-    expect(find.text('Customer Details'), findsNothing);
+    expect(find.text('Overview'), findsNothing);
+    expect(find.text('Record Payment'), findsNothing);
   });
 
   testWidgets('customer form: create posts the schema-shaped body', (
@@ -8447,85 +8627,91 @@ void main() {
     expect(adapter.lastCustomerPostBody?.containsKey('customer_code'), false);
   });
 
-  testWidgets('customer form: edit from the detail dialog PUTs and updates', (
+  testWidgets('customer form: edit from the row menu PUTs and updates', (
     tester,
   ) async {
-    useWideSurface(tester);
+    // Wider surface: the trailing ⋮ actions column must be on-screen.
+    tester.view.physicalSize = const Size(2200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     final adapter = _AuthFakeAdapter();
     await bootToCustomers(tester, adapter);
 
-    // Open the detail dialog (double-tap the row), then Edit.
-    await tester.tap(find.text('Acme Corp'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Acme Corp'));
+    // Open the first row's ⋮ menu and choose Edit — opens the form dialog
+    // pre-filled from the grid row's Customer.
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(PlutoGrid),
+            matching: find.byIcon(Icons.more_vert),
+          )
+          .first,
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+    await tester.tap(find.text('Edit'));
     await tester.pumpAndSettle();
     expect(find.text('Edit Customer'), findsOneWidget);
 
-    // Pre-filled from the detail; change the name (first TextFormField).
+    // Change the name (first TextFormField) and save.
     await tester.enterText(find.byType(TextFormField).at(0), 'Acme Corp Ltd');
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
 
     expect(find.text('Edit Customer'), findsNothing);
-    // The PUT body carries the prefilled values (proving the form seeded
-    // from the detail fetch) plus the edited name.
+    // The PUT body carries the row-provided prefill values plus the
+    // edited name (customer_code is never sent).
     expect(adapter.lastCustomerPutBody?['customer_name'], 'Acme Corp Ltd');
     expect(adapter.lastCustomerPutBody?['phone'], '555-0101');
     expect(adapter.lastCustomerPutBody?['email'], 'a@acme.com');
-    expect(adapter.lastCustomerPutBody?['contact_person'], 'Jane Doe');
-    expect(adapter.lastCustomerPutBody?['payment_terms'], 'Net 30');
-    expect(adapter.lastCustomerPutBody?['payment_terms_days'], 30);
-    expect(adapter.lastCustomerPutBody?['credit_limit'], 5000);
     expect(adapter.lastCustomerPutBody?.containsKey('customer_code'), false);
   });
 
-  testWidgets('customer detail Ledger button opens the ledger dialog', (
+  testWidgets('customer detail Ledger tab shows grouped entries and totals', (
     tester,
   ) async {
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
     await bootToCustomers(tester, adapter);
 
-    // Open the detail dialog (double-tap the row), then Ledger.
-    await tester.tap(find.text('Acme Corp'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Acme Corp'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Ledger'));
+    // F2 opens the detail page, then switch to the Ledger tab.
+    final sm = tester
+        .state<PlutoGridState>(find.byType(PlutoGrid))
+        .stateManager;
+    sm.setCurrentCell(sm.firstCell, 0);
+    sm.gridFocusNode.requestFocus();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.f2);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
     await tester.pumpAndSettle();
 
-    // Entries from the fake /customers/1/ledger payload (description +
-    // reference subtext). Scoped to the ledger dialog by type — the
-    // customers grid behind it renders its own balance values, and the
-    // detail dialog's own Close/Edit buttons are also in the tree.
-    final ledgerDialog = find.byType(CustomerLedgerDialog);
-    Finder inLedger(String text) =>
-        find.descendant(of: ledgerDialog, matching: find.text(text));
-    expect(inLedger('Invoice for goods'), findsOneWidget);
-    expect(inLedger('INV-2026-001'), findsOneWidget);
-    expect(inLedger('Payment received'), findsOneWidget);
-    // Totals row: total debit 500, total credit 200, closing balance
-    // 620.50 — each value also appears in its entry row (debit/credit/
-    // balance columns), so two matches each.
-    expect(inLedger('500.00'), findsNWidgets(2));
-    expect(inLedger('200.00'), findsNWidgets(2));
-    expect(inLedger('620.50'), findsNWidgets(2));
-
-    // Close the ledger (the detail dialog's own Close is also in the
-    // tree, so scope to the ledger dialog) — returns to the detail dialog.
-    await tester.tap(
-      find.descendant(
-        of: ledgerDialog,
-        matching: find.widgetWithText(TextButton, 'Close'),
-      ),
-    );
+    await tester.tap(find.text('Ledger').first);
     await tester.pumpAndSettle();
-    expect(find.text('Payment received'), findsNothing);
+
+    // The fake ledger's INVOICE becomes a group header carrying its own
+    // date/type/reference plus the invoice debit, summed credit (total
+    // paid) and remaining balance (web parity). The PAYMENT carries
+    // linked_invoice_no, so it groups under the invoice header.
+    expect(find.text('INVOICE'), findsOneWidget); // header type cell
+    expect(find.text('INV-2026-001'), findsOneWidget); // reference col
+    // Header summary (collapsed): 1 payment · Balance: 300.00; the
+    // child payment is hidden until expanded.
+    expect(find.textContaining('1 payments · Balance: 300.00'), findsOneWidget);
+    expect(find.text('500.00'), findsWidgets); // header debit
+    expect(find.text('Payment received'), findsNothing); // child hidden
+    // Totals footer: balance = debit 500 − credit 200 = 300 (also shown
+    // in the page's quick-stat Balance, so multiple matches).
+    expect(find.text('300.00'), findsWidgets);
+
+    // Expanding the group reveals the payment row, indented with the
+    // web's "—" child marker.
+    await tester.tap(find.textContaining('1 payments · Balance: 300.00'));
+    await tester.pumpAndSettle();
+    expect(find.text('Payment received'), findsOneWidget);
+    expect(find.text('—'), findsOneWidget); // child indent marker
   });
 
-  testWidgets('suppliers screen F2 opens the supplier detail dialog', (
+  testWidgets('suppliers screen F2 opens the supplier detail page', (
     tester,
   ) async {
     useWideSurface(tester);
@@ -8546,18 +8732,22 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
     await tester.pumpAndSettle();
 
-    // Detail dialog renders the fetched supplier (header label + contact
-    // person from the fake /suppliers/1 payload).
-    expect(find.text('Supplier Details'), findsOneWidget);
-    expect(find.text('Ali Raza'), findsOneWidget);
+    // The full-screen detail page renders: header (name + contact),
+    // quick stats, Record Payment + the 5 tabs.
+    expect(find.text('Alpha Traders'), findsOneWidget);
+    expect(find.text('(Ali Raza)'), findsOneWidget);
+    expect(find.text('250.00'), findsWidgets); // balance quick-stat
+    expect(find.text('Record Payment'), findsOneWidget);
+    expect(find.text('Overview'), findsOneWidget);
+    expect(find.text('POs'), findsOneWidget);
 
-    // Close returns to the grid.
-    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    // Back returns to the grid.
+    await tester.tap(find.byIcon(Icons.arrow_back));
     await tester.pumpAndSettle();
-    expect(find.text('Supplier Details'), findsNothing);
+    expect(find.text('Overview'), findsNothing);
   });
 
-  testWidgets('suppliers screen Enter opens the supplier detail dialog', (
+  testWidgets('suppliers screen Enter opens the supplier detail page', (
     tester,
   ) async {
     useWideSurface(tester);
@@ -8575,12 +8765,13 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
 
-    expect(find.text('Supplier Details'), findsOneWidget);
-    expect(find.text('Ali Raza'), findsOneWidget);
+    expect(find.text('Alpha Traders'), findsOneWidget);
+    expect(find.text('(Ali Raza)'), findsOneWidget);
+    expect(find.text('Overview'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.tap(find.byIcon(Icons.arrow_back));
     await tester.pumpAndSettle();
-    expect(find.text('Supplier Details'), findsNothing);
+    expect(find.text('Overview'), findsNothing);
   });
 
   testWidgets('suppliers screen F2 with no selected row is a no-op', (
@@ -8602,99 +8793,162 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
     await tester.pumpAndSettle();
 
-    expect(find.text('Supplier Details'), findsNothing);
+    expect(find.text('Overview'), findsNothing);
+    expect(find.text('Record Payment'), findsNothing);
   });
 
-  testWidgets('supplier detail Ledger button opens the ledger dialog', (
+  testWidgets('suppliers screen row menu delete confirms and calls DELETE', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(2200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final adapter = _AuthFakeAdapter();
+    await bootToSuppliers(tester, adapter);
+
+    final gridMenuButton = find
+        .descendant(
+          of: find.byType(PlutoGrid),
+          matching: find.byIcon(Icons.more_vert),
+        )
+        .first;
+    await tester.tap(gridMenuButton);
+    await tester.pumpAndSettle();
+    expect(find.text('View'), findsOneWidget);
+
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
+    // Confirm dialog message (scoped — the grid's supplier-name cell
+    // also contains 'Alpha Traders').
+    expect(
+      find.textContaining('Are you sure you want to delete'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
+    await tester.pumpAndSettle();
+    expect(adapter.supplierDeleteCount, 1);
+    // The list refetches after a successful delete.
+    expect(adapter.lastSuppliersQuery?['page'], 1);
+  });
+
+  testWidgets('supplier detail Record Payment modal posts PO allocations', (
     tester,
   ) async {
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
     await bootToSuppliers(tester, adapter);
 
-    // Open the detail dialog (double-tap the row), then Ledger.
-    await tester.tap(find.text('Alpha Traders'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Alpha Traders'));
+    // F2 opens the detail page, then Record Payment.
+    final sm = tester
+        .state<PlutoGridState>(find.byType(PlutoGrid))
+        .stateManager;
+    sm.setCurrentCell(sm.firstCell, 0);
+    sm.gridFocusNode.requestFocus();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.f2);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Ledger'));
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Record Payment'));
+    await tester.pumpAndSettle();
+
+    // Modal opens with the supplier pre-bound and the open PO listed.
+    expect(find.text('SUP001 — Alpha Traders'), findsOneWidget);
+    expect(find.text('PO-2026-001'), findsOneWidget);
+
+    // Amount + add the PO allocation.
+    await tester.enterText(find.byType(TextFormField).at(1), '1000');
+    await tester.pump();
+    await tester.tap(find.text('+ Add'));
+    await tester.pump();
+
+    // Submit posts the supplier-shaped body with po_allocations.
+    await tester.tap(find.widgetWithText(FilledButton, 'Record Payment').last);
+    await tester.pumpAndSettle();
+
+    final body = adapter.lastPaymentPostBody!;
+    expect(body['supplier_id'], 1);
+    expect(body['amount'], 1000);
+    expect((body['po_allocations'] as List).length, 1);
+    expect((body['po_allocations'] as List).first['po_id'], 1);
+    expect((body['po_allocations'] as List).first['amount'], 1000);
+  });
+
+  testWidgets('supplier detail Ledger tab shows entries and totals', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSuppliers(tester, adapter);
+
+    // F2 opens the detail page, then switch to the Ledger tab.
+    final sm = tester
+        .state<PlutoGridState>(find.byType(PlutoGrid))
+        .stateManager;
+    sm.setCurrentCell(sm.firstCell, 0);
+    sm.gridFocusNode.requestFocus();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.f2);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Ledger').first);
     await tester.pumpAndSettle();
 
     // Entries from the fake /suppliers/1/ledger payload (description +
-    // reference subtext). Scoped to the ledger dialog by type — the
-    // suppliers grid behind it renders its own balance values, and the
-    // detail dialog's own Close/Edit buttons are also in the tree.
-    final ledgerDialog = find.byType(SupplierLedgerDialog);
-    Finder inLedger(String text) =>
-        find.descendant(of: ledgerDialog, matching: find.text(text));
-    expect(inLedger('Purchase goods'), findsOneWidget);
-    expect(inLedger('PO-2026-001'), findsOneWidget);
-    expect(inLedger('Payment made'), findsOneWidget);
-    // Totals row: total debit 500, total credit 200, closing balance
-    // 620.50 — each value also appears in its entry row (debit/credit/
-    // balance columns), so two matches each.
-    expect(inLedger('500.00'), findsNWidgets(2));
-    expect(inLedger('200.00'), findsNWidgets(2));
-    expect(inLedger('620.50'), findsNWidgets(2));
-
-    // Close the ledger (the detail dialog's own Close is also in the
-    // tree, so scope to the ledger dialog) — returns to the detail dialog.
-    await tester.tap(
-      find.descendant(
-        of: ledgerDialog,
-        matching: find.widgetWithText(TextButton, 'Close'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.byType(SupplierLedgerDialog), findsNothing);
-    expect(find.text('Purchase goods'), findsNothing);
+    // reference subtext).
+    expect(find.text('Purchase goods'), findsOneWidget);
+    expect(find.text('PO-2026-001'), findsOneWidget);
+    expect(find.text('Payment made'), findsOneWidget);
+    // Web-parity amount treatment: debit/credit cells are currency-
+    // formatted and zero cells are blank — raw numbers (500.0 / 200.0)
+    // and "0.00" placeholders must not appear. The formatted amounts
+    // show in both the grid cells and the totals footer.
+    expect(find.text('500.00'), findsWidgets);
+    expect(find.text('200.00'), findsWidgets);
+    expect(find.text('120.50'), findsWidgets);
+    expect(find.text('500.0'), findsNothing);
+    expect(find.text('200.0'), findsNothing);
+    expect(find.text('0.00'), findsNothing);
   });
 
-  testWidgets('supplier ledger Statement button opens the statement dialog', (
+  testWidgets('supplier detail Statement tab shows the running balance', (
     tester,
   ) async {
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
     await bootToSuppliers(tester, adapter);
 
-    // Detail (double-tap) → Ledger → Statement.
-    await tester.tap(find.text('Alpha Traders'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Alpha Traders'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Ledger'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Statement'));
+    // F2 opens the detail page, then switch to the Statement tab.
+    final sm = tester
+        .state<PlutoGridState>(find.byType(PlutoGrid))
+        .stateManager;
+    sm.setCurrentCell(sm.firstCell, 0);
+    sm.gridFocusNode.requestFocus();
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.f2);
+    await tester.pump();
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
     await tester.pumpAndSettle();
 
-    // Balance tiles + the opening row + transaction rows, scoped to the
-    // statement dialog (the ledger behind also renders balances and the
-    // 'Statement' footer button).
-    final statementDialog = find.byType(SupplierStatementDialog);
-    Finder inStatement(String text) =>
-        find.descendant(of: statementDialog, matching: find.text(text));
-    expect(inStatement('Statement'), findsOneWidget); // header label
-    expect(inStatement('Opening Balance'), findsNWidgets(2)); // tile + row
-    expect(inStatement('Closing Balance'), findsNWidgets(2)); // tile + totals
-    expect(inStatement('Purchase goods'), findsOneWidget);
-    expect(inStatement('Payment made'), findsOneWidget);
+    await tester.tap(find.text('Statement').first);
+    await tester.pumpAndSettle();
+
+    // Summary tiles + the opening row + transaction rows.
+    expect(find.text('Statement Summary'), findsOneWidget);
+    expect(find.text('Opening Balance'), findsNWidgets(2)); // tile + row
+    expect(find.text('Closing Balance'), findsNWidgets(2)); // tile + row
+    expect(find.text('Purchase goods'), findsOneWidget);
+    expect(find.text('Payment made'), findsOneWidget);
     // opening: tile + row; total debit 500 = entry + totals; total credit
     // 200 = entry + totals; closing 400 = tile + entry-2 balance + totals.
-    expect(inStatement('100.00'), findsNWidgets(2));
-    expect(inStatement('500.00'), findsNWidgets(2));
-    expect(inStatement('200.00'), findsNWidgets(2));
-    expect(inStatement('400.00'), findsNWidgets(3));
-
-    // Close (scoped — the ledger behind has its own Close) returns to the
-    // ledger dialog.
-    await tester.tap(
-      find.descendant(
-        of: statementDialog,
-        matching: find.widgetWithText(TextButton, 'Close'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.byType(SupplierStatementDialog), findsNothing);
+    expect(find.text('100.00'), findsNWidgets(2));
+    expect(find.text('500.00'), findsNWidgets(2));
+    expect(find.text('200.00'), findsNWidgets(2));
+    expect(find.text('400.00'), findsNWidgets(3));
   });
 
   testWidgets('supplier form: create posts the schema-shaped body', (
@@ -8737,19 +8991,30 @@ void main() {
     expect(adapter.lastSupplierPostBody?.containsKey('is_active'), false);
   });
 
-  testWidgets('supplier form: edit from the detail dialog PUTs and updates', (
+  testWidgets('suppliers screen row menu edit PUTs and updates', (
     tester,
   ) async {
-    useWideSurface(tester);
+    // Wider than [useWideSurface]: the full web-parity column set plus
+    // the nav rail pushes the trailing actions column off a 1600px
+    // surface, so the ⋮ tap would miss.
+    tester.view.physicalSize = const Size(2200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     final adapter = _AuthFakeAdapter();
     await bootToSuppliers(tester, adapter);
 
-    // Open the detail dialog (double-tap the row), then Edit.
-    await tester.tap(find.text('Alpha Traders'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Alpha Traders'));
+    // Open the first row's ⋮ menu and choose Edit — opens the form dialog
+    // pre-filled from the grid row's Supplier.
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(PlutoGrid),
+            matching: find.byIcon(Icons.more_vert),
+          )
+          .first,
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+    await tester.tap(find.text('Edit'));
     await tester.pumpAndSettle();
     expect(find.text('Edit Supplier'), findsOneWidget); // form title
 
@@ -8763,16 +9028,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Edit Supplier'), findsNothing);
-    // The PUT body carries the prefilled values (proving the form seeded
-    // from the detail fetch) plus the edited name; supplier_code is not
-    // updatable server-side.
+    // The PUT body carries the row-provided prefill values plus the
+    // edited name (supplier_code is not updatable server-side).
     expect(adapter.lastSupplierPutBody?['supplier_name'], 'Alpha Traders Ltd');
     expect(adapter.lastSupplierPutBody?['phone'], '555-0201');
     expect(adapter.lastSupplierPutBody?['email'], 'a@alpha.com');
-    expect(adapter.lastSupplierPutBody?['contact_person'], 'Ali Raza');
-    expect(adapter.lastSupplierPutBody?['address'], '12 Industrial Rd');
-    expect(adapter.lastSupplierPutBody?['payment_terms'], 'Net 30');
-    expect(adapter.lastSupplierPutBody?['is_active'], 1);
     expect(adapter.lastSupplierPutBody?.containsKey('supplier_code'), false);
   });
 

@@ -884,6 +884,42 @@ abstract class AppLocalizations {
   /// **'Customer deleted successfully!'**
   String get customersCustomerdeleted;
 
+  /// No description provided for @customersDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days'**
+  String customersDays(Object days);
+
+  /// No description provided for @customersContactinfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact Info'**
+  String get customersContactinfo;
+
+  /// No description provided for @customersFixbalances.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix Balances'**
+  String get customersFixbalances;
+
+  /// No description provided for @customersFixbalancesconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'This will recalculate all customer balances from unpaid invoices. Continue?'**
+  String get customersFixbalancesconfirm;
+
+  /// No description provided for @customersFixbalancessuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Balances recalculated successfully'**
+  String get customersFixbalancessuccess;
+
+  /// No description provided for @customersNotapplicable.
+  ///
+  /// In en, this message translates to:
+  /// **'N/A'**
+  String get customersNotapplicable;
+
   /// No description provided for @suppliersSuppliers.
   ///
   /// In en, this message translates to:
@@ -1033,6 +1069,390 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Opening Balance'**
   String get suppliersOpeningbalance;
+
+  /// No description provided for @suppliersClosingbalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing Balance'**
+  String get suppliersClosingbalance;
+
+  /// No description provided for @suppliersOverview.
+  ///
+  /// In en, this message translates to:
+  /// **'Overview'**
+  String get suppliersOverview;
+
+  /// No description provided for @suppliersPos.
+  ///
+  /// In en, this message translates to:
+  /// **'POs'**
+  String get suppliersPos;
+
+  /// No description provided for @suppliersPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments'**
+  String get suppliersPayments;
+
+  /// No description provided for @suppliersBacktosuppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Suppliers'**
+  String get suppliersBacktosuppliers;
+
+  /// No description provided for @suppliersRecordpayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Payment'**
+  String get suppliersRecordpayment;
+
+  /// No description provided for @suppliersFinancialsummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial Summary'**
+  String get suppliersFinancialsummary;
+
+  /// No description provided for @suppliersCurrentbalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Balance'**
+  String get suppliersCurrentbalance;
+
+  /// No description provided for @suppliersTotalpovalue.
+  ///
+  /// In en, this message translates to:
+  /// **'Total PO Value'**
+  String get suppliersTotalpovalue;
+
+  /// No description provided for @suppliersTotalpos.
+  ///
+  /// In en, this message translates to:
+  /// **'Total POs'**
+  String get suppliersTotalpos;
+
+  /// No description provided for @suppliersPostatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase Order Status'**
+  String get suppliersPostatus;
+
+  /// No description provided for @suppliersDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get suppliersDraft;
+
+  /// No description provided for @suppliersSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitted'**
+  String get suppliersSubmitted;
+
+  /// No description provided for @suppliersPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial'**
+  String get suppliersPartial;
+
+  /// No description provided for @suppliersCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get suppliersCompleted;
+
+  /// No description provided for @suppliersContactinfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact Info'**
+  String get suppliersContactinfo;
+
+  /// No description provided for @suppliersAccountsettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Settings'**
+  String get suppliersAccountsettings;
+
+  /// No description provided for @suppliersSincesupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier Since'**
+  String get suppliersSincesupplier;
+
+  /// No description provided for @suppliersNopos.
+  ///
+  /// In en, this message translates to:
+  /// **'No purchase orders found'**
+  String get suppliersNopos;
+
+  /// No description provided for @suppliersPono.
+  ///
+  /// In en, this message translates to:
+  /// **'PO No'**
+  String get suppliersPono;
+
+  /// No description provided for @suppliersTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get suppliersTotal;
+
+  /// No description provided for @suppliersExpecteddelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected Delivery'**
+  String get suppliersExpecteddelivery;
+
+  /// No description provided for @suppliersLedgerType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get suppliersLedgerType;
+
+  /// No description provided for @suppliersLedgerTotals.
+  ///
+  /// In en, this message translates to:
+  /// **'Totals'**
+  String get suppliersLedgerTotals;
+
+  /// No description provided for @suppliersLedgerTotaldebit.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Debit'**
+  String get suppliersLedgerTotaldebit;
+
+  /// No description provided for @suppliersLedgerTotalcredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Credit'**
+  String get suppliersLedgerTotalcredit;
+
+  /// No description provided for @suppliersExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export CSV'**
+  String get suppliersExportcsv;
+
+  /// No description provided for @suppliersExportpdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Export PDF'**
+  String get suppliersExportpdf;
+
+  /// No description provided for @suppliersExportimage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get suppliersExportimage;
+
+  /// No description provided for @suppliersExportsuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported successfully'**
+  String get suppliersExportsuccess;
+
+  /// No description provided for @suppliersNopayments.
+  ///
+  /// In en, this message translates to:
+  /// **'No payments found'**
+  String get suppliersNopayments;
+
+  /// No description provided for @suppliersPaymentno.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment No'**
+  String get suppliersPaymentno;
+
+  /// No description provided for @suppliersAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get suppliersAmount;
+
+  /// No description provided for @suppliersMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Method'**
+  String get suppliersMethod;
+
+  /// No description provided for @suppliersReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get suppliersReference;
+
+  /// No description provided for @suppliersPrintreceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Print Receipt'**
+  String get suppliersPrintreceipt;
+
+  /// No description provided for @suppliersPrintreceipta4.
+  ///
+  /// In en, this message translates to:
+  /// **'Print Receipt (A4)'**
+  String get suppliersPrintreceipta4;
+
+  /// No description provided for @suppliersDeletepayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Payment'**
+  String get suppliersDeletepayment;
+
+  /// No description provided for @suppliersConfirmdeletepayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete payment'**
+  String get suppliersConfirmdeletepayment;
+
+  /// No description provided for @suppliersPaymentdeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment deleted successfully!'**
+  String get suppliersPaymentdeleted;
+
+  /// No description provided for @suppliersStatementsummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Statement Summary'**
+  String get suppliersStatementsummary;
+
+  /// No description provided for @suppliersTotaldebits.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Debits'**
+  String get suppliersTotaldebits;
+
+  /// No description provided for @suppliersTotalcredits.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Credits'**
+  String get suppliersTotalcredits;
+
+  /// No description provided for @suppliersTransactiondetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction Details'**
+  String get suppliersTransactiondetails;
+
+  /// No description provided for @suppliersBeginningbalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Beginning balance'**
+  String get suppliersBeginningbalance;
+
+  /// No description provided for @suppliersEndingbalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Ending balance'**
+  String get suppliersEndingbalance;
+
+  /// No description provided for @suppliersTotalamount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Amount'**
+  String get suppliersTotalamount;
+
+  /// No description provided for @suppliersAllocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Allocation'**
+  String get suppliersAllocation;
+
+  /// No description provided for @suppliersAvailablepos.
+  ///
+  /// In en, this message translates to:
+  /// **'Available POs'**
+  String get suppliersAvailablepos;
+
+  /// No description provided for @suppliersAutoallocate.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Allocate'**
+  String get suppliersAutoallocate;
+
+  /// No description provided for @suppliersAllposallocated.
+  ///
+  /// In en, this message translates to:
+  /// **'All available POs are allocated'**
+  String get suppliersAllposallocated;
+
+  /// No description provided for @suppliersNoopenpos.
+  ///
+  /// In en, this message translates to:
+  /// **'No open purchase orders to allocate against'**
+  String get suppliersNoopenpos;
+
+  /// No description provided for @suppliersAllocatedpos.
+  ///
+  /// In en, this message translates to:
+  /// **'Allocated POs'**
+  String get suppliersAllocatedpos;
+
+  /// No description provided for @suppliersUnallocated.
+  ///
+  /// In en, this message translates to:
+  /// **'Unallocated Amount'**
+  String get suppliersUnallocated;
+
+  /// No description provided for @suppliersAllocationrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'At least one PO allocation is required'**
+  String get suppliersAllocationrequired;
+
+  /// No description provided for @suppliersAmountmustmatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount must match total allocated'**
+  String get suppliersAmountmustmatch;
+
+  /// No description provided for @suppliersPaymentrecordedsuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Recorded Successfully'**
+  String get suppliersPaymentrecordedsuccess;
+
+  /// No description provided for @suppliersWhatnext.
+  ///
+  /// In en, this message translates to:
+  /// **'What would you like to do next?'**
+  String get suppliersWhatnext;
+
+  /// No description provided for @suppliersDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get suppliersDelete;
+
+  /// No description provided for @suppliersConfirmdelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete'**
+  String get suppliersConfirmdelete;
+
+  /// No description provided for @suppliersSupplierdeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier deleted successfully!'**
+  String get suppliersSupplierdeleted;
+
+  /// No description provided for @suppliersFixbalances.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix Balances'**
+  String get suppliersFixbalances;
+
+  /// No description provided for @suppliersFixbalancesconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'This will recalculate all supplier balances from their ledger entries. Continue?'**
+  String get suppliersFixbalancesconfirm;
+
+  /// No description provided for @suppliersBalancesrecalculated.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier balances recalculated successfully'**
+  String get suppliersBalancesrecalculated;
 
   /// No description provided for @reportsReports.
   ///
@@ -8257,6 +8677,390 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Balance'**
   String get customersBalance;
+
+  /// No description provided for @customersAccountsettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Settings'**
+  String get customersAccountsettings;
+
+  /// No description provided for @customersAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get customersAdd;
+
+  /// No description provided for @customersAllinvoicesallocated.
+  ///
+  /// In en, this message translates to:
+  /// **'All open invoices are already allocated'**
+  String get customersAllinvoicesallocated;
+
+  /// No description provided for @customersAllocatedinvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Allocated'**
+  String get customersAllocatedinvoices;
+
+  /// No description provided for @customersAllocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice Allocations'**
+  String get customersAllocation;
+
+  /// No description provided for @customersAllocationrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'At least one invoice allocation is required'**
+  String get customersAllocationrequired;
+
+  /// No description provided for @customersAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get customersAmount;
+
+  /// No description provided for @customersAmountmustmatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount must match total allocated'**
+  String get customersAmountmustmatch;
+
+  /// No description provided for @customersAutoallocate.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Allocate'**
+  String get customersAutoallocate;
+
+  /// No description provided for @customersAvailableinvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Available Invoices'**
+  String get customersAvailableinvoices;
+
+  /// No description provided for @customersAvgdaystopay.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg. Days to Pay'**
+  String get customersAvgdaystopay;
+
+  /// No description provided for @customersBacktocustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Customers'**
+  String get customersBacktocustomers;
+
+  /// No description provided for @customersCancelinvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Invoice'**
+  String get customersCancelinvoice;
+
+  /// No description provided for @customersCancelinvoiceconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this invoice? This cannot be undone.'**
+  String get customersCancelinvoiceconfirm;
+
+  /// No description provided for @customersClosingbalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing Balance'**
+  String get customersClosingbalance;
+
+  /// No description provided for @customersConfirmdeleteinvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete invoice'**
+  String get customersConfirmdeleteinvoice;
+
+  /// No description provided for @customersConfirmdeletepayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete payment'**
+  String get customersConfirmdeletepayment;
+
+  /// No description provided for @customersCustomersince.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Since'**
+  String get customersCustomersince;
+
+  /// No description provided for @customersDeleteinvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Invoice'**
+  String get customersDeleteinvoice;
+
+  /// No description provided for @customersDeletepayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Payment'**
+  String get customersDeletepayment;
+
+  /// No description provided for @customersDuedate.
+  ///
+  /// In en, this message translates to:
+  /// **'Due Date'**
+  String get customersDuedate;
+
+  /// No description provided for @customersExportcsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to CSV'**
+  String get customersExportcsv;
+
+  /// No description provided for @customersExportimage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get customersExportimage;
+
+  /// No description provided for @customersExportpdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to PDF'**
+  String get customersExportpdf;
+
+  /// No description provided for @customersExportsuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Export successful'**
+  String get customersExportsuccess;
+
+  /// No description provided for @customersFinancialsummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial Summary'**
+  String get customersFinancialsummary;
+
+  /// No description provided for @customersInvoicedeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice deleted'**
+  String get customersInvoicedeleted;
+
+  /// No description provided for @customersInvoiceno.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice No'**
+  String get customersInvoiceno;
+
+  /// No description provided for @customersInvoicecancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice cancelled'**
+  String get customersInvoicecancelled;
+
+  /// No description provided for @customersInvoicestatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice Status'**
+  String get customersInvoicestatus;
+
+  /// No description provided for @customersInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoices'**
+  String get customersInvoices;
+
+  /// No description provided for @customersLedgerPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'payments'**
+  String get customersLedgerPayments;
+
+  /// No description provided for @customersLedgerTotals.
+  ///
+  /// In en, this message translates to:
+  /// **'TOTALS'**
+  String get customersLedgerTotals;
+
+  /// No description provided for @customersLedgerType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get customersLedgerType;
+
+  /// No description provided for @customersMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Method'**
+  String get customersMethod;
+
+  /// No description provided for @customersNoinvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'No invoices found'**
+  String get customersNoinvoices;
+
+  /// No description provided for @customersNopayments.
+  ///
+  /// In en, this message translates to:
+  /// **'No payments found'**
+  String get customersNopayments;
+
+  /// No description provided for @customersNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get customersNotes;
+
+  /// No description provided for @customersOutstanding.
+  ///
+  /// In en, this message translates to:
+  /// **'Outstanding'**
+  String get customersOutstanding;
+
+  /// No description provided for @customersOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue'**
+  String get customersOverdue;
+
+  /// No description provided for @customersOverview.
+  ///
+  /// In en, this message translates to:
+  /// **'Overview'**
+  String get customersOverview;
+
+  /// No description provided for @customersPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get customersPaid;
+
+  /// No description provided for @customersPaymentdeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment deleted'**
+  String get customersPaymentdeleted;
+
+  /// No description provided for @customersPaymentno.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment No'**
+  String get customersPaymentno;
+
+  /// No description provided for @customersPaymentrecordedsuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Recorded Successfully'**
+  String get customersPaymentrecordedsuccess;
+
+  /// No description provided for @customersPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments'**
+  String get customersPayments;
+
+  /// No description provided for @customersPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get customersPending;
+
+  /// No description provided for @customersPrintreceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Print Receipt'**
+  String get customersPrintreceipt;
+
+  /// No description provided for @customersPrintreceipta4.
+  ///
+  /// In en, this message translates to:
+  /// **'Print Receipt (A4)'**
+  String get customersPrintreceipta4;
+
+  /// No description provided for @customersRecordpayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Payment'**
+  String get customersRecordpayment;
+
+  /// No description provided for @customersReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get customersReference;
+
+  /// No description provided for @customersRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get customersRemove;
+
+  /// No description provided for @customersStatement.
+  ///
+  /// In en, this message translates to:
+  /// **'Statement'**
+  String get customersStatement;
+
+  /// No description provided for @customersStatementsummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Statement Summary'**
+  String get customersStatementsummary;
+
+  /// No description provided for @customersTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get customersTotal;
+
+  /// No description provided for @customersTotalamount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Amount'**
+  String get customersTotalamount;
+
+  /// No description provided for @customersTotalcredits.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Credits'**
+  String get customersTotalcredits;
+
+  /// No description provided for @customersTotaldebits.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Debits'**
+  String get customersTotaldebits;
+
+  /// No description provided for @customersTotalinvoiced.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Invoiced'**
+  String get customersTotalinvoiced;
+
+  /// No description provided for @customersTotalreceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Received'**
+  String get customersTotalreceived;
+
+  /// No description provided for @customersTransactiondetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction Details'**
+  String get customersTransactiondetails;
+
+  /// No description provided for @customersUnallocated.
+  ///
+  /// In en, this message translates to:
+  /// **'Unallocated Amount'**
+  String get customersUnallocated;
+
+  /// No description provided for @customersUtilization.
+  ///
+  /// In en, this message translates to:
+  /// **'Utilization'**
+  String get customersUtilization;
+
+  /// No description provided for @customersWhatnext.
+  ///
+  /// In en, this message translates to:
+  /// **'What would you like to do next?'**
+  String get customersWhatnext;
 
   /// No description provided for @commonPage.
   ///

@@ -12,6 +12,7 @@ import 'features/auth/change_password_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/splash_screen.dart';
 import 'features/settings/settings_screen.dart';
+import 'features/customers/customer_detail_screen.dart';
 import 'features/customers/customers_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/inventory/inventory_shell.dart';
@@ -49,6 +50,7 @@ import 'features/sales/invoice_print_preview_page.dart';
 import 'features/sales/sales_invoice_form_page.dart';
 import 'features/sales_orders/sales_shell.dart';
 import 'features/shell/app_shell.dart';
+import 'features/suppliers/supplier_detail_screen.dart';
 import 'features/suppliers/suppliers_screen.dart';
 import 'features/shell/module_placeholder_screen.dart';
 import 'l10n/app_localizations.dart';
@@ -171,54 +173,77 @@ final routerProvider = Provider<GoRouter>((ref) {
                       title: dest.label(AppLocalizations.of(context)!),
                     ),
                   },
-                  // Report screens live as sub-routes under the hub.
-                  routes: dest.path == '/reports'
-                      ? [
-                          GoRoute(
-                            path: ':report',
-                            builder: (context, state) {
-                              final slug = state.pathParameters['report'] ?? '';
-                              return switch (slug) {
-                                'ar-summary' => const ArSummaryReportScreen(),
-                                'ar-aging' => const ArAgingReportScreen(),
-                                'sales-summary' =>
-                                  const SalesSummaryReportScreen(),
-                                'low-stock' => const LowStockReportScreen(),
-                                'stock-level' => const StockLevelReportScreen(),
-                                'stock-valuation' =>
-                                  const StockValuationReportScreen(),
-                                'sales-by-customer' =>
-                                  const SalesByCustomerReportScreen(),
-                                'dso' => const DsoReportScreen(),
-                                'expenses' => const ExpensesReportScreen(),
-                                'cash-flow' => const CashFlowReportScreen(),
-                                'profit-loss' => const ProfitLossReportScreen(),
-                                'inventory-movement' =>
-                                  const InventoryMovementReportScreen(),
-                                'purchase-summary' =>
-                                  const PurchaseSummaryReportScreen(),
-                                'top-debtors' => const TopDebtorsReportScreen(),
-                                'customer-statements' =>
-                                  const CustomerStatementsReportScreen(),
-                                'sales-by-item' =>
-                                  const SalesByItemReportScreen(),
-                                'supplier-analysis' =>
-                                  const SupplierAnalysisReportScreen(),
-                                'production-summary' =>
-                                  const ProductionSummaryReportScreen(),
-                                'bom-usage' => const BomUsageReportScreen(),
-                                _ => ModulePlaceholderScreen(
-                                  title:
-                                      reportTitles[slug]?.call(
-                                        AppLocalizations.of(context)!,
-                                      ) ??
-                                      slug,
-                                ),
-                              };
-                            },
-                          ),
-                        ]
-                      : const [],
+                  // Report screens live as sub-routes under the hub; the
+                  // customer detail page under the customers branch (web
+                  // `/customers/:id`).
+                  routes: switch (dest.path) {
+                    '/reports' => [
+                      GoRoute(
+                        path: ':report',
+                        builder: (context, state) {
+                          final slug = state.pathParameters['report'] ?? '';
+                          return switch (slug) {
+                            'ar-summary' => const ArSummaryReportScreen(),
+                            'ar-aging' => const ArAgingReportScreen(),
+                            'sales-summary' =>
+                              const SalesSummaryReportScreen(),
+                            'low-stock' => const LowStockReportScreen(),
+                            'stock-level' => const StockLevelReportScreen(),
+                            'stock-valuation' =>
+                              const StockValuationReportScreen(),
+                            'sales-by-customer' =>
+                              const SalesByCustomerReportScreen(),
+                            'dso' => const DsoReportScreen(),
+                            'expenses' => const ExpensesReportScreen(),
+                            'cash-flow' => const CashFlowReportScreen(),
+                            'profit-loss' => const ProfitLossReportScreen(),
+                            'inventory-movement' =>
+                              const InventoryMovementReportScreen(),
+                            'purchase-summary' =>
+                              const PurchaseSummaryReportScreen(),
+                            'top-debtors' => const TopDebtorsReportScreen(),
+                            'customer-statements' =>
+                              const CustomerStatementsReportScreen(),
+                            'sales-by-item' =>
+                              const SalesByItemReportScreen(),
+                            'supplier-analysis' =>
+                              const SupplierAnalysisReportScreen(),
+                            'production-summary' =>
+                              const ProductionSummaryReportScreen(),
+                            'bom-usage' => const BomUsageReportScreen(),
+                            _ => ModulePlaceholderScreen(
+                              title:
+                                  reportTitles[slug]?.call(
+                                    AppLocalizations.of(context)!,
+                                  ) ??
+                                  slug,
+                            ),
+                          };
+                        },
+                      ),
+                    ],
+                    '/customers' => [
+                      GoRoute(
+                        path: ':id',
+                        builder: (context, state) => CustomerDetailScreen(
+                          customerId:
+                              int.tryParse(state.pathParameters['id'] ?? '') ??
+                              0,
+                        ),
+                      ),
+                    ],
+                    '/suppliers' => [
+                      GoRoute(
+                        path: ':id',
+                        builder: (context, state) => SupplierDetailScreen(
+                          supplierId:
+                              int.tryParse(state.pathParameters['id'] ?? '') ??
+                              0,
+                        ),
+                      ),
+                    ],
+                    _ => const [],
+                  },
                 ),
               ],
             ),

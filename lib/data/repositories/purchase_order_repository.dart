@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
+import '../models/json_helpers.dart' show asInt, asNum;
 import '../models/purchase_order.dart'
     show GoodsReceipt, PurchaseOrder, PurchaseOrderDetail, PurchaseOrderItem;
 import 'api_result.dart';
@@ -23,11 +24,27 @@ class PurchaseOrderRepository {
 
   /// All purchase orders — bare array (the list endpoint has no search or
   /// page; the grid keeps sorting/filtering client-side like items).
-  Future<ApiResult<List<PurchaseOrder>>> list() => _api.getRawList(
-    ApiEndpoints.purchaseOrders,
-    parseItem: (Object? json) =>
-        PurchaseOrder.fromJson(json as Map<String, dynamic>),
-  );
+  /// [supplierId] filters with the server's `supplier_id` query param
+  /// (the supplier detail POs tab / payment modal's allocation source).
+  Future<ApiResult<List<PurchaseOrder>>> list({int? supplierId}) =>
+      _api.getRawList(
+        ApiEndpoints.purchaseOrders,
+        queryParameters: supplierId == null
+            ? null
+            : {'supplier_id': supplierId},
+        parseItem: (Object? json) =>
+            PurchaseOrder.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// `GET /purchase-orders/summary/supplier/:supplierId` — **bare object**
+  /// `POSummary` (`total_pos`, `total_value`, `draft_pos`, …). The server
+  /// returns a zeroed summary when the supplier has no POs.
+  Future<ApiResult<POSummary>> summaryBySupplier(int supplierId) =>
+      _api.getRaw(
+        '${ApiEndpoints.purchaseOrders}/summary/supplier/$supplierId',
+        parse: (Object? json) =>
+            POSummary.fromJson(json as Map<String, dynamic>),
+      );
 
   /// PO detail — bare `{...po, items}` response.
   Future<ApiResult<PurchaseOrderDetail>> detail(int id) => _api.getRaw(
@@ -130,3 +147,32 @@ class PurchaseOrderRepository {
 final purchaseOrderRepositoryProvider = Provider<PurchaseOrderRepository>(
   (ref) => PurchaseOrderRepository(RepositoryClient(ref.watch(dioProvider))),
 );
+
+/// `GET /purchase-orders/summary/supplier/:supplierId` response DTO — the
+/// web `POSummary` shape used by the supplier Overview tab.
+class POSummary {
+  const POSummary({
+    required this.totalPos,
+    required this.totalValue,
+    required this.draftPos,
+    required this.submittedPos,
+    required this.partiallyReceivedPos,
+    required this.completedPos,
+  });
+
+  factory POSummary.fromJson(Map<String, dynamic> json) => POSummary(
+    totalPos: asInt(json['total_pos']) ?? 0,
+    totalValue: asNum(json['total_value']) ?? 0,
+    draftPos: asInt(json['draft_pos']) ?? 0,
+    submittedPos: asInt(json['submitted_pos']) ?? 0,
+    partiallyReceivedPos: asInt(json['partially_received_pos']) ?? 0,
+    completedPos: asInt(json['completed_pos']) ?? 0,
+  );
+
+  final int totalPos;
+  final num totalValue;
+  final int draftPos;
+  final int submittedPos;
+  final int partiallyReceivedPos;
+  final int completedPos;
+}

@@ -21,6 +21,7 @@ cd "$ROOT"
 VERSION="$(grep -m1 '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
 FLUTTER="${FLUTTER:-flutter}"
 NODE="${NODE:-node}"
+NODE_VERSION="$($NODE --version | cut -d' ' -f2 | sed 's/^v//')"
 WITH_DATA=1
 DO_BUILD=1
 OUT=""
@@ -35,7 +36,7 @@ done
 OUT="${OUT:-$ROOT/build/minierp-setup-$VERSION.run}"
 
 echo "=== MiniERP builder $(date) ==="
-echo "  version: $VERSION | node: $($NODE --version | cut -d' ' -f2) | data: $WITH_DATA"
+echo "  version: $VERSION | node: $NODE_VERSION | data: $WITH_DATA"
 
 # -------------------------------------------------
 #   1. Build Flutter release bundle (if needed)
@@ -86,13 +87,13 @@ rm -rf "$STAGE/minierp/server/node_modules/sqlite3"
 if [ "$WITH_DATA" = 1 ] && [ -f server/database/erp.db ]; then
   echo "[3.2/5] Packing existing DB (WAL checkpoint prepare)..."
   mkdir -p "$STAGE/minierp/server/database"
-  "$NODE" -e "
+  (cd server && "$NODE" -e "
     const D=require('better-sqlite3');
     const db=new D('database/erp.db');
     db.pragma('wal_checkpoint(TRUNCATE)');
-    db.pragma('optimize', 'REINDEX');
+    db.pragma('optimize');
     db.close();
-  "
+  ")
   cp server/database/erp.db "$STAGE/minierp/server/database/erp.db"
 else
   echo "[3.2/5] Fresh install: no DB shipped — schema auto-initializes on first run"
@@ -109,17 +110,19 @@ HOST=0.0.0.0
 NODE_ENV=production
 JWT_SECRET=$JWT
 DEFAULT_ADMIN_PASSWORD=admin123
+ALLOWED_ORIGINS=http://localhost:3011,http://127.0.0.1:3011,file://
 EOF
 
 # -------------------------------------------------
 #   5. Bundle Node Node.js runtime
 # -------------------------------------------------
 echo "[5/5] Bundling bundled Node $($NODE --version)"
-CACHE="$ROOT/build/.cache/node-$($NODE --version | cut -d' ' -f2)-linux-x64.tar.xz"
-[ -f "$CACHE" ] || curl -fL --retry 3 -o "$CACHE" "https://nodejs.org/dist/v$($NODE --version | cut -d' ' -f2)/node-v$($NODE --version | cut -d' ' -f2)-linux-x64.tar.xz"
-tar -xJf "$CACHE" -C "$STAGE/minierp/runtime" --strip-components=1 "node-v$($NODE --version | cut -d' ' -f2)-linux-x64/bin/node"
+CACHE="$ROOT/build/.cache/node-$NODE_VERSION-linux-x64.tar.xz"
+[ -f "$CACHE" ] || curl -fL --retry 3 -o "$CACHE" "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz"
 mkdir -p "$STAGE/minierp/runtime"
-mv "$STAGE/minierp/runtime/node-v${NODE_VERSION}-linux-x64/bin/node" "$STAGE/minierp/runtime/node"
+tar -xJf "$CACHE" -C "$STAGE/minierp/runtime" "node-v$NODE_VERSION-linux-x64/bin/node"
+mv "$STAGE/minierp/runtime/node-v$NODE_VERSION-linux-x64/bin/node" "$STAGE/minierp/runtime/node"
+rm -rf "$STAGE/minierp/runtime/node-v$NODE_VERSION-linux-x64"
 chmod +x "$STAGE/minierp/runtime/node"
 
 # -------------------------------------------------
@@ -133,18 +136,18 @@ echo "[6/5] Verifying bundled Node + better-sqlite3 ABI..."
 "
 
 # -------------------------------------------------
-#   7. Launcher (minierp) — starts server if needed, then the app
+#   8. Desktop entry (in payload only; stub substitutes placeholder)
 # -------------------------------------------------
-echo "[7/5] Writing launcher minierp..."
+echo "[8/5] Writing launcher minierp..."
 cat > "$STAGE/minierp/minierp" <<'LAUNCHER'
 #!/usr/bin/env bash
 # MiniERP launcher.
 set -euo pipefail
-APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 SERVER_DIR="$APP_DIR/server"
 NODE="$APP_DIR/runtime/node"
 PORT="${PORT:-3011}"
-HEALTH_URL="http://127.0.0.1:${PORT}/api/health"
+HEALTH_URL="http://127.0.0.1:${PORT}/health"
 PID_FILE="$APP_DIR/server.pid"
 
 server_running() {
@@ -226,11 +229,12 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 echo "📦 Extracting MiniERP…"
-SKIP=$(awk '/^__PAYLOAD_BELOW__$/{print NR+1; exit 0}' "$0")
-tail -n +"$SKIP" "$0" | tar -xz -C "$TMP"
+MARKER_OFFSET=$(grep -abo '__PAYLOAD_BELOW__' "$0" | tail -n1 | cut -d: -f1)
+tail -c +"$((MARKER_OFFSET + 20))" "$0" | tar -xzf - -C "$TMP"
 mkdir -p "$(dirname "$DIR")"
 mv "$TMP/minierp" "$DIR"
 chmod +x "$DIR/bundle/minierp_app" "$DIR/runtime/node" "$DIR/minierp" 2>/dev/null || true
+rm -f "$DIR/server/database/erp.db"
 
 mkdir -p "$HOME/.local/bin"
 ln -sf "$DIR/minierp" "$HOME/.local/bin/minierp"
@@ -243,11 +247,12 @@ fi
 
 echo ""
 echo "✅ MiniERP installed → $DIR"
-echo "   Launch with:   minierp            (or \$DIR/minierp)"
+echo "   Launch with:   minierp            (or $DIR/minierp)"
 echo "   Stop server:    minierp stop"
 echo "   View logs:      tail -f $DIR/server/logs/server.log"
-echo "   Remove:         rm -rf $DIR \$HOME/.local/bin/minierp \$HOME/.local/share/applications/minierp.desktop"
-echo "__PAYLOAD_BELOW__"
+echo "   Remove:         rm -rf $DIR $HOME/.local/bin/minierp $HOME/.local/share/applications/minierp.desktop"
+exit 0
+: "__PAYLOAD_BELOW__"
 STUB
 
 # Build final single‑file installer
