@@ -11,16 +11,13 @@ import '../l10n/app_localizations.dart';
 ///
 /// - `pickDate`        — single-field pickers (form dialogs).
 /// - `pickFilterDate`  — From/To filter buttons writing nullable
-///   `StateProvider<DateTime?>`s (list screens: sales, expenses,
-///   sales summary).
-/// - `pickReportDate`  — From/To report-range buttons writing
-///   non-nullable `StateProvider<DateTime>`s (report screens; moved
-///   here from `report_providers.dart` and re-exported there).
+///   `StateProvider<DateTime?>`s (all list + report screens; null
+///   means "no filter", and report callers fall back to defaults).
 /// - `DateFilterButton`— the compact calendar button both list screens
 ///   previously built inline as `_dateButton`.
 /// - `DateRangeFilter` — the complete From/To filter row (two
-///   [DateFilterButton]s + optional clear) that the list screens
-///   render in their toolbars.
+///   [DateFilterButton]s + optional clear) that every screen with a
+///   date-range filter renders in its toolbar.
 
 /// Shows the app-standard date picker (2000 → 2100 by default) and
 /// returns the picked [DateTime], or null when dismissed.
@@ -62,26 +59,6 @@ Future<void> pickFilterDate(
   ref.read((isFrom ? fromProvider : toProvider).notifier).state = picked;
 }
 
-/// From/To picker for a non-nullable report date-range provider pair.
-/// Writes the picked date back (refetching the report). The picker
-/// caps at today, matching the report endpoints' historical range.
-Future<void> pickReportDate(
-  BuildContext context,
-  WidgetRef ref, {
-  required StateProvider<DateTime> fromProvider,
-  required StateProvider<DateTime> toProvider,
-  required bool isFrom,
-}) async {
-  final current = isFrom ? ref.read(fromProvider) : ref.read(toProvider);
-  final picked = await pickDate(
-    context,
-    initialDate: current,
-    lastDate: DateTime.now(),
-  );
-  if (picked == null) return;
-  ref.read((isFrom ? fromProvider : toProvider).notifier).state = picked;
-}
-
 /// Compact calendar button used on the list-screen toolbars (the
 /// previous per-screen `_dateButton`). `width`/`height` are optional —
 /// screens wrap it in a fixed-size [SizedBox] when the toolbar layout
@@ -114,56 +91,6 @@ class DateFilterButton extends StatelessWidget {
           textStyle: Theme.of(context).textTheme.bodyMedium,
         ),
       ),
-    );
-  }
-}
-
-/// From/To date-range filter row for the report-screen toolbars: two
-/// [DateFilterButton]s wired to a non-nullable provider pair via
-/// [pickReportDate], with the colon-prefixed `From: date` / `To: date`
-/// labels the report screens use. Replaces the per-screen
-/// `OutlinedButton.icon` pairs every report screen previously inlined.
-class ReportDateRangeFilter extends ConsumerWidget {
-  const ReportDateRangeFilter({
-    super.key,
-    required this.fromProvider,
-    required this.toProvider,
-  });
-
-  final StateProvider<DateTime> fromProvider;
-  final StateProvider<DateTime> toProvider;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context)!;
-    final from = ref.watch(fromProvider);
-    final to = ref.watch(toProvider);
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        DateFilterButton(
-          label: '${l10n.commonFrom}: ${Formatters.date(isoDate(from))}',
-          onTap: () => pickReportDate(
-            context,
-            ref,
-            fromProvider: fromProvider,
-            toProvider: toProvider,
-            isFrom: true,
-          ),
-        ),
-        const SizedBox(width: 8),
-        DateFilterButton(
-          label: '${l10n.commonTo}: ${Formatters.date(isoDate(to))}',
-          onTap: () => pickReportDate(
-            context,
-            ref,
-            fromProvider: fromProvider,
-            toProvider: toProvider,
-            isFrom: false,
-          ),
-        ),
-      ],
     );
   }
 }

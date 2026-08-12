@@ -221,6 +221,8 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
                         required: true,
                         child: TextFormField(
                           controller: _nameController,
+                          onFieldSubmitted: submitOnEnter(_submit),
+                          autofocus: true,
                           enabled: !_submitting,
                           decoration: formInputDecoration(),
                           validator: (v) => requiredValidator(
@@ -238,6 +240,7 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
                               label: l10n.customersContactperson,
                               child: TextFormField(
                                 controller: _contactController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: formInputDecoration(),
                               ),
@@ -250,6 +253,7 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
                               required: true,
                               child: TextFormField(
                                 controller: _phoneController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 keyboardType: TextInputType.phone,
                                 decoration: formInputDecoration(),
@@ -271,6 +275,7 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
                               label: l10n.customersEmail,
                               child: TextFormField(
                                 controller: _emailController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 keyboardType: TextInputType.emailAddress,
                                 decoration: formInputDecoration(),
@@ -284,6 +289,7 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
                               label: l10n.customersPaymentterms,
                               child: TextFormField(
                                 controller: _termsController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: formInputDecoration(),
                               ),
@@ -300,6 +306,7 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
                               label: l10n.customersPaymenttermsdays,
                               child: TextFormField(
                                 controller: _termsDaysController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
@@ -316,6 +323,7 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
                               label: l10n.customersCreditlimit,
                               child: TextFormField(
                                 controller: _creditLimitController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
@@ -332,6 +340,7 @@ class _CustomerFormDialogState extends ConsumerState<CustomerFormDialog> {
                               label: l10n.customersOpeningbalance,
                               child: TextFormField(
                                 controller: _openingBalanceController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(

@@ -21,6 +21,7 @@ import 'package:go_router/go_router.dart';
 import 'package:minierp_app/app.dart';
 import 'package:minierp_app/core/api/api_client.dart';
 import 'package:minierp_app/core/auth/token_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:minierp_app/features/activity_log/activity_log_providers.dart'
     show activityLogFromDateProvider, activityLogToDateProvider;
 import 'package:minierp_app/features/activity_log/activity_log_screen.dart'
@@ -34,6 +35,7 @@ import 'package:minierp_app/features/reports/reports_dashboard_screen.dart';
 import 'package:minierp_app/widgets/status_badge.dart' show StatusBadge;
 import 'package:minierp_app/widgets/searchable_select.dart';
 import 'package:pluto_grid/pluto_grid.dart';
+import 'package:printing/printing.dart' show PdfPreview;
 
 class _FakeTokenStorage implements TokenStorage {
   String? token;
@@ -175,6 +177,9 @@ class _AuthFakeAdapter implements HttpClientAdapter {
 
   /// Mutable so a test can fail once, then retry successfully.
   bool failItems = false;
+
+  /// How many times the items list GET ran (Ctrl+R refresh assertion).
+  int itemsFetchCount = 0;
 
   /// When true, `GET /inventory/stock-ledger/1` returns an empty array.
   bool emptyStockLedger = false;
@@ -1313,6 +1318,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       }, status: 201);
     }
     if (options.path == '/inventory/items') {
+      itemsFetchCount++;
       if (failItems) {
         return _json({
           'success': false,
@@ -2657,6 +2663,10 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           },
         ],
       });
+    }
+    if (options.path == '/invoices/1/payments' && options.method == 'GET') {
+      // Bare array — the real getInvoicePayments shape (no envelope).
+      return _json(<Object>[]);
     }
     if (options.path == '/invoices/1/return' && options.method == 'POST') {
       final body = options.data as Map<String, dynamic>;
@@ -4304,7 +4314,62 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+/// Stubs the `printing` plugin's method channel so the invoice print
+/// preview can render and the print job can complete under `flutter
+/// test` (PORTING.md §12 — no real platform backend exists there).
+/// `printingInfo` reports rastering available; `rasterPdf` emits one
+/// 1×1 page; `printPdf` completes the job as printed.
+void _mockPrintingChannel() {
+  const channel = MethodChannel('net.nfet.printing');
+  final messenger = TestDefaultBinaryMessengerBinding
+      .instance.defaultBinaryMessenger;
+  messenger.setMockMethodCallHandler(channel, (call) async {
+    switch (call.method) {
+      case 'printingInfo':
+        return {'canRaster': true, 'canPrint': true};
+      case 'rasterPdf':
+        final job = (call.arguments as Map)['job'];
+        await messenger.handlePlatformMessage(
+          'net.nfet.printing',
+          const StandardMethodCodec().encodeMethodCall(
+            MethodCall('onPageRasterized', {
+              'job': job,
+              'width': 1,
+              'height': 1,
+              'image': Uint8List.fromList([255, 0, 0, 255]),
+            }),
+          ),
+          (_) {},
+        );
+        await messenger.handlePlatformMessage(
+          'net.nfet.printing',
+          const StandardMethodCodec().encodeMethodCall(
+            MethodCall('onPageRasterEnd', {'job': job, 'error': null}),
+          ),
+          (_) {},
+        );
+        return null;
+      case 'printPdf':
+        final job = (call.arguments as Map)['job'];
+        await messenger.handlePlatformMessage(
+          'net.nfet.printing',
+          const StandardMethodCodec().encodeMethodCall(
+            MethodCall('onCompleted', {'job': job, 'completed': true, 'error': null}),
+          ),
+          (_) {},
+        );
+        return 1;
+      default:
+        return null;
+    }
+  });
+}
+
 void main() {
+  // The locale provider persists to SharedPreferences; tests use the
+  // in-memory mock so the platform plugin isn't hit.
+  SharedPreferences.setMockInitialValues({});
+
   testWidgets('boots to the login screen when no stored token exists', (
     tester,
   ) async {
@@ -4952,6 +5017,95 @@ void main() {
     expect(adapter.lastItemPostBody?['is_purchased'], true); // schema default
     expect(adapter.lastItemPostBody?['sale_type'], 'packed');
     expect(adapter.lastItemPostBody?['reorder_level'], 0);
+  });
+
+  testWidgets('Ctrl+N opens the new-record form from a list screen', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToItems(tester);
+
+    // No toolbar tap — the shell's ScreenShortcutScope must resolve the
+    // shortcut from arbitrary focus (post-boot focus sits in the scope's
+    // own focus or the nav rail, both inside the scope). This is the
+    // regression guard for the keypress-walk resolution: it must fire
+    // without the search field being touched.
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyN);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyN);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    // The item form dialog opened (the Save button only exists in the
+    // dialog — the toolbar's own "New Item" button is always present).
+    expect(find.widgetWithText(FilledButton, 'Save'), findsOneWidget);
+  });
+
+  testWidgets('Ctrl+F focuses the search field from a grid cell', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    await bootToItems(tester);
+
+    // Give the grid keyboard focus — the exact state a user reaches by
+    // clicking a cell (PlutoGrid's tap handler requests the grid's own
+    // focus node), using the same helper the F2/Enter tests use.
+    final sm = tester
+        .state<PlutoGridState>(find.byType(PlutoGrid))
+        .stateManager;
+    sm.setCurrentCell(sm.firstCell, 0);
+    sm.gridFocusNode.requestFocus();
+    await tester.pump();
+
+    // Sanity: focus is on the grid, not the toolbar search field.
+    final searchField = tester.widget<TextField>(
+      find.byType(TextField).first,
+    );
+    expect(FocusManager.instance.primaryFocus, isNot(searchField.focusNode));
+
+    // Ctrl+F from a grid cell must focus the visible screen's search —
+    // the regression guard for the keypress-walk resolution (the grid is
+    // a sibling of the toolbar, not a descendant, so an ancestor lookup
+    // from the focused cell would find nothing). PlutoGrid swallows every
+    // focus-system key, so this also guards the HardwareKeyboard
+    // interception that makes the shortcut fire from the grid at all.
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    expect(FocusManager.instance.primaryFocus, searchField.focusNode);
+  });
+
+  testWidgets('Ctrl+R refetches the items list from a grid cell', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    // Give the grid keyboard focus — the same state the Ctrl+F test uses
+    // (PlutoGrid swallows every focus-system key, so the refresh must
+    // travel the HardwareKeyboard path too).
+    final sm = tester
+        .state<PlutoGridState>(find.byType(PlutoGrid))
+        .stateManager;
+    sm.setCurrentCell(sm.firstCell, 0);
+    sm.gridFocusNode.requestFocus();
+    await tester.pump();
+
+    final fetchesBefore = adapter.itemsFetchCount;
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyR);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyR);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    // Ctrl+R invalidated the items provider → exactly one refetch, and
+    // the grid still shows the reloaded rows.
+    expect(adapter.itemsFetchCount, fetchesBefore + 1);
+    expect(find.text('Widget A'), findsOneWidget);
   });
 
   testWidgets('item form: edit from the detail dialog PUTs and updates', (
@@ -6453,6 +6607,19 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Settles the invoice print preview page with bounded pumps. The
+  /// page's PdfPreview raster never completes under `flutter test`
+  /// (dart:ui image decoding is unavailable), so its loading spinner
+  /// animates while the preview is the top route — pumpAndSettle would
+  /// time out on it. Use this after navigating to/back from the preview;
+  /// pumpAndSettle is fine once an opaque route covers it (overlay
+  /// tickers are muted) or after it is popped.
+  Future<void> pumpPreviewPage(WidgetTester tester) async {
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump(const Duration(milliseconds: 250));
+  }
+
   testWidgets('sales screen renders the PlutoGrid with server data', (
     tester,
   ) async {
@@ -6589,6 +6756,11 @@ void main() {
     );
     expect(find.byType(PlutoGrid), findsOneWidget);
 
+    // The customer popup auto-opens on load (spec §2.1) — dismiss it so
+    // the Save button below is not covered by the popup barrier.
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
     // Saving without a customer: the customer rule fires first.
     await tester.ensureVisible(find.widgetWithText(FilledButton, 'Save'));
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
@@ -6615,15 +6787,20 @@ void main() {
   testWidgets('invoice form: edit prefills items and PUTs updates', (
     tester,
   ) async {
+    _mockPrintingChannel();
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
     await bootToSales(tester, adapter);
 
-    // Double-tap the row pushes the routed edit page with the row as
-    // `extra`; the grid prefills from the bare detail fetch.
+    // Double-tap the row opens the A4 print preview (not the edit
+    // form); Edit on the preview page pushes the routed edit form with
+    // the invoice, and the form prefills from the bare detail fetch.
     await tester.tap(find.text('INV-2026-440955'));
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text('INV-2026-440955'));
+    await pumpPreviewPage(tester);
+    expect(find.byType(PdfPreview), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
     await tester.pumpAndSettle();
     expect(
       find.descendant(
@@ -6650,9 +6827,11 @@ void main() {
     // Save posts the prefilled body unchanged (qty 10 × rate 100).
     await tester.ensureVisible(find.widgetWithText(FilledButton, 'Save'));
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
-    await tester.pumpAndSettle();
+    // The form pops back to the preview (its spinner animates), so the
+    // pop is settled with bounded pumps too.
+    await pumpPreviewPage(tester);
 
-    // Page popped, PUT body matches the updateInvoice DTO shape.
+    // Form popped, PUT body matches the updateInvoice DTO shape.
     expect(find.text('Edit Invoice'), findsNothing);
     final body = adapter.lastInvoicePutBody!;
     expect(body.containsKey('invoice_no'), isFalse); // edit keeps the no.
@@ -6666,6 +6845,40 @@ void main() {
     expect(items.single['item_id'], 1);
     expect(items.single['quantity'], 10);
     expect(items.single['unit_price'], 100);
+  });
+
+  testWidgets('sales screen: double-tap opens the invoice print preview', (
+    tester,
+  ) async {
+    _mockPrintingChannel();
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSales(tester, adapter);
+
+    // Double-tap the row → A4 print preview page (not the edit form),
+    // with a rendered PdfPreview and explicit Print + Cancel actions.
+    await tester.tap(find.text('INV-2026-440955'));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('INV-2026-440955'));
+    await pumpPreviewPage(tester);
+
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.textContaining('INV-2026-440955'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(PdfPreview), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Print A4'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Edit'), findsOneWidget);
+
+    // Cancel: the back arrow pops back to the sales grid (the preview
+    // is disposed, so the grid below settles normally).
+    await tester.tap(find.byType(BackButton));
+    await pumpPreviewPage(tester);
+    expect(find.byType(PdfPreview), findsNothing);
+    expect(find.text('INV-2026-440955'), findsWidgets);
   });
 
   // Invoice returns (PORTING.md §5/§6) — bare-array endpoint (no search
@@ -9193,6 +9406,18 @@ void main() {
       find.descendant(of: dialog, matching: find.text('Pending: 100')),
       findsOneWidget,
     );
+
+    // The dialog autofocuses its primary input — the first received-qty
+    // cell — so the user can adjust quantities (or Enter to receive all)
+    // without clicking. Verify via the focus manager that the focus
+    // actually landed there: the closed dialog's only EditableTexts are
+    // the notes field and the qty cell, so `.last` is the qty field.
+    final qtyEditable = tester.widget<EditableText>(
+      find
+          .descendant(of: dialog, matching: find.byType(EditableText))
+          .last,
+    );
+    expect(FocusManager.instance.primaryFocus, qtyEditable.focusNode);
 
     // Receive 60 of the 100 pending — exercises the editable qty (and
     // leaves 40 pending, so the PO stays Partially Received). Notes is

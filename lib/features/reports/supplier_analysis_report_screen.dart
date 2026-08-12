@@ -15,9 +15,10 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart' show SupplierAnalysisRow;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart' show ReportDateRangeFilter;
+import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
 import 'supplier_analysis_detail_dialog.dart';
 
@@ -228,7 +229,6 @@ class _SupplierAnalysisReportScreenState
   Widget build(BuildContext context) {
     final report = ref.watch(supplierAnalysisReportProvider);
     final l10n = AppLocalizations.of(context)!;
-    final textTheme = Theme.of(context).textTheme;
 
     ref.listen(
       supplierAnalysisReportProvider,
@@ -240,35 +240,36 @@ class _SupplierAnalysisReportScreenState
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.reportsSupplieranalysisreport,
-                  style: textTheme.titleLarge,
-                ),
-              ),
-              ReportDateRangeFilter(
-                fromProvider: reportSupplierFromDateProvider,
-                toProvider: reportSupplierToDateProvider,
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed:
-                    report.isLoading || (report.valueOrNull?.isEmpty ?? true)
-                    ? null
-                    : () => saveCsv(
-                        context,
-                        suggestedName: csvSuggestedName('supplier-analysis'),
-                        csv: buildSupplierAnalysisCsv(l10n, report.valueOrNull!),
-                        successMessage: l10n.reportsExported,
-                        errorMessage: l10n.reportsExportfailed,
-                      ),
-                icon: const Icon(Icons.file_download_outlined, size: 18),
-                label: Text(l10n.reportsExportcsv),
-              ),
-            ],
+          child: Text(
+            l10n.reportsSupplieranalysisreport,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
+        ),
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          filters: [
+            DateRangeFilter(
+              fromProvider: reportSupplierFromDateProvider,
+              toProvider: reportSupplierToDateProvider,
+            ),
+          ],
+          onRefresh: () => ref.invalidate(supplierAnalysisReportProvider),
+          actions: [
+            TextButton.icon(
+              onPressed:
+                  report.isLoading || (report.valueOrNull?.isEmpty ?? true)
+                  ? null
+                  : () => saveCsv(
+                      context,
+                      suggestedName: csvSuggestedName('supplier-analysis'),
+                      csv: buildSupplierAnalysisCsv(l10n, report.valueOrNull!),
+                      successMessage: l10n.reportsExported,
+                      errorMessage: l10n.reportsExportfailed,
+                    ),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: Text(l10n.reportsExportcsv),
+            ),
+          ],
         ),
         Expanded(child: _body(report)),
       ],

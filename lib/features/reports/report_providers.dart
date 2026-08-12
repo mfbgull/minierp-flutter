@@ -34,11 +34,19 @@ import '../../data/repositories/paged_request.dart'
 import '../../data/repositories/report_repository.dart'
     show reportRepositoryProvider;
 
-// Shared date helpers now live in lib/core/utils/date_utils.dart and
-// lib/widgets/date_picker_helpers.dart — the report screens keep
-// importing them through this file, so re-export the two names they use.
-export '../../core/utils/date_utils.dart' show isoDate;
-export '../../widgets/date_picker_helpers.dart' show pickReportDate;
+/// Default report range start (N months before today) and end (today) —
+/// the report date providers initialize to these, and the report
+/// FutureProviders fall back to them if a provider is ever null (the
+/// pickers can't clear report dates, so this only guards resets).
+DateTime _monthsAgo(int months) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month - months, now.day);
+}
+
+DateTime _today() {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+}
 
 // ── AR aging ─────────────────────────────────────────────────────────
 
@@ -53,23 +61,18 @@ final arAgingProvider = FutureProvider<ArAgingReport>((ref) async {
 
 // ── Sales summary ────────────────────────────────────────────────────
 
-/// Date-range filters for the sales summary report — always non-null
-/// (the endpoint requires both dates). Defaults mirror the web app's
+/// Date-range filters for the sales summary report (the endpoint
+/// requires both dates). Defaults mirror the web app's
 /// `SalesSummaryReport` initial state: last month → today.
-final reportSalesFromDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 1, now.day);
-});
-final reportSalesToDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportSalesFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(1));
+final reportSalesToDateProvider = StateProvider<DateTime?>((ref) => _today());
 
 /// Loads GET /reports/sales-summary, re-running when the date range
 /// changes (the screen's From/To buttons write these providers).
 final salesSummaryProvider = FutureProvider<SalesSummaryReport>((ref) async {
-  final from = ref.watch(reportSalesFromDateProvider);
-  final to = ref.watch(reportSalesToDateProvider);
+  final from = ref.watch(reportSalesFromDateProvider) ?? _monthsAgo(1);
+  final to = ref.watch(reportSalesToDateProvider) ?? _today();
   final result = await ref
       .watch(reportRepositoryProvider)
       .salesSummary(fromDate: isoDate(from), toDate: isoDate(to));
@@ -121,22 +124,19 @@ final stockValuationReportProvider = FutureProvider<StockValuationReport>((
 /// Date-range filters for the sales-by-customer report. Defaults mirror
 /// the web app's `SalesByCustomerReport` initial state: last month →
 /// today (the endpoint requires both dates).
-final reportSalesByCustomerFromDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 1, now.day);
-});
-final reportSalesByCustomerToDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportSalesByCustomerFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(1));
+final reportSalesByCustomerToDateProvider =
+    StateProvider<DateTime?>((ref) => _today());
 
 /// Loads GET /reports/sales-by-customer, re-running when the date range
 /// changes (the screen's From/To buttons write these providers).
 final salesByCustomerReportProvider = FutureProvider<List<SalesByCustomerRow>>((
   ref,
 ) async {
-  final from = ref.watch(reportSalesByCustomerFromDateProvider);
-  final to = ref.watch(reportSalesByCustomerToDateProvider);
+  final from =
+      ref.watch(reportSalesByCustomerFromDateProvider) ?? _monthsAgo(1);
+  final to = ref.watch(reportSalesByCustomerToDateProvider) ?? _today();
   final result = await ref
       .watch(reportRepositoryProvider)
       .salesByCustomer(fromDate: isoDate(from), toDate: isoDate(to));
@@ -151,19 +151,14 @@ final salesByCustomerReportProvider = FutureProvider<List<SalesByCustomerRow>>((
 /// Date-range filters for the DSO report. Defaults mirror the web app's
 /// `DSOReport` initial state: last month → today (the endpoint defaults
 /// to the last 30 days when both are omitted, so these are always sent).
-final reportDsoFromDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 1, now.day);
-});
-final reportDsoToDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportDsoFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(1));
+final reportDsoToDateProvider = StateProvider<DateTime?>((ref) => _today());
 
 /// Loads GET /reports/dso, re-running when the date range changes.
 final dsoReportProvider = FutureProvider<DSOMetric>((ref) async {
-  final from = ref.watch(reportDsoFromDateProvider);
-  final to = ref.watch(reportDsoToDateProvider);
+  final from = ref.watch(reportDsoFromDateProvider) ?? _monthsAgo(1);
+  final to = ref.watch(reportDsoToDateProvider) ?? _today();
   final result = await ref
       .watch(reportRepositoryProvider)
       .dso(fromDate: isoDate(from), toDate: isoDate(to));
@@ -177,19 +172,14 @@ final dsoReportProvider = FutureProvider<DSOMetric>((ref) async {
 
 /// Date-range filters for the cash flow report (the endpoint requires
 /// both dates). Defaults mirror the web app: last month → today.
-final reportCashFlowFromDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 1, now.day);
-});
-final reportCashFlowToDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportCashFlowFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(1));
+final reportCashFlowToDateProvider = StateProvider<DateTime?>((ref) => _today());
 
 /// Loads GET /reports/cash-flow, re-running when the date range changes.
 final cashFlowReportProvider = FutureProvider<CashFlowReport>((ref) async {
-  final from = ref.watch(reportCashFlowFromDateProvider);
-  final to = ref.watch(reportCashFlowToDateProvider);
+  final from = ref.watch(reportCashFlowFromDateProvider) ?? _monthsAgo(1);
+  final to = ref.watch(reportCashFlowToDateProvider) ?? _today();
   final result = await ref
       .watch(reportRepositoryProvider)
       .cashFlow(fromDate: isoDate(from), toDate: isoDate(to));
@@ -203,19 +193,15 @@ final cashFlowReportProvider = FutureProvider<CashFlowReport>((ref) async {
 
 /// Date-range filters for the P&L report (the endpoint requires both
 /// dates). Defaults mirror the web app: last month → today.
-final reportProfitLossFromDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 1, now.day);
-});
-final reportProfitLossToDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportProfitLossFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(1));
+final reportProfitLossToDateProvider =
+    StateProvider<DateTime?>((ref) => _today());
 
 /// Loads GET /reports/profit-loss, re-running when the date range changes.
 final profitLossReportProvider = FutureProvider<ProfitLossReport>((ref) async {
-  final from = ref.watch(reportProfitLossFromDateProvider);
-  final to = ref.watch(reportProfitLossToDateProvider);
+  final from = ref.watch(reportProfitLossFromDateProvider) ?? _monthsAgo(1);
+  final to = ref.watch(reportProfitLossToDateProvider) ?? _today();
   final result = await ref
       .watch(reportRepositoryProvider)
       .profitLoss(fromDate: isoDate(from), toDate: isoDate(to));
@@ -229,14 +215,9 @@ final profitLossReportProvider = FutureProvider<ProfitLossReport>((ref) async {
 
 /// Date-range filters for the inventory movement report. Defaults mirror
 /// the web app: last month → today (the endpoint tolerates both omitted).
-final reportMovementFromDateProvider = StateProvider<DateTime?>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 1, now.day);
-});
-final reportMovementToDateProvider = StateProvider<DateTime?>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportMovementFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(1));
+final reportMovementToDateProvider = StateProvider<DateTime?>((ref) => _today());
 
 /// Loads GET /reports/inventory-movement, re-running when the date range
 /// changes.
@@ -262,22 +243,17 @@ final inventoryMovementReportProvider = FutureProvider<InventoryMovementReport>(
 /// Date-range filters for the purchase summary report. Defaults mirror
 /// the web app: last 3 months → today (the endpoint requires both
 /// dates).
-final reportPurchaseFromDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 3, now.day);
-});
-final reportPurchaseToDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportPurchaseFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(3));
+final reportPurchaseToDateProvider = StateProvider<DateTime?>((ref) => _today());
 
 /// Loads GET /reports/purchase-summary, re-running when the date range
 /// changes.
 final purchaseSummaryReportProvider = FutureProvider<PurchaseSummaryReport>((
   ref,
 ) async {
-  final from = ref.watch(reportPurchaseFromDateProvider);
-  final to = ref.watch(reportPurchaseToDateProvider);
+  final from = ref.watch(reportPurchaseFromDateProvider) ?? _monthsAgo(3);
+  final to = ref.watch(reportPurchaseToDateProvider) ?? _today();
   final result = await ref
       .watch(reportRepositoryProvider)
       .purchaseSummary(fromDate: isoDate(from), toDate: isoDate(to));
@@ -312,14 +288,9 @@ final topDebtorsReportProvider = FutureProvider<List<TopDebtorRow>>((
 /// Date-range filters for the expenses report (the endpoint requires
 /// both dates). Defaults mirror the web app's `ExpensesReport` initial
 /// state: last month → today.
-final reportExpensesFromDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 1, now.day);
-});
-final reportExpensesToDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportExpensesFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(1));
+final reportExpensesToDateProvider = StateProvider<DateTime?>((ref) => _today());
 
 /// Active category filter for the expenses report — null means "all
 /// categories" (the `category` query param is omitted).
@@ -328,8 +299,8 @@ final reportExpensesCategoryProvider = StateProvider<String?>((ref) => null);
 /// Loads GET /reports/expenses, re-running when the date range or the
 /// selected category changes.
 final expensesReportProvider = FutureProvider<ExpensesReport>((ref) async {
-  final from = ref.watch(reportExpensesFromDateProvider);
-  final to = ref.watch(reportExpensesToDateProvider);
+  final from = ref.watch(reportExpensesFromDateProvider) ?? _monthsAgo(1);
+  final to = ref.watch(reportExpensesToDateProvider) ?? _today();
   final category = ref.watch(reportExpensesCategoryProvider);
   final result = await ref
       .watch(reportRepositoryProvider)
@@ -350,14 +321,10 @@ final expensesReportProvider = FutureProvider<ExpensesReport>((ref) async {
 /// the web app's `CustomerStatementsReport` initial state: last 3 months
 /// → today (the endpoint tolerates omitted dates, but the port always
 /// sends them).
-final reportStatementsFromDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 3, now.day);
-});
-final reportStatementsToDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportStatementsFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(3));
+final reportStatementsToDateProvider =
+    StateProvider<DateTime?>((ref) => _today());
 
 /// Active customer filter for the customer statements report — null means
 /// "All Customers" (the `customerId` query param is omitted).
@@ -379,8 +346,8 @@ final customersForReportProvider = FutureProvider<List<Customer>>((ref) async {
 /// or selected customer changes.
 final customerStatementsReportProvider =
     FutureProvider<List<CustomerStatementRow>>((ref) async {
-  final from = ref.watch(reportStatementsFromDateProvider);
-  final to = ref.watch(reportStatementsToDateProvider);
+  final from = ref.watch(reportStatementsFromDateProvider) ?? _monthsAgo(3);
+  final to = ref.watch(reportStatementsToDateProvider) ?? _today();
   final customerId = ref.watch(reportStatementsCustomerIdProvider);
   final result = await ref
       .watch(reportRepositoryProvider)
@@ -400,22 +367,18 @@ final customerStatementsReportProvider =
 /// Date-range filters for the sales-by-item report. Defaults mirror the
 /// web app's `SalesByItemReport` initial state: last month → today (the
 /// endpoint requires both dates).
-final reportSalesByItemFromDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 1, now.day);
-});
-final reportSalesByItemToDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportSalesByItemFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(1));
+final reportSalesByItemToDateProvider =
+    StateProvider<DateTime?>((ref) => _today());
 
 /// Loads GET /reports/sales-by-item, re-running when the date range
 /// changes.
 final salesByItemReportProvider = FutureProvider<List<SalesByItemRow>>((
   ref,
 ) async {
-  final from = ref.watch(reportSalesByItemFromDateProvider);
-  final to = ref.watch(reportSalesByItemToDateProvider);
+  final from = ref.watch(reportSalesByItemFromDateProvider) ?? _monthsAgo(1);
+  final to = ref.watch(reportSalesByItemToDateProvider) ?? _today();
   final result = await ref
       .watch(reportRepositoryProvider)
       .salesByItem(fromDate: isoDate(from), toDate: isoDate(to));
@@ -430,21 +393,17 @@ final salesByItemReportProvider = FutureProvider<List<SalesByItemRow>>((
 /// Date-range filters for the supplier-analysis report. Defaults mirror
 /// the web app's `SupplierAnalysisReport` initial state: last 3 months
 /// → today (the endpoint requires both dates).
-final reportSupplierFromDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 3, now.day);
-});
-final reportSupplierToDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportSupplierFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(3));
+final reportSupplierToDateProvider =
+    StateProvider<DateTime?>((ref) => _today());
 
 /// Loads GET /reports/supplier-analysis, re-running when the date range
 /// changes.
 final supplierAnalysisReportProvider = FutureProvider<List<SupplierAnalysisRow>>(
   (ref) async {
-    final from = ref.watch(reportSupplierFromDateProvider);
-    final to = ref.watch(reportSupplierToDateProvider);
+    final from = ref.watch(reportSupplierFromDateProvider) ?? _monthsAgo(3);
+    final to = ref.watch(reportSupplierToDateProvider) ?? _today();
     final result = await ref
         .watch(reportRepositoryProvider)
         .supplierAnalysis(fromDate: isoDate(from), toDate: isoDate(to));
@@ -460,21 +419,17 @@ final supplierAnalysisReportProvider = FutureProvider<List<SupplierAnalysisRow>>
 /// Date-range filters for the production-summary report. Defaults mirror
 /// the web app's `ProductionSummaryReport` initial state: last month →
 /// today (the endpoint requires both dates).
-final reportProductionFromDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 1, now.day);
-});
-final reportProductionToDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportProductionFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(1));
+final reportProductionToDateProvider =
+    StateProvider<DateTime?>((ref) => _today());
 
 /// Loads GET /reports/production-summary, re-running when the date range
 /// changes.
 final productionSummaryReportProvider =
     FutureProvider<ProductionSummaryReport>((ref) async {
-  final from = ref.watch(reportProductionFromDateProvider);
-  final to = ref.watch(reportProductionToDateProvider);
+  final from = ref.watch(reportProductionFromDateProvider) ?? _monthsAgo(1);
+  final to = ref.watch(reportProductionToDateProvider) ?? _today();
   final result = await ref
       .watch(reportRepositoryProvider)
       .productionSummary(fromDate: isoDate(from), toDate: isoDate(to));
@@ -500,14 +455,9 @@ final arSummaryProvider = FutureProvider<ArSummaryReport>((ref) async {
 /// Date-range filters for the bom-usage report. Defaults mirror the web
 /// app's `BOMUsageReport` initial state: last month → today (the
 /// endpoint tolerates omitted dates, but the port always sends them).
-final reportBomFromDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month - 1, now.day);
-});
-final reportBomToDateProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day);
-});
+final reportBomFromDateProvider =
+    StateProvider<DateTime?>((ref) => _monthsAgo(1));
+final reportBomToDateProvider = StateProvider<DateTime?>((ref) => _today());
 
 /// Active finished-item filter for the bom-usage report — null means
 /// "All Items" (the `itemId` query param is omitted).
@@ -529,8 +479,8 @@ final finishedItemsForReportProvider = FutureProvider<List<Item>>((ref) async {
 /// Loads GET /reports/bom-usage, re-running when the date range or the
 /// selected finished item changes.
 final bomUsageReportProvider = FutureProvider<BomUsageReport>((ref) async {
-  final from = ref.watch(reportBomFromDateProvider);
-  final to = ref.watch(reportBomToDateProvider);
+  final from = ref.watch(reportBomFromDateProvider) ?? _monthsAgo(1);
+  final to = ref.watch(reportBomToDateProvider) ?? _today();
   final itemId = ref.watch(reportBomItemIdProvider);
   final result = await ref
       .watch(reportRepositoryProvider)

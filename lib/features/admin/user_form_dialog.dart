@@ -15,6 +15,7 @@ import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/form_field.dart';
+import '../../widgets/form_helpers.dart';
 import '../../widgets/searchable_select.dart';
 import 'admin_models.dart';
 import 'admin_providers.dart';
@@ -210,6 +211,8 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         required: true,
                         child: TextFormField(
                           controller: _usernameController,
+                          onFieldSubmitted: submitOnEnter(_submit),
+                          autofocus: true,
                           enabled: !_submitting,
                           decoration: _decoration(),
                           validator: _validateRequired,
@@ -221,6 +224,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         required: true,
                         child: TextFormField(
                           controller: _fullNameController,
+                          onFieldSubmitted: submitOnEnter(_submit),
                           enabled: !_submitting,
                           decoration: _decoration(),
                           validator: _validateRequired,
@@ -232,6 +236,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         required: true,
                         child: TextFormField(
                           controller: _emailController,
+                          onFieldSubmitted: submitOnEnter(_submit),
                           enabled: !_submitting,
                           decoration: _decoration(),
                           validator: _validateEmail,
@@ -266,6 +271,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                           required: true,
                           child: TextFormField(
                             controller: _passwordController,
+                            onFieldSubmitted: submitOnEnter(_submit),
                             enabled: !_submitting,
                             obscureText: true,
                             decoration: _decoration(),

@@ -16,6 +16,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'low_stock_detail_dialog.dart';
 import 'report_providers.dart';
 
@@ -164,10 +165,7 @@ class _LowStockReportScreenState extends ConsumerState<LowStockReportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: _header(l10n, rows),
-        ),
+        _header(l10n, rows),
         Expanded(child: _body(rows)),
       ],
     );
@@ -183,14 +181,17 @@ class _LowStockReportScreenState extends ConsumerState<LowStockReportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                l10n.reportsLowstockalertreport,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Text(
+            l10n.reportsLowstockalertreport,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          onRefresh: () => ref.invalidate(lowStockReportProvider),
+          actions: [
             TextButton.icon(
               onPressed: rows.isLoading || loaded.isEmpty
                   ? null
@@ -207,36 +208,38 @@ class _LowStockReportScreenState extends ConsumerState<LowStockReportScreen> {
           ],
         ),
         if (loaded.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.warning_amber_outlined,
-                  size: 18,
-                  color: scheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${loaded.length} ${l10n.reportsLowstockcount}',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(width: 14),
-                Text(
-                  '${l10n.reportsShortagetotal}: '
-                  '${Formatters.number(totalShortage)}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: scheme.error,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: scheme.outlineVariant),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_outlined,
+                    size: 18,
+                    color: scheme.primary,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Text(
+                    '${loaded.length} ${l10n.reportsLowstockcount}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(width: 14),
+                  Text(
+                    '${l10n.reportsShortagetotal}: '
+                    '${Formatters.number(totalShortage)}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: scheme.error,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

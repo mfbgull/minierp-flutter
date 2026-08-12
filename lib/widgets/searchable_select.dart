@@ -34,6 +34,8 @@ class SearchableSelect<T> extends StatelessWidget {
     this.emptyText,
     this.menuMaxHeight = 280,
     this.textStyle = const TextStyle(fontSize: 14),
+    this.autoOpen = false,
+    this.openSignal,
   });
 
   final List<T> items;
@@ -68,6 +70,16 @@ class SearchableSelect<T> extends StatelessWidget {
   /// smaller size.
   final TextStyle textStyle;
 
+  /// Opens the popup once on first build (used by the invoice form's
+  /// customer field on load, spec §2.1). One-shot per State — parent
+  /// rebuilds do not reopen it.
+  final bool autoOpen;
+
+  /// External trigger to open the popup on demand (e.g. a global
+  /// shortcut like Alt+C). Every fire opens it (a no-op when already
+  /// open).
+  final Listenable? openSignal;
+
   String _label(T item) => labelBuilder?.call(item) ?? item.toString();
 
   /// Trigger label: the selected item's label, or [hint] when nothing is
@@ -100,6 +112,8 @@ class SearchableSelect<T> extends StatelessWidget {
         errorText: field.errorText,
         menuMaxHeight: menuMaxHeight,
         textStyle: textStyle,
+        autoOpen: autoOpen,
+        openSignal: openSignal,
       ),
     );
   }
@@ -120,6 +134,8 @@ class _SearchableSelectField<T> extends StatefulWidget {
     required this.errorText,
     required this.menuMaxHeight,
     required this.textStyle,
+    required this.autoOpen,
+    required this.openSignal,
   });
 
   final List<T> items;
@@ -135,6 +151,8 @@ class _SearchableSelectField<T> extends StatefulWidget {
   final String? errorText;
   final double menuMaxHeight;
   final TextStyle textStyle;
+  final bool autoOpen;
+  final Listenable? openSignal;
 
   @override
   State<_SearchableSelectField<T>> createState() =>
@@ -156,6 +174,12 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
   @override
   void initState() {
     super.initState();
+    if (widget.autoOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openPopup();
+      });
+    }
+    widget.openSignal?.addListener(_onOpenSignal);
     _focus.onKeyEvent = (node, event) {
       if (event is! KeyDownEvent) return KeyEventResult.ignored;
       if (event.logicalKey == LogicalKeyboardKey.enter ||
@@ -199,13 +223,50 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
   }
 
   @override
+  void didUpdateWidget(_SearchableSelectField<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The option list arrived/refreshed while the popup is open (e.g. the
+    // customer popup auto-opens before the async provider resolves, spec
+    // §8.1): re-filter against the live items so the options appear
+    // without reopening.
+    if (oldWidget.items != widget.items && _open) {
+      final query = _searchController.text.trim().toLowerCase();
+      setState(() {
+        _filtered = query.isEmpty
+            ? [...widget.items]
+            : [
+                for (final item in widget.items)
+                  if (_labelOf(item).toLowerCase().contains(query)) item,
+              ];
+        _selectedIndex = _filtered.isEmpty ? -1 : 0;
+      });
+      // Overlay refresh must wait for the build phase to finish.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _overlay?.markNeedsBuild();
+      });
+    }
+  }
+
+  @override
   void dispose() {
+    widget.openSignal?.removeListener(_onOpenSignal);
     _removeOverlay();
     _focus.dispose();
     _searchFocus.dispose();
     _searchController.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// Alt+C (or the on-load auto-open) — opens the popup when closed;
+  /// re-focuses its filter when it is already open (spec §7).
+  void _onOpenSignal() {
+    if (!mounted) return;
+    if (_open) {
+      _searchFocus.requestFocus();
+    } else {
+      _openPopup();
+    }
   }
 
   String _labelOf(T item) =>
@@ -246,6 +307,13 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
       builder: (overlayContext) => _popup(overlayContext, left, top, width),
     );
     Overlay.of(context).insert(_overlay!);
+    // Autofocus on the filter field is unreliable inside a freshly
+    // inserted overlay entry (esp. when it opens during a route
+    // transition or before async items resolve) — request focus
+    // explicitly once the entry is live.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _open) _searchFocus.requestFocus();
+    });
   }
 
   void _close() {

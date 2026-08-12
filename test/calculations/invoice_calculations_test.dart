@@ -31,6 +31,7 @@ const looseAmountDriven = InvoiceFormItem(
   tax: 0,
   discount: Discount(type: DiscountType.flat, value: 0),
   saleType: SaleType.loose,
+  amountDriven: true,
   lastEditedField: EditedField.amount,
 );
 
@@ -88,6 +89,7 @@ void main() {
       tax: 0,
       discount: Discount(type: DiscountType.percentage, value: 10),
       saleType: SaleType.loose,
+      amountDriven: true,
       lastEditedField: EditedField.amount,
     );
     expect(calculateItemTotal(discounted), 90);

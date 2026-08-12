@@ -149,6 +149,7 @@ class _ProcessReturnDialogState extends ConsumerState<ProcessReturnDialog> {
                   required: true,
                   child: TextFormField(
                     controller: _qtyController,
+                    onFieldSubmitted: submitOnEnter(_submit),
                     enabled: !_submitting,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
@@ -173,6 +174,7 @@ class _ProcessReturnDialogState extends ConsumerState<ProcessReturnDialog> {
                   label: l10n.purchasesReturnreason,
                   child: TextFormField(
                     controller: _reasonController,
+                    onFieldSubmitted: submitOnEnter(_submit),
                     enabled: !_submitting,
                     decoration: formInputDecoration(
                       hintText: l10n.purchasesReturnreasonplaceholder,

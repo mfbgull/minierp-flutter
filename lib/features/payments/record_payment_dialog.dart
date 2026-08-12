@@ -316,7 +316,9 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                   _AllocationLineRow(
                     invoice: openInvoices[i],
                     controller: _amountControllers[i],
+                    autofocus: i == 0,
                     onAmountChanged: () => setState(() {}),
+                    onSubmit: _submit,
                   ),
                 ],
               if (_totalAllocated > 0) ...[
@@ -381,6 +383,7 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
               label: l10n.fieldsReference,
               child: TextFormField(
                 controller: _referenceController,
+                onFieldSubmitted: submitOnEnter(_submit),
                 decoration: formInputDecoration(
                   hintText: l10n.paymentsReferencehint,
                 ),
@@ -391,6 +394,7 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
               label: l10n.fieldsNotes,
               child: TextFormField(
                 controller: _notesController,
+                onFieldSubmitted: submitOnEnter(_submit),
                 decoration: formInputDecoration(
                   hintText: l10n.paymentsNoteshint,
                 ),
@@ -436,15 +440,25 @@ class _AllocationLineRow extends StatelessWidget {
   const _AllocationLineRow({
     required this.invoice,
     required this.controller,
+    required this.autofocus,
     required this.onAmountChanged,
+    required this.onSubmit,
   });
 
   final Invoice invoice;
   final TextEditingController controller;
 
+  /// Focuses the first allocation amount on open so the user can start
+  /// typing straight away (the amounts are the dialog's primary input).
+  final bool autofocus;
+
   /// Rebuilds the dialog so the running total + submit button track the
   /// entered amounts (enterText alone doesn't rebuild the parent).
   final VoidCallback onAmountChanged;
+
+  /// Enter-to-submit: pressing Enter in a filled line saves the payment
+  /// (same [submitOnEnter] contract as the header's reference/notes).
+  final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -483,7 +497,9 @@ class _AllocationLineRow extends StatelessWidget {
             label: l10n.fieldsAmount,
             child: TextFormField(
               controller: controller,
+              autofocus: autofocus,
               onChanged: (_) => onAmountChanged(),
+              onFieldSubmitted: submitOnEnter(onSubmit),
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),

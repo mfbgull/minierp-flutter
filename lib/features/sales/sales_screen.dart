@@ -7,7 +7,7 @@
 // Grid state: same pattern as ItemsScreen/ExpensesScreen — rows are fed
 // through the PlutoGridStateManager (clear + append) on provider
 // changes; the provider is the single source of truth. Double-tapping a
-// row opens the edit form; New Invoice opens the create form.
+// row opens the A4 print preview; New Invoice opens the create form.
 //
 // Summary strip: Total Sales / Total Paid / Total Due computed from the
 // *filtered* rows, so it always matches the active filters.
@@ -247,7 +247,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
               ref.read(invoicesProvider).valueOrNull ?? const <Invoice>[];
           final matches = invoices.where((i) => i.id == id);
           if (matches.isEmpty) return;
-          context.push('/sales/form', extra: matches.first);
+          // Double-tap → print preview (not the edit form); the preview
+          // refetches the saved detail so it always matches the document.
+          context.push('/sales/print-preview', extra: matches.first);
         },
         noRowsWidget: Center(
           child: Text(

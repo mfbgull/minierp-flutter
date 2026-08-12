@@ -16,7 +16,6 @@ import '../models/sales_forms.dart'
     show
         CalculableLine,
         DiscountScope,
-        EditedField,
         InvoiceFormItem,
         InvoiceFormPayment,
         InvoiceFormState,
@@ -26,11 +25,11 @@ import '../models/sales_forms.dart'
 
 /* ── Item-level calculations ────────────────────────────────────── */
 
-/// Base amount of a line. Loose lines where the user typed the Amount use
-/// it verbatim — qty × rate would differ by the quantity rounding.
+/// Base amount of a line. Amount-driven loose lines (flip model, spec
+/// §5.2) bill the entered amount verbatim — qty × rate would differ by
+/// the quantity rounding.
 num calculateItemBase(CalculableLine item) {
-  if (item.saleType == SaleType.loose &&
-      item.lastEditedField == EditedField.amount) {
+  if (item.saleType == SaleType.loose && item.amountDriven) {
     return item.amount;
   }
   return item.quantity * item.rate;

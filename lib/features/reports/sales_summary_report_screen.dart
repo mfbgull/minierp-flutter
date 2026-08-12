@@ -15,9 +15,10 @@ import '../../core/utils/invoice_status.dart';
 import '../../data/models/report.dart' show SalesSummaryReport;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart' show ReportDateRangeFilter;
+import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../../widgets/status_badge.dart';
 import 'report_providers.dart';
 
@@ -44,7 +45,6 @@ class _SalesSummaryReportScreenState
   Widget build(BuildContext context) {
     final report = ref.watch(salesSummaryProvider);
     final l10n = AppLocalizations.of(context)!;
-    final textTheme = Theme.of(context).textTheme;
 
     ref.listen(salesSummaryProvider, (previous, next) => _applyReport(next));
 
@@ -53,38 +53,37 @@ class _SalesSummaryReportScreenState
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.reportsSalessummaryreport,
-                  style: textTheme.titleLarge,
-                ),
-              ),
-              // From / To date buttons — same pattern as the other
-              // report screens; writing the providers refetches.
-              ReportDateRangeFilter(
-                fromProvider: reportSalesFromDateProvider,
-                toProvider: reportSalesToDateProvider,
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed:
-                    report.isLoading ||
-                        (report.valueOrNull?.sales.isEmpty ?? true)
-                    ? null
-                    : () => saveCsv(
-                        context,
-                        suggestedName: csvSuggestedName('sales-summary'),
-                        csv: buildSalesSummaryCsv(l10n, report.valueOrNull!),
-                        successMessage: l10n.reportsExported,
-                        errorMessage: l10n.reportsExportfailed,
-                      ),
-                icon: const Icon(Icons.file_download_outlined, size: 18),
-                label: Text(l10n.reportsExportcsv),
-              ),
-            ],
+          child: Text(
+            l10n.reportsSalessummaryreport,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
+        ),
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          filters: [
+            DateRangeFilter(
+              fromProvider: reportSalesFromDateProvider,
+              toProvider: reportSalesToDateProvider,
+            ),
+          ],
+          onRefresh: () => ref.invalidate(salesSummaryProvider),
+          actions: [
+            TextButton.icon(
+              onPressed:
+                  report.isLoading ||
+                      (report.valueOrNull?.sales.isEmpty ?? true)
+                  ? null
+                  : () => saveCsv(
+                      context,
+                      suggestedName: csvSuggestedName('sales-summary'),
+                      csv: buildSalesSummaryCsv(l10n, report.valueOrNull!),
+                      successMessage: l10n.reportsExported,
+                      errorMessage: l10n.reportsExportfailed,
+                    ),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: Text(l10n.reportsExportcsv),
+            ),
+          ],
         ),
         if (report.valueOrNull != null) ...[
           Padding(

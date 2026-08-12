@@ -14,6 +14,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
 
 class ArAgingReportScreen extends ConsumerStatefulWidget {
@@ -132,10 +133,7 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: _header(l10n, report),
-        ),
+        _header(l10n, report),
         Expanded(child: _body(report)),
       ],
     );
@@ -147,14 +145,17 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                l10n.reportsTabsAr_aging,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Text(
+            l10n.reportsTabsAr_aging,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          onRefresh: () => ref.invalidate(arAgingProvider),
+          actions: [
             TextButton.icon(
               onPressed: report.isLoading || (value?.buckets.isEmpty ?? true)
                   ? null
@@ -171,15 +172,20 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
           ],
         ),
         if (value != null && value.asOfDate.isNotEmpty)
-          Text(
-            '${l10n.reportsAsOf} ${Formatters.date(value.asOfDate)}',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: Text(
+              '${l10n.reportsAsOf} ${Formatters.date(value.asOfDate)}',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
           ),
         if (value != null) ...[
-          const SizedBox(height: 10),
-          _totalsStrip(l10n, value),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: _totalsStrip(l10n, value),
+          ),
         ],
       ],
     );

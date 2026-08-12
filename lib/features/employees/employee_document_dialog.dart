@@ -16,6 +16,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/date_picker_helpers.dart' show pickDate;
 import '../../widgets/form_field.dart';
+import '../../widgets/form_helpers.dart';
 import 'employee_providers.dart';
 import 'employee_repository.dart' show employeeRepositoryProvider;
 
@@ -207,6 +208,8 @@ class _EmployeeDocumentDialogState
                         required: true,
                         child: TextFormField(
                           controller: _nameController,
+                          autofocus: true,
+                          onFieldSubmitted: submitOnEnter(_submit),
                           enabled: !_submitting,
                           decoration: _decoration(),
                           validator: _validateName,
@@ -221,6 +224,7 @@ class _EmployeeDocumentDialogState
                               label: l10n.employeesDocumentsType,
                               child: TextFormField(
                                 controller: _typeController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -232,6 +236,7 @@ class _EmployeeDocumentDialogState
                               label: l10n.employeesDocumentsNumber,
                               child: TextFormField(
                                 controller: _numberController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),

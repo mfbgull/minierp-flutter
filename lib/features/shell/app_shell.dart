@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_notifier.dart';
+import '../../core/i18n/locale_provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/screen_shortcuts.dart';
 
 /// One module in the shell's navigation. [label] is resolved with the
 /// active localization; [path] is the router branch root; [adminOnly]
@@ -182,6 +184,31 @@ class AppShell extends ConsumerWidget {
             icon: const Icon(Icons.key_outlined),
             onPressed: () => context.push('/change-password'),
           ),
+          PopupMenuButton<Locale>(
+            tooltip: l10n.commonLanguage,
+            icon: const Icon(Icons.language),
+            onSelected: (locale) =>
+                ref.read(localeProvider.notifier).setLocale(locale),
+            itemBuilder: (context) => [
+              for (final locale in supportedLocales)
+                PopupMenuItem(
+                  value: locale,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          locale.languageCode == 'en' ? 'English' : 'اردو',
+                        ),
+                      ),
+                      if (locale == ref.read(localeProvider))
+                        Icon(Icons.check, size: 18, color: Theme.of(
+                          context,
+                        ).colorScheme.primary),
+                    ],
+                  ),
+                ),
+            ],
+          ),
           IconButton(
             tooltip: l10n.commonLogout,
             icon: const Icon(Icons.logout),
@@ -190,23 +217,28 @@ class AppShell extends ConsumerWidget {
           const SizedBox(width: 4),
         ],
       ),
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _NavRail(
-            destinations: visible,
-            selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
-            onSelect: (index) {
-              final branchIndex = shellDestinations.indexOf(visible[index]);
-              navigationShell.goBranch(
-                branchIndex,
-                initialLocation: branchIndex == navigationShell.currentIndex,
-              );
-            },
-          ),
-          const VerticalDivider(width: 1, thickness: 1),
-          Expanded(child: navigationShell),
-        ],
+      // Screen-level keyboard shortcuts (Ctrl+F focus search, Ctrl+N new
+      // record): the scope resolves the visible branch's toolbar at
+      // keypress time and dispatches the keys from anywhere on screen.
+      body: ScreenShortcutScope(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _NavRail(
+              destinations: visible,
+              selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
+              onSelect: (index) {
+                final branchIndex = shellDestinations.indexOf(visible[index]);
+                navigationShell.goBranch(
+                  branchIndex,
+                  initialLocation: branchIndex == navigationShell.currentIndex,
+                );
+              },
+            ),
+            const VerticalDivider(width: 1, thickness: 1),
+            Expanded(child: navigationShell),
+          ],
+        ),
       ),
     );
   }
@@ -231,7 +263,7 @@ class _NavRail extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     return Container(
-      width: 208,
+      width: 180,
       color: scheme.surface,
       child: SafeArea(
         child: Column(

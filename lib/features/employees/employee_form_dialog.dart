@@ -20,6 +20,7 @@ import '../../widgets/app_toast.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/date_picker_helpers.dart' show pickDate;
 import '../../widgets/form_field.dart';
+import '../../widgets/form_helpers.dart';
 import '../../widgets/searchable_select.dart';
 import 'employee_models.dart';
 import 'employee_providers.dart';
@@ -398,6 +399,8 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               required: true,
                               child: TextFormField(
                                 controller: _firstNameController,
+                                onFieldSubmitted: submitOnEnter(_submit),
+                                autofocus: true,
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                                 validator: _validateName,
@@ -411,6 +414,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               required: true,
                               child: TextFormField(
                                 controller: _lastNameController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                                 validator: _validateLastName,
@@ -428,6 +432,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsEmail,
                               child: TextFormField(
                                 controller: _emailController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                                 validator: _validateEmail,
@@ -440,6 +445,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsPhone,
                               child: TextFormField(
                                 controller: _phoneController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -456,6 +462,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsMobile,
                               child: TextFormField(
                                 controller: _mobileController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -467,6 +474,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsCnic_no,
                               child: TextFormField(
                                 controller: _cnicController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -483,6 +491,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsDepartment,
                               child: TextFormField(
                                 controller: _departmentController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -494,6 +503,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsDesignation,
                               child: TextFormField(
                                 controller: _designationController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -526,6 +536,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsSalary,
                               child: TextFormField(
                                 controller: _salaryController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 keyboardType: const TextInputType
                                     .numberWithOptions(decimal: true),
@@ -628,6 +639,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsCity,
                               child: TextFormField(
                                 controller: _cityController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -639,6 +651,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsState,
                               child: TextFormField(
                                 controller: _stateController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -655,6 +668,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsPostal_code,
                               child: TextFormField(
                                 controller: _postalCodeController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -666,6 +680,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsCountry,
                               child: TextFormField(
                                 controller: _countryController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -693,6 +708,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsBank_name,
                               child: TextFormField(
                                 controller: _bankNameController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -704,6 +720,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsBank_account_no,
                               child: TextFormField(
                                 controller: _bankAccountController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -716,6 +733,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                         label: l10n.employeesFieldsBank_iban,
                         child: TextFormField(
                           controller: _ibanController,
+                          onFieldSubmitted: submitOnEnter(_submit),
                           enabled: !_submitting,
                           decoration: _decoration(),
                         ),
@@ -729,6 +747,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsEmergency_contact_name,
                               child: TextFormField(
                                 controller: _emergencyNameController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -740,6 +759,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
                               label: l10n.employeesFieldsEmergency_contact_phone,
                               child: TextFormField(
                                 controller: _emergencyPhoneController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),

@@ -14,9 +14,10 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart' show SalesByItemRow;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart' show ReportDateRangeFilter;
+import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
 import 'sales_by_item_detail_dialog.dart';
 
@@ -173,47 +174,44 @@ class _SalesByItemReportScreenState
   Widget build(BuildContext context) {
     final report = ref.watch(salesByItemReportProvider);
     final l10n = AppLocalizations.of(context)!;
-    final textTheme = Theme.of(context).textTheme;
 
-    ref.listen(
-      salesByItemReportProvider,
-      (previous, next) => _applyRows(next),
-    );
+    ref.listen(salesByItemReportProvider, (previous, next) => _applyRows(next));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.reportsSalesbyitemreport,
-                  style: textTheme.titleLarge,
-                ),
-              ),
-              ReportDateRangeFilter(
-                fromProvider: reportSalesByItemFromDateProvider,
-                toProvider: reportSalesByItemToDateProvider,
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed:
-                    report.isLoading || (report.valueOrNull?.isEmpty ?? true)
-                    ? null
-                    : () => saveCsv(
-                        context,
-                        suggestedName: csvSuggestedName('sales-by-item'),
-                        csv: buildSalesByItemCsv(l10n, report.valueOrNull!),
-                        successMessage: l10n.reportsExported,
-                        errorMessage: l10n.reportsExportfailed,
-                      ),
-                icon: const Icon(Icons.file_download_outlined, size: 18),
-                label: Text(l10n.reportsExportcsv),
-              ),
-            ],
+          child: Text(
+            l10n.reportsSalesbyitemreport,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
+        ),
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          filters: [
+            DateRangeFilter(
+              fromProvider: reportSalesByItemFromDateProvider,
+              toProvider: reportSalesByItemToDateProvider,
+            ),
+          ],
+          onRefresh: () => ref.invalidate(salesByItemReportProvider),
+          actions: [
+            TextButton.icon(
+              onPressed:
+                  report.isLoading || (report.valueOrNull?.isEmpty ?? true)
+                  ? null
+                  : () => saveCsv(
+                      context,
+                      suggestedName: csvSuggestedName('sales-by-item'),
+                      csv: buildSalesByItemCsv(l10n, report.valueOrNull!),
+                      successMessage: l10n.reportsExported,
+                      errorMessage: l10n.reportsExportfailed,
+                    ),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: Text(l10n.reportsExportcsv),
+            ),
+          ],
         ),
         Expanded(child: _body(report)),
       ],

@@ -21,7 +21,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart'
-    show ErrorBanner, formInputDecoration, numText;
+    show ErrorBanner, formInputDecoration, numText, submitOnEnter;
 import '../../widgets/searchable_select.dart';
 import 'calculations/production_calculations.dart' show bomMaterialCost;
 import 'production_providers.dart';
@@ -233,6 +233,8 @@ class _BomFormDialogState extends ConsumerState<BomFormDialog> {
                               required: true,
                               child: TextFormField(
                                 controller: _nameController,
+                                onFieldSubmitted: submitOnEnter(_submit),
+                                autofocus: true,
                                 enabled: !_submitting,
                                 decoration: formInputDecoration(),
                                 validator: (v) =>
@@ -274,6 +276,7 @@ class _BomFormDialogState extends ConsumerState<BomFormDialog> {
                               required: true,
                               child: TextFormField(
                                 controller: _quantityController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(

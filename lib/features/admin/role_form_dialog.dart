@@ -13,6 +13,7 @@ import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/form_field.dart';
+import '../../widgets/form_helpers.dart';
 import 'admin_models.dart';
 import 'admin_providers.dart';
 import 'admin_repository.dart' show adminRepositoryProvider;
@@ -163,6 +164,8 @@ class _RoleFormDialogState extends ConsumerState<RoleFormDialog> {
                         required: true,
                         child: TextFormField(
                           controller: _nameController,
+                          onFieldSubmitted: submitOnEnter(_submit),
+                          autofocus: true,
                           enabled: !_submitting && !locked,
                           decoration: _decoration(),
                           validator: _validateName,
