@@ -429,6 +429,27 @@ class AppLocalizationsUr extends AppLocalizations {
   String get customersCustomerdeleted => 'گاہک کامیابی سے حذف ہوگیا!';
 
   @override
+  String customersDays(Object days) {
+    return '$days دن';
+  }
+
+  @override
+  String get customersContactinfo => 'رابطہ معلومات';
+
+  @override
+  String get customersFixbalances => 'بیلنس ٹھیک کریں';
+
+  @override
+  String get customersFixbalancesconfirm =>
+      'یہ تمام گاہکوں کے بیلنس غیر ادا شدہ انوائسز سے دوبارہ شمار کرے گا۔ جاری رکھیں؟';
+
+  @override
+  String get customersFixbalancessuccess => 'بیلنس کامیابی سے دوبارہ شمار ہوئے';
+
+  @override
+  String get customersNotapplicable => 'ن/ا';
+
+  @override
   String get suppliersSuppliers => 'سپلائر';
 
   @override
@@ -502,6 +523,202 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get suppliersOpeningbalance => 'ابتدائی بیلنس';
+
+  @override
+  String get suppliersClosingbalance => 'اختتامی بیلنس';
+
+  @override
+  String get suppliersOverview => 'جائزہ';
+
+  @override
+  String get suppliersPos => 'پروکیورمنٹ آرڈرز';
+
+  @override
+  String get suppliersPayments => 'ادائیگیاں';
+
+  @override
+  String get suppliersBacktosuppliers => 'سپلائرز پر واپس';
+
+  @override
+  String get suppliersRecordpayment => 'ادائیگی ریکارڈ کریں';
+
+  @override
+  String get suppliersFinancialsummary => 'مالی خلاصہ';
+
+  @override
+  String get suppliersCurrentbalance => 'موجودہ بیلنس';
+
+  @override
+  String get suppliersTotalpovalue => 'کل پی او مالیت';
+
+  @override
+  String get suppliersTotalpos => 'کل پی اوز';
+
+  @override
+  String get suppliersPostatus => 'پروکیورمنٹ آرڈر کی حیثیت';
+
+  @override
+  String get suppliersDraft => 'ڈرافٹ';
+
+  @override
+  String get suppliersSubmitted => 'جمع کرایا گیا';
+
+  @override
+  String get suppliersPartial => 'جزوی';
+
+  @override
+  String get suppliersCompleted => 'مکمل';
+
+  @override
+  String get suppliersContactinfo => 'رابطہ کی معلومات';
+
+  @override
+  String get suppliersAccountsettings => 'اکاؤنٹ کی ترتیبات';
+
+  @override
+  String get suppliersSincesupplier => 'سپلائر از';
+
+  @override
+  String get suppliersNopos => 'کوئی پروکیورمنٹ آرڈر نہیں ملا';
+
+  @override
+  String get suppliersPono => 'پی او نمبر';
+
+  @override
+  String get suppliersTotal => 'کل';
+
+  @override
+  String get suppliersExpecteddelivery => 'متوقع ترسیل';
+
+  @override
+  String get suppliersLedgerType => 'قسم';
+
+  @override
+  String get suppliersLedgerTotals => 'کل رقم';
+
+  @override
+  String get suppliersLedgerTotaldebit => 'کل ڈیبٹ';
+
+  @override
+  String get suppliersLedgerTotalcredit => 'کل کریڈٹ';
+
+  @override
+  String get suppliersExportcsv => 'سی ایس وی ایکسپورٹ';
+
+  @override
+  String get suppliersExportpdf => 'پی ڈی ایف ایکسپورٹ';
+
+  @override
+  String get suppliersExportimage => 'تصویر';
+
+  @override
+  String get suppliersExportsuccess => 'کامیابی سے ایکسپورٹ ہو گیا';
+
+  @override
+  String get suppliersNopayments => 'کوئی ادائیگی نہیں ملی';
+
+  @override
+  String get suppliersPaymentno => 'ادائیگی نمبر';
+
+  @override
+  String get suppliersAmount => 'رقم';
+
+  @override
+  String get suppliersMethod => 'طریقہ';
+
+  @override
+  String get suppliersReference => 'حوالہ';
+
+  @override
+  String get suppliersPrintreceipt => 'رسید پرنٹ کریں';
+
+  @override
+  String get suppliersPrintreceipta4 => 'رسید پرنٹ کریں (A4)';
+
+  @override
+  String get suppliersDeletepayment => 'ادائیگی حذف کریں';
+
+  @override
+  String get suppliersConfirmdeletepayment =>
+      'کیا آپ واقعی ادائیگی حذف کرنا چاہتے ہیں';
+
+  @override
+  String get suppliersPaymentdeleted => 'ادائیگی کامیابی سے حذف ہو گئی!';
+
+  @override
+  String get suppliersStatementsummary => 'بیان کا خلاصہ';
+
+  @override
+  String get suppliersTotaldebits => 'کل ڈیبٹس';
+
+  @override
+  String get suppliersTotalcredits => 'کل کریڈٹس';
+
+  @override
+  String get suppliersTransactiondetails => 'لین دین کی تفصیلات';
+
+  @override
+  String get suppliersBeginningbalance => 'ابتدائی بیلنس';
+
+  @override
+  String get suppliersEndingbalance => 'آخری بیلنس';
+
+  @override
+  String get suppliersTotalamount => 'کل رقم';
+
+  @override
+  String get suppliersAllocation => 'تخصیص';
+
+  @override
+  String get suppliersAvailablepos => 'دستیاب پی اوز';
+
+  @override
+  String get suppliersAutoallocate => 'خودکار تخصیص';
+
+  @override
+  String get suppliersAllposallocated => 'تمام دستیاب پی اوز تخصیص ہو چکے ہیں';
+
+  @override
+  String get suppliersNoopenpos => 'تخصیص کے لیے کوئی کھلا پی او نہیں';
+
+  @override
+  String get suppliersAllocatedpos => 'تخصیص شدہ پی اوز';
+
+  @override
+  String get suppliersUnallocated => 'غیر تخصیص شدہ رقم';
+
+  @override
+  String get suppliersAllocationrequired => 'کم از کم ایک پی او تخصیص درکار ہے';
+
+  @override
+  String get suppliersAmountmustmatch => 'رقم کل تخصیص کے برابر ہونی چاہیے';
+
+  @override
+  String get suppliersPaymentrecordedsuccess =>
+      'ادائیگی کامیابی سے ریکارڈ ہو گئی';
+
+  @override
+  String get suppliersWhatnext => 'آگے کیا کرنا چاہیں گے؟';
+
+  @override
+  String get suppliersDelete => 'حذف کریں';
+
+  @override
+  String get suppliersConfirmdelete => 'کیا آپ واقعی حذف کرنا چاہتے ہیں';
+
+  @override
+  String get suppliersSupplierdeleted => 'سپلائر کامیابی سے حذف ہو گیا!';
+
+  @override
+  String get suppliersFixbalances => 'بیلنس درست کریں';
+
+  @override
+  String get suppliersFixbalancesconfirm =>
+      'یہ تمام سپلائر بیلنس ان کے لیجر اندراجات سے دوبارہ شمار کرے گا۔ جاری رکھیں؟';
+
+  @override
+  String get suppliersBalancesrecalculated =>
+      'سپلائر بیلنس کامیابی سے دوبارہ شمار ہو گئے';
 
   @override
   String get reportsReports => 'رپورٹس';
@@ -4183,6 +4400,201 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get customersBalance => 'بیلنس';
+
+  @override
+  String get customersAccountsettings => 'اکاؤنٹ کی ترتیبات';
+
+  @override
+  String get customersAdd => 'شامل کریں';
+
+  @override
+  String get customersAllinvoicesallocated =>
+      'تمام کھلی انوائسیں پہلے ہی مختص ہیں';
+
+  @override
+  String get customersAllocatedinvoices => 'کل مختص شدہ';
+
+  @override
+  String get customersAllocation => 'انوائس مختص';
+
+  @override
+  String get customersAllocationrequired => 'کم از کم ایک انوائس مختص ضروری ہے';
+
+  @override
+  String get customersAmount => 'رقم';
+
+  @override
+  String get customersAmountmustmatch => 'رقم مختص کل کے برابر ہونی چاہیے';
+
+  @override
+  String get customersAutoallocate => 'خودکار مختص';
+
+  @override
+  String get customersAvailableinvoices => 'دستیاب انوائسز';
+
+  @override
+  String get customersAvgdaystopay => 'ادائیگی کے اوسط دن';
+
+  @override
+  String get customersBacktocustomers => 'گاہکوں پر واپس جائیں';
+
+  @override
+  String get customersCancelinvoice => 'انوائس منسوخ کریں';
+
+  @override
+  String get customersCancelinvoiceconfirm =>
+      'کیا یہ انوائس منسوخ کریں؟ یہ واپس نہیں ہو سکتی۔';
+
+  @override
+  String get customersClosingbalance => 'اختتامی بیلنس';
+
+  @override
+  String get customersConfirmdeleteinvoice => 'انوائس حذف کریں';
+
+  @override
+  String get customersConfirmdeletepayment => 'ادائیگی حذف کریں';
+
+  @override
+  String get customersCustomersince => 'گاہک از';
+
+  @override
+  String get customersDeleteinvoice => 'انوائس حذف کریں';
+
+  @override
+  String get customersDeletepayment => 'ادائیگی حذف کریں';
+
+  @override
+  String get customersDuedate => 'واجب الادا تاریخ';
+
+  @override
+  String get customersExportcsv => 'CSV برآمد کریں';
+
+  @override
+  String get customersExportimage => 'تصویر';
+
+  @override
+  String get customersExportpdf => 'PDF برآمد کریں';
+
+  @override
+  String get customersExportsuccess => 'برآمد کامیاب';
+
+  @override
+  String get customersFinancialsummary => 'مالیاتی خلاصہ';
+
+  @override
+  String get customersInvoicedeleted => 'انوائس حذف ہو گئی';
+
+  @override
+  String get customersInvoiceno => 'انوائس نمبر';
+
+  @override
+  String get customersInvoicecancelled => 'انوائس منسوخ ہو گئی';
+
+  @override
+  String get customersInvoicestatus => 'انوائس کی حالت';
+
+  @override
+  String get customersInvoices => 'انوائسز';
+
+  @override
+  String get customersLedgerPayments => 'ادائیگیاں';
+
+  @override
+  String get customersLedgerTotals => 'کل';
+
+  @override
+  String get customersLedgerType => 'قسم';
+
+  @override
+  String get customersMethod => 'طریقہ';
+
+  @override
+  String get customersNoinvoices => 'کوئی انوائس نہیں ملی';
+
+  @override
+  String get customersNopayments => 'کوئی ادائیگی نہیں ملی';
+
+  @override
+  String get customersNotes => 'نوٹس';
+
+  @override
+  String get customersOutstanding => 'بقایا جات';
+
+  @override
+  String get customersOverdue => 'تاخیر شدہ';
+
+  @override
+  String get customersOverview => 'جائزہ';
+
+  @override
+  String get customersPaid => 'ادا شدہ';
+
+  @override
+  String get customersPaymentdeleted => 'ادائیگی حذف ہو گئی';
+
+  @override
+  String get customersPaymentno => 'ادائیگی نمبر';
+
+  @override
+  String get customersPaymentrecordedsuccess =>
+      'ادائیگی کامیابی سے ریکارڈ ہو گئی';
+
+  @override
+  String get customersPayments => 'ادائیگیاں';
+
+  @override
+  String get customersPending => 'زیر التوا';
+
+  @override
+  String get customersPrintreceipt => 'رسید پرنٹ کریں';
+
+  @override
+  String get customersPrintreceipta4 => 'رسید پرنٹ کریں (A4)';
+
+  @override
+  String get customersRecordpayment => 'ادائیگی ریکارڈ کریں';
+
+  @override
+  String get customersReference => 'حوالہ';
+
+  @override
+  String get customersRemove => 'ہٹائیں';
+
+  @override
+  String get customersStatement => 'اسٹیٹمنٹ';
+
+  @override
+  String get customersStatementsummary => 'اسٹیٹمنٹ کا خلاصہ';
+
+  @override
+  String get customersTotal => 'کل';
+
+  @override
+  String get customersTotalamount => 'کل رقم';
+
+  @override
+  String get customersTotalcredits => 'کل کریڈٹ';
+
+  @override
+  String get customersTotaldebits => 'کل ڈیبٹ';
+
+  @override
+  String get customersTotalinvoiced => 'کل بل کردہ';
+
+  @override
+  String get customersTotalreceived => 'کل وصول شدہ';
+
+  @override
+  String get customersTransactiondetails => 'لین دین کی تفصیلات';
+
+  @override
+  String get customersUnallocated => 'غیر مختص رقم';
+
+  @override
+  String get customersUtilization => 'استعمال';
+
+  @override
+  String get customersWhatnext => 'اب آگے کیا کرنا چاہیں گے؟';
 
   @override
   String get commonPage => 'صفحہ';

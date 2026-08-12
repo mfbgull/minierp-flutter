@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/customer.dart' show Customer;
+import '../models/json_helpers.dart';
 import '../models/ledger_entry.dart' show LedgerEntry;
 import 'api_result.dart';
 import 'paged_request.dart';
@@ -38,6 +39,51 @@ class CustomerBalance {
   final int customerId;
   final String customerName;
   final num currentBalance;
+}
+
+/// `GET /customers/:id/statement` response DTO — customer + period,
+/// opening/closing balances and the period's transactions (each parsed as
+/// a [LedgerEntry]; the server computes the closing balance server-side).
+class CustomerStatement {
+  const CustomerStatement({
+    required this.customerId,
+    required this.customerName,
+    required this.openingBalance,
+    required this.closingBalance,
+    required this.transactions,
+    this.fromDate,
+    this.toDate,
+  });
+
+  factory CustomerStatement.fromJson(Map<String, dynamic> json) {
+    final customer = json['customer'] is Map<String, dynamic>
+        ? json['customer'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final period = json['period'] is Map<String, dynamic>
+        ? json['period'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    final tx = json['transactions'];
+    return CustomerStatement(
+      customerId: asInt(customer['id']) ?? 0,
+      customerName: asString(customer['customer_name']) ?? '',
+      fromDate: asString(period['fromDate']),
+      toDate: asString(period['toDate']),
+      openingBalance: asNum(json['openingBalance']) ?? 0,
+      closingBalance: asNum(json['closingBalance']) ?? 0,
+      transactions: [
+        for (final t in tx is List ? tx : const <dynamic>[])
+          if (t is Map<String, dynamic>) LedgerEntry.fromJson(t),
+      ],
+    );
+  }
+
+  final int customerId;
+  final String customerName;
+  final String? fromDate;
+  final String? toDate;
+  final num openingBalance;
+  final num closingBalance;
+  final List<LedgerEntry> transactions;
 }
 
 class CustomerRepository {
@@ -93,6 +139,29 @@ class CustomerRepository {
     '${ApiEndpoints.customers}/$id/balance',
     parse: (Object? json) =>
         CustomerBalance.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// `POST /customers/recalculate-balances` — recomputes every customer's
+  /// `current_balance` from unpaid invoices (the web "Fix Balances"
+  /// action). Enveloped `{success, message}` — no data payload.
+  Future<ApiResult<void>> recalculateBalances() => _api.post(
+    '${ApiEndpoints.customers}/recalculate-balances',
+    body: const <String, dynamic>{},
+    parse: (_) {},
+  );
+
+  /// `GET /customers/:id/statement?fromDate&toDate` — the date-ranged AR
+  /// statement (web CustomerStatement page; `fromDate`/`toDate` are the
+  /// server's exact query-param names, sent as ISO `YYYY-MM-DD`).
+  Future<ApiResult<CustomerStatement>> statement(
+    int id, {
+    String? fromDate,
+    String? toDate,
+  }) => _api.get(
+    '${ApiEndpoints.customers}/$id/statement',
+    queryParameters: {'fromDate': ?fromDate, 'toDate': ?toDate},
+    parse: (Object? json) =>
+        CustomerStatement.fromJson(json as Map<String, dynamic>),
   );
 }
 

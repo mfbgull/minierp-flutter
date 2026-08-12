@@ -91,6 +91,38 @@ class InvoiceRepository {
             Payment.fromJson(json as Map<String, dynamic>),
       );
 
+  /// All payments for one customer (`GET /payments?customerId=<id>` — the
+  /// same enveloped list endpoint; the customer detail Payments tab
+  /// ignores the pagination block and takes the full page).
+  Future<ApiResult<List<Payment>>> paymentsForCustomer(int customerId) =>
+      _api.getList(
+        ApiEndpoints.payments,
+        queryParameters: {'customerId': customerId},
+        parseItem: (Object? json) =>
+            Payment.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// All payments for one supplier (`GET /payments?supplierId=<id>` — the
+  /// supplier detail Payments tab's query; enveloped list).
+  Future<ApiResult<List<Payment>>> paymentsForSupplier(int supplierId) =>
+      _api.getList(
+        ApiEndpoints.payments,
+        queryParameters: {'supplierId': supplierId},
+        parseItem: (Object? json) =>
+            Payment.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// Create a supplier payment (`POST /payments` with a `supplier_id` +
+  /// `po_allocations` array — see `createSupplierPayment` in the web
+  /// SupplierPaymentModal). Enveloped; parses the returned Payment.
+  Future<ApiResult<Payment>> createSupplierPayment(
+    Map<String, dynamic> body,
+  ) => _api.post(
+    ApiEndpoints.payments,
+    body: body,
+    parse: (Object? json) => Payment.fromJson(json as Map<String, dynamic>),
+  );
+
   /// One payment (`GET /payments/:id`, enveloped object).
   Future<ApiResult<Payment>> payment(int id) => _api.get(
     '${ApiEndpoints.payments}/$id',

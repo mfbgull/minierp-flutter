@@ -15,6 +15,7 @@ class Payment {
     required this.paymentMethod,
     this.customerName,
     this.supplierId,
+    this.supplierName,
     this.invoiceId,
     this.invoiceNo,
     this.referenceNo,
@@ -28,6 +29,7 @@ class Payment {
     customerId: asInt(json['customer_id']) ?? 0,
     customerName: asString(json['customer_name']),
     supplierId: asInt(json['supplier_id']),
+    supplierName: asString(json['supplier_name']),
     invoiceId: asInt(json['invoice_id']),
     invoiceNo: asString(json['invoice_no']),
     paymentDate: asString(json['payment_date']) ?? '',
@@ -43,6 +45,7 @@ class Payment {
   final int customerId;
   final String? customerName;
   final int? supplierId; // supplier payments only
+  final String? supplierName;
   final int? invoiceId;
   final String? invoiceNo;
   final String paymentDate;
@@ -58,6 +61,7 @@ class Payment {
     'customer_id': customerId,
     if (customerName != null) 'customer_name': customerName,
     if (supplierId != null) 'supplier_id': supplierId,
+    if (supplierName != null) 'supplier_name': supplierName,
     if (invoiceId != null) 'invoice_id': invoiceId,
     if (invoiceNo != null) 'invoice_no': invoiceNo,
     'payment_date': paymentDate,

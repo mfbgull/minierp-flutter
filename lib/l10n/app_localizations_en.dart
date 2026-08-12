@@ -430,6 +430,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get customersCustomerdeleted => 'Customer deleted successfully!';
 
   @override
+  String customersDays(Object days) {
+    return '$days days';
+  }
+
+  @override
+  String get customersContactinfo => 'Contact Info';
+
+  @override
+  String get customersFixbalances => 'Fix Balances';
+
+  @override
+  String get customersFixbalancesconfirm =>
+      'This will recalculate all customer balances from unpaid invoices. Continue?';
+
+  @override
+  String get customersFixbalancessuccess =>
+      'Balances recalculated successfully';
+
+  @override
+  String get customersNotapplicable => 'N/A';
+
+  @override
   String get suppliersSuppliers => 'Suppliers';
 
   @override
@@ -503,6 +525,203 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get suppliersOpeningbalance => 'Opening Balance';
+
+  @override
+  String get suppliersClosingbalance => 'Closing Balance';
+
+  @override
+  String get suppliersOverview => 'Overview';
+
+  @override
+  String get suppliersPos => 'POs';
+
+  @override
+  String get suppliersPayments => 'Payments';
+
+  @override
+  String get suppliersBacktosuppliers => 'Back to Suppliers';
+
+  @override
+  String get suppliersRecordpayment => 'Record Payment';
+
+  @override
+  String get suppliersFinancialsummary => 'Financial Summary';
+
+  @override
+  String get suppliersCurrentbalance => 'Current Balance';
+
+  @override
+  String get suppliersTotalpovalue => 'Total PO Value';
+
+  @override
+  String get suppliersTotalpos => 'Total POs';
+
+  @override
+  String get suppliersPostatus => 'Purchase Order Status';
+
+  @override
+  String get suppliersDraft => 'Draft';
+
+  @override
+  String get suppliersSubmitted => 'Submitted';
+
+  @override
+  String get suppliersPartial => 'Partial';
+
+  @override
+  String get suppliersCompleted => 'Completed';
+
+  @override
+  String get suppliersContactinfo => 'Contact Info';
+
+  @override
+  String get suppliersAccountsettings => 'Account Settings';
+
+  @override
+  String get suppliersSincesupplier => 'Supplier Since';
+
+  @override
+  String get suppliersNopos => 'No purchase orders found';
+
+  @override
+  String get suppliersPono => 'PO No';
+
+  @override
+  String get suppliersTotal => 'Total';
+
+  @override
+  String get suppliersExpecteddelivery => 'Expected Delivery';
+
+  @override
+  String get suppliersLedgerType => 'Type';
+
+  @override
+  String get suppliersLedgerTotals => 'Totals';
+
+  @override
+  String get suppliersLedgerTotaldebit => 'Total Debit';
+
+  @override
+  String get suppliersLedgerTotalcredit => 'Total Credit';
+
+  @override
+  String get suppliersExportcsv => 'Export CSV';
+
+  @override
+  String get suppliersExportpdf => 'Export PDF';
+
+  @override
+  String get suppliersExportimage => 'Image';
+
+  @override
+  String get suppliersExportsuccess => 'Exported successfully';
+
+  @override
+  String get suppliersNopayments => 'No payments found';
+
+  @override
+  String get suppliersPaymentno => 'Payment No';
+
+  @override
+  String get suppliersAmount => 'Amount';
+
+  @override
+  String get suppliersMethod => 'Method';
+
+  @override
+  String get suppliersReference => 'Reference';
+
+  @override
+  String get suppliersPrintreceipt => 'Print Receipt';
+
+  @override
+  String get suppliersPrintreceipta4 => 'Print Receipt (A4)';
+
+  @override
+  String get suppliersDeletepayment => 'Delete Payment';
+
+  @override
+  String get suppliersConfirmdeletepayment =>
+      'Are you sure you want to delete payment';
+
+  @override
+  String get suppliersPaymentdeleted => 'Payment deleted successfully!';
+
+  @override
+  String get suppliersStatementsummary => 'Statement Summary';
+
+  @override
+  String get suppliersTotaldebits => 'Total Debits';
+
+  @override
+  String get suppliersTotalcredits => 'Total Credits';
+
+  @override
+  String get suppliersTransactiondetails => 'Transaction Details';
+
+  @override
+  String get suppliersBeginningbalance => 'Beginning balance';
+
+  @override
+  String get suppliersEndingbalance => 'Ending balance';
+
+  @override
+  String get suppliersTotalamount => 'Total Amount';
+
+  @override
+  String get suppliersAllocation => 'Allocation';
+
+  @override
+  String get suppliersAvailablepos => 'Available POs';
+
+  @override
+  String get suppliersAutoallocate => 'Auto Allocate';
+
+  @override
+  String get suppliersAllposallocated => 'All available POs are allocated';
+
+  @override
+  String get suppliersNoopenpos =>
+      'No open purchase orders to allocate against';
+
+  @override
+  String get suppliersAllocatedpos => 'Allocated POs';
+
+  @override
+  String get suppliersUnallocated => 'Unallocated Amount';
+
+  @override
+  String get suppliersAllocationrequired =>
+      'At least one PO allocation is required';
+
+  @override
+  String get suppliersAmountmustmatch => 'Amount must match total allocated';
+
+  @override
+  String get suppliersPaymentrecordedsuccess => 'Payment Recorded Successfully';
+
+  @override
+  String get suppliersWhatnext => 'What would you like to do next?';
+
+  @override
+  String get suppliersDelete => 'Delete';
+
+  @override
+  String get suppliersConfirmdelete => 'Are you sure you want to delete';
+
+  @override
+  String get suppliersSupplierdeleted => 'Supplier deleted successfully!';
+
+  @override
+  String get suppliersFixbalances => 'Fix Balances';
+
+  @override
+  String get suppliersFixbalancesconfirm =>
+      'This will recalculate all supplier balances from their ledger entries. Continue?';
+
+  @override
+  String get suppliersBalancesrecalculated =>
+      'Supplier balances recalculated successfully';
 
   @override
   String get reportsReports => 'Reports';
@@ -4184,6 +4403,201 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get customersBalance => 'Balance';
+
+  @override
+  String get customersAccountsettings => 'Account Settings';
+
+  @override
+  String get customersAdd => 'Add';
+
+  @override
+  String get customersAllinvoicesallocated =>
+      'All open invoices are already allocated';
+
+  @override
+  String get customersAllocatedinvoices => 'Total Allocated';
+
+  @override
+  String get customersAllocation => 'Invoice Allocations';
+
+  @override
+  String get customersAllocationrequired =>
+      'At least one invoice allocation is required';
+
+  @override
+  String get customersAmount => 'Amount';
+
+  @override
+  String get customersAmountmustmatch => 'Amount must match total allocated';
+
+  @override
+  String get customersAutoallocate => 'Auto Allocate';
+
+  @override
+  String get customersAvailableinvoices => 'Available Invoices';
+
+  @override
+  String get customersAvgdaystopay => 'Avg. Days to Pay';
+
+  @override
+  String get customersBacktocustomers => 'Back to Customers';
+
+  @override
+  String get customersCancelinvoice => 'Cancel Invoice';
+
+  @override
+  String get customersCancelinvoiceconfirm =>
+      'Cancel this invoice? This cannot be undone.';
+
+  @override
+  String get customersClosingbalance => 'Closing Balance';
+
+  @override
+  String get customersConfirmdeleteinvoice => 'Delete invoice';
+
+  @override
+  String get customersConfirmdeletepayment => 'Delete payment';
+
+  @override
+  String get customersCustomersince => 'Customer Since';
+
+  @override
+  String get customersDeleteinvoice => 'Delete Invoice';
+
+  @override
+  String get customersDeletepayment => 'Delete Payment';
+
+  @override
+  String get customersDuedate => 'Due Date';
+
+  @override
+  String get customersExportcsv => 'Export to CSV';
+
+  @override
+  String get customersExportimage => 'Image';
+
+  @override
+  String get customersExportpdf => 'Export to PDF';
+
+  @override
+  String get customersExportsuccess => 'Export successful';
+
+  @override
+  String get customersFinancialsummary => 'Financial Summary';
+
+  @override
+  String get customersInvoicedeleted => 'Invoice deleted';
+
+  @override
+  String get customersInvoiceno => 'Invoice No';
+
+  @override
+  String get customersInvoicecancelled => 'Invoice cancelled';
+
+  @override
+  String get customersInvoicestatus => 'Invoice Status';
+
+  @override
+  String get customersInvoices => 'Invoices';
+
+  @override
+  String get customersLedgerPayments => 'payments';
+
+  @override
+  String get customersLedgerTotals => 'TOTALS';
+
+  @override
+  String get customersLedgerType => 'Type';
+
+  @override
+  String get customersMethod => 'Method';
+
+  @override
+  String get customersNoinvoices => 'No invoices found';
+
+  @override
+  String get customersNopayments => 'No payments found';
+
+  @override
+  String get customersNotes => 'Notes';
+
+  @override
+  String get customersOutstanding => 'Outstanding';
+
+  @override
+  String get customersOverdue => 'Overdue';
+
+  @override
+  String get customersOverview => 'Overview';
+
+  @override
+  String get customersPaid => 'Paid';
+
+  @override
+  String get customersPaymentdeleted => 'Payment deleted';
+
+  @override
+  String get customersPaymentno => 'Payment No';
+
+  @override
+  String get customersPaymentrecordedsuccess => 'Payment Recorded Successfully';
+
+  @override
+  String get customersPayments => 'Payments';
+
+  @override
+  String get customersPending => 'Pending';
+
+  @override
+  String get customersPrintreceipt => 'Print Receipt';
+
+  @override
+  String get customersPrintreceipta4 => 'Print Receipt (A4)';
+
+  @override
+  String get customersRecordpayment => 'Record Payment';
+
+  @override
+  String get customersReference => 'Reference';
+
+  @override
+  String get customersRemove => 'Remove';
+
+  @override
+  String get customersStatement => 'Statement';
+
+  @override
+  String get customersStatementsummary => 'Statement Summary';
+
+  @override
+  String get customersTotal => 'Total';
+
+  @override
+  String get customersTotalamount => 'Total Amount';
+
+  @override
+  String get customersTotalcredits => 'Total Credits';
+
+  @override
+  String get customersTotaldebits => 'Total Debits';
+
+  @override
+  String get customersTotalinvoiced => 'Total Invoiced';
+
+  @override
+  String get customersTotalreceived => 'Total Received';
+
+  @override
+  String get customersTransactiondetails => 'Transaction Details';
+
+  @override
+  String get customersUnallocated => 'Unallocated Amount';
+
+  @override
+  String get customersUtilization => 'Utilization';
+
+  @override
+  String get customersWhatnext => 'What would you like to do next?';
 
   @override
   String get commonPage => 'Page';
