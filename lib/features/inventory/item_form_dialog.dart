@@ -214,6 +214,8 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
                           required: true,
                           child: TextFormField(
                             controller: _codeController,
+                            onFieldSubmitted: submitOnEnter(_submit),
+                            autofocus: true,
                             enabled: !_submitting,
                             decoration: formInputDecoration(),
                             validator: (v) => requiredValidator(
@@ -227,6 +229,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
                         required: true,
                         child: TextFormField(
                           controller: _nameController,
+                          onFieldSubmitted: submitOnEnter(_submit),
                           enabled: !_submitting,
                           decoration: formInputDecoration(),
                           validator: (v) => requiredValidator(
@@ -279,6 +282,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
                               label: l10n.inventoryReorderlevel,
                               child: TextFormField(
                                 controller: _reorderController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
@@ -295,6 +299,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
                               label: l10n.inventoryStandardcost,
                               child: TextFormField(
                                 controller: _costController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
@@ -311,6 +316,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
                               label: l10n.inventorySellingprice,
                               child: TextFormField(
                                 controller: _priceController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(

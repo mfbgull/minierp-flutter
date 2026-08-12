@@ -157,6 +157,11 @@ class LineRowData implements CalculableLine, FillableLine {
   set roundingStep(num? value) => _setCell('round_step', value);
 
   @override
+  bool get amountDriven => _cell('amount_driven') == true;
+
+  set amountDriven(bool value) => _setCell('amount_driven', value);
+
+  @override
   EditedField? get lastEditedField {
     final v = _cell('last_edited');
     if (v == null) return null;
@@ -192,11 +197,13 @@ class LineRowData implements CalculableLine, FillableLine {
     required num quantity,
     required num amount,
     required num rate,
+    required bool amountDriven,
     required EditedField? lastEditedField,
   }) {
     this.quantity = quantity;
     this.amount = amount;
     this.rate = rate;
+    this.amountDriven = amountDriven;
     this.lastEditedField = lastEditedField;
   }
 }
@@ -297,6 +304,12 @@ class GridNavController extends ChangeNotifier {
     return (i >= 0 && i + 1 < order.length) ? order[i + 1] : null;
   }
 
+  LineColumn? previousField(LineColumn column) {
+    final order = fieldOrder();
+    final i = order.indexOf(column);
+    return i > 0 ? order[i - 1] : null;
+  }
+
   bool isEditing(PlutoRow row, LineColumn column) =>
       _editingRow == row && _editingColumn == column;
 
@@ -328,6 +341,24 @@ class GridNavController extends ChangeNotifier {
     if (_editor == controller) _editor = null;
   }
 
+  /// PlutoGrid's shared key-event result — set from the grid's `onLoaded`
+  /// (page). Used by [passToIME] to arm the one-shot `skip` flag so
+  /// character keys escape the grid's `FocusScope` and reach the platform
+  /// IME instead of being swallowed as `handled`.
+  PlutoGridKeyEventResult? keyEventResult;
+
+  /// Let an unhandled key escape the grid's `FocusScope` so it reaches the
+  /// platform IME. Without this, `_handleGridFocusOnKey` (pluto_grid.dart)
+  /// consumes *every* key that bubbles past the cell editor — `handled`
+  /// blocks the IME on desktop, so typing in the editor does nothing.
+  /// Mirrors PlutoGrid's own editor (`TextCellState._handleOnKey` →
+  /// `eventResult.skip`): the scope honors the flag in `consume()` and
+  /// returns `ignored`.
+  KeyEventResult passToIME() {
+    final result = keyEventResult;
+    return result?.skip(KeyEventResult.ignored) ?? KeyEventResult.ignored;
+  }
+
   // ── Commit ────────────────────────────────────────────────────
 
   /// Commit the editing cell's in-flight value into its line, then leave
@@ -342,7 +373,9 @@ class GridNavController extends ChangeNotifier {
 
     switch (column) {
       case LineColumn.description:
-        data.description = text;
+        // No free-text lines (spec §4.4): unmatched text is discarded on
+        // navigation away unless the row already has a selected item.
+        data.description = data.hasItem ? text : '';
         break;
       case LineColumn.quantity:
         _applyDriver(row, LineField.quantity, _parseNum(text));
@@ -376,6 +409,7 @@ class GridNavController extends ChangeNotifier {
         rate: data.rate,
         qtyDecimalPrecision: data.qtyDecimalPrecision,
         roundingStep: data.roundingStep,
+        amountDriven: data.amountDriven,
         lastEditedField: data.lastEditedField,
       ),
       field,
@@ -385,6 +419,7 @@ class GridNavController extends ChangeNotifier {
       quantity: patch.quantity,
       amount: patch.amount,
       rate: patch.rate,
+      amountDriven: patch.amountDriven,
       lastEditedField: patch.lastEditedField,
     );
     _bump();
@@ -432,7 +467,9 @@ class GridNavController extends ChangeNotifier {
         _bump();
         return KeyEventResult.handled;
       }
-      return KeyEventResult.ignored;
+      // Ctrl+letter keys etc. — let them escape the scope too (uniform
+      // pass-through for everything the editor doesn't handle).
+      return passToIME();
     }
 
     switch (key) {
@@ -473,6 +510,22 @@ class GridNavController extends ChangeNotifier {
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.tab:
+        if (HardwareKeyboard.instance.isShiftPressed) {
+          // Shift+Tab — commit, previous field; wrap to the previous
+          // row's last navigable field; first row first field → no-op.
+          final isFirstRow = _rowIndex <= 0;
+          commitCurrent();
+          final prev = previousField(column);
+          if (prev != null) {
+            _schedule(row: row, column: prev);
+          } else if (!isFirstRow) {
+            final target = lastNavigable(rows[_rowIndex - 1]);
+            if (target != null) {
+              _schedule(row: rows[_rowIndex - 1], column: target);
+            }
+          }
+          return KeyEventResult.handled;
+        }
         final isLast = _rowIndex == rows.length - 1;
         commitCurrent();
         final next = nextField(column);
@@ -493,7 +546,9 @@ class GridNavController extends ChangeNotifier {
         return KeyEventResult.handled;
 
       default:
-        return KeyEventResult.ignored;
+        // Character keys etc. — let them through to the IME (the grid's
+        // FocusScope would otherwise swallow them; spec §2.3/§5.2).
+        return passToIME();
     }
   }
 
@@ -525,7 +580,39 @@ class GridNavController extends ChangeNotifier {
         return KeyEventResult.handled;
 
       case LogicalKeyboardKey.arrowRight:
+        final next = nextField(column);
+        if (next != null) {
+          _schedule(row: row, column: next, enterEdit: false);
+        } else if (isLastRow) {
+          onAppendRow?.call();
+        } else if (rowIdx >= 0 && rowIdx < rows.length - 1) {
+          final target = firstNavigable(rows[rowIdx + 1]);
+          if (target != null) {
+            _schedule(row: rows[rowIdx + 1], column: target, enterEdit: false);
+          }
+        }
+        return KeyEventResult.handled;
+
       case LogicalKeyboardKey.tab:
+        if (HardwareKeyboard.instance.isShiftPressed) {
+          // Shift+Tab — display-focus the previous field; wrap to the
+          // previous row's last navigable field; first row → no-op.
+          final isFirstRow = rowIdx <= 0;
+          final prev = previousField(column);
+          if (prev != null) {
+            _schedule(row: row, column: prev, enterEdit: false);
+          } else if (!isFirstRow) {
+            final target = lastNavigable(rows[rowIdx - 1]);
+            if (target != null) {
+              _schedule(
+                row: rows[rowIdx - 1],
+                column: target,
+                enterEdit: false,
+              );
+            }
+          }
+          return KeyEventResult.handled;
+        }
         final next = nextField(column);
         if (next != null) {
           _schedule(row: row, column: next, enterEdit: false);
@@ -540,6 +627,9 @@ class GridNavController extends ChangeNotifier {
         return KeyEventResult.handled;
 
       default:
+        // Character keys in display mode are deliberately consumed here
+        // (no type-to-start-edit; editing is entered via Enter/tap) —
+        // unlike the edit-mode paths, nothing passes to the IME.
         return KeyEventResult.ignored;
     }
   }
@@ -560,6 +650,14 @@ class GridNavController extends ChangeNotifier {
   LineColumn? firstNavigable(PlutoRow row) {
     for (final c in fieldOrder()) {
       if (navigable(row, c)) return c;
+    }
+    return null;
+  }
+
+  LineColumn? lastNavigable(PlutoRow row) {
+    final order = fieldOrder();
+    for (var i = order.length - 1; i >= 0; i--) {
+      if (navigable(row, order[i])) return order[i];
     }
     return null;
   }
@@ -588,36 +686,25 @@ class GridNavController extends ChangeNotifier {
   void commitMoveUp(PlutoRow row, LineColumn column) =>
       _commitThen(row, column, rowOffset: -1, colOffset: 0);
 
-  /// Commit + Enter semantics of the searchable cell: next field, else
-  /// append (last row) / next row's first field.
-  void commitEnterSearchable(PlutoRow row, LineColumn column) {
-    final isLast = _rowIndex == rows.length - 1;
-    commitCurrent();
-    final next = nextField(column);
-    if (next != null) {
-      _schedule(row: row, column: next);
-    } else if (isLast) {
-      onAppendRow?.call();
-    } else if (_rowIndex >= 0) {
-      final first = firstNavigable(rows[_rowIndex + 1]);
-      if (first != null) _schedule(row: rows[_rowIndex + 1], column: first);
-    }
-  }
-
-  /// Commit + Tab semantics of the searchable cell (same as Enter here:
-  /// next field → append / next row).
-  void commitTabSearchable(PlutoRow row, LineColumn column) =>
-      commitEnterSearchable(row, column);
+  /// Commit + move right to the next navigable field of the same row
+  /// (the description cell's Right-arrow exit once an item is selected).
+  void commitMoveRight(PlutoRow row, LineColumn column) =>
+      _commitThen(row, column, rowOffset: 0, colOffset: 1);
 
   /// Commit the current cell, then resolve a row/column move with the
   /// token/Timer sequencing (`enterEdit:false` = display-focus move).
+  ///
+  /// The target is resolved *before* committing: a boundary arrow (Left at
+  /// the first editable cell, Right at the last, Up at the first row, Down
+  /// at the last row) is a no-op, and committing first would end edit mode
+  /// with nowhere to go (spec §6.1 boundary rules — the arrow does nothing
+  /// and the cell keeps editing, value stays in-flight).
   void _commitThen(
     PlutoRow row,
     LineColumn column, {
     required int rowOffset,
     required int colOffset,
   }) {
-    commitCurrent();
     final target = resolveTarget(
       rows: rows,
       fromRowIdx: rows.indexOf(row),
@@ -628,6 +715,7 @@ class GridNavController extends ChangeNotifier {
       order: fieldOrder(),
     );
     if (target == null) return;
+    commitCurrent();
     _schedule(row: rows[target.rowIdx], column: target.column);
   }
 

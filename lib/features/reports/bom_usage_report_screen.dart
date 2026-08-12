@@ -15,9 +15,10 @@ import '../../data/models/item.dart' show Item;
 import '../../data/models/report.dart' show BomUsageReport, BomUsageRow;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart' show ReportDateRangeFilter;
+import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../../widgets/searchable_select.dart';
 import 'bom_usage_detail_dialog.dart';
 import 'report_providers.dart';
@@ -168,68 +169,64 @@ class _BomUsageReportScreenState extends ConsumerState<BomUsageReportScreen> {
     final items = ref.watch(finishedItemsForReportProvider);
     final selectedItemId = ref.watch(reportBomItemIdProvider);
     final l10n = AppLocalizations.of(context)!;
-    final textTheme = Theme.of(context).textTheme;
 
-    ref.listen(
-      bomUsageReportProvider,
-      (previous, next) => _applyReport(next),
-    );
+    ref.listen(bomUsageReportProvider, (previous, next) => _applyReport(next));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.reportsBomusage,
-                  style: textTheme.titleLarge,
-                ),
-              ),
-              ReportDateRangeFilter(
-                fromProvider: reportBomFromDateProvider,
-                toProvider: reportBomToDateProvider,
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                width: 220,
-                child: SearchableSelect<int>(
-                  items:
-                      items.valueOrNull?.map((i) => i.id).toList() ??
-                      const <int>[],
-                  selected: selectedItemId,
-                  onChanged: (itemId) {
-                    ref
-                        .read(reportBomItemIdProvider.notifier)
-                        .state = itemId;
-                  },
-                  labelBuilder: (id) {
-                    final item = items.valueOrNull
-                        ?.cast<Item?>()
-                        .firstWhere((i) => i?.id == id, orElse: () => null);
-                    return item?.itemName ?? id.toString();
-                  },
-                  hint: l10n.reportsAllitems,
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: report.isLoading || (report.valueOrNull?.rows.isEmpty ?? true)
-                    ? null
-                    : () => saveCsv(
-                        context,
-                        suggestedName: csvSuggestedName('bom-usage'),
-                        csv: buildBomUsageCsv(l10n, report.valueOrNull!),
-                        successMessage: l10n.reportsExported,
-                        errorMessage: l10n.reportsExportfailed,
-                      ),
-                icon: const Icon(Icons.file_download_outlined, size: 18),
-                label: Text(l10n.reportsExportcsv),
-              ),
-            ],
+          child: Text(
+            l10n.reportsBomusage,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
+        ),
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          filters: [
+            DateRangeFilter(
+              fromProvider: reportBomFromDateProvider,
+              toProvider: reportBomToDateProvider,
+            ),
+            SizedBox(
+              width: 220,
+              child: SearchableSelect<int>(
+                items:
+                    items.valueOrNull?.map((i) => i.id).toList() ??
+                    const <int>[],
+                selected: selectedItemId,
+                onChanged: (itemId) {
+                  ref.read(reportBomItemIdProvider.notifier).state = itemId;
+                },
+                labelBuilder: (id) {
+                  final item = items.valueOrNull?.cast<Item?>().firstWhere(
+                    (i) => i?.id == id,
+                    orElse: () => null,
+                  );
+                  return item?.itemName ?? id.toString();
+                },
+                hint: l10n.reportsAllitems,
+              ),
+            ),
+          ],
+          onRefresh: () => ref.invalidate(bomUsageReportProvider),
+          actions: [
+            TextButton.icon(
+              onPressed:
+                  report.isLoading || (report.valueOrNull?.rows.isEmpty ?? true)
+                  ? null
+                  : () => saveCsv(
+                      context,
+                      suggestedName: csvSuggestedName('bom-usage'),
+                      csv: buildBomUsageCsv(l10n, report.valueOrNull!),
+                      successMessage: l10n.reportsExported,
+                      errorMessage: l10n.reportsExportfailed,
+                    ),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: Text(l10n.reportsExportcsv),
+            ),
+          ],
         ),
         Expanded(child: _body(report)),
       ],

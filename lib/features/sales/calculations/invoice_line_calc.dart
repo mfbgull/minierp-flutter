@@ -1,9 +1,16 @@
 // Invoice line calculation — packed vs loose items (PORTING.md §7).
-// 1:1 port of `calculations/invoiceLineCalc.ts`.
+// 1:1 port of `calculations/invoiceLineCalc.ts`, extended with the
+// loose "amount-driven once touched" flip model (invoice-form-keyboard
+// spec §5.2):
 //
 // packed: quantity drives amount (amount = qty × rate), as it always has.
-// loose:  bidirectional — whichever of quantity/amount the user last
-//         edited drives the other.
+// loose:  a sticky per-line flag (`amountDriven`). Until the amount is
+//         edited the line behaves like a packed line (qty drives amount);
+//         the first amount edit flips it permanently — amount drives qty
+//         (qty = amount ÷ rate). Editing qty or rate never un-flips it.
+// zero-rate: when rate ≤ 0 on an amount-driven loose line, the quantity
+//         wins — the amount is accepted but qty is not recomputed and no
+//         error is raised (spec §5.3).
 //
 // All functions are pure; no UI/state imports. `SaleType` is reused
 // from the data models.
@@ -53,6 +60,8 @@ class CalcItemLineInput {
     this.rate,
     this.qtyDecimalPrecision,
     this.roundingStep,
+    this.amountDriven,
+    this.editedField,
     this.lastEditedField,
   });
 
@@ -67,6 +76,16 @@ class CalcItemLineInput {
   /// Explicit step overriding the one derived from qtyDecimalPrecision.
   final num? roundingStep;
 
+  /// Sticky loose-line flag: `true` once the amount has been edited
+  /// (spec §5.2). Falls back to `lastEditedField == amount` when null so
+  /// legacy callers/tests keep working.
+  final bool? amountDriven;
+
+  /// The field this edit targets. `null` (legacy direct calls) falls back
+  /// to [lastEditedField].
+  final LineField? editedField;
+
+  /// Legacy per-edit driver marker, retained for backward compatibility.
   final EditedField? lastEditedField;
 }
 
@@ -113,66 +132,71 @@ CalcItemLineResult calcItemLine(CalcItemLineInput input) {
       ? input.roundingStep!
       : math.pow(10, -(input.qtyDecimalPrecision ?? 0)).toDouble();
 
-  if (input.lastEditedField == EditedField.amount) {
-    if (rate <= 0) {
-      return (
-        quantity: quantity,
-        amount: amount,
-        error: CalcItemLineError(
-          code: LineErrorCode.zeroRate,
-          severity: LineErrorSeverity.error,
-          message: 'Rate must be greater than 0',
-        ),
-      );
-    }
-    final derivedQty = roundToStep(amount / rate, step);
-    if (amount > 0 && derivedQty == 0) {
-      return (
-        quantity: derivedQty,
-        amount: amount,
-        error: CalcItemLineError(
-          code: LineErrorCode.zeroQuantity,
-          severity: LineErrorSeverity.warning,
-          message: 'Amount results in zero quantity',
-        ),
-      );
-    }
-    return (quantity: derivedQty, amount: amount, error: null);
-  }
-
-  if (input.lastEditedField == EditedField.quantity) {
+  // Which field is authoritative for this edit (flip model, spec §5.2)?
+  // - Editing the amount → derive qty (amount ÷ rate).
+  // - Editing the rate on an already amount-driven line → derive qty too
+  //   (the entered amount stays the driver).
+  // - Everything else (qty edit, rate edit on an unflipped line) → qty is
+  //   authoritative, amount = qty × rate.
+  final editedField = input.editedField ??
+      (input.lastEditedField == EditedField.amount
+          ? LineField.amount
+          : input.lastEditedField == EditedField.quantity
+          ? LineField.quantity
+          : null);
+  final amountDriven =
+      input.amountDriven ?? input.lastEditedField == EditedField.amount;
+  final deriveQty = editedField == LineField.amount ||
+      (editedField == LineField.rate && amountDriven);
+  if (!deriveQty) {
     return (quantity: quantity, amount: _round2(quantity * rate), error: null);
   }
 
-  // Fresh row — nothing driven yet
-  return (quantity: quantity, amount: amount, error: null);
+  // Derive quantity from the amount. Zero-rate rule (spec §5.3): quantity
+  // wins — accept the amount, keep qty, no error.
+  if (rate <= 0) {
+    return (quantity: quantity, amount: amount, error: null);
+  }
+  final derivedQty = roundToStep(amount / rate, step);
+  if (amount > 0 && derivedQty == 0) {
+    return (
+      quantity: derivedQty,
+      amount: amount,
+      error: CalcItemLineError(
+        code: LineErrorCode.zeroQuantity,
+        severity: LineErrorSeverity.warning,
+        message: 'Amount results in zero quantity',
+      ),
+    );
+  }
+  return (quantity: derivedQty, amount: amount, error: null);
 }
 
-/// `({quantity, amount, rate, lastEditedField})` structural result.
+/// `({quantity, amount, rate, amountDriven, lastEditedField})` structural
+/// result.
 typedef LineFieldPatch = ({
   num quantity,
   num amount,
   num rate,
+  bool amountDriven,
   EditedField? lastEditedField,
 });
 
 /// Build the patch for a quantity/rate/amount edit on a line.
-/// Editing Quantity or Amount makes it the driver; editing Rate keeps the
-/// existing driver fixed and recomputes the other side.
+/// Editing Amount flips the line to amount-driven (permanent for that
+/// line, spec §5.2). Editing Quantity or Rate keeps the current driver
+/// and recomputes the driven side: a flipped line recomputes qty on a
+/// rate edit, an unflipped one recomputes amount.
 /// Shared by both invoice grids so their behaviour cannot drift.
 LineFieldPatch applyLineFieldUpdate(
   CalcItemLineInput item,
   LineField field,
   num value,
 ) {
-  final EditedField? lastEditedField;
-  if (field == LineField.rate) {
-    lastEditedField = item.lastEditedField ?? EditedField.quantity;
-  } else {
-    lastEditedField = field == LineField.quantity
-        ? EditedField.quantity
-        : EditedField.amount;
-  }
+  final amountDriven = field == LineField.amount
+      ? true
+      : (item.amountDriven ??
+            item.lastEditedField == EditedField.amount);
 
   final result = calcItemLine(
     CalcItemLineInput(
@@ -182,7 +206,8 @@ LineFieldPatch applyLineFieldUpdate(
       rate: field == LineField.rate ? value : item.rate,
       qtyDecimalPrecision: item.qtyDecimalPrecision,
       roundingStep: item.roundingStep,
-      lastEditedField: lastEditedField,
+      amountDriven: amountDriven,
+      editedField: field,
     ),
   );
 
@@ -190,7 +215,10 @@ LineFieldPatch applyLineFieldUpdate(
     quantity: result.quantity,
     amount: result.amount,
     rate: field == LineField.rate ? value : item.rate ?? 0,
-    lastEditedField: item.saleType == SaleType.loose ? lastEditedField : null,
+    amountDriven: item.saleType == SaleType.loose ? amountDriven : false,
+    lastEditedField: item.saleType == SaleType.loose
+        ? (amountDriven ? EditedField.amount : EditedField.quantity)
+        : null,
   );
 }
 
@@ -207,7 +235,8 @@ CalcItemLineError? lineIssue(CalcItemLineInput input) {
       rate: input.rate,
       qtyDecimalPrecision: input.qtyDecimalPrecision,
       roundingStep: input.roundingStep,
-      lastEditedField: EditedField.amount,
+      amountDriven: true,
+      editedField: LineField.amount,
     ),
   ).error;
 }

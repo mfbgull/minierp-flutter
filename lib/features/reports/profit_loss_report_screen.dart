@@ -13,8 +13,9 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart' show ProfitLossReport;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart' show ReportDateRangeFilter;
+import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
 
 class ProfitLossReportScreen extends ConsumerWidget {
@@ -24,41 +25,41 @@ class ProfitLossReportScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final report = ref.watch(profitLossReportProvider);
     final l10n = AppLocalizations.of(context)!;
-    final textTheme = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.reportsProfitlossreport,
-                  style: textTheme.titleLarge,
-                ),
-              ),
-              ReportDateRangeFilter(
-                fromProvider: reportProfitLossFromDateProvider,
-                toProvider: reportProfitLossToDateProvider,
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: report.isLoading || report.valueOrNull == null
-                    ? null
-                    : () => saveCsv(
-                        context,
-                        suggestedName: csvSuggestedName('profit-loss'),
-                        csv: buildProfitLossCsv(l10n, report.valueOrNull!),
-                        successMessage: l10n.reportsExported,
-                        errorMessage: l10n.reportsExportfailed,
-                      ),
-                icon: const Icon(Icons.file_download_outlined, size: 18),
-                label: Text(l10n.reportsExportcsv),
-              ),
-            ],
+          child: Text(
+            l10n.reportsProfitlossreport,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
+        ),
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          filters: [
+            DateRangeFilter(
+              fromProvider: reportProfitLossFromDateProvider,
+              toProvider: reportProfitLossToDateProvider,
+            ),
+          ],
+          onRefresh: () => ref.invalidate(profitLossReportProvider),
+          actions: [
+            TextButton.icon(
+              onPressed: report.isLoading || report.valueOrNull == null
+                  ? null
+                  : () => saveCsv(
+                      context,
+                      suggestedName: csvSuggestedName('profit-loss'),
+                      csv: buildProfitLossCsv(l10n, report.valueOrNull!),
+                      successMessage: l10n.reportsExported,
+                      errorMessage: l10n.reportsExportfailed,
+                    ),
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              label: Text(l10n.reportsExportcsv),
+            ),
+          ],
         ),
         Expanded(child: _body(context, ref, report)),
       ],

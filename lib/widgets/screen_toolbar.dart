@@ -15,11 +15,34 @@
 // clear-all icon when [onClearAll] + [hasActiveFilters] are provided
 // (the invoices/quotation/returns style), otherwise a text-clear icon
 // while the field has content (the customers/items style).
+//
+// Keyboard shortcuts (screen_shortcuts.dart): the shell's
+// ScreenShortcutScope dispatches Ctrl+F / Ctrl+N / Ctrl+R / Ctrl+E to
+// the visible shell branch's toolbar (resolved at keypress time from
+// the element tree — hidden branches are TickerMode-disabled), via
+// [ScreenToolbarState.focusSearch], [ScreenToolbarState.triggerNew],
+// [ScreenToolbarState.triggerRefresh] and
+// [ScreenToolbarState.triggerExport] — the first [primaryActions]
+// entry's onPressed becomes the Ctrl+N callback and the first enabled
+// [actions] entry (the CSV-export slot) the Ctrl+E callback, so the
+// 40+ screens need no per-screen wiring. The same affordances are
+// advertised in the UI: the search hint shows the Ctrl+F chord, the
+// first primary action is wrapped in a Ctrl+N tooltip (its own label
+// already says what it creates), the refresh button's tooltip shows
+// Ctrl+R, and the first enabled export action a Ctrl+E tooltip.
 
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import 'searchable_select.dart';
+
+/// The Ctrl+F / Ctrl+N / Ctrl+R / Ctrl+E chords as shown in the UI
+/// (universal key names, so not localized). These must stay in sync with
+/// the key bindings in screen_shortcuts.dart.
+const String kShortcutFindChord = 'Ctrl+F';
+const String kShortcutNewChord = 'Ctrl+N';
+const String kShortcutRefreshChord = 'Ctrl+R';
+const String kShortcutExportChord = 'Ctrl+E';
 
 /// Compact bordered searchable-select for the toolbar row — the shared
 /// `_filterDropdown` helper the expenses/employees/users screens used to
@@ -83,7 +106,7 @@ class ScreenToolbarDropdown<T> extends StatelessWidget {
 /// The shared toolbar row described above. All lists are optional — a
 /// screen that has no search (e.g. a pure filter bar) simply omits the
 /// search params, and read-only logs omit [primaryActions].
-class ScreenToolbar extends StatelessWidget {
+class ScreenToolbar extends StatefulWidget {
   const ScreenToolbar({
     super.key,
     this.searchController,
@@ -141,37 +164,118 @@ class ScreenToolbar extends StatelessWidget {
 
   final EdgeInsetsGeometry padding;
 
+  @override
+  ScreenToolbarState createState() => ScreenToolbarState();
+}
+
+/// The toolbar's state — public so the shell's [ScreenShortcutScope] can
+/// resolve the visible screen's toolbar and dispatch Ctrl+F / Ctrl+N to
+/// it (see screen_shortcuts.dart).
+class ScreenToolbarState extends State<ScreenToolbar> {
+  /// The search field's focus node — the Ctrl+F target. Created here so
+  /// the 40+ screens don't each have to own one.
+  final FocusNode _searchFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  /// Ctrl+F — focus the search field (no-op when the screen has no search
+  /// field or a filter has disabled it).
+  void focusSearch() {
+    if (widget.searchController == null || !widget.searchEnabled) return;
+    _searchFocusNode.requestFocus();
+  }
+
+  /// Ctrl+N — fire the first primary action (the "New …" button); no-op
+  /// on screens without one (read-only logs, reports).
+  void triggerNew() => _onNewShortcut?.call();
+
+  /// Ctrl+R — fire the screen's refresh callback; no-op on screens whose
+  /// toolbar has no refresh button ([onRefresh] omitted).
+  void triggerRefresh() => widget.onRefresh?.call();
+
+  /// Ctrl+E — fire the first enabled secondary action (the CSV-export
+  /// button slot, [actions]); no-op on screens without one.
+  void triggerExport() => _exportAction?.onPressed?.call();
+
+  /// The secondary action the Ctrl+E shortcut targets — the first
+  /// [ButtonStyleButton] with a live onPressed in [widget.actions].
+  /// Every screen uses [actions] for its CSV-export button
+  /// (TextButton.icon), and those are disabled while loading/empty, so
+  /// the live callback is read off the widget rather than re-passed by
+  /// the ~25 screens. The UI hint ([_chordLabelled]) wraps exactly this
+  /// same action so the advertised chord and the shortcut can never
+  /// drift apart.
+  ButtonStyleButton? get _exportAction {
+    for (final action in widget.actions) {
+      if (action is ButtonStyleButton && action.onPressed != null) {
+        return action;
+      }
+    }
+    return null;
+  }
+
+  /// The primary action the Ctrl+N shortcut targets — the first
+  /// [ButtonStyleButton] with a live onPressed. Primary actions are the
+  /// screens' own "New …" buttons (today FilledButton.icon / .tonalIcon,
+  /// both [ButtonStyleButton] subtypes), so the callback is read off the
+  /// widget rather than re-passed by 40 screens. The UI hint
+  /// ([_shortcutLabelledActions]) wraps exactly this same action so the
+  /// advertised chord and the shortcut can never drift apart.
+  ButtonStyleButton? get _shortcutAction {
+    for (final action in widget.primaryActions) {
+      if (action is ButtonStyleButton && action.onPressed != null) {
+        return action;
+      }
+    }
+    return null;
+  }
+
+  /// The Ctrl+N target's onPressed.
+  VoidCallback? get _onNewShortcut => _shortcutAction?.onPressed;
+
   Widget _searchField(AppLocalizations l10n) {
-    final controller = searchController;
+    final controller = widget.searchController;
     assert(controller != null);
     return SizedBox(
-      width: searchWidth,
+      width: widget.searchWidth,
       child: ValueListenableBuilder<TextEditingValue>(
         valueListenable: controller!,
         builder: (context, value, _) => TextField(
           controller: controller,
-          enabled: searchEnabled,
-          onChanged: onSearchChanged,
+          focusNode: _searchFocusNode,
+          enabled: widget.searchEnabled,
+          onChanged: widget.onSearchChanged,
           decoration: InputDecoration(
             isDense: true,
             prefixIcon: const Icon(Icons.search, size: 20),
-            hintText: searchHint ?? l10n.commonSearch,
+            // Advertise the Ctrl+F shortcut in the hint — the chord is
+            // omitted while a filter has disabled the search (Ctrl+F is
+            // inert then).
+            hintText: widget.searchEnabled
+                ? '${widget.searchHint ?? l10n.commonSearch}'
+                    ' ($kShortcutFindChord)'
+                : widget.searchHint ?? l10n.commonSearch,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            suffixIcon: onClearAll != null && hasActiveFilters
+            suffixIcon: widget.onClearAll != null && widget.hasActiveFilters
                 ? IconButton(
                     icon: const Icon(Icons.filter_alt_off, size: 18),
                     tooltip: l10n.commonClear,
-                    onPressed: onClearAll,
+                    onPressed: widget.onClearAll,
                   )
                 : value.text.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.clear, size: 18),
-                    onPressed: onClearSearch ??
+                    tooltip: l10n.commonClear,
+                    onPressed: widget.onClearSearch ??
                         () {
                           // Cancel the screen's pending debounce so a
                           // stale timer can't resurrect the term.
                           controller.clear();
-                          onSearchChanged?.call('');
+                          widget.onSearchChanged?.call('');
                         },
                   )
                 : null,
@@ -181,26 +285,56 @@ class ScreenToolbar extends StatelessWidget {
     );
   }
 
+  /// Wraps the [target] entry of [actions] in a Tooltip showing [chord] —
+  /// the action the matching shortcut fires ([_shortcutAction] for
+  /// Ctrl+N, [_exportAction] for Ctrl+E). The action's own label says
+  /// what it does, so the tooltip only adds the key chord; the other
+  /// actions stay unwrapped.
+  List<Widget> _chordLabelled(
+    List<Widget> actions,
+    ButtonStyleButton? target,
+    String chord,
+  ) {
+    if (target == null) return actions;
+    return [
+      for (final action in actions)
+        identical(action, target)
+            ? Tooltip(message: chord, child: action)
+            : action,
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+
     return Padding(
-      padding: padding,
+      padding: widget.padding,
       child: Wrap(
         spacing: 10,
         runSpacing: 10,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          if (searchController != null) _searchField(l10n),
-          ...filters,
-          if (onRefresh != null)
+          if (widget.searchController != null) _searchField(l10n),
+          ...widget.filters,
+          if (widget.onRefresh != null)
             IconButton(
               icon: const Icon(Icons.refresh),
-              tooltip: l10n.commonRefresh,
-              onPressed: onRefresh,
+              // Advertise the Ctrl+R shortcut in the tooltip — the button
+              // (and the shortcut) only exist when onRefresh is wired.
+              tooltip: '${l10n.commonRefresh} ($kShortcutRefreshChord)',
+              onPressed: widget.onRefresh,
             ),
-          ...actions,
-          ...primaryActions,
+          ..._chordLabelled(
+            widget.actions,
+            _exportAction,
+            kShortcutExportChord,
+          ),
+          ..._chordLabelled(
+            widget.primaryActions,
+            _shortcutAction,
+            kShortcutNewChord,
+          ),
         ],
       ),
     );

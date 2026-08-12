@@ -22,9 +22,10 @@ import '../../data/models/report.dart'
         ExpenseCategoryBreakdown;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart' show ReportDateRangeFilter;
+import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../../widgets/searchable_select.dart';
 import '../../widgets/status_badge.dart';
 import '../expenses/expense_providers.dart' show expenseCategoriesProvider;
@@ -213,10 +214,7 @@ class _ExpensesReportScreenState extends ConsumerState<ExpensesReportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: _header(l10n, report),
-        ),
+        _header(l10n, report),
         Expanded(child: _body(report)),
       ],
     );
@@ -228,22 +226,24 @@ class _ExpensesReportScreenState extends ConsumerState<ExpensesReportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                l10n.reportsExpensesreport,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            const SizedBox(width: 8),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Text(
+            l10n.reportsExpensesreport,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          filters: [
             _categoryDropdown(l10n),
-            const SizedBox(width: 8),
-            ReportDateRangeFilter(
+            DateRangeFilter(
               fromProvider: reportExpensesFromDateProvider,
               toProvider: reportExpensesToDateProvider,
             ),
-            const SizedBox(width: 8),
+          ],
+          onRefresh: () => ref.invalidate(expensesReportProvider),
+          actions: [
             TextButton.icon(
               onPressed: report.isLoading || (loaded?.rows.isEmpty ?? true)
                   ? null
@@ -260,11 +260,15 @@ class _ExpensesReportScreenState extends ConsumerState<ExpensesReportScreen> {
           ],
         ),
         if (summary != null) ...[
-          const SizedBox(height: 10),
-          _summaryStrip(l10n, summary),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: _summaryStrip(l10n, summary),
+          ),
           if ((loaded?.categoryBreakdown ?? const []).isNotEmpty) ...[
-            const SizedBox(height: 10),
-            _breakdown(l10n, loaded!.categoryBreakdown),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: _breakdown(l10n, loaded!.categoryBreakdown),
+            ),
           ],
         ],
       ],

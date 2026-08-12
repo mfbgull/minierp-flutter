@@ -27,7 +27,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/date_picker_helpers.dart' show pickDate;
 import '../../widgets/form_field.dart';
-import '../../widgets/form_helpers.dart' show numText;
+import '../../widgets/form_helpers.dart' show numText, submitOnEnter;
 import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show warehousesProvider;
 import 'purchase_order_providers.dart';
@@ -369,8 +369,12 @@ class _ReceiveGoodsDialogState extends ConsumerState<ReceiveGoodsDialog> {
           width: 96,
           child: TextFormField(
             controller: line.controller,
+            // Focus the first line so the user can adjust quantities (or
+            // Enter to receive everything) without clicking into the grid.
+            autofocus: index == 0,
             enabled: !_saving,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onFieldSubmitted: submitOnEnter(_save),
             decoration: _decoration(),
             validator: (value) {
               final qty = double.tryParse(value ?? '') ?? -1;

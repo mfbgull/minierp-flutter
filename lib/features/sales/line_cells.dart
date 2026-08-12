@@ -5,7 +5,6 @@
 // `GridNavController`. The description cell embeds the client-side
 // item-search dropdown (spec §5.5).
 
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -20,6 +19,26 @@ import 'calculations/invoice_line_calc.dart'
     show CalcItemLineInput, lineIssue, LineErrorSeverity;
 import 'line_items_grid.dart';
 import 'models/sales_forms.dart' show DiscountScope, EditedField;
+
+/// Re-assert focus on a cell editor after it mounts. A TextField's
+/// `autofocus` only registers the enclosing FocusScope's autofocus
+/// candidate (`FocusScope.autofocus`) and does NOT focus while the scope
+/// is unfocused — the normal state here (the PlutoGrid scope is only ever
+/// focused by our own cells), so the editor would render without focus,
+/// the IME would never connect, and typing would do nothing. Request the
+/// editor node directly, and repeat on the next frame: PlutoGrid's
+/// `setKeepFocus` grabs the grid node the first time its FocusScope gains
+/// focus (`gridFocusNode.requestFocus`), and the second request lands
+/// after `keepFocus` is already true, when the scope no longer steals.
+void _assertEditorFocus(FocusNode node, State state) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!state.mounted) return;
+    node.requestFocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (state.mounted) node.requestFocus();
+    });
+  });
+}
 
 /// Serial `#` column (read-only).
 class SerialCell extends StatelessWidget {
@@ -89,6 +108,12 @@ class _LineCellState extends State<LineCell> {
   bool _dismissed = false;
   TextEditingController? _editor;
 
+  /// Whether the select-all-on-entry was already applied for this edit
+  /// session. Re-applying it on later rebuilds would make the next IME
+  /// commit *replace* the selected text instead of inserting — the
+  /// one-character bug (each keystroke ended up the only character).
+  bool _selectedAll = false;
+
   GridNavController get nav => widget.nav;
   PlutoRow get row => widget.row;
   LineColumn get column => widget.column;
@@ -118,6 +143,9 @@ class _LineCellState extends State<LineCell> {
     _removeOverlay();
     _focus.dispose();
     _editFocus.dispose();
+    // Drop the nav's editor reference so it can't read a disposed
+    // controller (e.g. a row removed mid-edit).
+    if (_editor != null) nav.detachEditor(_editor!);
     _editor?.dispose();
     super.dispose();
   }
@@ -145,6 +173,10 @@ class _LineCellState extends State<LineCell> {
     if (_editing && !_announcedEdit) {
       _announcedEdit = true;
       _dismissed = false;
+      _selectedAll = false;
+      // `autofocus` alone never focuses this editor inside the PlutoGrid
+      // FocusScope — assert focus explicitly (spec §2.3/§5.2).
+      _assertEditorFocus(_editFocus, this);
       final notify = widget.onBeginEdit;
       if (notify != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -215,10 +247,15 @@ class _LineCellState extends State<LineCell> {
     final controller = _editor ??= TextEditingController(text: _displayText());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      controller.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: controller.text.length,
-      );
+      // Select-all exactly once per session: re-applying it on rebuilds
+      // would make every subsequent IME commit replace the text.
+      if (!_selectedAll) {
+        controller.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: controller.text.length,
+        );
+        _selectedAll = true;
+      }
       nav.attachEditor(controller);
     });
     return Container(
@@ -247,7 +284,10 @@ class _LineCellState extends State<LineCell> {
     TextEditingController? controller,
   ) {
     final e = event is KeyDownEvent ? event : null;
-    if (e == null || controller == null) return KeyEventResult.ignored;
+    // KeyUp / no-editor keys still must not be swallowed by the grid's
+    // FocusScope (it returns `handled` for everything) — pass them to the
+    // IME path too.
+    if (e == null || controller == null) return nav.passToIME();
     final sel = controller.selection;
     return nav.handleEditKey(
       row,
@@ -401,7 +441,6 @@ class DescriptionCell extends StatefulWidget {
 
 class _DescriptionCellState extends State<DescriptionCell> {
   static const double _itemExtent = 52;
-  static const int _initialLimit = 10;
 
   final FocusNode _focus = FocusNode();
   late final FocusNode _editFocus;
@@ -409,14 +448,20 @@ class _DescriptionCellState extends State<DescriptionCell> {
   final ScrollController _scroll = ScrollController();
   TextEditingController? _controller;
   OverlayEntry? _overlay;
-  Timer? _openTimer;
   List<Item> _filtered = const [];
   int _selectedIndex = -1;
   bool _open = false;
 
-  /// Set on the edit-session enter edge so rebuilds don't reopen the
-  /// dropdown (which leaks overlay entries). Reset on leaving edit mode.
+  /// Whether this cell was in edit mode on the last build — used to
+  /// detect edit-session boundaries (reset the editor, close the
+  /// dropdown) without rebuilding during the build phase.
   bool _wasEditing = false;
+
+  /// Whether the select-all-on-entry was already applied for this edit
+  /// session. Re-applying it on later rebuilds (the per-keystroke
+  /// `_filter` setState) would make the next IME commit *replace* the
+  /// selected text instead of inserting — the one-character bug.
+  bool _selectedAll = false;
 
   GridNavController get nav => widget.nav;
   PlutoRow get row => widget.row;
@@ -442,12 +487,37 @@ class _DescriptionCellState extends State<DescriptionCell> {
   @override
   void dispose() {
     _closeOverlay();
-    _openTimer?.cancel();
     _focus.dispose();
     _editFocus.dispose();
     _scroll.dispose();
+    // Drop the nav's editor reference so it can't read a disposed
+    // controller (e.g. a row removed mid-edit).
+    if (_controller != null) nav.detachEditor(_controller!);
     _controller?.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(DescriptionCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Item pool arrives late (spec §4.5): re-run the in-flight query so
+    // matches appear without re-typing. The refilter must wait for the
+    // build phase to finish — `_filter` marks the dropdown overlay
+    // dirty, and calling that synchronously here crashes with
+    // "markNeedsBuild() called during build" (the page memoizes the pool
+    // so `!=` only fires on genuine content changes).
+    if (oldWidget.items != widget.items &&
+        nav.isEditing(row, LineColumn.description) &&
+        _controller != null &&
+        _controller!.text.trim().isNotEmpty) {
+      final query = _controller!.text;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Skip when the dropdown was closed in the meantime (e.g. Escape)
+        // — refiltering would reopen it against the user's intent.
+        if (!mounted || _controller == null || !_open) return;
+        _filter(query);
+      });
+    }
   }
 
   @override
@@ -456,11 +526,32 @@ class _DescriptionCellState extends State<DescriptionCell> {
       listenable: nav,
       builder: (context, _) {
         final editing = nav.isEditing(row, LineColumn.description);
-        if (editing) {
-          _scheduleOpenOnce();
-        } else {
-          _wasEditing = false;
+        if (editing && !_wasEditing) {
+          // Fresh edit session: drop any stale query from a previous
+          // session and re-sync with the row's value (imported lines
+          // carry no `description` cell — show the item-name fallback,
+          // spec §8.19). Safe to write `c.text` here: no TextField is
+          // attached to the controller during the display→edit frame,
+          // so the notify has no listeners.
+          final c = _controller;
+          if (c != null && c.text != _displayDescription) {
+            c.text = _displayDescription;
+            _filtered = const [];
+            _selectedIndex = -1;
+          }
+          _selectedAll = false;
+          // `autofocus` alone never focuses this editor inside the
+          // PlutoGrid FocusScope — assert focus explicitly (spec §2.3).
+          _assertEditorFocus(_editFocus, this);
+        } else if (!editing && _wasEditing) {
+          // Left edit mode (navigation commit / Escape / selection):
+          // drop the dropdown overlay. Deferred — removing an overlay
+          // entry marks its ancestor dirty, which crashes during build.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _closeOverlay();
+          });
         }
+        _wasEditing = editing;
         if (!editing) return _display();
         return _editor();
       },
@@ -529,14 +620,20 @@ class _DescriptionCellState extends State<DescriptionCell> {
 
   Widget _editor() {
     final controller = _controller ??= TextEditingController(
-      text: LineRowData(row).description,
+      text: _displayDescription,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      controller.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: controller.text.length,
-      );
+      // Select-all exactly once per session: re-applying it on rebuilds
+      // (each keystroke re-runs `_filter` → setState) would make every
+      // subsequent IME commit replace the typed text.
+      if (!_selectedAll) {
+        controller.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: controller.text.length,
+        );
+        _selectedAll = true;
+      }
       nav.attachEditor(controller);
     });
     return Container(
@@ -566,25 +663,38 @@ class _DescriptionCellState extends State<DescriptionCell> {
     TextEditingController? controller,
   ) {
     final e = event is KeyDownEvent ? event : null;
-    if (e == null || controller == null) return KeyEventResult.ignored;
+    // KeyUp / no-editor keys still must not be swallowed by the grid's
+    // FocusScope — pass them to the IME path too.
+    if (e == null || controller == null) return nav.passToIME();
     final key = e.logicalKey;
 
+    // Dropdown open with matching options — navigate/select (spec §4.4).
     if (_open && _filtered.isNotEmpty) {
       switch (key) {
         case LogicalKeyboardKey.arrowDown:
           _selectedIndex = (_selectedIndex + 1) % _filtered.length;
-          _scrollToSelected();
           setState(() {});
+          // The dropdown lives in a separate overlay tree — `setState`
+          // alone never re-renders it, so without this the highlight
+          // stays put and the list never scrolls (the customer popup
+          // marks its overlay dirty the same way).
+          _refreshOverlay();
+          _scrollToSelected();
           return KeyEventResult.handled;
         case LogicalKeyboardKey.arrowUp:
           _selectedIndex = _selectedIndex <= 0
               ? _filtered.length - 1
               : _selectedIndex - 1;
-          _scrollToSelected();
           setState(() {});
+          _refreshOverlay();
+          _scrollToSelected();
           return KeyEventResult.handled;
         case LogicalKeyboardKey.enter:
         case LogicalKeyboardKey.tab:
+        case LogicalKeyboardKey.arrowRight:
+          // Right behaves like Enter/Tab while the dropdown is open:
+          // select the highlighted item and hand off to quantity (the
+          // reference's ArrowRight → save + focus quantity).
           if (_selectedIndex >= 0 && _selectedIndex < _filtered.length) {
             _selectItem(_filtered[_selectedIndex]);
             return KeyEventResult.handled;
@@ -598,6 +708,31 @@ class _DescriptionCellState extends State<DescriptionCell> {
       }
     }
 
+    // Dropdown open with no matches — "No products found". Enter/Tab/
+    // ArrowRight are blocked (a real item is required, spec §4.4); ↑/↓
+    // still navigate (discarding the unmatched text on commit); Escape
+    // closes the dropdown and stays editing.
+    if (_open && _filtered.isEmpty) {
+      switch (key) {
+        case LogicalKeyboardKey.enter:
+        case LogicalKeyboardKey.tab:
+        case LogicalKeyboardKey.arrowRight:
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.escape:
+          _closeOverlay();
+          setState(() {});
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.arrowDown:
+          nav.commitMoveDown(row, LineColumn.description);
+          return KeyEventResult.handled;
+        case LogicalKeyboardKey.arrowUp:
+          nav.commitMoveUp(row, LineColumn.description);
+          return KeyEventResult.handled;
+        default:
+          break;
+      }
+    }
+
     switch (key) {
       case LogicalKeyboardKey.arrowDown:
         nav.commitMoveDown(row, LineColumn.description);
@@ -605,71 +740,63 @@ class _DescriptionCellState extends State<DescriptionCell> {
       case LogicalKeyboardKey.arrowUp:
         nav.commitMoveUp(row, LineColumn.description);
         return KeyEventResult.handled;
+      // Dropdown closed. Right moves forward once an item is already on
+      // the row (commit + next field → qty, mirroring the number cells);
+      // with no item it stays blocked — no free-text lines (spec §4.4).
       case LogicalKeyboardKey.arrowRight:
-        nav.moveToCell(row, LineColumn.quantity);
+        if (LineRowData(row).hasItem) {
+          nav.commitMoveRight(row, LineColumn.description);
+        }
         return KeyEventResult.handled;
       case LogicalKeyboardKey.enter:
-        nav.commitEnterSearchable(row, LineColumn.description);
-        return KeyEventResult.handled;
       case LogicalKeyboardKey.tab:
-        nav.commitTabSearchable(row, LineColumn.description);
         return KeyEventResult.handled;
       case LogicalKeyboardKey.escape:
         nav.revertCurrent();
         return KeyEventResult.handled;
       default:
-        return KeyEventResult.ignored;
+        // Character keys (e.g. continuing to type while the dropdown is
+        // open) must reach the IME, not the grid's FocusScope (spec §4.4).
+        return nav.passToIME();
     }
   }
 
   void _filter(String text) {
     final query = text.trim().toLowerCase();
-    final pool = widget.items;
-    List<Item> matches;
+    // Empty query → close the dropdown (no first-10 fallback, spec §4.2).
     if (query.isEmpty) {
-      matches = pool.take(_initialLimit).toList();
-    } else {
-      matches = [
-        for (final it in pool)
-          if (it.itemName.toLowerCase().contains(query) ||
-              it.itemCode.toLowerCase().contains(query))
-            it,
-      ];
+      setState(() {
+        _filtered = const [];
+        _selectedIndex = -1;
+      });
+      _closeOverlay();
+      return;
     }
+    final pool = widget.items;
+    final matches = [
+      for (final it in pool)
+        if (it.itemName.toLowerCase().contains(query) ||
+            it.itemCode.toLowerCase().contains(query))
+          it,
+    ];
     setState(() {
       _filtered = matches;
       _selectedIndex = matches.isEmpty ? -1 : 0;
     });
+    _openDropdown();
     _refreshOverlay();
   }
 
-  /// One-shot "open the dropdown" trigger: fires only on the cell's
-  /// transition into edit mode, never on in-session rebuilds.
-  void _scheduleOpenOnce() {
-    if (_wasEditing) return;
-    _wasEditing = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !nav.isEditing(row, LineColumn.description)) return;
-      _openTimer?.cancel();
-      _openTimer = Timer(const Duration(milliseconds: 50), _openDropdown);
-    });
-  }
-
+  /// Opens the overlay once (positioned below the cell). The filtered
+  /// list is owned by [_filter] — this never resets it.
   void _openDropdown() {
-    if (!mounted) return;
-    // One overlay entry per edit session — a second insert would leak an
-    // entry that survives `_closeOverlay` and re-renders stale state.
-    if (_open) return;
+    if (!mounted || _open) return;
     final box = _anchorKey.currentContext?.findRenderObject() as RenderBox?;
     final overlay = Overlay.of(context);
     if (box == null) return;
     final topLeft = box.localToGlobal(Offset.zero);
     final width = math.max(box.size.width, 260.0);
-    setState(() {
-      _filtered = widget.items.take(_initialLimit).toList();
-      _selectedIndex = _filtered.isEmpty ? -1 : 0;
-      _open = true;
-    });
+    setState(() => _open = true);
     _overlay = OverlayEntry(
       builder: (overlayContext) => Positioned(
         left: topLeft.dx,
@@ -734,6 +861,7 @@ class _DescriptionCellState extends State<DescriptionCell> {
         if (!mounted) return;
         if (_selectedIndex != index) {
           setState(() => _selectedIndex = index);
+          _refreshOverlay();
         }
       },
       child: Container(
@@ -801,9 +929,10 @@ class _DescriptionCellState extends State<DescriptionCell> {
   }
 
   void _selectItem(Item item) {
-    if (!mounted) return;
+    // Idempotent (spec §4.5): a second activation after the overlay is
+    // already closed is a no-op — no double-fire on double-tap/Enter.
+    if (!mounted || !_open) return;
     _closeOverlay();
-    _openTimer?.cancel();
     setState(() {
       _filtered = const [];
       _selectedIndex = -1;

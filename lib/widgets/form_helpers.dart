@@ -30,6 +30,16 @@ String? nonNegativeNumberValidator(
   return null;
 }
 
+/// [TextFormField.onFieldSubmitted] handler that saves the form — pass
+/// it on every **single-line** text field so pressing Enter (the
+/// keyboard's action key) submits without reaching for the Save button.
+/// The submit method validates first, so a premature Enter just surfaces
+/// the field errors; fields are disabled while a save is in flight, so
+/// double-submits can't happen. Multi-line fields
+/// (description/address/notes) intentionally keep Enter = newline and are
+/// left without this handler.
+ValueChanged<String> submitOnEnter(VoidCallback onSubmit) => (_) => onSubmit();
+
 /// The dense input decoration used by every field in the form dialogs.
 InputDecoration formInputDecoration({String? hintText}) => InputDecoration(
   isDense: true,

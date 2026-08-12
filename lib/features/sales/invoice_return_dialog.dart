@@ -242,7 +242,9 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
                 _ReturnLineRow(
                   item: _returnableItems[i],
                   controller: _qtyControllers[i],
+                  autofocus: i == 0,
                   enabled: !_submitting,
+                  onSubmit: _submit,
                 ),
               ],
             ],
@@ -252,6 +254,7 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
               child: TextFormField(
                 controller: _reasonController,
                 enabled: !_submitting,
+                onFieldSubmitted: submitOnEnter(_submit),
                 decoration: formInputDecoration(
                   hintText: l10n.salesreturnsReturnreasonplaceholder,
                 ),
@@ -320,12 +323,22 @@ class _ReturnLineRow extends StatelessWidget {
   const _ReturnLineRow({
     required this.item,
     required this.controller,
+    required this.autofocus,
     required this.enabled,
+    required this.onSubmit,
   });
 
   final InvoiceItem item;
   final TextEditingController controller;
+
+  /// Focuses the first return-qty field on open — the quantities are the
+  /// dialog's primary input.
+  final bool autofocus;
   final bool enabled;
+
+  /// Enter-to-submit: pressing Enter on a filled line processes the
+  /// return (same [submitOnEnter] contract as the other dialogs).
+  final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -365,10 +378,12 @@ class _ReturnLineRow extends StatelessWidget {
             label: l10n.salesreturnsReturnquantity,
             child: TextFormField(
               controller: controller,
+              autofocus: autofocus,
               enabled: enabled,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              onFieldSubmitted: submitOnEnter(onSubmit),
               decoration: formInputDecoration(
                 hintText: Formatters.number(available),
               ),

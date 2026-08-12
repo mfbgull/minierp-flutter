@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import 'core/auth/auth_notifier.dart';
 import 'core/auth/session_events.dart';
+import 'core/i18n/locale_provider.dart';
 import 'core/theme/app_theme.dart';
 import 'features/activity_log/activity_log_screen.dart';
 import 'features/auth/change_password_screen.dart';
@@ -44,6 +45,7 @@ import 'features/reports/sales_summary_report_screen.dart';
 import 'features/reports/supplier_analysis_report_screen.dart';
 import 'features/reports/stock_level_report_screen.dart';
 import 'features/reports/stock_valuation_report_screen.dart';
+import 'features/sales/invoice_print_preview_page.dart';
 import 'features/sales/sales_invoice_form_page.dart';
 import 'features/sales_orders/sales_shell.dart';
 import 'features/shell/app_shell.dart';
@@ -96,6 +98,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/sales/form',
         builder: (context, state) =>
             SalesInvoiceFormPage(invoice: state.extra as Invoice?),
+      ),
+      // Invoice A4 print preview (PORTING.md §12): full-page PDF preview
+      // opened by the sales grid's row double-tap (Print + Cancel
+      // actions). Standalone like the form — outside the shell.
+      GoRoute(
+        path: '/sales/print-preview',
+        builder: (context, state) =>
+            InvoicePrintPreviewPage(invoice: state.extra as Invoice),
       ),
       // Authenticated shell (PORTING.md §5): one branch per module in
       // [shellDestinations] — each keeps its state while switching. Real
@@ -268,6 +278,7 @@ class MiniErpApp extends ConsumerWidget {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
       routerConfig: ref.watch(routerProvider),
+      locale: ref.watch(localeProvider),
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,

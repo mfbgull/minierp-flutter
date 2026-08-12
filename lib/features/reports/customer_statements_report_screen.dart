@@ -17,6 +17,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/date_picker_helpers.dart';
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../../widgets/searchable_select.dart';
 import 'customer_statement_detail_dialog.dart';
 import 'report_providers.dart';
@@ -149,10 +150,7 @@ class _CustomerStatementsReportScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: _header(l10n, report, customers, selectedCustomerId),
-        ),
+        _header(l10n, report, customers, selectedCustomerId),
         Expanded(child: _body(report)),
       ],
     );
@@ -168,19 +166,20 @@ class _CustomerStatementsReportScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                l10n.reportsCustomerstatementsreport,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            ReportDateRangeFilter(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Text(
+            l10n.reportsCustomerstatementsreport,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          filters: [
+            DateRangeFilter(
               fromProvider: reportStatementsFromDateProvider,
               toProvider: reportStatementsToDateProvider,
             ),
-            const SizedBox(width: 12),
             SizedBox(
               width: 220,
               child: SearchableSelect<int>(
@@ -209,7 +208,9 @@ class _CustomerStatementsReportScreenState
                 },
               ),
             ),
-            const SizedBox(width: 8),
+          ],
+          onRefresh: () => ref.invalidate(customerStatementsReportProvider),
+          actions: [
             TextButton.icon(
               onPressed: report.isLoading || (value?.isEmpty ?? true)
                   ? null

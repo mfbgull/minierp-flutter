@@ -204,6 +204,7 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
                               required: true,
                               child: TextFormField(
                                 controller: _codeController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting && !_isEdit,
                                 decoration: formInputDecoration(),
                                 validator: _isEdit
@@ -222,6 +223,8 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
                               required: true,
                               child: TextFormField(
                                 controller: _nameController,
+                                onFieldSubmitted: submitOnEnter(_submit),
+                                autofocus: true,
                                 enabled: !_submitting,
                                 decoration: formInputDecoration(),
                                 validator: (v) => requiredValidator(
@@ -242,6 +245,7 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
                               label: l10n.suppliersContactperson,
                               child: TextFormField(
                                 controller: _contactController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: formInputDecoration(),
                               ),
@@ -253,6 +257,7 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
                               label: l10n.suppliersPhone,
                               child: TextFormField(
                                 controller: _phoneController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 keyboardType: TextInputType.phone,
                                 decoration: formInputDecoration(),
@@ -270,6 +275,7 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
                               label: l10n.suppliersEmail,
                               child: TextFormField(
                                 controller: _emailController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 keyboardType: TextInputType.emailAddress,
                                 decoration: formInputDecoration(),
@@ -283,6 +289,7 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
                               label: l10n.suppliersPaymentterms,
                               child: TextFormField(
                                 controller: _termsController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: formInputDecoration(),
                               ),

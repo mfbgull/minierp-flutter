@@ -25,6 +25,7 @@ import '../../widgets/app_toast.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/date_picker_helpers.dart' show pickDate;
 import '../../widgets/form_field.dart';
+import '../../widgets/form_helpers.dart';
 import '../../widgets/searchable_select.dart';
 import 'expense_providers.dart';
 
@@ -311,6 +312,7 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                         required: true,
                         child: TextFormField(
                           controller: _amountController,
+                          onFieldSubmitted: submitOnEnter(_submit),
                           enabled: !_submitting,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
@@ -359,6 +361,7 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                               label: l10n.expensesVendor,
                               child: TextFormField(
                                 controller: _vendorController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -370,6 +373,7 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                               label: l10n.expensesReferenceno,
                               child: TextFormField(
                                 controller: _referenceNoController,
+                                onFieldSubmitted: submitOnEnter(_submit),
                                 enabled: !_submitting,
                                 decoration: _decoration(),
                               ),
@@ -382,6 +386,7 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                         label: l10n.expensesProject,
                         child: TextFormField(
                           controller: _projectController,
+                          onFieldSubmitted: submitOnEnter(_submit),
                           enabled: !_submitting,
                           decoration: _decoration(),
                         ),

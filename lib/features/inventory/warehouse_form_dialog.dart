@@ -7,6 +7,7 @@ import '../../data/repositories/inventory_repository.dart'
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/form_helpers.dart';
 import '../../widgets/screen_error_panel.dart';
 
 /// Opens the warehouse create/edit dialog. Resolves `true` when a save
@@ -141,6 +142,7 @@ class _WarehouseFormDialogState extends ConsumerState<WarehouseFormDialog> {
               ],
               TextFormField(
                 controller: _codeController,
+                onFieldSubmitted: submitOnEnter(_submit),
                 decoration: InputDecoration(labelText: 'Warehouse Code'),
                 enabled: !isEdit,
                 validator: (v) =>
@@ -149,6 +151,7 @@ class _WarehouseFormDialogState extends ConsumerState<WarehouseFormDialog> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _nameController,
+                onFieldSubmitted: submitOnEnter(_submit),
                 decoration: InputDecoration(labelText: 'Warehouse Name'),
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? 'Required' : null,
@@ -156,6 +159,7 @@ class _WarehouseFormDialogState extends ConsumerState<WarehouseFormDialog> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _locationController,
+                onFieldSubmitted: submitOnEnter(_submit),
                 decoration: const InputDecoration(labelText: 'Location'),
               ),
               const SizedBox(height: 20),

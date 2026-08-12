@@ -15,6 +15,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
 import 'top_debtor_detail_dialog.dart';
 
@@ -173,10 +174,7 @@ class _TopDebtorsReportScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: _header(l10n, report),
-        ),
+        _header(l10n, report),
         Expanded(child: _body(report)),
       ],
     );
@@ -187,14 +185,16 @@ class _TopDebtorsReportScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                l10n.reportsTopdebtorsreport,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Text(
+            l10n.reportsTopdebtorsreport,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          filters: [
             // Row-limit selector — same options as the web page's filter.
             DropdownButtonHideUnderline(
               child: DropdownButton<int>(
@@ -211,7 +211,9 @@ class _TopDebtorsReportScreenState
                 },
               ),
             ),
-            const SizedBox(width: 8),
+          ],
+          onRefresh: () => ref.invalidate(topDebtorsReportProvider),
+          actions: [
             TextButton.icon(
               onPressed: report.isLoading || (value?.isEmpty ?? true)
                   ? null

@@ -23,7 +23,8 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/detail_labels.dart' show detailSectionLabel;
 import '../../widgets/form_field.dart' show FormFieldShell;
-import '../../widgets/form_helpers.dart' show ErrorBanner, formInputDecoration;
+import '../../widgets/form_helpers.dart'
+    show ErrorBanner, formInputDecoration, submitOnEnter;
 import '../../widgets/searchable_select.dart';
 import 'inventory_providers.dart'
     show
@@ -238,6 +239,7 @@ class _StockTransferDialogState extends ConsumerState<_StockTransferDialog> {
                   required: true,
                   child: TextFormField(
                     controller: _qtyController,
+                    onFieldSubmitted: submitOnEnter(_submit),
                     enabled: !_busy,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,

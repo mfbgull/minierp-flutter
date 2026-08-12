@@ -53,6 +53,11 @@ abstract interface class CalculableLine {
   Discount get discount;
   SaleType get saleType;
   num get amount;
+
+  /// Sticky loose-line flag (spec §5.2): `true` once the amount has been
+  /// edited — the line then bills the entered amount and derives qty.
+  bool get amountDriven;
+
   EditedField? get lastEditedField;
 }
 
@@ -112,6 +117,7 @@ class InvoiceFormItem implements CalculableLine, FillableLine {
     required this.discount,
     this.saleType = SaleType.packed,
     this.amount = 0,
+    this.amountDriven = false,
     this.lastEditedField,
     this.qtyDecimalPrecision = 0,
     this.roundingStep,
@@ -142,6 +148,9 @@ class InvoiceFormItem implements CalculableLine, FillableLine {
 
   @override
   final num amount;
+
+  @override
+  final bool amountDriven;
 
   @override
   final EditedField? lastEditedField;
@@ -333,6 +342,7 @@ class InvoiceV2FormItem implements CalculableLine {
     required this.discount,
     this.saleType = SaleType.packed,
     this.amount = 0,
+    this.amountDriven = false,
     this.lastEditedField,
     this.qtyDecimalPrecision = 0,
     this.roundingStep,
@@ -359,6 +369,9 @@ class InvoiceV2FormItem implements CalculableLine {
 
   @override
   final num amount;
+
+  @override
+  final bool amountDriven;
 
   @override
   final EditedField? lastEditedField;

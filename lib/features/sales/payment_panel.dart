@@ -77,12 +77,16 @@ class PaymentPanel extends StatefulWidget {
   final void Function(InvoicePaymentRecord payment) onEditPayment;
 
   @override
-  State<PaymentPanel> createState() => _PaymentPanelState();
+  State<PaymentPanel> createState() => PaymentPanelState();
 }
 
-class _PaymentPanelState extends State<PaymentPanel> {
+/// State of the payment panel — public so the invoice form can focus the
+/// first payment-method amount field via a `GlobalKey` (Shift+Enter
+/// shortcut, spec §7).
+class PaymentPanelState extends State<PaymentPanel> {
   final Map<int, TextEditingController> _amountControllers = {};
   final Map<int, TextEditingController> _referenceControllers = {};
+  final Map<int, FocusNode> _amountFocusNodes = {};
   final TextEditingController _notes = TextEditingController();
 
   @override
@@ -93,9 +97,55 @@ class _PaymentPanelState extends State<PaymentPanel> {
     for (final c in _referenceControllers.values) {
       c.dispose();
     }
+    for (final n in _amountFocusNodes.values) {
+      n.dispose();
+    }
     _notes.dispose();
     super.dispose();
   }
+
+  /// The first method's Amount field focus node — created at build time
+  /// (via [_amountNode]) so the TextField is *attached* to the same node
+  /// [focusFirstAmount] later requests. Lazy creation in the focus call
+  /// would leave the TextField on its own internal node and the request
+  /// would silently no-op.
+  FocusNode _amountNode(int id) => _amountFocusNodes.putIfAbsent(id, () {
+    final n = FocusNode();
+    n.addListener(() {
+      if (!n.hasFocus) return;
+      // Bring the focused amount field into view when the panel body is
+      // scrolled (spec: invoice-form-layout §4.5 focus-into-view).
+      final ctx = n.context;
+      if (ctx != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) Scrollable.ensureVisible(ctx, alignment: 0.5);
+        });
+      }
+      final c = _amountControllers[id];
+      if (c != null && c.text.isNotEmpty) {
+        c.selection = TextSelection(baseOffset: 0, extentOffset: c.text.length);
+      }
+    });
+    return n;
+  });
+
+  /// Focus the first payment-method amount field, selecting its existing
+  /// text (spec §8.20). Ensures at least one method row exists first.
+  void focusFirstAmount() {
+    if (widget.saving) return;
+    if (widget.methods.isEmpty) {
+      widget.onAddMethod();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.methods.isNotEmpty) {
+          _focusAmount(widget.methods.first.id);
+        }
+      });
+      return;
+    }
+    _focusAmount(widget.methods.first.id);
+  }
+
+  void _focusAmount(int id) => _amountNode(id).requestFocus();
 
   TextEditingController _amountController(PaymentMethod m) =>
       _amountControllers.putIfAbsent(
@@ -125,34 +175,39 @@ class _PaymentPanelState extends State<PaymentPanel> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _header(l10n, theme),
-          const Divider(height: 16),
-          if (widget.isEdit) _existingPayments(l10n),
-          if (_showForm) _paymentForm(l10n),
-          // Create mode records payments as part of invoice save (no
-          // invoice id to allocate yet); edit mode records immediately.
-          if (widget.isEdit) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: widget.saving ? null : widget.onRecord,
-                icon: widget.saving
-                    ? const SizedBox(
-                        width: 13,
-                        height: 13,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.payments_outlined, size: 16),
-                label: Text(l10n.paymentsRecordpayment),
+      // The body scrolls internally so the panel fits the right column's
+      // height in the fixed-height layout (spec: invoice-form-layout
+      // §4.5); the Record Payment button scrolls with it.
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _header(l10n, theme),
+            const Divider(height: 16),
+            if (widget.isEdit) _existingPayments(l10n),
+            if (_showForm) _paymentForm(l10n),
+            // Create mode records payments as part of invoice save (no
+            // invoice id to allocate yet); edit mode records immediately.
+            if (widget.isEdit) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: widget.saving ? null : widget.onRecord,
+                  icon: widget.saving
+                      ? const SizedBox(
+                          width: 13,
+                          height: 13,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.payments_outlined, size: 16),
+                  label: Text(l10n.paymentsRecordpayment),
+                ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -222,7 +277,15 @@ class _PaymentPanelState extends State<PaymentPanel> {
     padding: const EdgeInsets.symmetric(vertical: 1),
     child: Row(
       children: [
-        Text(label, style: const TextStyle(fontSize: 12)),
+        // Flexible + ellipsis: long labels truncate instead of pushing
+        // the value out of the narrow panel column.
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 12),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
         const Spacer(),
         Text(
           Formatters.currency(value),
@@ -345,6 +408,7 @@ class _PaymentPanelState extends State<PaymentPanel> {
   }
 
   Widget _methodRow(AppLocalizations l10n, PaymentMethod m) {
+    final isFirst = m == widget.methods.first;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Column(
@@ -369,6 +433,7 @@ class _PaymentPanelState extends State<PaymentPanel> {
               Expanded(
                 child: TextField(
                   controller: _amountController(m),
+                  focusNode: isFirst ? _amountNode(m.id) : null,
                   enabled: !widget.saving,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -404,6 +469,7 @@ class _PaymentPanelState extends State<PaymentPanel> {
                       : () {
                           _amountControllers.remove(m.id)?.dispose();
                           _referenceControllers.remove(m.id)?.dispose();
+                          _amountFocusNodes.remove(m.id)?.dispose();
                           widget.onRemoveMethod(m.id);
                         },
                 ),

@@ -207,6 +207,7 @@ class _PaymentEditDialogState extends ConsumerState<PaymentEditDialog> {
                     label: l10n.fieldsReference,
                     child: TextFormField(
                       controller: _referenceController,
+                      onFieldSubmitted: submitOnEnter(_submit),
                       decoration: formInputDecoration(
                         hintText: l10n.paymentsReferencehint,
                       ),
@@ -217,6 +218,7 @@ class _PaymentEditDialogState extends ConsumerState<PaymentEditDialog> {
                     label: l10n.fieldsNotes,
                     child: TextFormField(
                       controller: _notesController,
+                      onFieldSubmitted: submitOnEnter(_submit),
                       decoration: formInputDecoration(
                         hintText: l10n.paymentsNoteshint,
                       ),

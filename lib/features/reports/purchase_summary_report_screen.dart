@@ -18,9 +18,10 @@ import '../../data/models/report.dart'
     show PurchaseSummaryReport, PurchaseSummaryRow, PurchaseSummaryStats;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart' show ReportDateRangeFilter;
+import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../../widgets/status_badge.dart';
 import 'purchase_summary_detail_dialog.dart';
 import 'report_providers.dart';
@@ -211,10 +212,7 @@ class _PurchaseSummaryReportScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: _header(l10n, report),
-        ),
+        _header(l10n, report),
         Expanded(child: _body(report)),
       ],
     );
@@ -229,19 +227,23 @@ class _PurchaseSummaryReportScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                l10n.reportsPurchasesummaryreport,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            ReportDateRangeFilter(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Text(
+            l10n.reportsPurchasesummaryreport,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ),
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          filters: [
+            DateRangeFilter(
               fromProvider: reportPurchaseFromDateProvider,
               toProvider: reportPurchaseToDateProvider,
             ),
-            const SizedBox(width: 8),
+          ],
+          onRefresh: () => ref.invalidate(purchaseSummaryReportProvider),
+          actions: [
             TextButton.icon(
               onPressed: report.isLoading || (value?.rows.isEmpty ?? true)
                   ? null
@@ -258,8 +260,10 @@ class _PurchaseSummaryReportScreenState
           ],
         ),
         if (loaded != null) ...[
-          const SizedBox(height: 10),
-          _summaryStrip(l10n, loaded),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: _summaryStrip(l10n, loaded),
+          ),
         ],
       ],
     );

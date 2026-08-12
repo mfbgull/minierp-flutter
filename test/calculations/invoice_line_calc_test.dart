@@ -63,18 +63,20 @@ void main() {
       );
     });
 
-    test('loose: amount with zero rate errors', () {
+    test('loose: amount with zero rate keeps quantity, no error', () {
+      // Zero-rate rule (spec §5.3): quantity wins — the amount is
+      // accepted but qty is not recomputed and no error is raised.
       final res = calcItemLine(
         const CalcItemLineInput(
           saleType: SaleType.loose,
+          quantity: 2,
           amount: 100,
           rate: 0,
           lastEditedField: EditedField.amount,
           qtyDecimalPrecision: 3,
         ),
       );
-      expect(res.error?.code, LineErrorCode.zeroRate);
-      expect(res.error?.severity, LineErrorSeverity.error);
+      expect(res, (quantity: 2, amount: 100, error: null));
     });
 
     test('loose: amount too small warns about zero quantity', () {
@@ -178,14 +180,75 @@ void main() {
         quantity: 0.667,
         amount: 100,
         rate: 150,
+        amountDriven: true,
         lastEditedField: EditedField.amount,
       ));
       expect(applyLineFieldUpdate(loose, LineField.quantity, 2), (
         quantity: 2,
         amount: 300,
         rate: 150,
+        amountDriven: false,
         lastEditedField: EditedField.quantity,
       ));
+    });
+
+    test('amount edit flips the line permanently (flip model, spec §5.2)', () {
+      const loose = CalcItemLineInput(
+        saleType: SaleType.loose,
+        qtyDecimalPrecision: 3,
+        rate: 150,
+      );
+
+      // Amount edit flips it.
+      final flipped = applyLineFieldUpdate(loose, LineField.amount, 100);
+      expect(flipped.amountDriven, isTrue);
+
+      // A later qty edit recomputes amount but does NOT un-flip.
+      final afterQty = applyLineFieldUpdate(
+        CalcItemLineInput(
+          saleType: SaleType.loose,
+          qtyDecimalPrecision: 3,
+          rate: 150,
+          amount: 100,
+          quantity: 0.667,
+          amountDriven: flipped.amountDriven,
+        ),
+        LineField.quantity,
+        2,
+      );
+      expect(afterQty.amountDriven, isTrue);
+      expect(afterQty.amount, 300);
+      expect(afterQty.quantity, 2);
+
+      // A rate edit on a flipped line recomputes qty, keeping the amount.
+      final afterRate = applyLineFieldUpdate(
+        CalcItemLineInput(
+          saleType: SaleType.loose,
+          qtyDecimalPrecision: 3,
+          rate: 150,
+          amount: 100,
+          quantity: 2,
+          amountDriven: afterQty.amountDriven,
+        ),
+        LineField.rate,
+        200,
+      );
+      expect(afterRate.amountDriven, isTrue);
+      expect(afterRate.quantity, 0.5);
+      expect(afterRate.amount, 100);
+    });
+
+    test('zero rate on an amount edit keeps qty and still flips', () {
+      const loose = CalcItemLineInput(
+        saleType: SaleType.loose,
+        quantity: 2,
+        qtyDecimalPrecision: 3,
+        rate: 0,
+      );
+      final res = applyLineFieldUpdate(loose, LineField.amount, 100);
+      expect(res.amountDriven, isTrue);
+      expect(res.quantity, 2, reason: 'qty wins when rate is 0');
+      expect(res.amount, 100);
     });
 
     test('rate edit keeps the existing driver', () {
@@ -201,6 +264,7 @@ void main() {
         quantity: 0.5,
         amount: 100,
         rate: 200,
+        amountDriven: true,
         lastEditedField: EditedField.amount,
       ));
     });
@@ -215,6 +279,7 @@ void main() {
         quantity: 4,
         amount: 40,
         rate: 10,
+        amountDriven: false,
         lastEditedField: null,
       ));
     });
@@ -238,15 +303,17 @@ void main() {
         ),
         null,
       );
+      // Zero-rate rule (spec §5.3): quantity wins — no inline error.
       expect(
         lineIssue(
           const CalcItemLineInput(
             saleType: SaleType.loose,
+            quantity: 2,
             amount: 100,
             rate: 0,
           ),
-        )?.code,
-        LineErrorCode.zeroRate,
+        ),
+        null,
       );
       expect(
         lineIssue(

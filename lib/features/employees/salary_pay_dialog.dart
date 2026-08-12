@@ -14,6 +14,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/date_picker_helpers.dart' show pickDate;
 import '../../widgets/form_field.dart';
+import '../../widgets/form_helpers.dart';
 import '../../widgets/searchable_select.dart';
 import '../../features/sales/payment_panel.dart' show kPaymentMethods;
 import 'employee_models.dart';
@@ -181,6 +182,8 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
                               required: true,
                               child: TextFormField(
                                 controller: _amountController,
+                                onFieldSubmitted: submitOnEnter(_submit),
+                                autofocus: true,
                                 enabled: !_submitting,
                                 keyboardType: const TextInputType
                                     .numberWithOptions(decimal: true),
@@ -227,6 +230,7 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
                         label: l10n.employeesReferenceno,
                         child: TextFormField(
                           controller: _referenceController,
+                          onFieldSubmitted: submitOnEnter(_submit),
                           enabled: !_submitting,
                           decoration: _decoration(),
                         ),
