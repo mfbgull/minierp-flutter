@@ -1,6 +1,6 @@
 # Date Range Picker — Implementation Spec
 
-Status: **draft — for review, no code written yet**
+Status: **in implementation** — Phase 0 (shared date math + `compactRange`, committed) and Phase 1 (server preferences store + week-aware `period=week`, §6) are **done**; Phases 2–6 pending. §6 below reflects what Phase 1 actually built.
 Source of reference: `D:/date-range-picker.html` (web prototype shared by the user)
 Target app: `mini-erp-flutter` (Flutter desktop/Windows/Linux + web, Material 3, l10n en+ur)
 
@@ -224,15 +224,17 @@ New shared widget in `lib/widgets/date_range_picker.dart` (internals private to 
 
 ### 6.1 Server work
 
-New per-user preference store (AGENTS.md: migration required):
+New per-user preference store (AGENTS.md: migration required) — **implemented in Phase 1**.
 
-- **Table** `user_preferences` (new migration `server/src/migrations/add-user-preferences.sql`):
-  - `user_id INTEGER PRIMARY KEY` (FK users), `week_start TEXT NOT NULL DEFAULT 'monday'`, `default_range JSON` (`{from,to}` ISO dates or null), `presets JSON NOT NULL DEFAULT '[]'` (array of `{id, name, from, to}`), timestamps.
-- **Endpoints** (auth-protected, `requirePermission`-consistent with existing routes):
-  - `GET /preferences` → the current user's `{weekStart, defaultRange, presets}`.
-  - `PUT /preferences` → partial update, returns the saved object (same envelope pattern as the existing settings/routes).
-- Server model/service + controller + routes mirroring the existing `settings` pattern; prepared statements only, transactional writes.
-- **Backfill on read**: GET returns server defaults when no row exists.
+- **Table** `user_preferences` (migration `server/src/migrations/add-user-preferences.sql` + symmetric rollback in `migrations/rollbacks/`):
+  - `user_id INTEGER PRIMARY KEY` (FK users `ON DELETE CASCADE`) — the PK is what makes the upsert's `ON CONFLICT(user_id)` legal, `week_start TEXT NOT NULL DEFAULT 'monday'`, `default_range TEXT` (JSON-serialized `{from,to}` ISO dates, or NULL), `presets TEXT NOT NULL DEFAULT '[]'` (JSON array of `{id, name, from, to}`), `updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`.
+  - SQLite has no native JSON column — JSON fields are stored as `TEXT` and parsed defensively in the model (a corrupt blob falls back per-field, never throws).
+- **Endpoints** (auth-protected via `authenticateToken`; reuse the **`settings`** module permissions — `read` for GET, `update` for PUT — so a settings-capable user controls dashboard week start; no new permission entries):
+  - `GET /api/preferences` → the current user's `{weekStart, defaultRange, presets}` (camelCase wire shape), in the standard `{success, data}` envelope.
+  - `PUT /api/preferences` → **partial** update (fields not present keep their current value; `defaultRange: null` clears it), returns the saved merged object.
+- Implemented as `models/UserPreferences.ts` (get/upsert, single-statement atomic write) + `controllers/preferencesController.ts` + `routes/preferences.ts` (mounted in `app.ts`), mirroring the existing `settings` pattern. Prepared statements only.
+- **Backfill on read**: GET returns server defaults (`{monday, null, []}`) when no row exists — defaults are computed in memory, **no write-on-GET** (a row is only created by the first PUT).
+- **PUT validation** (400 on violation): `weekStart` ∈ `{monday, saturday, sunday}`; `defaultRange` is `{from, to}` in `YYYY-MM-DD` with `from <= to` (lexicographic comparison is exact for the enforced zero-padded format) or explicit `null`; each preset is `{id, name, from, to}` with non-empty **unique** ids and `from <= to`.
 
 ### 6.2 Client consumption
 
@@ -244,11 +246,13 @@ New per-user preference store (AGENTS.md: migration required):
 
 ### 6.3 Week-aware `period=week` dashboard blocks
 
-Per decision Q1, the dashboard's **Sales Summary** and **Expense Summary** blocks stop being rolling 7-day windows and become calendar weeks aligned to the saved `week_start`:
+Per decision Q1, the dashboard's **Sales Summary** and **Expense Summary** blocks stop being rolling 7-day windows and become calendar weeks aligned to the saved `week_start` — **implemented in Phase 1**.
 
-- `server/src/models/Dashboard.ts` `getSalesSummary(db, period)` / `getExpenseSummary(db, period)`: for `period === 'week'`, compute `startOfWeek(today)` from the **authenticated user's** `week_start` (read from `user_preferences`; fall back to `monday`), then filter `invoice_date BETWEEN startOfWeek AND startOfWeek + 6 days`. Equivalent trailing bound (`≤ today`) is fine since no future data exists — use the full week for symmetry with the picker's "This week".
-- Implementation: compute the day offset in JS (`(jsDow - weekStartIndex + 7) % 7`, `jsDow` Mon=1…Sun=0, `weekStartIndex` Mon=1/Sat=6/Sun=0) and pass it as a SQL parameter (`date('now', '-' || ? || ' days')` … `'+' || ? || ' days'`) — no string-built SQL.
-- The dashboard controllers already authenticate per-request, so the preference lookup threads the same `req.user` used by the preferences routes.
+- `server/src/models/Dashboard.ts`: `getSalesSummary(db, period = 'today', userId?)` / `getExpenseSummary(db, period = 'month', userId?)` build their WHERE clause through a shared `periodWhereClause(db, period, column, userId?)` helper. `period` goes through a whitelist `switch` (`today` | `week` | `month`); `column` is hard-coded by each caller (`invoice_date` / `expense_date`) — never user input.
+- For `period === 'week'` **with** a `userId`, the bounds come from `weekBounds(todayISO, weekStart)` (`server/src/utils/weekMath.ts` — UTC math, the server twin of the Flutter `date_range_math.dart`): inclusive `{from, to}` where `from` is the week's first day per the saved `week_start` and `to = from + 6`. The user's `week_start` is read via `UserPreferences.getForUser(db, userId)` — an absent row backfills the `monday` default. Using the full week matches the picker's "This week"; trailing future days are harmless since no future data exists.
+- The bounds are passed as **prepared-statement parameters** — `` `${column} BETWEEN ? AND ?` `` with `[from, to]` — no string-built SQL (AGENTS.md DATABASE rule).
+- `week` **without** a `userId` keeps the legacy rolling 7-day window; unknown periods default to `today`. Only authenticated `period=week` is week-start-aware.
+- The dashboard controllers already authenticate per-request and pass `req.user?.id` into the model functions, threading the same `req.user` used by the preferences routes.
 - All other periods (`today`, `month`) and all other rolling-N-day queries (chart, production status, stock movement) stay rolling windows — only `period=week` changes.
 
 ### 6.4 Settings screen
@@ -332,10 +336,11 @@ Also: `dashboardGlobalDateRangeHint` stays as-is.
 - Keyboard: arrows move focus, Enter commits, Escape closes, PageUp/PageDown page months.
 - Dark theme smoke test (theme brightness both modes).
 
-### 9.3 Server
+### 9.3 Server — three suites implemented in Phase 1 (38 tests)
 
-- Preferences GET default row; PUT partial update persists; per-user isolation; validation of `week_start` enum + `presets` shape.
-- `period=week` boundary behavior: `getSalesSummary`/`getExpenseSummary` return the calendar week aligned to each week-start value (monday/saturday/sunday), with the start-of-week offset correct across month/year boundaries.
+- `userPreferences.test.ts` (in-memory DB): defaults when no row exists; upsert + partial merge without clobbering; per-user isolation; clear-null; preset JSON round-trip; corrupt-row fallback.
+- `preferences.test.ts` (HTTP, real app): GET defaults; partial PUT persists and doesn't clobber earlier fields; invalid `weekStart`; malformed and **reversed** `defaultRange`; reversed preset; **duplicate / empty preset ids**; single-day `from == to` accepted; clear via `null`; non-object body; 401 unauthenticated; **403 for a role lacking `settings` permission** (seeded `User` role).
+- `dashboardWeek.test.ts` (in-memory): `period=week` aligned to monday/saturday/sunday; expense summary on a saturday week; rolling fallback without a user id; **monday fallback for a user id with no preference row**; `today`/`month` unchanged; cancelled invoices excluded. (`weekBounds` rollover across month/year boundaries is covered in Phase 0's `weekMath.test.ts`.)
 
 ### 9.4 Existing suites to update
 

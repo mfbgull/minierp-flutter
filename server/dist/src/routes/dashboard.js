@@ -20,6 +20,9 @@ router.get('/production-status', (0, requirePermission_1.requirePermission)('das
 router.get('/stock-movement-summary', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardController_1.default.getStockMovementSummary);
 router.get('/kpi', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardController_1.default.getKPI);
 router.get('/ar-summary', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardController_1.default.getARSummary);
+router.get('/cash-position', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardController_1.default.getCashPosition);
+router.get('/cash-opening-balances', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardController_1.default.getCashOpeningBalances);
+router.put('/cash-opening-balances', (0, requirePermission_1.requirePermission)('dashboard', 'update'), dashboardController_1.default.saveCashOpeningBalances);
 // ============ Layout CRUD ============
 router.get('/layout/active', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardLayoutController_1.default.getActiveLayout);
 router.post('/layout', (0, requirePermission_1.requirePermission)('dashboard', 'create'), dashboardLayoutController_1.default.createLayout);

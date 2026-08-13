@@ -44,7 +44,9 @@ function getTopCustomers(req: AuthRequest, res: Response): void {
 function getSalesSummary(req: AuthRequest, res: Response): void {
   try {
     const period = (req.query.period as string) || 'today';
-    const data = DashboardModel.getSalesSummary(db, period);
+    // The user id makes `period=week` a calendar week aligned to the
+    // user's saved week-start day (spec §6.3).
+    const data = DashboardModel.getSalesSummary(db, period, req.user?.id);
     res.json({ success: true, data });
   } catch (error) {
     logger.error('Sales summary error:', error);
@@ -59,7 +61,9 @@ function getSalesSummary(req: AuthRequest, res: Response): void {
 function getExpenseSummary(req: AuthRequest, res: Response): void {
   try {
     const period = (req.query.period as string) || 'month';
-    const data = DashboardModel.getExpenseSummary(db, period);
+    // The user id makes `period=week` a calendar week aligned to the
+    // user's saved week-start day (spec §6.3).
+    const data = DashboardModel.getExpenseSummary(db, period, req.user?.id);
     res.json({ success: true, data });
   } catch (error) {
     logger.error('Expense summary error:', error);

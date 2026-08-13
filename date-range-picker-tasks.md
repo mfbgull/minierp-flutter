@@ -28,7 +28,7 @@ Companion to `date-range-picker-spec.md` (all decisions locked). This file break
 - Acceptance: `Aug 13, 2026` / `Aug 7 – 13, 2026` / `Aug 7 – Sep 13, 2026` / `Aug 7, 2026 – Sep 13, 2027`; unit tests in `test/core/formatters_test.dart`.
 
 **T0.3 — Week-start-aware server week math** · Owner: Server.
-- Shared helper in `server/src/utils/weekMath.ts`: `weekBounds(todayISO, weekStart): { from, to }` — the JS `(jsDow - weekStartIndex + 7) % 7` offset from spec §6.3, returning ISO bounds.
+- Shared helper in `server/src/utils/weekMath.ts`: `weekBounds(todayISO, weekStart): { from, to }` — inclusive UTC ISO bounds of the week containing `todayISO` (internally the `(dow - weekStartIndex + 7) % 7` offset, per spec §6.3).
 - Acceptance: `npm run typecheck`; small unit test for offset across boundaries.
 
 > **Milestone M0:** date math is solid on both layers. Nothing else can proceed safely without it.
@@ -43,11 +43,11 @@ Companion to `date-range-picker-spec.md` (all decisions locked). This file break
 - Acceptance: server boots against an existing DB without error; fresh DB gets the table; rollback note in `server/src/migrations/rollbacks/`.
 
 **T1.2 — Model + controller + routes** · Owner: Server.
-- `server/src/models/UserPreferences.ts` (mirror `Settings.ts`): `getForUser(db, userId)` (backfills default row on read — spec §6.1), `updateForUser(db, userId, partial)` (validate `week_start` enum `['monday','saturday','sunday']`; validate `default_range` shape `{from,to}` ISO; validate `presets` array of `{id,name,from,to}`; prepared statements + transactional write).
-- `server/src/controllers/preferencesController.ts` (mirror `settingsController.ts`): `getPreferences`, `updatePreferences` — read/write from `req.user.id`, structured `{success, data}` envelope.
-- `server/src/routes/preferences.ts`: `GET /` + `PUT /` guarded by `requirePermission('settings', 'read'|'update')` (matches the existing settings permission module) — confirm the module name during review.
+- `server/src/models/UserPreferences.ts` (mirror `Settings.ts`): `getForUser(db, userId)` (returns server defaults in memory when no row exists — **no write-on-GET**; a row is only created by the first PUT), `updateForUser(db, userId, partial)` (merges partial onto current, single-statement upsert `ON CONFLICT(user_id)`; JSON fields stored as TEXT and parsed defensively). **Validation lives in the controller**, not the model (matches the codebase's controller-validates pattern).
+- `server/src/controllers/preferencesController.ts` (mirror `settingsController.ts`): `getPreferences`, `updatePreferences` — read/write from `req.user.id`, structured `{success, data}` envelope; PUT validates `week_start` enum `['monday','saturday','sunday']`, `default_range` shape `{from,to}` ISO **with `from <= to`** (or explicit `null` to clear), `presets` array of `{id,name,from,to}` with non-empty **unique** ids and `from <= to`.
+- `server/src/routes/preferences.ts`: `GET /` + `PUT /` guarded by `requirePermission('settings', 'read'|'update')` (matches the existing settings permission module) — confirmed during review.
 - Mount in the app's route aggregator alongside the other route files.
-- Acceptance: `npm run typecheck`, `npm run lint`; **QA** adds controller tests (spec §9.3): default-row backfill, partial update persists, per-user isolation, invalid enum/shape → 400.
+- Acceptance: `npm run typecheck`, `npm run lint`; **QA** adds controller tests (spec §9.3): default-row backfill, partial update persists, per-user isolation, invalid enum/shape → 400, reversed-range + duplicate/empty preset id → 400, clear-null, 403 for a non-settings role.
 
 **T1.3 — Week-aware `period=week` dashboard blocks** · Owner: Server. Depends on T1.1.
 - `server/src/models/Dashboard.ts` `getSalesSummary`/`getExpenseSummary`: for `period === 'week'`, look up the requester's `week_start` (via `UserPreferences.getForUser`), compute `weekBounds` (T0.3), and filter with parameterized `date(...)` bounds. The dashboard controller passes `req.user.id` down.
@@ -66,7 +66,7 @@ Companion to `date-range-picker-spec.md` (all decisions locked). This file break
 
 **T2.2 — Providers + boot cache** · Owner: Flutter. Depends on T2.1.
 - `lib/features/preferences/preference_providers.dart`:
-  - `userPreferencesProvider` (FutureProvider, `GET /preferences`)
+  - `userPreferencesProvider` (FutureProvider, `GET /api/preferences`)
   - `weekStartProvider` (`StateProvider<WeekStart>`, seeded from cache) and `activeDefaultRangeProvider`
   - A small **synchronous cache** (`SharedPreferences` — already a dependency) so `StateProvider` initializers can read the week start / default range before the network resolves: `main()` preloads `SharedPreferences.getInstance()` + fires the server fetch; cache is the seed, server response wins on arrival (write-through per spec §6.2).
 - Acceptance: providers expose current values synchronously at first read; changing week start or default range persists via `PUT /preferences` with a toast on failure.

@@ -869,6 +869,7 @@ runForecastEnhancementsMigration();
 runCustomReportsMigration();
 runDashboardLayoutsMigration();
 runLooseItemMigration();
+runUserPreferencesMigration();
 
 // Rollback support: run if --rollback flag is passed
 if (process.argv.includes('--rollback')) {
@@ -1622,6 +1623,32 @@ function runLooseItemMigration(): void {
     }
   } catch (error: any) {
     logger.error('Loose item support migration error:', error.message);
+  }
+}
+
+function runUserPreferencesMigration(): void {
+  // Per-user date-range picker preferences (week start, default range,
+  // custom presets) — date-range-picker-spec.md §6.1.
+  try {
+    const tableCheck = db.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE type='table' AND name='user_preferences'
+    `).get() as { name: string } | undefined;
+
+    if (!tableCheck) {
+      logger.info('Running user preferences migration...');
+
+      const migrationSQL = fs.readFileSync(
+        path.join(__dirname, '../migrations/add-user-preferences.sql'),
+        'utf8'
+      );
+
+      db.exec(migrationSQL);
+
+      logger.info('✅ User preferences migration completed!');
+    }
+  } catch (error: any) {
+    logger.error('User preferences migration error:', error.message);
   }
 }
 
