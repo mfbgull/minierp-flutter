@@ -4978,4 +4978,105 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get dashboardOpeningbalanceSaved => 'ابتدائی بیلنس محفوظ ہو گیا';
+
+  @override
+  String get drpPresetToday => 'آج';
+
+  @override
+  String get drpPresetYesterday => 'کل';
+
+  @override
+  String get drpPresetThisWeek => 'اس ہفتے';
+
+  @override
+  String get drpPresetLastWeek => 'پچھلے ہفتے';
+
+  @override
+  String get drpPresetLast7 => 'پچھلے 7 دن';
+
+  @override
+  String get drpPresetLast30 => 'پچھلے 30 دن';
+
+  @override
+  String get drpPresetLast90 => 'پچھلے 90 دن';
+
+  @override
+  String get drpPresetThisMonth => 'اس مہینے';
+
+  @override
+  String get drpPresetLastMonth => 'پچھلے مہینے';
+
+  @override
+  String get drpPresetCustomRange => 'اپنی مرضی کی رینج';
+
+  @override
+  String get drpPresetCustom => 'اپنی مرضی';
+
+  @override
+  String get drpPresetAllDates => 'تمام تاریخیں';
+
+  @override
+  String get drpPickStart => 'شروع کی تاریخ منتخب کریں';
+
+  @override
+  String get drpPickEnd => 'اختتام کی تاریخ منتخب کریں';
+
+  @override
+  String get drpPickDate => 'تاریخ منتخب کریں';
+
+  @override
+  String drpDaysSelected(Object count) {
+    return '$count دن منتخب';
+  }
+
+  @override
+  String get drpOneDay => '1 دن';
+
+  @override
+  String get drpPrevPeriod => 'پچھلی مدت';
+
+  @override
+  String get drpNextPeriod => 'اگلی مدت';
+
+  @override
+  String get drpWeekStartsOn => 'ہفتہ شروع ہوتا ہے';
+
+  @override
+  String get drpWeekdayMonday => 'پیر';
+
+  @override
+  String get drpWeekdaySaturday => 'ہفتہ';
+
+  @override
+  String get drpWeekdaySunday => 'اتوار';
+
+  @override
+  String get drpSetDefault => 'ڈیفالٹ رینج مقرر کریں';
+
+  @override
+  String get drpDefaultSet => 'ڈیفالٹ رینج مقرر ہو گئی';
+
+  @override
+  String get drpDefaultFailed => 'ڈیفالٹ رینج محفوظ نہیں ہو سکی';
+
+  @override
+  String get drpWeekStartFailed => 'ہفتے کا آغاز محفوظ نہیں ہو سکا';
+
+  @override
+  String get drpAddPreset => 'پری سیٹ شامل کریں';
+
+  @override
+  String get drpPresetName => 'پری سیٹ کا نام';
+
+  @override
+  String get drpPresetAdded => 'پری سیٹ شامل ہو گیا';
+
+  @override
+  String get drpPresetAddFailed => 'پری سیٹ محفوظ نہیں ہو سکا';
+
+  @override
+  String get drpPresetRemoveFailed => 'پری سیٹ ہٹایا نہیں جا سکا';
+
+  @override
+  String get drpPresetRemove => 'پری سیٹ ہٹائیں';
 }

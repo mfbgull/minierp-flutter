@@ -9791,6 +9791,204 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Opening balances saved'**
   String get dashboardOpeningbalanceSaved;
+
+  /// No description provided for @drpPresetToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get drpPresetToday;
+
+  /// No description provided for @drpPresetYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get drpPresetYesterday;
+
+  /// No description provided for @drpPresetThisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'This week'**
+  String get drpPresetThisWeek;
+
+  /// No description provided for @drpPresetLastWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Last week'**
+  String get drpPresetLastWeek;
+
+  /// No description provided for @drpPresetLast7.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 days'**
+  String get drpPresetLast7;
+
+  /// No description provided for @drpPresetLast30.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 30 days'**
+  String get drpPresetLast30;
+
+  /// No description provided for @drpPresetLast90.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 90 days'**
+  String get drpPresetLast90;
+
+  /// No description provided for @drpPresetThisMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'This month'**
+  String get drpPresetThisMonth;
+
+  /// No description provided for @drpPresetLastMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Last month'**
+  String get drpPresetLastMonth;
+
+  /// No description provided for @drpPresetCustomRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom range'**
+  String get drpPresetCustomRange;
+
+  /// No description provided for @drpPresetCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get drpPresetCustom;
+
+  /// No description provided for @drpPresetAllDates.
+  ///
+  /// In en, this message translates to:
+  /// **'All dates'**
+  String get drpPresetAllDates;
+
+  /// No description provided for @drpPickStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a start date'**
+  String get drpPickStart;
+
+  /// No description provided for @drpPickEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an end date'**
+  String get drpPickEnd;
+
+  /// No description provided for @drpPickDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a date'**
+  String get drpPickDate;
+
+  /// No description provided for @drpDaysSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} days selected'**
+  String drpDaysSelected(Object count);
+
+  /// No description provided for @drpOneDay.
+  ///
+  /// In en, this message translates to:
+  /// **'1 day'**
+  String get drpOneDay;
+
+  /// No description provided for @drpPrevPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous period'**
+  String get drpPrevPeriod;
+
+  /// No description provided for @drpNextPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Next period'**
+  String get drpNextPeriod;
+
+  /// No description provided for @drpWeekStartsOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Week starts on'**
+  String get drpWeekStartsOn;
+
+  /// No description provided for @drpWeekdayMonday.
+  ///
+  /// In en, this message translates to:
+  /// **'Monday'**
+  String get drpWeekdayMonday;
+
+  /// No description provided for @drpWeekdaySaturday.
+  ///
+  /// In en, this message translates to:
+  /// **'Saturday'**
+  String get drpWeekdaySaturday;
+
+  /// No description provided for @drpWeekdaySunday.
+  ///
+  /// In en, this message translates to:
+  /// **'Sunday'**
+  String get drpWeekdaySunday;
+
+  /// No description provided for @drpSetDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as default range'**
+  String get drpSetDefault;
+
+  /// No description provided for @drpDefaultSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Default range set'**
+  String get drpDefaultSet;
+
+  /// No description provided for @drpDefaultFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save default range'**
+  String get drpDefaultFailed;
+
+  /// No description provided for @drpWeekStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save week start'**
+  String get drpWeekStartFailed;
+
+  /// No description provided for @drpAddPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Add preset'**
+  String get drpAddPreset;
+
+  /// No description provided for @drpPresetName.
+  ///
+  /// In en, this message translates to:
+  /// **'Preset name'**
+  String get drpPresetName;
+
+  /// No description provided for @drpPresetAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Preset added'**
+  String get drpPresetAdded;
+
+  /// No description provided for @drpPresetAddFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save preset'**
+  String get drpPresetAddFailed;
+
+  /// No description provided for @drpPresetRemoveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t remove preset'**
+  String get drpPresetRemoveFailed;
+
+  /// No description provided for @drpPresetRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove preset'**
+  String get drpPresetRemove;
 }
 
 class _AppLocalizationsDelegate

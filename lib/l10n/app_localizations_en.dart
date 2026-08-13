@@ -4982,4 +4982,105 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dashboardOpeningbalanceSaved => 'Opening balances saved';
+
+  @override
+  String get drpPresetToday => 'Today';
+
+  @override
+  String get drpPresetYesterday => 'Yesterday';
+
+  @override
+  String get drpPresetThisWeek => 'This week';
+
+  @override
+  String get drpPresetLastWeek => 'Last week';
+
+  @override
+  String get drpPresetLast7 => 'Last 7 days';
+
+  @override
+  String get drpPresetLast30 => 'Last 30 days';
+
+  @override
+  String get drpPresetLast90 => 'Last 90 days';
+
+  @override
+  String get drpPresetThisMonth => 'This month';
+
+  @override
+  String get drpPresetLastMonth => 'Last month';
+
+  @override
+  String get drpPresetCustomRange => 'Custom range';
+
+  @override
+  String get drpPresetCustom => 'Custom';
+
+  @override
+  String get drpPresetAllDates => 'All dates';
+
+  @override
+  String get drpPickStart => 'Pick a start date';
+
+  @override
+  String get drpPickEnd => 'Pick an end date';
+
+  @override
+  String get drpPickDate => 'Pick a date';
+
+  @override
+  String drpDaysSelected(Object count) {
+    return '$count days selected';
+  }
+
+  @override
+  String get drpOneDay => '1 day';
+
+  @override
+  String get drpPrevPeriod => 'Previous period';
+
+  @override
+  String get drpNextPeriod => 'Next period';
+
+  @override
+  String get drpWeekStartsOn => 'Week starts on';
+
+  @override
+  String get drpWeekdayMonday => 'Monday';
+
+  @override
+  String get drpWeekdaySaturday => 'Saturday';
+
+  @override
+  String get drpWeekdaySunday => 'Sunday';
+
+  @override
+  String get drpSetDefault => 'Set as default range';
+
+  @override
+  String get drpDefaultSet => 'Default range set';
+
+  @override
+  String get drpDefaultFailed => 'Couldn\'t save default range';
+
+  @override
+  String get drpWeekStartFailed => 'Couldn\'t save week start';
+
+  @override
+  String get drpAddPreset => 'Add preset';
+
+  @override
+  String get drpPresetName => 'Preset name';
+
+  @override
+  String get drpPresetAdded => 'Preset added';
+
+  @override
+  String get drpPresetAddFailed => 'Couldn\'t save preset';
+
+  @override
+  String get drpPresetRemoveFailed => 'Couldn\'t remove preset';
+
+  @override
+  String get drpPresetRemove => 'Remove preset';
 }

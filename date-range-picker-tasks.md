@@ -97,7 +97,8 @@ Companion to `date-range-picker-spec.md` (all decisions locked). This file break
 - Full keyboard nav (§4.6): arrow-key day focus across month boundaries, Enter/Space select, PageUp/PageDown paging, Home/End, Escape returns focus to pill; `Semantics` labels per day; verify no clash with `screen_shortcuts.dart`.
 - Acceptance: **QA** widget tests for both modes + keyboard (spec §9.2); dark-theme smoke test.
 
-> **Milestone M3:** the widget is complete and testable in isolation against the preferences providers.
+> **Milestone M3 (done):** the widget is complete and testable in isolation against the preferences providers.
+> Built as `lib/widgets/date_range_picker.dart` (single file, `DateRangeFilter` kept as the drop-in class): pill bar with `‹ ›` shift arrows + preset chip, `OverlayPortal`-anchored popover clamped to window edges (flips up when there's no room below), dual-month grids with week-start-aware ordering + 42-cell keyboard navigation, instant-apply selection state machine (commit on end pick, swap on reverse, same-day = single day, discard on close), presets sidebar (All dates / built-ins / user presets with ✕ remove + Add dialog / Custom), footer (hint + week-start `SegmentedButton` + Set-as-default), single-date mode (`DateRangeMode.singleDate`, reduced presets, ±1-day arrows clamped at today), `Semantics` labels per day, and the `drp*` l10n keys (en + ur) pulled forward from T5.2. Two reviewer-driven widget fixes landed: day cells carry a stable `drp-day-YYYY-MM-DD` `ValueKey` (tests target cells by key across the month pair), and the single-date pill watches `dateProvider` so the arrows re-enable/disable as the committed date moves. 23 widget tests cover both modes, presets, shift arrows, week-start toggle, keyboard nav, and the dark theme.
 
 ---
 
