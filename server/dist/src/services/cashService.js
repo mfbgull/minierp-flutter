@@ -100,6 +100,13 @@ function collectFlows(db, uptoDate) {
     for (const row of salaries) {
         add(row.payment_method, 0, row.outflow);
     }
+    // Direct purchases: paid on the spot, so they drain the cash till.
+    const purchases = db.prepare(`
+    SELECT COALESCE(SUM(total_cost), 0) as outflow
+    FROM purchases
+    WHERE purchase_date <= ?
+  `).get(uptoDate);
+    totals.get('cash').outflow += Number(purchases.outflow) || 0;
     return totals;
 }
 /** The opening (seed) balance per account — the cash a new business
@@ -208,6 +215,18 @@ function getCashAccountTransactions(db, accountKey, uptoDate) {
   `).all(uptoDate)) {
         const amount = Number(r.amount) || 0;
         push({ method: r.method, date: r.date, reference: r.reference, description: r.description, amount: -amount, type: 'salary' });
+    }
+    // Direct purchases: cash outflow (paid on the spot).
+    for (const r of db.prepare(`
+    SELECT purchase_date as date, purchase_no as reference,
+           'Purchase ' || purchase_no as description, total_cost as amount
+    FROM purchases
+    WHERE purchase_date <= ?
+  `).all(uptoDate)) {
+        const amount = Number(r.amount) || 0;
+        if (amount > 0) {
+            push({ method: 'cash', date: r.date, reference: r.reference, description: r.description, amount: -amount, type: 'purchase' });
+        }
     }
     out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     return out;

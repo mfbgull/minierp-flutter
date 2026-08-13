@@ -111,7 +111,7 @@ class _DashboardBody extends StatelessWidget {
           // Horizontal stat strip — one fixed-height row so short windows
           // scroll sideways instead of stacking/overflowing.
           SizedBox(
-            height: 108,
+            height: 84,
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
@@ -162,28 +162,17 @@ class _DashboardBody extends StatelessWidget {
           const _CashPositionStrip(),
           const SizedBox(height: 16),
           // Row 1: sales vs purchases + AR aging buckets; row 2: stock
-          // by category + top customers; low-stock alerts full-width at
-          // the bottom (mirrors the web default block grid).
+          // by category + top customers + low-stock alerts (all three
+          // side by side).
           if (compact)
             SizedBox(height: 360, child: _salesPurchasesRow(summary))
           else
             Expanded(flex: 3, child: _salesPurchasesRow(summary)),
           const SizedBox(height: 16),
           if (compact)
-            SizedBox(height: 300, child: _stockCategoryRow(summary))
+            SizedBox(height: 360, child: _stockInsightsRow(summary))
           else
-            Expanded(flex: 2, child: _stockCategoryRow(summary)),
-          const SizedBox(height: 16),
-          if (compact)
-            SizedBox(
-              height: 280,
-              child: _LowStockPanel(items: summary.lowStockItems),
-            )
-          else
-            Expanded(
-              flex: 2,
-              child: _LowStockPanel(items: summary.lowStockItems),
-            ),
+            Expanded(flex: 3, child: _stockInsightsRow(summary)),
         ];
         final content = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -215,7 +204,7 @@ class _DashboardBody extends StatelessWidget {
     ],
   );
 
-  Widget _stockCategoryRow(DashboardSummary summary) => Row(
+  Widget _stockInsightsRow(DashboardSummary summary) => Row(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Expanded(
@@ -226,6 +215,11 @@ class _DashboardBody extends StatelessWidget {
       ),
       const SizedBox(width: 16),
       Expanded(flex: 3, child: const _TopCustomersPanel()),
+      const SizedBox(width: 16),
+      Expanded(
+        flex: 2,
+        child: _LowStockPanel(items: summary.lowStockItems),
+      ),
     ],
   );
 }
@@ -233,11 +227,19 @@ class _DashboardBody extends StatelessWidget {
 /// Closing cash/bank balances per account (`GET /dashboard/cash-position`)
 /// — a compact horizontal strip so the day's cash position is visible
 /// on the dashboard without opening the reconciliation report.
-class _CashPositionStrip extends ConsumerWidget {
+class _CashPositionStrip extends ConsumerStatefulWidget {
   const _CashPositionStrip();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CashPositionStrip> createState() =>
+      _CashPositionStripState();
+}
+
+class _CashPositionStripState extends ConsumerState<_CashPositionStrip> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
     final position = ref.watch(dashboardCashPositionProvider);
@@ -284,29 +286,49 @@ class _CashPositionStrip extends ConsumerWidget {
                     textStyle: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
+                IconButton(
+                  icon: Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                  ),
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: _expanded ? l10n.commonHide : l10n.commonShow,
+                ),
               ],
             ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 86,
-              child: position.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-                error: (error, _) => _PanelError(
-                  message: error is ApiError ? error.message : error.toString(),
-                  onRetry: () => ref.invalidate(dashboardCashPositionProvider),
-                ),
-                data: (data) => ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    for (final account in data.accounts)
-                      _CashPositionCard(account: account),
-                    // Grand total as a highlighted trailing card.
-                    _CashTotalCard(total: data.total),
-                  ],
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 200),
+              crossFadeState: _expanded
+                  ? CrossFadeState.showFirst
+                  : CrossFadeState.showSecond,
+              firstChild: Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: SizedBox(
+                  height: 86,
+                  child: position.when(
+                    loading: () => const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    error: (error, _) => _PanelError(
+                      message: error is ApiError
+                          ? error.message
+                          : error.toString(),
+                      onRetry: () =>
+                          ref.invalidate(dashboardCashPositionProvider),
+                    ),
+                    data: (data) => ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        for (final account in data.accounts)
+                          _CashPositionCard(account: account),
+                        // Grand total as a highlighted trailing card.
+                        _CashTotalCard(total: data.total),
+                      ],
+                    ),
+                  ),
                 ),
               ),
+              secondChild: const SizedBox.shrink(),
             ),
           ],
         ),
@@ -480,18 +502,18 @@ class _KpiCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return SizedBox(
-      width: 232,
-      height: 108,
+      width: 188,
+      height: 84,
       child: Card(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Icon(icon, size: 18, color: scheme.primary),
+                  Icon(icon, size: 16, color: scheme.primary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -514,7 +536,7 @@ class _KpiCard extends StatelessWidget {
                   maxLines: 1,
                   style: Theme.of(
                     context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                  ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
             ],

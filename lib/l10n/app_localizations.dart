@@ -9780,6 +9780,12 @@ abstract class AppLocalizations {
   /// **'Refund'**
   String get cashposRefund;
 
+  /// No description provided for @cashposPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase'**
+  String get cashposPurchase;
+
   /// No description provided for @dashboardOpeningbalance.
   ///
   /// In en, this message translates to:

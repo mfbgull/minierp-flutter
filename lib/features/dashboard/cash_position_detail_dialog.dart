@@ -153,6 +153,7 @@ class _CashPositionDetailDialog extends StatelessWidget {
       'expense' => l10n.cashposExpense,
       'salary' => l10n.cashposSalary,
       'refund' => l10n.cashposRefund,
+      'purchase' => l10n.cashposPurchase,
       _ => t.type,
     };
     final detail = [

@@ -4977,6 +4977,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cashposRefund => 'Refund';
 
   @override
+  String get cashposPurchase => 'Purchase';
+
+  @override
   String get dashboardOpeningbalance => 'Opening balance';
 
   @override

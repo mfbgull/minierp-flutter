@@ -1615,6 +1615,7 @@
   "cashposExpense": "Expense",
   "cashposSalary": "Salary",
   "cashposRefund": "Refund",
+  "cashposPurchase": "Purchase",
   "dashboardOpeningbalance": "Opening balance",
   "dashboardOpeningbalanceHint": "The starting cash/bank balance your business was founded with. It is added to today's position.",
   "dashboardOpeningbalanceSaved": "Opening balances saved",
