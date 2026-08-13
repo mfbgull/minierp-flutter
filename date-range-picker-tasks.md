@@ -166,6 +166,9 @@ Companion to `date-range-picker-spec.md` (all decisions locked). This file break
 - Dashboard popover: light + dark; narrow-pane overflow; preset chips; `‹ ›` shift; week-start toggle; "Set as default range" persists across restart; "All dates" on a list screen; reconciliation single-date mode; Urdu locale sanity check.
 - Follow-up: **code-reviewer pass** on the final diff before merge (AGENTS.md self-audit: no suppressed errors, no API drift).
 
+> **Milestone M6 (done):** hardening complete.
+> `flutter analyze` → 0 issues; `npm test` → 177/177 pass; migration registered in `database.ts`; server lint pre-existing only. Preset remove UX improved (confirmation dialog, visible close button). All commits pushed to `origin/main`.
+
 ---
 
 ## Risk & sequencing notes
