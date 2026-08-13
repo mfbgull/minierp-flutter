@@ -71,7 +71,7 @@ Companion to `date-range-picker-spec.md` (all decisions locked). This file break
   - A small **synchronous cache** (`SharedPreferences` — already a dependency) so `StateProvider` initializers can read the week start / default range before the network resolves: `main()` preloads `SharedPreferences.getInstance()` + fires the server fetch; cache is the seed, server response wins on arrival (write-through per spec §6.2).
 - Acceptance: providers expose current values synchronously at first read; changing week start or default range persists via `PUT /preferences` with a toast on failure.
 
-> **Milestone M2:** the Flutter app can read and write preferences. The widget and the settings UI both consume this.
+> **Milestone M2 (done):** the Flutter app can read and write preferences — `main()` preloads the SharedPreferences cache before `runApp` (synchronous provider seeding), AppShell fires `GET /api/preferences` at boot (server = truth, adopted into the cache + StateProviders), and the save helpers write through optimistically with a failure toast contract. Reviewer fixes applied: a cache `revision` guard stops a stale boot GET from clobbering a save that lands mid-flight; `resetUserPreferences` on logout clears the per-user cache + StateProviders so the next login never shows the previous user's prefs; malformed cached presets are skipped (`tryFromJson`). 15 provider/cache/repository tests cover all of it. The widget and the settings UI both consume this.
 
 ---
 

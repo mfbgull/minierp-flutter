@@ -91,6 +91,7 @@ abstract final class ApiEndpoints {
   static const boms = '/boms';
   static const productions = '/productions';
   static const settings = '/settings';
+  static const preferences = '/preferences';
   static const activityLog = '/activity-logs';
   static const forecasts = '/forecasts';
   static const integrations = '/integrations';

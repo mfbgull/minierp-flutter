@@ -12,6 +12,8 @@ import '../dashboard/dashboard_providers.dart'
         dashboardCashPositionProvider,
         dashboardSummaryProvider,
         dashboardTopCustomersProvider;
+import '../preferences/preference_providers.dart'
+    show userPreferencesProvider;
 
 /// One module in the shell's navigation. [label] is resolved with the
 /// active localization; [path] is the router branch root; [adminOnly]
@@ -163,6 +165,12 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final auth = ref.watch(authProvider);
+    // Boot the per-user date-range preferences (server = truth): the
+    // SharedPreferences cache already seeded the preference
+    // StateProviders synchronously; this fetch syncs them with the
+    // server when it resolves (date-range-picker-spec.md §6.2). The
+    // shell only renders once authenticated, so the JWT is in place.
+    ref.watch(userPreferencesProvider);
     final isAdmin = auth.user?.isAdmin ?? false;
     final visible = [
       for (final dest in shellDestinations)

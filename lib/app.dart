@@ -23,6 +23,8 @@ import 'features/integrations/integrations_screen.dart';
 import 'features/employees/employees_screen.dart';
 import 'features/admin/admin_shell.dart';
 import 'features/payments/payments_screen.dart';
+import 'features/preferences/preference_providers.dart'
+    show resetUserPreferences;
 import 'features/production/production_shell.dart';
 import 'data/models/invoice.dart' show Invoice;
 import 'features/reports/ar_aging_report_screen.dart';
@@ -287,6 +289,13 @@ class MiniErpApp extends ConsumerWidget {
     // Re-evaluate the router redirect when the auth status changes.
     ref.listen(authProvider, (previous, next) {
       if (previous?.status != next.status) {
+        // Per-user preferences are cached per session; on logout reset
+        // the local state + cache to defaults and refetch on the next
+        // login so a different user's week start / default range /
+        // presets replace the previous user's.
+        if (next.status == AuthStatus.unauthenticated) {
+          resetUserPreferences(ref);
+        }
         ref.read(routerRefreshProvider).value++;
       }
     });

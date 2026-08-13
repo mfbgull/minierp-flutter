@@ -1,6 +1,6 @@
 # Date Range Picker — Implementation Spec
 
-Status: **in implementation** — Phase 0 (shared date math + `compactRange`, committed) and Phase 1 (server preferences store + week-aware `period=week`, §6) are **done**; Phases 2–6 pending. §6 below reflects what Phase 1 actually built.
+Status: **in implementation** — Phase 0 (shared date math + `compactRange`), Phase 1 (server preferences store + week-aware `period=week`, §6) and Phase 2 (Flutter preference client, §6.2) are **done**; Phases 3–6 pending. §6 below reflects what Phases 1–2 actually built.
 Source of reference: `D:/date-range-picker.html` (web prototype shared by the user)
 Target app: `mini-erp-flutter` (Flutter desktop/Windows/Linux + web, Material 3, l10n en+ur)
 
