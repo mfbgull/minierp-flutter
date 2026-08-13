@@ -38,6 +38,27 @@ class PurchaseRepository {
     parse: (Object? json) => Purchase.fromJson(json as Map<String, dynamic>),
   );
 
+  /// Record a direct purchase (`POST /purchases`). The server writes the
+  /// purchase row, posts the stock movement, and returns the new
+  /// purchase (bare object). [purchaseDate] is ISO `yyyy-MM-dd`.
+  Future<ApiResult<Purchase>> create({
+    required int itemId,
+    required int warehouseId,
+    required num quantity,
+    required num unitCost,
+    required String purchaseDate,
+  }) => _api.post(
+    ApiEndpoints.purchases,
+    body: {
+      'item_id': itemId,
+      'warehouse_id': warehouseId,
+      'quantity': quantity,
+      'unit_cost': unitCost,
+      'purchase_date': purchaseDate,
+    },
+    parse: (Object? json) => Purchase.fromJson(json as Map<String, dynamic>),
+  );
+
   /// Purchase-return history — bare array (the endpoint has no search or
   /// page; the grid keeps sorting/filtering client-side like items).
   Future<ApiResult<List<PurchaseReturn>>> returns() => _api.getRawList(

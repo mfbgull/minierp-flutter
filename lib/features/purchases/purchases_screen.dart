@@ -19,6 +19,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import 'purchase_detail_dialog.dart';
+import 'purchase_form_dialog.dart';
 import 'purchase_providers.dart';
 
 class PurchasesScreen extends ConsumerStatefulWidget {
@@ -125,6 +126,13 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
           searchHint: l10n.commonSearch,
           onSearchChanged: _onSearchChanged,
           onRefresh: () => ref.invalidate(purchasesProvider),
+          primaryActions: [
+            FilledButton.icon(
+              onPressed: () => showPurchaseFormDialog(context),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(l10n.purchasesNewpurchase),
+            ),
+          ],
         ),
         Expanded(child: gridScreenBody(purchases, provider: purchasesProvider)),
       ],

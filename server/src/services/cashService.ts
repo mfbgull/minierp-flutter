@@ -16,7 +16,8 @@
  *
  *   inflow  = customer payments received (positive amounts)
  *   outflow = supplier payments + expenses (paid) + salaries + refunds
- *             (negative customer payments)
+ *             (negative customer payments) + direct purchases (paid on
+ *             the spot, draining the cash till)
  *   balance = cumulative inflow − cumulative outflow
  */
 import Database from 'better-sqlite3';
@@ -120,6 +121,14 @@ function collectFlows(db: Database.Database, uptoDate: string): Map<string, Flow
   for (const row of salaries) {
     add(row.payment_method, 0, row.outflow);
   }
+
+  // Direct purchases: paid on the spot, so they drain the cash till.
+  const purchases = db.prepare(`
+    SELECT COALESCE(SUM(total_cost), 0) as outflow
+    FROM purchases
+    WHERE purchase_date <= ?
+  `).get(uptoDate) as { outflow: number };
+  totals.get('cash')!.outflow += Number(purchases.outflow) || 0;
 
   return totals;
 }
@@ -280,6 +289,19 @@ export function getCashAccountTransactions(
   `).all(uptoDate) as Array<Record<string, unknown>>) {
     const amount = Number(r.amount) || 0;
     push({ method: r.method as string | null, date: r.date as string, reference: r.reference as string | null, description: r.description as string | null, amount: -amount, type: 'salary' });
+  }
+
+  // Direct purchases: cash outflow (paid on the spot).
+  for (const r of db.prepare(`
+    SELECT purchase_date as date, purchase_no as reference,
+           'Purchase ' || purchase_no as description, total_cost as amount
+    FROM purchases
+    WHERE purchase_date <= ?
+  `).all(uptoDate) as Array<Record<string, unknown>>) {
+    const amount = Number(r.amount) || 0;
+    if (amount > 0) {
+      push({ method: 'cash', date: r.date as string, reference: r.reference as string | null, description: r.description as string | null, amount: -amount, type: 'purchase' });
+    }
   }
 
   out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));

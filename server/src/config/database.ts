@@ -54,6 +54,7 @@ function initializeDatabase(): void {
 
     createDefaultUser();
     createDefaultWarehouse();
+    seedDemoData();
 
     logger.info('✅ Database initialization complete!');
   } else {
@@ -102,6 +103,54 @@ function createDefaultWarehouse(): void {
     stmt.run('WH-001', 'Main Warehouse', 'Default Location', 1);
 
     logger.info('✅ Default warehouse created (WH-001)');
+  }
+}
+
+// Seed a minimal demo dataset on a freshly created database so a new
+// install has something to work with out of the box.
+function seedDemoData(): void {
+  try {
+    const admin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as
+      { id: number } | undefined;
+
+    // Walk-in customer (default cash/POS customer)
+    const existingCustomer = db.prepare('SELECT id FROM customers WHERE customer_code = ?').get('WALKIN');
+    if (!existingCustomer) {
+      db.prepare(`
+        INSERT INTO customers (customer_code, customer_name, is_active)
+        VALUES (?, ?, ?)
+      `).run('WALKIN', 'Walkin Customer', 1);
+      logger.info('✅ Demo customer created (Walkin Customer)');
+    }
+
+    // Demo supplier
+    const existingSupplier = db.prepare('SELECT id FROM suppliers WHERE supplier_code = ?').get('DEMO-SUP');
+    if (!existingSupplier) {
+      db.prepare(`
+        INSERT INTO suppliers (supplier_code, supplier_name, is_active)
+        VALUES (?, ?, ?)
+      `).run('DEMO-SUP', 'Demo supplier', 1);
+      logger.info('✅ Demo supplier created (Demo supplier)');
+    }
+
+    // Demonstration product
+    const existingItem = db.prepare('SELECT id FROM items WHERE item_code = ?').get('WIDGET-A');
+    if (!existingItem) {
+      db.prepare(`
+        INSERT INTO items (
+          item_code, item_name, category, unit_of_measure,
+          standard_cost, standard_selling_price,
+          is_purchased, is_finished_good, is_active, created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'WIDGET-A', 'Widget A', 'General', 'Nos',
+        0, 0,
+        1, 1, 1, admin?.id ?? null
+      );
+      logger.info('✅ Demo product created (Widget A)');
+    }
+  } catch (error: any) {
+    logger.error('Demo seed data error:', error.message);
   }
 }
 

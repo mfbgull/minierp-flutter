@@ -4973,6 +4973,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get cashposRefund => 'ریفنڈ';
 
   @override
+  String get cashposPurchase => 'خریداری';
+
+  @override
   String get dashboardOpeningbalance => 'ابتدائی بیلنس';
 
   @override
