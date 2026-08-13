@@ -6,12 +6,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const database_1 = __importDefault(require("../config/database"));
 const logger_1 = __importDefault(require("../utils/logger"));
 const Dashboard_1 = __importDefault(require("../models/Dashboard"));
+const cashService_1 = require("../services/cashService");
 // ═══════════════════════════════════════════════════════════════
 //  EXISTING
 // ═══════════════════════════════════════════════════════════════
 function getSummary(req, res) {
     try {
-        const data = Dashboard_1.default.getSummary(database_1.default);
+        const fromDate = String(req.query.fromDate || req.query.from_date || '');
+        const toDate = String(req.query.toDate || req.query.to_date || '');
+        const data = Dashboard_1.default.getSummary(database_1.default, fromDate || undefined, toDate || undefined);
         res.json({ success: true, data });
     }
     catch (error) {
@@ -44,7 +47,9 @@ function getTopCustomers(req, res) {
 function getSalesSummary(req, res) {
     try {
         const period = req.query.period || 'today';
-        const data = Dashboard_1.default.getSalesSummary(database_1.default, period);
+        // The user id makes `period=week` a calendar week aligned to the
+        // user's saved week-start day (spec §6.3).
+        const data = Dashboard_1.default.getSalesSummary(database_1.default, period, req.user?.id);
         res.json({ success: true, data });
     }
     catch (error) {
@@ -59,7 +64,9 @@ function getSalesSummary(req, res) {
 function getExpenseSummary(req, res) {
     try {
         const period = req.query.period || 'month';
-        const data = Dashboard_1.default.getExpenseSummary(database_1.default, period);
+        // The user id makes `period=week` a calendar week aligned to the
+        // user's saved week-start day (spec §6.3).
+        const data = Dashboard_1.default.getExpenseSummary(database_1.default, period, req.user?.id);
         res.json({ success: true, data });
     }
     catch (error) {
@@ -125,8 +132,78 @@ function getARSummary(req, res) {
         res.status(500).json({ error: 'Failed to fetch AR summary' });
     }
 }
+/**
+ * GET /api/dashboard/cash-position
+ * Closing balance per cash account (Cash, Bank, Easypaisa, JazzCash,
+ * UPaisa) as of today + the grand total.
+ */
+function getCashPosition(req, res) {
+    try {
+        const data = Dashboard_1.default.getCashPosition(database_1.default);
+        res.json({ success: true, data });
+    }
+    catch (error) {
+        logger_1.default.error('Cash position error:', error);
+        res.status(500).json({ error: 'Failed to fetch cash position' });
+    }
+}
+/**
+ * GET /api/dashboard/cash-opening-balances
+ * The per-account opening (seed) balances a new business starts with.
+ */
+function getCashOpeningBalances(req, res) {
+    try {
+        const opening = (0, cashService_1.getOpeningBalances)(database_1.default);
+        const accounts = cashService_1.CASH_ACCOUNTS.map((a) => ({
+            key: a.key,
+            name: a.name,
+            amount: opening.get(a.key) ?? 0,
+        }));
+        res.json({ success: true, data: { accounts } });
+    }
+    catch (error) {
+        logger_1.default.error('Cash opening balances error:', error);
+        res.status(500).json({ error: 'Failed to fetch cash opening balances' });
+    }
+}
+/**
+ * PUT /api/dashboard/cash-opening-balances
+ * Save the opening (seed) balance per account — the starting cash a
+ * business was founded with. Body: `{ accounts: [{ key, amount }] }`.
+ */
+function saveCashOpeningBalances(req, res) {
+    try {
+        const { accounts } = req.body;
+        if (!accounts || !Array.isArray(accounts)) {
+            res.status(400).json({ error: 'accounts array is required' });
+            return;
+        }
+        const validKeys = new Set(cashService_1.CASH_ACCOUNTS.map((a) => a.key));
+        for (const entry of accounts) {
+            if (!validKeys.has(entry.key)) {
+                res.status(400).json({ error: `Unknown account key: ${entry.key}` });
+                return;
+            }
+            (0, cashService_1.saveOpeningBalance)(database_1.default, entry.key, Number(entry.amount) || 0);
+        }
+        const opening = (0, cashService_1.getOpeningBalances)(database_1.default);
+        const data = cashService_1.CASH_ACCOUNTS.map((a) => ({
+            key: a.key,
+            name: a.name,
+            amount: opening.get(a.key) ?? 0,
+        }));
+        res.json({ success: true, data: { accounts: data } });
+    }
+    catch (error) {
+        logger_1.default.error('Save cash opening balances error:', error);
+        res.status(500).json({ error: 'Failed to save cash opening balances' });
+    }
+}
 exports.default = {
     getSummary,
+    getCashPosition,
+    getCashOpeningBalances,
+    saveCashOpeningBalances,
     getTopCustomers,
     getSalesSummary,
     getExpenseSummary,

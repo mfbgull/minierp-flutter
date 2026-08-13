@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const accountingService_1 = __importDefault(require("../services/accountingService"));
+const cashService_1 = require("../services/cashService");
 function getARAgingReport(asOfDate, db) {
     const agingData = db.prepare(`
     SELECT c.customer_name, c.customer_code, SUM(i.balance_amount) as total_outstanding,
@@ -416,13 +417,21 @@ function getProfitLossReport(startDate, endDate, db) {
     // in the audit), so COGS will be slightly off until that flow is
     // also fixed; the SQL itself is correct.
     const revenue = db.prepare(`
-    SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices
+    SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total FROM invoices
     WHERE invoice_date BETWEEN ? AND ?
       AND status != 'Cancelled'
   `).get(startDate, endDate);
+    // COGS nets SALE movements against their stock reversals (returns /
+    // deletes / updates post an ADJUSTMENT at the same cost) so returned
+    // sales stop counting as cost of goods sold.
     const cogs = db.prepare(`
     SELECT COALESCE(ABS(SUM(sm.quantity * sm.unit_cost)), 0) as total FROM stock_movements sm
-    WHERE sm.movement_type = 'SALE' AND sm.movement_date BETWEEN ? AND ?
+    WHERE sm.movement_date BETWEEN ? AND ?
+      AND (
+        sm.movement_type = 'SALE'
+        OR (sm.movement_type = 'ADJUSTMENT'
+            AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE'))
+      )
   `).get(startDate, endDate);
     const expenses = db.prepare(`SELECT expense_category, SUM(amount) as total FROM expenses WHERE expense_date BETWEEN ? AND ? GROUP BY expense_category ORDER BY total DESC`).all(startDate, endDate);
     const totalExpenses = expenses.reduce((sum, e) => sum + e.total, 0);
@@ -524,13 +533,18 @@ function getBalanceSheet(asOfDate, db) {
     // Note: this is the same calc as the P&L, just run for [earliest,
     // asOfDate] instead of [startDate, endDate].
     const revenueYTD = db.prepare(`
-    SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices
+    SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total FROM invoices
     WHERE invoice_date <= ? AND status != 'Cancelled'
   `).get(asOfDate);
     const cogsYTD = db.prepare(`
     SELECT COALESCE(ABS(SUM(quantity * unit_cost)), 0) as total
     FROM stock_movements
-    WHERE movement_type IN ('SALE','OUT') AND movement_date <= ?
+    WHERE movement_date <= ?
+      AND (
+        movement_type IN ('SALE','OUT')
+        OR (movement_type = 'ADJUSTMENT'
+            AND reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE'))
+      )
   `).get(asOfDate);
     const expensesYTD = db.prepare(`
     SELECT COALESCE(SUM(amount), 0) as total FROM expenses
@@ -652,8 +666,8 @@ function getMonthlySales(year, db) {
   `).all(year);
 }
 function getGrossProfit(startDate, endDate, db) {
-    const revenue = db.prepare(`SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices WHERE invoice_date BETWEEN ? AND ?`).get(startDate, endDate);
-    const cogs = db.prepare(`SELECT COALESCE(SUM(sm.quantity * sm.unit_cost), 0) as total FROM stock_movements sm WHERE sm.movement_type = 'SALE' AND sm.movement_date BETWEEN ? AND ?`).get(startDate, endDate);
+    const revenue = db.prepare(`SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total FROM invoices WHERE invoice_date BETWEEN ? AND ? AND status != 'Cancelled'`).get(startDate, endDate);
+    const cogs = db.prepare(`SELECT COALESCE(ABS(SUM(sm.quantity * sm.unit_cost)), 0) as total FROM stock_movements sm WHERE sm.movement_date BETWEEN ? AND ? AND (sm.movement_type = 'SALE' OR (sm.movement_type = 'ADJUSTMENT' AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE')))`).get(startDate, endDate);
     return { startDate, endDate, revenue: revenue.total, cogs: cogs.total, grossProfit: revenue.total - cogs.total, margin: revenue.total > 0 ? ((revenue.total - cogs.total) / revenue.total * 100) : 0 };
 }
 function getStockLevelReport(db) {
@@ -836,6 +850,89 @@ function getSupplierOutstanding(asOfDate, db) {
     WHERE po.status IN ('Approved', 'Received') GROUP BY s.id ORDER BY outstanding DESC
   `).all();
 }
+/**
+ * End-of-day cash reconciliation for `date`: for every tracked account
+ * (Cash, Bank, Easypaisa, JazzCash, UPaisa) the opening balance, day
+ * inflow/outflow/net and the expected (book) closing balance, merged
+ * with any previously saved counted amounts and variance.
+ */
+function getCashReconciliation(db, date) {
+    const accounts = (0, cashService_1.getCashAccountTotals)(db, date);
+    const savedRows = db.prepare(`
+    SELECT account_key, counted_balance, notes, updated_at
+    FROM cash_reconciliations
+    WHERE reconciliation_date = ?
+  `).all(date);
+    const savedByKey = new Map(savedRows.map((r) => [r.account_key, r]));
+    const rows = accounts.map((a) => {
+        const saved = savedByKey.get(a.key);
+        const counted = saved && saved.counted_balance !== null && saved.counted_balance !== undefined
+            ? Math.round(Number(saved.counted_balance) * 100) / 100
+            : null;
+        return {
+            key: a.key,
+            name: a.name,
+            opening_balance: a.opening,
+            inflow: a.inflow,
+            outflow: a.outflow,
+            net: a.net,
+            expected_balance: a.closing,
+            counted_balance: counted,
+            variance: counted === null ? null : Math.round((counted - a.closing) * 100) / 100,
+            notes: saved?.notes ?? null,
+            reconciled: counted !== null,
+            reconciled_at: saved?.updated_at ?? null,
+        };
+    });
+    return {
+        date,
+        accounts: rows,
+        totals: {
+            total_opening: rows.reduce((s, r) => s + r.opening_balance, 0),
+            total_inflow: rows.reduce((s, r) => s + r.inflow, 0),
+            total_outflow: rows.reduce((s, r) => s + r.outflow, 0),
+            total_closing: rows.reduce((s, r) => s + r.expected_balance, 0),
+        },
+    };
+}
+/**
+ * Save the counted end-of-day amounts for `date` (upsert per account).
+ * Expected balances are snapshotted into the row so the audit trail
+ * survives later transactions, and the variance is recomputed against
+ * the snapshot. Returns the refreshed reconciliation for the date.
+ */
+function saveCashReconciliation(db, date, entries, userId) {
+    const validKeys = new Set(cashService_1.CASH_ACCOUNTS.map((a) => a.key));
+    const expected = new Map((0, cashService_1.getCashAccountTotals)(db, date).map((a) => [a.key, a.closing]));
+    const upsert = db.prepare(`
+    INSERT INTO cash_reconciliations (
+      reconciliation_date, account_key, account_name,
+      expected_balance, counted_balance, variance, notes, reconciled_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(reconciliation_date, account_key) DO UPDATE SET
+      expected_balance = excluded.expected_balance,
+      counted_balance = excluded.counted_balance,
+      variance = excluded.variance,
+      notes = excluded.notes,
+      reconciled_by = excluded.reconciled_by,
+      updated_at = CURRENT_TIMESTAMP
+  `);
+    db.transaction(() => {
+        for (const entry of entries) {
+            if (!validKeys.has(entry.key)) {
+                throw new Error(`Unknown account key: ${entry.key}`);
+            }
+            const counted = entry.counted_balance === null || entry.counted_balance === undefined
+                ? null
+                : Math.round(Number(entry.counted_balance) * 100) / 100;
+            const accountName = cashService_1.CASH_ACCOUNTS.find((a) => a.key === entry.key).name;
+            const expectedBalance = expected.get(entry.key);
+            const variance = counted === null ? null : Math.round((counted - expectedBalance) * 100) / 100;
+            upsert.run(date, entry.key, accountName, expectedBalance, counted, variance, entry.notes?.trim() ? entry.notes.trim() : null, userId);
+        }
+    })();
+    return getCashReconciliation(db, date);
+}
 function getExpenseReport(startDate, endDate, category, db) {
     const conditions = ['expense_date BETWEEN ? AND ?'];
     const params = [startDate, endDate];
@@ -866,5 +963,6 @@ exports.default = {
     getGrossProfit, getStockLevelReport, getLowStockReport, getBatchTraceability,
     getPurchaseSummary, getProductionEfficiency, getBOMUsage, getBOMUsageReport, getCustomerOutstanding,
     getSupplierOutstanding, getExpenseReport,
+    getCashReconciliation, saveCashReconciliation,
 };
 //# sourceMappingURL=Reports.js.map

@@ -34,6 +34,7 @@ import dashboardRoutes from './routes/dashboard';
 import forecastsRoutes from './routes/forecasts';
 import accountingRoutes from './routes/accounting';
 import customReportsRoutes from './routes/customReports';
+import preferencesRoutes from './routes/preferences';
 import path from 'path';
 import fs from 'fs';
 
@@ -227,6 +228,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/forecasts', forecastsRoutes);
 app.use('/api/accounting', accountingRoutes);
 app.use('/api/reports/custom', customReportsRoutes);
+app.use('/api/preferences', preferencesRoutes);
 
 // Serve static files from client/dist in production
 // This MUST come AFTER API routes

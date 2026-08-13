@@ -26,6 +26,14 @@ router.get('/stock-valuation', (0, requirePermission_1.requirePermission)('repor
 router.get('/inventory-movement', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.getInventoryMovementReport);
 router.get('/profit-loss', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.getProfitLossReport);
 router.get('/cash-flow', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.getCashFlowReport);
+// End-of-day cash/till reconciliation: per-account opening/expected/counted
+// balances for a date (GET) and saving the counted amounts (POST). POST is
+// write-side but sits under the reports module's read permission — there is
+// no reports:create permission seeded, and the save only records counted
+// figures against an auditable table (same spirit as recording a physical
+// count under inventory).
+router.get('/cash-reconciliation', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.getCashReconciliation);
+router.post('/cash-reconciliation', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.saveCashReconciliation);
 router.get('/purchase-summary', (0, requirePermission_1.requirePermission)('reports', 'read'), reportsController_1.default.getPurchaseSummary);
 router.get('/supplier-analysis', (0, requirePermission_1.requirePermission)('reports', 'read'), reportsController_1.default.getSupplierAnalysis);
 router.get('/production-summary', (0, requirePermission_1.requirePermission)('reports', 'read'), reportsController_1.default.getProductionSummary);

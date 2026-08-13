@@ -61,6 +61,30 @@ Server-side aggregated dashboard data. Replaces 5 separate full-table fetches.
 }
 ```
 
+### GET /dashboard/sales-summary
+Sales totals for a period — the dashboard's Sales Summary block.
+
+| Query Param | Type | Description |
+|---|---|---|
+| `period` | string | `today` (default) \| `week` \| `month` |
+
+`period=week` returns the **calendar week** containing today, aligned to the
+signed-in user's saved week-start day (`monday` \| `saturday` \| `sunday`,
+default `monday` — see the Preferences section below): a saturday-starting
+user sees the Saturday→Friday week, a monday-starting user the Monday→Sunday
+week. When no user context is available it falls back to the rolling 7-day
+window. `today` and `month` keep their existing rolling semantics.
+
+```json
+// Response 200
+{ "success": true, "data": { "period_total": 890000.00, "count": 42 } }
+```
+
+### GET /dashboard/expense-summary
+Expense totals for a period — same `period` param and week-start-aware `week`
+behavior as sales-summary (default `month`). Returns the same `{ period_total,
+count }` envelope.
+
 ---
 
 ## Customers
@@ -431,6 +455,51 @@ Most reports accept `from` and `to` date query parameters.
 
 ---
 
+## Preferences
+
+Per-user date-range picker preferences (week-start day, default range, custom
+presets), synced server-side across devices. Scoped to the authenticated user
+and guarded by the `settings` module permissions (`read` for GET, `update` for
+PUT) — an admin or settings-capable user can change their own week start, which
+also re-aligns the dashboard's `period=week` blocks.
+
+### GET /preferences
+The current user's preferences. Server defaults (`monday`, no default range,
+no presets) are returned when no row exists yet — nothing is written on read.
+
+```json
+// Response 200
+{
+  "success": true,
+  "data": {
+    "weekStart": "monday",
+    "defaultRange": { "from": "2026-08-03", "to": "2026-08-09" },
+    "presets": [{ "id": "summer", "name": "Summer", "from": "2026-06-01", "to": "2026-08-31" }]
+  }
+}
+```
+
+`defaultRange` is `null` when unset; `presets` is always an array.
+
+### PUT /preferences
+**Partial** update — fields not present keep their current value; returns the
+saved merged object. `defaultRange: null` clears the saved default.
+
+```json
+// Request — any subset of the three fields
+{ "weekStart": "saturday", "defaultRange": null }
+
+// Response 200
+{ "success": true, "data": { "weekStart": "saturday", "defaultRange": null, "presets": [] } }
+```
+
+**Validation (400 on violation):** `weekStart` must be `monday` | `saturday` |
+`sunday`; `defaultRange` must be `{ "from", "to" }` (YYYY-MM-DD) with `from <=
+to`, or `null`; each preset must be `{ "id", "name", "from", "to" }` with a
+non-empty unique `id` and `from <= to`.
+
+---
+
 ## Integrations (Admin Only)
 
 All integration endpoints require both authentication and admin role.
@@ -467,9 +536,11 @@ All integration endpoints require both authentication and admin role.
 
 ## Health Check
 
-### GET /health (No auth required)
+### GET /health
+Requires authentication like all other endpoints — the global auth middleware runs before the route, so an unauthenticated probe returns `401 { "error": "Access token required" }` (any HTTP response can still be treated as "server is up" by a health check).
 
 ```json
+// Response 200 (with auth)
 { "status": "ok", "timestamp": "2026-02-20T12:00:00.000Z", "uptime": 3600 }
 ```
 

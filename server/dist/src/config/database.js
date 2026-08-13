@@ -751,6 +751,9 @@ runForecastEnhancementsMigration();
 runCustomReportsMigration();
 runDashboardLayoutsMigration();
 runLooseItemMigration();
+runCashAccountsMigration();
+runOpeningBalancesMigration();
+runUserPreferencesMigration();
 // Rollback support: run if --rollback flag is passed
 if (process.argv.includes('--rollback')) {
     const targetMigration = process.argv.find(arg => arg.startsWith('--rollback='));
@@ -1343,6 +1346,31 @@ function runDashboardLayoutsMigration() {
         logger_1.default.error('Dashboard layouts migration error:', error.message);
     }
 }
+function runCashAccountsMigration() {
+    // Idempotent by construction (INSERT OR IGNORE + CREATE IF NOT EXISTS
+    // in the SQL), so it runs on every server start like the GL foundation
+    // migration — no column/table pre-check needed.
+    try {
+        const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-cash-accounts.sql'), 'utf8');
+        db.exec(migrationSQL);
+        logger_1.default.info('✅ Cash accounts migration applied (Easypaisa/JazzCash/UPaisa accounts + cash_reconciliations)');
+    }
+    catch (error) {
+        logger_1.default.error('Cash accounts migration error:', error.message);
+    }
+}
+function runOpeningBalancesMigration() {
+    // Idempotent (CREATE IF NOT EXISTS + INSERT OR IGNORE) — runs on every
+    // server start so the seed rows exist before any cash computation.
+    try {
+        const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-opening-balances.sql'), 'utf8');
+        db.exec(migrationSQL);
+        logger_1.default.info('✅ Opening balances migration applied (per-account seed balances)');
+    }
+    catch (error) {
+        logger_1.default.error('Opening balances migration error:', error.message);
+    }
+}
 function runLooseItemMigration() {
     try {
         const columnCheck = db.prepare(`
@@ -1358,6 +1386,25 @@ function runLooseItemMigration() {
     }
     catch (error) {
         logger_1.default.error('Loose item support migration error:', error.message);
+    }
+}
+function runUserPreferencesMigration() {
+    // Per-user date-range picker preferences (week start, default range,
+    // custom presets) — date-range-picker-spec.md §6.1.
+    try {
+        const tableCheck = db.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE type='table' AND name='user_preferences'
+    `).get();
+        if (!tableCheck) {
+            logger_1.default.info('Running user preferences migration...');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-user-preferences.sql'), 'utf8');
+            db.exec(migrationSQL);
+            logger_1.default.info('✅ User preferences migration completed!');
+        }
+    }
+    catch (error) {
+        logger_1.default.error('User preferences migration error:', error.message);
     }
 }
 function runRollback(migrationName) {

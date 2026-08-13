@@ -349,6 +349,33 @@ function getTaxSummaryReport(req, res) {
         res.status(500).json({ success: false, error: 'Failed to fetch tax summary report' });
     }
 }
+function getCashReconciliation(req, res) {
+    try {
+        const date = String((0, queryUtils_1.getQueryParam)(req.query.date)) || new Date().toISOString().split('T')[0];
+        res.json({ success: true, data: Reports_1.default.getCashReconciliation(database_1.default, date) });
+    }
+    catch (error) {
+        logger_1.default.error('Error fetching cash reconciliation:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch cash reconciliation' });
+    }
+}
+function saveCashReconciliation(req, res) {
+    try {
+        const { date, accounts } = req.body;
+        const dateStr = date || new Date().toISOString().split('T')[0];
+        if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
+            res.status(400).json({ success: false, error: 'accounts array is required' });
+            return;
+        }
+        const data = Reports_1.default.saveCashReconciliation(database_1.default, dateStr, accounts, req.user.id);
+        res.json({ success: true, message: 'Cash reconciliation saved', data });
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to save cash reconciliation';
+        logger_1.default.error('Error saving cash reconciliation:', error);
+        res.status(400).json({ success: false, error: message });
+    }
+}
 function getBatchTraceabilityReport(req, res) {
     try {
         const { itemId } = req.params;
@@ -370,6 +397,7 @@ exports.default = {
     getStockValuationReport, getInventoryMovementReport, getProfitLossReport, getCashFlowReport,
     getPurchaseSummary, getSupplierAnalysis, getProductionSummary, getBOMUsageReport,
     getExpensesReport, getTrialBalanceReport, getGeneralLedgerReport, getBalanceSheetReport,
-    getIncomeStatementReport, getTaxSummaryReport, getBatchTraceabilityReport,
+    getIncomeStatementReport, getTaxSummaryReport, getCashReconciliation, saveCashReconciliation,
+    getBatchTraceabilityReport,
 };
 //# sourceMappingURL=reportsController.js.map

@@ -38,6 +38,7 @@ const dashboard_1 = __importDefault(require("./routes/dashboard"));
 const forecasts_1 = __importDefault(require("./routes/forecasts"));
 const accounting_1 = __importDefault(require("./routes/accounting"));
 const customReports_1 = __importDefault(require("./routes/customReports"));
+const preferences_1 = __importDefault(require("./routes/preferences"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 // Create Express app
@@ -207,6 +208,7 @@ app.use('/api/dashboard', dashboard_1.default);
 app.use('/api/forecasts', forecasts_1.default);
 app.use('/api/accounting', accounting_1.default);
 app.use('/api/reports/custom', customReports_1.default);
+app.use('/api/preferences', preferences_1.default);
 // Serve static files from client/dist in production
 // This MUST come AFTER API routes
 if (process.env.NODE_ENV === 'production') {

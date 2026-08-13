@@ -1,4 +1,6 @@
 import Database from 'better-sqlite3';
+import { getForUser } from './UserPreferences';
+import { weekBounds } from '../utils/weekMath';
 
 interface DashboardSummary {
   totalItems: number;
@@ -162,61 +164,75 @@ function getTopCustomers(db: Database.Database, limit: number = 5): TopCustomer[
   `).all(limit) as TopCustomer[];
 }
 
+/** SQLite's notion of today, in the wire `YYYY-MM-DD` format. */
+function todayISO(db: Database.Database): string {
+  return (db.prepare(`SELECT date('now') as d`).get() as { d: string }).d;
+}
+
 /**
- * Get sales summary for a given period.
- * period: 'today' | 'week' | 'month'
+ * The WHERE fragment + parameters for a period filter. `column` is the
+ * date column (hard-coded by the caller — never user input). `period` is
+ * `today` | `week` | `month`:
+ *
+ * - `today` / `month` keep their existing rolling semantics;
+ * - `week` becomes a **calendar week** aligned to the user's saved
+ *   week-start day when a `userId` is given (spec §6.3), falling back to
+ *   the rolling 7-day window otherwise.
  */
-function getSalesSummary(db: Database.Database, period: string = 'today'): SalesSummaryResult {
-  let dateFilter: string;
+function periodWhereClause(
+  db: Database.Database,
+  period: string,
+  column: string,
+  userId?: number,
+): { where: string; params: string[] } {
   switch (period) {
     case 'today':
-      dateFilter = "invoice_date = date('now')";
-      break;
+      return { where: `${column} = date('now')`, params: [] };
     case 'week':
-      dateFilter = "invoice_date >= date('now', '-7 days')";
-      break;
+      if (userId !== undefined) {
+        const { from, to } = weekBounds(todayISO(db), getForUser(db, userId).weekStart);
+        return { where: `${column} BETWEEN ? AND ?`, params: [from, to] };
+      }
+      return { where: `${column} >= date('now', '-7 days')`, params: [] };
     case 'month':
-      dateFilter = "invoice_date >= date('now', '-1 month')";
-      break;
+      return { where: `${column} >= date('now', '-1 month')`, params: [] };
     default:
-      dateFilter = "invoice_date = date('now')";
+      return { where: `${column} = date('now')`, params: [] };
   }
+}
+
+/**
+ * Get sales summary for a given period.
+ * period: 'today' | 'week' | 'month' (week is week-start-aware per user).
+ */
+function getSalesSummary(db: Database.Database, period: string = 'today', userId?: number): SalesSummaryResult {
+  const { where, params } = periodWhereClause(db, period, 'invoice_date', userId);
 
   return db.prepare(`
     SELECT
       COALESCE(SUM(total_amount), 0) as period_total,
       COUNT(*) as count
     FROM invoices
-    WHERE ${dateFilter}
+    WHERE ${where}
       AND status != 'Cancelled'
-  `).get() as SalesSummaryResult;
+  `).get(...params) as SalesSummaryResult;
 }
 
 /**
  * Get expense summary for a given period.
- * period: 'week' | 'month'
+ * period: 'week' | 'month' (week is week-start-aware per user).
  */
-function getExpenseSummary(db: Database.Database, period: string = 'month'): ExpenseSummaryResult {
-  let dateFilter: string;
-  switch (period) {
-    case 'week':
-      dateFilter = "expense_date >= date('now', '-7 days')";
-      break;
-    case 'month':
-      dateFilter = "expense_date >= date('now', '-1 month')";
-      break;
-    default:
-      dateFilter = "expense_date >= date('now', '-1 month')";
-  }
+function getExpenseSummary(db: Database.Database, period: string = 'month', userId?: number): ExpenseSummaryResult {
+  const { where, params } = periodWhereClause(db, period, 'expense_date', userId);
 
   return db.prepare(`
     SELECT
       COALESCE(SUM(amount), 0) as period_total,
       COUNT(*) as count
     FROM expenses
-    WHERE ${dateFilter}
+    WHERE ${where}
       AND status != 'Cancelled'
-  `).get() as ExpenseSummaryResult;
+  `).get(...params) as ExpenseSummaryResult;
 }
 
 /**
