@@ -18,6 +18,30 @@ abstract final class Formatters {
     return DateFormat.yMMMd(locale).format(parsed);
   }
 
+  /// Compact range text for the date-picker pill (reference §2.1, en-dashes
+  /// exactly like the web prototype — `to` must be `>= from`):
+  ///
+  /// - same day        → `Aug 13, 2026`
+  /// - same month/year → `Aug 7–13, 2026`
+  /// - same year       → `Aug 7 – Sep 13, 2026`
+  /// - different years → `Aug 7, 2026 – Sep 13, 2027`
+  static String compactRange(DateTime from, DateTime to, {String locale = 'en'}) {
+    const enDash = '\u2013';
+    if (from.year == to.year && from.month == to.month && from.day == to.day) {
+      return DateFormat.yMMMd(locale).format(from);
+    }
+    if (from.year == to.year && from.month == to.month) {
+      return '${DateFormat('MMM', locale).format(from)} '
+          '${from.day}$enDash${to.day}, ${from.year}';
+    }
+    if (from.year == to.year) {
+      return '${DateFormat('MMM d', locale).format(from)} $enDash '
+          '${DateFormat('MMM d, y', locale).format(to)}';
+    }
+    return '${DateFormat('MMM d, y', locale).format(from)} $enDash '
+        '${DateFormat('MMM d, y', locale).format(to)}';
+  }
+
   /// "2026-08-03T10:30:00" → "Aug 3, 2026 10:30 AM".
   static String dateTime(DateTime value, {String locale = 'en'}) {
     return DateFormat.yMMMd(locale).add_jm().format(value);
