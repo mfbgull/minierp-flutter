@@ -16,11 +16,16 @@ import '../../data/models/invoice.dart'
 import '../../l10n/app_localizations.dart';
 import '../../widgets/searchable_select.dart';
 
-/// Payment methods offered by the reference dropdown.
+/// Payment methods offered by the reference dropdown. Matches the
+/// server's expense payment-method options; wallet methods feed the
+/// cash/till reconciliation accounts.
 const List<String> kPaymentMethods = [
   'Cash',
-  'Check',
   'Bank Transfer',
+  'Easypaisa',
+  'JazzCash',
+  'UPaisa',
+  'Check',
   'Credit Card',
   'Online Payment',
 ];

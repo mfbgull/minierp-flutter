@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { AuthRequest } from '../types';
 import { getQueryParam } from '../utils/queryUtils';
 import db from '../config/database';
 import logger from '../utils/logger';
@@ -268,6 +269,36 @@ function getTaxSummaryReport(req: Request, res: Response): void {
   } catch (error) { logger.error('Error fetching tax summary report:', error); res.status(500).json({ success: false, error: 'Failed to fetch tax summary report' }); }
 }
 
+function getCashReconciliation(req: AuthRequest, res: Response): void {
+  try {
+    const date = String(getQueryParam(req.query.date)) || new Date().toISOString().split('T')[0];
+    res.json({ success: true, data: ReportsModel.getCashReconciliation(db, date) });
+  } catch (error) {
+    logger.error('Error fetching cash reconciliation:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch cash reconciliation' });
+  }
+}
+
+function saveCashReconciliation(req: AuthRequest, res: Response): void {
+  try {
+    const { date, accounts } = req.body as {
+      date?: string;
+      accounts?: Array<{ key: string; counted_balance: number | null; notes?: string | null }>;
+    };
+    const dateStr = date || new Date().toISOString().split('T')[0];
+    if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
+      res.status(400).json({ success: false, error: 'accounts array is required' });
+      return;
+    }
+    const data = ReportsModel.saveCashReconciliation(db, dateStr, accounts, req.user!.id);
+    res.json({ success: true, message: 'Cash reconciliation saved', data });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to save cash reconciliation';
+    logger.error('Error saving cash reconciliation:', error);
+    res.status(400).json({ success: false, error: message });
+  }
+}
+
 function getBatchTraceabilityReport(req: Request, res: Response): void {
   try {
     const { itemId } = req.params;
@@ -283,5 +314,6 @@ export default {
   getStockValuationReport, getInventoryMovementReport, getProfitLossReport, getCashFlowReport,
   getPurchaseSummary, getSupplierAnalysis, getProductionSummary, getBOMUsageReport,
   getExpensesReport, getTrialBalanceReport, getGeneralLedgerReport, getBalanceSheetReport,
-  getIncomeStatementReport, getTaxSummaryReport, getBatchTraceabilityReport,
+  getIncomeStatementReport, getTaxSummaryReport, getCashReconciliation, saveCashReconciliation,
+  getBatchTraceabilityReport,
 };

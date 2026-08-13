@@ -117,6 +117,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboardSalesrevenue => 'Sales Revenue';
 
   @override
+  String get dashboardProfit => 'Profit';
+
+  @override
+  String get dashboardGlobalDateRangeHint =>
+      'Date range applies to all report screens';
+
+  @override
   String get dashboardTopcustomers => 'Top Customers';
 
   @override
@@ -4899,4 +4906,80 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get productionWarehouse => 'Finished Goods Warehouse';
+
+  @override
+  String get fieldsAccount => 'Account';
+
+  @override
+  String get dashboardCashbankposition => 'Cash / Bank Position';
+
+  @override
+  String get dashboardCashrecon => 'Reconcile';
+
+  @override
+  String get reportsCashreconciliation => 'Cash Reconciliation';
+
+  @override
+  String get cashreconOpening => 'Opening';
+
+  @override
+  String get cashreconInflow => 'Inflow';
+
+  @override
+  String get cashreconOutflow => 'Outflow';
+
+  @override
+  String get cashreconNet => 'Net';
+
+  @override
+  String get cashreconExpected => 'Expected';
+
+  @override
+  String get cashreconCounted => 'Counted';
+
+  @override
+  String get cashreconVariance => 'Variance';
+
+  @override
+  String get cashreconNotes => 'Notes';
+
+  @override
+  String get cashreconNotcounted => 'Not counted';
+
+  @override
+  String get cashreconReconciled => 'Reconciled';
+
+  @override
+  String get cashreconSave => 'Save';
+
+  @override
+  String get cashreconSaved => 'Reconciliation saved';
+
+  @override
+  String get cashposTransactions => 'Transactions';
+
+  @override
+  String get cashposPaymentreceived => 'Payment received';
+
+  @override
+  String get cashposSupplierpayment => 'Supplier payment';
+
+  @override
+  String get cashposExpense => 'Expense';
+
+  @override
+  String get cashposSalary => 'Salary';
+
+  @override
+  String get cashposRefund => 'Refund';
+
+  @override
+  String get dashboardOpeningbalance => 'Opening balance';
+
+  @override
+  String get dashboardOpeningbalanceHint =>
+      'The starting cash/bank balance your business was founded with. It is added to today\'s position.';
+
+  @override
+  String get dashboardOpeningbalanceSaved => 'Opening balances saved';
 }

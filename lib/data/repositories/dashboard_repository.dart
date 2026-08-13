@@ -10,6 +10,8 @@ import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/dashboard_summary.dart'
     show
         ArSummaryResult,
+        CashOpeningBalances,
+        CashPositionSummary,
         DashboardSummary,
         ExpenseSummaryResult,
         KpiResult,
@@ -25,8 +27,18 @@ class DashboardRepository {
 
   final RepositoryClient _api;
 
-  Future<ApiResult<DashboardSummary>> summary() => _api.get(
+  /// `GET /dashboard/summary` — KPIs + the sales/purchases chart.
+  /// [fromDate]/[toDate] filter the money figures and the chart (the
+  /// dashboard's global range picker); omitted → server defaults
+  /// (7-day chart, all-time totals).
+  Future<ApiResult<DashboardSummary>> summary({
+    String? fromDate,
+    String? toDate,
+  }) => _api.get(
     ApiEndpoints.dashboardSummary,
+    queryParameters: fromDate == null && toDate == null
+        ? null
+        : <String, dynamic>{'fromDate': fromDate, 'toDate': toDate},
     parse: (Object? json) =>
         DashboardSummary.fromJson(json as Map<String, dynamic>),
   );
@@ -91,6 +103,37 @@ class DashboardRepository {
     ApiEndpoints.dashboardArSummary,
     parse: (Object? json) =>
         ArSummaryResult.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// `GET /dashboard/cash-position` — closing balance per cash account
+  /// (Cash, Bank, Easypaisa, JazzCash, UPaisa) as of today.
+  Future<ApiResult<CashPositionSummary>> cashPosition() => _api.get(
+    ApiEndpoints.dashboardCashPosition,
+    parse: (Object? json) =>
+        CashPositionSummary.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// `GET /dashboard/cash-opening-balances` — the starting (seed)
+  /// balance each cash account was founded with.
+  Future<ApiResult<CashOpeningBalances>> cashOpeningBalances() => _api.get(
+    ApiEndpoints.dashboardCashOpeningBalances,
+    parse: (Object? json) =>
+        CashOpeningBalances.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// `PUT /dashboard/cash-opening-balances` — save the starting balances
+  /// for the given account keys (e.g. `[{'key': 'cash', 'amount': 20000}]`).
+  Future<ApiResult<CashOpeningBalances>> saveCashOpeningBalances(
+    List<({String key, num amount})> accounts,
+  ) => _api.put(
+    ApiEndpoints.dashboardCashOpeningBalances,
+    body: {
+      'accounts': [
+        for (final a in accounts) {'key': a.key, 'amount': a.amount},
+      ],
+    },
+    parse: (Object? json) =>
+        CashOpeningBalances.fromJson(json as Map<String, dynamic>),
   );
 }
 

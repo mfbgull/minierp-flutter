@@ -6,6 +6,12 @@ import '../../core/auth/auth_notifier.dart';
 import '../../core/i18n/locale_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/screen_shortcuts.dart';
+import '../dashboard/dashboard_providers.dart'
+    show
+        dashboardArSummaryProvider,
+        dashboardCashPositionProvider,
+        dashboardSummaryProvider,
+        dashboardTopCustomersProvider;
 
 /// One module in the shell's navigation. [label] is resolved with the
 /// active localization; [path] is the router branch root; [adminOnly]
@@ -229,6 +235,17 @@ class AppShell extends ConsumerWidget {
               selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
               onSelect: (index) {
                 final branchIndex = shellDestinations.indexOf(visible[index]);
+                // The dashboard branch is kept alive by the
+                // StatefulShellRoute (its FutureProviders cache), so
+                // invalidate its providers on every visit to reflect
+                // work done on other modules (sales, expenses, ...).
+                if (branchIndex == 0) {
+                  ref
+                    ..invalidate(dashboardSummaryProvider)
+                    ..invalidate(dashboardArSummaryProvider)
+                    ..invalidate(dashboardCashPositionProvider)
+                    ..invalidate(dashboardTopCustomersProvider(5));
+                }
                 navigationShell.goBranch(
                   branchIndex,
                   initialLocation: branchIndex == navigationShell.currentIndex,

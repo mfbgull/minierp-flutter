@@ -42,6 +42,11 @@ Get the current authenticated user.
 ### GET /dashboard/summary
 Server-side aggregated dashboard data. Replaces 5 separate full-table fetches.
 
+| Query Param | Type | Description |
+|---|---|---|
+| `fromDate` | string (YYYY-MM-DD) | Range start — filters the money figures (sales, purchases, profit), the sales/purchases chart and recent productions. Omit for all-time totals + 7-day chart. |
+| `toDate` | string (YYYY-MM-DD) | Range end (inclusive). Requires `fromDate`. |
+
 ```json
 // Response 200
 {
@@ -51,6 +56,7 @@ Server-side aggregated dashboard data. Replaces 5 separate full-table fetches.
     "totalStockValue": 245000.50,
     "totalSalesRevenue": 890000.00,
     "totalPurchases": 560000.00,
+    "totalProfit": 330000.00,
     "warehouseStockCount": 312,
     "lowStockItems": [{ "id": 1, "item_code": "ITM001", "item_name": "Widget", "current_stock": 5, "reorder_level": 10, "category": "Parts" }],
     "stockByCategory": [{ "category": "Parts", "total_stock": 500 }],
@@ -60,6 +66,58 @@ Server-side aggregated dashboard data. Replaces 5 separate full-table fetches.
   }
 }
 ```
+
+### GET /dashboard/cash-position
+Closing balance per cash account (Cash, Bank, Easypaisa, JazzCash,
+UPaisa), plus each account's opening/inflow/outflow and the individual
+transactions behind the balance. Revenue/profit figures elsewhere net
+out fully-returned invoices.
+
+```json
+// Response 200
+{
+  "success": true,
+  "data": {
+    "date": "2026-08-13",
+    "accounts": [{
+      "key": "cash",
+      "name": "Cash",
+      "balance": -5050,
+      "opening": -4350,
+      "inflow": 0,
+      "outflow": 700,
+      "net": -700,
+      "transactions": [{
+        "date": "2026-08-13",
+        "type": "refund",
+        "reference": "PAY004",
+        "description": "Refund for return on INV-2026-152278",
+        "amount": -700
+      }]
+    }],
+    "total": -4350
+  }
+}
+```
+
+`transactions[].type` is one of `payment_received` | `supplier_payment`
+| `expense` | `salary` | `refund` (positive = money in, negative = out).
+
+### GET /dashboard/cash-opening-balances
+Starting (seed) balance each cash account was founded with — a new
+business records its opening cash here; the cash-position strip seeds
+from it.
+
+```json
+// Response 200
+{ "success": true, "data": { "accounts": [
+  { "key": "cash", "name": "Cash", "amount": 20000 }
+] } }
+```
+
+### PUT /dashboard/cash-opening-balances
+Save the opening balances. Body: `{ "accounts": [{ "key": "cash", "amount": 20000 }] }`.
+Returns the saved accounts in the same envelope as GET.
 
 ### GET /dashboard/sales-summary
 Sales totals for a period — the dashboard's Sales Summary block.

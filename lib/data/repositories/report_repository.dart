@@ -14,6 +14,7 @@ import '../../data/models/report.dart'
         ArSummaryReport,
         BomUsageReport,
         CashFlowReport,
+        CashReconciliation,
         CustomerStatementRow,
         DSOMetric,
         ExpensesReport,
@@ -274,6 +275,32 @@ class ReportRepository {
         : <String, dynamic>{'asOfDate': asOfDate},
     parse: (Object? json) =>
         ArSummaryReport.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// GET /reports/cash-reconciliation — end-of-day cash/till
+  /// reconciliation for a single date: per-account opening/expected
+  /// balances merged with any saved counted amounts.
+  Future<ApiResult<CashReconciliation>> cashReconciliation({
+    required String date,
+  }) => _api.get(
+    ApiEndpoints.reportCashReconciliation,
+    queryParameters: {'date': date},
+    parse: (Object? json) =>
+        CashReconciliation.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// POST /reports/cash-reconciliation — saves the counted end-of-day
+  /// amounts for a date. `accounts` entries are `{key, counted_balance,
+  /// notes}`; a null `counted_balance` clears the count. Returns the
+  /// refreshed reconciliation.
+  Future<ApiResult<CashReconciliation>> saveCashReconciliation({
+    required String date,
+    required List<Map<String, dynamic>> accounts,
+  }) => _api.post(
+    ApiEndpoints.reportCashReconciliation,
+    body: {'date': date, 'accounts': accounts},
+    parse: (Object? json) =>
+        CashReconciliation.fromJson(json as Map<String, dynamic>),
   );
 }
 

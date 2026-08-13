@@ -50,6 +50,7 @@ import '../../data/models/report.dart'
         ArAgingReport,
         BomUsageReport,
         CashFlowReport,
+        CashReconciliation,
         CustomerStatementRow,
         DSOMetric,
         ExpensesReport,
@@ -645,6 +646,57 @@ String buildCashFlowCsv(AppLocalizations l10n, CashFlowReport report) {
       (l10n.reportsNetcashflow, Formatters.currency(report.netCashFlow)),
     ],
     (row) => [sanitizeCsvCell(row.$1), row.$2],
+  );
+}
+
+/// Builds the CSV text for the cash reconciliation — Account | Opening
+/// | Inflow | Outflow | Expected | Counted | Variance | Notes, one row
+/// per account, then a Total row mirroring the screen's grid.
+String buildCashReconciliationCsv(
+  AppLocalizations l10n,
+  CashReconciliation report,
+) {
+  final rows = [
+    for (final a in report.accounts)
+      [
+        sanitizeCsvCell(a.name.isEmpty ? '—' : a.name),
+        Formatters.currency(a.openingBalance),
+        Formatters.currency(a.inflow),
+        Formatters.currency(a.outflow),
+        Formatters.currency(a.expectedBalance),
+        a.countedBalance == null ? '—' : Formatters.currency(a.countedBalance!),
+        a.variance == null ? '—' : Formatters.currency(a.variance!),
+        sanitizeCsvCell((a.notes?.isEmpty ?? true) ? '—' : a.notes!),
+      ],
+    [
+      l10n.commonTotal,
+      Formatters.currency(report.totals.opening),
+      Formatters.currency(report.totals.inflow),
+      Formatters.currency(report.totals.outflow),
+      Formatters.currency(report.totals.closing),
+      Formatters.currency(
+        report.accounts.fold<num>(0, (s, a) => s + (a.countedBalance ?? 0)),
+      ),
+      Formatters.currency(
+        report.accounts.fold<num>(0, (s, a) => s + (a.countedBalance ?? 0)) -
+            report.totals.closing,
+      ),
+      '',
+    ],
+  ];
+  return _buildGridCsv(
+    [
+      l10n.fieldsAccount,
+      l10n.cashreconOpening,
+      l10n.cashreconInflow,
+      l10n.cashreconOutflow,
+      l10n.cashreconExpected,
+      l10n.cashreconCounted,
+      l10n.cashreconVariance,
+      l10n.cashreconNotes,
+    ],
+    rows,
+    (row) => row,
   );
 }
 

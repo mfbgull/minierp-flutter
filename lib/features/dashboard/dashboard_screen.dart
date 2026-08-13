@@ -3,11 +3,13 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/dashboard_summary.dart'
     show
         ArSummaryResult,
+        CashAccountPosition,
         DashboardSummary,
         DayTotal,
         LowStockItem,
@@ -15,6 +17,12 @@ import '../../data/models/dashboard_summary.dart'
         TopCustomer;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
+import '../reports/report_providers.dart'
+    show applyGlobalReportRange, globalReportFromDateProvider, globalReportToDateProvider;
+import 'cash_opening_balance_dialog.dart' show showCashOpeningBalanceDialog;
+import 'cash_position_detail_dialog.dart';
 import 'dashboard_providers.dart';
 
 /// Landing screen behind the auth gate — renders the server-side
@@ -26,14 +34,58 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final summary = ref.watch(dashboardSummaryProvider);
-    return summary.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => _DashboardError(
-        message: error is ApiError ? error.message : error.toString(),
-        onRetry: () => ref.invalidate(dashboardSummaryProvider),
-      ),
-      data: (data) => _DashboardBody(summary: data),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Global date range: the dashboard's From/To picker is the
+        // app-wide default for every report page (each page's own
+        // picker can still override its range), plus a refresh that
+        // reloads all dashboard blocks.
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          filters: [
+            DateRangeFilter(
+              fromProvider: globalReportFromDateProvider,
+              toProvider: globalReportToDateProvider,
+              onChanged: () {
+                final from = ref.read(globalReportFromDateProvider);
+                final to = ref.read(globalReportToDateProvider);
+                if (from != null && to != null) {
+                  applyGlobalReportRange(ref, from, to);
+                }
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Text(
+                l10n.dashboardGlobalDateRangeHint,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+          onRefresh: () {
+            ref
+              ..invalidate(dashboardSummaryProvider)
+              ..invalidate(dashboardArSummaryProvider)
+              ..invalidate(dashboardCashPositionProvider)
+              ..invalidate(dashboardTopCustomersProvider(5));
+          },
+        ),
+        Expanded(
+          child: summary.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, _) => _DashboardError(
+              message: error is ApiError ? error.message : error.toString(),
+              onRetry: () => ref.invalidate(dashboardSummaryProvider),
+            ),
+            data: (data) => _DashboardBody(summary: data),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -46,11 +98,15 @@ class _DashboardBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Short windows (e.g. a 600px test surface or a small desktop
+        // pane): fixed-height block rows inside a scroll view so blocks
+        // are never squeezed below their content (which would overflow
+        // the panels' internal Columns). Tall windows keep the
+        // fill-the-screen Expanded rows.
+        final compact = constraints.maxHeight < 560;
+        final children = <Widget>[
           // Horizontal stat strip — one fixed-height row so short windows
           // scroll sideways instead of stacking/overflowing.
           SizedBox(
@@ -74,6 +130,11 @@ class _DashboardBody extends StatelessWidget {
                   icon: Icons.trending_up,
                 ),
                 _KpiCard(
+                  label: l10n.dashboardProfit,
+                  value: Formatters.currency(summary.totalProfit),
+                  icon: Icons.monetization_on_outlined,
+                ),
+                _KpiCard(
                   label: l10n.navPurchases,
                   value: Formatters.currency(summary.totalPurchases),
                   icon: Icons.shopping_cart_outlined,
@@ -94,47 +155,308 @@ class _DashboardBody extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          // Cash & bank position — closing balance per account (Cash,
+          // Bank, Easypaisa, JazzCash, UPaisa), shared with the
+          // end-of-day reconciliation report.
+          const _CashPositionStrip(),
+          const SizedBox(height: 16),
           // Row 1: sales vs purchases + AR aging buckets; row 2: stock
           // by category + top customers; low-stock alerts full-width at
           // the bottom (mirrors the web default block grid).
-          Expanded(
-            flex: 3,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          if (compact)
+            SizedBox(height: 360, child: _salesPurchasesRow(summary))
+          else
+            Expanded(flex: 3, child: _salesPurchasesRow(summary)),
+          const SizedBox(height: 16),
+          if (compact)
+            SizedBox(height: 300, child: _stockCategoryRow(summary))
+          else
+            Expanded(flex: 2, child: _stockCategoryRow(summary)),
+          const SizedBox(height: 16),
+          if (compact)
+            SizedBox(
+              height: 280,
+              child: _LowStockPanel(items: summary.lowStockItems),
+            )
+          else
+            Expanded(
+              flex: 2,
+              child: _LowStockPanel(items: summary.lowStockItems),
+            ),
+        ];
+        final content = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        );
+        if (compact) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: content,
+          );
+        }
+        return Padding(padding: const EdgeInsets.all(20), child: content);
+      },
+    );
+  }
+
+  Widget _salesPurchasesRow(DashboardSummary summary) => Row(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Expanded(
+        flex: 3,
+        child: _SalesVsPurchasesPanel(
+          sales: summary.salesByDay,
+          purchases: summary.purchasesByDay,
+        ),
+      ),
+      const SizedBox(width: 16),
+      Expanded(flex: 2, child: const _ArSummaryPanel()),
+    ],
+  );
+
+  Widget _stockCategoryRow(DashboardSummary summary) => Row(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Expanded(
+        flex: 2,
+        child: _StockByCategoryPanel(
+          categories: summary.stockByCategory,
+        ),
+      ),
+      const SizedBox(width: 16),
+      Expanded(flex: 3, child: const _TopCustomersPanel()),
+    ],
+  );
+}
+
+/// Closing cash/bank balances per account (`GET /dashboard/cash-position`)
+/// — a compact horizontal strip so the day's cash position is visible
+/// on the dashboard without opening the reconciliation report.
+class _CashPositionStrip extends ConsumerWidget {
+  const _CashPositionStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    final position = ref.watch(dashboardCashPositionProvider);
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
+                Icon(
+                  // Not account_balance_wallet_outlined — that's the
+                  // Payments rail icon the tests tap to navigate.
+                  Icons.savings_outlined,
+                  size: 18,
+                  color: scheme.primary,
+                ),
+                const SizedBox(width: 8),
                 Expanded(
-                  flex: 3,
-                  child: _SalesVsPurchasesPanel(
-                    sales: summary.salesByDay,
-                    purchases: summary.purchasesByDay,
+                  child: Text(
+                    l10n.dashboardCashbankposition,
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(flex: 2, child: const _ArSummaryPanel()),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            flex: 2,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: _StockByCategoryPanel(
-                    categories: summary.stockByCategory,
+                TextButton.icon(
+                  onPressed: () =>
+                      showCashOpeningBalanceDialog(context, ref),
+                  icon: const Icon(Icons.playlist_add, size: 15),
+                  label: Text(l10n.dashboardOpeningbalance),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(flex: 3, child: const _TopCustomersPanel()),
+                TextButton.icon(
+                  onPressed: () => context.go('/reports/cash-reconciliation'),
+                  icon: const Icon(Icons.open_in_new, size: 15),
+                  label: Text(l10n.dashboardCashrecon),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
               ],
             ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 86,
+              child: position.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                error: (error, _) => _PanelError(
+                  message: error is ApiError ? error.message : error.toString(),
+                  onRetry: () => ref.invalidate(dashboardCashPositionProvider),
+                ),
+                data: (data) => ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (final account in data.accounts)
+                      _CashPositionCard(account: account),
+                    // Grand total as a highlighted trailing card.
+                    _CashTotalCard(total: data.total),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CashPositionCard extends StatelessWidget {
+  const _CashPositionCard({required this.account});
+
+  final CashAccountPosition account;
+
+  // Per-account accent (soft fill + icon tint), matching the wallet
+  // colors used across the app's money screens.
+  static const Map<String, Color> _accents = {
+    'cash': Color(0xFF16A34A),
+    'bank': Color(0xFF2563EB),
+    'easypaisa': Color(0xFF0D9488),
+    'jazzcash': Color(0xFFEA580C),
+    'upaisa': Color(0xFF7C3AED),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = _accents[account.key] ?? scheme.primary;
+    final inColor = const Color(0xFF16A34A);
+    return GestureDetector(
+      onTap: () =>
+          showCashPositionDetailDialog(context, account: account),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          width: 190,
+          margin: const EdgeInsets.only(right: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: accent.withValues(alpha: 0.35)),
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            flex: 2,
-            child: _LowStockPanel(items: summary.lowStockItems),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.savings_outlined, size: 15, color: accent),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      account.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  Formatters.currency(account.balance),
+                  maxLines: 1,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: accent,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              // Compact money-in / money-out so the balance is traceable
+              // at a glance: +inflow / −outflow. Tap opens the detail.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_upward, size: 11, color: inColor),
+                    const SizedBox(width: 2),
+                    Text(
+                      Formatters.number(account.inflow),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: inColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.arrow_downward, size: 11, color: scheme.error),
+                    const SizedBox(width: 2),
+                    Text(
+                      Formatters.number(account.outflow),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CashTotalCard extends StatelessWidget {
+  const _CashTotalCard({required this.total});
+
+  final num total;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 190,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            AppLocalizations.of(context)!.commonTotal,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              Formatters.currency(total),
+              maxLines: 1,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ),
         ],
       ),

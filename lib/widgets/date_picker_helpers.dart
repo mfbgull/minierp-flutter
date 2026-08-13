@@ -109,6 +109,7 @@ class DateRangeFilter extends ConsumerWidget {
     super.key,
     required this.fromProvider,
     required this.toProvider,
+    this.onChanged,
     this.onClear,
     this.showClear,
     this.width,
@@ -117,6 +118,12 @@ class DateRangeFilter extends ConsumerWidget {
 
   final StateProvider<DateTime?> fromProvider;
   final StateProvider<DateTime?> toProvider;
+
+  /// Called after a From/To pick writes its provider (and after the
+  /// clear button runs [onClear]) — lets callers react to the new
+  /// range, e.g. the dashboard propagating its global range to every
+  /// report page.
+  final VoidCallback? onChanged;
 
   /// When non-null, renders a clear button after the To button. Shown
   /// when [showClear] evaluates true, or (when null) whenever either
@@ -148,26 +155,32 @@ class DateRangeFilter extends ConsumerWidget {
           label: from == null
               ? l10n.commonFrom
               : Formatters.date(isoDate(from)),
-          onTap: () => pickFilterDate(
-            context,
-            ref,
-            fromProvider: fromProvider,
-            toProvider: toProvider,
-            isFrom: true,
-          ),
+          onTap: () async {
+            await pickFilterDate(
+              context,
+              ref,
+              fromProvider: fromProvider,
+              toProvider: toProvider,
+              isFrom: true,
+            );
+            onChanged?.call();
+          },
         ),
         const SizedBox(width: 8),
         DateFilterButton(
           width: width,
           height: height,
           label: to == null ? l10n.commonTo : Formatters.date(isoDate(to)),
-          onTap: () => pickFilterDate(
-            context,
-            ref,
-            fromProvider: fromProvider,
-            toProvider: toProvider,
-            isFrom: false,
-          ),
+          onTap: () async {
+            await pickFilterDate(
+              context,
+              ref,
+              fromProvider: fromProvider,
+              toProvider: toProvider,
+              isFrom: false,
+            );
+            onChanged?.call();
+          },
         ),
         if (clearVisible) ...[
           const SizedBox(width: 4),
@@ -178,7 +191,10 @@ class DateRangeFilter extends ConsumerWidget {
               size: 20,
               color: Theme.of(context).colorScheme.outline,
             ),
-            onPressed: onClear,
+            onPressed: () {
+              onClear?.call();
+              onChanged?.call();
+            },
           ),
         ],
       ],

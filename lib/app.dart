@@ -29,6 +29,7 @@ import 'features/reports/ar_aging_report_screen.dart';
 import 'features/reports/ar_summary_report_screen.dart';
 import 'features/reports/bom_usage_report_screen.dart';
 import 'features/reports/cash_flow_report_screen.dart';
+import 'features/reports/cash_reconciliation_screen.dart';
 import 'features/reports/dso_report_screen.dart';
 import 'features/reports/expenses_report_screen.dart';
 import 'features/reports/inventory_movement_report_screen.dart';
@@ -196,6 +197,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                             'dso' => const DsoReportScreen(),
                             'expenses' => const ExpensesReportScreen(),
                             'cash-flow' => const CashFlowReportScreen(),
+                            'cash-reconciliation' =>
+                              const CashReconciliationScreen(),
                             'profit-loss' => const ProfitLossReportScreen(),
                             'inventory-movement' =>
                               const InventoryMovementReportScreen(),
