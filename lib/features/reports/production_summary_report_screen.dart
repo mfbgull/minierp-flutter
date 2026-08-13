@@ -14,7 +14,7 @@ import '../../data/models/report.dart'
     show ProductionSummaryReport, ProductionSummaryRow, ProductionSummaryStats;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
@@ -207,6 +207,7 @@ class _ProductionSummaryReportScreenState
             DateRangeFilter(
               fromProvider: reportProductionFromDateProvider,
               toProvider: reportProductionToDateProvider,
+              showAllDates: false,
             ),
           ],
           onRefresh: () => ref.invalidate(productionSummaryReportProvider),

@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../preferences/preference_providers.dart' show initialRange;
+
 import '../../data/models/invoice.dart' show Invoice;
 import '../../data/models/sales_return.dart' show SalesReturn;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -17,8 +19,8 @@ final invoiceReturnsWarehouseProvider = StateProvider<String?>((ref) => null);
 
 /// Client-side date-range filters (ISO strings, applied to
 /// `return_date`). The endpoint has no date params.
-final invoiceReturnsFromDateProvider = StateProvider<DateTime?>((ref) => null);
-final invoiceReturnsToDateProvider = StateProvider<DateTime?>((ref) => null);
+final invoiceReturnsFromDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).from);
+final invoiceReturnsToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
 
 /// Invoice-return history (`GET /invoices/returns`, **bare array** — the
 /// endpoint has no search/page params, so the grid keeps sorting/filtering

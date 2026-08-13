@@ -25,7 +25,7 @@ import '../../data/repositories/production_repository.dart'
     show productionRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
-import '../../widgets/date_picker_helpers.dart' show pickDate;
+import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart'
     show ErrorBanner, formInputDecoration, submitOnEnter;

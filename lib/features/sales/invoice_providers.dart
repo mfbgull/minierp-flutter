@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../preferences/preference_providers.dart' show initialRange;
+
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/invoice.dart' show Invoice;
 import '../../data/models/item.dart' show Item;
@@ -22,8 +24,8 @@ final invoicesSearchProvider = StateProvider<String>((ref) => '');
 
 /// Client-side date-range filters (ISO strings, applied to
 /// `invoice_date`). The endpoint has no date params.
-final invoicesFromDateProvider = StateProvider<DateTime?>((ref) => null);
-final invoicesToDateProvider = StateProvider<DateTime?>((ref) => null);
+final invoicesFromDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).from);
+final invoicesToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
 
 /// Rows for the sales grid. Re-runs when the status filter changes; the
 /// screen invalidates it on refresh. Search/date filtering happens

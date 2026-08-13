@@ -128,7 +128,8 @@ Companion to `date-range-picker-spec.md` (all decisions locked). This file break
 - `cash_reconciliation_screen.dart`: replace `_pickDate` + its `pickDate` button with `DateRangeFilter(mode: singleDate, dateProvider: reportReconciliationDateProvider, ...)`.
 - Acceptance: reconciliation date changes through the pill; existing screen behavior (single date → report refetch) unchanged.
 
-> **Milestone M4:** the whole app runs on the new picker.
+> **Milestone M4 (done):** the whole app runs on the new picker.
+> Built: `date_picker_helpers.dart` renamed → `date_picker.dart` (only `pickDate` survives; the old `DateRangeFilter`/`DateFilterButton`/`pickFilterDate` are deleted, and the widget-test groups moved to `date_range_picker_test.dart`); `initialRange(ref)` shared initializer in `preference_providers.dart` (saved default range, else This week with the saved week start) seeds the global pair, all 13 report pairs, and the 6 list-screen pairs; dashboard + 12 report screens pass `showAllDates: false`, list screens keep the default (`true`) with their `onClear`/`showClear` contracts; `cash_reconciliation_screen` now uses `DateRangeFilter(mode: singleDate, dateProvider: …)` in place of its `DateFilterButton` + `pickDate`; all imports repaired to correct relative depths. Tests: list-screen boot helpers reset the seeded range to All dates via a `clearScreenDates` helper (date behavior stays covered by dedicated tests); the dashboard propagation test drives the pill's ‹ arrow (This week → Last week) and asserts the shifted dates on the dashboard + report queries; the activity-log date test asserts the pill's presence instead of the removed From/To labels.
 
 ---
 
@@ -144,7 +145,8 @@ Companion to `date-range-picker-spec.md` (all decisions locked). This file break
 **T5.3 — API docs** · Owner: Docs.
 - `docs/API.md`: document `GET/PUT /preferences` and the changed `period=week` semantics (§6.3).
 
-> **Milestone M5:** feature-complete.
+> **Milestone M5 (done):** feature-complete.
+> Built: `settingsSectionDate` l10n key added to `en.arb` + `ur.arb` + regenerated `app_localizations*.dart`; `_dateRangeSection` widget in `settings_screen.dart` renders a `SegmentedButton<WeekStart>` (Mon/Sat/Sun) that writes through `saveWeekStart` + `weekStartProvider`, and a `Set as default range` button that calls `saveDefaultRange` with the current `activeDefaultRangeProvider` value (disabled when null); the section is inserted above the existing server-settings cards. `docs/API.md` already documents the `GET/PUT /preferences` endpoints and `period=week` semantics. `flutter analyze` clean.
 
 ---
 

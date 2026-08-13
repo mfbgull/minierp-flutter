@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../preferences/preference_providers.dart' show initialRange;
+
 import '../../data/models/quotation.dart' show Quotation, QuotationDetail;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/quotation_repository.dart'
@@ -16,8 +18,8 @@ final quotationsSearchProvider = StateProvider<String>((ref) => '');
 
 /// Client-side date-range filters (ISO strings, applied to
 /// `quotation_date`). The endpoint has no date params.
-final quotationsFromDateProvider = StateProvider<DateTime?>((ref) => null);
-final quotationsToDateProvider = StateProvider<DateTime?>((ref) => null);
+final quotationsFromDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).from);
+final quotationsToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
 
 /// All quotations (`GET /quotations`, **bare array** — the endpoint has
 /// no search/page params, so the grid keeps sorting/filtering

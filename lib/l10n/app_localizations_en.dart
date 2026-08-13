@@ -1948,6 +1948,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSectionOther => 'Other Settings';
 
   @override
+  String get settingsSectionDate => 'Date & Range';
+
+  @override
   String get settingsKeyCompanyName => 'Company Name';
 
   @override

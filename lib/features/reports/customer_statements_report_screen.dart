@@ -14,7 +14,7 @@ import '../../data/models/customer.dart' show Customer;
 import '../../data/models/report.dart' show CustomerStatementRow;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart';
+import '../../widgets/date_range_picker.dart';
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
@@ -179,6 +179,7 @@ class _CustomerStatementsReportScreenState
             DateRangeFilter(
               fromProvider: reportStatementsFromDateProvider,
               toProvider: reportStatementsToDateProvider,
+              showAllDates: false,
             ),
             SizedBox(
               width: 220,

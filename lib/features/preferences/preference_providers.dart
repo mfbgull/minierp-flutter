@@ -22,7 +22,8 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../core/utils/date_range_math.dart' show DateRange, WeekStart;
+import '../../core/utils/date_range_math.dart'
+    show DatePreset, DateRange, WeekStart, presetRange;
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/user_preferences.dart'
     show UserPreset, UserPreferences;
@@ -207,6 +208,31 @@ final weekStartProvider = StateProvider<WeekStart>(
 final activeDefaultRangeProvider = StateProvider<DateRange?>(
   (ref) => ref.watch(preferencesCacheProvider).defaultRange,
 );
+
+/// The initial From/To range for report and list screens (spec §6.2 / Q17):
+/// the saved default range when one is set, else the **"This week"** preset
+/// computed with the saved week start. Reads the boot-seeded StateProviders
+/// synchronously, so a screen's first frame already shows the seeded range
+/// with no network round-trip — and the seeding follows the user's saved
+/// default from the very first build.
+///
+/// Uses `ref.read` (not `ref.watch`) deliberately: a StateProvider's
+/// initializer re-runs when a provider it watches changes, which would
+/// recreate its state and **reset the committed range to the re-derived
+/// seed** — e.g. toggling the week-start in the picker footer or the server
+/// preferences arriving at boot would clobber every screen's selection.
+/// Read captures the seed once, at first build; a *server-only* saved
+/// default (fresh device whose local cache has none) takes effect on the
+/// next boot, since the cache is the seeding source (§6.2).
+DateRange initialRange(Ref ref) {
+  final saved = ref.read(activeDefaultRangeProvider);
+  if (saved != null) return saved;
+  return presetRange(
+    DatePreset.thisWeek,
+    DateTime.now(),
+    ref.read(weekStartProvider),
+  );
+}
 
 /// User-defined presets (server `presets` array is the source of truth;
 /// the picker sidebar renders this for the ✕-remove + active matching).

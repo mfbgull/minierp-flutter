@@ -3848,6 +3848,12 @@ abstract class AppLocalizations {
   /// **'Other Settings'**
   String get settingsSectionOther;
 
+  /// No description provided for @settingsSectionDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date & Range'**
+  String get settingsSectionDate;
+
   /// No description provided for @settingsKeyCompanyName.
   ///
   /// In en, this message translates to:

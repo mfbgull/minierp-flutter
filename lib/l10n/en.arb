@@ -626,6 +626,7 @@
   "settingsSectionTax": "Tax",
   "settingsSectionNumbering": "Document Numbering",
   "settingsSectionOther": "Other Settings",
+  "settingsSectionDate": "Date & Range",
   "settingsKeyCompanyName": "Company Name",
   "settingsKeyCompanyEmail": "Company Email",
   "settingsKeyCompanyPhone": "Company Phone",

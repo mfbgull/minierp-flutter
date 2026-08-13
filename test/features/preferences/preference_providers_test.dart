@@ -255,6 +255,48 @@ void main() {
       expect(container.read(userPresetsProvider), isEmpty);
     });
 
+    test(
+      'initialRange-seeded pairs keep committed state when prefs change',
+      () {
+        final container = ProviderContainer(
+          overrides: [
+            preferencesCacheProvider.overrideWithValue(PreferencesCache()),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        // A From/To pair seeded like every report/list screen (no saved
+        // default → This week at seed time).
+        final from = StateProvider<DateTime?>(
+          (ref) => initialRange(ref).from,
+        );
+        final to = StateProvider<DateTime?>((ref) => initialRange(ref).to);
+        expect(container.read(from), isNotNull);
+        expect(container.read(to), isNotNull);
+
+        // The user commits a custom range…
+        final custom = DateTime(2026, 5, 1);
+        container.read(from.notifier).state = custom;
+        expect(container.read(from), custom);
+
+        // …then toggles the week-start in the picker footer. The seeded
+        // provider must NOT reset to the re-derived seed (Phase 4
+        // regression: initialRange used ref.watch, which re-ran the
+        // StateProvider initializer and clobbered committed ranges).
+        container.read(weekStartProvider.notifier).state =
+            WeekStart.saturday;
+        expect(container.read(from), custom);
+
+        // Server prefs arriving at boot (with a saved default range)
+        // must not reset a committed range either.
+        container.read(activeDefaultRangeProvider.notifier).state = (
+          from: DateTime(2026, 8, 3),
+          to: DateTime(2026, 8, 9),
+        );
+        expect(container.read(from), custom);
+      },
+    );
+
     test('userPreferencesProvider adopts the server response as truth',
         () async {
       final adapter = _PrefsFakeAdapter(prefs: {

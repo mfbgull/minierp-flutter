@@ -17,7 +17,7 @@ import '../../data/models/dashboard_summary.dart'
         TopCustomer;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../reports/report_providers.dart'
     show applyGlobalReportRange, globalReportFromDateProvider, globalReportToDateProvider;
@@ -49,6 +49,7 @@ class DashboardScreen extends ConsumerWidget {
             DateRangeFilter(
               fromProvider: globalReportFromDateProvider,
               toProvider: globalReportToDateProvider,
+              showAllDates: false,
               onChanged: () {
                 final from = ref.read(globalReportFromDateProvider);
                 final to = ref.read(globalReportToDateProvider);
