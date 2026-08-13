@@ -801,15 +801,18 @@ class _RangePopover extends ConsumerWidget {
                             preset,
                           ),
                           child: Container(
-                            padding: const EdgeInsets.all(2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: scheme.errorContainer,
+                              color: scheme.error,
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Icon(
                               Icons.close,
-                              size: 12,
-                              color: scheme.onErrorContainer,
+                              size: 14,
+                              color: scheme.onError,
                             ),
                           ),
                         ),
