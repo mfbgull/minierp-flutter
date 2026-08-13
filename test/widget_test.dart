@@ -26,10 +26,20 @@ import 'package:minierp_app/features/activity_log/activity_log_providers.dart'
     show activityLogFromDateProvider, activityLogToDateProvider;
 import 'package:minierp_app/features/activity_log/activity_log_screen.dart'
     show ActivityLogScreen;
+import 'package:minierp_app/features/expenses/expense_providers.dart'
+    show expensesFromDateProvider, expensesToDateProvider;
+import 'package:minierp_app/features/sales/invoice_providers.dart'
+    show invoicesFromDateProvider, invoicesToDateProvider;
+import 'package:minierp_app/features/sales/invoice_return_providers.dart'
+    show invoiceReturnsFromDateProvider, invoiceReturnsToDateProvider;
+import 'package:minierp_app/features/sales_orders/sales_order_providers.dart'
+    show salesOrdersFromDateProvider, salesOrdersToDateProvider;
+import 'package:minierp_app/features/quotations/quotation_providers.dart'
+    show quotationsFromDateProvider, quotationsToDateProvider;
 import 'package:minierp_app/features/auth/change_password_screen.dart';
 import 'package:minierp_app/features/admin/admin_models.dart' show Role;
 import 'package:minierp_app/features/reports/reports_dashboard_screen.dart';
-import 'package:minierp_app/widgets/date_picker_helpers.dart' show DateFilterButton;
+import 'package:minierp_app/widgets/date_range_picker.dart' show DateRangeFilter;
 import 'package:minierp_app/core/utils/date_utils.dart' show isoDate;
 import 'package:minierp_app/widgets/status_badge.dart' show StatusBadge;
 import 'package:minierp_app/widgets/searchable_select.dart';
@@ -4762,9 +4772,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // The toolbar's From/To pickers (the app-wide range) + the hint
+    // The toolbar's single pill picker (the app-wide range) + the hint
     // that it applies to every report screen.
-    expect(find.byType(DateFilterButton), findsNWidgets(2));
+    expect(find.byType(DateRangeFilter), findsOneWidget);
     expect(
       find.text('Date range applies to all report screens'),
       findsOneWidget,
@@ -4794,20 +4804,34 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Change the global From date on the dashboard (July 13 → July 20).
-    await tester.tap(find.byType(DateFilterButton).first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('20'));
-    await tester.tap(find.text('OK'));
+    // Shift the pill's range back one week (‹): This week → Last week
+    // (the app opens seeded on This week; the ‹ arrow moves the whole
+    // week back and the commit propagates to every report page).
+    await tester.tap(
+      find.descendant(
+        of: find.byType(DateRangeFilter),
+        matching: find.byIcon(Icons.chevron_left),
+      ),
+    );
     await tester.pumpAndSettle();
 
     final now = DateTime.now();
-    final expectedFrom = isoDate(DateTime(now.year, now.month - 1, 20));
+    final thisMonday = DateTime(
+      now.year,
+      now.month,
+      now.day - (now.weekday - 1),
+    );
+    final expectedFrom = isoDate(
+      DateTime(thisMonday.year, thisMonday.month, thisMonday.day - 7),
+    );
+    final expectedTo = isoDate(
+      DateTime(thisMonday.year, thisMonday.month, thisMonday.day - 1),
+    );
 
     // The dashboard's own summary refetched with the new range too — the
     // KPI figures and the sales/purchases chart respect the picker.
     expect(adapter.lastDashboardSummaryQuery?['fromDate'], expectedFrom);
-    expect(adapter.lastDashboardSummaryQuery?['toDate'], isoDate(now));
+    expect(adapter.lastDashboardSummaryQuery?['toDate'], expectedTo);
 
     // And every report page picks the new range up.
     await tester.tap(find.text('Reports'));
@@ -4815,7 +4839,7 @@ void main() {
     await tester.tap(find.text('Sales Summary Report'));
     await tester.pumpAndSettle();
     expect(adapter.lastSalesSummaryQuery?['fromDate'], expectedFrom);
-    expect(adapter.lastSalesSummaryQuery?['toDate'], isoDate(now));
+    expect(adapter.lastSalesSummaryQuery?['toDate'], expectedTo);
   });
 
   testWidgets('dashboard refresh button reloads every block', (tester) async {
@@ -5552,6 +5576,24 @@ void main() {
 
   // Expenses grid — same toolbar/grid contract as items, driven by the
   // /expenses + options endpoints from PORTING.md §5/§6.
+
+  /// The app seeds every list screen's date range to the saved default /
+  /// "This week" (Phase 4). Most list tests assert on the full fixture
+  /// set, which predates that range — reset the screen's date providers
+  /// to "All dates" so all rows show. Date-filter behavior itself is
+  /// covered by dedicated tests that set the providers directly.
+  void clearScreenDates(
+    WidgetTester tester,
+    List<StateProvider<DateTime?>> providers,
+  ) {
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(Scaffold).first),
+    );
+    for (final provider in providers) {
+      container.read(provider.notifier).state = null;
+    }
+  }
+
   Future<void> bootToExpenses(WidgetTester tester) async {
     final storage = _FakeTokenStorage()..token = 'test-token';
     final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
@@ -5567,6 +5609,11 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Expenses'));
+    await tester.pumpAndSettle();
+    clearScreenDates(
+      tester,
+      [expensesFromDateProvider, expensesToDateProvider],
+    );
     await tester.pumpAndSettle();
   }
 
@@ -6017,13 +6064,12 @@ void main() {
     final adapter = _AuthFakeAdapter();
     await bootToActivityLog(tester, adapter: adapter);
 
-    // From/To buttons from the shared DateRangeFilter render in the
-    // toolbar.
-    expect(find.text('From'), findsOneWidget);
-    expect(find.text('To'), findsOneWidget);
+    // The toolbar's pill picker is present (its own interaction is
+    // covered by date_range_picker_test.dart).
+    expect(find.byType(DateRangeFilter), findsOneWidget);
 
     // Set the range through the providers (the filter's own date-picker
-    // interaction is covered by date_picker_helpers_test.dart).
+    // interaction is covered by date_picker_test.dart).
     final container = ProviderScope.containerOf(
       tester.element(find.byType(ActivityLogScreen)),
     );
@@ -7005,6 +7051,11 @@ void main() {
     // by its unique icon instead.
     await tester.tap(find.byIcon(Icons.point_of_sale_outlined));
     await tester.pumpAndSettle();
+    clearScreenDates(
+      tester,
+      [invoicesFromDateProvider, invoicesToDateProvider],
+    );
+    await tester.pumpAndSettle();
   }
 
   /// Settles the invoice print preview page with bounded pumps. The
@@ -7292,6 +7343,11 @@ void main() {
     // Switch the sales shell to the returns tab (invoices is default).
     await tester.tap(find.text('Invoice Returns'));
     await tester.pumpAndSettle();
+    clearScreenDates(
+      tester,
+      [invoiceReturnsFromDateProvider, invoiceReturnsToDateProvider],
+    );
+    await tester.pumpAndSettle();
   }
 
   testWidgets('invoice returns screen renders the returns grid', (
@@ -7304,6 +7360,14 @@ void main() {
     // Offstage returns tab is skipped by the default finders.
     expect(find.text('SM-2026-0031'), findsNothing);
     await tester.tap(find.text('Invoice Returns'));
+    await tester.pumpAndSettle();
+    // This test lands on the returns tab itself (not via the
+    // bootToInvoiceReturns helper) — reset its seeded date range so the
+    // older fixture rows are all visible.
+    clearScreenDates(
+      tester,
+      [invoiceReturnsFromDateProvider, invoiceReturnsToDateProvider],
+    );
     await tester.pumpAndSettle();
 
     // Rows from the bare-array fake: return no, item, qty magnitudes and
@@ -7847,6 +7911,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    clearScreenDates(
+      tester,
+      [salesOrdersFromDateProvider, salesOrdersToDateProvider],
+    );
+    await tester.pumpAndSettle();
   }
 
   Future<void> bootToProduction(
@@ -8237,6 +8306,11 @@ void main() {
         of: find.byType(NavigationBar),
         matching: find.text('Quotations'),
       ),
+    );
+    await tester.pumpAndSettle();
+    clearScreenDates(
+      tester,
+      [quotationsFromDateProvider, quotationsToDateProvider],
     );
     await tester.pumpAndSettle();
   }

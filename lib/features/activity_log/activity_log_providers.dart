@@ -7,6 +7,8 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../preferences/preference_providers.dart' show initialRange;
+
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/activity_log.dart'
     show ActivityLog, ActivityLogUser, ActivityStats;
@@ -37,8 +39,8 @@ final activityLogUserIdProvider = StateProvider<int?>((ref) => null);
 
 /// Inclusive date-range filter — null means unbounded (sent as
 /// `start_date`/`end_date`).
-final activityLogFromDateProvider = StateProvider<DateTime?>((ref) => null);
-final activityLogToDateProvider = StateProvider<DateTime?>((ref) => null);
+final activityLogFromDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).from);
+final activityLogToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
 
 /// One page of logs. Re-runs when any filter/paging state changes; the
 /// screen invalidates it on refresh.

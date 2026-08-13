@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../preferences/preference_providers.dart' show initialRange;
+
 import '../../data/models/expense.dart'
     show Expense, ExpenseCategory, ExpenseOption;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -17,8 +19,8 @@ final expensesCategoryProvider = StateProvider<String?>((ref) => null);
 final expensesStatusProvider = StateProvider<String?>((ref) => null);
 
 /// Inclusive date-range filter — null means unbounded.
-final expensesFromDateProvider = StateProvider<DateTime?>((ref) => null);
-final expensesToDateProvider = StateProvider<DateTime?>((ref) => null);
+final expensesFromDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).from);
+final expensesToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
 
 /// Rows for the expenses grid. Re-runs when any filter changes; the
 /// screen invalidates it on refresh and after create/edit/delete.

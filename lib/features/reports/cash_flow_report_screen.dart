@@ -13,7 +13,7 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart' show CashFlowReport;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
@@ -42,6 +42,7 @@ class CashFlowReportScreen extends ConsumerWidget {
             DateRangeFilter(
               fromProvider: reportCashFlowFromDateProvider,
               toProvider: reportCashFlowToDateProvider,
+              showAllDates: false,
             ),
           ],
           onRefresh: () => ref.invalidate(cashFlowReportProvider),

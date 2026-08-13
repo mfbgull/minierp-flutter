@@ -27,7 +27,7 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/activity_log.dart' show ActivityCount, ActivityLog;
 import '../../data/repositories/paged_request.dart' show OffsetPagedResponse;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart' show DateRangeFilter;
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';

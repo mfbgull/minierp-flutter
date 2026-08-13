@@ -15,7 +15,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../data/repositories/customer_repository.dart'
     show CustomerStatement;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker_helpers.dart' show pickDate;
+import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/detail_error.dart';
 import 'customer_providers.dart';
 

@@ -15,12 +15,17 @@ import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_range_math.dart' show WeekStart;
 import '../../data/models/setting.dart' show AppSetting;
 import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
 import '../../data/repositories/settings_repository.dart'
     show settingsRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/screen_error_panel.dart';
+import '../preferences/preference_providers.dart'
+    show saveDefaultRange, saveWeekStart, weekStartProvider;
+import '../reports/report_providers.dart'
+    show globalReportFromDateProvider, globalReportToDateProvider;
 import 'settings_providers.dart';
 
 /// Keys configured on the Integrations module's service forms — excluded
@@ -319,6 +324,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     constraints: const BoxConstraints(maxWidth: 900),
                     child: Column(
                       children: [
+                        _dateRangeSection(l10n),
+                        const SizedBox(height: 16),
                         for (final section in sections) ...[
                           _sectionCard(l10n, section),
                           const SizedBox(height: 16),
@@ -418,6 +425,117 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         helperMaxLines: 2,
         border: const OutlineInputBorder(),
         isDense: true,
+      ),
+    );
+  }
+
+  // ── Date & Range section (§5.1 / spec §6.4) ──────────────────────────
+  Widget _dateRangeSection(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    final currentWeekStart = ref.watch(weekStartProvider);
+    // Read the *current active* range from the global report providers —
+    // this is what the user sees on the dashboard / reports right now.
+    final fromDate = ref.watch(globalReportFromDateProvider);
+    final toDate = ref.watch(globalReportToDateProvider);
+    final hasActiveRange = fromDate != null && toDate != null;
+
+    return Card(
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.date_range_outlined, size: 20, color: scheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.settingsSectionDate,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Week starts on
+            Text(
+              l10n.drpWeekStartsOn,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<WeekStart>(
+              segments: [
+                ButtonSegment(
+                  value: WeekStart.monday,
+                  label: Text(l10n.drpWeekdayMonday),
+                ),
+                ButtonSegment(
+                  value: WeekStart.saturday,
+                  label: Text(l10n.drpWeekdaySaturday),
+                ),
+                ButtonSegment(
+                  value: WeekStart.sunday,
+                  label: Text(l10n.drpWeekdaySunday),
+                ),
+              ],
+              selected: {currentWeekStart},
+              onSelectionChanged: (selection) {
+                final value = selection.first;
+                ref.read(weekStartProvider.notifier).state = value;
+                saveWeekStart(ref, value).then((error) {
+                  if (!mounted || error == null) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l10n.drpWeekStartFailed)),
+                  );
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            // Set current range as default — captures the active range
+            // from the dashboard / reports and persists it as the default
+            // for next app open (spec §6.2).
+            Row(
+              children: [
+                Icon(
+                  Icons.bookmark_outline,
+                  size: 20,
+                  color: scheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.drpSetDefault,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: !hasActiveRange
+                      ? null
+                      : () async {
+                          final error = await saveDefaultRange(
+                            ref,
+                            (from: fromDate, to: toDate),
+                          );
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                error == null
+                                    ? l10n.drpDefaultSet
+                                    : l10n.drpDefaultFailed,
+                              ),
+                            ),
+                          );
+                        },
+                  icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                  label: Text(l10n.drpSetDefault),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

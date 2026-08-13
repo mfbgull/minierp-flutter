@@ -1943,6 +1943,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get settingsSectionOther => 'دیگر ترتیبات';
 
   @override
+  String get settingsSectionDate => 'تاریخ اور رینج';
+
+  @override
   String get settingsKeyCompanyName => 'کمپنی کا نام';
 
   @override

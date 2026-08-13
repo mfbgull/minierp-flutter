@@ -24,7 +24,7 @@ import '../../data/repositories/sales_order_repository.dart'
     show salesOrderRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
-import '../../widgets/date_picker_helpers.dart' show pickDate;
+import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart' show numText;
 import '../../widgets/searchable_select.dart';

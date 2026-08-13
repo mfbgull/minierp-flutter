@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../preferences/preference_providers.dart' show initialRange;
+
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/sales_order.dart' show SalesOrder, SalesOrderDetail;
 import '../../data/models/item.dart' show Item;
@@ -22,8 +24,8 @@ final salesOrdersSearchProvider = StateProvider<String>((ref) => '');
 
 /// Client-side date-range filters (ISO strings, applied to `so_date`).
 /// The endpoint has no date params.
-final salesOrdersFromDateProvider = StateProvider<DateTime?>((ref) => null);
-final salesOrdersToDateProvider = StateProvider<DateTime?>((ref) => null);
+final salesOrdersFromDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).from);
+final salesOrdersToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
 
 /// All sales orders (`GET /sales-orders`, **bare array** — the endpoint
 /// has no search/page params, so the grid keeps sorting/filtering

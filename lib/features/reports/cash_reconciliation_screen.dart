@@ -14,7 +14,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/csv_export.dart';
-import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart'
     show CashReconciliation, CashReconciliationAccount;
@@ -23,7 +22,7 @@ import '../../data/repositories/report_repository.dart'
     show reportRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart' show showAppToast;
-import '../../widgets/date_picker_helpers.dart' show DateFilterButton, pickDate;
+import '../../widgets/date_range_picker.dart' show DateRangeFilter, DateRangeMode;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
@@ -75,13 +74,6 @@ class _CashReconciliationScreenState
     _loadedDate = report.date;
   }
 
-  Future<void> _pickDate() async {
-    final current = ref.read(reportReconciliationDateProvider);
-    final picked = await pickDate(context, initialDate: current ?? DateTime.now());
-    if (picked == null) return;
-    ref.read(reportReconciliationDateProvider.notifier).state = picked;
-  }
-
   Future<void> _save() async {
     final report = ref.read(cashReconciliationProvider).valueOrNull;
     final l10n = AppLocalizations.of(context)!;
@@ -113,7 +105,6 @@ class _CashReconciliationScreenState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final report = ref.watch(cashReconciliationProvider);
-    final date = ref.watch(reportReconciliationDateProvider) ?? DateTime.now();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -128,9 +119,15 @@ class _CashReconciliationScreenState
         ScreenToolbar(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           filters: [
-            DateFilterButton(
-              label: Formatters.date(isoDate(date)),
-              onTap: _pickDate,
+            // Single-date mode: the pill shows one date, the presets are
+            // Today/Yesterday/This month, and tapping a day commits it.
+            // from/to are ignored in this mode (the widget only writes
+            // dateProvider), so all three share the same provider.
+            DateRangeFilter(
+              mode: DateRangeMode.singleDate,
+              fromProvider: reportReconciliationDateProvider,
+              toProvider: reportReconciliationDateProvider,
+              dateProvider: reportReconciliationDateProvider,
             ),
           ],
           onRefresh: () => ref.invalidate(cashReconciliationProvider),
