@@ -17,6 +17,8 @@ abstract final class ApiEndpoints {
       '/dashboard/stock-movement-summary';
   static const dashboardKpi = '/dashboard/kpi';
   static const dashboardArSummary = '/dashboard/ar-summary';
+  static const dashboardCashPosition = '/dashboard/cash-position';
+  static const dashboardCashOpeningBalances = '/dashboard/cash-opening-balances';
 
   // Layout persistence (§10)
   static const dashboardLayouts = '/dashboard/layouts';
@@ -71,6 +73,7 @@ abstract final class ApiEndpoints {
   static const reportProductionSummary = '/reports/production-summary';
   static const reportBomUsage = '/reports/bom-usage';
   static const reportArSummary = '/reports/ar-summary';
+  static const reportCashReconciliation = '/reports/cash-reconciliation';
 
   // Misc
   static const customers = '/customers';

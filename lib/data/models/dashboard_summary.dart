@@ -204,6 +204,137 @@ class DayTotal {
   final num total;
 }
 
+/// One individual money movement behind a cash-account balance.
+class CashPositionTransaction {
+  const CashPositionTransaction({
+    required this.date,
+    required this.type,
+    required this.reference,
+    required this.description,
+    required this.amount,
+  });
+
+  factory CashPositionTransaction.fromJson(Map<String, dynamic> json) =>
+      CashPositionTransaction(
+        date: asString(json['date']) ?? '',
+        type: asString(json['type']) ?? '',
+        reference: asString(json['reference']),
+        description: asString(json['description']),
+        amount: asNum(json['amount']) ?? 0,
+      );
+
+  final String date;
+
+  /// 'payment_received' | 'supplier_payment' | 'expense' | 'salary' | 'refund'.
+  final String type;
+  final String? reference;
+  final String? description;
+
+  /// Signed: positive = money in, negative = money out.
+  final num amount;
+}
+
+/// One cash-account row — `GET /dashboard/cash-position` `accounts`.
+class CashAccountPosition {
+  const CashAccountPosition({
+    required this.key,
+    required this.name,
+    required this.balance,
+    required this.opening,
+    required this.inflow,
+    required this.outflow,
+    required this.net,
+    required this.transactions,
+  });
+
+  factory CashAccountPosition.fromJson(Map<String, dynamic> json) =>
+      CashAccountPosition(
+        key: asString(json['key']) ?? '',
+        name: asString(json['name']) ?? '',
+        balance: asNum(json['balance']) ?? 0,
+        opening: asNum(json['opening']) ?? 0,
+        inflow: asNum(json['inflow']) ?? 0,
+        outflow: asNum(json['outflow']) ?? 0,
+        net: asNum(json['net']) ?? 0,
+        transactions: [
+          for (final row in json['transactions'] as List? ?? const [])
+            CashPositionTransaction.fromJson(row as Map<String, dynamic>),
+        ],
+      );
+
+  final String key;
+  final String name;
+  final num balance;
+  final num opening;
+  final num inflow;
+  final num outflow;
+  final num net;
+  final List<CashPositionTransaction> transactions;
+}
+
+/// One cash-account opening (seed) balance —
+/// `GET/PUT /dashboard/cash-opening-balances` `accounts` row.
+class CashOpeningBalance {
+  const CashOpeningBalance({
+    required this.key,
+    required this.name,
+    required this.amount,
+  });
+
+  factory CashOpeningBalance.fromJson(Map<String, dynamic> json) =>
+      CashOpeningBalance(
+        key: asString(json['key']) ?? '',
+        name: asString(json['name']) ?? '',
+        amount: asNum(json['amount']) ?? 0,
+      );
+
+  final String key;
+  final String name;
+
+  /// The starting (seed) balance the business was founded with.
+  final num amount;
+}
+
+/// `GET/PUT /dashboard/cash-opening-balances` — the opening balances a
+/// new business starts with (seeded into the cash-position accounts).
+class CashOpeningBalances {
+  const CashOpeningBalances({required this.accounts});
+
+  factory CashOpeningBalances.fromJson(Map<String, dynamic> json) =>
+      CashOpeningBalances(
+        accounts: [
+          for (final row in json['accounts'] as List? ?? const [])
+            CashOpeningBalance.fromJson(row as Map<String, dynamic>),
+        ],
+      );
+
+  final List<CashOpeningBalance> accounts;
+}
+
+/// Closing balances per cash account as of today —
+/// `GET /dashboard/cash-position`.
+class CashPositionSummary {
+  const CashPositionSummary({
+    required this.date,
+    required this.accounts,
+    required this.total,
+  });
+
+  factory CashPositionSummary.fromJson(Map<String, dynamic> json) =>
+      CashPositionSummary(
+        date: asString(json['date']) ?? '',
+        accounts: [
+          for (final row in json['accounts'] as List? ?? const [])
+            CashAccountPosition.fromJson(row as Map<String, dynamic>),
+        ],
+        total: asNum(json['total']) ?? 0,
+      );
+
+  final String date;
+  final List<CashAccountPosition> accounts;
+  final num total;
+}
+
 /// Aggregated dashboard KPIs — `GET /dashboard/summary`
 /// (server/src/models/Dashboard.ts `getSummary`).
 class DashboardSummary {
@@ -212,6 +343,7 @@ class DashboardSummary {
     required this.totalStockValue,
     required this.totalSalesRevenue,
     required this.totalPurchases,
+    required this.totalProfit,
     required this.warehouseStockCount,
     required this.lowStockItems,
     required this.stockByCategory,
@@ -226,6 +358,7 @@ class DashboardSummary {
         totalStockValue: asNum(json['totalStockValue']) ?? 0,
         totalSalesRevenue: asNum(json['totalSalesRevenue']) ?? 0,
         totalPurchases: asNum(json['totalPurchases']) ?? 0,
+        totalProfit: asNum(json['totalProfit']) ?? 0,
         warehouseStockCount: asInt(json['warehouseStockCount']) ?? 0,
         lowStockItems: _parseList(json['lowStockItems'], LowStockItem.fromJson),
         stockByCategory: _parseList(
@@ -241,6 +374,7 @@ class DashboardSummary {
   final num totalStockValue;
   final num totalSalesRevenue;
   final num totalPurchases;
+  final num totalProfit;
   final int warehouseStockCount;
   final List<LowStockItem> lowStockItems;
   final List<StockByCategory> stockByCategory;

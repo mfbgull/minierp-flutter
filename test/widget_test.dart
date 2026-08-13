@@ -29,6 +29,8 @@ import 'package:minierp_app/features/activity_log/activity_log_screen.dart'
 import 'package:minierp_app/features/auth/change_password_screen.dart';
 import 'package:minierp_app/features/admin/admin_models.dart' show Role;
 import 'package:minierp_app/features/reports/reports_dashboard_screen.dart';
+import 'package:minierp_app/widgets/date_picker_helpers.dart' show DateFilterButton;
+import 'package:minierp_app/core/utils/date_utils.dart' show isoDate;
 import 'package:minierp_app/widgets/status_badge.dart' show StatusBadge;
 import 'package:minierp_app/widgets/searchable_select.dart';
 import 'package:pluto_grid/pluto_grid.dart';
@@ -483,6 +485,17 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   Map<String, dynamic>? lastInvoiceReturnBody;
   num invoice1ReturnedQty = 0;
   bool rejectInvoiceReturn = false;
+
+  /// Captured dashboard/report state: summary request count (refresh
+  /// button) and the last summary/sales-summary query params (global
+  /// date range).
+  int dashboardSummaryCalls = 0;
+  Map<String, dynamic>? lastDashboardSummaryQuery;
+  Map<String, dynamic>? lastSalesSummaryQuery;
+
+  /// Captured PUT body of the last /dashboard/cash-opening-balances
+  /// save (opening-balance editor test).
+  Map<String, dynamic>? lastOpeningBalancesPutBody;
 
   /// Captured payments-module request state: paged list query, create/
   /// update bodies, and a delete counter.
@@ -1955,6 +1968,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       });
     }
     if (options.path == '/reports/sales-summary') {
+      lastSalesSummaryQuery = options.queryParameters;
       // Enveloped — the real ReportsModel.getSalesSummary shape (stats +
       // per-invoice detail).
       return _json({
@@ -3315,6 +3329,8 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       });
     }
     if (options.path == '/dashboard/summary') {
+      dashboardSummaryCalls++;
+      lastDashboardSummaryQuery = options.queryParameters;
       return _json({
         'success': true,
         'data': {
@@ -3322,6 +3338,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'totalStockValue': 245000.50,
           'totalSalesRevenue': 890000.00,
           'totalPurchases': 560000.00,
+          'totalProfit': 330000.00,
           'warehouseStockCount': 312,
           'lowStockItems': [
             {
@@ -3378,6 +3395,133 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'amount_over_90': 70000.0,
           'customer_count': 25,
         },
+      });
+    }
+    if (options.path == '/dashboard/cash-position') {
+      // Enveloped — the real DashboardModel.getCashPosition shape (one
+      // closing balance per tracked account + total).
+      return _json({
+        'success': true,
+        'data': {
+          'date': '2026-08-12',
+          'accounts': [
+            {
+              'key': 'cash',
+              'name': 'Cash',
+              'balance': 25000.0,
+              'opening': 20000.0,
+              'inflow': 12000.0,
+              'outflow': 4000.0,
+              'net': 8000.0,
+              'transactions': [
+                {
+                  'date': '2026-08-12',
+                  'type': 'payment_received',
+                  'reference': 'PAY002',
+                  'description': 'Invoice INV-2026-152278',
+                  'amount': 12000.0,
+                },
+                {
+                  'date': '2026-08-12',
+                  'type': 'supplier_payment',
+                  'reference': 'PAY001',
+                  'description': 'Supplier payment',
+                  'amount': -4000.0,
+                },
+                {
+                  'date': '2026-08-13',
+                  'type': 'refund',
+                  'reference': 'PAY004',
+                  'description': 'Refund for return on INV-2026-152278',
+                  'amount': -700.0,
+                },
+              ],
+            },
+            {'key': 'bank', 'name': 'Bank', 'balance': 180000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
+            {'key': 'easypaisa', 'name': 'Easypaisa', 'balance': 45000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
+            {'key': 'jazzcash', 'name': 'JazzCash', 'balance': 15000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
+            {'key': 'upaisa', 'name': 'UPaisa', 'balance': 8000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
+          ],
+          'total': 273000.0,
+        },
+      });
+    }
+    if (options.path == '/dashboard/cash-opening-balances' &&
+        options.method == 'GET') {
+      // Enveloped — the real cashService.getOpeningBalances shape (the
+      // per-account seed balances, cash starts at 20,000).
+      return _json({
+        'success': true,
+        'data': {
+          'accounts': [
+            {'key': 'cash', 'name': 'Cash', 'amount': 20000.0},
+            {'key': 'bank', 'name': 'Bank', 'amount': 0},
+            {'key': 'easypaisa', 'name': 'Easypaisa', 'amount': 0},
+            {'key': 'jazzcash', 'name': 'JazzCash', 'amount': 0},
+            {'key': 'upaisa', 'name': 'UPaisa', 'amount': 0},
+          ],
+        },
+      });
+    }
+    if (options.path == '/dashboard/cash-opening-balances' &&
+        options.method == 'PUT') {
+      final body = options.data as Map<String, dynamic>;
+      lastOpeningBalancesPutBody = body;
+      return _json({'success': true, 'data': body});
+    }
+    if (options.path == '/reports/cash-reconciliation' &&
+        options.method == 'GET') {
+      // Enveloped — the real Reports.getCashReconciliation shape
+      // (per-account opening/day-flow/expected/counted + totals).
+      return _json({
+        'success': true,
+        'data': {
+          'date': '2026-08-12',
+          'accounts': [
+            {
+              'key': 'cash',
+              'name': 'Cash',
+              'opening_balance': 20000.0,
+              'inflow': 15000.0,
+              'outflow': 10000.0,
+              'net': 5000.0,
+              'expected_balance': 25000.0,
+              'counted_balance': null,
+              'variance': null,
+              'notes': null,
+              'reconciled': false,
+              'reconciled_at': null,
+            },
+            {
+              'key': 'bank',
+              'name': 'Bank',
+              'opening_balance': 170000.0,
+              'inflow': 20000.0,
+              'outflow': 10000.0,
+              'net': 10000.0,
+              'expected_balance': 180000.0,
+              'counted_balance': 179500.0,
+              'variance': -500.0,
+              'notes': 'Bank fee',
+              'reconciled': true,
+              'reconciled_at': '2026-08-12 18:00:00',
+            },
+          ],
+          'totals': {
+            'total_opening': 190000.0,
+            'total_inflow': 35000.0,
+            'total_outflow': 20000.0,
+            'total_closing': 205000.0,
+          },
+        },
+      });
+    }
+    if (options.path == '/reports/cash-reconciliation' &&
+        options.method == 'POST') {
+      // Enveloped — the real saveCashReconciliation shape.
+      return _json({
+        'success': true,
+        'message': 'Reconciliation saved successfully',
       });
     }
     // ── Production module (PORTING.md §13) ────────────────────────
@@ -4443,8 +4587,8 @@ void main() {
   testWidgets('login persists the token and navigates to the dashboard shell', (
     tester,
   ) async {
-    // A wide surface so all 6 KPI cards fit the horizontal strip.
-    tester.view.physicalSize = const Size(1600, 900);
+    // A wide surface so all KPI cards fit the horizontal strip.
+    tester.view.physicalSize = const Size(2000, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     final storage = _FakeTokenStorage();
@@ -4494,6 +4638,210 @@ void main() {
     expect(find.text('12 invoices'), findsOneWidget); // invoice count meta
     expect(find.text('Current'), findsOneWidget); // first aging bucket
     expect(find.text('1-30 Days'), findsOneWidget); // second aging bucket
+  });
+
+  testWidgets('cash position card opens the balance breakdown dialog', (
+    tester,
+  ) async {
+    // Wide surface so every KPI card and the cash strip are built.
+    tester.view.physicalSize = const Size(2000, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = _AuthFakeAdapter();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The Cash card shows the compact in/out breakdown from the fake
+    // /dashboard/cash-position payload (12,000 in / 4,000 out).
+    expect(find.text('Cash'), findsOneWidget);
+    expect(find.text('12,000'), findsOneWidget);
+    expect(find.text('4,000'), findsOneWidget);
+
+    // Tapping the card opens the drill-down: the balance build-up
+    // (opening + inflow − outflow) and every transaction behind it.
+    await tester.tap(find.text('Cash'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Transactions'), findsOneWidget);
+    expect(find.text('20,000.00'), findsOneWidget); // opening
+    // +/− amounts appear twice each: the summary row and its matching
+    // transaction row.
+    expect(find.text('+12,000.00'), findsNWidgets(2)); // inflow
+    expect(find.text('−4,000.00'), findsNWidgets(2)); // outflow
+    expect(find.text('Payment received'), findsOneWidget);
+    expect(find.textContaining('PAY002'), findsOneWidget);
+    expect(find.text('Supplier payment'), findsOneWidget);
+    expect(find.textContaining('PAY001'), findsOneWidget);
+    // Returns show up as labelled refunds, so a payment reversal is
+    // never mistaken for a payment out.
+    expect(find.text('Refund'), findsOneWidget);
+    expect(find.textContaining('PAY004'), findsOneWidget);
+    expect(find.textContaining('Refund for return on INV-2026-152278'),
+        findsOneWidget);
+  });
+
+  testWidgets('opening balance editor saves the starting cash', (
+    tester,
+  ) async {
+    // Wide surface so every KPI card and the cash strip are built.
+    tester.view.physicalSize = const Size(2000, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final adapter = _AuthFakeAdapter();
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The cash strip header has an "Opening balance" editor button.
+    await tester.tap(find.text('Opening balance'));
+    await tester.pumpAndSettle();
+
+    // The dialog lists every cash account with its current seed value
+    // (Cash starts at 20,000 from the fake GET).
+    expect(find.text('Opening balance'), findsWidgets); // title + button
+    expect(find.widgetWithText(TextField, 'Cash'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Bank'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Easypaisa'), findsOneWidget);
+
+    // Raise the starting cash to 25,000 and save.
+    await tester.enterText(find.widgetWithText(TextField, 'Cash'), '25000');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    // The PUT carried the edited seed balance, the dialog closed, and
+    // the confirmation snackbar appeared.
+    final body = adapter.lastOpeningBalancesPutBody;
+    expect(body, isNotNull);
+    final cashEntry = (body!['accounts'] as List).cast<Map<String, dynamic>>()
+        .firstWhere((a) => a['key'] == 'cash');
+    expect(cashEntry['amount'], 25000);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Opening balances saved'), findsOneWidget);
+  });
+
+  testWidgets('dashboard shows the global date range picker and hint', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(2000, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = _AuthFakeAdapter();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The toolbar's From/To pickers (the app-wide range) + the hint
+    // that it applies to every report screen.
+    expect(find.byType(DateFilterButton), findsNWidgets(2));
+    expect(
+      find.text('Date range applies to all report screens'),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.refresh), findsOneWidget);
+  });
+
+  testWidgets('dashboard date range propagates to every report page', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(2000, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final adapter = _AuthFakeAdapter();
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Change the global From date on the dashboard (July 13 → July 20).
+    await tester.tap(find.byType(DateFilterButton).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('20'));
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    final now = DateTime.now();
+    final expectedFrom = isoDate(DateTime(now.year, now.month - 1, 20));
+
+    // The dashboard's own summary refetched with the new range too — the
+    // KPI figures and the sales/purchases chart respect the picker.
+    expect(adapter.lastDashboardSummaryQuery?['fromDate'], expectedFrom);
+    expect(adapter.lastDashboardSummaryQuery?['toDate'], isoDate(now));
+
+    // And every report page picks the new range up.
+    await tester.tap(find.text('Reports'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sales Summary Report'));
+    await tester.pumpAndSettle();
+    expect(adapter.lastSalesSummaryQuery?['fromDate'], expectedFrom);
+    expect(adapter.lastSalesSummaryQuery?['toDate'], isoDate(now));
+  });
+
+  testWidgets('dashboard refresh button reloads every block', (tester) async {
+    tester.view.physicalSize = const Size(2000, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final adapter = _AuthFakeAdapter();
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(adapter.dashboardSummaryCalls, 1);
+
+    await tester.tap(find.byIcon(Icons.refresh));
+    await tester.pumpAndSettle();
+    expect(adapter.dashboardSummaryCalls, greaterThanOrEqualTo(2));
   });
 
   testWidgets('stored token + valid /auth/me restores the session at boot', (
@@ -7101,15 +7449,19 @@ void main() {
   testWidgets('invoice form: process return posts qty + reason and refetches', (
     tester,
   ) async {
+    _mockPrintingChannel();
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
     await bootToSales(tester, adapter);
 
-    // Double-tap the row pushes the routed edit page; its bottom bar has
-    // the Process Return action.
+    // Double-tap opens the A4 print preview (whose raster never settles
+    // under flutter test) — bounded pumps, then Edit pushes the routed
+    // form whose bottom bar has the Process Return action.
     await tester.tap(find.text('INV-2026-440955'));
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text('INV-2026-440955'));
+    await pumpPreviewPage(tester);
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
     await tester.pumpAndSettle();
     expect(find.text('Edit Invoice'), findsOneWidget);
 
@@ -7152,6 +7504,7 @@ void main() {
   testWidgets('invoice form: process return validates qty against available', (
     tester,
   ) async {
+    _mockPrintingChannel();
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
     await bootToSales(tester, adapter);
@@ -7159,6 +7512,8 @@ void main() {
     await tester.tap(find.text('INV-2026-440955'));
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text('INV-2026-440955'));
+    await pumpPreviewPage(tester);
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Process Return'));
     await tester.tap(find.text('Process Return'));
@@ -7183,6 +7538,7 @@ void main() {
   testWidgets('invoice form: process return surfaces a server rejection', (
     tester,
   ) async {
+    _mockPrintingChannel();
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter()..rejectInvoiceReturn = true;
     await bootToSales(tester, adapter);
@@ -7190,6 +7546,8 @@ void main() {
     await tester.tap(find.text('INV-2026-440955'));
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text('INV-2026-440955'));
+    await pumpPreviewPage(tester);
+    await tester.tap(find.widgetWithText(TextButton, 'Edit'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Process Return'));
     await tester.tap(find.text('Process Return'));

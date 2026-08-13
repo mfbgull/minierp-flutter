@@ -117,6 +117,13 @@ class AppLocalizationsUr extends AppLocalizations {
   String get dashboardSalesrevenue => 'فروخت آمدنی';
 
   @override
+  String get dashboardProfit => 'منافع';
+
+  @override
+  String get dashboardGlobalDateRangeHint =>
+      'تاریخ کی حد تمام رپورٹ اسکرینز پر لاگو ہوتی ہے';
+
+  @override
   String get dashboardTopcustomers => 'ٹاپ کسٹمرز';
 
   @override
@@ -4895,4 +4902,80 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get productionWarehouse => 'تیار مال کا گودام';
+
+  @override
+  String get fieldsAccount => 'کھاتہ';
+
+  @override
+  String get dashboardCashbankposition => 'نقدی / بینک پوزیشن';
+
+  @override
+  String get dashboardCashrecon => 'مطابقت کریں';
+
+  @override
+  String get reportsCashreconciliation => 'نقدی مطابقت';
+
+  @override
+  String get cashreconOpening => 'افتتاحی';
+
+  @override
+  String get cashreconInflow => 'آمد';
+
+  @override
+  String get cashreconOutflow => 'اخراج';
+
+  @override
+  String get cashreconNet => 'خالص';
+
+  @override
+  String get cashreconExpected => 'متوقع';
+
+  @override
+  String get cashreconCounted => 'گنا ہوا';
+
+  @override
+  String get cashreconVariance => 'فرق';
+
+  @override
+  String get cashreconNotes => 'نوٹس';
+
+  @override
+  String get cashreconNotcounted => 'نہیں گنا گیا';
+
+  @override
+  String get cashreconReconciled => 'مطابقت شدہ';
+
+  @override
+  String get cashreconSave => 'محفوظ کریں';
+
+  @override
+  String get cashreconSaved => 'مطابقت محفوظ ہو گئی';
+
+  @override
+  String get cashposTransactions => 'لین دین';
+
+  @override
+  String get cashposPaymentreceived => 'وصول شدہ ادائیگی';
+
+  @override
+  String get cashposSupplierpayment => 'سپلائر کی ادائیگی';
+
+  @override
+  String get cashposExpense => 'خرچہ';
+
+  @override
+  String get cashposSalary => 'تنخواہ';
+
+  @override
+  String get cashposRefund => 'ریفنڈ';
+
+  @override
+  String get dashboardOpeningbalance => 'ابتدائی بیلنس';
+
+  @override
+  String get dashboardOpeningbalanceHint =>
+      'وہ ابتدائی نقدی/بینک بیلنس جس کے ساتھ آپ نے کاروبار شروع کیا۔ یہ آج کی پوزیشن میں شامل ہوتا ہے۔';
+
+  @override
+  String get dashboardOpeningbalanceSaved => 'ابتدائی بیلنس محفوظ ہو گیا';
 }

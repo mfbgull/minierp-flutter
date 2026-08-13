@@ -427,15 +427,26 @@ export class AccountingService {
   }
 
   /**
-   * Map a payment method string to a chart-of-accounts code. Cash
-   * defaults to 1000 (Cash), everything else to 1010 (Bank). This
-   * matches the seed data; if you add more accounts (e.g. mobile
-   * money, PayPal), extend this method.
+   * Map a payment method string to a chart-of-accounts code.
+   *   cash             → 1000 (Cash)
+   *   easypaisa        → 1020 (Easypaisa / Mobile Wallet)
+   *   jazzcash         → 1030 (JazzCash)
+   *   upaisa           → 1040 (UPaisa)
+   *   everything else  → 1010 (Bank) — checks, cards, bank transfers.
+   * Cash defaults to 1000 when no method is supplied. The wallet
+   * accounts are seeded by the add-cash-accounts migration; keep this
+   * list in sync with `cashService` normalization and the reconciliation
+   * report.
    */
-  static _cashOrBankAccountCode(paymentMethod?: string): '1000' | '1010' {
+  static _cashOrBankAccountCode(
+    paymentMethod?: string
+  ): '1000' | '1010' | '1020' | '1030' | '1040' {
     if (!paymentMethod) return '1000';
     const m = paymentMethod.toLowerCase().trim();
     if (m === 'cash') return '1000';
+    if (m === 'easypaisa') return '1020';
+    if (m === 'jazzcash') return '1030';
+    if (m === 'upaisa') return '1040';
     return '1010';
   }
 

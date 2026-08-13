@@ -1,4 +1,8 @@
 import Database from 'better-sqlite3';
+import {
+  getCashAccountTotals,
+  getCashAccountTransactions,
+} from '../services/cashService';
 import { getForUser } from './UserPreferences';
 import { weekBounds } from '../utils/weekMath';
 
@@ -7,6 +11,7 @@ interface DashboardSummary {
   totalStockValue: number;
   totalSalesRevenue: number;
   totalPurchases: number;
+  totalProfit: number;
   warehouseStockCount: number;
   lowStockItems: Array<{
     id: number;
@@ -72,21 +77,72 @@ interface ARSummaryResult {
   customer_count: number;
 }
 
-function getSummary(db: Database.Database): DashboardSummary {
+/**
+ * Aggregated dashboard KPIs. `fromDate`/`toDate` (the dashboard's
+ * global range picker) filter the money figures (sales, purchases,
+ * profit), the sales-vs-purchases chart and recent productions; the
+ * inventory snapshots (items, stock value, low stock, category split)
+ * are current positions and stay unfiltered. When no range is given
+ * the chart keeps its 7-day window, productions the 30-day window, and
+ * the money totals stay all-time.
+ */
+function getSummary(db: Database.Database, fromDate?: string, toDate?: string): DashboardSummary {
+  const ranged = !!(fromDate && toDate);
+  const from = fromDate || '2000-01-01';
+  const to = toDate || '2099-12-31';
+
   const itemCount = db.prepare('SELECT COUNT(*) as count FROM items WHERE is_active = 1').get() as { count: number };
 
+  // Inventory value = batch-tracked value (SUM quantity_remaining *
+  // unit_cost) plus a legacy fallback for items that still carry stock
+  // on `current_stock` but have no batch rows (the balance sheet and
+  // stock valuation report already use this exact formula — the
+  // dashboard previously only counted batches, so legacy items showed
+  // as Rs 0).
   const stockValue = db.prepare(`
     SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) as total
     FROM stock_batches WHERE quantity_remaining > 0
   `).get() as { total: number };
+  const legacyStockValue = db.prepare(`
+    SELECT COALESCE(SUM(i.current_stock * i.standard_cost), 0) as total
+    FROM items i
+    WHERE i.is_active = 1
+      AND i.current_stock > 0
+      AND NOT EXISTS (
+        SELECT 1 FROM stock_batches sb WHERE sb.item_id = i.id AND sb.quantity_remaining > 0
+      )
+  `).get() as { total: number };
 
+  // Net revenue: excludes Cancelled invoices and subtracts returned
+  // amounts (the P&L definition) so a returned invoice stops counting
+  // — Sales − COGS = Profit stays exact.
   const salesRevenue = db.prepare(`
-    SELECT COALESCE(SUM(total_amount), 0) as total FROM invoices
-  `).get() as { total: number };
+    SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total
+    FROM invoices
+    WHERE status != 'Cancelled' AND invoice_date BETWEEN ? AND ?
+  `).get(from, to) as { total: number };
 
+  // Purchases live in purchase_orders (the purchase module's table) —
+  // the legacy `purchases` table is empty and only kept for backward
+  // compatibility. Draft/Cancelled POs are not real money spent.
   const purchaseTotal = db.prepare(`
-    SELECT COALESCE(SUM(total_cost), 0) as total FROM purchases
-  `).get() as { total: number };
+    SELECT COALESCE(SUM(total_amount), 0) as total FROM purchase_orders
+    WHERE status NOT IN ('Draft', 'Cancelled') AND po_date BETWEEN ? AND ?
+  `).get(from, to) as { total: number };
+
+  // COGS — SALE movements netted against their stock reversals (invoice
+  // returns / deletes / updates post an ADJUSTMENT with the same cost),
+  // so a returned sale no longer counts as cost of goods sold.
+  const cogs = db.prepare(`
+    SELECT COALESCE(ABS(SUM(sm.quantity * sm.unit_cost)), 0) as total
+    FROM stock_movements sm
+    WHERE sm.movement_date BETWEEN ? AND ?
+      AND (
+        sm.movement_type = 'SALE'
+        OR (sm.movement_type = 'ADJUSTMENT'
+            AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE'))
+      )
+  `).get(from, to) as { total: number };
 
   const warehouseStocks = db.prepare(`
     SELECT COUNT(*) as count FROM stock_balances WHERE quantity > 0
@@ -108,38 +164,106 @@ function getSummary(db: Database.Database): DashboardSummary {
     ORDER BY total_stock DESC
   `).all() as DashboardSummary['stockByCategory'];
 
-  const salesByDay = db.prepare(`
-    SELECT invoice_date as date, COALESCE(SUM(total_amount), 0) as total
-    FROM invoices
-    WHERE invoice_date >= date('now', '-7 days')
-    GROUP BY invoice_date
-    ORDER BY invoice_date
-  `).all() as DashboardSummary['salesByDay'];
+  const salesByDay = (ranged
+    ? db.prepare(`
+        SELECT invoice_date as date, COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total
+        FROM invoices
+        WHERE status != 'Cancelled' AND invoice_date BETWEEN ? AND ?
+        GROUP BY invoice_date
+        ORDER BY invoice_date
+      `).all(from, to)
+    : db.prepare(`
+        SELECT invoice_date as date, COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total
+        FROM invoices
+        WHERE status != 'Cancelled' AND invoice_date >= date('now', '-7 days')
+        GROUP BY invoice_date
+        ORDER BY invoice_date
+      `).all()) as DashboardSummary['salesByDay'];
 
-  const purchasesByDay = db.prepare(`
-    SELECT purchase_date as date, COALESCE(SUM(total_cost), 0) as total
-    FROM purchases
-    WHERE purchase_date >= date('now', '-7 days')
-    GROUP BY purchase_date
-    ORDER BY purchase_date
-  `).all() as DashboardSummary['purchasesByDay'];
+  const purchasesByDay = (ranged
+    ? db.prepare(`
+        SELECT po_date as date, COALESCE(SUM(total_amount), 0) as total
+        FROM purchase_orders
+        WHERE status NOT IN ('Draft', 'Cancelled') AND po_date BETWEEN ? AND ?
+        GROUP BY po_date
+        ORDER BY po_date
+      `).all(from, to)
+    : db.prepare(`
+        SELECT po_date as date, COALESCE(SUM(total_amount), 0) as total
+        FROM purchase_orders
+        WHERE po_date >= date('now', '-7 days')
+          AND status NOT IN ('Draft', 'Cancelled')
+        GROUP BY po_date
+        ORDER BY po_date
+      `).all()) as DashboardSummary['purchasesByDay'];
 
-  const productionCount = db.prepare(`
-    SELECT COUNT(*) as count FROM productions
-    WHERE production_date >= date('now', '-30 days')
-  `).get() as { count: number };
+  const productionCount = (ranged
+    ? db.prepare(`
+        SELECT COUNT(*) as count FROM productions
+        WHERE production_date BETWEEN ? AND ?
+      `).get(from, to)
+    : db.prepare(`
+        SELECT COUNT(*) as count FROM productions
+        WHERE production_date >= date('now', '-30 days')
+      `).get()) as { count: number };
 
   return {
     totalItems: itemCount.count,
-    totalStockValue: stockValue.total,
+    totalStockValue: stockValue.total + legacyStockValue.total,
     totalSalesRevenue: salesRevenue.total,
     totalPurchases: purchaseTotal.total,
+    totalProfit: salesRevenue.total - cogs.total,
     warehouseStockCount: warehouseStocks.count,
     lowStockItems,
     stockByCategory,
     salesByDay,
     purchasesByDay,
     recentProductions: productionCount.count,
+  };
+}
+
+/**
+ * Cash & bank position as of today — one closing balance per tracked
+ * account (Cash, Bank, Easypaisa, JazzCash, UPaisa) plus the total.
+ * Shared computation with the cash-reconciliation report (cashService).
+ */
+function getCashPosition(db: Database.Database): {
+  date: string;
+  accounts: Array<{
+    key: string;
+    name: string;
+    balance: number;
+    opening: number;
+    inflow: number;
+    outflow: number;
+    net: number;
+    transactions: Array<{
+      date: string;
+      type: string;
+      reference: string | null;
+      description: string | null;
+      amount: number;
+    }>;
+  }>;
+  total: number;
+} {
+  const today = db.prepare(`SELECT date('now') as d`).get() as { d: string };
+  const accounts = getCashAccountTotals(db, today.d).map((a) => ({
+    key: a.key,
+    name: a.name,
+    balance: a.closing,
+    opening: a.opening,
+    inflow: a.inflow,
+    outflow: a.outflow,
+    net: a.net,
+    // The individual movements behind the balance — the drill-down for
+    // the dashboard card, so users can see why the position is what it is.
+    transactions: getCashAccountTransactions(db, a.key, today.d),
+  }));
+  return {
+    date: today.d,
+    accounts,
+    total: accounts.reduce((sum, a) => sum + a.balance, 0),
   };
 }
 
@@ -389,6 +513,7 @@ function getARSummary(db: Database.Database): ARSummaryResult {
 
 export default {
   getSummary,
+  getCashPosition,
   getTopCustomers,
   getSalesSummary,
   getExpenseSummary,

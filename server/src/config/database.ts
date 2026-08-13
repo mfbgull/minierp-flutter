@@ -869,6 +869,8 @@ runForecastEnhancementsMigration();
 runCustomReportsMigration();
 runDashboardLayoutsMigration();
 runLooseItemMigration();
+runCashAccountsMigration();
+runOpeningBalancesMigration();
 runUserPreferencesMigration();
 
 // Rollback support: run if --rollback flag is passed
@@ -1599,6 +1601,37 @@ function runDashboardLayoutsMigration(): void {
     }
   } catch (error: any) {
     logger.error('Dashboard layouts migration error:', error.message);
+  }
+}
+
+function runCashAccountsMigration(): void {
+  // Idempotent by construction (INSERT OR IGNORE + CREATE IF NOT EXISTS
+  // in the SQL), so it runs on every server start like the GL foundation
+  // migration — no column/table pre-check needed.
+  try {
+    const migrationSQL = fs.readFileSync(
+      path.join(__dirname, '../migrations/add-cash-accounts.sql'),
+      'utf8'
+    );
+    db.exec(migrationSQL);
+    logger.info('✅ Cash accounts migration applied (Easypaisa/JazzCash/UPaisa accounts + cash_reconciliations)');
+  } catch (error: any) {
+    logger.error('Cash accounts migration error:', error.message);
+  }
+}
+
+function runOpeningBalancesMigration(): void {
+  // Idempotent (CREATE IF NOT EXISTS + INSERT OR IGNORE) — runs on every
+  // server start so the seed rows exist before any cash computation.
+  try {
+    const migrationSQL = fs.readFileSync(
+      path.join(__dirname, '../migrations/add-opening-balances.sql'),
+      'utf8'
+    );
+    db.exec(migrationSQL);
+    logger.info('✅ Opening balances migration applied (per-account seed balances)');
+  } catch (error: any) {
+    logger.error('Opening balances migration error:', error.message);
   }
 }
 

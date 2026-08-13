@@ -3,6 +3,11 @@ import { AuthRequest } from '../types';
 import db from '../config/database';
 import logger from '../utils/logger';
 import DashboardModel from '../models/Dashboard';
+import {
+  CASH_ACCOUNTS,
+  getOpeningBalances,
+  saveOpeningBalance,
+} from '../services/cashService';
 
 // ═══════════════════════════════════════════════════════════════
 //  EXISTING
@@ -10,7 +15,9 @@ import DashboardModel from '../models/Dashboard';
 
 function getSummary(req: AuthRequest, res: Response): void {
   try {
-    const data = DashboardModel.getSummary(db);
+    const fromDate = String((req.query.fromDate as string) || (req.query.from_date as string) || '');
+    const toDate = String((req.query.toDate as string) || (req.query.to_date as string) || '');
+    const data = DashboardModel.getSummary(db, fromDate || undefined, toDate || undefined);
     res.json({ success: true, data });
   } catch (error) {
     logger.error('Dashboard summary error:', error);
@@ -129,8 +136,80 @@ function getARSummary(req: AuthRequest, res: Response): void {
   }
 }
 
+/**
+ * GET /api/dashboard/cash-position
+ * Closing balance per cash account (Cash, Bank, Easypaisa, JazzCash,
+ * UPaisa) as of today + the grand total.
+ */
+function getCashPosition(req: AuthRequest, res: Response): void {
+  try {
+    const data = DashboardModel.getCashPosition(db);
+    res.json({ success: true, data });
+  } catch (error) {
+    logger.error('Cash position error:', error);
+    res.status(500).json({ error: 'Failed to fetch cash position' });
+  }
+}
+
+/**
+ * GET /api/dashboard/cash-opening-balances
+ * The per-account opening (seed) balances a new business starts with.
+ */
+function getCashOpeningBalances(req: AuthRequest, res: Response): void {
+  try {
+    const opening = getOpeningBalances(db);
+    const accounts = CASH_ACCOUNTS.map((a) => ({
+      key: a.key,
+      name: a.name,
+      amount: opening.get(a.key) ?? 0,
+    }));
+    res.json({ success: true, data: { accounts } });
+  } catch (error) {
+    logger.error('Cash opening balances error:', error);
+    res.status(500).json({ error: 'Failed to fetch cash opening balances' });
+  }
+}
+
+/**
+ * PUT /api/dashboard/cash-opening-balances
+ * Save the opening (seed) balance per account — the starting cash a
+ * business was founded with. Body: `{ accounts: [{ key, amount }] }`.
+ */
+function saveCashOpeningBalances(req: AuthRequest, res: Response): void {
+  try {
+    const { accounts } = req.body as {
+      accounts?: Array<{ key: string; amount: number }>;
+    };
+    if (!accounts || !Array.isArray(accounts)) {
+      res.status(400).json({ error: 'accounts array is required' });
+      return;
+    }
+    const validKeys = new Set(CASH_ACCOUNTS.map((a) => a.key));
+    for (const entry of accounts) {
+      if (!validKeys.has(entry.key)) {
+        res.status(400).json({ error: `Unknown account key: ${entry.key}` });
+        return;
+      }
+      saveOpeningBalance(db, entry.key, Number(entry.amount) || 0);
+    }
+    const opening = getOpeningBalances(db);
+    const data = CASH_ACCOUNTS.map((a) => ({
+      key: a.key,
+      name: a.name,
+      amount: opening.get(a.key) ?? 0,
+    }));
+    res.json({ success: true, data: { accounts: data } });
+  } catch (error) {
+    logger.error('Save cash opening balances error:', error);
+    res.status(500).json({ error: 'Failed to save cash opening balances' });
+  }
+}
+
 export default {
   getSummary,
+  getCashPosition,
+  getCashOpeningBalances,
+  saveCashOpeningBalances,
   getTopCustomers,
   getSalesSummary,
   getExpenseSummary,

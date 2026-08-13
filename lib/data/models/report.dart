@@ -1182,6 +1182,104 @@ class BomUsageReport {
   final List<BomUsageRow> rows;
 }
 
+// ── Cash reconciliation (GET/POST /reports/cash-reconciliation) ─────
+
+/// One tracked cash account of the end-of-day reconciliation
+/// (Cash, Bank, Easypaisa, JazzCash, UPaisa).
+class CashReconciliationAccount {
+  const CashReconciliationAccount({
+    required this.key,
+    required this.name,
+    required this.openingBalance,
+    required this.inflow,
+    required this.outflow,
+    required this.net,
+    required this.expectedBalance,
+    required this.countedBalance,
+    required this.variance,
+    required this.notes,
+    required this.reconciled,
+    required this.reconciledAt,
+  });
+
+  factory CashReconciliationAccount.fromJson(Map<String, dynamic> json) =>
+      CashReconciliationAccount(
+        key: asString(json['key']) ?? '',
+        name: asString(json['name']) ?? '',
+        openingBalance: asNum(json['opening_balance']) ?? 0,
+        inflow: asNum(json['inflow']) ?? 0,
+        outflow: asNum(json['outflow']) ?? 0,
+        net: asNum(json['net']) ?? 0,
+        expectedBalance: asNum(json['expected_balance']) ?? 0,
+        countedBalance: asNum(json['counted_balance']),
+        variance: asNum(json['variance']),
+        notes: asString(json['notes']),
+        reconciled: json['reconciled'] == true,
+        reconciledAt: asString(json['reconciled_at']),
+      );
+
+  final String key;
+  final String name;
+  final num openingBalance;
+  final num inflow;
+  final num outflow;
+  final num net;
+  final num expectedBalance;
+  final num? countedBalance;
+  final num? variance;
+  final String? notes;
+  final bool reconciled;
+  final String? reconciledAt;
+}
+
+/// Totals across all accounts for the reconciliation date.
+class CashReconciliationTotals {
+  const CashReconciliationTotals({
+    required this.opening,
+    required this.inflow,
+    required this.outflow,
+    required this.closing,
+  });
+
+  factory CashReconciliationTotals.fromJson(Map<String, dynamic> json) =>
+      CashReconciliationTotals(
+        opening: asNum(json['total_opening']) ?? 0,
+        inflow: asNum(json['total_inflow']) ?? 0,
+        outflow: asNum(json['total_outflow']) ?? 0,
+        closing: asNum(json['total_closing']) ?? 0,
+      );
+
+  final num opening;
+  final num inflow;
+  final num outflow;
+  final num closing;
+}
+
+/// End-of-day cash/till reconciliation — `GET /reports/cash-reconciliation`.
+class CashReconciliation {
+  const CashReconciliation({
+    required this.date,
+    required this.accounts,
+    required this.totals,
+  });
+
+  factory CashReconciliation.fromJson(Map<String, dynamic> json) =>
+      CashReconciliation(
+        date: asString(json['date']) ?? '',
+        accounts: [
+          for (final row in json['accounts'] as List? ?? const [])
+            CashReconciliationAccount.fromJson(row as Map<String, dynamic>),
+        ],
+        totals: CashReconciliationTotals.fromJson(
+          json['totals'] as Map<String, dynamic>? ?? const {},
+        ),
+      );
+
+  final String date;
+  final List<CashReconciliationAccount> accounts;
+  final CashReconciliationTotals totals;
+}
+
 // ── AR summary (GET /reports/ar-summary) ────────────────────────────
 
 /// One item of the status breakdown (count + amount for a given status).

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
+import '../activity_log/activity_log_providers.dart'
+    show activityLogFromDateProvider, activityLogToDateProvider;
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/item.dart' show Item;
 import '../../data/models/report.dart'
@@ -9,6 +11,7 @@ import '../../data/models/report.dart'
         ArSummaryReport,
         BomUsageReport,
         CashFlowReport,
+        CashReconciliation,
         CustomerStatementRow,
         DSOMetric,
         ExpensesReport,
@@ -439,6 +442,29 @@ final productionSummaryReportProvider =
   };
 });
 
+// ── Cash reconciliation ──────────────────────────────────────────────
+
+/// The single reconciliation date (defaults to today). The report is a
+/// single-day view — the screen's date button writes this provider.
+final reportReconciliationDateProvider = StateProvider<DateTime?>((
+  ref,
+) => _today());
+
+/// Loads GET /reports/cash-reconciliation, re-running when the date
+/// changes.
+final cashReconciliationProvider = FutureProvider<CashReconciliation>((
+  ref,
+) async {
+  final date = ref.watch(reportReconciliationDateProvider) ?? _today();
+  final result = await ref
+      .watch(reportRepositoryProvider)
+      .cashReconciliation(date: isoDate(date));
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
 // ── AR summary ───────────────────────────────────────────────────────
 
 /// Loads GET /reports/ar-summary (server default: as of today).
@@ -494,3 +520,48 @@ final bomUsageReportProvider = FutureProvider<BomUsageReport>((ref) async {
     ApiFailure(:final error) => throw error,
   };
 });
+
+// ── Global report date range ───────────────────────────────────────
+
+/// App-wide default From/To range, set from the dashboard's date-range
+/// picker. Every report page inherits this range via
+/// [applyGlobalReportRange]; each page's own From/To pickers can still
+/// change that page's range afterwards.
+final globalReportFromDateProvider = StateProvider<DateTime?>(
+  (ref) => _monthsAgo(1),
+);
+final globalReportToDateProvider = StateProvider<DateTime?>(
+  (ref) => _today(),
+);
+
+/// Every report page's From/To provider pair — the targets of the
+/// dashboard's global date range. Top-level finals initialize lazily,
+/// so this list may safely reference providers declared above.
+final List<(StateProvider<DateTime?>, StateProvider<DateTime?>)>
+    _reportRangePairs = [
+      (reportSalesFromDateProvider, reportSalesToDateProvider),
+      (reportSalesByCustomerFromDateProvider, reportSalesByCustomerToDateProvider),
+      (reportDsoFromDateProvider, reportDsoToDateProvider),
+      (reportCashFlowFromDateProvider, reportCashFlowToDateProvider),
+      (reportProfitLossFromDateProvider, reportProfitLossToDateProvider),
+      (reportMovementFromDateProvider, reportMovementToDateProvider),
+      (reportPurchaseFromDateProvider, reportPurchaseToDateProvider),
+      (reportExpensesFromDateProvider, reportExpensesToDateProvider),
+      (reportStatementsFromDateProvider, reportStatementsToDateProvider),
+      (reportSalesByItemFromDateProvider, reportSalesByItemToDateProvider),
+      (reportSupplierFromDateProvider, reportSupplierToDateProvider),
+      (reportProductionFromDateProvider, reportProductionToDateProvider),
+      (reportBomFromDateProvider, reportBomToDateProvider),
+      (activityLogFromDateProvider, activityLogToDateProvider),
+    ];
+
+/// Applies [from]..[to] to every report page's range providers — called
+/// when the dashboard's global picker changes so all pages inherit the
+/// new range. Pages keep their own pickers; a page stays on this range
+/// until the global range changes again.
+void applyGlobalReportRange(WidgetRef ref, DateTime from, DateTime to) {
+  for (final (fromProvider, toProvider) in _reportRangePairs) {
+    ref.read(fromProvider.notifier).state = from;
+    ref.read(toProvider.notifier).state = to;
+  }
+}

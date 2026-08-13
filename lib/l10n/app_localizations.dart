@@ -308,6 +308,18 @@ abstract class AppLocalizations {
   /// **'Sales Revenue'**
   String get dashboardSalesrevenue;
 
+  /// No description provided for @dashboardProfit.
+  ///
+  /// In en, this message translates to:
+  /// **'Profit'**
+  String get dashboardProfit;
+
+  /// No description provided for @dashboardGlobalDateRangeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Date range applies to all report screens'**
+  String get dashboardGlobalDateRangeHint;
+
   /// No description provided for @dashboardTopcustomers.
   ///
   /// In en, this message translates to:
@@ -9629,6 +9641,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Finished Goods Warehouse'**
   String get productionWarehouse;
+
+  /// No description provided for @fieldsAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get fieldsAccount;
+
+  /// No description provided for @dashboardCashbankposition.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash / Bank Position'**
+  String get dashboardCashbankposition;
+
+  /// No description provided for @dashboardCashrecon.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconcile'**
+  String get dashboardCashrecon;
+
+  /// No description provided for @reportsCashreconciliation.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash Reconciliation'**
+  String get reportsCashreconciliation;
+
+  /// No description provided for @cashreconOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening'**
+  String get cashreconOpening;
+
+  /// No description provided for @cashreconInflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Inflow'**
+  String get cashreconInflow;
+
+  /// No description provided for @cashreconOutflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Outflow'**
+  String get cashreconOutflow;
+
+  /// No description provided for @cashreconNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Net'**
+  String get cashreconNet;
+
+  /// No description provided for @cashreconExpected.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected'**
+  String get cashreconExpected;
+
+  /// No description provided for @cashreconCounted.
+  ///
+  /// In en, this message translates to:
+  /// **'Counted'**
+  String get cashreconCounted;
+
+  /// No description provided for @cashreconVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Variance'**
+  String get cashreconVariance;
+
+  /// No description provided for @cashreconNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get cashreconNotes;
+
+  /// No description provided for @cashreconNotcounted.
+  ///
+  /// In en, this message translates to:
+  /// **'Not counted'**
+  String get cashreconNotcounted;
+
+  /// No description provided for @cashreconReconciled.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconciled'**
+  String get cashreconReconciled;
+
+  /// No description provided for @cashreconSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get cashreconSave;
+
+  /// No description provided for @cashreconSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconciliation saved'**
+  String get cashreconSaved;
+
+  /// No description provided for @cashposTransactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions'**
+  String get cashposTransactions;
+
+  /// No description provided for @cashposPaymentreceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment received'**
+  String get cashposPaymentreceived;
+
+  /// No description provided for @cashposSupplierpayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier payment'**
+  String get cashposSupplierpayment;
+
+  /// No description provided for @cashposExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense'**
+  String get cashposExpense;
+
+  /// No description provided for @cashposSalary.
+  ///
+  /// In en, this message translates to:
+  /// **'Salary'**
+  String get cashposSalary;
+
+  /// No description provided for @cashposRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund'**
+  String get cashposRefund;
+
+  /// No description provided for @dashboardOpeningbalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance'**
+  String get dashboardOpeningbalance;
+
+  /// No description provided for @dashboardOpeningbalanceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The starting cash/bank balance your business was founded with. It is added to today\'s position.'**
+  String get dashboardOpeningbalanceHint;
+
+  /// No description provided for @dashboardOpeningbalanceSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balances saved'**
+  String get dashboardOpeningbalanceSaved;
 }
 
 class _AppLocalizationsDelegate
