@@ -794,16 +794,24 @@ class _RangePopover extends ConsumerWidget {
                         label: preset.name,
                         active: _userPresetActive(preset),
                         onTap: () => onUserPresetTap(preset),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.close, size: 14),
-                          tooltip: l10n.drpPresetRemove,
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 24,
-                            minHeight: 24,
+                        trailing: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _confirmRemovePreset(
+                            context,
+                            preset,
                           ),
-                          onPressed: () => onUserPresetRemove(preset),
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: scheme.errorContainer,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Icon(
+                              Icons.close,
+                              size: 12,
+                              color: scheme.onErrorContainer,
+                            ),
+                          ),
                         ),
                       ),
                     const SizedBox(height: 6),
@@ -960,6 +968,32 @@ class _RangePopover extends ConsumerWidget {
     if (pendingEnd == null) return l10n.drpPickEnd;
     final n = daysInRange(pendingStart!, pendingEnd!);
     return n == 1 ? l10n.drpOneDay : l10n.drpDaysSelected(n);
+  }
+
+  Future<void> _confirmRemovePreset(
+    BuildContext context,
+    UserPreset preset,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.drpPresetRemove),
+        content: Text(preset.name),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.commonDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      onUserPresetRemove(preset);
+    }
   }
 
   Widget _presetTile(
