@@ -117,6 +117,24 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
 
   void _refilter() => syncGridRows(ref.read(quotationsProvider));
 
+  /// Opt into the per-row ⋮ actions menu (View detail).
+  @override
+  bool get hasRowActions => true;
+
+  @override
+  List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
+    final id = row.cells['id']?.value as int?;
+    if (id == null || id <= 0) return null;
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      GridRowAction(
+        icon: Icons.visibility_outlined,
+        label: l10n.commonView,
+        onTap: () => showQuotationDetailDialog(context, quotationId: id),
+      ),
+    ];
+  }
+
   @override
   PlutoRow gridRowFor(Quotation quotation) => PlutoRow(
     cells: {

@@ -24,7 +24,8 @@ import '../../data/models/expense.dart' show Expense;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
-import '../../widgets/pluto_grid_screen.dart' show serialGridColumn, withSerialCell;
+import '../../widgets/pluto_grid_screen.dart'
+    show plutoGridConfigurationFor, serialGridColumn, withSerialCell;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
@@ -98,9 +99,49 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     }
   }
 
+  /// Opens the row-actions menu (Edit) anchored at [cellContext] — the
+  /// same Listener + [showMenu] pattern as the sales/customers grids.
+  Future<void> _openRowMenu(
+    BuildContext cellContext,
+    Expense? expense,
+  ) async {
+    if (expense == null || !mounted) return;
+    final box = cellContext.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final overlay = Overlay.of(cellContext, rootOverlay: true);
+    final l10n = AppLocalizations.of(cellContext)!;
+    final action = await showMenu<_ExpenseRowAction>(
+      context: cellContext,
+      position: RelativeRect.fromRect(
+        Rect.fromPoints(
+          box.localToGlobal(Offset.zero),
+          box.localToGlobal(box.size.bottomRight(Offset.zero)),
+        ),
+        Offset.zero & overlay.context.size!,
+      ),
+      items: [
+        PopupMenuItem(
+          value: _ExpenseRowAction.edit,
+          child: Row(
+            children: [
+              const Icon(Icons.edit_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n.commonEdit),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (action != null && mounted) {
+      showExpenseFormDialog(context, expense: expense);
+    }
+  }
+
   PlutoRow _rowFor(Expense expense, int index) => withSerialCell(
     PlutoRow(
       cells: {
+        // Hidden cell carrying the full Expense for the ⋮ menu.
+        'data': PlutoCell(value: expense),
         'id': PlutoCell(value: expense.id),
         'expense_no': PlutoCell(value: expense.expenseNo),
         'expense_date': PlutoCell(value: expense.expenseDate),
@@ -286,6 +327,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       child: PlutoGrid(
+        configuration: plutoGridConfigurationFor(context),
         columns: _columns,
         rows: <PlutoRow>[],
         onLoaded: (event) {
@@ -320,8 +362,9 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
 
   /// Column set — dense data-screen conventions (PORTING.md §6), read-only
   /// with the id column hidden (it carries the row's expense id to the
-  /// double-tap handler).
-  static List<PlutoColumn> _buildColumns(AppLocalizations l10n) {
+  /// double-tap handler). Instance (not static) because the actions
+  /// column's renderer opens the per-row menu on `this` State.
+  List<PlutoColumn> _buildColumns(AppLocalizations l10n) {
     PlutoColumn textColumn(String field, String title, double width) =>
         PlutoColumn(
           title: title,
@@ -404,8 +447,40 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         ),
       ),
       textColumn('created_by', l10n.expensesCreatedby, 130),
+      // Per-row actions menu — the ⋮ dropdown (Edit), same Listener +
+      // showMenu pattern as the sales grid.
+      PlutoColumn(
+        title: l10n.commonActions,
+        field: 'actions',
+        type: PlutoColumnType.text(),
+        width: 64,
+        readOnly: true,
+        enableContextMenu: false,
+        enableFilterMenuItem: false,
+        enableHideColumnMenuItem: false,
+        enableSetColumnsMenuItem: false,
+        renderer: (ctx) {
+          final expense = ctx.cell.row.cells['data']?.value as Expense?;
+          return Builder(
+            builder: (cellContext) => Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (_) => _openRowMenu(cellContext, expense),
+              child: Center(
+                child: Icon(
+                  Icons.more_vert,
+                  size: 18,
+                  color: Theme.of(cellContext).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     ];
   }
 }
+
+/// The per-row ⋮ menu actions for an expense row.
+enum _ExpenseRowAction { edit }
 
 /// Full-pane error state with a retry — same pattern as the items screen.

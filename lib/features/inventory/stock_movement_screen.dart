@@ -49,6 +49,27 @@ class _StockMovementScreenState extends ConsumerState<StockMovementScreen>
     showStockMovementDetailDialog(context, movement: movement);
   }
 
+  /// Opt into the per-row ⋮ actions menu (View detail).
+  @override
+  bool get hasRowActions => true;
+
+  @override
+  List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
+    final movement = _firstWhereOrNull(
+      _movements,
+      (m) => m.id == row.cells['id']?.value,
+    );
+    if (movement == null) return null;
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      GridRowAction(
+        icon: Icons.visibility_outlined,
+        label: l10n.commonView,
+        onTap: () => showStockMovementDetailDialog(context, movement: movement),
+      ),
+    ];
+  }
+
   @override
   PlutoRow gridRowFor(StockMovement m) => PlutoRow(
     cells: {

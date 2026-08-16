@@ -7,6 +7,7 @@ import 'core/auth/auth_notifier.dart';
 import 'core/auth/session_events.dart';
 import 'core/i18n/locale_provider.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_mode_provider.dart';
 import 'features/activity_log/activity_log_screen.dart';
 import 'features/auth/change_password_screen.dart';
 import 'features/auth/login_screen.dart';
@@ -313,7 +314,7 @@ class MiniErpApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: ref.watch(themeModeProvider),
       routerConfig: ref.watch(routerProvider),
       locale: ref.watch(localeProvider),
       localizationsDelegates: const [

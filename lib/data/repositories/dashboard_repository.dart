@@ -89,14 +89,23 @@ class DashboardRepository {
         StockMovementSummaryResult.fromJson(json as Map<String, dynamic>),
   );
 
-  /// `GET /dashboard/kpi?metric=stock_health`.
-  Future<ApiResult<KpiResult>> kpi({String metric = 'stock_health'}) =>
-      _api.get(
-        ApiEndpoints.dashboardKpi,
-        queryParameters: {'metric': metric},
-        parse: (Object? json) =>
-            KpiResult.fromJson(json as Map<String, dynamic>),
-      );
+  /// `GET /dashboard/kpi?metric=stock_health`. Optional [fromDate]/
+  /// [toDate] apply the dashboard's global range to the money metrics
+  /// (stock snapshots stay unfiltered server-side, matching summary).
+  Future<ApiResult<KpiResult>> kpi({
+    String metric = 'stock_health',
+    String? fromDate,
+    String? toDate,
+  }) => _api.get(
+    ApiEndpoints.dashboardKpi,
+    queryParameters: {
+      'metric': metric,
+      'fromDate': ?fromDate,
+      'toDate': ?toDate,
+    },
+    parse: (Object? json) =>
+        KpiResult.fromJson(json as Map<String, dynamic>),
+  );
 
   /// `GET /dashboard/ar-summary`.
   Future<ApiResult<ArSummaryResult>> arSummary() => _api.get(

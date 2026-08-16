@@ -88,6 +88,24 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
     showPurchaseDetailDialog(context, purchaseId: purchaseId);
   }
 
+  /// Opt into the per-row ⋮ actions menu (View detail).
+  @override
+  bool get hasRowActions => true;
+
+  @override
+  List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
+    final id = row.cells['id']?.value as int?;
+    if (id == null || id <= 0) return null;
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      GridRowAction(
+        icon: Icons.visibility_outlined,
+        label: l10n.commonView,
+        onTap: () => showPurchaseDetailDialog(context, purchaseId: id),
+      ),
+    ];
+  }
+
   @override
   PlutoRow gridRowFor(Purchase purchase) => PlutoRow(
     cells: {

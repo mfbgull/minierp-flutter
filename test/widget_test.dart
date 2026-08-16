@@ -184,6 +184,10 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   final bool changePasswordFails;
   final String role;
 
+  /// When true, `GET /dashboard/layout/active` 404s — the dashboard
+  /// falls back to the curated default layout (spec §10).
+  bool noDashboardLayout = false;
+
   /// Mutable so a test can fail once, then retry successfully.
   bool failItems = false;
 
@@ -3338,6 +3342,116 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         ],
       });
     }
+    if (options.path == '/dashboard/kpi') {
+      // Per-card KPI values (the layout-driven strip fetches each
+      // visible card via /dashboard/kpi?metric=). Same figures as the
+      // summary fixture above so the strip and panels agree.
+      final metric = options.queryParameters['metric'] ?? '';
+      final values = <String, num>{
+        'total_active_items': 150,
+        'stock_value': 245000.50,
+        'sales_revenue': 890000.00,
+        'gross_profit': 330000.00,
+        'purchase_orders': 560000.00,
+        'warehouse_stock': 312,
+        'outstanding_receivables': 420000.00,
+        'inventory_turnover': 2.5,
+        'avg_days_to_pay': 14.0,
+        'stock_health': 85.0,
+        'monthly_revenue': 890000.00,
+      };
+      if (!values.containsKey(metric)) {
+        return _json({
+          'success': false,
+          'error': {'code': 'UNKNOWN_METRIC', 'message': 'Unknown metric'},
+        }, status: 404);
+      }
+      return _json({
+        'success': true,
+        'data': {
+          'metric': metric,
+          'value': values[metric],
+          'unit': metric == 'warehouse_stock' || metric == 'total_active_items'
+              ? 'count'
+              : 'currency',
+          'label': metric,
+        },
+      });
+    }
+    if (options.path == '/dashboard/layout/active' && noDashboardLayout) {
+      // No saved layout (404) → the dashboard renders the curated
+      // default (4 KPI cards + 3 panels + cash strip).
+      return _json({'success': true, 'data': null}, status: 404);
+    }
+    if (options.path == '/dashboard/layout/active') {
+      // A saved layout with every block visible — exercises the full
+      // layout-driven dashboard (KPI strip + all 5 panels + cash strip)
+      // in one shell test.
+      List<Map<String, Object>> allBlocks() => [
+        for (final (i, id) in [
+          'kpi_total_items',
+          'kpi_stock_value',
+          'kpi_sales_revenue',
+          'kpi_gross_profit',
+          'kpi_purchase_orders',
+          'kpi_wh_stock',
+          'kpi_ar',
+        ].indexed)
+          {
+            'id': id,
+            'type': 'kpi',
+            'title': 'dashboardcard$id',
+            'x': i,
+            'y': 0,
+            'width': 188,
+            'height': 84,
+            'visible': true,
+            'version': 1,
+            'config': {'metric': id},
+          },
+        for (final (i, id) in [
+          'panel_sales_purchases',
+          'panel_ar_aging',
+          'panel_stock_by_category',
+          'panel_top_customers',
+          'panel_low_stock',
+        ].indexed)
+          {
+            'id': id,
+            'type': 'panel',
+            'title': 'dashboardcard$id',
+            'x': i,
+            'y': i < 2 ? 1 : 2,
+            'width': 2,
+            'height': 1,
+            'visible': true,
+            'version': 1,
+            'config': <String, Object>{},
+          },
+        {
+          'id': 'cash_strip',
+          'type': 'cash',
+          'title': 'dashboardcardCashstrip',
+          'x': 0,
+          'y': 1,
+          'width': 1,
+          'height': 1,
+          'visible': true,
+          'version': 1,
+          'config': <String, Object>{},
+        },
+      ];
+      return _json({
+        'success': true,
+        'data': {
+          'id': 1,
+          'user_id': 1,
+          'layout_name': 'Default',
+          'is_active': true,
+          'blocks': allBlocks(),
+        },
+      });
+    }
     if (options.path == '/dashboard/summary') {
       dashboardSummaryCalls++;
       lastDashboardSummaryQuery = options.queryParameters;
@@ -4629,11 +4743,10 @@ void main() {
     expect(find.byIcon(Icons.logout), findsOneWidget);
     expect(storage.token, 'test-token'); // JWT persisted
 
-    // The two summary fields rendered on top of the base KPI strip:
-    // the recentProductions KPI card (last in the strip) + the
-    // stock-by-category donut legend.
-    expect(find.text('Recent Productions'), findsOneWidget);
-    expect(find.text('12'), findsOneWidget); // recentProductions value
+    // The layout-driven KPI strip (curated default: Stock Value, Sales
+    // Revenue, Gross Profit, PO's) + the stock-by-category donut legend.
+    expect(find.text('245,000.50'), findsOneWidget); // stock value KPI
+    expect(find.text('560,000.00'), findsOneWidget); // PO's KPI
     expect(find.text('Stock by Category'), findsOneWidget);
     expect(find.text('Parts'), findsOneWidget); // legend category
     expect(find.text('500 (100%)'), findsOneWidget); // total + share
@@ -4641,7 +4754,8 @@ void main() {
     // The two block panels (GET /dashboard/ar-summary + top-customers)
     // render their data next to the summary-driven panels.
     expect(find.text('AR Summary'), findsOneWidget);
-    expect(find.text('420,000.00'), findsOneWidget); // total AR
+    // 420,000.00 appears twice: the AR KPI card + the AR summary total.
+    expect(find.text('420,000.00'), findsNWidgets(2)); // total AR
     expect(find.text('25 customers'), findsOneWidget);
     expect(find.text('Top Customers'), findsOneWidget);
     expect(find.text('Acme Corp'), findsOneWidget); // top customer row
@@ -4672,6 +4786,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // The cash strip is collapsed by default (expand icon in its
+    // header) — expand it to reveal the per-account cards.
+    await tester.tap(find.byIcon(Icons.expand_more));
+    await tester.pumpAndSettle();
+
     // The Cash card shows the compact in/out breakdown from the fake
     // /dashboard/cash-position payload (12,000 in / 4,000 out).
     expect(find.text('Cash'), findsOneWidget);
@@ -4689,9 +4808,9 @@ void main() {
     // transaction row.
     expect(find.text('+12,000.00'), findsNWidgets(2)); // inflow
     expect(find.text('−4,000.00'), findsNWidgets(2)); // outflow
-    expect(find.text('Payment received'), findsOneWidget);
+    expect(find.text('Payment Received'), findsOneWidget);
     expect(find.textContaining('PAY002'), findsOneWidget);
-    expect(find.text('Supplier payment'), findsOneWidget);
+    expect(find.text('Supplier Payment'), findsOneWidget);
     expect(find.textContaining('PAY001'), findsOneWidget);
     // Returns show up as labelled refunds, so a payment reversal is
     // never mistaken for a payment out.
@@ -4699,6 +4818,108 @@ void main() {
     expect(find.textContaining('PAY004'), findsOneWidget);
     expect(find.textContaining('Refund for return on INV-2026-152278'),
         findsOneWidget);
+  });
+
+  // Dashboard customizer (spec §10 client widget tests): 404 → curated
+  // default, dialog toggle → strip updates live, and the all-hidden
+  // empty state.
+  Future<void> bootDashboard(WidgetTester tester, _AuthFakeAdapter adapter) async {
+    tester.view.physicalSize = const Size(2000, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('dashboard 404 layout falls back to the curated default', (
+    tester,
+  ) async {
+    final adapter = _AuthFakeAdapter()..noDashboardLayout = true;
+    await bootDashboard(tester, adapter);
+
+    // Curated default (§3): 4 KPI cards + 3 panels + cash strip — and
+    // the off-by-default cards (Total Items, W.H Stock, AR) absent.
+    expect(find.text('245,000.50'), findsOneWidget); // Stock Value
+    expect(find.text('890,000.00'), findsOneWidget); // Sales Revenue
+    expect(find.text('330,000.00'), findsOneWidget); // Gross Profit
+    expect(find.text('560,000.00'), findsOneWidget); // PO's
+    expect(find.text('Total Items'), findsNothing);
+    expect(find.text('W.H Stock'), findsNothing);
+    // AR KPI card off by default → its 420,000.00 only appears once,
+    // inside the AR Aging panel (on by default, §4.2).
+    expect(find.text('420,000.00'), findsOneWidget);
+    // Panels: Sales vs Purchases + AR Aging + Low Stock on; the other
+    // two off.
+    expect(find.text('Low Stock Alerts'), findsOneWidget);
+    expect(find.text('AR Summary'), findsOneWidget);
+    expect(find.text('Stock by Category'), findsNothing);
+    expect(find.text('Top Customers'), findsNothing);
+    // Cash strip visible.
+    expect(find.text('Cash / Bank Position'), findsOneWidget);
+  });
+
+  testWidgets('customizer dialog toggling a card updates the strip live', (
+    tester,
+  ) async {
+    final adapter = _AuthFakeAdapter();
+    await bootDashboard(tester, adapter);
+
+    // All blocks visible (fixture) — every KPI card renders, including
+    // the AR card's 420,000.00.
+    expect(find.text('420,000.00'), findsNWidgets(2)); // AR card + AR panel
+
+    // Open the customizer (toolbar Customize button).
+    await tester.tap(find.widgetWithText(TextButton, 'Customize'));
+    await tester.pumpAndSettle();
+
+    // The dialog lists the AR card in the KPI Cards section — untick it
+    // (live preview: the strip behind the dialog updates immediately).
+    final arTile = find.ancestor(
+      of: find.text('AR'),
+      matching: find.byType(ListTile),
+    ).first;
+    await tester.tap(arTile);
+    await tester.pumpAndSettle();
+
+    // Close without saving (Done) — the live change is kept in the
+    // working state, and the AR card is gone from the strip.
+    await tester.tap(find.widgetWithText(TextButton, 'Done'));
+    await tester.pumpAndSettle();
+    expect(find.text('420,000.00'), findsOneWidget); // only the AR panel
+    expect(find.text('AR'), findsNothing);
+  });
+
+  testWidgets('customizer empty state shows when all cards are hidden', (
+    tester,
+  ) async {
+    final adapter = _AuthFakeAdapter();
+    await bootDashboard(tester, adapter);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Customize'));
+    await tester.pumpAndSettle();
+
+    // Clear All hides every block; the strip behind shows the empty
+    // state.
+    await tester.tap(find.widgetWithText(TextButton, 'Clear All'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Done'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No cards shown — customize to add'), findsOneWidget);
+    // Panels + cash strip gone too.
+    expect(find.text('Low Stock Alerts'), findsNothing);
+    expect(find.text('Cash / Bank Position'), findsNothing);
   });
 
   testWidgets('opening balance editor saves the starting cash', (

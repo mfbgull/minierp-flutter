@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const database_1 = __importDefault(require("../config/database"));
 const logger_1 = __importDefault(require("../utils/logger"));
+const queryUtils_1 = require("../utils/queryUtils");
 const Dashboard_1 = __importDefault(require("../models/Dashboard"));
 const cashService_1 = require("../services/cashService");
 // ═══════════════════════════════════════════════════════════════
@@ -110,7 +111,9 @@ function getStockMovementSummary(req, res) {
 function getKPI(req, res) {
     try {
         const metric = req.query.metric || 'stock_health';
-        const data = Dashboard_1.default.getKPI(database_1.default, metric);
+        const fromDate = String(((0, queryUtils_1.getQueryParam)(req.query.fromDate)) || '');
+        const toDate = String(((0, queryUtils_1.getQueryParam)(req.query.toDate)) || '');
+        const data = Dashboard_1.default.getKPI(database_1.default, metric, fromDate || undefined, toDate || undefined);
         res.json({ success: true, data });
     }
     catch (error) {

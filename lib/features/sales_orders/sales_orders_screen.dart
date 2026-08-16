@@ -117,6 +117,24 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
 
   void _refilter() => syncGridRows(ref.read(salesOrdersProvider));
 
+  /// Opt into the per-row ⋮ actions menu (View detail).
+  @override
+  bool get hasRowActions => true;
+
+  @override
+  List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
+    final id = row.cells['id']?.value as int?;
+    if (id == null || id <= 0) return null;
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      GridRowAction(
+        icon: Icons.visibility_outlined,
+        label: l10n.commonView,
+        onTap: () => showSalesOrderDetailDialog(context, soId: id),
+      ),
+    ];
+  }
+
   @override
   PlutoRow gridRowFor(SalesOrder so) => PlutoRow(
     cells: {

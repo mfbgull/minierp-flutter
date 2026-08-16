@@ -10,6 +10,26 @@ import 'json_helpers.dart';
 /// (`[key: string]: unknown`), so the known fields are typed here and any
 /// unrecognized keys are preserved in [extras] so a save→load round-trip
 /// never drops block settings.
+/// Block size presets (spec §6.3) — persisted as `config.size`
+/// (`'small' | 'medium' | 'large'`). Maps to card width (KPI) or flex
+/// ratio (panels); the cash strip is fixed and has no size control.
+enum DashboardBlockSize {
+  small('small'),
+  medium('medium'),
+  large('large');
+
+  const DashboardBlockSize(this.value);
+
+  final String value;
+
+  /// Parses a persisted size string; anything unknown → medium.
+  static DashboardBlockSize parse(Object? value) => switch (value) {
+    'small' => DashboardBlockSize.small,
+    'large' => DashboardBlockSize.large,
+    _ => DashboardBlockSize.medium,
+  };
+}
+
 class DashboardBlockConfig {
   const DashboardBlockConfig({
     this.refreshInterval,
@@ -18,6 +38,7 @@ class DashboardBlockConfig {
     this.limit,
     this.period,
     this.days,
+    this.size,
     this.extras = const {},
   });
 
@@ -29,6 +50,7 @@ class DashboardBlockConfig {
       'limit',
       'period',
       'days',
+      'size',
     };
     return DashboardBlockConfig(
       refreshInterval: asNum(json['refreshInterval']),
@@ -37,6 +59,7 @@ class DashboardBlockConfig {
       limit: asNum(json['limit']),
       period: asString(json['period']),
       days: asNum(json['days']),
+      size: DashboardBlockSize.parse(json['size']),
       extras: {
         for (final entry in json.entries)
           if (!known.contains(entry.key)) entry.key: entry.value,
@@ -51,6 +74,11 @@ class DashboardBlockConfig {
   final String? period;
   final num? days;
 
+  /// Block size preset (spec §6.3), default medium. Only emitted when it
+  /// differs from the server-side default so old layouts round-trip
+  /// unchanged.
+  final DashboardBlockSize? size;
+
   /// Unrecognized config keys, preserved verbatim for round-trips.
   final Map<String, dynamic> extras;
 
@@ -61,6 +89,8 @@ class DashboardBlockConfig {
     if (limit != null) 'limit': limit,
     if (period != null) 'period': period,
     if (days != null) 'days': days,
+    if (size != null && size != DashboardBlockSize.medium)
+      'size': size!.value,
     ...extras,
   };
 }

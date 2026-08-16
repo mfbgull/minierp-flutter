@@ -41,6 +41,7 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const bcrypt = __importStar(require("bcrypt"));
 const logger_1 = __importDefault(require("../utils/logger"));
+const sequence_1 = require("../utils/sequence");
 // Database file path - use DATABASE_PATH env var if set (Electron), otherwise default
 const dbDir = process.env.DATABASE_PATH || path_1.default.join(__dirname, '../../../database');
 const dbPath = path_1.default.join(dbDir, 'erp.db');
@@ -795,6 +796,7 @@ runLooseItemMigration();
 runCashAccountsMigration();
 runOpeningBalancesMigration();
 runUserPreferencesMigration();
+runUnbatchedStockReconciliation();
 // Rollback support: run if --rollback flag is passed
 if (process.argv.includes('--rollback')) {
     const targetMigration = process.argv.find(arg => arg.startsWith('--rollback='));
@@ -1427,6 +1429,72 @@ function runLooseItemMigration() {
     }
     catch (error) {
         logger_1.default.error('Loose item support migration error:', error.message);
+    }
+}
+function runUnbatchedStockReconciliation() {
+    // Reconcile stock that is on hand but has no covering stock_batches row.
+    // Before PO goods receipts created batches (see PurchaseOrderModel.
+    // addReceipt), received stock was written to stock_balances only, so
+    // batch-based valuation (dashboard stock value, stock valuation report,
+    // balance sheet) silently ignored it. This folds that legacy on-hand
+    // stock into a synthetic cost layer so it becomes visible.
+    try {
+        const rows = db.prepare(`
+      SELECT
+        sb.item_id,
+        sb.warehouse_id,
+        sb.quantity as on_hand,
+        COALESCE((
+          SELECT SUM(quantity_remaining)
+          FROM stock_batches
+          WHERE item_id = sb.item_id AND warehouse_id = sb.warehouse_id
+        ), 0) as covered,
+        i.standard_cost
+      FROM stock_balances sb
+      JOIN items i ON i.id = sb.item_id
+      WHERE sb.quantity > 0
+    `).all();
+        let created = 0;
+        const insertBatch = db.prepare(`
+      INSERT INTO stock_batches (
+        batch_no, item_id, warehouse_id, source_type,
+        source_id, quantity_original, quantity_remaining,
+        unit_cost, received_date
+      ) VALUES (?, ?, ?, 'PURCHASE', 0, ?, ?, ?, ?)
+    `);
+        for (const row of rows) {
+            const uncovered = row.on_hand - row.covered;
+            if (uncovered <= 0.0005)
+                continue;
+            // Prefer the weighted-average cost of inbound movements that have
+            // NO batch link — those are precisely the goods-receipt units this
+            // migration is reconciling (they record unit_price). Ignoring
+            // batch-linked movements avoids polluting the average with legacy
+            // seed movements. Fall back to the item's standard cost, then 0.
+            const avg = db.prepare(`
+        SELECT COALESCE(
+          SUM(quantity * unit_cost) * 1.0 / NULLIF(SUM(quantity), 0),
+          0
+        ) as cost
+        FROM stock_movements
+        WHERE item_id = ? AND quantity > 0 AND batch_id IS NULL
+      `).get(row.item_id);
+            const unitCost = avg.cost > 0
+                ? avg.cost
+                : (row.standard_cost || 0);
+            // Distinct RECON prefix + own sequence so numbers never collide
+            // with real receipt batches (BATCH-26-PUR-xxxx).
+            const nextNo = (0, sequence_1.getNextSequenceNumber)(db, 'BATCH_RECON_last_no');
+            const batchNo = `BATCH-${new Date().getFullYear() % 100}-RECON-${nextNo.toString().padStart(4, '0')}`;
+            insertBatch.run(batchNo, row.item_id, row.warehouse_id, uncovered, uncovered, unitCost, new Date().toISOString().split('T')[0]);
+            created++;
+        }
+        if (created > 0) {
+            logger_1.default.info(`✅ Unbatched stock reconciliation: created ${created} batch row(s)`);
+        }
+    }
+    catch (error) {
+        logger_1.default.error('Unbatched stock reconciliation error:', error.message);
     }
 }
 function runUserPreferencesMigration() {

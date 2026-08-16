@@ -132,6 +132,29 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
 
   void _refilter() => syncGridRows(ref.read(invoiceReturnsProvider));
 
+  /// Opt into the per-row ⋮ actions menu (View detail).
+  @override
+  bool get hasRowActions => true;
+
+  @override
+  List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
+    final id = row.cells['id']?.value as int?;
+    if (id == null || id <= 0) return null;
+    final salesReturn = _returnsById[id];
+    if (salesReturn == null) return null;
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      GridRowAction(
+        icon: Icons.visibility_outlined,
+        label: l10n.commonView,
+        onTap: () => showInvoiceReturnDetailDialog(
+          context,
+          salesReturn: salesReturn,
+        ),
+      ),
+    ];
+  }
+
   @override
   PlutoRow gridRowFor(SalesReturn salesReturn) {
     // Cache the model for the F2/Enter/double-tap detail path.

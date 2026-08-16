@@ -54,8 +54,11 @@ function getSummary(db, fromDate, toDate) {
     // COGS — SALE movements netted against their stock reversals (invoice
     // returns / deletes / updates post an ADJUSTMENT with the same cost),
     // so a returned sale no longer counts as cost of goods sold.
+    // quantity is Positive for IN, Negative for OUT. SALE = OUT (negative),
+    // RETURN = IN (positive). SUM(quantity * unit_cost) is negative;
+    // negate to get positive COGS.
     const cogs = db.prepare(`
-    SELECT COALESCE(ABS(SUM(sm.quantity * sm.unit_cost)), 0) as total
+    SELECT COALESCE(-SUM(sm.quantity * sm.unit_cost), 0) as total
     FROM stock_movements sm
     WHERE sm.movement_date BETWEEN ? AND ?
       AND (
@@ -141,7 +144,13 @@ function getSummary(db, fromDate, toDate) {
  * Shared computation with the cash-reconciliation report (cashService).
  */
 function getCashPosition(db) {
-    const today = db.prepare(`SELECT date('now') as d`).get();
+    // 'today' must be the LOCAL date: expenses/payments are stored with
+    // the client's local YYYY-MM-DD (Flutter sends isoDate(DateTime.now())),
+    // so computing the as-of date with UTC date('now') silently drops
+    // transactions recorded today in positive-offset timezones (e.g.
+    // UTC+5 sees date('now') = yesterday while the user's "today" expense
+    // is already dated tomorrow).
+    const today = db.prepare(`SELECT date('now', 'localtime') as d`).get();
     const accounts = (0, cashService_1.getCashAccountTotals)(db, today.d).map((a) => ({
         key: a.key,
         name: a.name,
@@ -167,21 +176,28 @@ function getCashPosition(db) {
  * Get top N customers by total revenue.
  */
 function getTopCustomers(db, limit = 5) {
+    // Join customers: invoices.customer_name is never populated (it's a
+    // denormalized column the invoice flow doesn't fill in), so grouping
+    // on it produced a single 'None' row. LEFT JOIN keeps invoices whose
+    // customer was later deleted; COALESCE covers that edge too.
     return db.prepare(`
     SELECT
-      customer_name,
-      COALESCE(SUM(total_amount), 0) as total_revenue,
+      COALESCE(c.customer_name, 'Deleted Customer') as customer_name,
+      COALESCE(SUM(i.total_amount), 0) as total_revenue,
       COUNT(*) as invoice_count
-    FROM invoices
-    WHERE status != 'Cancelled'
-    GROUP BY customer_name
+    FROM invoices i
+    LEFT JOIN customers c ON c.id = i.customer_id
+    WHERE i.status != 'Cancelled'
+    GROUP BY i.customer_id
     ORDER BY total_revenue DESC
     LIMIT ?
   `).all(limit);
 }
-/** SQLite's notion of today, in the wire `YYYY-MM-DD` format. */
+/** SQLite's notion of today, in the wire `YYYY-MM-DD` format. Uses the
+ * local date (date('now', 'localtime')) so it stays in sync with the
+ * client-side dates the app stores (Flutter sends local ISO dates). */
 function todayISO(db) {
-    return db.prepare(`SELECT date('now') as d`).get().d;
+    return db.prepare(`SELECT date('now', 'localtime') as d`).get().d;
 }
 /**
  * The WHERE fragment + parameters for a period filter. `column` is the
@@ -196,17 +212,17 @@ function todayISO(db) {
 function periodWhereClause(db, period, column, userId) {
     switch (period) {
         case 'today':
-            return { where: `${column} = date('now')`, params: [] };
+            return { where: `${column} = date('now', 'localtime')`, params: [] };
         case 'week':
             if (userId !== undefined) {
                 const { from, to } = (0, weekMath_1.weekBounds)(todayISO(db), (0, UserPreferences_1.getForUser)(db, userId).weekStart);
                 return { where: `${column} BETWEEN ? AND ?`, params: [from, to] };
             }
-            return { where: `${column} >= date('now', '-7 days')`, params: [] };
+            return { where: `${column} >= date('now', '-7 days', 'localtime')`, params: [] };
         case 'month':
-            return { where: `${column} >= date('now', '-1 month')`, params: [] };
+            return { where: `${column} >= date('now', '-1 month', 'localtime')`, params: [] };
         default:
-            return { where: `${column} = date('now')`, params: [] };
+            return { where: `${column} = date('now', 'localtime')`, params: [] };
     }
 }
 /**
@@ -294,8 +310,82 @@ function getStockMovementSummary(db, days = 7) {
  * Supported metrics: inventory_turnover, avg_days_to_pay, total_active_items,
  * stock_health, outstanding_receivables, monthly_revenue
  */
-function getKPI(db, metric) {
+function getKPI(db, metric, fromDate, toDate) {
+    // The money KPIs respect the dashboard's global date range, exactly like
+    // getSummary — same defaults (all-time when no range), same SQL — so a
+    // KPI card and the summary always agree. Inventory snapshots (stock
+    // value, warehouse stock, active items) are current positions and stay
+    // unfiltered, matching getSummary's behavior.
+    const from = fromDate || '2000-01-01';
+    const to = toDate || '2099-12-31';
+    // Inventory value = batch-tracked value plus the legacy fallback for
+    // items carrying stock with no batch rows (identical to getSummary).
+    const stockValueTotal = db.prepare(`
+    SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) as total
+    FROM stock_batches WHERE quantity_remaining > 0
+  `).get();
+    const legacyStockValue = db.prepare(`
+    SELECT COALESCE(SUM(i.current_stock * i.standard_cost), 0) as total
+    FROM items i
+    WHERE i.is_active = 1
+      AND i.current_stock > 0
+      AND NOT EXISTS (
+        SELECT 1 FROM stock_batches sb WHERE sb.item_id = i.id AND sb.quantity_remaining > 0
+      )
+  `).get();
     switch (metric) {
+        // ── Phase 1 core cards (match getSummary exactly) ────────────────
+        case 'stock_value':
+            return {
+                metric,
+                value: stockValueTotal.total + legacyStockValue.total,
+                unit: 'currency',
+                label: 'Stock Value',
+            };
+        case 'sales_revenue': {
+            const result = db.prepare(`
+        SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total
+        FROM invoices
+        WHERE status != 'Cancelled' AND invoice_date BETWEEN ? AND ?
+      `).get(from, to);
+            return { metric, value: result.total, unit: 'currency', label: 'Sales Revenue' };
+        }
+        case 'gross_profit': {
+            const revenue = db.prepare(`
+        SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total
+        FROM invoices
+        WHERE status != 'Cancelled' AND invoice_date BETWEEN ? AND ?
+      `).get(from, to);
+            const cogs = db.prepare(`
+        SELECT COALESCE(-SUM(sm.quantity * sm.unit_cost), 0) as total
+        FROM stock_movements sm
+        WHERE sm.movement_date BETWEEN ? AND ?
+          AND (
+            sm.movement_type = 'SALE'
+            OR (sm.movement_type = 'ADJUSTMENT'
+                AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE'))
+          )
+      `).get(from, to);
+            return { metric, value: revenue.total - cogs.total, unit: 'currency', label: 'Gross Profit' };
+        }
+        case 'purchase_orders': {
+            const result = db.prepare(`
+        SELECT COALESCE(SUM(total_amount), 0) as total FROM purchase_orders
+        WHERE status NOT IN ('Draft', 'Cancelled') AND po_date BETWEEN ? AND ?
+      `).get(from, to);
+            return { metric, value: result.total, unit: 'currency', label: 'Purchase Orders' };
+        }
+        case 'warehouse_stock': {
+            const result = db.prepare(`
+        SELECT COUNT(*) as count FROM stock_balances WHERE quantity > 0
+      `).get();
+            return { metric, value: result.count, unit: 'count', label: 'Warehouse Stock' };
+        }
+        case 'total_items': {
+            const result = db.prepare('SELECT COUNT(*) as count FROM items WHERE is_active = 1').get();
+            return { metric, value: result.count, unit: 'count', label: 'Active Items' };
+        }
+        // ── Pre-existing extra metrics ───────────────────────────────────
         case 'inventory_turnover': {
             const purchases = db.prepare(`
         SELECT COALESCE(SUM(total_cost), 0) as total FROM purchases
@@ -347,6 +437,74 @@ function getKPI(db, metric) {
           AND status != 'Cancelled'
       `).get();
             return { metric, value: result.total, unit: 'currency', label: 'Monthly Revenue' };
+        }
+        // ── Additional cards (match the P&L / cash reports) ─────────────
+        case 'expenses': {
+            // Same SQL as getExpenseSummary + the P&L report: non-cancelled
+            // expenses within the range.
+            const result = db.prepare(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM expenses
+        WHERE status != 'Cancelled' AND expense_date BETWEEN ? AND ?
+      `).get(from, to);
+            return { metric, value: result.total, unit: 'currency', label: 'Expenses' };
+        }
+        case 'net_profit': {
+            // Identical to getProfitLossReport: revenue − COGS − expenses.
+            const revenue = db.prepare(`
+        SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total
+        FROM invoices
+        WHERE status != 'Cancelled' AND invoice_date BETWEEN ? AND ?
+      `).get(from, to);
+            const cogs = db.prepare(`
+        SELECT COALESCE(ABS(SUM(sm.quantity * sm.unit_cost)), 0) as total
+        FROM stock_movements sm
+        WHERE sm.movement_date BETWEEN ? AND ?
+          AND (
+            sm.movement_type = 'SALE'
+            OR (sm.movement_type = 'ADJUSTMENT'
+                AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE'))
+          )
+      `).get(from, to);
+            const expenseRow = db.prepare(`
+        SELECT COALESCE(SUM(amount), 0) as total FROM expenses
+        WHERE status != 'Cancelled' AND expense_date BETWEEN ? AND ?
+      `).get(from, to);
+            return {
+                metric,
+                value: revenue.total - cogs.total - expenseRow.total,
+                unit: 'currency',
+                label: 'Net Profit',
+            };
+        }
+        case 'outstanding_payables': {
+            // Mirror of the AR card: latest supplier_ledger running balance
+            // per supplier (what we owe, not gross PO value) — identical to
+            // the balance sheet's AP.
+            const result = db.prepare(`
+        SELECT COALESCE(SUM(balance), 0) as total FROM (
+          SELECT sl1.supplier_id, sl1.balance
+          FROM supplier_ledger sl1
+          WHERE sl1.balance > 0
+            AND sl1.id = (
+              SELECT MAX(sl2.id) FROM supplier_ledger sl2
+              WHERE sl2.supplier_id = sl1.supplier_id
+            )
+        )
+      `).get();
+            return { metric, value: result.total, unit: 'currency', label: 'Outstanding Payables' };
+        }
+        case 'total_customers': {
+            const result = db.prepare('SELECT COUNT(*) as count FROM customers WHERE is_active = 1').get();
+            return { metric, value: result.count, unit: 'count', label: 'Total Customers' };
+        }
+        case 'low_stock_count': {
+            // Same filter as the dashboard's Low Stock panel: active items at
+            // or below reorder level.
+            const result = db.prepare(`
+        SELECT COUNT(*) as count FROM items
+        WHERE is_active = 1 AND reorder_level > 0 AND current_stock <= reorder_level
+      `).get();
+            return { metric, value: result.count, unit: 'count', label: 'Low Stock Items' };
         }
         default:
             return { metric, value: 0, unit: '', label: 'Unknown Metric' };
