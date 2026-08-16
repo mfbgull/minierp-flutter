@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CASH_ACCOUNTS = void 0;
 exports.normalizeCashMethod = normalizeCashMethod;
+exports.collectFlows = collectFlows;
 exports.getOpeningBalances = getOpeningBalances;
 exports.saveOpeningBalance = saveOpeningBalance;
 exports.getCashAccountTotals = getCashAccountTotals;

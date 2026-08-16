@@ -16,7 +16,8 @@ import '../../data/models/report.dart' show SalesSummaryReport;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
-import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
+import '../../widgets/pluto_grid_screen.dart'
+    show plutoGridConfigurationFor, serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../../widgets/status_badge.dart';
@@ -223,6 +224,7 @@ class _SalesSummaryReportScreenState
     final scheme = Theme.of(context).colorScheme;
 
     return PlutoGrid(
+      configuration: plutoGridConfigurationFor(context),
       columns: [
         serialGridColumn(),
         PlutoColumn(

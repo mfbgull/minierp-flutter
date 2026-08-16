@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_notifier.dart';
 import '../../core/i18n/locale_provider.dart';
+import '../../core/theme/theme_mode_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/screen_shortcuts.dart';
 import '../dashboard/dashboard_providers.dart'
@@ -11,6 +12,7 @@ import '../dashboard/dashboard_providers.dart'
         dashboardArSummaryProvider,
         dashboardCashPositionProvider,
         dashboardSummaryProvider,
+        invalidateDashboardKpiCards,
         dashboardTopCustomersProvider;
 import '../preferences/preference_providers.dart'
     show userPreferencesProvider;
@@ -223,6 +225,9 @@ class AppShell extends ConsumerWidget {
                 ),
             ],
           ),
+          // Dark-mode toggle: flips the effective brightness and
+          // persists the choice (light / dark / system).
+          _DarkModeToggle(),
           IconButton(
             tooltip: l10n.commonLogout,
             icon: const Icon(Icons.logout),
@@ -248,6 +253,10 @@ class AppShell extends ConsumerWidget {
                 // invalidate its providers on every visit to reflect
                 // work done on other modules (sales, expenses, ...).
                 if (branchIndex == 0) {
+                  // KPI strip cards fetch per-card values and need
+                  // their own invalidation (a new sale / invoice stays
+                  // stale otherwise until hot restart).
+                  invalidateDashboardKpiCards(ref);
                   ref
                     ..invalidate(dashboardSummaryProvider)
                     ..invalidate(dashboardArSummaryProvider)
@@ -379,6 +388,29 @@ class _NavItem extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Dark-mode toggle in the shell toolbar — a single icon that flips
+/// the *effective* brightness and persists the choice (themeModeProvider).
+class _DarkModeToggle extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final mode = ref.watch(themeModeProvider);
+    final effective = Theme.of(context).brightness == Brightness.dark;
+    // System mode follows the OS; once the user taps the icon we pin
+    // an explicit mode so the toggle has immediate effect.
+    final isDark = mode == ThemeMode.dark ||
+        (mode == ThemeMode.system && effective);
+
+    return IconButton(
+      tooltip: l10n.commonThemeMode,
+      icon: Icon(isDark ? Icons.dark_mode : Icons.light_mode),
+      onPressed: () => ref
+          .read(themeModeProvider.notifier)
+          .setMode(isDark ? ThemeMode.light : ThemeMode.dark),
     );
   }
 }

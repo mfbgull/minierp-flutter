@@ -22,6 +22,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../widgets/pluto_grid_screen.dart'
+    show plutoGridConfigurationFor;
+
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/print_utils.dart' show printPdfBytes;
 import '../../core/utils/formatters.dart';
@@ -1080,6 +1083,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       );
     }
     return PlutoGrid(
+      configuration: plutoGridConfigurationFor(context),
       columns: columns,
       rows: _rows,
       onLoaded: (event) {

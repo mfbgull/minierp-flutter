@@ -19,6 +19,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show itemsProvider;
+import '../inventory/item_detail_dialog.dart' show showItemDetailDialog;
 import 'forecast_models.dart';
 import 'forecast_providers.dart';
 import 'forecast_repository.dart' show ForecastDemandFilters;
@@ -35,8 +36,28 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
     with PlutoGridScreen<ForecastDemand, DemandForecastScreen> {
   @override
   void openRowDetail(int rowId) {
-    // The demand grid is read-only in the reference (no detail route) —
-    // F2/Enter stays wired to the mixin but opens nothing.
+    if (!mounted) return;
+    // The demand grid is read-only in the reference — drill into the
+    // item's detail (the forecast row's `id` cell is the item id).
+    showItemDetailDialog(context, itemId: rowId);
+  }
+
+  /// Opt into the per-row ⋮ actions menu (View item).
+  @override
+  bool get hasRowActions => true;
+
+  @override
+  List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
+    final itemId = row.cells['id']?.value as int?;
+    if (itemId == null || itemId <= 0) return null;
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      GridRowAction(
+        icon: Icons.visibility_outlined,
+        label: l10n.commonView,
+        onTap: () => showItemDetailDialog(context, itemId: itemId),
+      ),
+    ];
   }
 
   @override

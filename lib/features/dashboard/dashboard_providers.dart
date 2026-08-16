@@ -19,6 +19,7 @@ import '../../data/repositories/dashboard_repository.dart'
     show dashboardRepositoryProvider;
 import '../reports/report_providers.dart'
     show globalReportFromDateProvider, globalReportToDateProvider;
+import 'dashboard_kpi_catalog.dart' show kpiCardCatalog;
 
 /// Loads the aggregated dashboard KPIs (GET /dashboard/summary), filtered
 /// by the dashboard's global date range (the money figures + chart react
@@ -86,16 +87,33 @@ final dashboardStockMovementSummaryProvider =
       return _data(result);
     });
 
-/// `GET /dashboard/kpi?metric=`.
+/// `GET /dashboard/kpi?metric=` — respects the dashboard's global date
+/// range (spec §6.4: all blocks follow the global range), so a card and
+/// the summary always agree when a range is active.
 final dashboardKpiProvider = FutureProvider.family<KpiResult, String>((
   ref,
   metric,
 ) async {
-  final result = await ref
-      .watch(dashboardRepositoryProvider)
-      .kpi(metric: metric);
+  final from = ref.watch(globalReportFromDateProvider);
+  final to = ref.watch(globalReportToDateProvider);
+  final result = await ref.watch(dashboardRepositoryProvider).kpi(
+    metric: metric,
+    fromDate: from == null ? null : isoDate(from),
+    toDate: to == null ? null : isoDate(to),
+  );
   return _data(result);
 });
+
+/// Invalidates every KPI card metric (the strip cards fetch per-card
+/// `/dashboard/kpi` values, so a new sale / invoice isn't reflected
+/// until their providers are rebuilt). Iterating the whole catalog is
+/// cheap — invalidating a family member nobody watches only marks it
+/// stale; the fetch happens on the next watch.
+void invalidateDashboardKpiCards(WidgetRef ref) {
+  for (final def in kpiCardCatalog) {
+    ref.invalidate(dashboardKpiProvider(def.metric));
+  }
+}
 
 /// `GET /dashboard/ar-summary`.
 final dashboardArSummaryProvider = FutureProvider<ArSummaryResult>((ref) async {

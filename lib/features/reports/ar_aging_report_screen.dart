@@ -12,7 +12,7 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart' show ArAgingBucket, ArAgingReport;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
+import '../../widgets/pluto_grid_screen.dart' show plutoGridConfigurationFor, serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
@@ -258,6 +258,7 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: PlutoGrid(
+        configuration: plutoGridConfigurationFor(context),
         columns: _columns,
         rows: <PlutoRow>[],
         onLoaded: (event) {

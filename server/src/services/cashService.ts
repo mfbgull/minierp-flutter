@@ -57,7 +57,7 @@ interface FlowTotals {
 
 /** Cumulative inflow/outflow per account for every row on or before
  * `uptoDate`. Eight small indexed GROUP BYs — fine for an ERP database. */
-function collectFlows(db: Database.Database, uptoDate: string): Map<string, FlowTotals> {
+export function collectFlows(db: Database.Database, uptoDate: string): Map<string, FlowTotals> {
   // Seed every account with its opening (business-start) balance — the
   // till didn't start at zero. `inflow` carries the seed so
   // balance = inflow − outflow includes it on every day.

@@ -117,6 +117,11 @@ class ScreenToolbar extends StatefulWidget {
     this.searchWidth = 260,
     this.filters = const [],
     this.actions = const [],
+    // Labeled actions that sit between the refresh button and the
+    // export/primary slots — rendered but never treated as the Ctrl+E
+    // export target or the Ctrl+N primary target (the dashboard's
+    // "Customize" button is the first user).
+    this.trailingActions = const [],
     this.primaryActions = const [],
     this.onRefresh,
     this.onClearAll,
@@ -148,6 +153,11 @@ class ScreenToolbar extends StatefulWidget {
 
   /// Secondary actions after refresh (CSV export buttons, …).
   final List<Widget> actions;
+
+  /// Labeled actions after the export slot but before the primary
+  /// "New …" buttons — e.g. the dashboard's Customize button. Unlike
+  /// [actions], never picked as the Ctrl+E export target.
+  final List<Widget> trailingActions;
 
   /// The trailing "New …" buttons (kept as the screens' own widgets so
   /// every FilledButton variant stays exactly as-is).
@@ -330,6 +340,7 @@ class ScreenToolbarState extends State<ScreenToolbar> {
             _exportAction,
             kShortcutExportChord,
           ),
+          ...widget.trailingActions,
           ..._chordLabelled(
             widget.primaryActions,
             _shortcutAction,

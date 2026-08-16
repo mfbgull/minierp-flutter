@@ -14,7 +14,8 @@ import 'package:flutter/material.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../l10n/app_localizations.dart';
-import 'pluto_grid_screen.dart' show serialGridColumn, withSerialCell;
+import 'pluto_grid_screen.dart'
+    show plutoGridConfigurationFor, serialGridColumn, withSerialCell;
 
 /// A read-only PlutoGrid over [data] for the detail tabs.
 class DetailTabGrid<T> extends StatefulWidget {
@@ -54,7 +55,8 @@ class DetailTabGrid<T> extends StatefulWidget {
 class _DetailTabGridState<T> extends State<DetailTabGrid<T>> {
   PlutoGridStateManager? _manager;
   late List<PlutoColumn> _columns;
-  final PlutoGridConfiguration _configuration = const PlutoGridConfiguration();
+  PlutoGridConfiguration _configuration = const PlutoGridConfiguration();
+  Brightness? _configurationBrightness;
   bool _columnsReady = false;
 
   @override
@@ -66,6 +68,14 @@ class _DetailTabGridState<T> extends State<DetailTabGrid<T>> {
         ...widget.buildColumns(AppLocalizations.of(context)!),
       ];
       _columnsReady = true;
+    }
+    // Rebuild the grid configuration when the theme brightness flips so
+    // dark mode is respected (PlutoGrid re-applies it in
+    // didUpdateWidget).
+    final brightness = Theme.of(context).brightness;
+    if (_configurationBrightness != brightness) {
+      _configuration = plutoGridConfigurationFor(context);
+      _configurationBrightness = brightness;
     }
   }
 

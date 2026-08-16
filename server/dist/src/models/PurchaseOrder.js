@@ -71,6 +71,17 @@ class PurchaseOrderModel {
     static generatePONo(db) {
         return (0, sequence_1.generateDocNo)(db, 'PO');
     }
+    /**
+     * Atomic batch number for goods-receipt cost layers, same sequence as
+     * the direct-purchase flow (BATCH-last_no) so numbers stay unique across
+     * both purchase paths.
+     */
+    static generateBatchNo(db) {
+        const year = new Date().getFullYear();
+        const settingKey = `BATCH_last_no_${year}`;
+        const nextNo = (0, sequence_1.getNextSequenceNumber)(db, settingKey);
+        return `BATCH-${year % 100}-PUR-${nextNo.toString().padStart(4, '0')}`;
+    }
     static getAll(filters = {}, db) {
         let query = `
       SELECT
@@ -439,7 +450,8 @@ class PurchaseOrderModel {
                 const poItem = db.prepare(`
           SELECT * FROM purchase_order_items WHERE id = ?
         `).get(receiptItem.po_item_id);
-                receiptItemStmt.run(receiptId, receiptItem.po_item_id, poItem.item_id, receiptItem.received_quantity);
+                const receiptItemResult = receiptItemStmt.run(receiptId, receiptItem.po_item_id, poItem.item_id, receiptItem.received_quantity);
+                const receiptItemId = receiptItemResult.lastInsertRowid;
                 // Update PO item received_quantity
                 const newReceived = poItem.received_quantity + receiptItem.received_quantity;
                 db.prepare(`
@@ -447,15 +459,30 @@ class PurchaseOrderModel {
           SET received_quantity = ?
           WHERE id = ?
         `).run(newReceived, receiptItem.po_item_id);
+                // Batch costing: create a cost layer for the received stock so
+                // batch-based valuation (dashboard stock value, stock valuation
+                // report, balance sheet) actually sees PO-received goods. Without
+                // this, receipts added stock to stock_balances but no stock_batches
+                // row, so the received value was invisible to every batch-based
+                // figure.
+                const batchNo = this.generateBatchNo(db);
+                const batchResult = db.prepare(`
+          INSERT INTO stock_batches (
+            batch_no, item_id, warehouse_id, source_type,
+            source_id, quantity_original, quantity_remaining,
+            unit_cost, received_date
+          ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?)
+        `).run(batchNo, poItem.item_id, warehouse_id, receiptItemId, receiptItem.received_quantity, receiptItem.received_quantity, poItem.unit_price, receipt_date);
+                const batchId = batchResult.lastInsertRowid;
                 // Create stock movement using atomic movement number generation
                 const movementNo = StockMovement_1.default.generateMovementNo(db);
                 db.prepare(`
           INSERT INTO stock_movements (
             movement_no, item_id, warehouse_id, movement_type,
             quantity, unit_cost, reference_doctype, reference_docno,
-            remarks, movement_date, created_by
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(movementNo, poItem.item_id, warehouse_id, 'PURCHASE', receiptItem.received_quantity, poItem.unit_price, 'GOODS_RECEIPT', receiptNo, `Receipt ${receiptNo} against PO ${po.po_no}`, receipt_date, userId);
+            remarks, movement_date, created_by, batch_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(movementNo, poItem.item_id, warehouse_id, 'PURCHASE', receiptItem.received_quantity, poItem.unit_price, 'GOODS_RECEIPT', receiptNo, `Receipt ${receiptNo} against PO ${po.po_no}`, receipt_date, userId, batchId);
                 // Update stock balance
                 const existingBalance = db.prepare(`
           SELECT * FROM stock_balances
@@ -594,6 +621,28 @@ class PurchaseOrderModel {
             WHERE item_id = ? AND warehouse_id = ?
           `).run(returnItem.return_quantity, poItem.item_id, po.warehouse_id);
                 }
+                // Batch costing: reduce the cost layers (oldest first, FIFO) for
+                // the stock going back to the supplier, so batch coverage stays in
+                // sync with on-hand stock.
+                let toReturn = returnItem.return_quantity;
+                const batches = db.prepare(`
+          SELECT id, quantity_remaining
+          FROM stock_batches
+          WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+          ORDER BY received_date ASC, id ASC
+        `).all(poItem.item_id, po.warehouse_id);
+                for (const batch of batches) {
+                    if (toReturn <= 0)
+                        break;
+                    const consume = Math.min(toReturn, batch.quantity_remaining);
+                    db.prepare(`
+            UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?
+          `).run(consume, batch.id);
+                    toReturn -= consume;
+                }
+                // If the batches didn't fully cover the return (legacy stock with no
+                // batch rows), the remainder is unbatchable stock — leave it as-is;
+                // the reconciliation migration will fold it into a batch later.
                 // Update items.current_stock
                 db.prepare(`
           UPDATE items

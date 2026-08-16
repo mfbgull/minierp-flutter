@@ -9,97 +9,19 @@ class AppLocalizationsUr extends AppLocalizations {
   AppLocalizationsUr([String locale = 'ur']) : super(locale);
 
   @override
-  String get activitylogCleanup => 'صفائی';
-
-  @override
-  String get activitylogCleanupdays => 'ریٹینشن (دن)';
-
-  @override
-  String get activitylogCleanupdesc =>
-      'ریٹینشن مدت سے پرانی لاگز مستقل طور پر حذف ہو جائیں گی۔ اسے واپس نہیں کیا جا سکتا۔';
-
-  @override
-  String get activitylogCleanupinvalid => 'دنوں کی درست تعداد درج کریں';
-
-  @override
-  String activitylogCleanupsuccess(Object count) {
-    return '$count لاگ اندراجات صاف ہو گئے';
-  }
-
-  @override
-  String get activitylogCleanuptitle => 'پرانی لاگز صاف کریں';
-
-  @override
-  String get activitylogAction => 'عمل';
-
-  @override
-  String get activitylogAllactions => 'تمام اعمال';
-
-  @override
-  String get activitylogAllentities => 'تمام اقسام';
-
-  @override
-  String get activitylogAllusers => 'تمام صارفین';
-
-  @override
-  String get activitylogCount => 'لاگز';
-
-  @override
-  String get activitylogDetailtitle => 'سرگرمی کی تفصیل';
-
-  @override
-  String get activitylogDuration => 'دورانیہ';
-
-  @override
-  String get activitylogEntity => 'ہستی';
-
-  @override
-  String get activitylogExportcsv => 'CSV برآمد کریں';
-
-  @override
-  String get activitylogExported => 'سرگرمی لاگ برآمد ہو گیا';
-
-  @override
-  String get activitylogExportfailed => 'برآمد ناکام ہوئی';
-
-  @override
-  String get activitylogIp => 'آئی پی ایڈریس';
-
-  @override
-  String get activitylogLevel => 'سطح';
-
-  @override
-  String get activitylogMetadata => 'میٹا ڈیٹا';
-
-  @override
-  String get activitylogTimestamp => 'وقت';
-
-  @override
-  String get activitylogToday => 'آج';
-
-  @override
-  String get activitylogTotal => 'کل لاگز';
-
-  @override
-  String get activitylogUser => 'صارف';
-
-  @override
-  String get activitylogUseragent => 'یوزر ایجنٹ';
-
-  @override
   String get dashboardWelcome => 'خوش آمدید';
-
-  @override
-  String get dashboardArsummary => 'وصولیات کا خلاصہ';
 
   @override
   String get dashboardTotalitems => 'کل مصنوعات';
 
   @override
-  String get dashboardWarehousestocks => 'گودام اسٹاک';
+  String get dashboardWarehousestocks => 'ڈبلیو ایچ اسٹاک';
 
   @override
-  String get dashboardRecentproductions => 'حالیہ پروڈکشنز';
+  String get dashboardAr => 'اے آر';
+
+  @override
+  String get dashboardArHint => 'گاہکوں سے وصول ہونے والی کل بقایا رقم';
 
   @override
   String get dashboardStockvalue => 'اسٹاک کی قیمت';
@@ -108,23 +30,7 @@ class AppLocalizationsUr extends AppLocalizations {
   String get dashboardCurrentinventoryworth => 'موجودہ انوینٹری کی قیمت';
 
   @override
-  String get dashboardCustomers => 'کسٹمرز';
-
-  @override
-  String get dashboardInvoices => 'انوائسز';
-
-  @override
   String get dashboardSalesrevenue => 'فروخت آمدنی';
-
-  @override
-  String get dashboardProfit => 'منافع';
-
-  @override
-  String get dashboardGlobalDateRangeHint =>
-      'تاریخ کی حد تمام رپورٹ اسکرینز پر لاگو ہوتی ہے';
-
-  @override
-  String get dashboardTopcustomers => 'ٹاپ کسٹمرز';
 
   @override
   String get dashboardTotalsales => 'کل فروخت';
@@ -161,6 +67,94 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get dashboardLivingecosystem => 'لیوینگ ایکوسسٹم';
+
+  @override
+  String get dashboardcardTotalitems => 'کل اشیاء';
+
+  @override
+  String get dashboardcardStockvalue => 'اسٹاک ویلیو';
+
+  @override
+  String get dashboardcardSalesrevenue => 'فروخت آمدنی';
+
+  @override
+  String get dashboardcardGrossprofit => 'کل منافع';
+
+  @override
+  String get dashboardcardPurchases => 'پی او';
+
+  @override
+  String get dashboardcardWarehousestock => 'ڈبلیو ایچ اسٹاک';
+
+  @override
+  String get dashboardcardAr => 'اے آر';
+
+  @override
+  String get dashboardcardInventoryturnover => 'انوینٹری گردش';
+
+  @override
+  String get dashboardcardAvgtodayspay => 'ادائیگی کے اوسط دن';
+
+  @override
+  String get dashboardcardStockhealth => 'اسٹاک صحت';
+
+  @override
+  String get dashboardcardMonthlyrevenue => 'ماہانہ آمدنی';
+
+  @override
+  String get dashboardcardNetprofit => 'خالص منافع';
+
+  @override
+  String get dashboardcardExpenses => 'اخراجات';
+
+  @override
+  String get dashboardcardPayables => 'قابل ادائیگی';
+
+  @override
+  String get dashboardcardCustomers => 'گاہک';
+
+  @override
+  String get dashboardcardLowstockcount => 'کم اسٹاک';
+
+  @override
+  String get dashboardcardPanelSalespurchases => 'فروخت بمقابلہ خریداری';
+
+  @override
+  String get dashboardcardPanelArAging => 'وصولیوں کی ایجنگ';
+
+  @override
+  String get dashboardcardPanelStockbycategory => 'زمرے کے لحاظ سے اسٹاک';
+
+  @override
+  String get dashboardcardPanelTopcustomers => 'بہترین گاہک';
+
+  @override
+  String get dashboardcardPanelLowstock => 'کم اسٹاک';
+
+  @override
+  String get dashboardcardCashstrip => 'نقدی اور بینک پوزیشن';
+
+  @override
+  String get dashboardcardsEmpty =>
+      'کوئی کارڈ نہیں دکھایا گیا — حسب ضرورت بنانے کے لیے ایڈجسٹ کریں';
+
+  @override
+  String get dashboardcardsSearch => 'کارڈ تلاش کریں…';
+
+  @override
+  String get dashboardcardsSelectall => 'سب منتخب کریں';
+
+  @override
+  String get dashboardcardsClearall => 'سب صاف کریں';
+
+  @override
+  String get dashboardcardsKpis => 'کے پی آئی کارڈز';
+
+  @override
+  String get dashboardcardsPanels => 'پینلز';
+
+  @override
+  String get dashboardcardsCashbank => 'نقدی اور بینک';
 
   @override
   String get dashboardcustomizationCustomize => 'کسٹمائز کریں';
@@ -436,27 +430,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get customersCustomerdeleted => 'گاہک کامیابی سے حذف ہوگیا!';
 
   @override
-  String customersDays(Object days) {
-    return '$days دن';
-  }
-
-  @override
-  String get customersContactinfo => 'رابطہ معلومات';
-
-  @override
-  String get customersFixbalances => 'بیلنس ٹھیک کریں';
-
-  @override
-  String get customersFixbalancesconfirm =>
-      'یہ تمام گاہکوں کے بیلنس غیر ادا شدہ انوائسز سے دوبارہ شمار کرے گا۔ جاری رکھیں؟';
-
-  @override
-  String get customersFixbalancessuccess => 'بیلنس کامیابی سے دوبارہ شمار ہوئے';
-
-  @override
-  String get customersNotapplicable => 'ن/ا';
-
-  @override
   String get suppliersSuppliers => 'سپلائر';
 
   @override
@@ -466,266 +439,16 @@ class AppLocalizationsUr extends AppLocalizations {
   String get suppliersSuppliername => 'سپلائر کا نام';
 
   @override
-  String get suppliersBalance => 'بیلنس';
-
-  @override
-  String get suppliersContactperson => 'رابطہ شخص';
-
-  @override
-  String get suppliersCreditutilization => 'کریڈٹ استعمال';
-
-  @override
-  String get suppliersNotes => 'نوٹس';
-
-  @override
-  String get suppliersPaymentterms => 'ادائیگی کی شرائط';
-
-  @override
-  String get suppliersSuppliercode => 'سپلائر کوڈ';
-
-  @override
-  String get suppliersSupplierdetails => 'سپلائر کی تفصیلات';
-
-  @override
   String get suppliersPhone => 'فون';
 
   @override
   String get suppliersEmail => 'ای میل';
 
   @override
-  String get suppliersEditsupplier => 'سپلائر میں ترمیم کریں';
-
-  @override
-  String get suppliersErrorCodeRequired => 'سپلائر کوڈ درکار ہے';
-
-  @override
-  String get suppliersErrorEmail => 'غلط ای میل فارمیٹ';
-
-  @override
-  String get suppliersErrorNameRequired => 'سپلائر کا نام درکار ہے';
-
-  @override
   String get suppliersAddress => 'پتہ';
 
   @override
   String get suppliersActions => 'ایکشنز';
-
-  @override
-  String get suppliersLedger => 'لیجر';
-
-  @override
-  String get suppliersLedgerDebit => 'ڈیبٹ';
-
-  @override
-  String get suppliersLedgerCredit => 'کریڈٹ';
-
-  @override
-  String get suppliersLedgerClosingbalance => 'اختتامی بیلنس';
-
-  @override
-  String get suppliersLedgerNoentries => 'کوئی لیجر اندراج نہیں ملا';
-
-  @override
-  String get suppliersStatement => 'بیان';
-
-  @override
-  String get suppliersOpeningbalance => 'ابتدائی بیلنس';
-
-  @override
-  String get suppliersClosingbalance => 'اختتامی بیلنس';
-
-  @override
-  String get suppliersOverview => 'جائزہ';
-
-  @override
-  String get suppliersPos => 'پروکیورمنٹ آرڈرز';
-
-  @override
-  String get suppliersPayments => 'ادائیگیاں';
-
-  @override
-  String get suppliersBacktosuppliers => 'سپلائرز پر واپس';
-
-  @override
-  String get suppliersRecordpayment => 'ادائیگی ریکارڈ کریں';
-
-  @override
-  String get suppliersFinancialsummary => 'مالی خلاصہ';
-
-  @override
-  String get suppliersCurrentbalance => 'موجودہ بیلنس';
-
-  @override
-  String get suppliersTotalpovalue => 'کل پی او مالیت';
-
-  @override
-  String get suppliersTotalpos => 'کل پی اوز';
-
-  @override
-  String get suppliersPostatus => 'پروکیورمنٹ آرڈر کی حیثیت';
-
-  @override
-  String get suppliersDraft => 'ڈرافٹ';
-
-  @override
-  String get suppliersSubmitted => 'جمع کرایا گیا';
-
-  @override
-  String get suppliersPartial => 'جزوی';
-
-  @override
-  String get suppliersCompleted => 'مکمل';
-
-  @override
-  String get suppliersContactinfo => 'رابطہ کی معلومات';
-
-  @override
-  String get suppliersAccountsettings => 'اکاؤنٹ کی ترتیبات';
-
-  @override
-  String get suppliersSincesupplier => 'سپلائر از';
-
-  @override
-  String get suppliersNopos => 'کوئی پروکیورمنٹ آرڈر نہیں ملا';
-
-  @override
-  String get suppliersPono => 'پی او نمبر';
-
-  @override
-  String get suppliersTotal => 'کل';
-
-  @override
-  String get suppliersExpecteddelivery => 'متوقع ترسیل';
-
-  @override
-  String get suppliersLedgerType => 'قسم';
-
-  @override
-  String get suppliersLedgerTotals => 'کل رقم';
-
-  @override
-  String get suppliersLedgerTotaldebit => 'کل ڈیبٹ';
-
-  @override
-  String get suppliersLedgerTotalcredit => 'کل کریڈٹ';
-
-  @override
-  String get suppliersExportcsv => 'سی ایس وی ایکسپورٹ';
-
-  @override
-  String get suppliersExportpdf => 'پی ڈی ایف ایکسپورٹ';
-
-  @override
-  String get suppliersExportimage => 'تصویر';
-
-  @override
-  String get suppliersExportsuccess => 'کامیابی سے ایکسپورٹ ہو گیا';
-
-  @override
-  String get suppliersNopayments => 'کوئی ادائیگی نہیں ملی';
-
-  @override
-  String get suppliersPaymentno => 'ادائیگی نمبر';
-
-  @override
-  String get suppliersAmount => 'رقم';
-
-  @override
-  String get suppliersMethod => 'طریقہ';
-
-  @override
-  String get suppliersReference => 'حوالہ';
-
-  @override
-  String get suppliersPrintreceipt => 'رسید پرنٹ کریں';
-
-  @override
-  String get suppliersPrintreceipta4 => 'رسید پرنٹ کریں (A4)';
-
-  @override
-  String get suppliersDeletepayment => 'ادائیگی حذف کریں';
-
-  @override
-  String get suppliersConfirmdeletepayment =>
-      'کیا آپ واقعی ادائیگی حذف کرنا چاہتے ہیں';
-
-  @override
-  String get suppliersPaymentdeleted => 'ادائیگی کامیابی سے حذف ہو گئی!';
-
-  @override
-  String get suppliersStatementsummary => 'بیان کا خلاصہ';
-
-  @override
-  String get suppliersTotaldebits => 'کل ڈیبٹس';
-
-  @override
-  String get suppliersTotalcredits => 'کل کریڈٹس';
-
-  @override
-  String get suppliersTransactiondetails => 'لین دین کی تفصیلات';
-
-  @override
-  String get suppliersBeginningbalance => 'ابتدائی بیلنس';
-
-  @override
-  String get suppliersEndingbalance => 'آخری بیلنس';
-
-  @override
-  String get suppliersTotalamount => 'کل رقم';
-
-  @override
-  String get suppliersAllocation => 'تخصیص';
-
-  @override
-  String get suppliersAvailablepos => 'دستیاب پی اوز';
-
-  @override
-  String get suppliersAutoallocate => 'خودکار تخصیص';
-
-  @override
-  String get suppliersAllposallocated => 'تمام دستیاب پی اوز تخصیص ہو چکے ہیں';
-
-  @override
-  String get suppliersNoopenpos => 'تخصیص کے لیے کوئی کھلا پی او نہیں';
-
-  @override
-  String get suppliersAllocatedpos => 'تخصیص شدہ پی اوز';
-
-  @override
-  String get suppliersUnallocated => 'غیر تخصیص شدہ رقم';
-
-  @override
-  String get suppliersAllocationrequired => 'کم از کم ایک پی او تخصیص درکار ہے';
-
-  @override
-  String get suppliersAmountmustmatch => 'رقم کل تخصیص کے برابر ہونی چاہیے';
-
-  @override
-  String get suppliersPaymentrecordedsuccess =>
-      'ادائیگی کامیابی سے ریکارڈ ہو گئی';
-
-  @override
-  String get suppliersWhatnext => 'آگے کیا کرنا چاہیں گے؟';
-
-  @override
-  String get suppliersDelete => 'حذف کریں';
-
-  @override
-  String get suppliersConfirmdelete => 'کیا آپ واقعی حذف کرنا چاہتے ہیں';
-
-  @override
-  String get suppliersSupplierdeleted => 'سپلائر کامیابی سے حذف ہو گیا!';
-
-  @override
-  String get suppliersFixbalances => 'بیلنس درست کریں';
-
-  @override
-  String get suppliersFixbalancesconfirm =>
-      'یہ تمام سپلائر بیلنس ان کے لیجر اندراجات سے دوبارہ شمار کرے گا۔ جاری رکھیں؟';
-
-  @override
-  String get suppliersBalancesrecalculated =>
-      'سپلائر بیلنس کامیابی سے دوبارہ شمار ہو گئے';
 
   @override
   String get reportsReports => 'رپورٹس';
@@ -767,30 +490,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsPurchasesummaryreport => 'خریداری خلاصہ رپورٹ';
 
   @override
-  String get reportsOpeningbalance => 'ابتدائی بیلنس';
-
-  @override
-  String get reportsTotaldebits => 'کل ڈیبٹ';
-
-  @override
-  String get reportsTotalcredits => 'کل کریڈٹ';
-
-  @override
-  String get reportsClosingbalance => 'اختتامی بیلنس';
-
-  @override
-  String get reportsTotalamount => 'کل رقم';
-
-  @override
-  String get reportsPaidamount => 'ادا شدہ رقم';
-
-  @override
-  String get reportsLastinvoicedate => 'آخری انوائس کی تاریخ';
-
-  @override
-  String get reportsAllcustomers => 'تمام گاہک';
-
-  @override
   String get reportsProductionsummaryreport => 'پروڈکشن خلاصہ رپورٹ';
 
   @override
@@ -824,343 +523,10 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsAccountsreceivablereports => 'اے آر رپورٹس';
 
   @override
-  String get reportsAsOf => 'بمطابق';
-
-  @override
-  String get reportsAvginvoicevalue => 'اوسط انوائس ویلیو';
-
-  @override
-  String get reportsBomusage => 'بی او ایم استعمال';
-
-  @override
-  String get reportsCategoryAr => 'وصولیاں';
-
-  @override
-  String get reportsCategoryFinancial => 'مالی رپورٹس';
-
-  @override
-  String get reportsCategoryInventory => 'انوینٹری رپورٹس';
-
-  @override
-  String get reportsCategoryProduction => 'پروڈکشن رپورٹس';
-
-  @override
-  String get reportsCategoryPurchase => 'خریداری رپورٹس';
-
-  @override
-  String get reportsCategorySales => 'فروخت رپورٹس';
-
-  @override
-  String get reportsCurrent => 'موجودہ';
-
-  @override
-  String get reportsDashboardSubtitle => 'جامع کاروباری تجزیہ اور رپورٹنگ';
-
-  @override
-  String get reportsDays1_30 => '1-30 دن';
-
-  @override
-  String get reportsDays31_60 => '31-60 دن';
-
-  @override
-  String get reportsDays61_90 => '61-90 دن';
-
-  @override
-  String get reportsDays90plus => '90+ دن';
-
-  @override
-  String get reportsItems => 'آئٹمز';
-
-  @override
-  String get reportsItemssold => 'فروخت شدہ آئٹمز';
-
-  @override
-  String get reportsLowstockcount => 'کم اسٹاک آئٹمز';
-
-  @override
-  String get reportsMinimumstock => 'کم از کم اسٹاک';
-
-  @override
-  String get reportsSellingprice => 'فروخت قیمت';
-
-  @override
-  String get reportsShortage => 'کمی';
-
-  @override
-  String get reportsShortagetotal => 'کمی کا کل';
-
-  @override
-  String get reportsStockstatus => 'اسٹاک سٹیٹس';
-
-  @override
-  String get reportsTotalinvoices => 'کل انوائسز';
-
-  @override
-  String get reportsTotaloutstanding => 'کل بقایا';
-
-  @override
-  String get reportsTotalreceivables => 'کل وصولیاں';
-
-  @override
-  String get reportsTotalsales => 'کل فروخت';
-
-  @override
-  String get reportsTotalitems => 'کل آئٹمز';
-
-  @override
-  String get reportsTotalinventoryvalue => 'کل انوینٹری ویلیو';
-
-  @override
-  String get reportsUnitcost => 'یونٹ لاگت';
-
-  @override
-  String get reportsTotalvalue => 'کل ویلیو';
-
-  @override
-  String get reportsValuationmethod => 'ویلیوایشن طریقہ';
-
-  @override
-  String get reportsBatchtracked => 'بیچ ٹریک شدہ';
-
-  @override
-  String get reportsLegacyitems => 'لیگیسی آئٹمز';
-
-  @override
-  String get reportsAvgordervalue => 'اوسط آرڈر ویلیو';
-
-  @override
-  String get reportsLastpurchase => 'آخری خریداری';
-
-  @override
-  String get reportsExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
-
-  @override
-  String get reportsExported => 'رپورٹ ایکسپورٹ ہو گئی';
-
-  @override
-  String get reportsExportfailed => 'رپورٹ ایکسپورٹ ناکام';
-
-  @override
-  String get reportsTotalquantitysold => 'کل فروخت شدہ مقدار';
-
-  @override
-  String get reportsAvgsellingprice => 'اوسط فروخت قیمت';
-
-  @override
-  String get reportsQuantitysold => 'فروخت شدہ مقدار';
-
-  @override
-  String get reportsTotalpurchasevalue => 'کل خریداری ویلیو';
-
-  @override
-  String get reportsOntimedeliveryrate => 'بروقت ترسیل کی شرح';
-
-  @override
-  String get reportsTotalproductionorders => 'کل پروڈکشن آرڈرز';
-
-  @override
-  String get reportsTotaloutputquantity => 'کل آؤٹ پٹ مقدار';
-
-  @override
-  String get reportsCompletedquantity => 'مکمل شدہ مقدار';
-
-  @override
-  String get reportsScrappedquantity => 'ختم شدہ مقدار';
-
-  @override
-  String get reportsProductiondate => 'پروڈکشن تاریخ';
-
-  @override
-  String get reportsProductionorder => 'پروڈکشن آرڈر';
-
-  @override
-  String get reportsOutputitem => 'آؤٹ پٹ آئٹم';
-
-  @override
-  String get reportsOutputquantity => 'آؤٹ پٹ مقدار';
-
-  @override
-  String get reportsPlannedquantity => 'منصوبہ بند مقدار';
-
-  @override
-  String get reportsParentitem => 'بنیادی آئٹم';
-
-  @override
-  String get reportsUsagecount => 'استعمال کی تعداد';
-
-  @override
-  String get reportsLastused => 'آخری استعمال';
-
-  @override
-  String get reportsTotalcomponents => 'کل اجزاء';
-
-  @override
-  String get reportsAllitems => 'تمام آئٹمز';
-
-  @override
-  String get fieldsMetric => 'پیمائش';
-
-  @override
-  String get fieldsValue => 'قیمت';
-
-  @override
-  String get reportsDsodays => 'وصولی کے دن (DSO)';
-
-  @override
-  String get reportsDsounit => 'دن';
-
-  @override
-  String get reportsDsosubtitle =>
-      'فروخت کے بعد وصولی میں لگنے والے اوسط دنوں کی پیمائش۔';
-
-  @override
-  String get reportsPeriod => 'دورانیہ';
-
-  @override
-  String get reportsTotalar => 'کل وصولیاں';
-
-  @override
-  String get reportsTotalinflow => 'کل نقد آمد';
-
-  @override
-  String get reportsTotaloutflow => 'کل نقد اخراج';
-
-  @override
-  String get reportsNetcashflow => 'خالص نقد بہاؤ';
-
-  @override
-  String get reportsCashflowpositive =>
-      'اس دورانیے میں مثبت نقد بہاؤ ہے، جو اچھی لیکویڈیٹی ظاہر کرتا ہے۔';
-
-  @override
-  String get reportsCashflownegative =>
-      'اس دورانیے میں منفی نقد بہاؤ ہے، اخراجات پر نظر ثانی کریں۔';
-
-  @override
-  String get reportsTotalrevenue => 'کل آمدنی';
-
-  @override
-  String get reportsTotalcogs => 'فروخت شدہ سامان کی لاگت (COGS)';
-
-  @override
-  String get reportsGrossprofit => 'مجموعی منافع';
-
-  @override
-  String get reportsTotalexpenses => 'کل اخراجات';
-
-  @override
-  String get reportsTotalrecords => 'کل ریکارڈز';
-
-  @override
-  String get reportsAverageexpense => 'اوسط خرچہ';
-
-  @override
-  String get reportsNetprofit => 'خالص منافع';
-
-  @override
-  String get reportsGrossprofitmargin => 'مجموعی منافع کا مارجن';
-
-  @override
-  String get reportsNetprofitmargin => 'خالص منافع کا مارجن';
-
-  @override
-  String get reportsExpensesbycategory => 'زمرے کے لحاظ سے اخراجات';
-
-  @override
-  String get reportsTotalinbound => 'کل آمد';
-
-  @override
-  String get reportsTotaloutbound => 'کل اخراج';
-
-  @override
-  String get reportsNetmovement => 'خالص حرکت';
-
-  @override
-  String get reportsMovementno => 'حرکت نمبر';
-
-  @override
-  String get reportsMovementtype => 'حرکت کی قسم';
-
-  @override
-  String get reportsTotalorders => 'کل آرڈرز';
-
-  @override
-  String get reportsTotalcost => 'کل لاگت';
-
-  @override
-  String get reportsReceived => 'وصول شدہ رقم';
-
-  @override
-  String get reportsBalance => 'بقیہ';
-
-  @override
-  String get reportsReturnvalue => 'واپسی کی مالیت';
-
-  @override
-  String get reportsTotalinvoiced => 'کل انوائس شدہ';
-
-  @override
-  String get reportsInvoicecount => 'انوائس کی تعداد';
-
-  @override
   String get quotationsQuotations => 'کوٹیشنز';
 
   @override
   String get quotationsNewquotation => 'نیا کوٹیشن';
-
-  @override
-  String get quotationsAdditem => 'آئٹم شامل کریں';
-
-  @override
-  String get quotationsDetailstitle => 'کوٹیشن کی تفصیل';
-
-  @override
-  String get quotationsEditsquotation => 'کوٹیشن میں ترمیم';
-
-  @override
-  String get quotationsPrinta4 => 'A4 پرنٹ کریں';
-
-  @override
-  String get quotationsErrorCustomerrequired => 'گاہک منتخب کریں';
-
-  @override
-  String get quotationsErrorDate => 'تاریخ منتخب کریں';
-
-  @override
-  String get quotationsErrorItemsrequired => 'کم از کم ایک آئٹم شامل کریں';
-
-  @override
-  String get quotationsExpirydate => 'تاریخ انقضا';
-
-  @override
-  String get quotationsExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
-
-  @override
-  String get quotationsExported => 'کوٹیشنز ایکسپورٹ ہو گئے';
-
-  @override
-  String get quotationsExportfailed => 'کوٹیشنز ایکسپورٹ ناکام';
-
-  @override
-  String get quotationsItem => 'آئٹم';
-
-  @override
-  String get quotationsQuantity => 'مقدار';
-
-  @override
-  String get quotationsQuotationdate => 'کوٹیشن کی تاریخ';
-
-  @override
-  String get quotationsSaved => 'کوٹیشن محفوظ ہوگیا';
-
-  @override
-  String get quotationsSearchplaceholder => 'کوٹیشنز تلاش کریں...';
-
-  @override
-  String get quotationsTerms => 'شرائط';
-
-  @override
-  String get quotationsUnitprice => 'یونٹ قیمت';
 
   @override
   String get quotationsQuotation => 'کوٹیشن #';
@@ -1208,15 +574,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get quotationsEdit => 'ترمیم';
 
   @override
-  String get quotationsConvertconfirm =>
-      'یہ اس کوٹیشن سے سیلز آرڈر بنائے گا اور اسے تبدیل شدہ نشان زد کرے گا۔ جاری رکھیں؟';
-
-  @override
-  String quotationsConvertedmsg(Object soNo) {
-    return 'کوٹیشن تبدیل ہوگیا — سیلز آرڈر $soNo بن گیا';
-  }
-
-  @override
   String get quotationsConverttoso => 'آرڈر میں تبدیل کریں';
 
   @override
@@ -1242,113 +599,10 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchaseordersNewpurchaseorder => 'نیا خریداری آرڈر';
 
   @override
-  String get purchaseordersPrinta4 => 'A4 پرنٹ کریں';
-
-  @override
-  String get purchaseordersExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
-
-  @override
-  String get purchaseordersExported => 'خریداری آرڈرز ایکسپورٹ ہو گئے';
-
-  @override
-  String get purchaseordersExportfailed => 'خریداری آرڈرز ایکسپورٹ ناکام';
-
-  @override
-  String get purchaseordersPono => 'پی او نمبر';
-
-  @override
-  String get purchaseordersExpecteddelivery => 'متوقع ترسیل';
-
-  @override
-  String get purchaseordersDetailstitle => 'خریداری آرڈر کی تفصیلات';
-
-  @override
-  String get purchaseordersDeleteconfirm =>
-      'کیا آپ واقعی یہ خریداری آرڈر حذف کرنا چاہتے ہیں؟ یہ واپس نہیں کیا جا سکتا۔';
-
-  @override
-  String get purchaseordersDeleted => 'خریداری آرڈر حذف ہو گیا';
-
-  @override
-  String get purchaseordersNoitems => 'اس آرڈر پر کوئی آئٹم نہیں';
-
-  @override
-  String get purchaseordersBalance => 'بیلنس';
-
-  @override
-  String get purchaseordersAdditem => 'آئٹم شامل کریں';
-
-  @override
-  String get purchaseordersEditpurchaseorder => 'پورچیز آرڈر میں ترمیم کریں';
-
-  @override
-  String get purchaseordersErrorItemsrequired => 'کم از کم ایک آئٹم شامل کریں';
-
-  @override
-  String get purchaseordersErrorSupplierrequired => 'سپلائر منتخب کریں';
-
-  @override
-  String get purchaseordersPodate => 'پی او تاریخ';
-
-  @override
-  String get purchaseordersSaved => 'پورچیز آرڈر محفوظ ہوگیا';
-
-  @override
-  String get purchaseordersSubmitconfirm =>
-      'کیا یہ پورچیز آرڈر جمع کروانا ہے؟ یہ لاک ہو جائے گا اور سپلائر لیجر میں درج ہو جائے گا۔';
-
-  @override
-  String get purchaseordersSubmittedsuccess => 'پورچیز آرڈر جمع کروا دیا گیا';
-
-  @override
-  String get purchaseordersUnitprice => 'یونٹ قیمت';
-
-  @override
-  String get purchaseordersReceivegoods => 'سامان وصول کریں';
-
-  @override
-  String get purchaseordersReceipts => 'رسیدیں';
-
-  @override
-  String get purchaseordersReceiptno => 'رسید نمبر';
-
-  @override
-  String get purchaseordersReceiptdate => 'رسید تاریخ';
-
-  @override
-  String get purchaseordersOrdered => 'آرڈر شدہ';
-
-  @override
-  String get purchaseordersQtyreceived => 'وصول شدہ مقدار';
-
-  @override
-  String get purchaseordersPending => 'زیر التوا';
-
-  @override
-  String get purchaseordersNoreceipts => 'ابھی تک کوئی رسید درج نہیں ہوئی';
-
-  @override
-  String get purchaseordersReceiptsaved => 'سامان کی رسید درج ہو گئی';
-
-  @override
-  String get purchaseordersErrorWarehouserequired => 'گودام منتخب کریں';
-
-  @override
-  String get purchaseordersErrorReceiveditemsrequired =>
-      'کم از کم ایک وصول شدہ مقدار درج کریں';
-
-  @override
-  String get purchaseordersErrorQtyexceeds =>
-      'وصول شدہ مقدار زیر التوا مقدار سے زیادہ نہیں ہو سکتی';
-
-  @override
   String get salesordersSalesorders => 'سیلز آرڈرز';
 
   @override
   String get salesordersNewsalesorder => 'نیا سیلز آرڈر';
-
-  @override
-  String get salesordersPrinta4 => 'A4 پرنٹ کریں';
 
   @override
   String get salesordersSono => 'آرڈر نمبر';
@@ -1361,9 +615,6 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get salesordersDate => 'تاریخ';
-
-  @override
-  String get salesordersDelivered => 'ڈیلیور شدہ';
 
   @override
   String get salesordersDelivery => 'ڈیلیوری';
@@ -1396,15 +647,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesordersEdit => 'ترمیم';
 
   @override
-  String get salesordersExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
-
-  @override
-  String get salesordersExported => 'سیلز آرڈرز ایکسپورٹ ہو گئے';
-
-  @override
-  String get salesordersExportfailed => 'سیلز آرڈرز ایکسپورٹ ناکام';
-
-  @override
   String get salesordersConverttoinvoice => 'بل میں تبدیل کریں';
 
   @override
@@ -1421,62 +663,10 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesordersFailed => 'سیلز آرڈر حذف کرنے میں ناکام';
 
   @override
-  String get salesordersAdditem => 'آئٹم شامل کریں';
-
-  @override
-  String get salesordersBalance => 'بیلنس';
-
-  @override
-  String get salesordersCancelconfirm =>
-      'کیا یہ سیلز آرڈر منسوخ کرنا ہے؟ بل شدہ آرڈرز کا بل منسوخ ہو جائے گا اور اسٹاک واپس ہو جائے گا۔';
-
-  @override
-  String get salesordersCancelledmsg => 'سیلز آرڈر منسوخ ہوگیا';
-
-  @override
-  String get salesordersDeliverydate => 'ڈیلیوری کی تاریخ';
-
-  @override
-  String get salesordersDetailstitle => 'سیلز آرڈر کی تفصیل';
-
-  @override
-  String get salesordersEditsalesorder => 'سیلز آرڈر میں ترمیم';
-
-  @override
-  String get salesordersErrorCustomerrequired => 'گاہک منتخب کریں';
-
-  @override
-  String get salesordersErrorDate => 'تاریخ منتخب کریں';
-
-  @override
-  String get salesordersErrorItemsrequired => 'کم از کم ایک آئٹم شامل کریں';
-
-  @override
-  String get salesordersItem => 'آئٹم';
-
-  @override
-  String get salesordersNoitems => 'اس آرڈر پر کوئی آئٹم نہیں';
-
-  @override
-  String get salesordersQuantity => 'مقدار';
-
-  @override
-  String get salesordersSaved => 'سیلز آرڈر محفوظ ہوگیا';
-
-  @override
-  String get salesordersSearchplaceholder => 'سیلز آرڈرز تلاش کریں...';
-
-  @override
-  String get salesordersSodate => 'آرڈر کی تاریخ';
-
-  @override
-  String get salesordersUnitprice => 'یونٹ قیمت';
-
-  @override
   String get productionProduction => 'پروڈکشن';
 
   @override
-  String get productionNewproduction => 'نئی پیداوار';
+  String get productionNewproduction => 'نیا پروڈکشن';
 
   @override
   String get warehousesWarehouses => 'گودام';
@@ -1555,88 +745,6 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get stockmovementsNewadjustment => 'نیا ایڈجسٹمنٹ';
-
-  @override
-  String get stockmovementsAdjustmentinvalid => 'درست مقدار درج کریں';
-
-  @override
-  String get stockmovementsAdjustmentmsg => 'اسٹاک ایڈجسٹمنٹ درج ہو گیا';
-
-  @override
-  String get stockmovementsAdjustmentreason => 'وجہ';
-
-  @override
-  String get stockmovementsAdjustmentsave => 'ایڈجسٹمنٹ درج کریں';
-
-  @override
-  String get stockmovementsAdjustmentzero => 'مقدار صفر نہیں ہو سکتی';
-
-  @override
-  String get stockmovementsAdjustmentsubtitle =>
-      'آئٹم، گودام، مقدار — منفی مقدار سٹاک کم کرتی ہے';
-
-  @override
-  String get stockmovementsAdjustmenthint => 'مثلاً -10 یا 10';
-
-  @override
-  String get stockmovementsNewtransfer => 'نیا ٹرانسفر';
-
-  @override
-  String get stockmovementsTransfersubtitle =>
-      'ماخذ گودام سے روانگی اور منزل گودام میں آمد کی حرکت بنائی جاتی ہے۔';
-
-  @override
-  String get stockmovementsTransferfrom => 'ماخذ گودام';
-
-  @override
-  String get stockmovementsTransferto => 'منزل گودام';
-
-  @override
-  String get stockmovementsTransfersave => 'سٹاک ٹرانسفر کریں';
-
-  @override
-  String get stockmovementsTransfermsg => 'سٹاک منتقل ہو گیا';
-
-  @override
-  String get stockmovementsTransferdiff => 'ماخذ اور منزل مختلف ہونے چاہئیں';
-
-  @override
-  String get stockmovementsTransferpositive => 'مقدار مثبت ہونی چاہیے';
-
-  @override
-  String get stockmovementsTransferpartialfail =>
-      'ٹرانسفر نامکمل: روانگی کی حرکت ریکارڈ ہو گئی، لیکن آمد کی حرکت ناکام رہی:';
-
-  @override
-  String get stockmovementsReverse => 'ایڈجسٹمنٹ ریورس کریں';
-
-  @override
-  String get stockmovementsReverseconfirm =>
-      'کیا اس ایڈجسٹمنٹ کے لیے معاوضہ حرکت پوسٹ کی جائے؟ سٹاک اسی مقدار سے واپس ایڈجسٹ ہو جائے گا۔';
-
-  @override
-  String get stockmovementsReversemsg => 'ایڈجسٹمنٹ ریورس ہو گئی';
-
-  @override
-  String get stockmovementsFilterall => 'تمام حرکات';
-
-  @override
-  String get stockmovementsFilterpurchase => 'خرید';
-
-  @override
-  String get stockmovementsFiltersale => 'فروخت';
-
-  @override
-  String get stockmovementsFiltertransfer => 'ٹرانسفر';
-
-  @override
-  String get stockmovementsFilterproduction => 'پروڈکشن';
-
-  @override
-  String get stockmovementsFilteradjustment => 'ایڈجسٹمنٹ';
-
-  @override
-  String get stockmovementsLinkedmovement => 'منسلک حرکت';
 
   @override
   String get stockmovementsAlltransactions => 'تمام ٹرانزیکشنز';
@@ -1873,48 +981,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get forecastsSortbymape => 'بہترین (سب سے کم MAPE) پہلے';
 
   @override
-  String get forecastsPredictedweek => 'پیش گوئی (ہفتہ)';
-
-  @override
-  String get forecastsPredictedmonth => 'پیش گوئی (ماہ)';
-
-  @override
-  String get forecastsPredictedquarter => 'پیش گوئی (سہ ماہی)';
-
-  @override
-  String get forecastsRecommendation => 'سفارش';
-
-  @override
-  String get forecastsOrdernow => 'ابھی آرڈر کریں';
-
-  @override
-  String get forecastsOrdersoon => 'جلد آرڈر کریں';
-
-  @override
-  String get forecastsMonitor => 'نگرانی';
-
-  @override
-  String get forecastsAdequate => 'مناسب';
-
-  @override
-  String get forecastsConfidence => 'اعتماد';
-
-  @override
-  String get forecastsPending => 'زیر التوا';
-
-  @override
-  String get forecastsSearchitems => 'اشیاء تلاش کریں...';
-
-  @override
-  String get forecastsCritical => 'نازک';
-
-  @override
-  String get forecastsWarning => 'انتباہ';
-
-  @override
-  String get forecastsOk => 'ٹھیک';
-
-  @override
   String get bomBillofmaterials => 'بل آف میٹریل';
 
   @override
@@ -1924,309 +990,13 @@ class AppLocalizationsUr extends AppLocalizations {
   String get settingsSettings => 'سیٹینگز';
 
   @override
-  String get settingsSubtitle =>
-      'کمپنی پروفائل، کرنسی، ٹیکس کی شرح اور دستاویز نمبرنگ۔';
-
-  @override
-  String get settingsSectionCompany => 'کمپنی';
-
-  @override
-  String get settingsSectionCurrency => 'کرنسی اور فارمیٹنگ';
-
-  @override
-  String get settingsSectionTax => 'ٹیکس';
-
-  @override
-  String get settingsSectionNumbering => 'دستاویز نمبرنگ';
-
-  @override
-  String get settingsSectionOther => 'دیگر ترتیبات';
-
-  @override
-  String get settingsSectionDate => 'تاریخ اور رینج';
-
-  @override
-  String get settingsKeyCompanyName => 'کمپنی کا نام';
-
-  @override
-  String get settingsKeyCompanyEmail => 'کمپنی ای میل';
-
-  @override
-  String get settingsKeyCompanyPhone => 'کمپنی فون';
-
-  @override
-  String get settingsKeyCompanyAddress => 'کمپنی کا پتہ';
-
-  @override
-  String get settingsKeyCompanyTaxId => 'کمپنی ٹیکس شناخت';
-
-  @override
-  String get settingsKeyCurrencySymbol => 'کرنسی علامت';
-
-  @override
-  String get settingsKeyCurrencyCode => 'کرنسی کوڈ';
-
-  @override
-  String get settingsKeyCurrency => 'کرنسی';
-
-  @override
-  String get settingsKeyDecimalPlaces => 'اعشاریہ مقامات';
-
-  @override
-  String get settingsKeyDateFormat => 'تاریخ فارمیٹ';
-
-  @override
-  String get settingsKeyTooltipTimeout => 'ٹول ٹپ ٹائم آؤٹ (سیکنڈ)';
-
-  @override
-  String get settingsKeyTaxRate => 'ڈیفالٹ ٹیکس شرح (٪)';
-
-  @override
-  String get settingsSaved => 'ترتیبات محفوظ ہو گئیں';
-
-  @override
-  String get settingsSaveFailed => 'ترتیبات محفوظ کرنے میں ناکامی';
-
-  @override
-  String get settingsUnsaved => 'غیر محفوظ تبدیلیاں';
-
-  @override
-  String get settingsNumberingHelper =>
-      'سرور کے زیر انتظام دستاویز کاؤنٹر — احتیاط سے ترمیم کریں۔';
-
-  @override
-  String get settingsEmpty => 'دکھانے کے لیے کوئی ترتیبات نہیں';
-
-  @override
   String get integrationsIntegrations => 'انٹیگریشنز';
-
-  @override
-  String get integrationsSubtitle =>
-      'تیسری پارٹی خدمات ترتیب دیں (ای میل، ایس ایم ایس، موسم، توثیق، کرنسی، ٹیکس)۔ API کلیدز خفیہ رکھی جاتی ہیں اور کبھی ظاہر نہیں ہوتیں۔';
-
-  @override
-  String get integrationsConfigured => 'ترتیب شدہ';
-
-  @override
-  String get integrationsNotconfigured => 'ترتیب شدہ نہیں';
-
-  @override
-  String get integrationsEnabled => 'فعال';
-
-  @override
-  String get integrationsSaved => 'انٹیگریشن ترتیبات محفوظ ہو گئیں';
-
-  @override
-  String get integrationsSaveFailed =>
-      'انٹیگریشن ترتیبات محفوظ کرنے میں ناکامی';
-
-  @override
-  String get integrationsApikey => 'API کلید';
-
-  @override
-  String get integrationsApikeyHelper =>
-      'خفیہ ذخیرہ — موجودہ کلید رکھنے کے لیے خالی چھوڑ دیں۔';
-
-  @override
-  String get integrationsFieldFromemail => 'بھیجنے والا ای میل';
-
-  @override
-  String get integrationsFieldFromname => 'بھیجنے والے کا نام';
-
-  @override
-  String get integrationsFieldAccountsid => 'اکاؤنٹ SID';
-
-  @override
-  String get integrationsFieldPhonenumber => 'فون نمبر';
-
-  @override
-  String get integrationsFieldDefaultlocation => 'ڈیفالٹ مقام';
-
-  @override
-  String get integrationsFieldBase => 'بنیادی کرنسی';
-
-  @override
-  String get integrationsFieldUpdateinterval => 'اپڈیٹ وقفہ (سیکنڈ)';
-
-  @override
-  String get integrationsFieldDefaultcountry => 'ڈیفالٹ ملک';
-
-  @override
-  String get integrationsFieldZipcode => 'زپ کوڈ';
-
-  @override
-  String get integrationsServiceEmail => 'ای میل (SendGrid)';
-
-  @override
-  String get integrationsServiceNotifications => 'ایس ایم ایس اطلاعیں (Twilio)';
-
-  @override
-  String get integrationsServiceWeather => 'موسم (Weatherstack)';
-
-  @override
-  String get integrationsServiceValidation => 'فون توثیق (Numverify)';
-
-  @override
-  String get integrationsServiceCurrency => 'کرنسی ایکسچینج (Fixer)';
-
-  @override
-  String get integrationsServiceTax => 'ٹیکس کیلکولیشن (TaxJar)';
 
   @override
   String get usermanagementUsermanagement => 'یوزر مینجمنٹ';
 
   @override
   String get usermanagementRolespermissions => 'ردز اینڈ پرمشنز';
-
-  @override
-  String get usermanagementSubtitle =>
-      'سسٹم صارفین، رولز اور پرمیشنز بنائیں اور ان کا نظم کریں';
-
-  @override
-  String get usermanagementUsers => 'صارفین';
-
-  @override
-  String get usermanagementAllroles => 'تمام رولز';
-
-  @override
-  String get usermanagementAllstatus => 'تمام حیثیتیں';
-
-  @override
-  String get usermanagementSearchusers => 'صارفین تلاش کریں...';
-
-  @override
-  String get usermanagementNewuser => 'نیا صارف';
-
-  @override
-  String get usermanagementEdituser => 'صارف میں ترمیم';
-
-  @override
-  String get usermanagementUsername => 'صارف نام';
-
-  @override
-  String get usermanagementEmail => 'ای میل';
-
-  @override
-  String get usermanagementFullname => 'مکمل نام';
-
-  @override
-  String get usermanagementRole => 'رول';
-
-  @override
-  String get usermanagementPassword => 'پاس ورڈ';
-
-  @override
-  String get usermanagementUsercreated => 'صارف کامیابی سے بنایا گیا';
-
-  @override
-  String get usermanagementUserupdated => 'صارف کامیابی سے اپڈیٹ ہوگیا';
-
-  @override
-  String get usermanagementUserdeleted => 'صارف کامیابی سے حذف ہوگیا';
-
-  @override
-  String get usermanagementDeleteconfirm =>
-      'کیا یہ صارف حذف کریں؟ اسے واپس نہیں کیا جا سکتا۔';
-
-  @override
-  String get usermanagementActivate => 'فعال کریں';
-
-  @override
-  String get usermanagementDeactivate => 'غیر فعال کریں';
-
-  @override
-  String get usermanagementActivated => 'صارف فعال ہوگیا';
-
-  @override
-  String get usermanagementDeactivated => 'صارف غیر فعال ہوگیا';
-
-  @override
-  String get usermanagementResetpassword => 'پاس ورڈ دوبارہ ترتیب دیں';
-
-  @override
-  String get usermanagementNewpassword => 'نیا پاس ورڈ';
-
-  @override
-  String get usermanagementResetconfirm =>
-      'کیا اس صارف کا پاس ورڈ دوبارہ ترتیب دیں؟';
-
-  @override
-  String get usermanagementResetdone =>
-      'پاس ورڈ کامیابی سے دوبارہ ترتیب دیا گیا';
-
-  @override
-  String get usermanagementValidationUsernamerequired => 'صارف نام ضروری ہے';
-
-  @override
-  String get usermanagementValidationEmailrequired => 'ای میل ضروری ہے';
-
-  @override
-  String get usermanagementValidationInvalidemail => 'غلط ای میل فارمیٹ';
-
-  @override
-  String get usermanagementValidationFullnamerequired => 'مکمل نام ضروری ہے';
-
-  @override
-  String get usermanagementValidationRolerequired => 'رول منتخب کریں';
-
-  @override
-  String get usermanagementValidationPasswordlength =>
-      'پاس ورڈ کم از کم 6 حروف کا ہونا چاہیے';
-
-  @override
-  String get usermanagementNewrole => 'نیا رول';
-
-  @override
-  String get usermanagementEditrole => 'رول میں ترمیم';
-
-  @override
-  String get usermanagementRolename => 'رول کا نام';
-
-  @override
-  String get usermanagementDescription => 'تفصیل';
-
-  @override
-  String get usermanagementSystemrole => 'سسٹم';
-
-  @override
-  String get usermanagementPermissions => 'پرمیشنز';
-
-  @override
-  String get usermanagementPermissioncount => 'پرمیشنز';
-
-  @override
-  String get usermanagementPermissionstitle => 'رول پرمیشنز';
-
-  @override
-  String usermanagementPermissionsubtitle(Object role) {
-    return '$role کے لیے پرمیشنز تفویض کریں';
-  }
-
-  @override
-  String get usermanagementPermissionsaved => 'پرمیشنز اپڈیٹ ہو گئیں';
-
-  @override
-  String get usermanagementRolevalidationname => 'رول کا نام ضروری ہے';
-
-  @override
-  String get usermanagementRolecreated => 'رول کامیابی سے بنایا گیا';
-
-  @override
-  String get usermanagementRoleupdated => 'رول کامیابی سے اپڈیٹ ہوگیا';
-
-  @override
-  String get usermanagementRoledeleted => 'رول کامیابی سے حذف ہوگیا';
-
-  @override
-  String get usermanagementRoledeleteconfirm =>
-      'کیا یہ رول حذف کریں؟ اس سے منسلک صارفین کو پہلے دوبارہ تفویض کرنا ہوگا۔';
-
-  @override
-  String get usermanagementCantmodifysystem =>
-      'سسٹم رولز میں ترمیم نہیں کی جا سکتی';
-
-  @override
-  String get usermanagementNoresults => 'کوئی صارف نہیں ملا';
 
   @override
   String get expensesExpenses => 'خرچے';
@@ -2236,64 +1006,6 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get expensesDescription => 'تفصیل';
-
-  @override
-  String get expensesAllcategories => 'تمام زمرے';
-
-  @override
-  String get expensesAllstatuses => 'تمام سٹیٹس';
-
-  @override
-  String get expensesCount => 'خرچے';
-
-  @override
-  String get expensesCreatedby => 'بنانے والا';
-
-  @override
-  String get expensesDeleteconfirmdesc =>
-      'اس سے خرچے کا ریکارڈ مستقل طور پر حذف ہو جائے گا۔';
-
-  @override
-  String get expensesDeleted => 'خرچہ حذف ہو گیا';
-
-  @override
-  String get expensesEdit => 'خرچہ میں ترمیم';
-
-  @override
-  String get expensesErrorAmountInvalid => 'درست رقم درج کریں';
-
-  @override
-  String get expensesErrorAmountRequired => 'رقم درکار ہے';
-
-  @override
-  String get expensesErrorCategoryRequired => 'کیٹیگری درکار ہے';
-
-  @override
-  String get expensesExpensedate => 'خرچے کی تاریخ';
-
-  @override
-  String get expensesExpenseno => 'خرچہ نمبر';
-
-  @override
-  String get expensesExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
-
-  @override
-  String get expensesExported => 'خرچے ایکسپورٹ ہو گئے';
-
-  @override
-  String get expensesExportfailed => 'خرچے ایکسپورٹ ناکام';
-
-  @override
-  String get expensesPaymentmethod => 'ادائیگی کا طریقہ';
-
-  @override
-  String get expensesProject => 'پروجیکٹ';
-
-  @override
-  String get expensesReferenceno => 'حوالہ نمبر';
-
-  @override
-  String get expensesVendor => 'وینڈر';
 
   @override
   String get employeesTitle => 'عملے';
@@ -2472,70 +1184,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get employeesDocumentsFile => 'فائل';
 
   @override
-  String get employeesDocumentsSelectfile => 'فائل منتخب کریں';
-
-  @override
-  String get employeesSearch => 'عملہ تلاش کریں...';
-
-  @override
-  String get employeesAlldepartments => 'تمام محکمے';
-
-  @override
-  String get employeesAllstatus => 'تمام حیثیتیں';
-
-  @override
-  String get employeesFullname => 'مکمل نام';
-
-  @override
-  String get employeesEmploymenttype => 'ملازمت کی قسم';
-
-  @override
-  String get employeesCount => 'عملہ';
-
-  @override
-  String get employeesActivecount => 'فعال';
-
-  @override
-  String get employeesTotalsalary => 'کل تنخواہ';
-
-  @override
-  String get employeesDeleteconfirm =>
-      'کیا یہ عملہ حذف کریں؟ اسے واپس نہیں کیا جا سکتا۔';
-
-  @override
-  String get employeesPaysalary => 'تنخواہ ادا کریں';
-
-  @override
-  String get employeesSalaryamount => 'رقم';
-
-  @override
-  String get employeesPaymentdate => 'ادائیگی کی تاریخ';
-
-  @override
-  String get employeesPaymentmethod => 'ادائیگی کا طریقہ';
-
-  @override
-  String get employeesReferenceno => 'حوالہ نمبر';
-
-  @override
-  String get employeesSalarynotes => 'نوٹس';
-
-  @override
-  String get employeesSalarypaid => 'تنخواہ کی ادائیگی درج ہو گئی';
-
-  @override
-  String get employeesSalaryhistory => 'تنخواہ کی تاریخ';
-
-  @override
-  String get employeesNosalaryhistory => 'ابھی کوئی تنخواہ ادائیگی نہیں';
-
-  @override
-  String get employeesDetailtitle => 'عملے کی تفصیلات';
-
-  @override
-  String get employeesInvalidamount => 'درست رقم درج کریں';
-
-  @override
   String get purchasesPurchases => 'خریداری';
 
   @override
@@ -2588,9 +1236,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesAlltransactions => 'تمام لین دین';
 
   @override
-  String get purchasesAvailableqty => 'واپسی کے لیے دستیاب';
-
-  @override
   String get purchasesTotalvaluecard => 'کل قیمت';
 
   @override
@@ -2636,15 +1281,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesExport => 'ایکسپورٹ';
 
   @override
-  String get purchasesExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
-
-  @override
-  String get purchasesExported => 'خریداری واپسی ایکسپورٹ ہو گئی';
-
-  @override
-  String get purchasesExportfailed => 'خریداری واپسی ایکسپورٹ ناکام';
-
-  @override
   String get purchasesSummary => 'خلاصہ';
 
   @override
@@ -2661,9 +1297,6 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get purchasesDatecol => 'تاریخ';
-
-  @override
-  String get purchasesDetailstitle => 'خریداری کی تفصیلات';
 
   @override
   String get purchasesItemcol => 'آئٹم';
@@ -2757,9 +1390,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesReturnhistory => 'واپسی دیکھیں';
 
   @override
-  String get purchasesReturnno => 'واپسی نمبر';
-
-  @override
   String get purchasesReturnnoitems => 'کوئی واپسی نہیں ملی';
 
   @override
@@ -2770,13 +1400,6 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get purchasesReturnqty => 'واپسی مقدار';
-
-  @override
-  String get purchasesReturnqtyexceeds =>
-      'واپسی کی مقدار دستیاب مقدار سے زیادہ ہے';
-
-  @override
-  String get purchasesReturnqtyinvalid => 'درست واپسی مقدار درج کریں';
 
   @override
   String get purchasesReturndate => 'واپسی تاریخ';
@@ -2800,15 +1423,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesEditinvoice => 'بل ترمیم';
 
   @override
-  String get salesExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
-
-  @override
-  String get salesExported => 'بلز ایکسپورٹ ہو گئے';
-
-  @override
-  String get salesExportfailed => 'بلز ایکسپورٹ ناکام';
-
-  @override
   String get salesInvoiceno => 'بل نمبر';
 
   @override
@@ -2825,33 +1439,6 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get salesInvoicesaved => 'بل کامیابی سے سیو ہوگیا!';
-
-  @override
-  String get salesErrorCustomerRequired => 'گاہک درکار ہے';
-
-  @override
-  String get salesErrorItemsRequired => 'کم از کم ایک آئٹم درکار ہے';
-
-  @override
-  String get salesItems => 'آئٹمز';
-
-  @override
-  String get salesRate => 'ریٹ';
-
-  @override
-  String get salesTax => 'ٹیکس %';
-
-  @override
-  String get salesSubtotal => 'ذیلی کل';
-
-  @override
-  String get salesDiscount => 'ڈسکاؤنٹ';
-
-  @override
-  String get salesGrandtotal => 'کل رقم';
-
-  @override
-  String get salesAdditem => 'آئٹم شامل کریں';
 
   @override
   String get salesLoading => 'لوڈ ہو رہا ہے...';
@@ -2908,88 +1495,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesReceipt => 'رسید';
 
   @override
-  String get salesreturnsAvailableqty => 'واپسی کے لیے دستیاب';
-
-  @override
-  String get salesreturnsDisposition => 'طریقہ کار';
-
-  @override
-  String get salesreturnsDispositionadjust => 'ایڈجسٹ';
-
-  @override
-  String get salesreturnsDispositioncredit => 'کریڈٹ';
-
-  @override
-  String get salesreturnsDispositionrefund => 'ریفنڈ';
-
-  @override
-  String get salesreturnsExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
-
-  @override
-  String get salesreturnsExported => 'انوائس واپسی ایکسپورٹ ہو گئی';
-
-  @override
-  String get salesreturnsExportfailed => 'انوائس واپسی ایکسپورٹ ناکام';
-
-  @override
-  String get salesreturnsOriginalqty => 'اصل مقدار';
-
-  @override
-  String get salesreturnsProcessreturn => 'واپسی پراسیس کریں';
-
-  @override
-  String get salesreturnsReturn => 'واپسی';
-
-  @override
-  String get salesreturnsReturndate => 'واپسی تاریخ';
-
-  @override
-  String get salesreturnsReturnno => 'واپسی نمبر';
-
-  @override
-  String get salesreturnsReturnnoitems => 'کوئی واپسی نہیں ملی';
-
-  @override
-  String get salesreturnsReturnprocessed => 'واپسی کامیابی سے ہوگئی';
-
-  @override
-  String get salesreturnsReturnqty => 'واپسی مقدار';
-
-  @override
-  String get salesreturnsReturnqtyexceeds =>
-      'واپسی کی مقدار دستیاب مقدار سے زیادہ ہے';
-
-  @override
-  String get salesreturnsReturnqtyinvalid => 'درست واپسی مقدار درج کریں';
-
-  @override
-  String get salesreturnsReturnquantity => 'واپسی مقدار';
-
-  @override
-  String get salesreturnsReturnreason => 'واپسی کی وجہ';
-
-  @override
-  String get salesreturnsReturnreasonplaceholder => 'واپسی کی وجہ درج کریں...';
-
-  @override
-  String get salesreturnsReturnsubtitle => 'اس بل کی واپسی پراسیس کریں';
-
-  @override
-  String get salesreturnsReturntitle => 'بل واپسی';
-
-  @override
-  String get salesreturnsReturnvalue => 'کل واپسی قیمت';
-
-  @override
-  String get salesreturnsSearchinvoices => 'بلز تلاش کریں...';
-
-  @override
-  String get salesreturnsSearchplaceholder => 'واپسیاں تلاش کریں...';
-
-  @override
-  String get salesreturnsSelectinvoice => 'بل منتخب کریں';
-
-  @override
   String get inventoryItems => 'مصنوعات';
 
   @override
@@ -3009,9 +1514,6 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get inventoryAggregateqty => 'مجموعی مقدار';
-
-  @override
-  String get inventoryInstock => 'اسٹاک میں';
 
   @override
   String get inventoryLowstock => 'کم اسٹاک';
@@ -3171,40 +1673,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get paymentsSubtitle => 'گاہک کی ادائیگیوں کا نظم کریں';
 
   @override
-  String get paymentsPaymentdetails => 'ادائیگی کی تفصیلات';
-
-  @override
-  String get paymentsPaymentno => 'ادائیگی نمبر';
-
-  @override
-  String get paymentsBalance => 'باقی رقم';
-
-  @override
-  String get paymentsAllocation => 'اختصاص';
-
-  @override
-  String get paymentsTotalallocated => 'کل مختص کردہ';
-
-  @override
-  String get paymentsOpeninvoices => 'کھلے انوائسز';
-
-  @override
-  String get paymentsNoopeninvoices => 'اس گاہک کے لیے کوئی کھلا انوائس نہیں';
-
-  @override
-  String get paymentsSelectinvoices =>
-      'ادائیگی کو اس گاہک کے کھلے انوائسز پر مختص کریں';
-
-  @override
-  String get paymentsRecordedsuccess => 'ادائیگی کامیابی سے ریکارڈ ہوگئی';
-
-  @override
-  String get paymentsReferencehint => 'چیک نمبر، ٹرانزیکشن آئی ڈی وغیرہ';
-
-  @override
-  String get paymentsNoteshint => 'اختیاری نوٹس...';
-
-  @override
   String get navDashboard => 'ڈیش باورڈ';
 
   @override
@@ -3235,9 +1703,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get navExpenses => 'خرچے';
 
   @override
-  String get navManufacturing => 'مینوفیکچرنگ';
-
-  @override
   String get navProduction => 'پروڈکشن';
 
   @override
@@ -3263,51 +1728,6 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get navQuotations => 'کوٹیشنز';
-
-  @override
-  String get physicalcountsCancelconfirm =>
-      'کیا یہ کاؤنٹ منسوخ کریں؟ اس کے بعد مکمل نہیں کیا جا سکے گا۔';
-
-  @override
-  String get physicalcountsCancelcount => 'کاؤنٹ منسوخ کریں';
-
-  @override
-  String get physicalcountsCancelledmsg => 'کاؤنٹ منسوخ ہو گیا';
-
-  @override
-  String get physicalcountsCompleteconfirm =>
-      'کیا یہ کاؤنٹ مکمل کریں؟ فرق والے آئٹمز کے ایڈجسٹمنٹ درج ہو جائیں گے۔';
-
-  @override
-  String get physicalcountsCompletecount => 'کاؤنٹ مکمل کریں';
-
-  @override
-  String get physicalcountsCompletedmsg => 'کاؤنٹ مکمل ہو گیا';
-
-  @override
-  String get physicalcountsRecordhint => 'گنی گئی مقدار';
-
-  @override
-  String get physicalcountsRecordinvalid => 'درست مقدار درج کریں';
-
-  @override
-  String get physicalcountsRecorditems => 'آئٹمز درج کریں';
-
-  @override
-  String get physicalcountsRecordnone => 'کم از کم ایک گنی گئی مقدار درج کریں';
-
-  @override
-  String get physicalcountsRecordedmsg => 'مقدار درج ہو گئی';
-
-  @override
-  String get physicalcountsRecordsave => 'مقدار محفوظ کریں';
-
-  @override
-  String get warehousesDeletedmsg => 'گودام حذف ہو گیا';
-
-  @override
-  String get warehousesDeleteconfirm =>
-      'کیا یہ گودام حذف کریں؟ یہ واپس نہیں ہو سکے گا۔';
 
   @override
   String get navSalesorders => 'سیلز آرڈرز';
@@ -3386,6 +1806,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get navInventorymovement => 'انوینٹری موومنٹ';
+
+  @override
+  String get navManufacturing => 'مینوفیکچرنگ';
 
   @override
   String get navPurchasereturns => 'خریداری واپسیاں';
@@ -3863,9 +2286,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get fieldsCustomer => 'گاہک';
 
   @override
-  String get fieldsCustomerCode => 'گاہک کوڈ';
-
-  @override
   String get fieldsItem => 'آئٹم';
 
   @override
@@ -3915,27 +2335,6 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get statusCancelled => 'منسوخ';
-
-  @override
-  String get statusApproved => 'منظور شدہ';
-
-  @override
-  String get statusSubmitted => 'جمع شدہ';
-
-  @override
-  String get statusSent => 'بھیجا گیا';
-
-  @override
-  String get statusPartiallypaid => 'جزوی طور پر ادا شدہ';
-
-  @override
-  String get statusReturned => 'واپس کیا گیا';
-
-  @override
-  String get statusPartiallyreturned => 'جزوی طور پر واپس کیا گیا';
-
-  @override
-  String get statusPartiallyreceived => 'جزوی طور پر موصول';
 
   @override
   String get statusDraft => 'مسودہ';
@@ -3995,6 +2394,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get commonLanguage => 'زبان';
 
   @override
+  String get commonThemeMode => 'ڈارک موڈ';
+
+  @override
   String get commonCurrency => 'کرنسی';
 
   @override
@@ -4002,65 +2404,6 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get commonLogin => 'لاگ ان';
-
-  @override
-  String get loginUsername => 'صارف نام';
-
-  @override
-  String get loginPassword => 'پاس ورڈ';
-
-  @override
-  String get loginSigningIn => 'سائن ان ہو رہا ہے...';
-
-  @override
-  String get loginInvalidCredentials => 'غلط صارف نام یا پاس ورڈ';
-
-  @override
-  String get loginServerUnreachable =>
-      'سرور سے رابطہ ممکن نہیں۔ کیا سرور پورٹ 3011 پر چل رہا ہے؟';
-
-  @override
-  String get loginDevHint => 'ڈیفالٹ لاگ ان: admin / admin123';
-
-  @override
-  String get splashLoading => 'لوڈ ہو رہا ہے...';
-
-  @override
-  String get logoutConfirmMessage => 'کیا آپ واقعی لاگ آؤٹ کرنا چاہتے ہیں؟';
-
-  @override
-  String get changePasswordTitle => 'پاس ورڈ تبدیل کریں';
-
-  @override
-  String get changePasswordCurrent => 'موجودہ پاس ورڈ';
-
-  @override
-  String get changePasswordNew => 'نیا پاس ورڈ';
-
-  @override
-  String get changePasswordConfirm => 'نیا پاس ورڈ تصدیق کریں';
-
-  @override
-  String get changePasswordButton => 'پاس ورڈ تبدیل کریں';
-
-  @override
-  String get changePasswordUpdating => 'اپ ڈیٹ ہو رہا ہے...';
-
-  @override
-  String get changePasswordSuccess => 'پاس ورڈ کامیابی سے تبدیل ہو گیا';
-
-  @override
-  String get changePasswordMismatch => 'پاس ورڈ مماثل نہیں ہیں';
-
-  @override
-  String get changePasswordTooShort => 'پاس ورڈ کم از کم 6 حروف کا ہونا چاہیے';
-
-  @override
-  String get changePasswordSameAsCurrent =>
-      'نیا پاس ورڈ موجودہ پاس ورڈ سے مختلف ہونا چاہیے';
-
-  @override
-  String get changePasswordWrongCurrent => 'موجودہ پاس ورڈ غلط ہے';
 
   @override
   String get commonUser => 'یوزر';
@@ -4126,12 +2469,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get commonClose => 'بند';
 
   @override
-  String get commonNavigate => 'نیویگیٹ کریں';
-
-  @override
-  String get commonOpen => 'کھولیں';
-
-  @override
   String get commonConfirm => 'تصدیق';
 
   @override
@@ -4147,16 +2484,7 @@ class AppLocalizationsUr extends AppLocalizations {
   String get commonRefresh => 'ریفریش';
 
   @override
-  String get commonRemove => 'ہٹائیں';
-
-  @override
   String get commonView => 'دیکھیں';
-
-  @override
-  String get commonShow => 'دکھائیں';
-
-  @override
-  String get commonHide => 'چھپائیں';
 
   @override
   String get commonCreate => 'بنائیں';
@@ -4268,28 +2596,216 @@ class AppLocalizationsUr extends AppLocalizations {
       'براہ کرم رسید پرنٹ کرنے کے لیے پاپ اپس کی اجازت دیں';
 
   @override
-  String get inventoryReorderlevel => 'ری آرڈر لیول';
+  String get activitylogAction => 'عمل';
 
   @override
-  String get inventorySellingprice => 'فروخت قیمت';
+  String get activitylogEntity => 'ہستی';
 
   @override
-  String get inventoryStandardcost => 'معیاری لاگت';
+  String get activitylogLevel => 'سطح';
+
+  @override
+  String get activitylogTimestamp => 'وقت';
+
+  @override
+  String get activitylogUser => 'صارف';
+
+  @override
+  String get bomFinisheditem => 'تیار شدہ مصنوع';
+
+  @override
+  String get bomItems => 'پرزے';
+
+  @override
+  String get bomMaterialcost => 'مواد کی لاگت';
+
+  @override
+  String get bomName => 'BOM کا نام';
+
+  @override
+  String get bomNo => 'BOM نمبر';
+
+  @override
+  String get cashreconCounted => 'گنتی';
+
+  @override
+  String get cashreconExpected => 'متوقع';
+
+  @override
+  String get cashreconInflow => 'آمد';
+
+  @override
+  String get cashreconNotes => 'نوٹس';
+
+  @override
+  String get cashreconOpening => 'ابتدائی بیلنس';
+
+  @override
+  String get cashreconOutflow => 'اخراج';
+
+  @override
+  String get cashreconVariance => 'فرق';
+
+  @override
+  String get commonNavigate => 'نیویگیٹ کریں';
+
+  @override
+  String get commonNext => 'اگلا';
+
+  @override
+  String get commonOf => 'از';
+
+  @override
+  String get commonOpen => 'کھولیں';
+
+  @override
+  String get commonPage => 'صفحہ';
+
+  @override
+  String get commonPerpage => 'فی صفحہ';
+
+  @override
+  String get commonPrevious => 'پچھلا';
+
+  @override
+  String get drpAddPreset => 'پری سیٹ شامل کریں';
+
+  @override
+  String drpDaysSelected(Object n) {
+    return '$n دن منتخب';
+  }
+
+  @override
+  String get drpDefaultFailed => 'ڈیفالٹ رینج محفوظ نہیں ہو سکی';
+
+  @override
+  String get drpDefaultSet => 'ڈیفالٹ رینج مقرر ہو گئی';
+
+  @override
+  String get drpNextPeriod => 'اگلی مدت';
+
+  @override
+  String get drpOneDay => '1 دن';
+
+  @override
+  String get drpPickDate => 'تاریخ منتخب کریں';
+
+  @override
+  String get drpPickEnd => 'اختتام کی تاریخ منتخب کریں';
+
+  @override
+  String get drpPickStart => 'شروع کی تاریخ منتخب کریں';
+
+  @override
+  String get drpPresetAddFailed => 'پری سیٹ محفوظ نہیں ہو سکا';
+
+  @override
+  String get drpPresetAdded => 'پری سیٹ شامل ہو گیا';
+
+  @override
+  String get drpPresetAllDates => 'تمام تاریخیں';
+
+  @override
+  String get drpPresetCustom => 'اپنی مرضی';
+
+  @override
+  String get drpPresetCustomRange => 'اپنی مرضی کی رینج';
+
+  @override
+  String get drpPresetLast30 => 'پچھلے 30 دن';
+
+  @override
+  String get drpPresetLast7 => 'پچھلے 7 دن';
+
+  @override
+  String get drpPresetLast90 => 'پچھلے 90 دن';
+
+  @override
+  String get drpPresetLastMonth => 'پچھلے مہینے';
+
+  @override
+  String get drpPresetLastWeek => 'پچھلے ہفتے';
+
+  @override
+  String get drpPresetName => 'پری سیٹ کا نام';
+
+  @override
+  String get drpPresetRemove => 'پری سیٹ ہٹائیں';
+
+  @override
+  String get drpPresetRemoveFailed => 'پری سیٹ ہٹایا نہیں جا سکا';
+
+  @override
+  String get drpPresetThisMonth => 'اس مہینے';
+
+  @override
+  String get drpPresetThisWeek => 'اس ہفتے';
+
+  @override
+  String get drpPresetToday => 'آج';
+
+  @override
+  String get drpPresetYesterday => 'کل';
+
+  @override
+  String get drpPrevPeriod => 'پچھلی مدت';
+
+  @override
+  String get drpSetDefault => 'ڈیفالٹ رینج مقرر کریں';
+
+  @override
+  String get drpWeekStartFailed => 'ہفتے کا آغاز محفوظ نہیں ہو سکا';
+
+  @override
+  String get drpWeekStartsOn => 'ہفتہ شروع ہوتا ہے';
+
+  @override
+  String get drpWeekdayMonday => 'پیر';
+
+  @override
+  String get drpWeekdaySaturday => 'ہفتہ';
+
+  @override
+  String get drpWeekdaySunday => 'اتوار';
+
+  @override
+  String get expensesCreatedby => 'بنانے والا';
+
+  @override
+  String get expensesExpenseno => 'خرچہ نمبر';
+
+  @override
+  String get expensesPaymentmethod => 'ادائیگی کا طریقہ';
+
+  @override
+  String get expensesProject => 'پروجیکٹ';
+
+  @override
+  String get expensesReferenceno => 'حوالہ نمبر';
+
+  @override
+  String get expensesVendor => 'وینڈر';
+
+  @override
+  String get fieldsAccount => 'کھاتہ';
+
+  @override
+  String get fieldsCustomerCode => 'گاہک کوڈ';
+
+  @override
+  String get fieldsMetric => 'پیمائش';
+
+  @override
+  String get fieldsValue => 'قیمت';
 
   @override
   String get inventoryCurrentstock => 'موجودہ اسٹاک';
 
   @override
-  String get inventoryItemdetails => 'مصنوعات کی تفصیلات';
+  String get inventoryReorderlevel => 'ری آرڈر لیول';
 
   @override
-  String get inventoryStockbywarehouse => 'گودام کے مطابق اسٹاک';
-
-  @override
-  String get inventoryStockledger => 'اسٹاک لیجر';
-
-  @override
-  String get inventoryStockledgerType => 'قسم';
+  String get inventoryStockledgerBalance => 'بیلنس';
 
   @override
   String get inventoryStockledgerIn => 'اندر';
@@ -4298,124 +2814,694 @@ class AppLocalizationsUr extends AppLocalizations {
   String get inventoryStockledgerOut => 'باہر';
 
   @override
-  String get inventoryStockledgerBalance => 'بیلنس';
+  String get inventoryStockledgerType => 'قسم';
 
   @override
-  String get inventoryStockledgerNoentries => 'کوئی اسٹاک ٹرانزیکشن نہیں ملی';
+  String get paymentsErrorAmountGreaterThanZero =>
+      'ادائیگی کی رقم صفر سے زیادہ ہونی چاہیے';
 
   @override
-  String get inventoryStockledgerAllwarehouses => 'تمام گودام';
+  String get productionBatchno => 'بیچ نمبر';
 
   @override
-  String get inventoryStockledgerExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+  String get productionNo => 'پیداوار نمبر';
 
   @override
-  String get inventoryStockledgerExported => 'اسٹاک لیجر ایکسپورٹ ہو گیا';
+  String get productionOutputitem => 'آؤٹ پٹ مصنوع';
 
   @override
-  String get inventoryStockledgerExportfailed => 'اسٹاک لیجر ایکسپورٹ ناکام';
+  String get productionTotalcost => 'کل لاگت';
 
   @override
-  String get inventoryRack => 'ریک';
+  String get productionUnitcost => 'فی یونٹ لاگت';
 
   @override
-  String get inventorySaletype => 'فروخت کی قسم';
+  String get productionWarehouse => 'تیار مال کا گودام';
 
   @override
-  String get inventoryPurchaseprice => 'خرید قیمت';
+  String get purchaseordersExpecteddelivery => 'متوقع ترسیل';
 
   @override
-  String get inventoryPurchased => 'خرید شدہ';
+  String get purchaseordersPono => 'پی او نمبر';
 
   @override
-  String get inventoryItemtype => 'قسم';
+  String get purchasesReturnno => 'واپسی نمبر';
 
   @override
-  String get inventorySaletypePacked => 'پیکڈ';
+  String get reportsAvginvoicevalue => 'اوسط انوائس ویلیو';
 
   @override
-  String get inventorySaletypeLoose => 'ڈھیلا';
+  String get reportsAvgordervalue => 'اوسط آرڈر ویلیو';
 
   @override
-  String get customersCustomercode => 'گاہک کوڈ';
+  String get reportsAvgsellingprice => 'اوسط فروخت قیمت';
 
   @override
-  String get customersContactperson => 'رابطہ شخص';
+  String get reportsBalance => 'بقیہ';
 
   @override
-  String get customersCreditlimit => 'کریڈٹ حد';
+  String get reportsClosingbalance => 'اختتامی بیلنس';
 
   @override
-  String get customersBillingaddress => 'بلنگ ایڈریس';
+  String get reportsCompletedquantity => 'مکمل شدہ مقدار';
 
   @override
-  String get customersEditcustomer => 'گاہک میں ترمیم کریں';
+  String get reportsCurrent => 'موجودہ';
 
   @override
-  String get customersErrorEmail => 'غلط ای میل فارمیٹ';
+  String get reportsDays1_30 => '1-30 دن';
 
   @override
-  String get customersErrorNameRequired => 'گاہک کا نام ضروری ہے';
+  String get reportsDays31_60 => '31-60 دن';
 
   @override
-  String get customersErrorNonnegative => 'صفر یا اس سے زیادہ ہونا چاہیے';
+  String get reportsDays61_90 => '61-90 دن';
 
   @override
-  String get customersErrorNumber => 'درست نمبر درج کریں';
+  String get reportsDays90plus => '90+ دن';
 
   @override
-  String get customersErrorPhoneRequired => 'فون نمبر ضروری ہے';
+  String get reportsDsodays => 'وصولی کے دن (DSO)';
 
   @override
-  String get customersPaymenttermsdays => 'ادائیگی کی شرائط (دن)';
+  String get reportsGrossprofit => 'مجموعی منافع';
 
   @override
-  String get customersShippingaddress => 'شپنگ ایڈریس';
+  String get reportsGrossprofitmargin => 'مجموعی منافع کا مارجن';
 
   @override
-  String get customersCreditutilization => 'کریڈٹ استعمال';
+  String get reportsInvoicecount => 'انوائس کی تعداد';
 
   @override
-  String get customersCurrentbalance => 'موجودہ بیلنس';
+  String get reportsItems => 'آئٹمز';
 
   @override
-  String get customersCustomerdetails => 'گاہک کی تفصیلات';
+  String get reportsLastpurchase => 'آخری خریداری';
 
   @override
-  String get customersOpeningbalance => 'ابتدائی بیلنس';
+  String get reportsLastused => 'آخری استعمال';
 
   @override
-  String get customersPaymentterms => 'ادائیگی کی شرائط';
+  String get reportsMinimumstock => 'کم از کم اسٹاک';
 
   @override
-  String get customersLedger => 'لیجر';
+  String get reportsMovementno => 'حرکت نمبر';
 
   @override
-  String get customersLedgerClosingbalance => 'اختتامی بیلنس';
+  String get reportsMovementtype => 'حرکت کی قسم';
 
   @override
-  String get customersLedgerCredit => 'کریڈٹ';
+  String get reportsNetcashflow => 'خالص نقد بہاؤ';
 
   @override
-  String get customersLedgerDebit => 'ڈیبٹ';
+  String get reportsNetprofit => 'خالص منافع';
 
   @override
-  String get customersLedgerNoentries => 'کوئی لیجر اندراج نہیں ملا';
+  String get reportsNetprofitmargin => 'خالص منافع کا مارجن';
 
   @override
-  String get customersLedgerTotalcredit => 'کل کریڈٹ';
+  String get reportsOntimedeliveryrate => 'بروقت ترسیل کی شرح';
 
   @override
-  String get customersLedgerTotaldebit => 'کل ڈیبٹ';
+  String get reportsOpeningbalance => 'ابتدائی بیلنس';
 
   @override
-  String get customersBalance => 'بیلنس';
+  String get reportsOutputitem => 'آؤٹ پٹ آئٹم';
+
+  @override
+  String get reportsOutputquantity => 'آؤٹ پٹ مقدار';
+
+  @override
+  String get reportsParentitem => 'بنیادی آئٹم';
+
+  @override
+  String get reportsPeriod => 'دورانیہ';
+
+  @override
+  String get reportsProductiondate => 'پروڈکشن تاریخ';
+
+  @override
+  String get reportsProductionorder => 'پروڈکشن آرڈر';
+
+  @override
+  String get reportsReceived => 'وصول شدہ رقم';
+
+  @override
+  String get reportsScrappedquantity => 'ختم شدہ مقدار';
+
+  @override
+  String get reportsSellingprice => 'فروخت قیمت';
+
+  @override
+  String get reportsShortage => 'کمی';
+
+  @override
+  String get reportsTotalar => 'کل وصولیاں';
+
+  @override
+  String get reportsTotalcogs => 'فروخت شدہ سامان کی لاگت (COGS)';
+
+  @override
+  String get reportsTotalcomponents => 'کل اجزاء';
+
+  @override
+  String get reportsTotalcost => 'کل لاگت';
+
+  @override
+  String get reportsTotalcredits => 'کل کریڈٹ';
+
+  @override
+  String get reportsTotaldebits => 'کل ڈیبٹ';
+
+  @override
+  String get reportsTotalexpenses => 'کل اخراجات';
+
+  @override
+  String get reportsTotalinflow => 'کل نقد آمد';
+
+  @override
+  String get reportsTotalinvoiced => 'کل انوائس شدہ';
+
+  @override
+  String get reportsTotalinvoices => 'کل انوائسز';
+
+  @override
+  String get reportsTotalorders => 'کل آرڈرز';
+
+  @override
+  String get reportsTotaloutflow => 'کل نقد اخراج';
+
+  @override
+  String get reportsTotaloutstanding => 'کل بقایا';
+
+  @override
+  String get reportsTotalpurchasevalue => 'کل خریداری ویلیو';
+
+  @override
+  String get reportsTotalquantitysold => 'کل فروخت شدہ مقدار';
+
+  @override
+  String get reportsTotalrevenue => 'کل آمدنی';
+
+  @override
+  String get reportsTotalsales => 'کل فروخت';
+
+  @override
+  String get reportsTotalvalue => 'کل ویلیو';
+
+  @override
+  String get reportsUnitcost => 'یونٹ لاگت';
+
+  @override
+  String get reportsUsagecount => 'استعمال کی تعداد';
+
+  @override
+  String get reportsValuationmethod => 'ویلیوایشن طریقہ';
+
+  @override
+  String get salesPaymentdate => 'ادائیگی کی تاریخ';
+
+  @override
+  String get salesreturnsReturndate => 'واپسی تاریخ';
+
+  @override
+  String get salesreturnsReturnno => 'واپسی نمبر';
+
+  @override
+  String get salesreturnsReturnqty => 'واپسی مقدار';
+
+  @override
+  String get salesreturnsReturnvalue => 'کل واپسی قیمت';
+
+  @override
+  String get suppliersAccountsettings => 'اکاؤنٹ کی ترتیبات';
+
+  @override
+  String get suppliersAllocatedpos => 'تخصیص شدہ پی اوز';
+
+  @override
+  String get suppliersAllocation => 'تخصیص';
+
+  @override
+  String get suppliersAllocationrequired => 'کم از کم ایک پی او تخصیص درکار ہے';
+
+  @override
+  String get suppliersAllposallocated => 'تمام دستیاب پی اوز تخصیص ہو چکے ہیں';
+
+  @override
+  String get suppliersAmount => 'رقم';
+
+  @override
+  String get suppliersAmountmustmatch => 'رقم کل تخصیص کے برابر ہونی چاہیے';
+
+  @override
+  String get suppliersAutoallocate => 'خودکار تخصیص';
+
+  @override
+  String get suppliersAvailablepos => 'دستیاب پی اوز';
+
+  @override
+  String get suppliersBacktosuppliers => 'سپلائرز پر واپس';
+
+  @override
+  String get suppliersBalance => 'بیلنس';
+
+  @override
+  String get suppliersBalancesrecalculated =>
+      'سپلائر بیلنس کامیابی سے دوبارہ شمار ہو گئے';
+
+  @override
+  String get suppliersBeginningbalance => 'ابتدائی بیلنس';
+
+  @override
+  String get suppliersClosingbalance => 'اختتامی بیلنس';
+
+  @override
+  String get suppliersCompleted => 'مکمل';
+
+  @override
+  String get suppliersConfirmdelete => 'کیا آپ واقعی حذف کرنا چاہتے ہیں';
+
+  @override
+  String get suppliersConfirmdeletepayment =>
+      'کیا آپ واقعی ادائیگی حذف کرنا چاہتے ہیں';
+
+  @override
+  String get suppliersContactinfo => 'رابطہ کی معلومات';
+
+  @override
+  String get suppliersContactperson => 'رابطہ شخص';
+
+  @override
+  String get suppliersCurrentbalance => 'موجودہ بیلنس';
+
+  @override
+  String get suppliersDelete => 'حذف کریں';
+
+  @override
+  String get suppliersDeletepayment => 'ادائیگی حذف کریں';
+
+  @override
+  String get suppliersDraft => 'ڈرافٹ';
+
+  @override
+  String get suppliersEditsupplier => 'سپلائر میں ترمیم کریں';
+
+  @override
+  String get suppliersEndingbalance => 'آخری بیلنس';
+
+  @override
+  String get suppliersErrorCodeRequired => 'سپلائر کوڈ درکار ہے';
+
+  @override
+  String get suppliersErrorNameRequired => 'سپلائر کا نام درکار ہے';
+
+  @override
+  String get suppliersExpecteddelivery => 'متوقع ترسیل';
+
+  @override
+  String get suppliersExportcsv => 'سی ایس وی ایکسپورٹ';
+
+  @override
+  String get suppliersExportimage => 'تصویر';
+
+  @override
+  String get suppliersExportpdf => 'پی ڈی ایف ایکسپورٹ';
+
+  @override
+  String get suppliersExportsuccess => 'کامیابی سے ایکسپورٹ ہو گیا';
+
+  @override
+  String get suppliersFinancialsummary => 'مالی خلاصہ';
+
+  @override
+  String get suppliersFixbalances => 'بیلنس درست کریں';
+
+  @override
+  String get suppliersFixbalancesconfirm =>
+      'یہ تمام سپلائر بیلنس ان کے لیجر اندراجات سے دوبارہ شمار کرے گا۔ جاری رکھیں؟';
+
+  @override
+  String get suppliersLedger => 'لیجر';
+
+  @override
+  String get suppliersLedgerCredit => 'کریڈٹ';
+
+  @override
+  String get suppliersLedgerDebit => 'ڈیبٹ';
+
+  @override
+  String get suppliersLedgerNoentries => 'کوئی لیجر اندراج نہیں ملا';
+
+  @override
+  String get suppliersLedgerTotalcredit => 'کل کریڈٹ';
+
+  @override
+  String get suppliersLedgerTotaldebit => 'کل ڈیبٹ';
+
+  @override
+  String get suppliersLedgerType => 'قسم';
+
+  @override
+  String get suppliersMethod => 'طریقہ';
+
+  @override
+  String get suppliersNoopenpos => 'تخصیص کے لیے کوئی کھلا پی او نہیں';
+
+  @override
+  String get suppliersNopayments => 'کوئی ادائیگی نہیں ملی';
+
+  @override
+  String get suppliersNopos => 'کوئی پروکیورمنٹ آرڈر نہیں ملا';
+
+  @override
+  String get suppliersNotes => 'نوٹس';
+
+  @override
+  String get suppliersOpeningbalance => 'ابتدائی بیلنس';
+
+  @override
+  String get suppliersOverview => 'جائزہ';
+
+  @override
+  String get suppliersPartial => 'جزوی';
+
+  @override
+  String get suppliersPaymentdeleted => 'ادائیگی کامیابی سے حذف ہو گئی!';
+
+  @override
+  String get suppliersPaymentno => 'ادائیگی نمبر';
+
+  @override
+  String get suppliersPaymentrecordedsuccess =>
+      'ادائیگی کامیابی سے ریکارڈ ہو گئی';
+
+  @override
+  String get suppliersPayments => 'ادائیگیاں';
+
+  @override
+  String get suppliersPaymentterms => 'ادائیگی کی شرائط';
+
+  @override
+  String get suppliersPono => 'پی او نمبر';
+
+  @override
+  String get suppliersPos => 'پروکیورمنٹ آرڈرز';
+
+  @override
+  String get suppliersPostatus => 'پروکیورمنٹ آرڈر کی حیثیت';
+
+  @override
+  String get suppliersPrintreceipt => 'رسید پرنٹ کریں';
+
+  @override
+  String get suppliersPrintreceipta4 => 'رسید پرنٹ کریں (A4)';
+
+  @override
+  String get suppliersRecordpayment => 'ادائیگی ریکارڈ کریں';
+
+  @override
+  String get suppliersReference => 'حوالہ';
+
+  @override
+  String get suppliersSincesupplier => 'سپلائر از';
+
+  @override
+  String get suppliersStatement => 'بیان';
+
+  @override
+  String get suppliersStatementsummary => 'بیان کا خلاصہ';
+
+  @override
+  String get suppliersSubmitted => 'جمع کرایا گیا';
+
+  @override
+  String get suppliersSuppliercode => 'سپلائر کوڈ';
+
+  @override
+  String get suppliersSupplierdeleted => 'سپلائر کامیابی سے حذف ہو گیا!';
+
+  @override
+  String get suppliersSupplierdetails => 'سپلائر کی تفصیلات';
+
+  @override
+  String get suppliersTotal => 'کل';
+
+  @override
+  String get suppliersTotalamount => 'کل رقم';
+
+  @override
+  String get suppliersTotalcredits => 'کل کریڈٹس';
+
+  @override
+  String get suppliersTotaldebits => 'کل ڈیبٹس';
+
+  @override
+  String get suppliersTotalpos => 'کل پی اوز';
+
+  @override
+  String get suppliersTotalpovalue => 'کل پی او مالیت';
+
+  @override
+  String get suppliersTransactiondetails => 'لین دین کی تفصیلات';
+
+  @override
+  String get suppliersUnallocated => 'غیر تخصیص شدہ رقم';
+
+  @override
+  String get suppliersWhatnext => 'آگے کیا کرنا چاہیں گے؟';
+
+  @override
+  String activitylogCleanupsuccess(Object days) {
+    return '$days لاگ اندراجات صاف ہو گئے';
+  }
+
+  @override
+  String usermanagementPermissionsubtitle(Object roleName) {
+    return '$roleName کے لیے پرمیشنز تفویض کریں';
+  }
+
+  @override
+  String customersDays(Object customerPaymentTermsDays) {
+    return '$customerPaymentTermsDays دن';
+  }
+
+  @override
+  String paymentsErrorAmountExceedsBalance(Object remainingBalance) {
+    return 'ادائیگی باقی رقم $remainingBalance سے زیادہ ہے';
+  }
+
+  @override
+  String productionShortfallLine(Object arg0, Object arg1, Object arg2) {
+    return '$arg0: $arg1 دستیاب، $arg2 درکار';
+  }
+
+  @override
+  String quotationsConvertedmsg(Object salesOrderNo) {
+    return 'کوٹیشن تبدیل ہوگیا — سیلز آرڈر $salesOrderNo بن گیا';
+  }
+
+  @override
+  String get activitylogAllactions => 'تمام اعمال';
+
+  @override
+  String get activitylogAllentities => 'تمام اقسام';
+
+  @override
+  String get activitylogAllusers => 'تمام صارفین';
+
+  @override
+  String get activitylogCleanup => 'صفائی';
+
+  @override
+  String get activitylogCleanupdays => 'ریٹینشن (دن)';
+
+  @override
+  String get activitylogCleanupdesc =>
+      'ریٹینشن مدت سے پرانی لاگز مستقل طور پر حذف ہو جائیں گی۔ اسے واپس نہیں کیا جا سکتا۔';
+
+  @override
+  String get activitylogCleanupinvalid => 'دنوں کی درست تعداد درج کریں';
+
+  @override
+  String get activitylogCleanuptitle => 'پرانی لاگز صاف کریں';
+
+  @override
+  String get activitylogCount => 'لاگز';
+
+  @override
+  String get activitylogDetailtitle => 'سرگرمی کی تفصیل';
+
+  @override
+  String get activitylogDuration => 'دورانیہ';
+
+  @override
+  String get activitylogExportcsv => 'CSV برآمد کریں';
+
+  @override
+  String get activitylogExported => 'سرگرمی لاگ برآمد ہو گیا';
+
+  @override
+  String get activitylogExportfailed => 'برآمد ناکام ہوئی';
+
+  @override
+  String get activitylogIp => 'آئی پی ایڈریس';
+
+  @override
+  String get activitylogMetadata => 'میٹا ڈیٹا';
+
+  @override
+  String get activitylogToday => 'آج';
+
+  @override
+  String get activitylogTotal => 'کل لاگز';
+
+  @override
+  String get activitylogUseragent => 'یوزر ایجنٹ';
+
+  @override
+  String get bomActivate => 'فعال کریں';
+
+  @override
+  String get bomAddmaterial => 'مواد شامل کریں';
+
+  @override
+  String get bomCreated => 'تاریخ تخلیق';
+
+  @override
+  String get bomCurrentstock => 'موجودہ اسٹاک';
+
+  @override
+  String get bomDeactivate => 'غیر فعال کریں';
+
+  @override
+  String get bomDeleteconfirm =>
+      'کیا یہ BOM حذف کریں؟ نوٹ: پیداوار میں استعمال شدہ BOM حذف نہیں ہو سکتا۔';
+
+  @override
+  String get bomDeleted => 'BOM حذف کر دیا گیا';
+
+  @override
+  String get bomDescription => 'وضاحت';
+
+  @override
+  String get bomDetailstitle => 'مصنوعات کا اجزاء نامہ';
+
+  @override
+  String get bomEdittitle => 'BOM میں ترمیم';
+
+  @override
+  String get bomErrorFinisheditem =>
+      'وہ تیار کنندہ مصنوع منتخب کریں جس کے لیے یہ BOM ہے۔';
+
+  @override
+  String get bomErrorItemsrequired => 'کم از کم ایک مواد کی لائن شامل کریں';
+
+  @override
+  String get bomExportcsv => 'CSV برآمد کریں';
+
+  @override
+  String get bomExported => 'BOMs برآمد ہو گئیں';
+
+  @override
+  String get bomExportfailed => 'برآمد ناکام رہی';
+
+  @override
+  String get bomMaterials => 'مواد';
+
+  @override
+  String get bomNoMaterials => 'کوئی مواد کی لائن نہیں';
+
+  @override
+  String get bomQuantity => 'بیچ مقدار';
+
+  @override
+  String get bomSaved => 'BOM محفوظ';
+
+  @override
+  String get bomUnitcost => 'معیاری لاگت';
+
+  @override
+  String get cashposExpense => 'خرچہ';
+
+  @override
+  String get cashposPaymentreceived => 'ادائیگی موصول';
+
+  @override
+  String get cashposPurchase => 'خریداری';
+
+  @override
+  String get cashposRefund => 'واپسی';
+
+  @override
+  String get cashposSalary => 'تنخواہ';
+
+  @override
+  String get cashposSupplierpayment => 'سپلائر ادائیگی';
+
+  @override
+  String get cashposTransactions => 'ٹرانزیکشنز';
+
+  @override
+  String get cashreconNet => 'خالص';
+
+  @override
+  String get cashreconNotcounted => 'گنتی نہیں ہوئی';
+
+  @override
+  String get cashreconReconciled => 'مطابقت شدہ';
+
+  @override
+  String get cashreconSave => 'محفوظ کریں';
+
+  @override
+  String get cashreconSaved => 'محفوظ ہوگیا';
+
+  @override
+  String get changePasswordButton => 'پاس ورڈ تبدیل کریں';
+
+  @override
+  String get changePasswordConfirm => 'نیا پاس ورڈ تصدیق کریں';
+
+  @override
+  String get changePasswordCurrent => 'موجودہ پاس ورڈ';
+
+  @override
+  String get changePasswordMismatch => 'پاس ورڈ مماثل نہیں ہیں';
+
+  @override
+  String get changePasswordNew => 'نیا پاس ورڈ';
+
+  @override
+  String get changePasswordSameAsCurrent =>
+      'نیا پاس ورڈ موجودہ پاس ورڈ سے مختلف ہونا چاہیے';
+
+  @override
+  String get changePasswordSuccess => 'پاس ورڈ کامیابی سے تبدیل ہو گیا';
+
+  @override
+  String get changePasswordTitle => 'پاس ورڈ تبدیل کریں';
+
+  @override
+  String get changePasswordTooShort => 'پاس ورڈ کم از کم 6 حروف کا ہونا چاہیے';
+
+  @override
+  String get changePasswordUpdating => 'اپ ڈیٹ ہو رہا ہے...';
+
+  @override
+  String get changePasswordWrongCurrent => 'موجودہ پاس ورڈ غلط ہے';
+
+  @override
+  String get commonHide => 'چھپائیں';
+
+  @override
+  String get commonRemove => 'ہٹائیں';
+
+  @override
+  String get commonShow => 'دکھائیں';
 
   @override
   String get customersAccountsettings => 'اکاؤنٹ کی ترتیبات';
-
-  @override
-  String get customersAdd => 'شامل کریں';
 
   @override
   String get customersAllinvoicesallocated =>
@@ -4449,6 +3535,12 @@ class AppLocalizationsUr extends AppLocalizations {
   String get customersBacktocustomers => 'گاہکوں پر واپس جائیں';
 
   @override
+  String get customersBalance => 'بیلنس';
+
+  @override
+  String get customersBillingaddress => 'بلنگ ایڈریس';
+
+  @override
   String get customersCancelinvoice => 'انوائس منسوخ کریں';
 
   @override
@@ -4465,6 +3557,27 @@ class AppLocalizationsUr extends AppLocalizations {
   String get customersConfirmdeletepayment => 'ادائیگی حذف کریں';
 
   @override
+  String get customersContactinfo => 'رابطہ معلومات';
+
+  @override
+  String get customersContactperson => 'رابطہ شخص';
+
+  @override
+  String get customersCreditlimit => 'کریڈٹ حد';
+
+  @override
+  String get customersCreditutilization => 'کریڈٹ استعمال';
+
+  @override
+  String get customersCurrentbalance => 'موجودہ بیلنس';
+
+  @override
+  String get customersCustomercode => 'گاہک کوڈ';
+
+  @override
+  String get customersCustomerdetails => 'گاہک کی تفصیلات';
+
+  @override
   String get customersCustomersince => 'گاہک از';
 
   @override
@@ -4475,6 +3588,21 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get customersDuedate => 'واجب الادا تاریخ';
+
+  @override
+  String get customersEditcustomer => 'گاہک میں ترمیم کریں';
+
+  @override
+  String get customersErrorNameRequired => 'گاہک کا نام ضروری ہے';
+
+  @override
+  String get customersErrorNonnegative => 'صفر یا اس سے زیادہ ہونا چاہیے';
+
+  @override
+  String get customersErrorNumber => 'درست نمبر درج کریں';
+
+  @override
+  String get customersErrorPhoneRequired => 'فون نمبر ضروری ہے';
 
   @override
   String get customersExportcsv => 'CSV برآمد کریں';
@@ -4492,22 +3620,53 @@ class AppLocalizationsUr extends AppLocalizations {
   String get customersFinancialsummary => 'مالیاتی خلاصہ';
 
   @override
+  String get customersFixbalances => 'بیلنس ٹھیک کریں';
+
+  @override
+  String get customersFixbalancesconfirm =>
+      'یہ تمام گاہکوں کے بیلنس غیر ادا شدہ انوائسز سے دوبارہ شمار کرے گا۔ جاری رکھیں؟';
+
+  @override
+  String get customersFixbalancessuccess => 'بیلنس کامیابی سے دوبارہ شمار ہوئے';
+
+  @override
+  String get customersInvoicecancelled => 'انوائس منسوخ ہو گئی';
+
+  @override
   String get customersInvoicedeleted => 'انوائس حذف ہو گئی';
 
   @override
   String get customersInvoiceno => 'انوائس نمبر';
 
   @override
-  String get customersInvoicecancelled => 'انوائس منسوخ ہو گئی';
+  String get customersInvoices => 'انوائسز';
 
   @override
   String get customersInvoicestatus => 'انوائس کی حالت';
 
   @override
-  String get customersInvoices => 'انوائسز';
+  String get customersLedger => 'لیجر';
+
+  @override
+  String get customersLedgerClosingbalance => 'اختتامی بیلنس';
+
+  @override
+  String get customersLedgerCredit => 'کریڈٹ';
+
+  @override
+  String get customersLedgerDebit => 'ڈیبٹ';
+
+  @override
+  String get customersLedgerNoentries => 'کوئی لیجر اندراج نہیں ملا';
 
   @override
   String get customersLedgerPayments => 'ادائیگیاں';
+
+  @override
+  String get customersLedgerTotalcredit => 'کل کریڈٹ';
+
+  @override
+  String get customersLedgerTotaldebit => 'کل ڈیبٹ';
 
   @override
   String get customersLedgerTotals => 'کل';
@@ -4525,7 +3684,13 @@ class AppLocalizationsUr extends AppLocalizations {
   String get customersNopayments => 'کوئی ادائیگی نہیں ملی';
 
   @override
+  String get customersNotapplicable => 'ن/ا';
+
+  @override
   String get customersNotes => 'نوٹس';
+
+  @override
+  String get customersOpeningbalance => 'ابتدائی بیلنس';
 
   @override
   String get customersOutstanding => 'بقایا جات';
@@ -4553,6 +3718,12 @@ class AppLocalizationsUr extends AppLocalizations {
   String get customersPayments => 'ادائیگیاں';
 
   @override
+  String get customersPaymentterms => 'ادائیگی کی شرائط';
+
+  @override
+  String get customersPaymenttermsdays => 'ادائیگی کی شرائط (دن)';
+
+  @override
   String get customersPending => 'زیر التوا';
 
   @override
@@ -4568,7 +3739,7 @@ class AppLocalizationsUr extends AppLocalizations {
   String get customersReference => 'حوالہ';
 
   @override
-  String get customersRemove => 'ہٹائیں';
+  String get customersShippingaddress => 'شپنگ ایڈریس';
 
   @override
   String get customersStatement => 'اسٹیٹمنٹ';
@@ -4607,19 +3778,258 @@ class AppLocalizationsUr extends AppLocalizations {
   String get customersWhatnext => 'اب آگے کیا کرنا چاہیں گے؟';
 
   @override
-  String get commonPage => 'صفحہ';
+  String get dashboardArsummary => 'وصولیات کا خلاصہ';
 
   @override
-  String get commonOf => 'از';
+  String get dashboardCashbankposition => 'نقدی / بینک پوزیشن';
 
   @override
-  String get commonNext => 'اگلا';
+  String get dashboardCashrecon => 'مطابقت کریں';
 
   @override
-  String get commonPrevious => 'پچھلا';
+  String get dashboardCustomers => 'کسٹمرز';
 
   @override
-  String get commonPerpage => 'فی صفحہ';
+  String get dashboardGlobalDateRangeHint =>
+      'تاریخ کی حد تمام رپورٹ اسکرینز پر لاگو ہوتی ہے';
+
+  @override
+  String get dashboardGrossProfit => 'مجموعی منافع';
+
+  @override
+  String get dashboardInvoices => 'انوائسز';
+
+  @override
+  String get dashboardOpeningbalance => 'ابتدائی بیلنس';
+
+  @override
+  String get dashboardOpeningbalanceHint =>
+      'وہ ابتدائی نقدی/بینک بیلنس جس کے ساتھ آپ نے کاروبار شروع کیا۔ یہ آج کی پوزیشن میں شامل ہوتا ہے۔';
+
+  @override
+  String get dashboardPurchaseOrders => 'پی او';
+
+  @override
+  String get dashboardPurchaseOrdersHint =>
+      'منتخب تاریخ کی حد میں کی گئی کل خریداری';
+
+  @override
+  String get dashboardRecentproductions => 'حالیہ پروڈکشنز';
+
+  @override
+  String get dashboardTopcustomers => 'ٹاپ کسٹمرز';
+
+  @override
+  String get employeesActivecount => 'فعال';
+
+  @override
+  String get employeesAlldepartments => 'تمام محکمے';
+
+  @override
+  String get employeesAllstatus => 'تمام حیثیتیں';
+
+  @override
+  String get employeesCount => 'عملہ';
+
+  @override
+  String get employeesDeleteconfirm =>
+      'کیا یہ عملہ حذف کریں؟ اسے واپس نہیں کیا جا سکتا۔';
+
+  @override
+  String get employeesDocumentsSelectfile => 'فائل منتخب کریں';
+
+  @override
+  String get employeesEmploymenttype => 'ملازمت کی قسم';
+
+  @override
+  String get employeesFullname => 'مکمل نام';
+
+  @override
+  String get employeesInvalidamount => 'درست رقم درج کریں';
+
+  @override
+  String get employeesNosalaryhistory => 'ابھی کوئی تنخواہ ادائیگی نہیں';
+
+  @override
+  String get employeesPaymentdate => 'ادائیگی کی تاریخ';
+
+  @override
+  String get employeesPaymentmethod => 'ادائیگی کا طریقہ';
+
+  @override
+  String get employeesPaysalary => 'تنخواہ ادا کریں';
+
+  @override
+  String get employeesReferenceno => 'حوالہ نمبر';
+
+  @override
+  String get employeesSalaryamount => 'رقم';
+
+  @override
+  String get employeesSalaryhistory => 'تنخواہ کی تاریخ';
+
+  @override
+  String get employeesSalarynotes => 'نوٹس';
+
+  @override
+  String get employeesSalarypaid => 'تنخواہ کی ادائیگی درج ہو گئی';
+
+  @override
+  String get employeesSearch => 'عملہ تلاش کریں...';
+
+  @override
+  String get employeesTotalsalary => 'کل تنخواہ';
+
+  @override
+  String get expensesAllcategories => 'تمام زمرے';
+
+  @override
+  String get expensesAllstatuses => 'تمام سٹیٹس';
+
+  @override
+  String get expensesCount => 'خرچے';
+
+  @override
+  String get expensesDeleteconfirmdesc =>
+      'اس سے خرچے کا ریکارڈ مستقل طور پر حذف ہو جائے گا۔';
+
+  @override
+  String get expensesDeleted => 'خرچہ حذف ہو گیا';
+
+  @override
+  String get expensesEdit => 'خرچہ میں ترمیم';
+
+  @override
+  String get expensesErrorAmountInvalid => 'درست رقم درج کریں';
+
+  @override
+  String get expensesErrorAmountRequired => 'رقم درکار ہے';
+
+  @override
+  String get expensesErrorCategoryRequired => 'کیٹیگری درکار ہے';
+
+  @override
+  String get expensesExpensedate => 'خرچے کی تاریخ';
+
+  @override
+  String get expensesExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get expensesExported => 'خرچے ایکسپورٹ ہو گئے';
+
+  @override
+  String get expensesExportfailed => 'خرچے ایکسپورٹ ناکام';
+
+  @override
+  String get forecastsAdequate => 'مناسب';
+
+  @override
+  String get forecastsConfidence => 'اعتماد';
+
+  @override
+  String get forecastsCritical => 'نازک';
+
+  @override
+  String get forecastsMonitor => 'نگرانی';
+
+  @override
+  String get forecastsOk => 'ٹھیک';
+
+  @override
+  String get forecastsOrdernow => 'ابھی آرڈر کریں';
+
+  @override
+  String get forecastsOrdersoon => 'جلد آرڈر کریں';
+
+  @override
+  String get forecastsPredictedmonth => 'پیش گوئی (ماہ)';
+
+  @override
+  String get forecastsPredictedquarter => 'پیش گوئی (سہ ماہی)';
+
+  @override
+  String get forecastsPredictedweek => 'پیش گوئی (ہفتہ)';
+
+  @override
+  String get forecastsRecommendation => 'سفارش';
+
+  @override
+  String get forecastsSearchitems => 'اشیاء تلاش کریں...';
+
+  @override
+  String get forecastsWarning => 'انتباہ';
+
+  @override
+  String get integrationsApikey => 'API کلید';
+
+  @override
+  String get integrationsApikeyHelper =>
+      'خفیہ ذخیرہ — موجودہ کلید رکھنے کے لیے خالی چھوڑ دیں۔';
+
+  @override
+  String get integrationsConfigured => 'ترتیب شدہ';
+
+  @override
+  String get integrationsEnabled => 'فعال';
+
+  @override
+  String get integrationsFieldAccountsid => 'اکاؤنٹ SID';
+
+  @override
+  String get integrationsFieldBase => 'بنیادی کرنسی';
+
+  @override
+  String get integrationsFieldDefaultcountry => 'ڈیفالٹ ملک';
+
+  @override
+  String get integrationsFieldDefaultlocation => 'ڈیفالٹ مقام';
+
+  @override
+  String get integrationsFieldFromemail => 'بھیجنے والا ای میل';
+
+  @override
+  String get integrationsFieldFromname => 'بھیجنے والے کا نام';
+
+  @override
+  String get integrationsFieldPhonenumber => 'فون نمبر';
+
+  @override
+  String get integrationsFieldUpdateinterval => 'اپڈیٹ وقفہ (سیکنڈ)';
+
+  @override
+  String get integrationsFieldZipcode => 'زپ کوڈ';
+
+  @override
+  String get integrationsNotconfigured => 'ترتیب شدہ نہیں';
+
+  @override
+  String get integrationsSaveFailed =>
+      'انٹیگریشن ترتیبات محفوظ کرنے میں ناکامی';
+
+  @override
+  String get integrationsSaved => 'انٹیگریشن ترتیبات محفوظ ہو گئیں';
+
+  @override
+  String get integrationsServiceCurrency => 'کرنسی ایکسچینج (Fixer)';
+
+  @override
+  String get integrationsServiceEmail => 'ای میل (SendGrid)';
+
+  @override
+  String get integrationsServiceNotifications => 'ایس ایم ایس اطلاعیں (Twilio)';
+
+  @override
+  String get integrationsServiceTax => 'ٹیکس کیلکولیشن (TaxJar)';
+
+  @override
+  String get integrationsServiceValidation => 'فون توثیق (Numverify)';
+
+  @override
+  String get integrationsServiceWeather => 'موسم (Weatherstack)';
+
+  @override
+  String get integrationsSubtitle =>
+      'تیسری پارٹی خدمات ترتیب دیں (ای میل، ایس ایم ایس، موسم، توثیق، کرنسی، ٹیکس)۔ API کلیدز خفیہ رکھی جاتی ہیں اور کبھی ظاہر نہیں ہوتیں۔';
 
   @override
   String get inventoryEdititem => 'آئٹم میں ترمیم';
@@ -4631,165 +4041,164 @@ class AppLocalizationsUr extends AppLocalizations {
   String get inventoryErrorNameRequired => 'مصنوعات نام درکار ہے';
 
   @override
-  String get inventoryErrorUomRequired => 'پیمائش کی اکائی درکار ہے';
-
-  @override
-  String get inventoryRequired => 'درکار ہے';
+  String get inventoryErrorNonnegative => 'صفر یا زیادہ ہونا چاہیے';
 
   @override
   String get inventoryErrorNumber => 'درست نمبر درج کریں';
 
   @override
-  String get inventoryErrorNonnegative => 'صفر یا زیادہ ہونا چاہیے';
+  String get inventoryErrorUomRequired => 'پیمائش کی اکائی درکار ہے';
 
   @override
-  String get salesClicktoadditem => 'آئٹم شامل کرنے کے لیے کلک کریں...';
+  String get inventoryInstock => 'اسٹاک میں';
 
   @override
-  String get salesNoproductsfound => 'کوئی پروڈکٹ نہیں ملی';
+  String get inventoryItemdetails => 'مصنوعات کی تفصیلات';
 
   @override
-  String get salesPayment => 'ادائیگی';
+  String get inventoryItemtype => 'قسم';
 
   @override
-  String get salesRecordpaymentnow => 'ابھی ادائیگی درج کریں';
+  String get inventoryPurchased => 'خرید شدہ';
 
   @override
-  String get salesPaymenthistory => 'ادائیگی کی تاریخ';
+  String get inventoryPurchaseprice => 'خرید قیمت';
 
   @override
-  String get salesPaymentdate => 'ادائیگی کی تاریخ';
+  String get inventoryRack => 'ریک';
 
   @override
-  String get salesPaymentmethods => 'ادائیگی کے طریقے';
+  String get inventoryRequired => 'درکار ہے';
 
   @override
-  String get salesAddmethod => 'طریقہ شامل کریں';
+  String get inventorySaletype => 'فروخت کی قسم';
 
   @override
-  String get salesMethod => 'طریقہ';
+  String get inventorySaletypeLoose => 'ڈھیلا';
 
   @override
-  String get salesReference => 'حوالہ';
+  String get inventorySaletypePacked => 'پیکڈ';
 
   @override
-  String get salesPaymenttotal => 'کل ادائیگی';
+  String get inventorySellingprice => 'فروخت قیمت';
 
   @override
-  String get paymentsErrorAmountGreaterThanZero =>
-      'ادائیگی کی رقم صفر سے زیادہ ہونی چاہیے';
+  String get inventoryStandardcost => 'معیاری لاگت';
 
   @override
-  String paymentsErrorAmountExceedsBalance(Object balance) {
-    return 'ادائیگی باقی رقم $balance سے زیادہ ہے';
-  }
+  String get inventoryStockbywarehouse => 'گودام کے مطابق اسٹاک';
 
   @override
-  String get salesPaymentrecorded => 'ادائیگی درج کر لی گئی';
+  String get inventoryStockledger => 'اسٹاک لیجر';
 
   @override
-  String get salesEditpayment => 'ادائیگی میں ترمیم';
+  String get inventoryStockledgerAllwarehouses => 'تمام گودام';
 
   @override
-  String get salesPaymentupdated => 'ادائیگی اپڈیٹ ہو گئی';
+  String get inventoryStockledgerExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
 
   @override
-  String get salesDiscountscope => 'ڈسکاؤنٹ کا دائرہ';
+  String get inventoryStockledgerExported => 'اسٹاک لیجر ایکسپورٹ ہو گیا';
 
   @override
-  String get salesInvoice => 'انوائس';
+  String get inventoryStockledgerExportfailed => 'اسٹاک لیجر ایکسپورٹ ناکام';
 
   @override
-  String get salesPeritem => 'فی آئٹم';
+  String get inventoryStockledgerNoentries => 'کوئی اسٹاک ٹرانزیکشن نہیں ملی';
 
   @override
-  String get bomActivate => 'فعال کریں';
+  String get loginDevHint => 'ڈیفالٹ لاگ ان: admin / admin123';
 
   @override
-  String get bomActivated => 'BOM فعال کیا گیا';
+  String get loginInvalidCredentials => 'غلط صارف نام یا پاس ورڈ';
 
   @override
-  String get bomAddmaterial => 'مواد شامل کریں';
+  String get loginPassword => 'پاس ورڈ';
 
   @override
-  String get bomCreated => 'تاریخ تخلیق';
+  String get loginServerUnreachable =>
+      'سرور سے رابطہ ممکن نہیں۔ کیا سرور پورٹ 3011 پر چل رہا ہے؟';
 
   @override
-  String get bomCurrentstock => 'موجودہ اسٹاک';
+  String get loginSigningIn => 'سائن ان ہو رہا ہے...';
 
   @override
-  String get bomDeactivate => 'غیر فعال کریں';
+  String get loginUsername => 'صارف نام';
 
   @override
-  String get bomDeactivated => 'BOM غیر فعال کیا گیا';
+  String get logoutConfirmMessage => 'کیا آپ واقعی لاگ آؤٹ کرنا چاہتے ہیں؟';
 
   @override
-  String get bomDeleteconfirm =>
-      'کیا یہ BOM حذف کریں؟ نوٹ: پیداوار میں استعمال شدہ BOM حذف نہیں ہو سکتا۔';
+  String get paymentsBalance => 'باقی رقم';
 
   @override
-  String get bomDeleted => 'BOM حذف کر دیا گیا';
+  String get paymentsNoopeninvoices => 'اس گاہک کے لیے کوئی کھلا انوائس نہیں';
 
   @override
-  String get bomDescription => 'وضاحت';
+  String get paymentsNoteshint => 'اختیاری نوٹس...';
 
   @override
-  String get bomDetailstitle => 'مصنوعات کا اجزاء نامہ';
+  String get paymentsOpeninvoices => 'کھلے انوائسز';
 
   @override
-  String get bomEdittitle => 'BOM میں ترمیم';
+  String get paymentsPaymentdetails => 'ادائیگی کی تفصیلات';
 
   @override
-  String get bomErrorFinisheditem =>
-      'وہ تیار کنندہ مصنوع منتخب کریں جس کے لیے یہ BOM ہے۔';
+  String get paymentsPaymentno => 'ادائیگی نمبر';
 
   @override
-  String get bomErrorItemsrequired => 'کم از کم ایک مواد کی لائن شامل کریں';
+  String get paymentsRecordedsuccess => 'ادائیگی کامیابی سے ریکارڈ ہوگئی';
 
   @override
-  String get bomExportcsv => 'CSV برآمد کریں';
+  String get paymentsReferencehint => 'چیک نمبر، ٹرانزیکشن آئی ڈی وغیرہ';
 
   @override
-  String get bomExported => 'BOMs برآمد ہو گئیں';
+  String get paymentsSelectinvoices =>
+      'ادائیگی کو اس گاہک کے کھلے انوائسز پر مختص کریں';
 
   @override
-  String get bomExportfailed => 'برآمد ناکام رہی';
+  String get paymentsTotalallocated => 'کل مختص کردہ';
 
   @override
-  String get bomFinisheditem => 'تیار شدہ مصنوع';
+  String get physicalcountsCancelconfirm =>
+      'کیا یہ کاؤنٹ منسوخ کریں؟ اس کے بعد مکمل نہیں کیا جا سکے گا۔';
 
   @override
-  String get bomItems => 'پرزے';
+  String get physicalcountsCancelcount => 'کاؤنٹ منسوخ کریں';
 
   @override
-  String get bomMaterialcost => 'مواد کی لاگت';
+  String get physicalcountsCancelledmsg => 'کاؤنٹ منسوخ ہو گیا';
 
   @override
-  String get bomMaterials => 'مواد';
+  String get physicalcountsCompleteconfirm =>
+      'کیا یہ کاؤنٹ مکمل کریں؟ فرق والے آئٹمز کے ایڈجسٹمنٹ درج ہو جائیں گے۔';
 
   @override
-  String get bomName => 'BOM کا نام';
+  String get physicalcountsCompletecount => 'کاؤنٹ مکمل کریں';
 
   @override
-  String get bomNo => 'BOM نمبر';
+  String get physicalcountsCompletedmsg => 'کاؤنٹ مکمل ہو گیا';
 
   @override
-  String get bomNoMaterials => 'کوئی مواد کی لائن نہیں';
+  String get physicalcountsRecordedmsg => 'مقدار درج ہو گئی';
 
   @override
-  String get bomQuantity => 'بیچ مقدار';
+  String get physicalcountsRecordhint => 'گنی گئی مقدار';
 
   @override
-  String get bomSaved => 'BOM محفوظ';
+  String get physicalcountsRecordinvalid => 'درست مقدار درج کریں';
 
   @override
-  String get bomUnitcost => 'معیاری لاگت';
+  String get physicalcountsRecorditems => 'آئٹمز درج کریں';
 
   @override
-  String get productionAddinput => 'ان پٹ شامل کریں';
+  String get physicalcountsRecordnone => 'کم از کم ایک گنی گئی مقدار درج کریں';
 
   @override
-  String get productionBatchno => 'بیچ نمبر';
+  String get physicalcountsRecordsave => 'مقدار محفوظ کریں';
+
+  @override
+  String get productionAvailable => 'دستیاب';
 
   @override
   String get productionBom => 'BOM';
@@ -4822,18 +4231,11 @@ class AppLocalizationsUr extends AppLocalizations {
   String get productionDetailstitle => 'پیداوار کی تفصیلات';
 
   @override
-  String get productionErrorInputsrequired => 'کم از کم ایک مواد درج کریں۔';
-
-  @override
   String get productionErrorBomrequired =>
       'مٹیریل ان پٹس لوڈ کرنے کے لیے BOM منتخب کریں۔';
 
   @override
-  String get productionAvailable => 'دستیاب';
-
-  @override
-  String get productionErrorInvalidqty =>
-      'مواد کی مقدار صفر سے زیادہ ہونی چاہیے۔';
+  String get productionErrorInputsrequired => 'کم از کم ایک مواد درج کریں۔';
 
   @override
   String get productionErrorOutputrequired => 'آؤٹ پٹ مصنوع لازمی ہے۔';
@@ -4865,13 +4267,7 @@ class AppLocalizationsUr extends AppLocalizations {
   String get productionMaterialcost => 'مواد کی لاگت';
 
   @override
-  String get productionNo => 'پیداوار نمبر';
-
-  @override
   String get productionNoinputs => 'اس پیداوار میں کوئی مواد درج نہیں۔';
-
-  @override
-  String get productionOutputitem => 'آؤٹ پٹ مصنوع';
 
   @override
   String get productionOutputquantity => 'آؤٹ پٹ مقدار';
@@ -4886,203 +4282,855 @@ class AppLocalizationsUr extends AppLocalizations {
   String get productionSaved => 'پیداوار محفوظ ہو گئی';
 
   @override
-  String productionShortfallLine(
-    Object available,
-    Object name,
-    Object required,
-  ) {
-    return '$name: $available دستیاب، $required درکار';
-  }
-
-  @override
   String get productionShortfallTitle => 'ان اشیاء کا اسٹاک ناکافی ہے';
 
   @override
-  String get productionTotalcost => 'کل لاگت';
+  String get purchaseordersAdditem => 'آئٹم شامل کریں';
 
   @override
-  String get productionUnitcost => 'فی یونٹ لاگت';
+  String get purchaseordersBalance => 'بیلنس';
 
   @override
-  String get productionWarehouse => 'تیار مال کا گودام';
+  String get purchaseordersDeleteconfirm =>
+      'کیا آپ واقعی یہ خریداری آرڈر حذف کرنا چاہتے ہیں؟ یہ واپس نہیں کیا جا سکتا۔';
 
   @override
-  String get fieldsAccount => 'کھاتہ';
+  String get purchaseordersDeleted => 'خریداری آرڈر حذف ہو گیا';
 
   @override
-  String get dashboardCashbankposition => 'نقدی / بینک پوزیشن';
+  String get purchaseordersDetailstitle => 'خریداری آرڈر کی تفصیلات';
 
   @override
-  String get dashboardCashrecon => 'مطابقت کریں';
+  String get purchaseordersEditpurchaseorder => 'پورچیز آرڈر میں ترمیم کریں';
+
+  @override
+  String get purchaseordersErrorItemsrequired => 'کم از کم ایک آئٹم شامل کریں';
+
+  @override
+  String get purchaseordersErrorQtyexceeds =>
+      'وصول شدہ مقدار زیر التوا مقدار سے زیادہ نہیں ہو سکتی';
+
+  @override
+  String get purchaseordersErrorReceiveditemsrequired =>
+      'کم از کم ایک وصول شدہ مقدار درج کریں';
+
+  @override
+  String get purchaseordersErrorSupplierrequired => 'سپلائر منتخب کریں';
+
+  @override
+  String get purchaseordersErrorWarehouserequired => 'گودام منتخب کریں';
+
+  @override
+  String get purchaseordersExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get purchaseordersExported => 'خریداری آرڈرز ایکسپورٹ ہو گئے';
+
+  @override
+  String get purchaseordersExportfailed => 'خریداری آرڈرز ایکسپورٹ ناکام';
+
+  @override
+  String get purchaseordersNoitems => 'اس آرڈر پر کوئی آئٹم نہیں';
+
+  @override
+  String get purchaseordersNoreceipts => 'ابھی تک کوئی رسید درج نہیں ہوئی';
+
+  @override
+  String get purchaseordersOrdered => 'آرڈر شدہ';
+
+  @override
+  String get purchaseordersPending => 'زیر التوا';
+
+  @override
+  String get purchaseordersPodate => 'پی او تاریخ';
+
+  @override
+  String get purchaseordersPrinta4 => 'A4 پرنٹ کریں';
+
+  @override
+  String get purchaseordersQtyreceived => 'وصول شدہ مقدار';
+
+  @override
+  String get purchaseordersReceiptdate => 'رسید تاریخ';
+
+  @override
+  String get purchaseordersReceiptno => 'رسید نمبر';
+
+  @override
+  String get purchaseordersReceipts => 'رسیدیں';
+
+  @override
+  String get purchaseordersReceiptsaved => 'سامان کی رسید درج ہو گئی';
+
+  @override
+  String get purchaseordersReceivegoods => 'سامان وصول کریں';
+
+  @override
+  String get purchaseordersSaved => 'پورچیز آرڈر محفوظ ہوگیا';
+
+  @override
+  String get purchaseordersSubmitconfirm =>
+      'کیا یہ پورچیز آرڈر جمع کروانا ہے؟ یہ لاک ہو جائے گا اور سپلائر لیجر میں درج ہو جائے گا۔';
+
+  @override
+  String get purchaseordersSubmittedsuccess => 'پورچیز آرڈر جمع کروا دیا گیا';
+
+  @override
+  String get purchasesAvailableqty => 'واپسی کے لیے دستیاب';
+
+  @override
+  String get purchasesDetailstitle => 'خریداری کی تفصیلات';
+
+  @override
+  String get purchasesExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get purchasesExported => 'خریداری واپسی ایکسپورٹ ہو گئی';
+
+  @override
+  String get purchasesExportfailed => 'خریداری واپسی ایکسپورٹ ناکام';
+
+  @override
+  String get purchasesReturnqtyexceeds =>
+      'واپسی کی مقدار دستیاب مقدار سے زیادہ ہے';
+
+  @override
+  String get purchasesReturnqtyinvalid => 'درست واپسی مقدار درج کریں';
+
+  @override
+  String get quotationsAdditem => 'آئٹم شامل کریں';
+
+  @override
+  String get quotationsConvertconfirm =>
+      'یہ اس کوٹیشن سے سیلز آرڈر بنائے گا اور اسے تبدیل شدہ نشان زد کرے گا۔ جاری رکھیں؟';
+
+  @override
+  String get quotationsDetailstitle => 'کوٹیشن کی تفصیل';
+
+  @override
+  String get quotationsEditsquotation => 'کوٹیشن میں ترمیم';
+
+  @override
+  String get quotationsErrorCustomerrequired => 'گاہک منتخب کریں';
+
+  @override
+  String get quotationsErrorItemsrequired => 'کم از کم ایک آئٹم شامل کریں';
+
+  @override
+  String get quotationsExpirydate => 'تاریخ انقضا';
+
+  @override
+  String get quotationsExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get quotationsExported => 'کوٹیشنز ایکسپورٹ ہو گئے';
+
+  @override
+  String get quotationsExportfailed => 'کوٹیشنز ایکسپورٹ ناکام';
+
+  @override
+  String get quotationsItem => 'آئٹم';
+
+  @override
+  String get quotationsPrinta4 => 'A4 پرنٹ کریں';
+
+  @override
+  String get quotationsQuantity => 'مقدار';
+
+  @override
+  String get quotationsQuotationdate => 'کوٹیشن کی تاریخ';
+
+  @override
+  String get quotationsSaved => 'کوٹیشن محفوظ ہوگیا';
+
+  @override
+  String get quotationsSearchplaceholder => 'کوٹیشنز تلاش کریں...';
+
+  @override
+  String get quotationsTerms => 'شرائط';
+
+  @override
+  String get quotationsUnitprice => 'یونٹ قیمت';
+
+  @override
+  String get reportsAllitems => 'تمام آئٹمز';
+
+  @override
+  String get reportsAsOf => 'بمطابق';
+
+  @override
+  String get reportsAverageexpense => 'اوسط خرچہ';
+
+  @override
+  String get reportsBatchtracked => 'بیچ ٹریک شدہ';
+
+  @override
+  String get reportsBomusage => 'بی او ایم استعمال';
+
+  @override
+  String get reportsCashflownegative =>
+      'اس دورانیے میں منفی نقد بہاؤ ہے، اخراجات پر نظر ثانی کریں۔';
+
+  @override
+  String get reportsCashflowpositive =>
+      'اس دورانیے میں مثبت نقد بہاؤ ہے، جو اچھی لیکویڈیٹی ظاہر کرتا ہے۔';
 
   @override
   String get reportsCashreconciliation => 'نقدی مطابقت';
 
   @override
-  String get cashreconOpening => 'افتتاحی';
+  String get reportsDashboardSubtitle => 'جامع کاروباری تجزیہ اور رپورٹنگ';
 
   @override
-  String get cashreconInflow => 'آمد';
+  String get reportsDsosubtitle =>
+      'فروخت کے بعد وصولی میں لگنے والے اوسط دنوں کی پیمائش۔';
 
   @override
-  String get cashreconOutflow => 'اخراج';
+  String get reportsDsounit => 'دن';
 
   @override
-  String get cashreconNet => 'خالص';
+  String get reportsExpensesbycategory => 'زمرے کے لحاظ سے اخراجات';
 
   @override
-  String get cashreconExpected => 'متوقع';
+  String get reportsExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
 
   @override
-  String get cashreconCounted => 'گنا ہوا';
+  String get reportsExported => 'رپورٹ ایکسپورٹ ہو گئی';
 
   @override
-  String get cashreconVariance => 'فرق';
+  String get reportsExportfailed => 'رپورٹ ایکسپورٹ ناکام';
 
   @override
-  String get cashreconNotes => 'نوٹس';
+  String get reportsItemssold => 'فروخت شدہ آئٹمز';
 
   @override
-  String get cashreconNotcounted => 'نہیں گنا گیا';
+  String get reportsLastinvoicedate => 'آخری انوائس کی تاریخ';
 
   @override
-  String get cashreconReconciled => 'مطابقت شدہ';
+  String get reportsLegacyitems => 'لیگیسی آئٹمز';
 
   @override
-  String get cashreconSave => 'محفوظ کریں';
+  String get reportsLowstockcount => 'کم اسٹاک آئٹمز';
 
   @override
-  String get cashreconSaved => 'مطابقت محفوظ ہو گئی';
+  String get reportsNetmovement => 'خالص حرکت';
 
   @override
-  String get cashposTransactions => 'لین دین';
+  String get reportsPaidamount => 'ادا شدہ رقم';
 
   @override
-  String get cashposPaymentreceived => 'وصول شدہ ادائیگی';
+  String get reportsPlannedquantity => 'منصوبہ بند مقدار';
 
   @override
-  String get cashposSupplierpayment => 'سپلائر کی ادائیگی';
+  String get reportsQuantitysold => 'فروخت شدہ مقدار';
 
   @override
-  String get cashposExpense => 'خرچہ';
+  String get reportsReturnvalue => 'واپسی کی مالیت';
 
   @override
-  String get cashposSalary => 'تنخواہ';
+  String get reportsShortagetotal => 'کمی کا کل';
 
   @override
-  String get cashposRefund => 'ریفنڈ';
+  String get reportsStockstatus => 'اسٹاک سٹیٹس';
 
   @override
-  String get cashposPurchase => 'خریداری';
+  String get reportsTotalamount => 'کل رقم';
 
   @override
-  String get dashboardOpeningbalance => 'ابتدائی بیلنس';
+  String get reportsTotalinbound => 'کل آمد';
 
   @override
-  String get dashboardOpeningbalanceHint =>
-      'وہ ابتدائی نقدی/بینک بیلنس جس کے ساتھ آپ نے کاروبار شروع کیا۔ یہ آج کی پوزیشن میں شامل ہوتا ہے۔';
+  String get reportsTotalinventoryvalue => 'کل انوینٹری ویلیو';
+
+  @override
+  String get reportsTotalitems => 'کل آئٹمز';
+
+  @override
+  String get reportsTotaloutbound => 'کل اخراج';
+
+  @override
+  String get reportsTotaloutputquantity => 'کل آؤٹ پٹ مقدار';
+
+  @override
+  String get reportsTotalproductionorders => 'کل پروڈکشن آرڈرز';
+
+  @override
+  String get reportsTotalreceivables => 'کل وصولیاں';
+
+  @override
+  String get reportsTotalrecords => 'کل ریکارڈز';
+
+  @override
+  String get salesAdditem => 'آئٹم شامل کریں';
+
+  @override
+  String get salesAddmethod => 'طریقہ شامل کریں';
+
+  @override
+  String get salesClicktoadditem => 'آئٹم شامل کرنے کے لیے کلک کریں...';
+
+  @override
+  String get salesDiscount => 'ڈسکاؤنٹ';
+
+  @override
+  String get salesDiscountscope => 'ڈسکاؤنٹ کا دائرہ';
+
+  @override
+  String get salesEditpayment => 'ادائیگی میں ترمیم';
+
+  @override
+  String get salesErrorCustomerRequired => 'گاہک درکار ہے';
+
+  @override
+  String get salesErrorItemsRequired => 'کم از کم ایک آئٹم درکار ہے';
+
+  @override
+  String get salesExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get salesExported => 'بلز ایکسپورٹ ہو گئے';
+
+  @override
+  String get salesExportfailed => 'بلز ایکسپورٹ ناکام';
+
+  @override
+  String get salesGrandtotal => 'کل رقم';
+
+  @override
+  String get salesInvoice => 'انوائس';
+
+  @override
+  String get salesItems => 'آئٹمز';
+
+  @override
+  String get salesMethod => 'طریقہ';
+
+  @override
+  String get salesPayment => 'ادائیگی';
+
+  @override
+  String get salesPaymenthistory => 'ادائیگی کی تاریخ';
+
+  @override
+  String get salesPaymentmethods => 'ادائیگی کے طریقے';
+
+  @override
+  String get salesPaymentrecorded => 'ادائیگی درج کر لی گئی';
+
+  @override
+  String get salesPaymenttotal => 'کل ادائیگی';
+
+  @override
+  String get salesPaymentupdated => 'ادائیگی اپڈیٹ ہو گئی';
+
+  @override
+  String get salesPeritem => 'فی آئٹم';
+
+  @override
+  String get salesRate => 'ریٹ';
+
+  @override
+  String get salesRecordpaymentnow => 'ابھی ادائیگی درج کریں';
+
+  @override
+  String get salesReference => 'حوالہ';
+
+  @override
+  String get salesSubtotal => 'ذیلی کل';
+
+  @override
+  String get salesTax => 'ٹیکس %';
+
+  @override
+  String get salesordersAdditem => 'آئٹم شامل کریں';
+
+  @override
+  String get salesordersCancelconfirm =>
+      'کیا یہ سیلز آرڈر منسوخ کرنا ہے؟ بل شدہ آرڈرز کا بل منسوخ ہو جائے گا اور اسٹاک واپس ہو جائے گا۔';
+
+  @override
+  String get salesordersCancelledmsg => 'سیلز آرڈر منسوخ ہوگیا';
+
+  @override
+  String get salesordersDelivered => 'ڈیلیور شدہ';
+
+  @override
+  String get salesordersDeliverydate => 'ڈیلیوری کی تاریخ';
+
+  @override
+  String get salesordersDetailstitle => 'سیلز آرڈر کی تفصیل';
+
+  @override
+  String get salesordersEditsalesorder => 'سیلز آرڈر میں ترمیم';
+
+  @override
+  String get salesordersErrorCustomerrequired => 'گاہک منتخب کریں';
+
+  @override
+  String get salesordersErrorItemsrequired => 'کم از کم ایک آئٹم شامل کریں';
+
+  @override
+  String get salesordersExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get salesordersExported => 'سیلز آرڈرز ایکسپورٹ ہو گئے';
+
+  @override
+  String get salesordersExportfailed => 'سیلز آرڈرز ایکسپورٹ ناکام';
+
+  @override
+  String get salesordersItem => 'آئٹم';
+
+  @override
+  String get salesordersNoitems => 'اس آرڈر پر کوئی آئٹم نہیں';
+
+  @override
+  String get salesordersPrinta4 => 'A4 پرنٹ کریں';
+
+  @override
+  String get salesordersQuantity => 'مقدار';
+
+  @override
+  String get salesordersSaved => 'سیلز آرڈر محفوظ ہوگیا';
+
+  @override
+  String get salesordersSearchplaceholder => 'سیلز آرڈرز تلاش کریں...';
+
+  @override
+  String get salesordersSodate => 'آرڈر کی تاریخ';
+
+  @override
+  String get salesordersUnitprice => 'یونٹ قیمت';
+
+  @override
+  String get salesreturnsAvailableqty => 'واپسی کے لیے دستیاب';
+
+  @override
+  String get salesreturnsDisposition => 'طریقہ کار';
+
+  @override
+  String get salesreturnsDispositionadjust => 'ایڈجسٹ';
+
+  @override
+  String get salesreturnsDispositioncredit => 'کریڈٹ';
+
+  @override
+  String get salesreturnsDispositionrefund => 'ریفنڈ';
+
+  @override
+  String get salesreturnsExportcsv => 'سی ایس وی میں ایکسپورٹ کریں';
+
+  @override
+  String get salesreturnsExported => 'انوائس واپسی ایکسپورٹ ہو گئی';
+
+  @override
+  String get salesreturnsExportfailed => 'انوائس واپسی ایکسپورٹ ناکام';
+
+  @override
+  String get salesreturnsProcessreturn => 'واپسی پراسیس کریں';
+
+  @override
+  String get salesreturnsReturn => 'واپسی';
+
+  @override
+  String get salesreturnsReturnnoitems => 'کوئی واپسی نہیں ملی';
+
+  @override
+  String get salesreturnsReturnprocessed => 'واپسی کامیابی سے ہوگئی';
+
+  @override
+  String get salesreturnsReturnqtyexceeds =>
+      'واپسی کی مقدار دستیاب مقدار سے زیادہ ہے';
+
+  @override
+  String get salesreturnsReturnqtyinvalid => 'درست واپسی مقدار درج کریں';
+
+  @override
+  String get salesreturnsReturnquantity => 'واپسی مقدار';
+
+  @override
+  String get salesreturnsReturnreason => 'واپسی کی وجہ';
+
+  @override
+  String get salesreturnsReturnreasonplaceholder => 'واپسی کی وجہ درج کریں...';
+
+  @override
+  String get salesreturnsReturnsubtitle => 'اس بل کی واپسی پراسیس کریں';
+
+  @override
+  String get salesreturnsReturntitle => 'بل واپسی';
+
+  @override
+  String get salesreturnsSearchinvoices => 'بلز تلاش کریں...';
+
+  @override
+  String get salesreturnsSearchplaceholder => 'واپسیاں تلاش کریں...';
+
+  @override
+  String get salesreturnsSelectinvoice => 'بل منتخب کریں';
+
+  @override
+  String get settingsEmpty => 'دکھانے کے لیے کوئی ترتیبات نہیں';
+
+  @override
+  String get settingsKeyCompanyAddress => 'کمپنی کا پتہ';
+
+  @override
+  String get settingsKeyCompanyEmail => 'کمپنی ای میل';
+
+  @override
+  String get settingsKeyCompanyName => 'کمپنی کا نام';
+
+  @override
+  String get settingsKeyCompanyPhone => 'کمپنی فون';
+
+  @override
+  String get settingsKeyCompanyTaxId => 'کمپنی ٹیکس شناخت';
+
+  @override
+  String get settingsKeyCurrency => 'کرنسی';
+
+  @override
+  String get settingsKeyCurrencyCode => 'کرنسی کوڈ';
+
+  @override
+  String get settingsKeyCurrencySymbol => 'کرنسی علامت';
+
+  @override
+  String get settingsKeyDateFormat => 'تاریخ فارمیٹ';
+
+  @override
+  String get settingsKeyDecimalPlaces => 'اعشاریہ مقامات';
+
+  @override
+  String get settingsKeyTaxRate => 'ڈیفالٹ ٹیکس شرح (٪)';
+
+  @override
+  String get settingsKeyTooltipTimeout => 'ٹول ٹپ ٹائم آؤٹ (سیکنڈ)';
+
+  @override
+  String get settingsNumberingHelper =>
+      'سرور کے زیر انتظام دستاویز کاؤنٹر — احتیاط سے ترمیم کریں۔';
+
+  @override
+  String get settingsSaveFailed => 'ترتیبات محفوظ کرنے میں ناکامی';
+
+  @override
+  String get settingsSaved => 'ترتیبات محفوظ ہو گئیں';
+
+  @override
+  String get settingsSectionCompany => 'کمپنی';
+
+  @override
+  String get settingsSectionCurrency => 'کرنسی اور فارمیٹنگ';
+
+  @override
+  String get settingsSectionDate => 'تاریخ اور رینج';
+
+  @override
+  String get settingsSectionNumbering => 'دستاویز نمبرنگ';
+
+  @override
+  String get settingsSectionOther => 'دیگر ترتیبات';
+
+  @override
+  String get settingsSectionTax => 'ٹیکس';
+
+  @override
+  String get settingsSubtitle =>
+      'کمپنی پروفائل، کرنسی، ٹیکس کی شرح اور دستاویز نمبرنگ۔';
+
+  @override
+  String get settingsUnsaved => 'غیر محفوظ تبدیلیاں';
+
+  @override
+  String get splashLoading => 'لوڈ ہو رہا ہے...';
+
+  @override
+  String get statusApproved => 'منظور شدہ';
+
+  @override
+  String get statusPartiallypaid => 'جزوی طور پر ادا شدہ';
+
+  @override
+  String get statusPartiallyreceived => 'جزوی طور پر موصول';
+
+  @override
+  String get statusPartiallyreturned => 'جزوی طور پر واپس کیا گیا';
+
+  @override
+  String get statusReturned => 'واپس کیا گیا';
+
+  @override
+  String get statusSent => 'بھیجا گیا';
+
+  @override
+  String get statusSubmitted => 'جمع شدہ';
+
+  @override
+  String get stockmovementsAdjustmenthint => 'مثلاً -10 یا 10';
+
+  @override
+  String get stockmovementsAdjustmentinvalid => 'درست مقدار درج کریں';
+
+  @override
+  String get stockmovementsAdjustmentmsg => 'اسٹاک ایڈجسٹمنٹ درج ہو گیا';
+
+  @override
+  String get stockmovementsAdjustmentreason => 'وجہ';
+
+  @override
+  String get stockmovementsAdjustmentsave => 'ایڈجسٹمنٹ درج کریں';
+
+  @override
+  String get stockmovementsAdjustmentsubtitle =>
+      'آئٹم، گودام، مقدار — منفی مقدار سٹاک کم کرتی ہے';
+
+  @override
+  String get stockmovementsAdjustmentzero => 'مقدار صفر نہیں ہو سکتی';
+
+  @override
+  String get stockmovementsFilteradjustment => 'ایڈجسٹمنٹ';
+
+  @override
+  String get stockmovementsFilterall => 'تمام حرکات';
+
+  @override
+  String get stockmovementsFilterproduction => 'پروڈکشن';
+
+  @override
+  String get stockmovementsFilterpurchase => 'خرید';
+
+  @override
+  String get stockmovementsFiltersale => 'فروخت';
+
+  @override
+  String get stockmovementsFiltertransfer => 'ٹرانسفر';
+
+  @override
+  String get stockmovementsLinkedmovement => 'منسلک حرکت';
+
+  @override
+  String get stockmovementsNewtransfer => 'نیا ٹرانسفر';
+
+  @override
+  String get stockmovementsReverse => 'ایڈجسٹمنٹ ریورس کریں';
+
+  @override
+  String get stockmovementsReverseconfirm =>
+      'کیا اس ایڈجسٹمنٹ کے لیے معاوضہ حرکت پوسٹ کی جائے؟ سٹاک اسی مقدار سے واپس ایڈجسٹ ہو جائے گا۔';
+
+  @override
+  String get stockmovementsReversemsg => 'ایڈجسٹمنٹ ریورس ہو گئی';
+
+  @override
+  String get stockmovementsTransferdiff => 'ماخذ اور منزل مختلف ہونے چاہئیں';
+
+  @override
+  String get stockmovementsTransferfrom => 'ماخذ گودام';
+
+  @override
+  String get stockmovementsTransfermsg => 'سٹاک منتقل ہو گیا';
+
+  @override
+  String get stockmovementsTransferpartialfail =>
+      'ٹرانسفر نامکمل: روانگی کی حرکت ریکارڈ ہو گئی، لیکن آمد کی حرکت ناکام رہی:';
+
+  @override
+  String get stockmovementsTransferpositive => 'مقدار مثبت ہونی چاہیے';
+
+  @override
+  String get stockmovementsTransfersave => 'سٹاک ٹرانسفر کریں';
+
+  @override
+  String get stockmovementsTransfersubtitle =>
+      'ماخذ گودام سے روانگی اور منزل گودام میں آمد کی حرکت بنائی جاتی ہے۔';
+
+  @override
+  String get stockmovementsTransferto => 'منزل گودام';
+
+  @override
+  String get suppliersLedgerTotals => 'کل رقم';
+
+  @override
+  String get usermanagementActivate => 'فعال کریں';
+
+  @override
+  String get usermanagementActivated => 'صارف فعال ہوگیا';
+
+  @override
+  String get usermanagementAllroles => 'تمام رولز';
+
+  @override
+  String get usermanagementAllstatus => 'تمام حیثیتیں';
+
+  @override
+  String get usermanagementCantmodifysystem =>
+      'سسٹم رولز میں ترمیم نہیں کی جا سکتی';
+
+  @override
+  String get usermanagementDeactivate => 'غیر فعال کریں';
+
+  @override
+  String get usermanagementDeactivated => 'صارف غیر فعال ہوگیا';
+
+  @override
+  String get usermanagementDeleteconfirm =>
+      'کیا یہ صارف حذف کریں؟ اسے واپس نہیں کیا جا سکتا۔';
+
+  @override
+  String get usermanagementDescription => 'تفصیل';
+
+  @override
+  String get usermanagementEditrole => 'رول میں ترمیم';
+
+  @override
+  String get usermanagementEdituser => 'صارف میں ترمیم';
+
+  @override
+  String get usermanagementEmail => 'ای میل';
+
+  @override
+  String get usermanagementFullname => 'مکمل نام';
+
+  @override
+  String get usermanagementNewpassword => 'نیا پاس ورڈ';
+
+  @override
+  String get usermanagementNewrole => 'نیا رول';
+
+  @override
+  String get usermanagementNewuser => 'نیا صارف';
+
+  @override
+  String get usermanagementPassword => 'پاس ورڈ';
+
+  @override
+  String get usermanagementPermissioncount => 'پرمیشنز';
+
+  @override
+  String get usermanagementPermissions => 'پرمیشنز';
+
+  @override
+  String get usermanagementPermissionsaved => 'پرمیشنز اپڈیٹ ہو گئیں';
+
+  @override
+  String get usermanagementPermissionstitle => 'رول پرمیشنز';
+
+  @override
+  String get usermanagementResetconfirm =>
+      'کیا اس صارف کا پاس ورڈ دوبارہ ترتیب دیں؟';
+
+  @override
+  String get usermanagementResetdone =>
+      'پاس ورڈ کامیابی سے دوبارہ ترتیب دیا گیا';
+
+  @override
+  String get usermanagementResetpassword => 'پاس ورڈ دوبارہ ترتیب دیں';
+
+  @override
+  String get usermanagementRole => 'رول';
+
+  @override
+  String get usermanagementRolecreated => 'رول کامیابی سے بنایا گیا';
+
+  @override
+  String get usermanagementRoledeleteconfirm =>
+      'کیا یہ رول حذف کریں؟ اس سے منسلک صارفین کو پہلے دوبارہ تفویض کرنا ہوگا۔';
+
+  @override
+  String get usermanagementRoledeleted => 'رول کامیابی سے حذف ہوگیا';
+
+  @override
+  String get usermanagementRolename => 'رول کا نام';
+
+  @override
+  String get usermanagementRoleupdated => 'رول کامیابی سے اپڈیٹ ہوگیا';
+
+  @override
+  String get usermanagementRolevalidationname => 'رول کا نام ضروری ہے';
+
+  @override
+  String get usermanagementSearchusers => 'صارفین تلاش کریں...';
+
+  @override
+  String get usermanagementSubtitle =>
+      'سسٹم صارفین، رولز اور پرمیشنز بنائیں اور ان کا نظم کریں';
+
+  @override
+  String get usermanagementSystemrole => 'سسٹم';
+
+  @override
+  String get usermanagementUsercreated => 'صارف کامیابی سے بنایا گیا';
+
+  @override
+  String get usermanagementUserdeleted => 'صارف کامیابی سے حذف ہوگیا';
+
+  @override
+  String get usermanagementUsername => 'صارف نام';
+
+  @override
+  String get usermanagementUserupdated => 'صارف کامیابی سے اپڈیٹ ہوگیا';
+
+  @override
+  String get usermanagementValidationEmailrequired => 'ای میل ضروری ہے';
+
+  @override
+  String get usermanagementValidationInvalidemail => 'غلط ای میل فارمیٹ';
+
+  @override
+  String get usermanagementValidationPasswordlength =>
+      'پاس ورڈ کم از کم 6 حروف کا ہونا چاہیے';
+
+  @override
+  String get usermanagementValidationRolerequired => 'رول منتخب کریں';
+
+  @override
+  String get warehousesDeleteconfirm =>
+      'کیا یہ گودام حذف کریں؟ یہ واپس نہیں ہو سکے گا۔';
+
+  @override
+  String get warehousesDeletedmsg => 'گودام حذف ہو گیا';
+
+  @override
+  String get customersErrorEmail => 'غلط ای میل فارمیٹ';
+
+  @override
+  String get customersRemove => 'ہٹائیں';
+
+  @override
+  String get customersAdd => 'شامل کریں';
 
   @override
   String get dashboardOpeningbalanceSaved => 'ابتدائی بیلنس محفوظ ہو گیا';
 
   @override
-  String get drpPresetToday => 'آج';
+  String get bomActivated => 'BOM فعال کیا گیا';
 
   @override
-  String get drpPresetYesterday => 'کل';
+  String get bomDeactivated => 'BOM غیر فعال کیا گیا';
 
   @override
-  String get drpPresetThisWeek => 'اس ہفتے';
+  String get reportsCategorySales => 'فروخت رپورٹس';
 
   @override
-  String get drpPresetLastWeek => 'پچھلے ہفتے';
+  String get reportsCategoryInventory => 'انوینٹری رپورٹس';
 
   @override
-  String get drpPresetLast7 => 'پچھلے 7 دن';
+  String get reportsCategoryFinancial => 'مالی رپورٹس';
 
   @override
-  String get drpPresetLast30 => 'پچھلے 30 دن';
+  String get reportsCategoryAr => 'وصولیاں';
 
   @override
-  String get drpPresetLast90 => 'پچھلے 90 دن';
+  String get reportsCategoryPurchase => 'خریداری رپورٹس';
 
   @override
-  String get drpPresetThisMonth => 'اس مہینے';
+  String get reportsCategoryProduction => 'پروڈکشن رپورٹس';
 
   @override
-  String get drpPresetLastMonth => 'پچھلے مہینے';
+  String get salesNoproductsfound => 'کوئی پروڈکٹ نہیں ملی';
 
   @override
-  String get drpPresetCustomRange => 'اپنی مرضی کی رینج';
-
-  @override
-  String get drpPresetCustom => 'اپنی مرضی';
-
-  @override
-  String get drpPresetAllDates => 'تمام تاریخیں';
-
-  @override
-  String get drpPickStart => 'شروع کی تاریخ منتخب کریں';
-
-  @override
-  String get drpPickEnd => 'اختتام کی تاریخ منتخب کریں';
-
-  @override
-  String get drpPickDate => 'تاریخ منتخب کریں';
-
-  @override
-  String drpDaysSelected(Object count) {
-    return '$count دن منتخب';
-  }
-
-  @override
-  String get drpOneDay => '1 دن';
-
-  @override
-  String get drpPrevPeriod => 'پچھلی مدت';
-
-  @override
-  String get drpNextPeriod => 'اگلی مدت';
-
-  @override
-  String get drpWeekStartsOn => 'ہفتہ شروع ہوتا ہے';
-
-  @override
-  String get drpWeekdayMonday => 'پیر';
-
-  @override
-  String get drpWeekdaySaturday => 'ہفتہ';
-
-  @override
-  String get drpWeekdaySunday => 'اتوار';
-
-  @override
-  String get drpSetDefault => 'ڈیفالٹ رینج مقرر کریں';
-
-  @override
-  String get drpDefaultSet => 'ڈیفالٹ رینج مقرر ہو گئی';
-
-  @override
-  String get drpDefaultFailed => 'ڈیفالٹ رینج محفوظ نہیں ہو سکی';
-
-  @override
-  String get drpWeekStartFailed => 'ہفتے کا آغاز محفوظ نہیں ہو سکا';
-
-  @override
-  String get drpAddPreset => 'پری سیٹ شامل کریں';
-
-  @override
-  String get drpPresetName => 'پری سیٹ کا نام';
-
-  @override
-  String get drpPresetAdded => 'پری سیٹ شامل ہو گیا';
-
-  @override
-  String get drpPresetAddFailed => 'پری سیٹ محفوظ نہیں ہو سکا';
-
-  @override
-  String get drpPresetRemoveFailed => 'پری سیٹ ہٹایا نہیں جا سکا';
-
-  @override
-  String get drpPresetRemove => 'پری سیٹ ہٹائیں';
+  String get suppliersErrorEmail => 'غلط ای میل فارمیٹ';
 }

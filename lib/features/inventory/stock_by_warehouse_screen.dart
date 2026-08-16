@@ -91,6 +91,24 @@ class _StockByWarehouseScreenState extends ConsumerState<StockByWarehouseScreen>
     showItemDetailDialog(context, itemId: itemId);
   }
 
+  /// Opt into the per-row ⋮ actions menu (View item detail).
+  @override
+  bool get hasRowActions => true;
+
+  @override
+  List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
+    final itemId = row.cells['id']?.value as int?;
+    if (itemId == null || itemId <= 0) return null;
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      GridRowAction(
+        icon: Icons.visibility_outlined,
+        label: l10n.commonView,
+        onTap: () => showItemDetailDialog(context, itemId: itemId),
+      ),
+    ];
+  }
+
   @override
   PlutoRow gridRowFor(StockBalance balance) => PlutoRow(
     cells: {

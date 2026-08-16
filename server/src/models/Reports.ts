@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
-import { CASH_ACCOUNTS, getCashAccountTotals } from '../services/cashService';
+import { CASH_ACCOUNTS, getCashAccountTotals, collectFlows } from '../services/cashService';
 
 function getARAgingReport(asOfDate: string, db: Database.Database) {
   const agingData = db.prepare(`
@@ -380,8 +380,14 @@ function getInventoryMovementReport(db: Database.Database, startDate?: string, e
 
   const rows = db.prepare(query).all(...params);
 
-  const totalInbound = rows.filter((r: any) => r.movement_type?.toLowerCase() === 'in').length;
-  const totalOutbound = rows.filter((r: any) => r.movement_type?.toLowerCase() === 'out').length;
+  // Classify by quantity direction, not movement_type literal strings.
+  // The system stores real types (PURCHASE, SALE, ADJUSTMENT, TRANSFER,
+  // ...) — a PURCHASE is inbound, a SALE is outbound, and ADJUSTMENT /
+  // TRANSFER directions are determined by the sign of the quantity.
+  // Comparing against 'in'/'out' always yielded 0. Quantity is positive
+  // for inbound, negative for outbound.
+  const totalInbound = rows.filter((r: any) => (r.quantity ?? 0) > 0).length;
+  const totalOutbound = rows.filter((r: any) => (r.quantity ?? 0) < 0).length;
 
   return {
     movements: rows,
@@ -712,9 +718,34 @@ function getGeneralLedger(startDate: string, endDate: string, db: Database.Datab
 }
 
 function getCashFlow(startDate: string, endDate: string, db: Database.Database) {
-  const inflows = db.prepare(`SELECT COALESCE(SUM(credit), 0) as total FROM customer_ledger WHERE transaction_type = 'PAYMENT' AND transaction_date BETWEEN ? AND ?`).get(startDate, endDate) as { total: number };
-  const outflows = db.prepare(`SELECT COALESCE(SUM(debit), 0) as total FROM customer_ledger WHERE transaction_type = 'EXPENSE' AND transaction_date BETWEEN ? AND ?`).get(startDate, endDate) as { total: number };
-  return { startDate, endDate, totalInflow: inflows.total, totalOutflow: outflows.total, netCashFlow: inflows.total - outflows.total };
+  // Same money-movement tables as the dashboard cash position
+  // (cashService.collectFlows — payments, expenses, salary_payments,
+  // purchases) so the two reports agree by construction. The old
+  // implementation only read customer_ledger PAYMENT credits and EXPENSE
+  // debits, ignoring supplier payments, salaries, refunds and direct
+  // purchases, so it systematically undercounted cash out.
+  //
+  // Period flow = cumulative flows at endDate minus cumulative flows at
+  // the day before startDate. collectFlows seeds opening balances as
+  // inflow on both sides, so they cancel out and only movements inside
+  // the range remain. Summing across all accounts gives the company-wide
+  // cash movement.
+  const dayBeforeStart = db.prepare(
+    `SELECT date(?, '-1 day') as d`
+  ).get(startDate) as { d: string };
+  const atEnd = collectFlows(db, endDate);
+  const beforeStart = collectFlows(db, dayBeforeStart.d);
+
+  let totalInflow = 0;
+  let totalOutflow = 0;
+  for (const a of CASH_ACCOUNTS) {
+    const now = atEnd.get(a.key)!;
+    const earlier = beforeStart.get(a.key)!;
+    totalInflow += now.inflow - earlier.inflow;
+    totalOutflow += now.outflow - earlier.outflow;
+  }
+
+  return { startDate, endDate, totalInflow, totalOutflow, netCashFlow: totalInflow - totalOutflow };
 }
 
 function getTaxSummary(startDate: string, endDate: string, db: Database.Database) {

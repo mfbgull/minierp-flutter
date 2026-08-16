@@ -6,12 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../data/models/dashboard_layout.dart'
+    show DashboardBlock, DashboardBlockSize;
 import '../../data/models/dashboard_summary.dart'
     show
         ArSummaryResult,
         CashAccountPosition,
         DashboardSummary,
         DayTotal,
+        KpiResult,
         LowStockItem,
         StockByCategory,
         TopCustomer;
@@ -23,6 +26,16 @@ import '../reports/report_providers.dart'
     show applyGlobalReportRange, globalReportFromDateProvider, globalReportToDateProvider;
 import 'cash_opening_balance_dialog.dart' show showCashOpeningBalanceDialog;
 import 'cash_position_detail_dialog.dart';
+import 'dashboard_customizer_dialog.dart' show showDashboardCustomizerDialog;
+import 'dashboard_kpi_catalog.dart'
+    show KpiCardFormat, kpiCardById, kpiCardHint, kpiCardLabel;
+import 'dashboard_layout_controller.dart'
+    show
+        kKpiCardHeight,
+        kKpiCardWidthFor,
+        panelFlexFor,
+        dashboardLayoutControllerProvider;
+import 'dashboard_panel_catalog.dart' show panelById;
 import 'dashboard_providers.dart';
 
 /// Landing screen behind the auth gate — renders the server-side
@@ -69,12 +82,29 @@ class DashboardScreen extends ConsumerWidget {
             ),
           ],
           onRefresh: () {
+            // The KPI strip cards fetch per-card `/dashboard/kpi`
+            // values — they need their own invalidation or a new sale /
+            // invoice stays stale until hot restart.
+            invalidateDashboardKpiCards(ref);
             ref
               ..invalidate(dashboardSummaryProvider)
               ..invalidate(dashboardArSummaryProvider)
               ..invalidate(dashboardCashPositionProvider)
               ..invalidate(dashboardTopCustomersProvider(5));
           },
+          // The "Customize" button (spec §6.1) — labeled, after the
+          // refresh button, opens the KPI card customizer dialog.
+          trailingActions: [
+            TextButton.icon(
+              onPressed: () => showDashboardCustomizerDialog(context),
+              icon: const Icon(Icons.tune, size: 18),
+              label: Text(l10n.dashboardcustomizationCustomize),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                textStyle: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ],
         ),
         Expanded(
           child: summary.when(
@@ -91,14 +121,27 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-class _DashboardBody extends StatelessWidget {
+class _DashboardBody extends ConsumerWidget {
   const _DashboardBody({required this.summary});
 
   final DashboardSummary summary;
 
   @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final layout = ref.watch(dashboardLayoutControllerProvider);
+    final cashVisible = layout.blocks.any(
+      (b) => b.id == 'cash_strip' && b.visible,
+    );
+    // Visible panels per row (empty rows collapse entirely, spec §6.5).
+    final row1 = [
+      for (final b in layout.blocks)
+        if (b.visible && panelById[b.id]?.row == 1) b,
+    ];
+    final row2 = [
+      for (final b in layout.blocks)
+        if (b.visible && panelById[b.id]?.row == 2) b,
+    ];
+
     return LayoutBuilder(
       builder: (context, constraints) {
         // Short windows (e.g. a 600px test surface or a small desktop
@@ -108,71 +151,33 @@ class _DashboardBody extends StatelessWidget {
         // fill-the-screen Expanded rows.
         final compact = constraints.maxHeight < 560;
         final children = <Widget>[
-          // Horizontal stat strip — one fixed-height row so short windows
-          // scroll sideways instead of stacking/overflowing.
-          SizedBox(
-            height: 84,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _KpiCard(
-                  label: l10n.dashboardTotalitems,
-                  value: Formatters.number(summary.totalItems),
-                  icon: Icons.inventory_2_outlined,
-                ),
-                _KpiCard(
-                  label: l10n.dashboardStockvalue,
-                  value: Formatters.currency(summary.totalStockValue),
-                  icon: Icons.paid_outlined,
-                ),
-                _KpiCard(
-                  label: l10n.dashboardSalesrevenue,
-                  value: Formatters.currency(summary.totalSalesRevenue),
-                  icon: Icons.trending_up,
-                ),
-                _KpiCard(
-                  label: l10n.dashboardProfit,
-                  value: Formatters.currency(summary.totalProfit),
-                  icon: Icons.monetization_on_outlined,
-                ),
-                _KpiCard(
-                  label: l10n.navPurchases,
-                  value: Formatters.currency(summary.totalPurchases),
-                  icon: Icons.shopping_cart_outlined,
-                ),
-                _KpiCard(
-                  label: l10n.dashboardWarehousestocks,
-                  value: Formatters.number(summary.warehouseStockCount),
-                  icon: Icons.warehouse_outlined,
-                ),
-                _KpiCard(
-                  label: l10n.dashboardRecentproductions,
-                  value: Formatters.number(summary.recentProductions),
-                  // NOT Icons.factory_outlined — that's the Production
-                  // rail icon tests tap to navigate.
-                  icon: Icons.precision_manufacturing_outlined,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Cash & bank position — closing balance per account (Cash,
-          // Bank, Easypaisa, JazzCash, UPaisa), shared with the
-          // end-of-day reconciliation report.
-          const _CashPositionStrip(),
-          const SizedBox(height: 16),
-          // Row 1: sales vs purchases + AR aging buckets; row 2: stock
-          // by category + top customers + low-stock alerts (all three
-          // side by side).
-          if (compact)
-            SizedBox(height: 360, child: _salesPurchasesRow(summary))
-          else
-            Expanded(flex: 3, child: _salesPurchasesRow(summary)),
-          const SizedBox(height: 16),
-          if (compact)
-            SizedBox(height: 360, child: _stockInsightsRow(summary))
-          else
-            Expanded(flex: 3, child: _stockInsightsRow(summary)),
+          // Horizontal stat strip — driven by the user's dashboard
+          // layout (spec §6.3): only visible cards, in layout order,
+          // each fetching its own `/dashboard/kpi` value. Reorderable
+          // on the strip itself (hover drag handle / long-press).
+          const _KpiStrip(),
+          // Cash & bank strip — shown/hidden per the user's layout.
+          if (cashVisible) ...[
+            const SizedBox(height: 16),
+            const _CashPositionStrip(),
+          ],
+          // Row 1: sales vs purchases + AR aging (visible panels only,
+          // reorderable within the row).
+          if (row1.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            if (compact)
+              SizedBox(height: 360, child: _PanelRow(row: 1, summary: summary))
+            else
+              Expanded(flex: 3, child: _PanelRow(row: 1, summary: summary)),
+          ],
+          // Row 2: stock by category + top customers + low stock.
+          if (row2.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            if (compact)
+              SizedBox(height: 360, child: _PanelRow(row: 2, summary: summary))
+            else
+              Expanded(flex: 3, child: _PanelRow(row: 2, summary: summary)),
+          ],
         ];
         final content = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -188,40 +193,6 @@ class _DashboardBody extends StatelessWidget {
       },
     );
   }
-
-  Widget _salesPurchasesRow(DashboardSummary summary) => Row(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Expanded(
-        flex: 3,
-        child: _SalesVsPurchasesPanel(
-          sales: summary.salesByDay,
-          purchases: summary.purchasesByDay,
-        ),
-      ),
-      const SizedBox(width: 16),
-      Expanded(flex: 2, child: const _ArSummaryPanel()),
-    ],
-  );
-
-  Widget _stockInsightsRow(DashboardSummary summary) => Row(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Expanded(
-        flex: 2,
-        child: _StockByCategoryPanel(
-          categories: summary.stockByCategory,
-        ),
-      ),
-      const SizedBox(width: 16),
-      Expanded(flex: 3, child: const _TopCustomersPanel()),
-      const SizedBox(width: 16),
-      Expanded(
-        flex: 2,
-        child: _LowStockPanel(items: summary.lowStockItems),
-      ),
-    ],
-  );
 }
 
 /// Closing cash/bank balances per account (`GET /dashboard/cash-position`)
@@ -487,33 +458,278 @@ class _CashTotalCard extends StatelessWidget {
   }
 }
 
-class _KpiCard extends StatelessWidget {
-  const _KpiCard({
-    required this.label,
-    required this.value,
-    required this.icon,
+/// The horizontal KPI stat strip — reads the dashboard layout controller
+/// and renders only the visible cards, in order, each fetching its own
+/// metric via `dashboardKpiProvider`. Reorderable (spec §6.3: reorder
+/// on the strip itself, drag handle on hover / long-press on touch).
+class _KpiStrip extends ConsumerWidget {
+  const _KpiStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final layout = ref.watch(dashboardLayoutControllerProvider);
+    // Only KPI cards belong in the strip — panels + the cash strip are
+    // rendered by their own widgets from the same layout.
+    final visible = [
+      for (final block in layout.blocks)
+        if (block.visible && kpiCardById.containsKey(block.id)) block,
+    ];
+
+    // Empty state (spec §8): all cards hidden — the toolbar Customize
+    // button stays reachable to add them back.
+    if (visible.isEmpty) {
+      return SizedBox(
+        height: kKpiCardHeight,
+        child: Center(
+          child: Text(
+            l10n.dashboardcardsEmpty,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: kKpiCardHeight,
+      child: ReorderableListView.builder(
+        scrollDirection: Axis.horizontal,
+        buildDefaultDragHandles: false,
+        itemCount: visible.length,
+        onReorderItem: (oldIndex, newIndex) =>
+            ref.read(dashboardLayoutControllerProvider.notifier).reorder(
+              oldIndex,
+              newIndex,
+            ),
+        itemBuilder: (context, index) {
+          final block = visible[index];
+          return _KpiMetricCard(
+            key: ValueKey(block.id),
+            block: block,
+            index: index,
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// One dashboard row of content panels — rendered from the user's
+/// layout (spec §6.5): only visible panels of this row, in order, sized
+/// by their flex ratios, reorderable within the row. An empty row (all
+/// panels hidden) collapses entirely — `_DashboardBody` skips it.
+class _PanelRow extends ConsumerWidget {
+  const _PanelRow({required this.row, required this.summary});
+
+  final int row;
+  final DashboardSummary summary;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final layout = ref.watch(dashboardLayoutControllerProvider);
+    final visible = [
+      for (final block in layout.blocks)
+        if (block.visible && panelById[block.id]?.row == row) block,
+    ];
+    int flexOf(DashboardBlock b) =>
+        panelFlexFor(panelById[b.id]?.flex ?? 1, b.config.size);
+    final totalFlex = visible.fold<int>(0, (sum, b) => sum + flexOf(b));
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final gap = 16.0;
+        // Remaining width after the inter-panel gaps, split by flex.
+        final available = math.max(
+          0.0,
+          constraints.maxWidth - gap * (visible.length - 1),
+        );
+        return ReorderableListView(
+          scrollDirection: Axis.horizontal,
+          buildDefaultDragHandles: false,
+          onReorderItem: (oldIndex, newIndex) =>
+              ref.read(dashboardLayoutControllerProvider.notifier)
+                  .reorderPanels(row, oldIndex, newIndex),
+          children: [
+            for (var i = 0; i < visible.length; i++)
+              Padding(
+                key: ValueKey(visible[i].id),
+                padding: EdgeInsets.only(
+                  right: i == visible.length - 1 ? 0 : gap,
+                ),
+                child: SizedBox(
+                  width: available * (flexOf(visible[i]) / totalFlex),
+                  child: _PanelFrame(
+                    block: visible[i],
+                    index: i,
+                    summary: summary,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Wraps one panel with a hover drag handle (desktop) / long-press drag
+/// (touch) — the row reorder affordance (spec §12: panel header while
+/// customizing). The handle sits in the panel's top-right corner.
+class _PanelFrame extends ConsumerStatefulWidget {
+  const _PanelFrame({
+    required this.block,
+    required this.index,
+    required this.summary,
   });
 
-  final String label;
-  final String value;
-  final IconData icon;
+  final DashboardBlock block;
+  final int index;
+  final DashboardSummary summary;
+
+  @override
+  ConsumerState<_PanelFrame> createState() => _PanelFrameState();
+}
+
+class _PanelFrameState extends ConsumerState<_PanelFrame> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return SizedBox(
-      width: 188,
-      height: 84,
+    final panel = switch (widget.block.id) {
+      'panel_sales_purchases' => _SalesVsPurchasesPanel(
+        sales: widget.summary.salesByDay,
+        purchases: widget.summary.purchasesByDay,
+      ),
+      'panel_ar_aging' => const _ArSummaryPanel(),
+      'panel_stock_by_category' => _StockByCategoryPanel(
+        categories: widget.summary.stockByCategory,
+      ),
+      'panel_top_customers' => const _TopCustomersPanel(),
+      'panel_low_stock' => _LowStockPanel(items: widget.summary.lowStockItems),
+      _ => const SizedBox.shrink(),
+    };
+
+    final body = MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Stack(
+        children: [
+          panel,
+          if (_hovered)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: ReorderableDragStartListener(
+                index: widget.index,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                    borderRadius: BorderRadius.circular(4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: scheme.shadow.withValues(alpha: 0.15),
+                        blurRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.drag_indicator,
+                    size: 14,
+                    color: scheme.outline,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    return ReorderableDelayedDragStartListener(
+      index: widget.index,
+      child: body,
+    );
+  }
+}
+
+/// One KPI card in the strip — fetches its metric value via
+/// `/dashboard/kpi?metric=` and formats it per its catalog definition.
+/// Draggable: a drag handle appears on hover (desktop); long-press
+/// starts the drag on touch (ReorderableDelayedDragStartListener).
+class _KpiMetricCard extends ConsumerStatefulWidget {
+  const _KpiMetricCard({
+    super.key,
+    required this.block,
+    required this.index,
+  });
+
+  final DashboardBlock block;
+
+  /// Index into the *visible* strip (ReorderableListView indices) — the
+  /// drag listeners must use this, not the block's grid `x`.
+  final int index;
+
+  @override
+  ConsumerState<_KpiMetricCard> createState() => _KpiMetricCardState();
+}
+
+class _KpiMetricCardState extends ConsumerState<_KpiMetricCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    final def = kpiCardById[widget.block.id];
+    if (def == null) return const SizedBox.shrink();
+
+    final label = kpiCardLabel(l10n, def.labelKey);
+    final hint = kpiCardHint(l10n, def.hintKey);
+    final kpi = ref.watch(dashboardKpiProvider(def.metric));
+
+    // Per-size styling (spec §6.3): Small = denser padding + smaller
+    // value font; Large = extra padding + larger value font; Medium =
+    // the current card.
+    final size = widget.block.config.size ?? DashboardBlockSize.medium;
+    final cardPadding = switch (size) {
+      DashboardBlockSize.small => const EdgeInsets.all(8),
+      DashboardBlockSize.large => const EdgeInsets.all(16),
+      _ => const EdgeInsets.all(12),
+    };
+    final valueStyle = (Theme.of(context).textTheme.titleMedium ?? const TextStyle())
+        .copyWith(fontWeight: FontWeight.w700);
+    final compactValueStyle = valueStyle.copyWith(
+      fontSize: valueStyle.fontSize == null
+          ? null
+          : valueStyle.fontSize! - (size == DashboardBlockSize.small ? 3 : 0),
+    );
+    final largeValueStyle = valueStyle.copyWith(
+      fontSize: valueStyle.fontSize == null
+          ? null
+          : (valueStyle.fontSize ?? 0) +
+                (size == DashboardBlockSize.large ? 4 : 0),
+    );
+    final valueTextStyle = switch (size) {
+      DashboardBlockSize.small => compactValueStyle,
+      DashboardBlockSize.large => largeValueStyle,
+      _ => valueStyle,
+    };
+
+    final card = SizedBox(
+      width: kKpiCardWidthFor(widget.block.config.size),
+      height: kKpiCardHeight,
       child: Card(
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: cardPadding,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Icon(icon, size: 16, color: scheme.primary),
+                  Icon(def.icon, size: 16, color: scheme.primary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -524,6 +740,20 @@ class _KpiCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  // Hover drag handle (desktop). MouseRegion on the card
+                  // tracks hover; the handle starts the reorder drag.
+                  if (_hovered)
+                    ReorderableDragStartListener(
+                      index: widget.index,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Icon(
+                          Icons.drag_indicator,
+                          size: 14,
+                          color: scheme.outline,
+                        ),
+                      ),
+                    ),
                 ],
               ),
               // Scale down instead of wrapping — stat values must never
@@ -531,12 +761,20 @@ class _KpiCard extends StatelessWidget {
               FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text(
-                  value,
-                  maxLines: 1,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                child: kpi.when(
+                  loading: () => Text(
+                    '—',
+                    style: valueTextStyle.copyWith(color: scheme.outline),
+                  ),
+                  error: (error, _) => Text(
+                    '—',
+                    style: valueTextStyle.copyWith(color: scheme.error),
+                  ),
+                  data: (data) => Text(
+                    _formatKpiValue(def.format, data),
+                    maxLines: 1,
+                    style: valueTextStyle,
+                  ),
                 ),
               ),
             ],
@@ -544,6 +782,32 @@ class _KpiCard extends StatelessWidget {
         ),
       ),
     );
+
+    final body = MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: hint == null
+          ? card
+          : Tooltip(message: hint, child: card),
+    );
+    return ReorderableDelayedDragStartListener(
+      index: widget.index,
+      child: body,
+    );
+  }
+
+  /// Formats a KPI result according to its catalog display format.
+  String _formatKpiValue(KpiCardFormat format, KpiResult kpi) {
+    switch (format) {
+      case KpiCardFormat.currency:
+        return Formatters.currency(kpi.value);
+      case KpiCardFormat.number:
+        return Formatters.number(kpi.value);
+      case KpiCardFormat.percent:
+        return '${Formatters.number(kpi.value)}%';
+      case KpiCardFormat.ratio:
+        return Formatters.number(kpi.value);
+    }
   }
 }
 

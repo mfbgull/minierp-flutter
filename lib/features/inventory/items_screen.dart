@@ -71,9 +71,16 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
     });
   }
 
+  /// Opt into the per-row ⋮ actions menu (View / Edit).
+  @override
+  bool get hasRowActions => true;
+
   @override
   PlutoRow gridRowFor(Item item) => PlutoRow(
     cells: {
+      // Hidden cell carrying the full Item so the ⋮ menu can open the
+      // edit form prefilled.
+      'data': PlutoCell(value: item),
       'id': PlutoCell(value: item.id),
       'code': PlutoCell(value: item.itemCode),
       'name': PlutoCell(value: item.itemName),
@@ -86,6 +93,25 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
       'active': PlutoCell(value: item.isActive),
     },
   );
+
+  @override
+  List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
+    final item = row.cells['data']?.value as Item?;
+    if (item == null) return null;
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      GridRowAction(
+        icon: Icons.visibility_outlined,
+        label: l10n.commonView,
+        onTap: () => showItemDetailDialog(context, itemId: item.id),
+      ),
+      GridRowAction(
+        icon: Icons.edit_outlined,
+        label: l10n.commonEdit,
+        onTap: () => showItemFormDialog(context, item: item),
+      ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {

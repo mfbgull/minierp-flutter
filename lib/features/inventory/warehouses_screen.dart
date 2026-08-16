@@ -75,6 +75,24 @@ class _WarehousesScreenState extends ConsumerState<WarehousesScreen>
     });
   }
 
+  /// Opt into the per-row ⋮ actions menu (Edit).
+  @override
+  bool get hasRowActions => true;
+
+  @override
+  List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
+    final warehouse = _firstWhereOrNull(_filtered, (w) => w.id == row.cells['id']?.value);
+    if (warehouse == null) return null;
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      GridRowAction(
+        icon: Icons.edit_outlined,
+        label: l10n.commonEdit,
+        onTap: () => _openForm(warehouse),
+      ),
+    ];
+  }
+
   @override
   PlutoRow gridRowFor(Warehouse w) => PlutoRow(
     cells: {

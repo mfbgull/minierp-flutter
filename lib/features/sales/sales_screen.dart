@@ -23,14 +23,23 @@ import '../../core/utils/csv_export.dart';
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../core/utils/invoice_status.dart';
-import '../../data/models/invoice.dart' show Invoice;
-import '../../data/repositories/api_result.dart' show ApiError;
+import '../../core/utils/print_utils.dart' show printPdfBytes;
+import '../../data/models/invoice.dart' show Invoice, InvoicePaymentRecord;
+import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
+import '../../data/repositories/invoice_repository.dart'
+    show invoiceRepositoryProvider;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/app_toast.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
-import '../../widgets/pluto_grid_screen.dart' show serialGridColumn, withSerialCell;
+import '../../widgets/pluto_grid_screen.dart'
+    show plutoGridConfigurationFor, serialGridColumn, withSerialCell;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
+import 'calculations/invoice_rules.dart' show canShowDeleteAction;
+import 'invoice_pdf.dart' show buildA4InvoicePdf;
+import 'invoice_payment_dialog.dart' show showInvoicePaymentDialog;
 import 'invoice_providers.dart';
 
 /// Invoice-status options for the filter dropdown (display → server
@@ -42,6 +51,9 @@ const List<(String, String?)> _statusOptions = [
   ('Partially Paid', 'Partially Paid'),
   ('Overdue', 'Overdue'),
 ];
+
+/// The per-row ⋮ menu actions for an invoice row.
+enum _InvoiceRowAction { view, edit, payment, print, delete }
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -129,6 +141,10 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         withSerialCell(
           PlutoRow(
             cells: {
+              // Hidden cell carrying the full Invoice for the actions
+              // menu (the id cell alone isn't enough — the menu needs
+              // status + amounts for the guards).
+              'data': PlutoCell(value: inv),
               'id': PlutoCell(value: inv.id),
               'invoice_no': PlutoCell(value: inv.invoiceNo),
               'invoice_date': PlutoCell(value: inv.invoiceDate),
@@ -138,6 +154,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
               'paid_amount': PlutoCell(value: inv.paidAmount),
               'balance_amount': PlutoCell(value: inv.balanceAmount),
               'created_by': PlutoCell(value: inv.createdByUsername ?? ''),
+              'actions': PlutoCell(value: ''),
             },
           ),
           index,
@@ -147,6 +164,171 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   }
 
   Future<void> _refresh() => ref.refresh(invoicesProvider.future);
+
+  /// Opens the row-actions menu anchored at [cellContext] (the ⋮ cell),
+  /// mirroring the customers grid: a raw Listener receives the tap even
+  /// though PlutoGrid's gesture handler competes in the arena.
+  Future<void> _openRowMenu(
+    BuildContext cellContext,
+    Invoice? invoice,
+  ) async {
+    if (invoice == null || !mounted) return;
+    final box = cellContext.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final overlay = Overlay.of(cellContext, rootOverlay: true);
+    final l10n = AppLocalizations.of(cellContext)!;
+
+    // Payment is offered while anything is still owed (Unpaid /
+    // Partially Paid / Overdue / Sent / Draft with a balance); Delete
+    // follows the shared rule (Draft/Unpaid with no money moved).
+    final canPay = invoice.balanceAmount > 0 &&
+        invoice.status != 'Cancelled' &&
+        invoice.status != 'Returned';
+    final canDelete = canShowDeleteAction(invoice);
+
+    final action = await showMenu<_InvoiceRowAction>(
+      context: cellContext,
+      position: RelativeRect.fromRect(
+        Rect.fromPoints(
+          box.localToGlobal(Offset.zero),
+          box.localToGlobal(box.size.bottomRight(Offset.zero)),
+        ),
+        Offset.zero & overlay.context.size!,
+      ),
+      items: [
+        PopupMenuItem(
+          value: _InvoiceRowAction.view,
+          child: Row(
+            children: [
+              const Icon(Icons.visibility_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n.commonView),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: _InvoiceRowAction.edit,
+          child: Row(
+            children: [
+              const Icon(Icons.edit_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n.commonEdit),
+            ],
+          ),
+        ),
+        if (canPay)
+          PopupMenuItem(
+            value: _InvoiceRowAction.payment,
+            child: Row(
+              children: [
+                const Icon(Icons.payments_outlined, size: 18),
+                const SizedBox(width: 8),
+                Text(l10n.paymentsRecordpayment),
+              ],
+            ),
+          ),
+        PopupMenuItem(
+          value: _InvoiceRowAction.print,
+          child: Row(
+            children: [
+              const Icon(Icons.print_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n.salesPrinta4),
+            ],
+          ),
+        ),
+        if (canDelete)
+          PopupMenuItem(
+            value: _InvoiceRowAction.delete,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.delete_outline,
+                  size: 18,
+                  color: Theme.of(cellContext).colorScheme.error,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.customersDeleteinvoice,
+                  style: TextStyle(
+                    color: Theme.of(cellContext).colorScheme.error,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+    if (action != null && mounted) {
+      switch (action) {
+        case _InvoiceRowAction.view:
+          // The read-only document view (same as the customer tab).
+          context.push('/sales/print-preview', extra: invoice);
+        case _InvoiceRowAction.edit:
+          context.push('/sales/form', extra: invoice);
+        case _InvoiceRowAction.payment:
+          await showInvoicePaymentDialog(context, invoice: invoice);
+        case _InvoiceRowAction.print:
+          _printInvoice(invoice);
+        case _InvoiceRowAction.delete:
+          await _deleteInvoice(invoice);
+      }
+    }
+  }
+
+  /// A4 print from the row menu — reuses the same PDF pipeline as the
+  /// print-preview page (fresh detail + payments → A4 bytes → native
+  /// print), without leaving the list.
+  Future<void> _printInvoice(Invoice invoice) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final repo = ref.read(invoiceRepositoryProvider);
+      final detailResult = await repo.invoice(invoice.id);
+      final detail = switch (detailResult) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+      final paymentsResult = await repo.invoicePayments(invoice.id);
+      final payments = switch (paymentsResult) {
+        ApiSuccess(:final data) => data,
+        ApiFailure() => const <InvoicePaymentRecord>[],
+      };
+      final bytes = await buildA4InvoicePdf(
+        invoice: detail,
+        payments: payments,
+      );
+      if (!mounted) return;
+      await printPdfBytes(bytes, '${invoice.invoiceNo}.pdf', context);
+    } catch (error) {
+      if (mounted) {
+        showAppToast(context, '${l10n.errorsFailed}: $error', isError: true);
+      }
+    }
+  }
+
+  /// Delete with confirm — mirrors the customer tab (guarded by
+  /// `canShowDeleteAction` above).
+  Future<void> _deleteInvoice(Invoice invoice) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.customersDeleteinvoice,
+      message: '${l10n.customersConfirmdeleteinvoice} "${invoice.invoiceNo}"?',
+      confirmLabel: l10n.customersDeleteinvoice,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final result = await ref.read(invoiceRepositoryProvider).delete(invoice.id);
+    if (!mounted) return;
+    switch (result) {
+      case ApiSuccess():
+        showAppToast(context, l10n.customersInvoicedeleted);
+        ref.invalidate(invoicesProvider);
+      case ApiFailure(:final error):
+        showAppToast(context, error.message, isError: true);
+    }
+  }
 
   Widget _summaryStrip(
     AppLocalizations l10n,
@@ -225,6 +407,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       child: PlutoGrid(
+        configuration: plutoGridConfigurationFor(context),
         columns: _columns,
         // Must be a modifiable list — FilteredList appends into it (a
         // const list throws "Cannot add to an unmodifiable list").
@@ -263,8 +446,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
 
   /// Column set — dense data-screen conventions (PORTING.md §6), read-only
   /// with the id column hidden (it carries the row's invoice id to the
-  /// double-tap handler).
-  static List<PlutoColumn> _buildColumns(AppLocalizations l10n) {
+  /// double-tap handler). Instance (not static) because the actions
+  /// column's renderer opens the per-row menu on `this` State.
+  List<PlutoColumn> _buildColumns(AppLocalizations l10n) {
     PlutoColumn textColumn(String field, String title, double width) =>
         PlutoColumn(
           title: title,
@@ -376,6 +560,38 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         ),
       ),
       textColumn('created_by', l10n.expensesCreatedby, 130),
+      // Per-row actions menu — the ⋮ dropdown (View / Edit / Payment /
+      // Print / Delete), same Listener + showMenu pattern as the
+      // customers grid. The full Invoice rides in the hidden `data`
+      // cell so the menu can guard on status + amounts.
+      PlutoColumn(
+        title: l10n.customersActions,
+        field: 'actions',
+        type: PlutoColumnType.text(),
+        width: 64,
+        readOnly: true,
+        enableContextMenu: false,
+        enableFilterMenuItem: false,
+        enableHideColumnMenuItem: false,
+        enableSetColumnsMenuItem: false,
+        renderer: (ctx) {
+          final invoice = ctx.cell.row.cells['data']?.value as Invoice?;
+          return Builder(
+            builder: (cellContext) => Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (_) =>
+                  _openRowMenu(cellContext, invoice),
+              child: Center(
+                child: Icon(
+                  Icons.more_vert,
+                  size: 18,
+                  color: Theme.of(cellContext).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     ];
   }
 

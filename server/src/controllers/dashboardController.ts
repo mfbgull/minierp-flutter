@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../types';
 import db from '../config/database';
 import logger from '../utils/logger';
+import { getQueryParam } from '../utils/queryUtils';
 import DashboardModel from '../models/Dashboard';
 import {
   CASH_ACCOUNTS,
@@ -114,7 +115,14 @@ function getStockMovementSummary(req: AuthRequest, res: Response): void {
 function getKPI(req: AuthRequest, res: Response): void {
   try {
     const metric = (req.query.metric as string) || 'stock_health';
-    const data = DashboardModel.getKPI(db, metric);
+    const fromDate = String((getQueryParam(req.query.fromDate)) || '');
+    const toDate = String((getQueryParam(req.query.toDate)) || '');
+    const data = DashboardModel.getKPI(
+      db,
+      metric,
+      fromDate || undefined,
+      toDate || undefined,
+    );
     res.json({ success: true, data });
   } catch (error) {
     logger.error('KPI error:', error);

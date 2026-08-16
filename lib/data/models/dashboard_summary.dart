@@ -343,7 +343,7 @@ class DashboardSummary {
     required this.totalStockValue,
     required this.totalSalesRevenue,
     required this.totalPurchases,
-    required this.totalProfit,
+    required this.totalGrossProfit,
     required this.warehouseStockCount,
     required this.lowStockItems,
     required this.stockByCategory,
@@ -358,7 +358,7 @@ class DashboardSummary {
         totalStockValue: asNum(json['totalStockValue']) ?? 0,
         totalSalesRevenue: asNum(json['totalSalesRevenue']) ?? 0,
         totalPurchases: asNum(json['totalPurchases']) ?? 0,
-        totalProfit: asNum(json['totalProfit']) ?? 0,
+        totalGrossProfit: asNum(json['totalProfit']) ?? 0,
         warehouseStockCount: asInt(json['warehouseStockCount']) ?? 0,
         lowStockItems: _parseList(json['lowStockItems'], LowStockItem.fromJson),
         stockByCategory: _parseList(
@@ -374,7 +374,7 @@ class DashboardSummary {
   final num totalStockValue;
   final num totalSalesRevenue;
   final num totalPurchases;
-  final num totalProfit;
+  final num totalGrossProfit;
   final int warehouseStockCount;
   final List<LowStockItem> lowStockItems;
   final List<StockByCategory> stockByCategory;
