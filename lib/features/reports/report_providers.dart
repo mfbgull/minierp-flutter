@@ -9,8 +9,10 @@ import '../../data/models/customer.dart' show Customer;
 import '../../data/models/item.dart' show Item;
 import '../../data/models/report.dart'
     show
+        ApAgingReport,
         ArAgingReport,
         ArSummaryReport,
+        BalanceSheetReport,
         BomUsageReport,
         CashFlowReport,
         CashReconciliation,
@@ -49,8 +51,17 @@ DateTime _today() {
 // ── AR aging ─────────────────────────────────────────────────────────
 
 /// Loads GET /reports/ar-aging (server default: as of today).
+/// As-of date for the AR aging report (defaults to today).
+final reportArAgingAsOfDateProvider = StateProvider<DateTime?>(
+  (ref) => _today(),
+);
+
+/// Loads GET /reports/ar-aging, re-running when the as-of date changes.
 final arAgingProvider = FutureProvider<ArAgingReport>((ref) async {
-  final result = await ref.watch(reportRepositoryProvider).arAging();
+  final asOf = ref.watch(reportArAgingAsOfDateProvider);
+  final result = await ref
+      .watch(reportRepositoryProvider)
+      .arAging(asOfDate: asOf == null ? null : isoDate(asOf));
   return switch (result) {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,
@@ -486,13 +497,14 @@ final reportBomItemIdProvider = StateProvider<int?>((ref) => null);
 
 /// All finished items for the bom-usage parent-item picker (reuses the
 /// inventory repository's items list — the same source the web page's
-/// `/inventory/items` select uses).
+/// `/inventory/items` select uses). Fetched as one large page with the
+/// `is_finished_good` filter.
 final finishedItemsForReportProvider = FutureProvider<List<Item>>((ref) async {
   final result = await ref
       .watch(inventoryRepositoryProvider)
-      .items(isFinishedGood: true);
+      .items(const PagedRequest(limit: 10000, extra: {'is_finished_good': '1'}));
   return switch (result) {
-    ApiSuccess(:final data) => data,
+    ApiSuccess(:final data) => data.items,
     ApiFailure(:final error) => throw error,
   };
 });
@@ -510,6 +522,44 @@ final bomUsageReportProvider = FutureProvider<BomUsageReport>((ref) async {
         toDate: isoDate(to),
         itemId: itemId,
       );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+// ── AP aging ─────────────────────────────────────────────────────────
+
+/// As-of date for the AP aging report (defaults to today).
+final reportApAgingAsOfDateProvider = StateProvider<DateTime?>(
+  (ref) => _today(),
+);
+
+/// Loads GET /reports/ap-aging, re-running when the as-of date changes.
+final apAgingProvider = FutureProvider<ApAgingReport>((ref) async {
+  final asOf = ref.watch(reportApAgingAsOfDateProvider);
+  final result = await ref
+      .watch(reportRepositoryProvider)
+      .apAging(asOfDate: asOf == null ? null : isoDate(asOf));
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+// ── Balance sheet ────────────────────────────────────────────────────
+
+/// As-of date for the balance sheet report (defaults to today).
+final reportBalanceSheetAsOfDateProvider = StateProvider<DateTime?>(
+  (ref) => _today(),
+);
+
+/// Loads GET /reports/balance-sheet, re-running when the as-of date changes.
+final balanceSheetProvider = FutureProvider<BalanceSheetReport>((ref) async {
+  final asOf = ref.watch(reportBalanceSheetAsOfDateProvider);
+  final result = await ref
+      .watch(reportRepositoryProvider)
+      .balanceSheet(asOfDate: asOf == null ? null : isoDate(asOf));
   return switch (result) {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,

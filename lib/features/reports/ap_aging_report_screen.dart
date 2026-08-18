@@ -1,7 +1,6 @@
-// AR aging report — GET /reports/ar-aging (PORTING.md §11). Renders the
-// per-customer aging buckets into a read-only PlutoGrid with a summary
-// strip of the column totals above it (mirroring the web's
-// `ARAgingReport` + `ReceivablesSummary` shapes in one grid).
+// AP aging report — GET /reports/ap-aging. Mirrors the AR aging report
+// for supplier payables: per-supplier aging buckets in a read-only
+// PlutoGrid with a summary strip above it.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +8,7 @@ import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
-import '../../data/models/report.dart' show ArAgingBucket, ArAgingReport;
+import '../../data/models/report.dart' show ApAgingBucket, ApAgingReport;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/client_paged_grid.dart';
@@ -19,15 +18,15 @@ import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
 
-class ArAgingReportScreen extends ConsumerStatefulWidget {
-  const ArAgingReportScreen({super.key});
+class ApAgingReportScreen extends ConsumerStatefulWidget {
+  const ApAgingReportScreen({super.key});
 
   @override
-  ConsumerState<ArAgingReportScreen> createState() =>
-      _ArAgingReportScreenState();
+  ConsumerState<ApAgingReportScreen> createState() =>
+      _ApAgingReportScreenState();
 }
 
-class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
+class _ApAgingReportScreenState extends ConsumerState<ApAgingReportScreen> {
   late List<PlutoColumn> _columns;
   bool _columnsReady = false;
 
@@ -41,30 +40,30 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
   }
 
   static PlutoColumn _moneyColumn(
-    AppLocalizations l10n,
     String field,
     String title,
     double width,
-  ) => PlutoColumn(
-    title: title,
-    field: field,
-    type: PlutoColumnType.number(format: '#,###.00'),
-    width: width,
-    readOnly: true,
-    textAlign: PlutoColumnTextAlign.end,
-    titleTextAlign: PlutoColumnTextAlign.end,
-    enableContextMenu: false,
-    renderer: (ctx) => Align(
-      alignment: Alignment.centerRight,
-      child: Text(Formatters.currency(ctx.cell.value as num? ?? 0)),
-    ),
-  );
+  ) =>
+      PlutoColumn(
+        title: title,
+        field: field,
+        type: PlutoColumnType.number(format: '#,###.00'),
+        width: width,
+        readOnly: true,
+        textAlign: PlutoColumnTextAlign.end,
+        titleTextAlign: PlutoColumnTextAlign.end,
+        enableContextMenu: false,
+        renderer: (ctx) => Align(
+          alignment: Alignment.centerRight,
+          child: Text(Formatters.currency(ctx.cell.value as num? ?? 0)),
+        ),
+      );
 
   static List<PlutoColumn> _buildColumns(AppLocalizations l10n) => [
     serialGridColumn(),
     PlutoColumn(
-      title: l10n.fieldsCustomer,
-      field: 'customer',
+      title: l10n.fieldsSupplier,
+      field: 'supplier',
       type: PlutoColumnType.text(),
       width: 220,
       readOnly: true,
@@ -77,20 +76,20 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
         ),
       ),
     ),
-    _moneyColumn(l10n, 'totalOutstanding', l10n.reportsTotaloutstanding, 150),
-    _moneyColumn(l10n, 'current', l10n.reportsCurrent, 120),
-    _moneyColumn(l10n, 'days1_30', l10n.reportsDays1_30, 120),
-    _moneyColumn(l10n, 'days31_60', l10n.reportsDays31_60, 120),
-    _moneyColumn(l10n, 'days61_90', l10n.reportsDays61_90, 120),
-    _moneyColumn(l10n, 'daysOver90', l10n.reportsDays90plus, 120),
+    _moneyColumn('totalOutstanding', l10n.reportsTotaloutstanding, 150),
+    _moneyColumn('current', l10n.reportsCurrent, 120),
+    _moneyColumn('days1_30', l10n.reportsDays1_30, 120),
+    _moneyColumn('days31_60', l10n.reportsDays31_60, 120),
+    _moneyColumn('days61_90', l10n.reportsDays61_90, 120),
+    _moneyColumn('daysOver90', l10n.reportsDays90plus, 120),
   ];
 
-  PlutoRow _rowFor(ArAgingBucket bucket) => PlutoRow(
+  PlutoRow _rowFor(ApAgingBucket bucket) => PlutoRow(
     cells: {
-      'customer': PlutoCell(
-        value: bucket.customerName.isEmpty
-            ? bucket.customerCode
-            : bucket.customerName,
+      'supplier': PlutoCell(
+        value: bucket.supplierName.isEmpty
+            ? bucket.supplierCode
+            : bucket.supplierName,
       ),
       'totalOutstanding': PlutoCell(value: bucket.totalOutstanding),
       'current': PlutoCell(value: bucket.currentAmount),
@@ -103,7 +102,7 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final report = ref.watch(arAgingProvider);
+    final report = ref.watch(apAgingProvider);
     final l10n = AppLocalizations.of(context)!;
 
     return Column(
@@ -115,7 +114,7 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
     );
   }
 
-  Widget _header(AppLocalizations l10n, AsyncValue<ArAgingReport> report) {
+  Widget _header(AppLocalizations l10n, AsyncValue<ApAgingReport> report) {
     final scheme = Theme.of(context).colorScheme;
     final value = report.valueOrNull;
     return Column(
@@ -124,7 +123,7 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Text(
-            l10n.reportsTabsAr_aging,
+            l10n.reportsTabsAp_aging,
             style: Theme.of(context).textTheme.titleLarge,
           ),
         ),
@@ -133,20 +132,20 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
           filters: [
             DateRangeFilter(
               mode: DateRangeMode.singleDate,
-              fromProvider: reportArAgingAsOfDateProvider,
-              toProvider: reportArAgingAsOfDateProvider,
-              dateProvider: reportArAgingAsOfDateProvider,
+              fromProvider: reportApAgingAsOfDateProvider,
+              toProvider: reportApAgingAsOfDateProvider,
+              dateProvider: reportApAgingAsOfDateProvider,
             ),
           ],
-          onRefresh: () => ref.invalidate(arAgingProvider),
+          onRefresh: () => ref.invalidate(apAgingProvider),
           actions: [
             TextButton.icon(
               onPressed: report.isLoading || (value?.buckets.isEmpty ?? true)
                   ? null
                   : () => saveCsv(
                       context,
-                      suggestedName: csvSuggestedName('ar-aging'),
-                      csv: buildArAgingCsv(l10n, value!),
+                      suggestedName: csvSuggestedName('ap-aging'),
+                      csv: buildApAgingCsv(l10n, value!),
                       successMessage: l10n.reportsExported,
                       errorMessage: l10n.reportsExportfailed,
                     ),
@@ -176,7 +175,7 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
   }
 
   /// Column totals — Current | 1-30 | 31-60 | 61-90 | 90+ | Total.
-  Widget _totalsStrip(AppLocalizations l10n, ArAgingReport report) {
+  Widget _totalsStrip(AppLocalizations l10n, ApAgingReport report) {
     final scheme = Theme.of(context).colorScheme;
     Widget cell(String label, num amount) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -220,13 +219,13 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
           const SizedBox(width: 8),
           cell(l10n.reportsDays90plus, s.totalOver90),
           const SizedBox(width: 8),
-          cell(l10n.reportsTotalreceivables, s.totalReceivables),
+          cell(l10n.reportsTotalpayables, s.totalPayables),
         ],
       ),
     );
   }
 
-  Widget _body(AsyncValue<ArAgingReport> report) {
+  Widget _body(AsyncValue<ApAgingReport> report) {
     final l10n = AppLocalizations.of(context)!;
     final errorMessage = switch (report) {
       AsyncError(:final error) => error is ApiError ? error.message : null,
@@ -235,12 +234,12 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
     if (errorMessage != null) {
       return ScreenErrorPanel(
         message: errorMessage,
-        onRetry: () => ref.invalidate(arAgingProvider),
+        onRetry: () => ref.invalidate(apAgingProvider),
       );
     }
 
-    return ClientPagedGrid<ArAgingBucket>(
-      data: report.valueOrNull?.buckets ?? const <ArAgingBucket>[],
+    return ClientPagedGrid<ApAgingBucket>(
+      data: report.valueOrNull?.buckets ?? const <ApAgingBucket>[],
       columns: _columns,
       gridRowFor: _rowFor,
       itemLabel: l10n.customreportsRows,
