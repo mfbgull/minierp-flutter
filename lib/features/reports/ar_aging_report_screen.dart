@@ -12,7 +12,9 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart' show ArAgingBucket, ArAgingReport;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/pluto_grid_screen.dart' show plutoGridConfigurationFor, serialGridColumn;
+import '../../widgets/client_paged_grid.dart';
+import '../../widgets/date_range_picker.dart' show DateRangeFilter, DateRangeMode;
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
@@ -28,15 +30,6 @@ class ArAgingReportScreen extends ConsumerStatefulWidget {
 class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
   late List<PlutoColumn> _columns;
   bool _columnsReady = false;
-
-  /// Grid manager — rows are fed through the manager (clear + append)
-  /// on provider changes, the same pattern as the expenses screen
-  /// (PlutoGrid only reads its `rows` prop in initState).
-  ///
-  /// The grid's `rows:` list must stay **mutable** — PlutoGrid wraps the
-  /// passed list and `appendRows` mutates it, so a `const` list throws
-  /// "Cannot add to an unmodifiable list".
-  PlutoGridStateManager? _manager;
 
   @override
   void didChangeDependencies() {
@@ -92,43 +85,26 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
     _moneyColumn(l10n, 'daysOver90', l10n.reportsDays90plus, 120),
   ];
 
-  /// Pushes the provider state into the grid manager (clear + append,
-  /// with the loading overlay toggled). No-op until `onLoaded`.
-  void _applyReport(AsyncValue<ArAgingReport> value) {
-    final manager = _manager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      final buckets = value.value?.buckets ?? const <ArAgingBucket>[];
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final bucket in buckets)
-          PlutoRow(
-            cells: {
-              'serial': PlutoCell(value: 0),
-              'customer': PlutoCell(
-                value: bucket.customerName.isEmpty
-                    ? bucket.customerCode
-                    : bucket.customerName,
-              ),
-              'totalOutstanding': PlutoCell(value: bucket.totalOutstanding),
-              'current': PlutoCell(value: bucket.currentAmount),
-              'days1_30': PlutoCell(value: bucket.days1_30),
-              'days31_60': PlutoCell(value: bucket.days31_60),
-              'days61_90': PlutoCell(value: bucket.days61_90),
-              'daysOver90': PlutoCell(value: bucket.daysOver90),
-            },
-          ),
-      ]);
-    }
-  }
+  PlutoRow _rowFor(ArAgingBucket bucket) => PlutoRow(
+    cells: {
+      'customer': PlutoCell(
+        value: bucket.customerName.isEmpty
+            ? bucket.customerCode
+            : bucket.customerName,
+      ),
+      'totalOutstanding': PlutoCell(value: bucket.totalOutstanding),
+      'current': PlutoCell(value: bucket.currentAmount),
+      'days1_30': PlutoCell(value: bucket.days1_30),
+      'days31_60': PlutoCell(value: bucket.days31_60),
+      'days61_90': PlutoCell(value: bucket.days61_90),
+      'daysOver90': PlutoCell(value: bucket.daysOver90),
+    },
+  );
 
   @override
   Widget build(BuildContext context) {
     final report = ref.watch(arAgingProvider);
     final l10n = AppLocalizations.of(context)!;
-
-    ref.listen(arAgingProvider, (previous, next) => _applyReport(next));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -154,6 +130,14 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
         ),
         ScreenToolbar(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          filters: [
+            DateRangeFilter(
+              mode: DateRangeMode.singleDate,
+              fromProvider: reportArAgingAsOfDateProvider,
+              toProvider: reportArAgingAsOfDateProvider,
+              dateProvider: reportArAgingAsOfDateProvider,
+            ),
+          ],
           onRefresh: () => ref.invalidate(arAgingProvider),
           actions: [
             TextButton.icon(
@@ -255,23 +239,12 @@ class _ArAgingReportScreenState extends ConsumerState<ArAgingReportScreen> {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      child: PlutoGrid(
-        configuration: plutoGridConfigurationFor(context),
-        columns: _columns,
-        rows: <PlutoRow>[],
-        onLoaded: (event) {
-          _manager = event.stateManager;
-          _applyReport(ref.read(arAgingProvider));
-        },
-        noRowsWidget: Center(
-          child: Text(
-            l10n.commonNoresults,
-            style: TextStyle(color: Theme.of(context).colorScheme.outline),
-          ),
-        ),
-      ),
+    return ClientPagedGrid<ArAgingBucket>(
+      data: report.valueOrNull?.buckets ?? const <ArAgingBucket>[],
+      columns: _columns,
+      gridRowFor: _rowFor,
+      itemLabel: l10n.customreportsRows,
+      isLoading: report.isLoading,
     );
   }
 }

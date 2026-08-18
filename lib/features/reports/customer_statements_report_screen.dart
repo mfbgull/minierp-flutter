@@ -14,8 +14,9 @@ import '../../data/models/customer.dart' show Customer;
 import '../../data/models/report.dart' show CustomerStatementRow;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/client_paged_grid.dart';
 import '../../widgets/date_range_picker.dart';
-import '../../widgets/pluto_grid_screen.dart' show plutoGridConfigurationFor, serialGridColumn;
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../../widgets/searchable_select.dart';
@@ -32,8 +33,6 @@ class CustomerStatementsReportScreen extends ConsumerStatefulWidget {
 
 class _CustomerStatementsReportScreenState
     extends ConsumerState<CustomerStatementsReportScreen> {
-  final Map<int, CustomerStatementRow> _rowsById = {};
-  PlutoGridStateManager? _manager;
   late List<PlutoColumn> _columns;
   bool _columnsReady = false;
 
@@ -46,25 +45,9 @@ class _CustomerStatementsReportScreenState
     }
   }
 
-  void _applyReport(AsyncValue<List<CustomerStatementRow>> value) {
-    final manager = _manager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      final loaded = value.value ?? const <CustomerStatementRow>[];
-      _rowsById.clear();
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, row) in loaded.indexed) _rowFor(index, row),
-      ]);
-    }
-  }
-
-  PlutoRow _rowFor(int index, CustomerStatementRow row) {
-    _rowsById[index] = row;
+  PlutoRow _rowFor(CustomerStatementRow row) {
     return PlutoRow(
       cells: {
-        'serial': PlutoCell(value: index + 1),
         'key': PlutoCell(value: row.customerId),
         'customerName': PlutoCell(value: row.customerName),
         'customerCode': PlutoCell(value: row.customerCode),
@@ -141,11 +124,6 @@ class _CustomerStatementsReportScreenState
     final l10n = AppLocalizations.of(context)!;
     final customers = ref.watch(customersForReportProvider);
     final selectedCustomerId = ref.watch(reportStatementsCustomerIdProvider);
-
-    ref.listen(
-      customerStatementsReportProvider,
-      (previous, next) => _applyReport(next),
-    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -244,35 +222,15 @@ class _CustomerStatementsReportScreenState
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      child: PlutoGrid(
-        configuration: plutoGridConfigurationFor(context),
-        columns: _columns,
-        rows: <PlutoRow>[],
-        onLoaded: (event) {
-          _manager = event.stateManager;
-          _manager?.hideColumn(
-            _columns.firstWhere((c) => c.field == 'key'),
-            true,
-            notify: false,
-          );
-          _applyReport(ref.read(customerStatementsReportProvider));
-        },
-        onRowDoubleTap: (event) {
-          final key = (event.row.cells['key']?.value as num?)?.toInt();
-          if (key == null) return;
-          final row = _rowsById[key];
-          if (row == null) return;
-          showCustomerStatementDetailDialog(context, row: row);
-        },
-        noRowsWidget: Center(
-          child: Text(
-            l10n.commonNoresults,
-            style: TextStyle(color: Theme.of(context).colorScheme.outline),
-          ),
-        ),
-      ),
+    return ClientPagedGrid<CustomerStatementRow>(
+      data: report.valueOrNull ?? const <CustomerStatementRow>[],
+      columns: _columns,
+      gridRowFor: _rowFor,
+      itemLabel: l10n.customreportsRows,
+      hiddenFields: const ['key'],
+      isLoading: report.isLoading,
+      onRowDoubleTap: (row) =>
+          showCustomerStatementDetailDialog(context, row: row),
     );
   }
 }

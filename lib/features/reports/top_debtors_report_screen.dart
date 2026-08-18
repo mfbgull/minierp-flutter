@@ -13,7 +13,8 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart' show TopDebtorRow;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/pluto_grid_screen.dart' show plutoGridConfigurationFor, serialGridColumn;
+import '../../widgets/client_paged_grid.dart';
+import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
@@ -29,19 +30,6 @@ class TopDebtorsReportScreen extends ConsumerStatefulWidget {
 
 class _TopDebtorsReportScreenState
     extends ConsumerState<TopDebtorsReportScreen> {
-  /// Row index → model for the double-tap detail dialog (the report has
-  /// no per-row endpoint — the dialog renders from the grid's own row
-  /// data; rows are keyed by grid index because the server sends no id).
-  final Map<int, TopDebtorRow> _rowsById = {};
-
-  /// Grid manager — rows are fed through the manager (clear + append) on
-  /// provider changes, the same pattern as the expenses screen (PlutoGrid
-  /// only reads its `rows` prop in initState). The `rows:` list must stay
-  /// **mutable** — PlutoGrid wraps the passed list and `appendRows`
-  /// mutates it, so a `const` list throws "Cannot add to an unmodifiable
-  /// list".
-  PlutoGridStateManager? _manager;
-
   late List<PlutoColumn> _columns;
   bool _columnsReady = false;
 
@@ -54,36 +42,16 @@ class _TopDebtorsReportScreenState
     }
   }
 
-  /// Pushes the provider state into the grid manager (clear + append,
-  /// with the loading overlay toggled). No-op until `onLoaded`.
-  void _applyReport(AsyncValue<List<TopDebtorRow>> value) {
-    final manager = _manager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      final loaded = value.value ?? const <TopDebtorRow>[];
-      _rowsById.clear();
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, row) in loaded.indexed) _rowFor(index, row),
-      ]);
-    }
-  }
-
-  PlutoRow _rowFor(int index, TopDebtorRow row) {
-    _rowsById[index] = row;
-    return PlutoRow(
-      cells: {
-        'serial': PlutoCell(value: index + 1),
-        'key': PlutoCell(value: index),
-        'customerName': PlutoCell(value: row.customerName),
-        'customerCode': PlutoCell(value: row.customerCode),
-        'outstanding': PlutoCell(value: row.totalOutstanding),
-        'invoiced': PlutoCell(value: row.totalInvoiced),
-        'invoiceCount': PlutoCell(value: row.invoiceCount),
-      },
-    );
-  }
+  PlutoRow _rowFor(TopDebtorRow row) => PlutoRow(
+    cells: {
+      'key': PlutoCell(value: 0),
+      'customerName': PlutoCell(value: row.customerName),
+      'customerCode': PlutoCell(value: row.customerCode),
+      'outstanding': PlutoCell(value: row.totalOutstanding),
+      'invoiced': PlutoCell(value: row.totalInvoiced),
+      'invoiceCount': PlutoCell(value: row.invoiceCount),
+    },
+  );
 
   static PlutoColumn _moneyColumn(String field, String title, double width) =>
       PlutoColumn(
@@ -166,11 +134,6 @@ class _TopDebtorsReportScreenState
     final report = ref.watch(topDebtorsReportProvider);
     final l10n = AppLocalizations.of(context)!;
 
-    ref.listen(
-      topDebtorsReportProvider,
-      (previous, next) => _applyReport(next),
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -246,35 +209,14 @@ class _TopDebtorsReportScreenState
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      child: PlutoGrid(
-        configuration: plutoGridConfigurationFor(context),
-        columns: _columns,
-        rows: <PlutoRow>[],
-        onLoaded: (event) {
-          _manager = event.stateManager;
-          _manager?.hideColumn(
-            _columns.firstWhere((c) => c.field == 'key'),
-            true,
-            notify: false,
-          );
-          _applyReport(ref.read(topDebtorsReportProvider));
-        },
-        onRowDoubleTap: (event) {
-          final key = (event.row.cells['key']?.value as num?)?.toInt();
-          if (key == null) return;
-          final row = _rowsById[key];
-          if (row == null) return;
-          showTopDebtorDetailDialog(context, row: row);
-        },
-        noRowsWidget: Center(
-          child: Text(
-            l10n.commonNoresults,
-            style: TextStyle(color: Theme.of(context).colorScheme.outline),
-          ),
-        ),
-      ),
+    return ClientPagedGrid<TopDebtorRow>(
+      data: report.valueOrNull ?? const <TopDebtorRow>[],
+      columns: _columns,
+      gridRowFor: _rowFor,
+      itemLabel: l10n.customreportsRows,
+      hiddenFields: const ['key'],
+      isLoading: report.isLoading,
+      onRowDoubleTap: (row) => showTopDebtorDetailDialog(context, row: row),
     );
   }
 }

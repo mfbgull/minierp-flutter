@@ -36,6 +36,8 @@ final Map<String, String Function(AppLocalizations)> reportTitles = {
   'supplier-analysis': (l) => l.reportsSupplieranalysisreport,
   'production-summary': (l) => l.reportsProductionsummaryreport,
   'bom-usage': (l) => l.reportsBomusage,
+  'ap-aging': (l) => l.reportsTabsAp_aging,
+  'balance-sheet': (l) => l.reportsBalanceSheet,
 };
 
 class _ReportEntry {
@@ -76,6 +78,7 @@ final List<_ReportCategory> _reportCategories = [
     Icons.payments_outlined,
     const [
       _ReportEntry('profit-loss', Icons.trending_down),
+      _ReportEntry('balance-sheet', Icons.account_balance_outlined),
       _ReportEntry('cash-flow', Icons.account_balance_wallet_outlined),
       _ReportEntry('cash-reconciliation', Icons.fact_check_outlined),
       _ReportEntry('expenses', Icons.credit_card),
@@ -98,6 +101,13 @@ final List<_ReportCategory> _reportCategories = [
     const [
       _ReportEntry('purchase-summary', Icons.shopping_cart_checkout_outlined),
       _ReportEntry('supplier-analysis', Icons.local_shipping_outlined),
+    ],
+  ),
+  _ReportCategory(
+    (l) => l.reportsCategoryAp,
+    Icons.hourglass_bottom_outlined,
+    const [
+      _ReportEntry('ap-aging', Icons.schedule_outlined),
     ],
   ),
   _ReportCategory(
