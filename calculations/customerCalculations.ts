@@ -27,8 +27,13 @@ export function calculateLedgerTotals(
     if (returnedInvoiceNos && returnedInvoiceNos.size > 0) {
       // Exclude INVOICE entries for returned invoices
       if (e.transaction_type === 'INVOICE' && returnedInvoiceNos.has(e.reference_no)) return false;
-      // Exclude PAYMENT entries linked to returned invoices
-      if (e.linked_invoice_no && returnedInvoiceNos.has(e.linked_invoice_no)) return false;
+      // Exclude PAYMENT entries linked to returned invoices. A payment can
+      // be allocated across several invoices; the server returns the
+      // comma-joined list in `linked_invoice_no`, so check every member.
+      if (e.linked_invoice_no) {
+        const linkedNos = e.linked_invoice_no.split(',').map((s) => s.trim());
+        if (linkedNos.some((no) => returnedInvoiceNos.has(no))) return false;
+      }
     }
     return true;
   });

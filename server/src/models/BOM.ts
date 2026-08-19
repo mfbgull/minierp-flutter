@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { getNextSequenceNumber } from '../utils/sequence';
+import { sanitizeSortParams, BOM_SORT_COLUMNS } from '../utils/sqlSanitizer';
 
 interface BOM {
   id: number;
@@ -51,6 +52,33 @@ interface UpdateBOMDTO {
   is_active?: number;
   items?: { item_id: number; quantity: number }[];
 }
+
+interface BOMFilters {
+  search?: string;
+  sortBy?: string;
+  sortOrder?: string;
+  page?: number;
+  limit?: number;
+}
+
+interface PaginatedBOMs {
+  rows: BOM[];
+  total: number;
+  pageNum: number;
+  limitNum: number;
+}
+
+// Whitelisted sort columns → qualified SQL column for the list query (the
+// finished-item join makes bare names ambiguous).
+const BOM_SORT_COLUMN_MAP: Record<string, string> = {
+  bom_no: 'b.bom_no',
+  bom_name: 'b.bom_name',
+  finished_item_name: 'i.item_name',
+  quantity: 'b.quantity',
+  item_count: 'item_count',
+  total_material_cost: 'total_material_cost',
+  created_at: 'b.created_at',
+};
 
 class BOMModel {
   static generateBOMNo(db: Database.Database): string {
@@ -112,8 +140,11 @@ class BOMModel {
     return transaction();
   }
 
-  static getAll(db: Database.Database): BOM[] {
-    return db.prepare(`
+  static getAll(filters: BOMFilters = {}, db: Database.Database): PaginatedBOMs {
+    const pageNum = filters.page || 1;
+    const limitNum = filters.limit || 10;
+
+    const select = `
       SELECT
         b.id,
         b.bom_no,
@@ -134,8 +165,45 @@ class BOMModel {
          WHERE bi.bom_id = b.id) AS total_material_cost
       FROM boms b
       JOIN items i ON b.finished_item_id = i.id
-      ORDER BY b.created_at DESC
-    `).all() as BOM[];
+      WHERE 1=1
+    `;
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (filters.search) {
+      conditions.push(
+        '(b.bom_no LIKE ? OR b.bom_name LIKE ? OR i.item_code LIKE ? OR i.item_name LIKE ?)'
+      );
+      const term = `%${filters.search}%`;
+      params.push(term, term, term, term);
+    }
+
+    const where = conditions.length ? ` AND ${conditions.join(' AND ')}` : '';
+
+    // Sort — whitelisted via sqlSanitizer, mapped to qualified columns
+    // (default matches the pre-paging behavior: newest BOM first).
+    const { column, order } = sanitizeSortParams(
+      filters.sortBy || 'created_at',
+      filters.sortOrder || 'DESC',
+      BOM_SORT_COLUMNS,
+      'created_at',
+      'DESC'
+    );
+    const sortColumn = BOM_SORT_COLUMN_MAP[column] || 'b.created_at';
+
+    const offset = (pageNum - 1) * limitNum;
+    const rows = db
+      .prepare(`${select}${where} ORDER BY ${sortColumn} ${order}, b.id DESC LIMIT ? OFFSET ?`)
+      .all(...params, limitNum, offset) as BOM[];
+
+    const countRow = db
+      .prepare(`SELECT COUNT(*) as total FROM boms b
+        JOIN items i ON b.finished_item_id = i.id
+        WHERE 1=1${where}`)
+      .get(...params) as { total: number };
+
+    return { rows, total: countRow.total, pageNum, limitNum };
   }
 
   static getById(id: number, db: Database.Database): BOMWithItems | null {

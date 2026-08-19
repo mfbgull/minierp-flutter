@@ -4,19 +4,21 @@
 // `/production` screen), so it is the default tab.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../shell/module_refresh.dart' show moduleTabRefreshOnVisit;
 import 'bom_screen.dart';
 import 'production_screen.dart';
 
-class ProductionShell extends StatefulWidget {
+class ProductionShell extends ConsumerStatefulWidget {
   const ProductionShell({super.key});
 
   @override
-  State<ProductionShell> createState() => _ProductionShellState();
+  ConsumerState<ProductionShell> createState() => _ProductionShellState();
 }
 
-class _ProductionShellState extends State<ProductionShell> {
+class _ProductionShellState extends ConsumerState<ProductionShell> {
   int _index = 0;
 
   @override
@@ -27,7 +29,12 @@ class _ProductionShellState extends State<ProductionShell> {
       children: [
         NavigationBar(
           selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() => _index = i),
+          onDestinationSelected: (i) {
+            setState(() => _index = i);
+            // Refresh the clicked tab's data (the IndexedStack keeps
+            // every tab alive, so its providers would stay cached).
+            moduleTabRefreshOnVisit['/production']?[i].call(ref);
+          },
           destinations: [
             NavigationDestination(
               icon: const Icon(Icons.factory_outlined),

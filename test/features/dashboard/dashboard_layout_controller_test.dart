@@ -64,9 +64,13 @@ void main() {
   tearDown(() => controller.dispose());
 
   /// Waits for the controller's async `_load()` to finish (the fake
-  /// Dio adapter resolves over a few microtask/event-loop turns).
+  /// Dio adapter resolves over a few microtask/event-loop turns). A
+  /// fixed delay of 20ms races the cold JIT path and parallel-suite
+  /// CPU contention (the load can take longer than 20ms, leaving the
+  /// state at its initial value); 200ms gives the chain comfortable
+  /// margin without materially slowing the file.
   Future<void> settle() =>
-      Future<void>.delayed(const Duration(milliseconds: 20));
+      Future<void>.delayed(const Duration(milliseconds: 200));
 
   List<String> visibleIds() => [
     for (final b in controller.state.blocks)

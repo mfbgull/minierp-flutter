@@ -457,46 +457,13 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsReportsdashboard => 'رپورٹس ڈیش باورڈ';
 
   @override
-  String get reportsLowstockalertreport => 'کم اسٹاک الرٹ رپورٹ';
-
-  @override
-  String get reportsStockvaluationreport => 'اسٹاک ویلیویشن رپورٹ';
-
-  @override
-  String get reportsSalessummaryreport => 'فروخت خلاصہ رپورٹ';
-
-  @override
   String get reportsProfitlossreport => 'پرافٹ اینڈ لاس رپورٹ';
 
   @override
   String get reportsCashflowreport => 'کیش فلو رپورٹ';
 
   @override
-  String get reportsExpensesreport => 'خرچے رپورٹ';
-
-  @override
-  String get reportsStocklevelreport => 'اسٹاک لیول رپورٹ';
-
-  @override
-  String get reportsInventorymovementreport => 'انوینٹری موومنٹ رپورٹ';
-
-  @override
   String get reportsTopdebtorsreport => 'ٹاپ ڈیٹر رپورٹ';
-
-  @override
-  String get reportsSupplieranalysisreport => 'سپلائر تجزیہ رپورٹ';
-
-  @override
-  String get reportsPurchasesummaryreport => 'خریداری خلاصہ رپورٹ';
-
-  @override
-  String get reportsProductionsummaryreport => 'پروڈکشن خلاصہ رپورٹ';
-
-  @override
-  String get reportsSalesbyitemreport => 'آئٹم کے حساب سے فروخت رپورٹ';
-
-  @override
-  String get reportsSalesbycustomerreport => 'گاہک کے حساب سے فروخت رپورٹ';
 
   @override
   String get reportsCustomerstatementsreport => 'گاہک بیانات رپورٹ';
@@ -666,6 +633,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get productionProduction => 'پروڈکشن';
 
   @override
+  String get productionProductions => 'پروڈکشن ریکارڈز';
+
+  @override
   String get productionNewproduction => 'نیا پروڈکشن';
 
   @override
@@ -676,6 +646,15 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get stockmovementsStockmovements => 'اسٹاک موومنٹس';
+
+  @override
+  String get inventoryItems => 'مصنوعات';
+
+  @override
+  String get stockbywarehouseBalances => 'اسٹاک بیلنس';
+
+  @override
+  String get physicalcountsPhysicalcounts => 'فیزیکل کاؤنٹ';
 
   @override
   String get stockmovementsNewmovement => 'نیا موومنٹ';
@@ -809,6 +788,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get forecastsDemandtitle => 'ڈیمانڈ فورکاسٹ';
+
+  @override
+  String get forecastsDemand => 'ڈیمانڈ فورکاسٹ ریکارڈز';
 
   @override
   String get forecastsForecasttrends => 'فورکاسٹ ٹرینڈز';
@@ -982,6 +964,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get bomBillofmaterials => 'بل آف میٹریل';
+
+  @override
+  String get bomBoms => 'BOM ریکارڈز';
 
   @override
   String get bomNewbom => 'نیا BOM';
@@ -1187,6 +1172,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesPurchases => 'خریداری';
 
   @override
+  String get purchasesPurchaseReturns => 'خرید واپسیاں';
+
+  @override
   String get purchasesNewpurchase => 'نیا خریداری';
 
   @override
@@ -1228,6 +1216,17 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get purchasesRecordpurchase => 'خریداری ریکارڈ کریں';
+
+  @override
+  String get purchasesDocument => 'دستاویز';
+
+  @override
+  String get purchasesSupplierrequiredforpayment =>
+      'ادائیگی ریکارڈ کرنے کے لیے سپلائر منتخب کریں';
+
+  @override
+  String get purchaseordersSubtitle =>
+      'سپلائرز سے اسٹاک آرڈر کریں اور خریداری آرڈر کی ادائیگی کی حیثیت ٹریک کریں';
 
   @override
   String get purchasesTotalpurchasescard => 'کل خریداریاں';
@@ -1393,6 +1392,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesReturnnoitems => 'کوئی واپسی نہیں ملی';
 
   @override
+  String get purchasesReturnloaderror => 'واپسیاں لوڈ کرنے میں ناکامی';
+
+  @override
   String get purchasesReturnvalue => 'کل واپسی قیمت';
 
   @override
@@ -1412,6 +1414,59 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get purchasesPoreturn => 'PO واپسی';
+
+  @override
+  String get purchasesNewreturn => 'نئی واپسی';
+
+  @override
+  String get purchasesReturnsourcepicker => 'واپسی کا ذریعہ منتخب کریں';
+
+  @override
+  String get purchasesReturnsourcetype => 'ذریعہ کی قسم';
+
+  @override
+  String get purchasesReturnsourcedirect => 'براہ راست خریداری';
+
+  @override
+  String get purchasesReturnsourcepo => 'خریداری آرڈر';
+
+  @override
+  String get purchasesReturnsourcenone => 'کوئی ذریعہ دستاویز نہیں ملی';
+
+  @override
+  String get purchasesReturnwarehouse => 'بحالی گودام';
+
+  @override
+  String get purchasesReturnitems => 'واپس کی جانے والی اشیاء';
+
+  @override
+  String get purchasesReturnempty =>
+      'اس دستاویز سے کوئی چیز واپس نہیں کی جا سکتی';
+
+  @override
+  String get purchasesAlreadyreturned => 'پہلے سے واپس';
+
+  @override
+  String get purchasesAvailable => 'دستیاب';
+
+  @override
+  String get purchasesVoid => 'منسوخ';
+
+  @override
+  String get purchasesVoidreturn => 'واپسی منسوخ کریں';
+
+  @override
+  String get purchasesVoidreturnsure =>
+      'اس سے اسٹاک موومنٹ، جنرل لیجر اور سپلائر کریڈٹ نوٹ واپس ہو جائے گا۔';
+
+  @override
+  String get purchasesVoidreason => 'منسوخی کی وجہ';
+
+  @override
+  String get purchasesVoidreasonplaceholder => 'منسوخی کی وجہ درج کریں...';
+
+  @override
+  String get purchasesReturnvoided => 'واپسی کامیابی سے منسوخ ہوگئی';
 
   @override
   String get salesInvoices => 'بلز';
@@ -1493,9 +1548,6 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get salesReceipt => 'رسید';
-
-  @override
-  String get inventoryItems => 'مصنوعات';
 
   @override
   String get inventoryItemsin => 'مصنوعات';
@@ -2370,6 +2422,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get commonNoresults => 'کوئی نتیجہ نہیں ملی';
 
   @override
+  String get commonEntries => 'اندراجات';
+
+  @override
   String get commonRequired => 'ضروری';
 
   @override
@@ -2647,16 +2702,10 @@ class AppLocalizationsUr extends AppLocalizations {
   String get cashreconVariance => 'فرق';
 
   @override
-  String get commonNavigate => 'نیویگیٹ کریں';
-
-  @override
   String get commonNext => 'اگلا';
 
   @override
   String get commonOf => 'از';
-
-  @override
-  String get commonOpen => 'کھولیں';
 
   @override
   String get commonPage => 'صفحہ';
@@ -2854,16 +2903,10 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsAvgordervalue => 'اوسط آرڈر ویلیو';
 
   @override
-  String get reportsAvgsellingprice => 'اوسط فروخت قیمت';
-
-  @override
   String get reportsBalance => 'بقیہ';
 
   @override
   String get reportsClosingbalance => 'اختتامی بیلنس';
-
-  @override
-  String get reportsCompletedquantity => 'مکمل شدہ مقدار';
 
   @override
   String get reportsCurrent => 'موجودہ';
@@ -2899,16 +2942,7 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsLastpurchase => 'آخری خریداری';
 
   @override
-  String get reportsLastused => 'آخری استعمال';
-
-  @override
-  String get reportsMinimumstock => 'کم از کم اسٹاک';
-
-  @override
   String get reportsMovementno => 'حرکت نمبر';
-
-  @override
-  String get reportsMovementtype => 'حرکت کی قسم';
 
   @override
   String get reportsNetcashflow => 'خالص نقد بہاؤ';
@@ -2926,46 +2960,13 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsOpeningbalance => 'ابتدائی بیلنس';
 
   @override
-  String get reportsOutputitem => 'آؤٹ پٹ آئٹم';
-
-  @override
-  String get reportsOutputquantity => 'آؤٹ پٹ مقدار';
-
-  @override
-  String get reportsParentitem => 'بنیادی آئٹم';
-
-  @override
   String get reportsPeriod => 'دورانیہ';
-
-  @override
-  String get reportsProductiondate => 'پروڈکشن تاریخ';
-
-  @override
-  String get reportsProductionorder => 'پروڈکشن آرڈر';
-
-  @override
-  String get reportsReceived => 'وصول شدہ رقم';
-
-  @override
-  String get reportsScrappedquantity => 'ختم شدہ مقدار';
-
-  @override
-  String get reportsSellingprice => 'فروخت قیمت';
-
-  @override
-  String get reportsShortage => 'کمی';
 
   @override
   String get reportsTotalar => 'کل وصولیاں';
 
   @override
   String get reportsTotalcogs => 'فروخت شدہ سامان کی لاگت (COGS)';
-
-  @override
-  String get reportsTotalcomponents => 'کل اجزاء';
-
-  @override
-  String get reportsTotalcost => 'کل لاگت';
 
   @override
   String get reportsTotalcredits => 'کل کریڈٹ';
@@ -2998,9 +2999,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsTotalpurchasevalue => 'کل خریداری ویلیو';
 
   @override
-  String get reportsTotalquantitysold => 'کل فروخت شدہ مقدار';
-
-  @override
   String get reportsTotalrevenue => 'کل آمدنی';
 
   @override
@@ -3013,13 +3011,13 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsUnitcost => 'یونٹ لاگت';
 
   @override
-  String get reportsUsagecount => 'استعمال کی تعداد';
-
-  @override
   String get reportsValuationmethod => 'ویلیوایشن طریقہ';
 
   @override
   String get salesPaymentdate => 'ادائیگی کی تاریخ';
+
+  @override
+  String get salesreturnsReturns => 'بل واپسیاں';
 
   @override
   String get salesreturnsReturndate => 'واپسی تاریخ';
@@ -3881,13 +3879,33 @@ class AppLocalizationsUr extends AppLocalizations {
   String get employeesTotalsalary => 'کل تنخواہ';
 
   @override
+  String get expensesAddcategory => 'زمرہ شامل کریں';
+
+  @override
   String get expensesAllcategories => 'تمام زمرے';
 
   @override
   String get expensesAllstatuses => 'تمام سٹیٹس';
 
   @override
+  String get expensesCategories => 'خرچوں کے زمرے';
+
+  @override
+  String get expensesCategorycreated => 'خرچے کا زمرہ بن گیا';
+
+  @override
+  String get expensesCategorydeleted => 'خرچے کا زمرہ حذف ہو گیا';
+
+  @override
+  String get expensesCategoryname => 'زمرے کا نام';
+
+  @override
   String get expensesCount => 'خرچے';
+
+  @override
+  String expensesDeletecategoryconfirm(Object categoryName) {
+    return 'زمرہ \"$categoryName\" حذف کریں؟ یہ واپس نہیں کیا جا سکتا۔';
+  }
 
   @override
   String get expensesDeleteconfirmdesc =>
@@ -3907,6 +3925,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get expensesErrorCategoryRequired => 'کیٹیگری درکار ہے';
+
+  @override
+  String get expensesErrorCategorynameRequired => 'زمرے کا نام درکار ہے';
 
   @override
   String get expensesExpensedate => 'خرچے کی تاریخ';
@@ -4398,6 +4419,17 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesReturnqtyinvalid => 'درست واپسی مقدار درج کریں';
 
   @override
+  String get purchasesReturnstockmoved =>
+      'اس آئٹم کا اسٹاک اب رسید گودام میں نہیں ہے — وہ گودام منتخب کریں جہاں سے واپسی کی جائے';
+
+  @override
+  String get purchasesReturnwarehousenostock =>
+      'منتخب گودام میں واپسی کی گئی اشیاء کے لیے کافی اسٹاک نہیں ہے';
+
+  @override
+  String get purchasesReturnpickhint => 'یہ اسٹاک رکھنے والا گودام منتخب کریں';
+
+  @override
   String get quotationsAdditem => 'آئٹم شامل کریں';
 
   @override
@@ -4453,19 +4485,7 @@ class AppLocalizationsUr extends AppLocalizations {
   String get quotationsUnitprice => 'یونٹ قیمت';
 
   @override
-  String get reportsAllitems => 'تمام آئٹمز';
-
-  @override
   String get reportsAsOf => 'بمطابق';
-
-  @override
-  String get reportsAverageexpense => 'اوسط خرچہ';
-
-  @override
-  String get reportsBatchtracked => 'بیچ ٹریک شدہ';
-
-  @override
-  String get reportsBomusage => 'بی او ایم استعمال';
 
   @override
   String get reportsCashflownegative =>
@@ -4501,19 +4521,10 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsExportfailed => 'رپورٹ ایکسپورٹ ناکام';
 
   @override
-  String get reportsItemssold => 'فروخت شدہ آئٹمز';
-
-  @override
   String get reportsLastinvoicedate => 'آخری انوائس کی تاریخ';
 
   @override
-  String get reportsLegacyitems => 'لیگیسی آئٹمز';
-
-  @override
   String get reportsLowstockcount => 'کم اسٹاک آئٹمز';
-
-  @override
-  String get reportsNetmovement => 'خالص حرکت';
 
   @override
   String get reportsPaidamount => 'ادا شدہ رقم';
@@ -4525,40 +4536,16 @@ class AppLocalizationsUr extends AppLocalizations {
   String get reportsQuantitysold => 'فروخت شدہ مقدار';
 
   @override
-  String get reportsReturnvalue => 'واپسی کی مالیت';
-
-  @override
-  String get reportsShortagetotal => 'کمی کا کل';
-
-  @override
   String get reportsStockstatus => 'اسٹاک سٹیٹس';
 
   @override
   String get reportsTotalamount => 'کل رقم';
 
   @override
-  String get reportsTotalinbound => 'کل آمد';
-
-  @override
-  String get reportsTotalinventoryvalue => 'کل انوینٹری ویلیو';
-
-  @override
-  String get reportsTotalitems => 'کل آئٹمز';
-
-  @override
-  String get reportsTotaloutbound => 'کل اخراج';
-
-  @override
-  String get reportsTotaloutputquantity => 'کل آؤٹ پٹ مقدار';
-
-  @override
-  String get reportsTotalproductionorders => 'کل پروڈکشن آرڈرز';
-
-  @override
   String get reportsTotalreceivables => 'کل وصولیاں';
 
   @override
-  String get reportsTotalrecords => 'کل ریکارڈز';
+  String get reportsTotalpayables => 'کل ادائیگیاں';
 
   @override
   String get salesAdditem => 'آئٹم شامل کریں';
@@ -4752,6 +4739,13 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesreturnsReturnreason => 'واپسی کی وجہ';
 
   @override
+  String get salesreturnsReturnwarehouse => 'اسٹاک بحال کرنے کا گودام';
+
+  @override
+  String get salesreturnsReturnwarehouserequired =>
+      'اسٹاک بحال کرنے کے لیے گودام منتخب کریں';
+
+  @override
   String get salesreturnsReturnreasonplaceholder => 'واپسی کی وجہ درج کریں...';
 
   @override
@@ -4866,6 +4860,12 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get statusSubmitted => 'جمع شدہ';
+
+  @override
+  String get statusPosted => 'پوسٹ شدہ';
+
+  @override
+  String get statusVoided => 'منسوخ شدہ';
 
   @override
   String get stockmovementsAdjustmenthint => 'مثلاً -10 یا 10';
@@ -5111,22 +5111,121 @@ class AppLocalizationsUr extends AppLocalizations {
   String get bomDeactivated => 'BOM غیر فعال کیا گیا';
 
   @override
-  String get reportsCategorySales => 'فروخت رپورٹس';
-
-  @override
-  String get reportsCategoryInventory => 'انوینٹری رپورٹس';
-
-  @override
   String get reportsCategoryFinancial => 'مالی رپورٹس';
 
   @override
   String get reportsCategoryAr => 'وصولیاں';
 
   @override
-  String get reportsCategoryPurchase => 'خریداری رپورٹس';
+  String get reportsCategoryAp => 'ادھتر ادائیگیاں';
 
   @override
-  String get reportsCategoryProduction => 'پروڈکشن رپورٹس';
+  String get reportsTabsAp_aging => 'AP ایجنگ';
+
+  @override
+  String get reportsCategoryInventory => 'انوینٹری رپورٹس';
+
+  @override
+  String get reportsTabsBatch_traceability => 'بیچ ٹریس ابلٹی';
+
+  @override
+  String get reportsCategoryAccounting => 'اکاؤنٹنگ رپورٹس';
+
+  @override
+  String get reportsTabsTrial_balance => 'ٹرائیل بیلنس';
+
+  @override
+  String get reportsTabsGeneral_ledger => 'جنرل لیجر';
+
+  @override
+  String get reportsTabsIncome_statement => 'آمدن بیانہ';
+
+  @override
+  String get reportsTabsTax_summary => 'ٹیکس خلاصہ';
+
+  @override
+  String get reportsSelectitem => 'آئٹم منتخب کریں';
+
+  @override
+  String get reportsNodata => 'کوئی ڈیٹا دستیاب نہیں';
+
+  @override
+  String get reportsMovementtype => 'نقل و حرکت کی قسم';
+
+  @override
+  String get reportsDate => 'تاریخ';
+
+  @override
+  String get reportsQuantity => 'مقدار';
+
+  @override
+  String get reportsExpenses => 'اخراجات';
+
+  @override
+  String get reportsBalanceSheet => 'بیلنس شیٹ';
+
+  @override
+  String get reportsTrialbalance => 'ٹرائیل بیلنس';
+
+  @override
+  String get reportsAccountcode => 'اکاؤنٹ کوڈ';
+
+  @override
+  String get reportsAccountname => 'اکاؤنٹ نام';
+
+  @override
+  String get reportsAccounttype => 'اکاؤنٹ قسم';
+
+  @override
+  String get reportsTotaldebit => 'کل ڈیبٹ';
+
+  @override
+  String get reportsTotalcredit => 'کل کریڈٹ';
+
+  @override
+  String get reportsBalanced => 'متوازن';
+
+  @override
+  String get reportsGeneralledger => 'جنرل لیجر';
+
+  @override
+  String get reportsDebit => 'ڈیبٹ';
+
+  @override
+  String get reportsCredit => 'کریڈٹ';
+
+  @override
+  String get reportsReferenceno => 'حوالہ نمبر';
+
+  @override
+  String get reportsTransactiontype => 'لین دین کی قسم';
+
+  @override
+  String get reportsIncomestatement => 'آمدن بیانہ';
+
+  @override
+  String get reportsRevenue => 'آمدنی';
+
+  @override
+  String get reportsCogs => 'فروخت اشیاء کی قیمت';
+
+  @override
+  String get reportsNetincome => 'خالص آمدنی';
+
+  @override
+  String get reportsTaxsummary => 'ٹیکس خلاصہ';
+
+  @override
+  String get reportsTotaltax => 'کل ٹیکس';
+
+  @override
+  String get reportsBatchtraceability => 'بیچ ٹریس ابلٹی';
+
+  @override
+  String get reportsWarehouseswithstock => 'اسٹاک والے گودام';
+
+  @override
+  String get reportsRecentmovements => 'حالیہ نقل و حرکت';
 
   @override
   String get salesNoproductsfound => 'کوئی پروڈکٹ نہیں ملی';

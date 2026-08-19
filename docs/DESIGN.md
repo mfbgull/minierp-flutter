@@ -427,6 +427,55 @@ These are sample prompts a developer might give to an AI when generating UI comp
 
 ---
 
+## Returns
+
+Two return flows share the same entry pattern — a source picker (returns tab
+"New"), or a per-row ⋮ menu on the source document — but differ on the
+**warehouse** by design:
+
+- **Purchase returns** (goods go back to the supplier): the warehouse is
+  **not** user-selectable. Stock is reduced from the source document's
+  warehouse (where the goods were received), shown read-only in the form
+  with a lock icon and the label "Warehouse". The multi-line form collects
+  per-line return quantities (capped at the remaining returnable qty), a
+  return date and a reason.
+- **Customer (invoice) returns** (goods come back into stock): the form
+  **asks** for a `Restock Warehouse` — a required select, since invoices
+  don't record one. The restocked goods land in the chosen warehouse;
+  when omitted the server falls back to the warehouse the sale was
+  dispatched from.
+
+On the purchase-returns grid, every row carries a status badge (Posted /
+Voided), a Void action in the row ⋮ menu (with a reason dialog; hidden once
+voided) and date-range + status filters in the toolbar. Under the 768px
+breakpoint the grid gives way to compact cards showing the same badges,
+totals (including the fixed warehouse with a lock) and the per-card ⋮ menu;
+the invoice-returns tab mirrors this with per-line cards (item, return no,
+qty / unit cost / total, customer, warehouse).
+
+## Purchase Entry Forms
+
+The New Purchase and Purchase Order dialogs share a three-section card
+layout (Document / Items / Payment) with an icon-chip section header and a
+running total:
+
+- **New Purchase** — one item line (item, qty, unit cost) plus a linked
+  supplier, invoice no and remarks. The payment section records a supplier
+  payment against the just-created purchase (`purchase_allocations`) so a
+  cash purchase is entered in one go; the amount auto-syncs to the line
+  total until typed over. Without a supplier the payment section is
+  disabled — the server has no ledger to apply it to.
+- **Purchase Order** — multi-line item table (item / qty / unit price /
+  amount) with a highlighted total. Create mode records a payment against
+  the PO on save (`po_allocations`); edit mode shows the Total / Paid /
+  Balance summary and a Record Payment action (pre-filled with the
+  remaining balance) that refreshes from the detail provider after each
+  payment.
+
+Direct purchases that carry a `supplier_id` post an AP supplier-ledger
+entry on record (mirroring PO submit), so supplier balances stay correct
+across the purchase → payment lifecycle.
+
 ## Implementation Notes
 
 - This design system prioritizes data density and efficiency for business users

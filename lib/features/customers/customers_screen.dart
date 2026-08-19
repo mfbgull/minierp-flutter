@@ -642,6 +642,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
       PlutoColumn(
         title: l10n.customersActions,
         field: 'actions',
+        // Pinned to the right edge — stays reachable when the grid scrolls.
+        frozen: PlutoColumnFrozen.end,
         type: PlutoColumnType.text(),
         width: 64,
         readOnly: true,

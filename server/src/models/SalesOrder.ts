@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { generateDocNo } from '../utils/sequence';
+import { sanitizeSortParams, SALES_ORDER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { QuotationWithWarehouse, InvoiceWithUsername } from '../types';
 import InvoiceModel from './Invoice';
 
@@ -72,12 +73,35 @@ export interface SalesOrderFilters {
   status?: string;
   customer_id?: number;
   customer_name?: string;
+  search?: string;
   start_date?: string;
   end_date?: string;
   warehouse_id?: number;
   source_type?: string;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  page?: number;
 }
+
+interface PaginatedSalesOrders {
+  rows: SalesOrder[];
+  total: number;
+  pageNum: number;
+  limitNum: number;
+}
+
+// Whitelisted sort columns → qualified SQL column for the list query (the
+// warehouse/user/quotation joins make bare names ambiguous).
+const SALES_ORDER_SORT_COLUMN_MAP: Record<string, string> = {
+  so_no: 'so.so_no',
+  so_date: 'so.so_date',
+  customer_name: 'so.customer_name',
+  status: 'so.status',
+  total_amount: 'so.total_amount',
+  delivery_date: 'so.delivery_date',
+  created_at: 'so.created_at',
+};
 
 class SalesOrderModel {
   /**
@@ -241,10 +265,14 @@ class SalesOrderModel {
   }
 
   /**
-   * Get all sales orders with filters
+   * Get all sales orders with filters — paged. Returns the canonical
+   * `{ rows, total, pageNum, limitNum }` shape (grid-pagination §1).
    */
-  static getAll(filters: SalesOrderFilters = {}, db: Database.Database): SalesOrder[] {
-    let query = `
+  static getAll(filters: SalesOrderFilters = {}, db: Database.Database): PaginatedSalesOrders {
+    const pageNum = filters.page || 1;
+    const limitNum = filters.limit || 10;
+
+    const select = `
       SELECT
         so.*,
         w.warehouse_code,
@@ -257,55 +285,75 @@ class SalesOrderModel {
       LEFT JOIN quotations q ON so.source_id = q.id AND so.source_type = 'QUOTATION'
       WHERE 1=1
     `;
-
+    const conditions: string[] = [];
     const params: any[] = [];
 
     if (filters.status) {
-      query += ` AND so.status = ?`;
+      conditions.push('so.status = ?');
       params.push(filters.status);
     }
 
     if (filters.customer_id) {
-      query += ` AND so.customer_id = ?`;
+      conditions.push('so.customer_id = ?');
       params.push(filters.customer_id);
     }
 
     if (filters.customer_name) {
-      query += ` AND so.customer_name LIKE ?`;
+      conditions.push('so.customer_name LIKE ?');
       params.push(`%${filters.customer_name}%`);
     }
 
+    if (filters.search) {
+      conditions.push('(so.so_no LIKE ? OR so.customer_name LIKE ?)');
+      const term = `%${filters.search}%`;
+      params.push(term, term);
+    }
+
     if (filters.start_date) {
-      query += ` AND so.so_date >= ?`;
+      conditions.push('so.so_date >= ?');
       params.push(filters.start_date);
     }
 
     if (filters.end_date) {
-      query += ` AND so.so_date <= ?`;
+      conditions.push('so.so_date <= ?');
       params.push(filters.end_date);
     }
 
     if (filters.warehouse_id) {
-      query += ` AND so.warehouse_id = ?`;
+      conditions.push('so.warehouse_id = ?');
       params.push(filters.warehouse_id);
     }
 
     if (filters.source_type) {
-      query += ` AND so.source_type = ?`;
+      conditions.push('so.source_type = ?');
       params.push(filters.source_type);
     }
 
-    query += ` ORDER BY so.so_date DESC, so.created_at DESC`;
+    const where = conditions.length ? ` AND ${conditions.join(' AND ')}` : '';
 
-    if (filters.limit) {
-      query += ` LIMIT ?`;
-      params.push(filters.limit);
-    }
+    // Sort — whitelisted via sqlSanitizer, mapped to qualified columns
+    // (default matches the pre-paging behavior: newest order first).
+    const { column, order } = sanitizeSortParams(
+      filters.sortBy || 'so_date',
+      filters.sortOrder || 'DESC',
+      SALES_ORDER_SORT_COLUMNS,
+      'so_date',
+      'DESC'
+    );
+    const sortColumn = SALES_ORDER_SORT_COLUMN_MAP[column] || 'so.so_date';
 
-    const salesOrders = db.prepare(query).all(...params) as SalesOrder[];
+    const offset = (pageNum - 1) * limitNum;
+    const salesOrders = db
+      .prepare(`${select}${where} ORDER BY ${sortColumn} ${order}, so.id DESC LIMIT ? OFFSET ?`)
+      .all(...params, limitNum, offset) as SalesOrder[];
 
-    // Get items for each sales order
-    return salesOrders.map(so => {
+    const countRow = db
+      .prepare(`SELECT COUNT(*) as total FROM sales_orders so WHERE 1=1${where}`)
+      .get(...params) as { total: number };
+
+    // Get items for each sales order (only the page's rows — avoids
+    // loading items for the full unfiltered table).
+    const rows = salesOrders.map(so => {
       const items = db.prepare(`
         SELECT
           soi.id, soi.so_id, soi.item_id,
@@ -322,6 +370,8 @@ class SalesOrderModel {
         items
       };
     });
+
+    return { rows, total: countRow.total, pageNum, limitNum };
   }
 
   /**

@@ -23,6 +23,8 @@ import '../../widgets/confirm_dialog.dart';
 import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
+import '../../widgets/payment_history_section.dart'
+    show PaymentHistorySection;
 import '../../widgets/status_badge.dart';
 import 'purchase_order_form_dialog.dart';
 import 'purchase_order_pdf.dart' show buildA4PurchaseOrderPdf;
@@ -180,6 +182,12 @@ class _DetailBody extends ConsumerWidget {
                   const SizedBox(height: 14),
                   _ReceiptsSection(detail: detail),
                 ],
+                const SizedBox(height: 14),
+                PaymentHistorySection(
+                  payments: ref.watch(purchaseOrderPaymentsProvider(detail.id)),
+                  onRetry: () =>
+                      ref.invalidate(purchaseOrderPaymentsProvider(detail.id)),
+                ),
               ],
             ),
           ),

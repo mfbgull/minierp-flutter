@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../shell/module_refresh.dart' show moduleTabRefreshOnVisit;
 import 'admin_providers.dart' show adminShellTabProvider;
 import 'roles_screen.dart';
 import 'users_screen.dart';
@@ -29,8 +30,12 @@ class _AdminShellState extends ConsumerState<AdminShell> {
       children: [
         NavigationBar(
           selectedIndex: index,
-          onDestinationSelected: (i) =>
-              ref.read(adminShellTabProvider.notifier).state = i,
+          onDestinationSelected: (i) {
+            ref.read(adminShellTabProvider.notifier).state = i;
+            // Refresh the clicked tab's data (the IndexedStack keeps
+            // every tab alive, so its providers would stay cached).
+            moduleTabRefreshOnVisit['/admin']?[i].call(ref);
+          },
           destinations: [
             NavigationDestination(
               icon: const Icon(Icons.people_outline),

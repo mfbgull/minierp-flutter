@@ -10,15 +10,19 @@
 // trend/confidence/recommendation cells use per-cell renderers matching
 // the web client's status colors.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/searchable_select.dart';
-import '../inventory/inventory_providers.dart' show itemsProvider;
+import '../inventory/inventory_providers.dart' show allItemsProvider;
 import '../inventory/item_detail_dialog.dart' show showItemDetailDialog;
 import 'forecast_models.dart';
 import 'forecast_providers.dart';
@@ -34,6 +38,34 @@ class DemandForecastScreen extends ConsumerStatefulWidget {
 
 class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
     with PlutoGridScreen<ForecastDemand, DemandForecastScreen> {
+  Timer? _debounce;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      ref.read(forecastDemandSearchProvider.notifier).state = value.trim();
+      // A new search starts back at page 1.
+      if (ref.read(forecastDemandPageProvider) != 1) {
+        ref.read(forecastDemandPageProvider.notifier).state = 1;
+      }
+    });
+  }
+
+  /// The demand provider returns a `PagedResponse` envelope — unwrap the
+  /// current page's items as the grid rows.
+  @override
+  Iterable<ForecastDemand> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<ForecastDemand>).items;
+
   @override
   void openRowDetail(int rowId) {
     if (!mounted) return;
@@ -240,6 +272,7 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         final mobile = constraints.maxWidth < 768;
+        final page = forecasts.valueOrNull;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -249,25 +282,45 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
             ),
             Expanded(
               child: mobile
-                  ? _mobileList(forecasts, l10n)
+                  ? _mobileList(l10n)
                   : gridScreenBody(forecasts, provider: forecastDemandProvider),
             ),
+            if (!mobile && page != null)
+              ServerPaginationBar(
+                page: page.currentPage,
+                totalPages: page.totalPages,
+                totalItems: page.totalItems,
+                hasNext: page.hasNext,
+                hasPrev: page.hasPrev,
+                limit: ref.watch(forecastDemandLimitProvider),
+                itemLabel: l10n.forecastsDemand,
+                onPageChanged: (p) =>
+                    ref.read(forecastDemandPageProvider.notifier).state = p,
+                onLimitChanged: (limit) {
+                  ref.read(forecastDemandLimitProvider.notifier).state = limit;
+                  if (ref.read(forecastDemandPageProvider) != 1) {
+                    ref.read(forecastDemandPageProvider.notifier).state = 1;
+                  }
+                },
+              ),
+            if (!mobile) const SizedBox(height: 16),
           ],
         );
       },
     );
   }
 
-  /// Category / trend / recommendation filter row. Category options come
-  /// from the items list (the reference derives them the same way); all
-  /// three are searchable selects with "All …" as the null option.
+  /// Category / trend / recommendation filter row + search. Category
+  /// options come from the items list (the reference derives them the
+  /// same way); all three are searchable selects with "All …" as the
+  /// null option.
   Widget _filterBar(
     AppLocalizations l10n,
     ForecastDemandFilters filters,
     bool mobile,
   ) {
     final categories =
-        ref.watch(itemsProvider).valueOrNull
+        ref.watch(allItemsProvider).valueOrNull
             ?.map((item) => item.category ?? '')
             .where((c) => c.isNotEmpty)
             .toSet()
@@ -282,6 +335,26 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
         spacing: 8,
         runSpacing: 8,
         children: [
+          SizedBox(
+            width: 180,
+            height: 40,
+            child: TextField(
+              controller: _searchController,
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: l10n.commonSearch,
+                prefixIcon: const Icon(Icons.search, size: 18),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
           _categorySelect(l10n, filters, categories, width: 180),
           _trendSelect(l10n, filters, width: 150),
           _statusSelect(l10n, filters, width: 150),
@@ -297,6 +370,25 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
 
     return Row(
       children: [
+        SizedBox(
+          width: 180,
+          height: 40,
+          child: TextField(
+            controller: _searchController,
+            onChanged: _onSearchChanged,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: l10n.commonSearch,
+              prefixIcon: const Icon(Icons.search, size: 18),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 8,
+              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
         _categorySelect(l10n, filters, categories),
         const SizedBox(width: 8),
         _trendSelect(l10n, filters),
@@ -321,9 +413,7 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
       key: const ValueKey('forecast-reset-filters'),
       tooltip: l10n.commonReset,
       icon: const Icon(Icons.filter_alt_off_outlined),
-      onPressed: () =>
-          ref.read(forecastDemandFiltersProvider.notifier).state =
-              const ForecastDemandFilters(),
+      onPressed: () => _updateFilters(const ForecastDemandFilters()),
     );
   }
 
@@ -431,16 +521,19 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
 
   void _updateFilters(ForecastDemandFilters next) {
     ref.read(forecastDemandFiltersProvider.notifier).state = next;
+    // A filter change starts back at page 1.
+    if (ref.read(forecastDemandPageProvider) != 1) {
+      ref.read(forecastDemandPageProvider.notifier).state = 1;
+    }
   }
 
   /// Compact cards under 768px (reference `CompactForecastCard`): name +
   /// code header, stock (tinted by stock/next-month ratio), predicted
-  /// month, confidence, recommendation badge + category footer.
-  Widget _mobileList(
-    AsyncValue<List<ForecastDemand>> forecasts,
-    AppLocalizations l10n,
-  ) {
+  /// month, confidence, recommendation badge + category footer. Uses the
+  /// full filtered list (the paged grid is desktop-only).
+  Widget _mobileList(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
+    final forecasts = ref.watch(filteredForecastDemandProvider);
     return forecasts.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../shell/module_refresh.dart' show moduleTabRefreshOnVisit;
 import 'items_screen.dart';
 import 'physical_count_screen.dart';
 import 'stock_by_warehouse_screen.dart';
@@ -28,7 +29,12 @@ class _InventoryShellState extends ConsumerState<InventoryShell> {
       children: [
         NavigationBar(
           selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() => _index = i),
+          onDestinationSelected: (i) {
+            setState(() => _index = i);
+            // Refresh the clicked tab's data (the IndexedStack keeps
+            // every tab alive, so its providers would stay cached).
+            moduleTabRefreshOnVisit['/inventory']?[i].call(ref);
+          },
           destinations: [
             NavigationDestination(
               icon: const Icon(Icons.inventory_2_outlined),

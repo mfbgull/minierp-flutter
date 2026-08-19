@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getQueryParam } from '../utils/queryUtils';
+import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import ProductionModel from '../models/Production';
 import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
@@ -49,20 +49,42 @@ function recordProduction(req: AuthRequest, res: Response): void {
 
 function getProductions(req: Request, res: Response): void {
   try {
+    const page = getQueryInteger(req.query.page, 1);
+    const limit = getQueryInteger(req.query.limit, 10);
     const startDateParam = getQueryParam(req.query.start_date);
     const endDateParam = getQueryParam(req.query.end_date);
     const outputItemIdParam = getQueryParam(req.query.output_item_id);
     const warehouseIdParam = getQueryParam(req.query.warehouse_id);
-    const limitParam = getQueryParam(req.query.limit);
+    const search = getQueryParam(req.query.search);
+    const sortBy = getQueryParam(req.query.sortBy);
+    const sortOrder = getQueryParam(req.query.sortOrder);
 
     const filters = {
       start_date: startDateParam as string | undefined,
       end_date: endDateParam as string | undefined,
       output_item_id: outputItemIdParam ? Number(outputItemIdParam) : undefined,
       warehouse_id: warehouseIdParam ? Number(warehouseIdParam) : undefined,
-      limit: limitParam ? parseInt(String(limitParam)) : undefined
+      search: search || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
+      page,
+      limit
     };
-    res.json(ProductionModel.getAll(filters, db));
+    const { rows, total, pageNum, limitNum } = ProductionModel.getAll(filters, db);
+
+    // Flat envelope (data = list, pagination a sibling) — the shape the
+    // client's `getPaged` helper parses.
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
+      }
+    });
   } catch (error) {
     logger.error('Get productions error:', error);
     res.status(500).json({ error: 'Failed to get productions' });

@@ -77,6 +77,28 @@ class ExpenseRepository {
         ExpenseCategory.fromJson(json! as Map<String, dynamic>),
   );
 
+  /// `POST /expenses/categories` — the quick-add from the expense form.
+  /// The server returns `{success, message, data: {id, category_name,
+  /// description, is_active}}` (no timestamps on create).
+  Future<ApiResult<ExpenseCategory>> createCategory({
+    required String categoryName,
+    String? description,
+  }) => _client.post(
+    ApiEndpoints.expensesCategories,
+    body: {
+      'category_name': categoryName,
+      if (description != null && description.isNotEmpty)
+        'description': description,
+    },
+    parse: (Object? json) =>
+        ExpenseCategory.fromJson(json! as Map<String, dynamic>),
+  );
+
+  /// `DELETE /expenses/categories/:id` — the server refuses (400) when
+  /// the category is still referenced by existing expenses.
+  Future<ApiResult<void>> deleteCategory(int id) =>
+      _client.delete('${ApiEndpoints.expensesCategories}/$id');
+
   Future<ApiResult<List<ExpenseOption>>> statusOptions() => _client.getList(
     '${ApiEndpoints.expenses}/status-options',
     parseItem: (Object? json) =>

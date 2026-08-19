@@ -5,21 +5,23 @@
 // root (the pre-shell `/sales` screen), so it is the default tab.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../shell/module_refresh.dart' show moduleTabRefreshOnVisit;
 import '../quotations/quotations_screen.dart';
 import '../sales/invoice_returns_screen.dart';
 import '../sales/sales_screen.dart';
 import 'sales_orders_screen.dart';
 
-class SalesShell extends StatefulWidget {
+class SalesShell extends ConsumerStatefulWidget {
   const SalesShell({super.key});
 
   @override
-  State<SalesShell> createState() => _SalesShellState();
+  ConsumerState<SalesShell> createState() => _SalesShellState();
 }
 
-class _SalesShellState extends State<SalesShell> {
+class _SalesShellState extends ConsumerState<SalesShell> {
   // Invoices is the branch root (the pre-shell `/sales` screen) — the
   // sales-orders view is reachable via the tabs.
   int _index = 0;
@@ -32,7 +34,12 @@ class _SalesShellState extends State<SalesShell> {
       children: [
         NavigationBar(
           selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() => _index = i),
+          onDestinationSelected: (i) {
+            setState(() => _index = i);
+            // Refresh the clicked tab's data (the IndexedStack keeps
+            // every tab alive, so its providers would stay cached).
+            moduleTabRefreshOnVisit['/sales']?[i].call(ref);
+          },
           destinations: [
             NavigationDestination(
               icon: const Icon(Icons.receipt_long_outlined),

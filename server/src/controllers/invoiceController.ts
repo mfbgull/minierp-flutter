@@ -7,7 +7,7 @@ import PaymentModel from '../models/Payment';
 import AccountingService from '../services/accountingService';
 import ledgerUtils from '../utils/ledgerUtils';
 import logger from '../utils/logger';
-import { getQueryParam } from '../utils/queryUtils';
+import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import {
   parseCurrency,
   subtractCurrency,
@@ -67,24 +67,46 @@ interface InvoiceItemRow {
  */
 function getInvoices(req: AuthRequest, res: Response): void {
   try {
-    const { customerId, status } = req.query as { customerId?: string; status?: string };
-    const filters: Parameters<typeof InvoiceModel.getAll>[0] = {};
+    const page = getQueryInteger(req.query.page, 1);
+    const limit = getQueryInteger(req.query.limit, 10);
+    const search = getQueryParam(req.query.search);
+    const sortBy = getQueryParam(req.query.sortBy);
+    const sortOrder = getQueryParam(req.query.sortOrder);
+    const customerIdParam = getQueryParam(req.query.customer_id) ?? getQueryParam(req.query.customerId);
+    const statusParam = getQueryParam(req.query.status);
+    const startDate = getQueryParam(req.query.start_date);
+    const endDate = getQueryParam(req.query.end_date);
 
-    if (customerId) { filters.customer_id = parseInt(customerId, 10); }
+    const filters: Parameters<typeof InvoiceModel.getAll>[0] = {
+      statuses: statusParam
+        ? statusParam.split(',').map((s) => s.trim())
+        : undefined,
+      customer_id: customerIdParam ? parseInt(customerIdParam, 10) : undefined,
+      search: search || undefined,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
+      page,
+      limit
+    };
 
-    if (status) {
-      const statusList = status.split(',').map((s) => s.trim());
-      let invoices = InvoiceModel.getByStatus(statusList, db);
-      if (customerId) {
-        const cid = parseInt(customerId, 10);
-        invoices = invoices.filter(inv => inv.customer_id === cid);
+    const { rows, total, pageNum, limitNum } = InvoiceModel.getAll(filters, db);
+
+    // Flat envelope matching the customers/suppliers shape the client's
+    // `getPaged` helper expects: `data` is the item list and `pagination`
+    // is a sibling of `data` (NOT nested inside it).
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
       }
-      res.json({ success: true, data: invoices });
-      return;
-    }
-
-    const invoices = InvoiceModel.getAll(filters, db);
-    res.json({ success: true, data: invoices });
+    });
   } catch (error: unknown) {
     logger.error('Get invoices error:', { error });
     res.status(500).json({ error: 'Failed to fetch invoices' });
@@ -751,6 +773,16 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
     const rawReason = body.reason;
     const rawDeductionType = body.deduction_type;      // 'percentage' | 'flat' | undefined
     const rawDeductionValue = Number(body.deduction_value) || 0;
+    // Optional restock warehouse — a customer return is restocked where
+    // the user chooses; when omitted the server restocks into the
+    // warehouse the sale was dispatched from (backward compatible).
+    const rawWarehouseId = body.warehouse_id;
+    const warehouseId = rawWarehouseId === undefined || rawWarehouseId === null || rawWarehouseId === ''
+      ? undefined
+      : Number(rawWarehouseId);
+    if (warehouseId !== undefined && (!Number.isInteger(warehouseId) || warehouseId <= 0)) {
+      return res.status(400).json({ error: 'A valid warehouse_id is required' });
+    }
 
     const returnItems: Array<{ invoice_item_id: number; return_quantity: number }> = Array.isArray(rawItems) ? rawItems : [];
     const reason: string = rawReason || (returnItems.length > 0 ? (returnItems[0] as any).reason || '' : '');
@@ -839,13 +871,15 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
           .run(returnItem.return_quantity, returnItem.invoice_item_id);
       }
 
-      // Reverse stock for the returned items using the same batch-aware logic
+      // Reverse stock for the returned items using the same batch-aware logic —
+      // restocked into the user-chosen warehouse when provided.
       InvoiceModel.reverseStockForItems(
         db,
         processedItems,
         invoice.invoice_no,
         userId,
-        'RETURN'
+        'RETURN',
+        warehouseId
       );
 
       // Calculate the total return amount (with item discounts applied)
@@ -1186,25 +1220,43 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
  */
 function getInvoiceReturnHistory(req: AuthRequest, res: Response): void {
   try {
+    const page = getQueryInteger(req.query.page, 1);
+    const limit = getQueryInteger(req.query.limit, 10);
+    const search = getQueryParam(req.query.search);
+    const warehouseName = getQueryParam(req.query.warehouse_name);
+    const sortBy = getQueryParam(req.query.sortBy);
+    const sortOrder = getQueryParam(req.query.sortOrder);
     const startDateParam = getQueryParam(req.query.start_date);
     const endDateParam = getQueryParam(req.query.end_date);
     const itemIdParam = getQueryParam(req.query.item_id);
-    const limitParam = getQueryParam(req.query.limit);
 
-    const filters: {
-      start_date?: string;
-      end_date?: string;
-      item_id?: number;
-      limit?: number;
-    } = {
-      start_date: startDateParam as string | undefined,
-      end_date: endDateParam as string | undefined,
+    const filters = {
+      start_date: startDateParam || undefined,
+      end_date: endDateParam || undefined,
       item_id: itemIdParam ? Number(itemIdParam) : undefined,
-      limit: limitParam ? parseInt(String(limitParam)) : undefined
+      search: search || undefined,
+      warehouse_name: warehouseName || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
+      page,
+      limit
     };
 
-    const returns = InvoiceModel.getReturnHistory(filters, db);
-    res.json(returns);
+    const { rows, total, pageNum, limitNum } = InvoiceModel.getReturnHistory(filters, db);
+
+    // Flat envelope (data = list, pagination a sibling) — the shape the
+    // client's `getPaged` helper parses.
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
+      }
+    });
   } catch (error: unknown) {
     logger.error('Get invoice return history error:', { error });
     res.status(500).json({ error: 'Failed to get invoice return history' });

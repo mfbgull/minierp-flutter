@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getQueryParam } from '../utils/queryUtils';
+import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import ItemModel from '../models/Item';
 import WarehouseModel from '../models/Warehouse';
 import StockMovementModel from '../models/StockMovement';
@@ -11,10 +11,41 @@ import logger from '../utils/logger';
 
 function getItems(req: Request, res: Response): void {
   try {
-    const items = ItemModel.getAll(req.query, db);
+    const page = getQueryInteger(req.query.page, 1);
+    const limit = getQueryInteger(req.query.limit, 10);
+    const search = getQueryParam(req.query.search);
+    const category = getQueryParam(req.query.category);
+    const sortBy = getQueryParam(req.query.sortBy);
+    const sortOrder = getQueryParam(req.query.sortOrder);
+    const lowStock = getQueryParam(req.query.low_stock);
+    const isRawMaterial = getQueryParam(req.query.is_raw_material);
+    const isFinishedGood = getQueryParam(req.query.is_finished_good);
+
+    const truthy = (v: string | undefined) =>
+      v === '1' || v?.toLowerCase() === 'true';
+
+    const { rows, total, pageNum, limitNum } = ItemModel.getAll({
+      search: search || undefined,
+      category: category || undefined,
+      lowStock: truthy(lowStock),
+      is_raw_material: isRawMaterial === undefined ? undefined : truthy(isRawMaterial),
+      is_finished_good: isFinishedGood === undefined ? undefined : truthy(isFinishedGood),
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
+      page,
+      limit
+    }, db);
+
     res.json({
       success: true,
-      data: items
+      data: rows,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
+      }
     });
   } catch (error) {
     logger.error('Get items error:', error);
@@ -169,7 +200,7 @@ function getUnitsOfMeasure(req: Request, res: Response): void {
 
 function getWarehouses(req: Request, res: Response): void {
   try {
-    const warehouses = WarehouseModel.getAllActive(db);
+    const warehouses = WarehouseModel.getStockSummary(db);
     res.json({
       success: true,
       data: warehouses
@@ -290,8 +321,36 @@ function deleteWarehouse(req: AuthRequest, res: Response): void {
 
 function getStockMovements(req: Request, res: Response): void {
   try {
-    const movements = StockMovementModel.getAll(req.query, db);
-    res.json(movements);
+    const page = getQueryInteger(req.query.page, 1);
+    const limit = getQueryInteger(req.query.limit, 10);
+    const movementType = getQueryParam(req.query.movement_type);
+    const sortBy = getQueryParam(req.query.sortBy);
+    const sortOrder = getQueryParam(req.query.sortOrder);
+    const search = getQueryParam(req.query.search);
+
+    const { rows, total, pageNum, limitNum } = StockMovementModel.getAll({
+      movement_type: movementType,
+      search,
+      sortBy,
+      sortOrder,
+      page,
+      limit
+    }, db);
+
+    // Flat envelope matching the customers/suppliers shape the client's
+    // `getPaged` helper expects: `data` is the item list and `pagination`
+    // is a sibling of `data` (NOT nested inside it).
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
+      }
+    });
   } catch (error) {
     logger.error('Get stock movements error:', error);
     res.status(500).json({ error: 'Failed to fetch stock movements' });
@@ -401,8 +460,33 @@ function getItemLedger(req: Request, res: Response): void {
 
 function getStockBalances(req: Request, res: Response): void {
   try {
-    const balances = StockMovementModel.getStockBalances(db);
-    res.json(balances);
+    const page = getQueryInteger(req.query.page, 1);
+    const limit = getQueryInteger(req.query.limit, 10);
+    const search = getQueryParam(req.query.search);
+    const warehouseCode = getQueryParam(req.query.warehouse_code);
+    const sortBy = getQueryParam(req.query.sortBy);
+    const sortOrder = getQueryParam(req.query.sortOrder);
+
+    const { rows, total, pageNum, limitNum } = StockMovementModel.getStockBalances({
+      search: search || undefined,
+      warehouse_code: warehouseCode || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
+      page,
+      limit
+    }, db);
+
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
+      }
+    });
   } catch (error) {
     logger.error('Get stock balances error:', error);
     res.status(500).json({ error: 'Failed to fetch stock balances' });
@@ -411,10 +495,30 @@ function getStockBalances(req: Request, res: Response): void {
 
 function getPhysicalCounts(req: Request, res: Response): void {
   try {
-    const counts = PhysicalCountModel.getAll(db);
+    const page = getQueryInteger(req.query.page, 1);
+    const limit = getQueryInteger(req.query.limit, 10);
+    const search = getQueryParam(req.query.search);
+    const sortBy = getQueryParam(req.query.sortBy);
+    const sortOrder = getQueryParam(req.query.sortOrder);
+
+    const { rows, total, pageNum, limitNum } = PhysicalCountModel.getAll({
+      search: search || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
+      page,
+      limit
+    }, db);
+
     res.json({
       success: true,
-      data: counts
+      data: rows,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
+      }
     });
   } catch (error) {
     logger.error('Get physical counts error:', error);

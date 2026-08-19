@@ -1,22 +1,34 @@
 // Purchase repository — typed against docs/API.md §Direct Purchases and
-// the server `purchaseController` shapes (PORTING.md §2).
+// the server `purchaseController` / `purchaseReturnController` shapes
+// (PORTING.md §2).
 //
 // Envelope variants observed on the server:
-// - `GET /purchases` → **bare array** of purchase rows (filters:
-//   start_date, end_date, item_id, warehouse_id, supplier_name, limit)
+// - `GET /purchases` → **enveloped + `pagination` block** (server-paged
+//   since grid-pagination Phase 6; filters: start_date, end_date,
+//   item_id, warehouse_id, supplier_name, search, page, limit, sortBy,
+//   sortOrder)
 // - `GET /purchases/:id` → **bare object** (same joined shape)
-// - `GET /purchases/returns` → **bare array** of return rows (no
-//   envelope, no pagination) — `Purchase.getReturnHistory`
-// - `POST /purchases/:id/return` → **enveloped** `{success, message,
-//   data: {returnedQuantity, totalCost}}`
+// - `GET /purchase-returns` → **enveloped + `pagination` block** —
+//   `PurchaseReturnModel.getAll` (headers; filters: search, start_date,
+//   end_date, type, status, warehouse_id)
+// - `GET /purchase-returns/:id` → **bare object** (header + items)
+// - `POST /purchase-returns` → **bare object** `PurchaseReturn` (header)
+// - `POST /purchase-returns/:id/void` → **enveloped** `{success,
+//   message, data: PurchaseReturn}`
+//
+// The old return endpoints (`POST /purchases/:id/return`,
+// `POST /purchase-orders/:id/return-receipt`, `GET /purchases/returns`)
+// were removed with the redesign (spec §7).
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
-import '../models/purchase.dart' show Purchase, PurchaseReturnResult;
+import '../models/invoice.dart' show InvoicePaymentRecord;
+import '../models/purchase.dart' show Purchase;
 import '../models/purchase_return.dart' show PurchaseReturn;
 import 'api_result.dart';
+import 'paged_request.dart' show PagedRequest, PagedResponse;
 import 'repository_client.dart';
 
 class PurchaseRepository {
@@ -24,13 +36,35 @@ class PurchaseRepository {
 
   final RepositoryClient _api;
 
-  /// Direct purchases — bare array (the endpoint has no search or page;
-  /// the grid keeps sorting/filtering client-side like items).
+  /// Direct purchases — full list (the grid now uses [listPaged]; this
+  /// stays for consumers that need the whole list in one fetch).
   Future<ApiResult<List<Purchase>>> list() => _api.getRawList(
     ApiEndpoints.purchases,
     parseItem: (Object? json) =>
         Purchase.fromJson(json as Map<String, dynamic>),
   );
+
+  /// One page of direct purchases (`GET /purchases`) — server-paginated
+  /// like the other converted lists. `supplier_name` rides in `extra`.
+  Future<ApiResult<PagedResponse<Purchase>>> listPaged(PagedRequest request) =>
+      _api.getPaged(
+        ApiEndpoints.purchases,
+        queryParameters: request.toQuery(),
+        parseItem: (Object? json) =>
+            Purchase.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// Payments allocated to this purchase (`GET /purchases/:id/payments`
+  /// — enveloped list; each row is the payment header plus the
+  /// per-purchase allocation amount, newest first). Same row shape as
+  /// the invoice payments endpoint, so it parses into
+  /// [InvoicePaymentRecord].
+  Future<ApiResult<List<InvoicePaymentRecord>>> payments(int purchaseId) =>
+      _api.getList(
+        '${ApiEndpoints.purchases}/$purchaseId/payments',
+        parseItem: (Object? json) =>
+            InvoicePaymentRecord.fromJson(json as Map<String, dynamic>),
+      );
 
   /// Purchase detail — bare object (same joined shape as the list rows).
   Future<ApiResult<Purchase>> detail(int id) => _api.getRaw(
@@ -40,13 +74,18 @@ class PurchaseRepository {
 
   /// Record a direct purchase (`POST /purchases`). The server writes the
   /// purchase row, posts the stock movement, and returns the new
-  /// purchase (bare object). [purchaseDate] is ISO `yyyy-MM-dd`.
+  /// purchase (bare object). [purchaseDate] is ISO `yyyy-MM-dd`;
+  /// [supplierId] links the purchase to a supplier (the server resolves
+  /// the name and posts the AP ledger entry).
   Future<ApiResult<Purchase>> create({
     required int itemId,
     required int warehouseId,
     required num quantity,
     required num unitCost,
     required String purchaseDate,
+    int? supplierId,
+    String? invoiceNo,
+    String? remarks,
   }) => _api.post(
     ApiEndpoints.purchases,
     body: {
@@ -55,34 +94,75 @@ class PurchaseRepository {
       'quantity': quantity,
       'unit_cost': unitCost,
       'purchase_date': purchaseDate,
+      'supplier_id': ?supplierId,
+      if (invoiceNo != null && invoiceNo.trim().isNotEmpty)
+        'invoice_no': invoiceNo.trim(),
+      if (remarks != null && remarks.trim().isNotEmpty)
+        'remarks': remarks.trim(),
     },
     parse: (Object? json) => Purchase.fromJson(json as Map<String, dynamic>),
   );
 
-  /// Purchase-return history — bare array (the endpoint has no search or
-  /// page; the grid keeps sorting/filtering client-side like items).
-  Future<ApiResult<List<PurchaseReturn>>> returns() => _api.getRawList(
-    '${ApiEndpoints.purchases}/returns',
+  /// One page of purchase-return headers (`GET /purchase-returns`) —
+  /// server-paginated like the other converted lists. Search and the
+  /// optional date/status/type/warehouse filters ride in `request.extra`.
+  Future<ApiResult<PagedResponse<PurchaseReturn>>> returnsPaged(
+    PagedRequest request,
+  ) => _api.getPaged(
+    ApiEndpoints.purchaseReturns,
+    queryParameters: request.toQuery(),
     parseItem: (Object? json) =>
         PurchaseReturn.fromJson(json as Map<String, dynamic>),
   );
 
-  /// Process a return — enveloped `{success, message, data:
-  /// {returnedQuantity, totalCost}}`. The server rejects (400) when the
-  /// quantity is non-positive or exceeds the stock available in the
-  /// purchase's batch.
-  Future<ApiResult<PurchaseReturnResult>> processReturn(
-    int id, {
-    required num quantity,
+  /// Create a return (`POST /purchase-returns`) — enveloped
+  /// `{success, message, data: PurchaseReturn}`. [sourceType] is
+  /// `PURCHASE` (sourceId = purchases.id) or `PURCHASE_ORDER` (sourceId =
+  /// purchase_orders.id); each line's `sourceItemId` is `purchases.id`
+  /// (direct purchase) or `purchase_order_items.id` (PO receipt) and its
+  /// quantity must be positive and ≤ the line's remaining returnable qty.
+  Future<ApiResult<PurchaseReturn>> createReturn({
+    required String returnDate,
+    required String sourceType,
+    required int sourceId,
+    required int warehouseId,
     String? reason,
+    required List<({int sourceItemId, num quantity})> items,
   }) => _api.post(
-    '${ApiEndpoints.purchases}/$id/return',
+    ApiEndpoints.purchaseReturns,
     body: {
-      'quantity': quantity,
+      'return_date': returnDate,
+      'source_type': sourceType,
+      'source_id': sourceId,
+      'warehouse_id': warehouseId,
       if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      'items': [
+        for (final line in items)
+          {'source_item_id': line.sourceItemId, 'quantity': line.quantity},
+      ],
     },
     parse: (Object? json) =>
-        PurchaseReturnResult.fromJson(json as Map<String, dynamic>),
+        PurchaseReturn.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// Return detail — bare object (header + embedded `items`).
+  Future<ApiResult<PurchaseReturn>> returnDetail(int id) => _api.getRaw(
+    '${ApiEndpoints.purchaseReturns}/$id',
+    parse: (Object? json) =>
+        PurchaseReturn.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// Void a return — full reversal (stock + GL + credit note) —
+  /// enveloped `{success, message, data: PurchaseReturn}`. The server
+  /// rejects (400) when the return is not POSTED or already VOIDED.
+  Future<ApiResult<PurchaseReturn>> voidReturn(
+    int id, {
+    required String reason,
+  }) => _api.post(
+    '${ApiEndpoints.purchaseReturns}/$id/void',
+    body: {'reason': reason.trim()},
+    parse: (Object? json) =>
+        PurchaseReturn.fromJson(json as Map<String, dynamic>),
   );
 }
 

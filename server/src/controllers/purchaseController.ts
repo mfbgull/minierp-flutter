@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
-import { getQueryParam } from '../utils/queryUtils';
+import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
 import Purchase from '../models/Purchase';
-import AccountingService from '../services/accountingService';
 import db from '../config/database';
 import logger from '../utils/logger';
 
@@ -44,12 +43,16 @@ function recordPurchase(req: AuthRequest, res: Response): void {
 
 function getPurchases(req: Request, res: Response): void {
   try {
+    const page = getQueryInteger(req.query.page, 1);
+    const limit = getQueryInteger(req.query.limit, 10);
     const startDateParam = getQueryParam(req.query.start_date);
     const endDateParam = getQueryParam(req.query.end_date);
     const itemIdParam = getQueryParam(req.query.item_id);
     const warehouseIdParam = getQueryParam(req.query.warehouse_id);
     const supplierNameParam = getQueryParam(req.query.supplier_name);
-    const limitParam = getQueryParam(req.query.limit);
+    const search = getQueryParam(req.query.search);
+    const sortBy = getQueryParam(req.query.sortBy);
+    const sortOrder = getQueryParam(req.query.sortOrder);
 
     const filters = {
       start_date: startDateParam as string | undefined,
@@ -57,12 +60,28 @@ function getPurchases(req: Request, res: Response): void {
       item_id: itemIdParam ? Number(itemIdParam) : undefined,
       warehouse_id: warehouseIdParam ? Number(warehouseIdParam) : undefined,
       supplier_name: supplierNameParam as string | undefined,
-      limit: limitParam ? parseInt(String(limitParam)) : undefined
+      search: search || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
+      page,
+      limit
     };
 
-    const purchases = Purchase.getAll(filters, db);
+    const { rows, total, pageNum, limitNum } = Purchase.getAll(filters, db);
 
-    res.json(purchases);
+    // Flat envelope (data = list, pagination a sibling) — the shape the
+    // client's `getPaged` helper parses.
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
+      }
+    });
   } catch (error) {
     logger.error('Get purchases error:', error);
     res.status(500).json({ error: 'Failed to get purchases' });
@@ -82,6 +101,16 @@ function getPurchase(req: Request, res: Response): void {
   } catch (error) {
     logger.error('Get purchase error:', error);
     res.status(500).json({ error: 'Failed to get purchase' });
+  }
+}
+
+function getPurchasePayments(req: Request, res: Response): void {
+  try {
+    const payments = Purchase.getPayments(Number(req.params.id), db);
+    res.json({ success: true, data: payments });
+  } catch (error) {
+    logger.error('Get purchase payments error:', error);
+    res.status(500).json({ error: 'Failed to get purchase payments' });
   }
 }
 
@@ -121,28 +150,6 @@ function getPurchaseSummaryByDateRange(req: Request, res: Response): void {
   }
 }
 
-function getReturnHistory(req: Request, res: Response): void {
-  try {
-    const startDateParam = getQueryParam(req.query.start_date);
-    const endDateParam = getQueryParam(req.query.end_date);
-    const itemIdParam = getQueryParam(req.query.item_id);
-    const limitParam = getQueryParam(req.query.limit);
-
-    const filters = {
-      start_date: startDateParam as string | undefined,
-      end_date: endDateParam as string | undefined,
-      item_id: itemIdParam ? Number(itemIdParam) : undefined,
-      limit: limitParam ? parseInt(String(limitParam)) : undefined
-    };
-
-    const returns = Purchase.getReturnHistory(filters, db);
-    res.json(returns);
-  } catch (error) {
-    logger.error('Get purchase return history error:', error);
-    res.status(500).json({ error: 'Failed to get purchase return history' });
-  }
-}
-
 function getTopSuppliers(req: Request, res: Response): void {
   try {
     const limitParam = getQueryParam(req.query.limit);
@@ -167,58 +174,13 @@ function deletePurchase(req: AuthRequest, res: Response): void {
   }
 }
 
-function returnPurchaseItems(req: AuthRequest, res: Response): Response | void {
-  try {
-    const { id } = req.params;
-    const purchaseId = parseInt(id as string, 10);
-    const userId = req.user!.id;
-
-    const { quantity, reason } = req.body as {
-      quantity: number;
-      reason?: string;
-    };
-
-    if (!quantity || quantity <= 0) {
-      return res.status(400).json({ error: 'A positive return quantity is required' });
-    }
-
-    // Wrap everything in a transaction so GL posting is atomic with stock return
-    let result: { returnedQuantity: number; totalCost: number };
-
-    db.transaction(() => {
-      // Fetch purchase first to get its number for the GL entry
-      const purchase = Purchase.getById(purchaseId, db);
-      if (!purchase) throw new Error('Purchase not found');
-
-      // Return stock and get the cost for GL posting
-      result = Purchase.returnPurchaseItems(db, purchaseId, quantity, userId, reason);
-
-      // Post GL reversal — Dr AP, Cr Inventory
-      AccountingService.postPurchaseReturnEntry(db, {
-        purchaseId,
-        purchaseNo: purchase.purchase_no,
-        returnAmount: result.totalCost,
-        returnDate: new Date().toISOString().split('T')[0],
-        userId,
-      });
-    })();
-
-    res.json({ success: true, message: 'Return processed successfully', data: result! });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Return purchase items error:', { error: errorMessage });
-    res.status(400).json({ error: errorMessage });
-  }
-}
-
 export default {
   recordPurchase,
   getPurchases,
   getPurchase,
+  getPurchasePayments,
   getPurchaseSummaryByItem,
   getPurchaseSummaryByDateRange,
   getTopSuppliers,
-  getReturnHistory,
   deletePurchase,
-  returnPurchaseItems,
 };

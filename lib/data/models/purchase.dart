@@ -28,6 +28,9 @@ class Purchase {
     required this.quantity,
     this.unitCost = 0,
     this.totalCost = 0,
+    this.paidAmount = 0,
+    this.balanceAmount = 0,
+    this.supplierId,
     this.supplierName,
     required this.warehouseId,
     this.warehouseName = '',
@@ -48,6 +51,9 @@ class Purchase {
     quantity: asNum(json['quantity']) ?? 0,
     unitCost: asNum(json['unit_cost']) ?? 0,
     totalCost: asNum(json['total_cost']) ?? 0,
+    paidAmount: asNum(json['paid_amount']) ?? 0,
+    balanceAmount: asNum(json['balance_amount']) ?? 0,
+    supplierId: asInt(json['supplier_id']),
     supplierName: asString(json['supplier_name']),
     warehouseId: asInt(json['warehouse_id']) ?? 0,
     warehouseName: asString(json['warehouse_name']) ?? '',
@@ -67,6 +73,9 @@ class Purchase {
   final num quantity;
   final num unitCost;
   final num totalCost;
+  final num paidAmount;
+  final num balanceAmount;
+  final int? supplierId;
   final String? supplierName;
   final int warehouseId;
   final String warehouseName;
@@ -80,18 +89,4 @@ class Purchase {
     final available = quantity - returnedQuantity;
     return available < 0 ? 0 : available;
   }
-}
-
-/// The `data` payload of `POST /purchases/:id/return`.
-class PurchaseReturnResult {
-  const PurchaseReturnResult({this.returnedQuantity = 0, this.totalCost = 0});
-
-  factory PurchaseReturnResult.fromJson(Map<String, dynamic> json) =>
-      PurchaseReturnResult(
-        returnedQuantity: asNum(json['returnedQuantity']) ?? 0,
-        totalCost: asNum(json['totalCost']) ?? 0,
-      );
-
-  final num returnedQuantity;
-  final num totalCost;
 }

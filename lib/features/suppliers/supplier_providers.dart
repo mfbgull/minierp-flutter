@@ -114,8 +114,8 @@ final supplierBalanceProvider = FutureProvider.autoDispose
     });
 
 /// The supplier's purchase orders (`GET /purchase-orders?supplier_id=<id>`,
-/// bare array) — the POs tab + the payment modal's allocation source.
-/// autoDispose: owned by the detail page.
+/// bare array) — the payment modal's allocation source. autoDispose:
+/// owned by the detail page.
 final supplierPurchaseOrdersProvider = FutureProvider.autoDispose
     .family<List<PurchaseOrder>, int>((ref, supplierId) async {
       final result = await ref
@@ -126,6 +126,58 @@ final supplierPurchaseOrdersProvider = FutureProvider.autoDispose
         ApiFailure(:final error) => throw error,
       };
     });
+
+/// Paged fetch args for [supplierPurchaseOrdersPagedProvider].
+class SupplierPurchaseOrdersArgs {
+  const SupplierPurchaseOrdersArgs({
+    required this.supplierId,
+    required this.page,
+    required this.limit,
+  });
+
+  final int supplierId;
+  final int page;
+  final int limit;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SupplierPurchaseOrdersArgs &&
+      other.supplierId == supplierId &&
+      other.page == page &&
+      other.limit == limit;
+
+  @override
+  int get hashCode => Object.hash(supplierId, page, limit);
+}
+
+/// Bumped by [invalidateSupplierQueries] so an open paged tab refetches
+/// its current page after a mutation.
+final supplierTabsVersionProvider = StateProvider<int>((ref) => 0);
+
+/// One page of the supplier's purchase orders
+/// (`GET /purchase-orders?supplier_id=<id>` + `page`/`limit` —
+/// server-paginated like the PO module). The POs tab renders this with a
+/// [ServerPaginationBar].
+final supplierPurchaseOrdersPagedProvider = FutureProvider.autoDispose
+    .family<PagedResponse<PurchaseOrder>, SupplierPurchaseOrdersArgs>((
+  ref,
+  args,
+) async {
+  ref.watch(supplierTabsVersionProvider);
+  final result = await ref
+      .watch(purchaseOrderRepositoryProvider)
+      .listPaged(
+        PagedRequest(
+          page: args.page,
+          limit: args.limit,
+          extra: {'supplier_id': args.supplierId},
+        ),
+      );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
 
 /// PO summary for the supplier (`GET /purchase-orders/summary/supplier/<id>`,
 /// bare `POSummary`) — the Overview tab's PO-status counts. autoDispose:
@@ -142,12 +194,55 @@ final supplierPOSummaryProvider = FutureProvider.autoDispose
     });
 
 /// The supplier's payments (`GET /payments?supplierId=<id>` — the web
-/// Payments tab's query). autoDispose: owned by the detail page.
+/// Payments tab's query). Full list. autoDispose: owned by the detail page.
 final supplierPaymentsProvider = FutureProvider.autoDispose
     .family<List<Payment>, int>((ref, supplierId) async {
       final result = await ref
           .watch(invoiceRepositoryProvider)
           .paymentsForSupplier(supplierId);
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+/// Paged fetch args for [supplierPaymentsPagedProvider].
+class SupplierPaymentsArgs {
+  const SupplierPaymentsArgs({
+    required this.supplierId,
+    required this.page,
+    required this.limit,
+  });
+
+  final int supplierId;
+  final int page;
+  final int limit;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SupplierPaymentsArgs &&
+      other.supplierId == supplierId &&
+      other.page == page &&
+      other.limit == limit;
+
+  @override
+  int get hashCode => Object.hash(supplierId, page, limit);
+}
+
+/// One page of the supplier's payments (`GET /payments?supplierId=<id>`
+/// + `page`/`limit` — server-paginated like the payments module; default
+/// sort `payment_date DESC` matches the module).
+final supplierPaymentsPagedProvider = FutureProvider.autoDispose
+    .family<PagedResponse<Payment>, SupplierPaymentsArgs>((ref, args) async {
+      ref.watch(supplierTabsVersionProvider);
+      final result = await ref.watch(invoiceRepositoryProvider).payments(
+        PagedRequest(
+          page: args.page,
+          limit: args.limit,
+          sortOrder: 'DESC',
+          extra: {'supplierId': args.supplierId},
+        ),
+      );
       return switch (result) {
         ApiSuccess(:final data) => data,
         ApiFailure(:final error) => throw error,
@@ -207,5 +302,8 @@ void invalidateSupplierQueries(WidgetRef ref, int supplierId) {
   ref.invalidate(supplierPurchaseOrdersProvider(supplierId));
   ref.invalidate(supplierPOSummaryProvider(supplierId));
   ref.invalidate(supplierPaymentsProvider(supplierId));
+  // The paged tab providers watch this version, so the page the user is
+  // currently on refetches after any mutation.
+  ref.read(supplierTabsVersionProvider.notifier).state++;
   ref.read(supplierStatementVersionProvider.notifier).state++;
 }

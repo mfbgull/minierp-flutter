@@ -78,3 +78,14 @@ bool canShowDeleteAction(Invoice invoice) {
 bool canCancelInvoice(Invoice invoice) {
   return invoice.status != 'Cancelled';
 }
+
+/// Check if an invoice can have a return processed — the row-menu Return
+/// guard. Draft invoices have nothing posted to reverse, and Cancelled /
+/// fully-Returned invoices have no returnable lines left. The return
+/// dialog itself still handles the edge cases (it lists only lines with
+/// remaining qty and the server re-validates).
+bool canReturnInvoice(Invoice invoice) {
+  return invoice.status != 'Draft' &&
+      invoice.status != 'Cancelled' &&
+      invoice.status != 'Returned';
+}

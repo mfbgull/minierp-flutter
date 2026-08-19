@@ -442,7 +442,7 @@ void main() {
 
     setUp(() => repo = InventoryRepository(api));
 
-    test('items parses the enveloped array and forwards filters', () async {
+    test('items parses the paged envelope and forwards filters', () async {
       Map<String, dynamic>? seenQuery;
       handler = (o) {
         seenQuery = o.queryParameters;
@@ -460,15 +460,24 @@ void main() {
               'sale_type': 'packed',
             },
           ],
+          'pagination': {
+            'currentPage': 1,
+            'totalPages': 1,
+            'totalItems': 1,
+            'hasNext': false,
+            'hasPrev': false,
+          },
         });
       };
-      final result = await repo.items(search: 'soap', isFinishedGood: true);
-      final items = result.requireData;
+      final result = await repo.items(
+        const PagedRequest(search: 'soap', extra: {'is_finished_good': '1'}),
+      );
+      final items = result.requireData.items;
       expect(items.single.itemName, 'Soap');
       expect(items.single.isFinishedGood, true);
       expect(items.single.saleType.value, 'packed');
       expect(seenQuery!['search'], 'soap');
-      expect(seenQuery!['is_finished_good'], true);
+      expect(seenQuery!['is_finished_good'], '1');
     });
 
     test('itemDetail parses the stock_by_warehouse breakdown', () async {
@@ -555,20 +564,6 @@ void main() {
       expect(result.requireData, ['Nos', 'Kg', 'Ltr']);
     });
 
-    test('lowStock parses bare item rows', () async {
-      handler = (o) => jsonBody([
-        {
-          'id': 2,
-          'item_code': 'RM2',
-          'item_name': 'Flour',
-          'unit_of_measure': 'kg',
-          'current_stock': 1,
-          'is_raw_material': 1,
-        },
-      ]);
-      final result = await repo.lowStock();
-      expect(result.requireData.single.currentStock, 1);
-    });
   });
 
   group('ExpenseRepository', () {
@@ -1226,49 +1221,48 @@ void main() {
       repo = ProductionRepository(api);
     });
 
-    test('productions GETs /productions with the optional filters', () async {
+    test('productionsPaged GETs /productions with the paged envelope', () async {
       Map<String, dynamic>? seenQuery;
       handler = (o) {
         seenQuery = o.queryParameters;
-        return jsonBody([
-          {
-            'id': 9,
-            'production_no': 'PROD-2026-005',
-            'output_item_id': 4,
-            'output_quantity': 10,
-            'warehouse_id': 2,
-            'production_date': '2026-08-10',
+        return jsonBody({
+          'success': true,
+          'data': [
+            {
+              'id': 9,
+              'production_no': 'PROD-2026-005',
+              'output_item_id': 4,
+              'output_quantity': 10,
+              'warehouse_id': 2,
+              'production_date': '2026-08-10',
+            },
+          ],
+          'pagination': {
+            'currentPage': 1,
+            'totalPages': 1,
+            'totalItems': 1,
+            'hasNext': false,
+            'hasPrev': false,
           },
-        ]);
+        });
       };
-      final result = await repo.productions(
-        const ProductionFilters(
-          startDate: '2026-08-01',
-          endDate: '2026-08-31',
-          outputItemId: 4,
-          warehouseId: 2,
+      final result = await repo.productionsPaged(
+        const PagedRequest(
+          page: 1,
           limit: 50,
+          search: 'widget',
+          sortBy: 'production_date',
+          sortOrder: 'DESC',
         ),
       );
-      expect(seenQuery, {
-        'start_date': '2026-08-01',
-        'end_date': '2026-08-31',
-        'output_item_id': 4,
-        'warehouse_id': 2,
-        'limit': 50,
-      });
-      expect(result.requireData.single.productionNo, 'PROD-2026-005');
-    });
-
-    test('productions without filters sends no query parameters', () async {
-      Map<String, dynamic>? seen;
-      handler = (o) {
-        seen = o.queryParameters;
-        return jsonBody(const []);
-      };
-      final result = await repo.productions();
-      expect(seen, isEmpty);
-      expect(result.requireData, isEmpty);
+      expect(seenQuery!['page'], 1);
+      expect(seenQuery!['limit'], 50);
+      expect(seenQuery!['search'], 'widget');
+      expect(seenQuery!['sortBy'], 'production_date');
+      expect(seenQuery!['sortOrder'], 'DESC');
+      final page = result.requireData;
+      expect(page.items.single.productionNo, 'PROD-2026-005');
+      expect(page.totalItems, 1);
     });
 
     test('production GETs /productions/:id with inputs', () async {
@@ -1352,28 +1346,45 @@ void main() {
       expect(result, isA<ApiSuccess<void>>());
     });
 
-    test('boms GETs the bare BOM list', () async {
+    test('bomsPaged GETs the paged BOM envelope', () async {
       String? seenPath;
+      Map<String, dynamic>? seenQuery;
       handler = (o) {
         seenPath = o.path;
-        return jsonBody([
-          {
-            'id': 1,
-            'bom_no': 'BOM-2026-001',
-            'bom_name': 'Widget Kit',
-            'finished_item_id': 3,
-            'quantity': 10,
-            'is_active': 1,
-            'item_count': 2,
-            'total_material_cost': 55,
+        seenQuery = o.queryParameters;
+        return jsonBody({
+          'success': true,
+          'data': [
+            {
+              'id': 1,
+              'bom_no': 'BOM-2026-001',
+              'bom_name': 'Widget Kit',
+              'finished_item_id': 3,
+              'quantity': 10,
+              'is_active': 1,
+              'item_count': 2,
+              'total_material_cost': 55,
+            },
+          ],
+          'pagination': {
+            'currentPage': 1,
+            'totalPages': 1,
+            'totalItems': 1,
+            'hasNext': false,
+            'hasPrev': false,
           },
-        ]);
+        });
       };
-      final result = await repo.boms();
+      final result = await repo.bomsPaged(
+        const PagedRequest(page: 1, limit: 10, search: 'widget'),
+      );
       expect(seenPath, '/boms');
-      expect(result.requireData.single.bomName, 'Widget Kit');
-      expect(result.requireData.single.itemCount, 2);
-      expect(result.requireData.single.isActive, true);
+      expect(seenQuery!['search'], 'widget');
+      final page = result.requireData;
+      expect(page.items.single.bomName, 'Widget Kit');
+      expect(page.items.single.itemCount, 2);
+      expect(page.items.single.isActive, true);
+      expect(page.totalItems, 1);
     });
 
     test('bom GETs /boms/:id and parses items + total material cost', () async {

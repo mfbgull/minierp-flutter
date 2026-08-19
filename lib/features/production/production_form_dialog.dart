@@ -334,7 +334,8 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
         const <Warehouse>[];
     final outputItems =
         ref.watch(productionOutputItemsProvider).valueOrNull ?? const <Item>[];
-    final boms = ref.watch(bomsProvider).valueOrNull ?? const <Bom>[];
+    final boms =
+        ref.watch(productionBomOptionsProvider).valueOrNull ?? const <Bom>[];
     final shortfalls = _shortfalls;
     final preview = _preview;
 

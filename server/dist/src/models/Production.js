@@ -4,7 +4,21 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const sequence_1 = require("../utils/sequence");
+const sqlSanitizer_1 = require("../utils/sqlSanitizer");
 const StockMovement_1 = __importDefault(require("./StockMovement"));
+// Whitelisted sort columns → qualified SQL column for the list query (the
+// item/warehouse/user joins make bare names ambiguous).
+const PRODUCTION_SORT_COLUMN_MAP = {
+    production_no: 'p.production_no',
+    production_date: 'p.production_date',
+    output_item_name: 'i.item_name',
+    warehouse_name: 'fgw.warehouse_name',
+    output_quantity: 'p.output_quantity',
+    unit_cost: 'p.unit_cost',
+    total_batch_cost: 'p.total_batch_cost',
+    batch_no: 'p.batch_no',
+    created_at: 'p.created_at',
+};
 class ProductionModel {
     /**
      * Consume a quantity of an item from the oldest available stock batches (FIFO).
@@ -211,7 +225,9 @@ class ProductionModel {
         return transaction.immediate();
     }
     static getAll(filters = {}, db) {
-        let query = `
+        const pageNum = filters.page || 1;
+        const limitNum = filters.limit || 10;
+        const select = `
       SELECT
         p.*,
         i.item_code as output_item_code,
@@ -229,33 +245,50 @@ class ProductionModel {
       JOIN users u ON p.created_by = u.id
       WHERE 1=1
     `;
+        const conditions = [];
         const params = [];
         if (filters.start_date) {
-            query += ` AND p.production_date >= ?`;
+            conditions.push('p.production_date >= ?');
             params.push(filters.start_date);
         }
         if (filters.end_date) {
-            query += ` AND p.production_date <= ?`;
+            conditions.push('p.production_date <= ?');
             params.push(filters.end_date);
         }
         if (filters.output_item_id) {
-            query += ` AND p.output_item_id = ?`;
+            conditions.push('p.output_item_id = ?');
             params.push(filters.output_item_id);
         }
         if (filters.warehouse_id) {
-            query += ` AND p.warehouse_id = ?`;
+            conditions.push('p.warehouse_id = ?');
             params.push(filters.warehouse_id);
         }
         if (filters.raw_materials_warehouse_id) {
-            query += ` AND p.raw_materials_warehouse_id = ?`;
+            conditions.push('p.raw_materials_warehouse_id = ?');
             params.push(filters.raw_materials_warehouse_id);
         }
-        query += ` ORDER BY p.production_date DESC, p.created_at DESC`;
-        if (filters.limit) {
-            query += ` LIMIT ?`;
-            params.push(filters.limit);
+        if (filters.search) {
+            conditions.push('(p.production_no LIKE ? OR i.item_code LIKE ? OR i.item_name LIKE ? OR p.batch_no LIKE ? OR p.remarks LIKE ? OR fgw.warehouse_name LIKE ?)');
+            const term = `%${filters.search}%`;
+            params.push(term, term, term, term, term, term);
         }
-        return db.prepare(query).all(...params);
+        const where = conditions.length ? ` AND ${conditions.join(' AND ')}` : '';
+        // Sort — whitelisted via sqlSanitizer, mapped to qualified columns
+        // (default matches the pre-paging behavior: newest production first).
+        const { column, order } = (0, sqlSanitizer_1.sanitizeSortParams)(filters.sortBy || 'production_date', filters.sortOrder || 'DESC', sqlSanitizer_1.PRODUCTION_SORT_COLUMNS, 'production_date', 'DESC');
+        const sortColumn = PRODUCTION_SORT_COLUMN_MAP[column] || 'p.production_date';
+        const offset = (pageNum - 1) * limitNum;
+        const rows = db
+            .prepare(`${select}${where} ORDER BY ${sortColumn} ${order}, p.id DESC LIMIT ? OFFSET ?`)
+            .all(...params, limitNum, offset);
+        const countRow = db
+            .prepare(`SELECT COUNT(*) as total FROM productions p
+        JOIN items i ON p.output_item_id = i.id
+        JOIN warehouses fgw ON p.warehouse_id = fgw.id
+        LEFT JOIN warehouses rmw ON p.raw_materials_warehouse_id = rmw.id
+        WHERE 1=1${where}`)
+            .get(...params);
+        return { rows, total: countRow.total, pageNum, limitNum };
     }
     static getById(id, db) {
         const production = db.prepare(`

@@ -4,7 +4,25 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const sequence_1 = require("../utils/sequence");
+const sqlSanitizer_1 = require("../utils/sqlSanitizer");
 const StockMovement_1 = __importDefault(require("./StockMovement"));
+const SupplierLedger_1 = __importDefault(require("./SupplierLedger"));
+// Whitelisted sort columns → qualified SQL column for the list query (the
+// item/warehouse/user joins make bare names ambiguous).
+const PURCHASE_SORT_COLUMN_MAP = {
+    purchase_no: 'p.purchase_no',
+    purchase_date: 'p.purchase_date',
+    item_name: 'i.item_name',
+    supplier_name: 'p.supplier_name',
+    quantity: 'p.quantity',
+    unit_cost: 'p.unit_cost',
+    total_cost: 'p.total_cost',
+    // ORDER BY can reference the SELECT aliases.
+    paid_amount: 'paid_amount',
+    balance_amount: 'balance_amount',
+    warehouse_name: 'w.warehouse_name',
+    created_at: 'p.created_at',
+};
 class PurchaseModel {
     static generatePurchaseNo(db) {
         return (0, sequence_1.generateDocNo)(db, 'PURCH');
@@ -29,18 +47,29 @@ class PurchaseModel {
             throw new Error('unit_cost must be non-negative');
         if (!data.purchase_date)
             throw new Error('purchase_date is required');
-        const { item_id, warehouse_id, quantity, unit_cost, supplier_name, purchase_date, invoice_no, remarks } = data;
+        const { item_id, warehouse_id, quantity, unit_cost, supplier_id, supplier_name, purchase_date, invoice_no, remarks } = data;
+        // A linked supplier wins over any free-text name: resolve the
+        // display name from the suppliers table so the purchase always
+        // shows the supplier's current name.
+        const resolvedSupplierId = supplier_id;
+        let resolvedSupplierName = supplier_name;
+        if (resolvedSupplierId) {
+            const supplier = db.prepare('SELECT id, supplier_name FROM suppliers WHERE id = ?').get(resolvedSupplierId);
+            if (!supplier)
+                throw new Error(`Supplier ${resolvedSupplierId} not found`);
+            resolvedSupplierName = supplier.supplier_name;
+        }
         const transaction = db.transaction(() => {
             const purchaseNo = this.generatePurchaseNo(db);
             const batchNo = this.generateBatchNo(db);
             const purchaseStmt = db.prepare(`
         INSERT INTO purchases (
           purchase_no, item_id, warehouse_id, quantity, unit_cost, total_cost,
-          supplier_name, purchase_date, invoice_no, remarks, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          supplier_id, supplier_name, purchase_date, invoice_no, remarks, created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
             const totalCost = quantity * unit_cost;
-            const result = purchaseStmt.run(purchaseNo, item_id, warehouse_id, quantity, unit_cost, totalCost, supplier_name || null, purchase_date, invoice_no || null, remarks || null, userId);
+            const result = purchaseStmt.run(purchaseNo, item_id, warehouse_id, quantity, unit_cost, totalCost, resolvedSupplierId || null, resolvedSupplierName || null, purchase_date, invoice_no || null, remarks || null, userId);
             const purchaseId = result.lastInsertRowid;
             // Create a stock_batch record for the purchased item
             db.prepare(`
@@ -96,6 +125,21 @@ class PurchaseModel {
         )
         WHERE id = ?
       `).run(item_id, item_id);
+            // Supplier AP entry: a linked purchase increases the supplier's
+            // payable balance (mirrors the PO submit flow's PURCHASE_ORDER
+            // entry; the payment flow then credits it down).
+            if (resolvedSupplierId) {
+                SupplierLedger_1.default.createEntry({
+                    supplier_id: resolvedSupplierId,
+                    transaction_date: purchase_date,
+                    transaction_type: 'PURCHASE',
+                    reference_no: purchaseNo,
+                    debit: totalCost,
+                    credit: 0,
+                    description: `Purchase ${purchaseNo}`,
+                }, db);
+                SupplierLedger_1.default.rebuildBalances(resolvedSupplierId, db);
+            }
             db.prepare(`
         INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
         VALUES (?, ?, ?, ?, ?)
@@ -105,7 +149,9 @@ class PurchaseModel {
         return transaction();
     }
     static getAll(filters = {}, db) {
-        let query = `
+        const pageNum = filters.page || 1;
+        const limitNum = filters.limit || 10;
+        const select = `
       SELECT
         p.*,
         i.item_code,
@@ -113,40 +159,63 @@ class PurchaseModel {
         i.unit_of_measure,
         w.warehouse_code,
         w.warehouse_name,
-        u.username as created_by_username
+        u.username as created_by_username,
+        COALESCE(pa.paid_amount, 0) as paid_amount,
+        p.total_cost - COALESCE(pa.paid_amount, 0) as balance_amount
       FROM purchases p
       JOIN items i ON p.item_id = i.id
       JOIN warehouses w ON p.warehouse_id = w.id
       JOIN users u ON p.created_by = u.id
+      LEFT JOIN (
+        SELECT purchase_id, SUM(amount) as paid_amount
+        FROM purchase_allocations GROUP BY purchase_id
+      ) pa ON pa.purchase_id = p.id
       WHERE 1=1
     `;
+        const conditions = [];
         const params = [];
         if (filters.start_date) {
-            query += ` AND p.purchase_date >= ?`;
+            conditions.push('p.purchase_date >= ?');
             params.push(filters.start_date);
         }
         if (filters.end_date) {
-            query += ` AND p.purchase_date <= ?`;
+            conditions.push('p.purchase_date <= ?');
             params.push(filters.end_date);
         }
         if (filters.item_id) {
-            query += ` AND p.item_id = ?`;
+            conditions.push('p.item_id = ?');
             params.push(filters.item_id);
         }
         if (filters.warehouse_id) {
-            query += ` AND p.warehouse_id = ?`;
+            conditions.push('p.warehouse_id = ?');
             params.push(filters.warehouse_id);
         }
         if (filters.supplier_name) {
-            query += ` AND p.supplier_name LIKE ?`;
+            conditions.push('p.supplier_name LIKE ?');
             params.push(`%${filters.supplier_name}%`);
         }
-        query += ` ORDER BY p.purchase_date DESC, p.created_at DESC`;
-        if (filters.limit) {
-            query += ` LIMIT ?`;
-            params.push(filters.limit);
+        if (filters.search) {
+            conditions.push('(p.purchase_no LIKE ? OR i.item_name LIKE ? OR p.supplier_name LIKE ?)');
+            const term = `%${filters.search}%`;
+            params.push(term, term, term);
         }
-        return db.prepare(query).all(...params);
+        const where = conditions.length ? ` AND ${conditions.join(' AND ')}` : '';
+        // Sort — whitelisted via sqlSanitizer, mapped to qualified columns
+        // (default matches the pre-paging behavior: newest purchase first).
+        const { column, order } = (0, sqlSanitizer_1.sanitizeSortParams)(filters.sortBy || 'purchase_date', filters.sortOrder || 'DESC', sqlSanitizer_1.PURCHASE_SORT_COLUMNS, 'purchase_date', 'DESC');
+        const sortColumn = PURCHASE_SORT_COLUMN_MAP[column] || 'p.purchase_date';
+        const offset = (pageNum - 1) * limitNum;
+        const purchases = db
+            .prepare(`${select}${where} ORDER BY ${sortColumn} ${order}, p.id DESC LIMIT ? OFFSET ?`)
+            .all(...params, limitNum, offset);
+        const countRow = db
+            .prepare(`SELECT COUNT(*) as total FROM purchases p
+        JOIN items i ON p.item_id = i.id
+        JOIN warehouses w ON p.warehouse_id = w.id
+        JOIN users u ON p.created_by = u.id
+        WHERE 1=1${where}`)
+            .get(...params);
+        return { rows: purchases, total: countRow.total, pageNum, limitNum };
     }
     static getById(id, db) {
         return db.prepare(`
@@ -157,13 +226,33 @@ class PurchaseModel {
         i.unit_of_measure,
         w.warehouse_code,
         w.warehouse_name,
-        u.username as created_by_username
+        u.username as created_by_username,
+        COALESCE(pa.paid_amount, 0) as paid_amount,
+        p.total_cost - COALESCE(pa.paid_amount, 0) as balance_amount
       FROM purchases p
       JOIN items i ON p.item_id = i.id
       JOIN warehouses w ON p.warehouse_id = w.id
       JOIN users u ON p.created_by = u.id
+      LEFT JOIN (
+        SELECT purchase_id, SUM(amount) as paid_amount
+        FROM purchase_allocations GROUP BY purchase_id
+      ) pa ON pa.purchase_id = p.id
       WHERE p.id = ?
     `).get(id);
+    }
+    /**
+     * Payments allocated to this direct purchase (`purchase_allocations`)
+     * — the payment header joined with the per-purchase allocation amount,
+     * newest first. Mirrors `PurchaseOrderModel.getPayments`; the client
+     * renders these as the purchase's payment history.
+     */
+    static getPayments(purchaseId, db) {
+        return db.prepare(`
+      SELECT p.id, p.payment_no, p.payment_date, p.payment_method,
+             p.reference_no, p.notes, pa.amount
+      FROM purchase_allocations pa JOIN payments p ON pa.payment_id = p.id
+      WHERE pa.purchase_id = ? ORDER BY p.payment_date DESC, p.id DESC
+    `).all(purchaseId);
     }
     static getSummaryByItem(item_id, db) {
         return db.prepare(`
@@ -204,120 +293,28 @@ class PurchaseModel {
       LIMIT ?
     `).all(limit);
     }
-    /**
-     * Return a list of all purchase-return stock movements for the returns history page.
-     * Filters by reference_doctype = 'PURCHASE_RETURN' (and optionally 'PO_RETURN').
-     */
-    static getReturnHistory(filters = {}, db) {
-        let query = `
-      SELECT
-        sm.id,
-        sm.movement_no,
-        sm.item_id,
-        sm.warehouse_id,
-        sm.quantity,
-        sm.unit_cost,
-        sm.reference_doctype,
-        sm.reference_docno,
-        sm.remarks,
-        sm.movement_date as return_date,
-        sm.created_at,
-        sm.created_by,
-        i.item_code,
-        i.item_name,
-        i.unit_of_measure,
-        w.warehouse_code,
-        w.warehouse_name,
-        u.username as created_by_username
-      FROM stock_movements sm
-      JOIN items i ON sm.item_id = i.id
-      JOIN warehouses w ON sm.warehouse_id = w.id
-      LEFT JOIN users u ON sm.created_by = u.id
-      WHERE sm.reference_doctype IN ('PURCHASE_RETURN', 'PO_RETURN')
-        AND sm.quantity < 0
-    `;
-        const params = [];
-        if (filters.start_date) {
-            query += ' AND sm.movement_date >= ?';
-            params.push(filters.start_date);
-        }
-        if (filters.end_date) {
-            query += ' AND sm.movement_date <= ?';
-            params.push(filters.end_date);
-        }
-        if (filters.item_id) {
-            query += ' AND sm.item_id = ?';
-            params.push(filters.item_id);
-        }
-        query += ' ORDER BY sm.movement_date DESC, sm.created_at DESC';
-        if (filters.limit) {
-            query += ' LIMIT ?';
-            params.push(filters.limit);
-        }
-        return db.prepare(query).all(...params);
-    }
-    static returnPurchaseItems(db, purchaseId, returnQuantity, userId, reason) {
-        const purchase = this.getById(purchaseId, db);
-        if (!purchase)
-            throw new Error('Purchase not found');
-        if (returnQuantity <= 0)
-            throw new Error('Return quantity must be positive');
-        const alreadyReturned = purchase.returned_quantity || 0;
-        const totalReturnedAfter = alreadyReturned + returnQuantity;
-        if (totalReturnedAfter > purchase.quantity) {
-            throw new Error(`Return quantity (${returnQuantity}) would exceed remaining available quantity. ` +
-                `Already returned: ${alreadyReturned}, Original: ${purchase.quantity}, ` +
-                `Available for return: ${purchase.quantity - alreadyReturned}`);
-        }
-        const transaction = db.transaction(() => {
-            // Find the stock_batch created by this purchase
-            const batch = db.prepare(`
-        SELECT id, batch_no, quantity_remaining, unit_cost
-        FROM stock_batches
-        WHERE source_type = 'PURCHASE' AND source_id = ?
-      `).get(purchaseId);
-            if (!batch)
-                throw new Error('No stock batch found for this purchase');
-            if (returnQuantity > batch.quantity_remaining) {
-                throw new Error(`Insufficient stock remaining to return. Requested: ${returnQuantity}, Available: ${batch.quantity_remaining}`);
-            }
-            const returnCost = returnQuantity * batch.unit_cost;
-            const now = new Date().toISOString().split('T')[0];
-            // Create ADJUSTMENT movement to remove stock (negative quantity)
-            StockMovement_1.default.recordMovement({
-                item_id: purchase.item_id,
-                warehouse_id: purchase.warehouse_id,
-                movement_type: 'ADJUSTMENT',
-                quantity: -returnQuantity,
-                unit_cost: batch.unit_cost,
-                reference_doctype: 'PURCHASE_RETURN',
-                reference_docno: purchase.purchase_no,
-                remarks: `Stock reversed - Purchase ${purchase.purchase_no} returned${reason ? ': ' + reason : ''} (batch ${batch.batch_no})`,
-                movement_date: now,
-            }, userId, db);
-            // Reduce the batch quantity_remaining
-            db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')
-                .run(returnQuantity, batch.id);
-            // Track cumulative returned quantity on the purchase record
-            db.prepare('UPDATE purchases SET returned_quantity = COALESCE(returned_quantity, 0) + ? WHERE id = ?')
-                .run(returnQuantity, purchaseId);
-            // Note: stock_balances and items.current_stock are already updated
-            // by StockMovementModel.recordMovement() above — no manual update needed.
-            // Log activity
-            db.prepare(`
-        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(userId, 'RETURN', 'Purchase', purchaseId, `Return processed for ${returnQuantity} unit(s) on Purchase ${purchase.purchase_no}${reason ? ': ' + reason : ''}`);
-            return { returnedQuantity: returnQuantity, totalCost: returnCost };
-        });
-        return transaction();
-    }
     static delete(id, userId, db) {
         const purchase = this.getById(id, db);
         if (!purchase) {
             throw new Error('Purchase not found');
         }
         const transaction = db.transaction(() => {
+            // A purchase with recorded payments cannot be deleted outright —
+            // the allocations/ledger would be orphaned. Deleting must go
+            // through the payment reversals first.
+            const paymentAlloc = db.prepare('SELECT id FROM purchase_allocations WHERE purchase_id = ? LIMIT 1').get(id);
+            if (paymentAlloc) {
+                throw new Error('Cannot delete purchase with recorded payments — delete the payments first');
+            }
+            // Reverse the supplier AP entry posted at record time (keeps the
+            // running balance chain consistent).
+            if (purchase.supplier_id) {
+                db.prepare(`
+          DELETE FROM supplier_ledger
+          WHERE supplier_id = ? AND reference_no = ? AND transaction_type = 'PURCHASE'
+        `).run(purchase.supplier_id, purchase.purchase_no);
+                SupplierLedger_1.default.rebuildBalances(purchase.supplier_id, db);
+            }
             // Find the stock_batch created by this purchase
             const batch = db.prepare(`
         SELECT id, batch_no, quantity_remaining, unit_cost

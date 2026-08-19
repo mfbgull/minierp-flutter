@@ -21,8 +21,8 @@ import '../../data/models/ledger_entry.dart' show LedgerEntry;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/client_paged_grid.dart';
 import '../../widgets/detail_error.dart';
-import '../../widgets/detail_tab_grid.dart';
 import 'supplier_providers.dart';
 
 class SupplierLedgerTab extends ConsumerStatefulWidget {
@@ -36,6 +36,18 @@ class SupplierLedgerTab extends ConsumerStatefulWidget {
 
 class _SupplierLedgerTabState extends ConsumerState<SupplierLedgerTab> {
   final GlobalKey _captureKey = GlobalKey();
+
+  late List<PlutoColumn> _gridColumns;
+  bool _columnsReady = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_columnsReady) {
+      _gridColumns = _columns(context, AppLocalizations.of(context)!);
+      _columnsReady = true;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,16 +125,18 @@ class _SupplierLedgerTabState extends ConsumerState<SupplierLedgerTab> {
           ),
         ),
         // Flat grid — wrapped in a RepaintBoundary so the Image export
-        // can capture exactly the visible table.
+        // can capture exactly the visible table. Client-side paging
+        // (default 10 rows per page, same as every other grid).
         Expanded(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: RepaintBoundary(
               key: _captureKey,
-              child: DetailTabGrid<LedgerEntry>(
+              child: ClientPagedGrid<LedgerEntry>(
                 data: ledger,
-                buildColumns: (l10n) => _columns(context, l10n),
+                columns: _gridColumns,
                 gridRowFor: _gridRowFor,
+                itemLabel: l10n.commonEntries,
               ),
             ),
           ),

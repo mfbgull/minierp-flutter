@@ -22,6 +22,7 @@ import '../../widgets/app_toast.dart';
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
 import '../../widgets/searchable_select.dart';
+import '../inventory/inventory_providers.dart' show warehousesProvider;
 import 'invoice_providers.dart';
 import 'invoice_return_providers.dart' show invoiceReturnsProvider;
 
@@ -54,6 +55,10 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
   /// per line (parallel lists — both rebuilt on load).
   List<InvoiceItem> _returnableItems = const [];
   final List<TextEditingController> _qtyControllers = [];
+
+  /// The warehouse the returned goods are restocked into — required
+  /// (invoices never record one, so the user must choose).
+  int? _warehouseId;
 
   String _disposition = 'credit';
   bool _submitting = false;
@@ -113,6 +118,10 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_warehouseId == null) {
+      setState(() => _error = l10n.salesreturnsReturnwarehouserequired);
+      return;
+    }
 
     final items = <Map<String, dynamic>>[];
     for (var i = 0; i < _returnableItems.length; i++) {
@@ -141,6 +150,7 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
           items: items,
           reason: _reasonController.text,
           disposition: _disposition,
+          warehouseId: _warehouseId,
         );
     if (!mounted) return;
 
@@ -229,6 +239,18 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Restock warehouse — the returned goods come back into the
+            // warehouse the user picks (invoices don't track one).
+            FormFieldShell(
+              label: l10n.salesreturnsReturnwarehouse,
+              required: true,
+              child: _WarehousePicker(
+                selected: _warehouseId,
+                enabled: !_submitting,
+                onChanged: (id) => setState(() => _warehouseId = id),
+              ),
+            ),
+            const SizedBox(height: 12),
             if (_returnableItems.isEmpty) ...[
               Text(
                 l10n.salesreturnsReturnnoitems,
@@ -405,6 +427,41 @@ class _ReturnLineRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Restock-warehouse select for the return dialog — a required picker
+/// over `GET /inventory/warehouses` with a hint until the user chooses.
+class _WarehousePicker extends ConsumerWidget {
+  const _WarehousePicker({
+    required this.selected,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final int? selected;
+  final bool enabled;
+  final ValueChanged<int?> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final warehouses = ref.watch(warehousesProvider).valueOrNull ?? const [];
+    return SearchableSelect<int>(
+      items: [for (final w in warehouses) w.id],
+      selected: selected,
+      hint: l10n.salesreturnsReturnwarehouserequired,
+      isDense: true,
+      enabled: enabled,
+      labelBuilder: (id) {
+        final match = warehouses.where((w) => w.id == id);
+        return match.isEmpty
+            ? '$id'
+            : match.first.warehouseName ?? match.first.warehouseCode;
+      },
+      decoration: formInputDecoration(),
+      onChanged: onChanged,
     );
   }
 }

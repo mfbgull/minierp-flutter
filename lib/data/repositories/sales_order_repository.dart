@@ -17,6 +17,7 @@ import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/sales_order.dart' show SalesOrder, SalesOrderDetail;
 import 'api_result.dart';
+import 'paged_request.dart' show PagedRequest, PagedResponse;
 import 'repository_client.dart';
 
 class SalesOrderRepository {
@@ -24,13 +25,24 @@ class SalesOrderRepository {
 
   final RepositoryClient _api;
 
-  /// All sales orders — bare array (no search/page params used; the grid
-  /// keeps sorting/filtering client-side like the PO/items screens).
+  /// All sales orders — full list (the grid now uses [listPaged]; this
+  /// stays for any consumer that needs the whole list in one fetch).
   Future<ApiResult<List<SalesOrder>>> list({
     Map<String, dynamic>? queryParameters,
   }) => _api.getRawList(
     ApiEndpoints.salesOrders,
     queryParameters: queryParameters,
+    parseItem: (Object? json) =>
+        SalesOrder.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// One page of sales orders (`GET /sales-orders`) — server-paginated
+  /// like the other converted lists. `status` rides in `extra`.
+  Future<ApiResult<PagedResponse<SalesOrder>>> listPaged(
+    PagedRequest request,
+  ) => _api.getPaged(
+    ApiEndpoints.salesOrders,
+    queryParameters: request.toQuery(),
     parseItem: (Object? json) =>
         SalesOrder.fromJson(json as Map<String, dynamic>),
   );

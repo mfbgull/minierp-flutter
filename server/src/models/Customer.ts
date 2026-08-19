@@ -230,31 +230,41 @@ class CustomerModel {
 
   static getLedger(id: string | string[] | number, sortBy: string, sortOrder: string, db: Database.Database): LedgerEntry[] {
     const { sortBy: safeBy, sortOrder: safeOrder } = safeSortBy(sortBy, sortOrder);
+    // `linked_invoice_no` is resolved with scalar subqueries instead of
+    // LEFT JOINs so every ledger entry yields exactly ONE row: joining
+    // payments → payment_allocations → invoices directly duplicated any
+    // entry whose payment was allocated to N invoices (each allocation
+    // produced a copy of the row), which inflated the running balance
+    // computed from the entries. For PAYMENT entries the linked value is
+    // the comma-joined list of every allocated invoice; RETURN entries
+    // resolve through their refund/credit payment (matched by notes —
+    // refunds carry a negative amount, not the legacy 0) and fall back
+    // to the invoice reference the entry itself was written with.
     return db.prepare(`
       SELECT cl.id, cl.transaction_date, cl.transaction_type, cl.reference_no,
         cl.debit, cl.credit, cl.balance, cl.description, cl.created_at,
-        COALESCE(
-          inv_adjust.invoice_no,
-          inv_return.invoice_no,
-          inv_direct.invoice_no
-        ) as linked_invoice_no
+        CASE
+          WHEN cl.transaction_type = 'RETURN' THEN COALESCE(
+            (
+              SELECT GROUP_CONCAT(i.invoice_no, ', ')
+              FROM payments pr
+              JOIN payment_allocations pra ON pra.payment_id = pr.id
+              JOIN invoices i ON i.id = pra.invoice_id
+              WHERE pr.customer_id = cl.customer_id
+                AND pr.amount <= 0
+                AND pr.notes LIKE '%' || cl.reference_no || '%'
+            ),
+            cl.reference_no
+          )
+          ELSE (
+            SELECT GROUP_CONCAT(i.invoice_no, ', ')
+            FROM payments p
+            JOIN payment_allocations pa ON pa.payment_id = p.id
+            JOIN invoices i ON i.id = pa.invoice_id
+            WHERE p.payment_no = cl.reference_no
+          )
+        END as linked_invoice_no
       FROM customer_ledger cl
-      LEFT JOIN payments p ON cl.reference_no = p.payment_no
-      LEFT JOIN payment_allocations pa ON p.id = pa.payment_id
-      LEFT JOIN invoices inv_direct ON pa.invoice_id = inv_direct.id
-      LEFT JOIN payments p_return ON cl.transaction_type = 'RETURN'
-        AND cl.customer_id = p_return.customer_id
-        AND p_return.amount = 0
-        AND p_return.notes LIKE '%' || cl.reference_no || '%'
-      LEFT JOIN payment_allocations pa_return ON p_return.id = pa_return.payment_id
-      LEFT JOIN invoices inv_return ON pa_return.invoice_id = inv_return.id
-      LEFT JOIN payments p_adjust ON cl.transaction_type = 'RETURN'
-        AND cl.customer_id = p_adjust.customer_id
-        AND p_adjust.amount = 0
-        AND p_adjust.payment_method = 'Credit'
-        AND p_adjust.notes LIKE '%' || cl.reference_no || '%'
-      LEFT JOIN payment_allocations pa_adjust ON p_adjust.id = pa_adjust.payment_id
-      LEFT JOIN invoices inv_adjust ON pa_adjust.invoice_id = inv_adjust.id
       WHERE cl.customer_id = ?
       ORDER BY cl.${safeBy} ${safeOrder}
     `).all(id) as LedgerEntry[];
@@ -264,28 +274,28 @@ class CustomerModel {
     let query = `
       SELECT cl.transaction_date, cl.transaction_type, cl.reference_no,
         cl.debit, cl.credit, cl.balance, cl.description,
-        COALESCE(
-          inv_adjust.invoice_no,
-          inv_return.invoice_no,
-          inv_direct.invoice_no
-        ) as linked_invoice_no
+        CASE
+          WHEN cl.transaction_type = 'RETURN' THEN COALESCE(
+            (
+              SELECT GROUP_CONCAT(i.invoice_no, ', ')
+              FROM payments pr
+              JOIN payment_allocations pra ON pra.payment_id = pr.id
+              JOIN invoices i ON i.id = pra.invoice_id
+              WHERE pr.customer_id = cl.customer_id
+                AND pr.amount <= 0
+                AND pr.notes LIKE '%' || cl.reference_no || '%'
+            ),
+            cl.reference_no
+          )
+          ELSE (
+            SELECT GROUP_CONCAT(i.invoice_no, ', ')
+            FROM payments p
+            JOIN payment_allocations pa ON pa.payment_id = p.id
+            JOIN invoices i ON i.id = pa.invoice_id
+            WHERE p.payment_no = cl.reference_no
+          )
+        END as linked_invoice_no
       FROM customer_ledger cl
-      LEFT JOIN payments p ON cl.reference_no = p.payment_no
-      LEFT JOIN payment_allocations pa ON p.id = pa.payment_id
-      LEFT JOIN invoices inv_direct ON pa.invoice_id = inv_direct.id
-      LEFT JOIN payments p_return ON cl.transaction_type = 'RETURN'
-        AND cl.customer_id = p_return.customer_id
-        AND p_return.amount = 0
-        AND p_return.notes LIKE '%' || cl.reference_no || '%'
-      LEFT JOIN payment_allocations pa_return ON p_return.id = pa_return.payment_id
-      LEFT JOIN invoices inv_return ON pa_return.invoice_id = inv_return.id
-      LEFT JOIN payments p_adjust ON cl.transaction_type = 'RETURN'
-        AND cl.customer_id = p_adjust.customer_id
-        AND p_adjust.amount = 0
-        AND p_adjust.payment_method = 'Credit'
-        AND p_adjust.notes LIKE '%' || cl.reference_no || '%'
-      LEFT JOIN payment_allocations pa_adjust ON p_adjust.id = pa_adjust.payment_id
-      LEFT JOIN invoices inv_adjust ON pa_adjust.invoice_id = inv_adjust.id
       WHERE cl.customer_id = ?
     `;
     const params: unknown[] = [id];

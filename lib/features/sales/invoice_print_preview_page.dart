@@ -24,6 +24,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/screen_error_panel.dart';
 import 'invoice_pdf.dart' show buildA4InvoicePdf;
+import 'invoice_return_dialog.dart' show showInvoiceReturnDialog;
 
 /// Print-preview page for one invoice.
 class InvoicePrintPreviewPage extends ConsumerStatefulWidget {
@@ -176,6 +177,14 @@ class _InvoicePrintPreviewPageState
                     )
                   : const Icon(Icons.print_outlined, size: 18),
               label: Text(l10n.salesPrinta4),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: TextButton.icon(
+              onPressed: _detail == null ? null : () => showInvoiceReturnDialog(context, invoiceId: _detail!.id),
+              icon: const Icon(Icons.assignment_return_outlined, size: 18),
+              label: Text(l10n.salesreturnsProcessreturn),
             ),
           ),
         ],

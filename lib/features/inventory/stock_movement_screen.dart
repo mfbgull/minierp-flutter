@@ -13,12 +13,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../data/models/stock_movement.dart' show StockMovement;
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'inventory_providers.dart'
-    show movementTypeFilterProvider, stockMovementsProvider;
+    show
+        GridSort,
+        movementTypeFilterProvider,
+        stockMovementsLimitProvider,
+        stockMovementsPageProvider,
+        stockMovementsProvider,
+        stockMovementsSortProvider;
 import 'stock_adjustment_dialog.dart';
 import 'stock_transfer_dialog.dart';
 import 'stock_movement_detail_dialog.dart';
@@ -52,6 +60,42 @@ class _StockMovementScreenState extends ConsumerState<StockMovementScreen>
   /// Opt into the per-row ⋮ actions menu (View detail).
   @override
   bool get hasRowActions => true;
+
+  /// The movements provider returns a `PagedResponse` envelope — unwrap
+  /// the current page's items as the grid rows.
+  @override
+  Iterable<StockMovement> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<StockMovement>).items;
+
+  /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
+  String? _sortColumnFor(String field) => switch (field) {
+    'no' => 'movement_no',
+    'date' => 'movement_date',
+    'item' => 'item_name',
+    'warehouse' => 'warehouse_name',
+    'type' => 'movement_type',
+    'qty' => 'quantity',
+    'ref' => 'reference_docno',
+    _ => null,
+  };
+
+  /// Column sort maps to the server-side sort provider (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    ref.read(stockMovementsSortProvider.notifier).state = sort.isNone
+        ? null
+        : GridSort(
+            sortBy,
+            sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC',
+          );
+    if (ref.read(stockMovementsPageProvider) != 1) {
+      ref.read(stockMovementsPageProvider.notifier).state = 1;
+    }
+  }
 
   @override
   List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
@@ -92,7 +136,8 @@ class _StockMovementScreenState extends ConsumerState<StockMovementScreen>
     // `value` rethrows the AsyncError — tolerate a failed/loading fetch
     // like the other grids (the grid pane shows its own error/empty
     // states).
-    _movements = movements.valueOrNull ?? const [];
+    _movements = movements.valueOrNull?.items ?? const [];
+    final page = movements.valueOrNull;
     final l10n = AppLocalizations.of(context)!;
 
     watchGridProvider(stockMovementsProvider(filter));
@@ -124,6 +169,10 @@ class _StockMovementScreenState extends ConsumerState<StockMovementScreen>
                     : value;
                 ref.read(movementTypeFilterProvider.notifier).state =
                     newFilter;
+                // A new filter starts back at page 1.
+                if (ref.read(stockMovementsPageProvider) != 1) {
+                  ref.read(stockMovementsPageProvider.notifier).state = 1;
+                }
                 // Switching back to All must refetch: the null-keyed
                 // family instance may be stale from an earlier load
                 // (and a movement posted under a filter won't appear
@@ -154,6 +203,24 @@ class _StockMovementScreenState extends ConsumerState<StockMovementScreen>
             provider: stockMovementsProvider(filter),
           ),
         ),
+        if (page != null)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(stockMovementsLimitProvider),
+            itemLabel: l10n.stockmovementsStockmovements,
+            onPageChanged: (p) =>
+                ref.read(stockMovementsPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(stockMovementsLimitProvider.notifier).state = limit;
+              if (ref.read(stockMovementsPageProvider) != 1) {
+                ref.read(stockMovementsPageProvider.notifier).state = 1;
+              }
+            },
+          ),
       ],
     );
   }

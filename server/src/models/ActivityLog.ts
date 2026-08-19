@@ -20,6 +20,29 @@ export interface ActivityLogFilters {
   offset?: number;
 }
 
+// `created_at` is stored in UTC (SQLite `CURRENT_TIMESTAMP`) while the
+// client filters by LOCAL calendar dates (`start_date`/`end_date`). The
+// query bounds must be converted or a UTC+ timezone pushes the local day
+// into the previous UTC calendar day — e.g. local Monday 00:00 in PKT
+// (UTC+5) is Sunday 19:00 UTC, so `created_at >= '2026-08-17'` would
+// silently exclude the whole local week. Same convention as Dashboard.ts
+// (`date('now', 'localtime')`): this desktop app's server runs on the
+// user's machine, so the server's local timezone is the client's.
+//
+// startDate → the UTC instant of local midnight (inclusive lower bound);
+// endDate → the UTC instant of the *next* local midnight (exclusive upper
+// bound) so the entire end day counts.
+//
+// Exported for unit tests (activityLog.test.ts) — the conversion is the
+// crux of the local-date-vs-UTC-storage fix.
+export function localDateToUtcBound(dateStr: string, endOfRange: boolean): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const local = endOfRange
+    ? new Date(y, m - 1, d + 1)
+    : new Date(y, m - 1, d);
+  return local.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 // Activity log entry with user info
 export interface ActivityLogWithUser {
   id: number;
@@ -116,12 +139,14 @@ class ActivityLogModel {
 
       if (filters.startDate) {
         whereClause += ' AND al.created_at >= ?';
-        params.push(filters.startDate);
+        params.push(localDateToUtcBound(filters.startDate, false));
       }
 
       if (filters.endDate) {
-        whereClause += ' AND al.created_at <= ?';
-        params.push(filters.endDate);
+        // Exclusive upper bound — `<= endDate` would drop the whole end
+        // day (a `YYYY-MM-DD HH:MM:SS` string sorts after a bare date).
+        whereClause += ' AND al.created_at < ?';
+        params.push(localDateToUtcBound(filters.endDate, true));
       }
 
       if (filters.search) {
@@ -226,8 +251,11 @@ class ActivityLogModel {
       const params: any[] = [];
 
       if (startDate && endDate) {
-        dateFilter = ' WHERE created_at BETWEEN ? AND ?';
-        params.push(startDate, endDate);
+        dateFilter = ' WHERE created_at >= ? AND created_at < ?';
+        params.push(
+          localDateToUtcBound(startDate, false),
+          localDateToUtcBound(endDate, true),
+        );
       }
 
       // Get action breakdown

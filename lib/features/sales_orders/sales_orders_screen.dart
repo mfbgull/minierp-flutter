@@ -1,10 +1,10 @@
 // Sales orders list screen — a read-only grid over `GET /sales-orders`
-// (**bare array**; no search/page params, so sorting and filtering stay
-// client-side like the items screen). Rendered with PlutoGrid via the
-// shared [PlutoGridScreen] mixin: F2/Enter + double-tap open the SO
-// detail, and the keyboard-hint status bar sits beneath the grid. Sits
-// in the `/sales` branch's Sales Orders tab (the web app hosts the list
-// at `/sales-orders` inside the sales module).
+// (**server-paginated**; search/status/date filters and sorting happen
+// server-side, grid-pagination §5 — the endpoint returns a `pagination`
+// block). Rendered with PlutoGrid via the shared [PlutoGridScreen]
+// mixin: F2/Enter + double-tap open the SO detail, and the
+// [ServerPaginationBar] sits beneath the grid. Sits in the `/sales`
+// branch's Sales Orders tab.
 
 import 'dart:async';
 
@@ -13,12 +13,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/csv_export.dart';
-import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../core/utils/so_status.dart';
 import '../../data/models/sales_order.dart' show SalesOrder;
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
@@ -56,6 +57,10 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       ref.read(salesOrdersSearchProvider.notifier).state = value.trim();
+      // A new search starts back at page 1.
+      if (ref.read(salesOrdersPageProvider) != 1) {
+        ref.read(salesOrdersPageProvider.notifier).state = 1;
+      }
     });
   }
 
@@ -71,51 +76,45 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
     ref.read(salesOrdersFromDateProvider.notifier).state = null;
     ref.read(salesOrdersToDateProvider.notifier).state = null;
     ref.read(salesOrdersSearchProvider.notifier).state = '';
-  }
-
-  /// Client-side filtering (search term + status + date range) over the
-  /// loaded rows — the endpoint only serves the full list, so every
-  /// filter runs here.
-  List<SalesOrder> _filteredRows(List<SalesOrder> orders) {
-    final search = ref.read(salesOrdersSearchProvider).toLowerCase();
-    final status = ref.read(salesOrdersStatusProvider);
-    final from = ref.read(salesOrdersFromDateProvider);
-    final to = ref.read(salesOrdersToDateProvider);
-    if (search.isEmpty && status == null && from == null && to == null) {
-      return orders;
+    if (ref.read(salesOrdersPageProvider) != 1) {
+      ref.read(salesOrdersPageProvider.notifier).state = 1;
     }
-    return orders.where((so) {
-      if (search.isNotEmpty &&
-          !so.soNo.toLowerCase().contains(search) &&
-          !so.customerName.toLowerCase().contains(search)) {
-        return false;
-      }
-      if (status != null && so.status != status) return false;
-      final iso = so.soDate;
-      if (from != null && iso.compareTo(isoDate(from)) < 0) return false;
-      if (to != null && iso.compareTo(isoDate(to)) > 0) return false;
-      return true;
-    }).toList();
   }
 
-  /// Provider → grid sync that honours the active client-side filters
-  /// (overrides the mixin's unfiltered clear+append).
+  /// The sales-orders provider returns a `PagedResponse` envelope —
+  /// unwrap the current page's items as the grid rows.
   @override
-  void syncGridRows(AsyncValue<Object?> value) {
-    final manager = gridStateManager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      final rows = _filteredRows(value.value as List<SalesOrder>);
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, row) in rows.indexed)
-          withSerialCell(gridRowFor(row), index),
-      ]);
+  Iterable<SalesOrder> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<SalesOrder>).items;
+
+  /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
+  String? _sortColumnFor(String field) => switch (field) {
+    'soNo' => 'so_no',
+    'date' => 'so_date',
+    'customer' => 'customer_name',
+    'status' => 'status',
+    'total' => 'total_amount',
+    'delivery' => 'delivery_date',
+    _ => null,
+  };
+
+  /// Column sort maps to the server-side sort provider (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    ref.read(salesOrdersSortProvider.notifier).state = sort.isNone
+        ? null
+        : SalesOrderSort(
+            sortBy,
+            sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC',
+          );
+    if (ref.read(salesOrdersPageProvider) != 1) {
+      ref.read(salesOrdersPageProvider.notifier).state = 1;
     }
   }
-
-  void _refilter() => syncGridRows(ref.read(salesOrdersProvider));
 
   /// Opt into the per-row ⋮ actions menu (View detail).
   @override
@@ -152,26 +151,22 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
   Widget build(BuildContext context) {
     final orders = ref.watch(salesOrdersProvider);
     final l10n = AppLocalizations.of(context)!;
+    // The full filtered list feeds the CSV export.
+    final filtered = ref.watch(filteredSalesOrdersProvider);
 
     // Keep the grid in sync with provider transitions (loading → data).
-    // The mixin listener routes through the overridden syncGridRows, so
-    // filtering applies on every load/refresh too.
+    // The mixin listener routes through the default syncGridRows, which
+    // unwraps the PagedResponse via gridRowsFrom.
     watchGridProvider(salesOrdersProvider);
-    // Client-side filters re-run the filter over the loaded rows without
-    // refetching.
-    ref.listen(salesOrdersSearchProvider, (previous, next) => _refilter());
-    ref.listen(salesOrdersStatusProvider, (previous, next) => _refilter());
-    ref.listen(salesOrdersFromDateProvider, (previous, next) => _refilter());
-    ref.listen(salesOrdersToDateProvider, (previous, next) => _refilter());
 
-    // The client-side filters drive the search-clear button and the
-    // dropdown, so they must be watched here for the build to re-run.
+    // The filters drive the search-clear button and the dropdown, so they
+    // must be watched here for the build to re-run.
     ref.watch(salesOrdersSearchProvider);
     ref.watch(salesOrdersStatusProvider);
     ref.watch(salesOrdersFromDateProvider);
     ref.watch(salesOrdersToDateProvider);
 
-    final filteredRows = _filteredRows(orders.valueOrNull ?? const []);
+    final filteredRows = filtered.valueOrNull ?? const <SalesOrder>[];
     // Status filter options — `(label, server value)` pairs with `All` =
     // null (localized, so built per build).
     final statusOptions = <(String, String?)>[
@@ -205,13 +200,24 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
                 return value ?? '';
               },
               width: 170,
-              onChanged: (v) =>
-                  ref.read(salesOrdersStatusProvider.notifier).state = v,
+              onChanged: (v) {
+                ref.read(salesOrdersStatusProvider.notifier).state = v;
+                // A new status filter starts back at page 1.
+                if (ref.read(salesOrdersPageProvider) != 1) {
+                  ref.read(salesOrdersPageProvider.notifier).state = 1;
+                }
+              },
             ),
             DateRangeFilter(
               width: 120,
               fromProvider: salesOrdersFromDateProvider,
               toProvider: salesOrdersToDateProvider,
+              onChanged: () {
+                // A new date range starts back at page 1.
+                if (ref.read(salesOrdersPageProvider) != 1) {
+                  ref.read(salesOrdersPageProvider.notifier).state = 1;
+                }
+              },
             ),
           ],
           onRefresh: () => ref.invalidate(salesOrdersProvider),
@@ -227,10 +233,7 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
                   : () => saveCsv(
                       context,
                       suggestedName: csvSuggestedName('sales-orders'),
-                      csv: buildSalesOrdersCsv(
-                        l10n,
-                        _filteredRows(orders.valueOrNull ?? const []),
-                      ),
+                      csv: buildSalesOrdersCsv(l10n, filteredRows),
                       successMessage: l10n.salesordersExported,
                       errorMessage: l10n.salesordersExportfailed,
                     ),
@@ -247,6 +250,25 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
           ],
         ),
         Expanded(child: gridScreenBody(orders, provider: salesOrdersProvider)),
+        if (orders.valueOrNull case final page?)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(salesOrdersLimitProvider),
+            itemLabel: l10n.salesordersSalesorders,
+            onPageChanged: (p) =>
+                ref.read(salesOrdersPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(salesOrdersLimitProvider.notifier).state = limit;
+              if (ref.read(salesOrdersPageProvider) != 1) {
+                ref.read(salesOrdersPageProvider.notifier).state = 1;
+              }
+            },
+          ),
+        const SizedBox(height: 16),
       ],
     );
   }

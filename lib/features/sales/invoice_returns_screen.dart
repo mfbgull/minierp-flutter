@@ -1,11 +1,10 @@
 // Invoice returns list screen — a read-only grid over `GET
-// /invoices/returns` (**bare array** of `RETURN` stock movements; no
-// search/page params, so sorting and filtering stay client-side like the
-// items screen). Rendered with PlutoGrid via the shared [PlutoGridScreen]
-// mixin: F2/Enter + double-tap open the return detail, and the
-// keyboard-hint status bar sits beneath the grid. Hosted as the
-// 'Invoice Returns' tab of the sales shell (the web app pairs it with
-// `/sales/returns`).
+// /invoices/returns` (**server-paginated**; search/warehouse/date filters
+// and sorting happen server-side, grid-pagination §5 — the endpoint
+// returns a `pagination` block). Rendered with PlutoGrid via the shared
+// [PlutoGridScreen] mixin: F2/Enter + double-tap open the return detail,
+// and the [ServerPaginationBar] sits beneath the grid. Hosted as the
+// 'Invoice Returns' tab of the sales shell.
 
 import 'dart:async';
 
@@ -14,11 +13,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/csv_export.dart';
-import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../data/models/sales_return.dart' show SalesReturn;
+import '../../data/models/warehouse.dart' show Warehouse;
+import '../../data/repositories/paged_request.dart' show PagedResponse;
+import '../../features/inventory/inventory_providers.dart'
+    show warehousesProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import 'invoice_return_detail_dialog.dart';
@@ -62,6 +65,10 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       ref.read(invoiceReturnsSearchProvider.notifier).state = value.trim();
+      // A new search starts back at page 1.
+      if (ref.read(invoiceReturnsPageProvider) != 1) {
+        ref.read(invoiceReturnsPageProvider.notifier).state = 1;
+      }
     });
   }
 
@@ -77,60 +84,46 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
     ref.read(invoiceReturnsFromDateProvider.notifier).state = null;
     ref.read(invoiceReturnsToDateProvider.notifier).state = null;
     ref.read(invoiceReturnsSearchProvider.notifier).state = '';
-  }
-
-  /// Client-side filtering (search term + warehouse + date range) over
-  /// the loaded rows — the endpoint only serves the full list, so every
-  /// filter runs here.
-  List<SalesReturn> _filteredRows(List<SalesReturn> returns) {
-    final search = ref.read(invoiceReturnsSearchProvider).toLowerCase();
-    final warehouse = ref.read(invoiceReturnsWarehouseProvider);
-    final from = ref.read(invoiceReturnsFromDateProvider);
-    final to = ref.read(invoiceReturnsToDateProvider);
-    if (search.isEmpty &&
-        warehouse == null &&
-        from == null &&
-        to == null) {
-      return returns;
+    if (ref.read(invoiceReturnsPageProvider) != 1) {
+      ref.read(invoiceReturnsPageProvider.notifier).state = 1;
     }
-    return returns.where((r) {
-      if (search.isNotEmpty &&
-          !r.movementNo.toLowerCase().contains(search) &&
-          !r.itemName.toLowerCase().contains(search) &&
-          !(r.customerName ?? '').toLowerCase().contains(search)) {
-        return false;
-      }
-      if (warehouse != null && r.warehouseName != warehouse) return false;
-      final iso = r.returnDate;
-      if (from != null && iso.compareTo(isoDate(from)) < 0) return false;
-      if (to != null && iso.compareTo(isoDate(to)) > 0) return false;
-      return true;
-    }).toList();
   }
 
-  /// Provider → grid sync that honours the active client-side filters
-  /// (overrides the mixin's unfiltered clear+append).
+  /// The returns provider returns a `PagedResponse` envelope — unwrap the
+  /// current page's items as the grid rows.
   @override
-  void syncGridRows(AsyncValue<Object?> value) {
-    final manager = gridStateManager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      final rows = _filteredRows(value.value as List<SalesReturn>);
-      // Rebuild the row-id → model map from the rows the grid actually
-      // shows (the detail dialog renders from the in-memory row).
-      _returnsById
-        ..clear()
-        ..addEntries([for (final r in rows) MapEntry(r.id, r)]);
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, row) in rows.indexed)
-          withSerialCell(gridRowFor(row), index),
-      ]);
+  Iterable<SalesReturn> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<SalesReturn>).items;
+
+  /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
+  String? _sortColumnFor(String field) => switch (field) {
+    'returnNo' => 'movement_no',
+    'date' => 'return_date',
+    'item' => 'item_name',
+    'customer' => 'customer_name',
+    'warehouse' => 'warehouse_name',
+    'qty' => 'quantity',
+    'unitCost' => 'unit_cost',
+    _ => null,
+  };
+
+  /// Column sort maps to the server-side sort provider (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    ref.read(invoiceReturnsSortProvider.notifier).state = sort.isNone
+        ? null
+        : InvoiceReturnSort(
+            sortBy,
+            sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC',
+          );
+    if (ref.read(invoiceReturnsPageProvider) != 1) {
+      ref.read(invoiceReturnsPageProvider.notifier).state = 1;
     }
   }
-
-  void _refilter() => syncGridRows(ref.read(invoiceReturnsProvider));
 
   /// Opt into the per-row ⋮ actions menu (View detail).
   @override
@@ -147,10 +140,8 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
       GridRowAction(
         icon: Icons.visibility_outlined,
         label: l10n.commonView,
-        onTap: () => showInvoiceReturnDetailDialog(
-          context,
-          salesReturn: salesReturn,
-        ),
+        onTap: () =>
+            showInvoiceReturnDetailDialog(context, salesReturn: salesReturn),
       ),
     ];
   }
@@ -179,102 +170,178 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
   Widget build(BuildContext context) {
     final returns = ref.watch(invoiceReturnsProvider);
     final l10n = AppLocalizations.of(context)!;
+    // The full filtered list feeds the CSV export.
+    final filtered = ref.watch(filteredInvoiceReturnsProvider);
+    // Warehouse filter options — `All` (null) plus every active
+    // warehouse (from the warehouses list; the filter matches
+    // `warehouse_name` server-side).
+    final warehouseOptions =
+        (ref.watch(warehousesProvider).valueOrNull ?? const <Warehouse>[])
+            .map((w) => w.warehouseName ?? '')
+            .where((n) => n.isNotEmpty)
+            .toList()
+          ..sort();
 
     // Keep the grid in sync with provider transitions (loading → data).
-    // The mixin listener routes through the overridden syncGridRows, so
-    // filtering applies on every load/refresh too.
+    // The mixin listener routes through the default syncGridRows, which
+    // unwraps the PagedResponse via gridRowsFrom.
     watchGridProvider(invoiceReturnsProvider);
-    // Client-side filters re-run the filter over the loaded rows without
-    // refetching.
-    ref.listen(invoiceReturnsSearchProvider, (previous, next) => _refilter());
-    ref.listen(invoiceReturnsWarehouseProvider, (previous, next) => _refilter());
-    ref.listen(invoiceReturnsFromDateProvider, (previous, next) => _refilter());
-    ref.listen(invoiceReturnsToDateProvider, (previous, next) => _refilter());
 
-    // The client-side filters drive the search-clear button and the
-    // warehouse dropdown, so they must be watched here for the build to
-    // re-run.
+    // The filters drive the search-clear button and the warehouse
+    // dropdown, so they must be watched here for the build to re-run.
     ref.watch(invoiceReturnsSearchProvider);
     ref.watch(invoiceReturnsWarehouseProvider);
     ref.watch(invoiceReturnsFromDateProvider);
     ref.watch(invoiceReturnsToDateProvider);
 
-    final allReturns = returns.valueOrNull ?? const <SalesReturn>[];
-    final filteredRows = _filteredRows(allReturns);
-    // Warehouse filter options — `All` (null) plus the distinct
-    // warehouse names from the loaded rows.
-    final warehouses = <String>[];
-    final seen = <String>{};
-    for (final r in allReturns) {
-      if (r.warehouseName.isNotEmpty && seen.add(r.warehouseName)) {
-        warehouses.add(r.warehouseName);
-      }
-    }
-    warehouses.sort();
+    final filteredRows = filtered.valueOrNull ?? const <SalesReturn>[];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Toolbar: search + warehouse filter + date range + actions —
-        // the same header the invoices tab has (the New slot opens the
-        // Process Return picker, since returns are created against an
-        // invoice).
-        ScreenToolbar(
-          searchController: _searchController,
-          searchHint: l10n.salesreturnsSearchplaceholder,
-          onSearchChanged: _onSearchChanged,
-          filters: [
-            ScreenToolbarDropdown<String?>(
-              items: [null, ...warehouses],
-              value: ref.watch(invoiceReturnsWarehouseProvider),
-              hint: l10n.commonAll,
-              labelBuilder: (v) => v ?? l10n.commonAll,
-              width: 170,
-              onChanged: (v) =>
-                  ref.read(invoiceReturnsWarehouseProvider.notifier).state = v,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final mobile = constraints.maxWidth < 768;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Toolbar: search + warehouse filter + date range + actions —
+            // the same header the invoices tab has (the New slot opens the
+            // Process Return picker, since returns are created against an
+            // invoice). The shared toolbar wraps, so the picker stays
+            // reachable on mobile.
+            ScreenToolbar(
+              searchController: _searchController,
+              searchHint: l10n.salesreturnsSearchplaceholder,
+              onSearchChanged: _onSearchChanged,
+              filters: [
+                ScreenToolbarDropdown<String?>(
+                  items: [null, ...warehouseOptions],
+                  value: ref.watch(invoiceReturnsWarehouseProvider),
+                  hint: l10n.commonAll,
+                  labelBuilder: (v) => v ?? l10n.commonAll,
+                  width: 170,
+                  onChanged: (v) {
+                    ref.read(invoiceReturnsWarehouseProvider.notifier).state =
+                        v;
+                    // A new warehouse filter starts back at page 1.
+                    if (ref.read(invoiceReturnsPageProvider) != 1) {
+                      ref.read(invoiceReturnsPageProvider.notifier).state = 1;
+                    }
+                  },
+                ),
+                DateRangeFilter(
+                  width: 120,
+                  fromProvider: invoiceReturnsFromDateProvider,
+                  toProvider: invoiceReturnsToDateProvider,
+                  onChanged: () {
+                    // A new date range starts back at page 1.
+                    if (ref.read(invoiceReturnsPageProvider) != 1) {
+                      ref.read(invoiceReturnsPageProvider.notifier).state = 1;
+                    }
+                  },
+                ),
+              ],
+              onRefresh: () => ref.invalidate(invoiceReturnsProvider),
+              onClearAll: _clearFilters,
+              hasActiveFilters: _hasActiveFilters,
+              actions: [
+                // CSV export — runs over the currently-filtered rows; the
+                // shared save helper owns the FilePicker + toast. Disabled
+                // until rows are loaded.
+                TextButton.icon(
+                  onPressed: returns.isLoading || filteredRows.isEmpty
+                      ? null
+                      : () => saveCsv(
+                          context,
+                          suggestedName: csvSuggestedName('invoice-returns'),
+                          csv: buildInvoiceReturnsCsv(l10n, filteredRows),
+                          successMessage: l10n.salesreturnsExported,
+                          errorMessage: l10n.salesreturnsExportfailed,
+                        ),
+                  icon: const Icon(Icons.file_download_outlined, size: 18),
+                  label: Text(l10n.salesreturnsExportcsv),
+                ),
+              ],
+              primaryActions: [
+                FilledButton.tonalIcon(
+                  onPressed: () => showInvoiceReturnPicker(context),
+                  icon: const Icon(Icons.assignment_return_outlined, size: 18),
+                  label: Text(l10n.salesreturnsProcessreturn),
+                ),
+              ],
             ),
-            DateRangeFilter(
-              width: 120,
-              fromProvider: invoiceReturnsFromDateProvider,
-              toProvider: invoiceReturnsToDateProvider,
+            Expanded(
+              child: mobile
+                  ? _mobileList(l10n)
+                  : gridScreenBody(returns, provider: invoiceReturnsProvider),
             ),
+            if (!mobile)
+              if (returns.valueOrNull case final page?)
+                ServerPaginationBar(
+                  page: page.currentPage,
+                  totalPages: page.totalPages,
+                  totalItems: page.totalItems,
+                  hasNext: page.hasNext,
+                  hasPrev: page.hasPrev,
+                  limit: ref.watch(invoiceReturnsLimitProvider),
+                  itemLabel: l10n.salesreturnsReturns,
+                  onPageChanged: (p) =>
+                      ref.read(invoiceReturnsPageProvider.notifier).state = p,
+                  onLimitChanged: (limit) {
+                    ref.read(invoiceReturnsLimitProvider.notifier).state =
+                        limit;
+                    if (ref.read(invoiceReturnsPageProvider) != 1) {
+                      ref.read(invoiceReturnsPageProvider.notifier).state = 1;
+                    }
+                  },
+                ),
+            if (!mobile) const SizedBox(height: 16),
           ],
-          onRefresh: () => ref.invalidate(invoiceReturnsProvider),
-          onClearAll: _clearFilters,
-          hasActiveFilters: _hasActiveFilters,
-          actions: [
-            // CSV export — runs over the currently-filtered rows; the
-            // shared save helper owns the FilePicker + toast. Disabled
-            // until rows are loaded.
-            TextButton.icon(
-              onPressed: returns.isLoading || filteredRows.isEmpty
-                  ? null
-                  : () => saveCsv(
-                      context,
-                      suggestedName: csvSuggestedName('invoice-returns'),
-                      csv: buildInvoiceReturnsCsv(
-                        l10n,
-                        _filteredRows(allReturns),
-                      ),
-                      successMessage: l10n.salesreturnsExported,
-                      errorMessage: l10n.salesreturnsExportfailed,
-                    ),
-              icon: const Icon(Icons.file_download_outlined, size: 18),
-              label: Text(l10n.salesreturnsExportcsv),
-            ),
-          ],
-          primaryActions: [
-            FilledButton.tonalIcon(
-              onPressed: () => showInvoiceReturnPicker(context),
-              icon: const Icon(Icons.assignment_return_outlined, size: 18),
-              label: Text(l10n.salesreturnsProcessreturn),
-            ),
-          ],
+        );
+      },
+    );
+  }
+
+  /// Compact cards under 768px (Compact Card System — modeled on
+  /// `PurchaseReturnsScreen._mobileList`): one card per return line fed
+  /// by the full *filtered* list provider, so the search + warehouse +
+  /// date filters apply to the mobile view too. Tapping a card opens the
+  /// same [InvoiceReturnDetailDialog] the grid F2/Enter opens. The
+  /// toolbar's Process Return primary action (source picker → return
+  /// dialog with the required restock-warehouse picker) stays above the
+  /// list.
+  Widget _mobileList(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    final filtered = ref.watch(filteredInvoiceReturnsProvider);
+    return filtered.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text('$error', style: TextStyle(color: scheme.error)),
         ),
-        Expanded(
-          child: gridScreenBody(returns, provider: invoiceReturnsProvider),
-        ),
-      ],
+      ),
+      data: (rows) => rows.isEmpty
+          ? Center(
+              child: Text(
+                l10n.salesreturnsReturnnoitems,
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(12),
+              itemCount: rows.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemBuilder: (context, i) {
+                final salesReturn = rows[i];
+                return _CompactInvoiceReturnCard(
+                  salesReturn: salesReturn,
+                  l10n: l10n,
+                  onTap: () => showInvoiceReturnDetailDialog(
+                    context,
+                    salesReturn: salesReturn,
+                  ),
+                );
+              },
+            ),
     );
   }
 
@@ -372,5 +439,184 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
       textColumn('warehouse', l10n.fieldsWarehouse, 140),
       textColumn('remarks', l10n.fieldsNotes, 180),
     ];
+  }
+}
+
+/// One compact card for the mobile invoice-returns list — mirrors the
+/// grid's columns (item, return no + invoice ref, date, qty / unit cost /
+/// total, customer, warehouse, remarks). Tapping the card opens the same
+/// [InvoiceReturnDetailDialog] the grid opens.
+class _CompactInvoiceReturnCard extends StatelessWidget {
+  const _CompactInvoiceReturnCard({
+    required this.salesReturn,
+    required this.l10n,
+    required this.onTap,
+  });
+
+  final SalesReturn salesReturn;
+  final AppLocalizations l10n;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final r = salesReturn;
+    final remarks = r.remarks?.trim();
+
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          r.itemName,
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (r.itemCode.isNotEmpty)
+                          Text(
+                            r.itemCode,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    Formatters.date(r.returnDate),
+                    style: textTheme.bodySmall,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${l10n.salesreturnsReturnno}: ${r.movementNo}',
+                style: textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _cardStat(
+                    context,
+                    l10n.salesreturnsReturnqty,
+                    Formatters.number(r.quantity),
+                  ),
+                  _cardStat(
+                    context,
+                    l10n.fieldsCost,
+                    Formatters.currency(r.unitCost),
+                  ),
+                  _cardStat(
+                    context,
+                    l10n.salesreturnsReturnvalue,
+                    Formatters.currency(r.returnValue),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _metaLine(
+                      context,
+                      Icons.person_outline,
+                      r.customerName ?? '',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _metaLine(
+                      context,
+                      Icons.warehouse_outlined,
+                      r.warehouseName,
+                    ),
+                  ),
+                ],
+              ),
+              if (remarks != null && remarks.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  remarks,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _metaLine(BuildContext context, IconData icon, String text) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: scheme.onSurfaceVariant),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            style: textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _cardStat(BuildContext context, String label, String value) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
   }
 }

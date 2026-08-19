@@ -29,11 +29,9 @@ rule ARCHITECTURE_GUARD:
   type: invariant
 
   frontend_stack:
-    - React
-    - Vite
-    - TypeScript
+    - Flutter
     - TanStack Query
-    - AG-Grid (desktop)
+    - Pluto-Grid (desktop)
     - Compact Card System (mobile)
 
   backend_stack:
@@ -235,7 +233,7 @@ rule SECURITY:
 rule UI_SYSTEM:
   frontend_patterns:
     desktop:
-      - AG_Grid_for_lists
+      - Pluto_Grid_for_lists
 
     mobile:
       breakpoint: 768px

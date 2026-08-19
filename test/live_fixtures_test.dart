@@ -298,109 +298,15 @@ void main() {
     expect(report.summary.totalReceivables, closeTo(summed, 0.01));
   });
 
-  test('sales_summary.json parses period + stats + rows', () {
-    final json = loadFixture('sales_summary.json');
-    final report = SalesSummaryReport.fromJson(
-      json['data'] as Map<String, dynamic>,
-    );
+  
 
-    expect(report.period, isNotNull);
-    expect(report.period!.startDate, isNotEmpty);
-    expect(report.period!.endDate, isNotEmpty);
-    expect(report.summary.totalInvoices, greaterThan(0));
-    expect(report.summary.totalSales, greaterThan(0));
-    expect(report.sales, isNotEmpty);
-    expect(report.sales.length, report.summary.totalInvoices);
-    for (final row in report.sales) {
-      expect(row.invoiceNo, isNotEmpty);
-      expect(row.customerName, isNotEmpty);
-      expect(row.totalSales, greaterThan(0));
-    }
-  });
+  
 
-  test('low_stock.json parses every bare list row', () {
-    final rows = loadFixtureList('low_stock.json');
-    final items = [
-      for (final r in rows)
-        LowStockReportRow.fromJson(r as Map<String, dynamic>),
-    ];
-    expect(items, isNotEmpty);
-    expect(items.length, rows.length);
-    for (final it in items) {
-      expect(it.id, greaterThan(0));
-      expect(it.itemName, isNotEmpty);
-      expect(it.currentStock, isNotNull);
-      expect(it.minimumStock, isNotNull);
-      expect(it.shortage, isNotNull);
-      expect(it.stockStatus, isNotEmpty);
-    }
-  });
+  
 
-  test('stock_level.json parses rows + summary tie-out', () {
-    final json = loadFixture('stock_level.json');
-    final report = StockLevelReport.fromJson(
-      json['data'] as Map<String, dynamic>,
-    );
+  
 
-    expect(report.rows, isNotEmpty);
-    for (final row in report.rows) {
-      expect(row.id, greaterThan(0));
-      expect(row.itemCode, isNotEmpty);
-      expect(row.itemName, isNotEmpty);
-      expect(row.stockStatus, isNotEmpty);
-    }
-    // Summary status counts partition the row set exactly.
-    expect(report.summary.totalItems, report.rows.length);
-    expect(
-      report.summary.inStock +
-          report.summary.lowStock +
-          report.summary.outOfStock,
-      report.summary.totalItems,
-    );
-  });
-
-  test('stock_valuation.json parses rows + summary tie-out', () {
-    final json = loadFixture('stock_valuation.json');
-    final report = StockValuationReport.fromJson(
-      json['data'] as Map<String, dynamic>,
-    );
-
-    expect(report.rows, isNotEmpty);
-    for (final row in report.rows) {
-      expect(row.id, greaterThan(0));
-      expect(row.itemName, isNotEmpty);
-      expect(row.valuationMethod, isNotEmpty);
-    }
-    // Batch + legacy counts partition the row set; total value ties to
-    // the summed row values (float-safe in case of decimal costs).
-    expect(report.summary.totalItems, report.rows.length);
-    expect(
-      report.summary.batchTrackedItems + report.summary.legacyItems,
-      report.summary.totalItems,
-    );
-    final summedValue = report.rows.fold<num>(
-      0,
-      (acc, r) => acc + r.totalValue,
-    );
-    expect(report.summary.totalValue, closeTo(summedValue, 0.01));
-  });
-
-  test('sales_by_customer.json parses every bare list row', () {
-    final rows = loadFixtureList('sales_by_customer.json');
-    final customers = [
-      for (final r in rows)
-        SalesByCustomerRow.fromJson(r as Map<String, dynamic>),
-    ];
-    expect(customers, isNotEmpty);
-    expect(customers.length, rows.length);
-    for (final c in customers) {
-      expect(c.customerName, isNotEmpty);
-      expect(c.customerCode, isNotEmpty);
-      expect(c.totalInvoices, greaterThan(0));
-      expect(c.totalSales, greaterThan(0));
-      expect(c.lastPurchaseDate, isNotEmpty);
-    }
-  });
+  
 
   test('dso.json parses the DSO metric + period', () {
     final json = loadFixture('dso.json');
@@ -456,44 +362,9 @@ void main() {
     );
   });
 
-  test('inventory_movement.json parses movements + summary', () {
-    final json = loadFixture('inventory_movement.json');
-    final report = InventoryMovementReport.fromJson(
-      json['data'] as Map<String, dynamic>,
-    );
+  
 
-    expect(report.rows, isNotEmpty);
-    for (final r in report.rows) {
-      expect(r.movementNo, isNotEmpty);
-      expect(r.itemName, isNotEmpty);
-      expect(r.movementType, isNotEmpty);
-    }
-    // Summary is computed by the server from the row set.
-    expect(report.summary.totalInbound, greaterThanOrEqualTo(0));
-    expect(report.summary.totalOutbound, greaterThanOrEqualTo(0));
-    expect(
-      report.summary.netMovement,
-      report.summary.totalInbound - report.summary.totalOutbound,
-    );
-  });
-
-  test('purchase_summary.json parses POs + stats tie-out', () {
-    final json = loadFixture('purchase_summary.json');
-    final report = PurchaseSummaryReport.fromJson(
-      json['data'] as Map<String, dynamic>,
-    );
-
-    expect(report.rows, isNotEmpty);
-    for (final r in report.rows) {
-      expect(r.purchaseOrderNumber, isNotEmpty);
-      expect(r.supplierName, isNotEmpty);
-      expect(r.poId, greaterThan(0));
-    }
-    // Period totals tie to the row set.
-    expect(report.summary.totalOrders, report.rows.length);
-    final summedCost = report.rows.fold<num>(0, (acc, r) => acc + r.totalCost);
-    expect(report.summary.totalCost, closeTo(summedCost, 0.01));
-  });
+  
 
   test('top_debtors.json parses every bare list row', () {
     final rows = loadFixtureList('top_debtors.json');

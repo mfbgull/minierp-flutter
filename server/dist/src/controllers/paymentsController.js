@@ -64,7 +64,7 @@ function getPayment(req, res) {
 }
 function createPayment(req, res) {
     try {
-        const { customer_id, supplier_id, payment_date, amount, payment_method, reference_no, notes, invoice_allocations, po_allocations } = req.body;
+        const { customer_id, supplier_id, payment_date, amount, payment_method, reference_no, notes, invoice_allocations, po_allocations, purchase_allocations } = req.body;
         if ((!customer_id && !supplier_id) || !payment_date || !amount || amount <= 0) {
             res.status(400).json({ success: false, error: 'Customer ID or Supplier ID, payment date, and amount are required' });
             return;
@@ -124,8 +124,10 @@ function createPayment(req, res) {
         }
         if (supplier_id) {
             const parsedSupplierId = parseInt(supplier_id, 10);
-            if (!po_allocations || !Array.isArray(po_allocations) || po_allocations.length === 0) {
-                res.status(400).json({ success: false, error: 'At least one PO allocation is required for supplier payments' });
+            const hasPoAllocs = po_allocations && Array.isArray(po_allocations) && po_allocations.length > 0;
+            const hasPurchaseAllocs = purchase_allocations && Array.isArray(purchase_allocations) && purchase_allocations.length > 0;
+            if (!hasPoAllocs && !hasPurchaseAllocs) {
+                res.status(400).json({ success: false, error: 'At least one PO or purchase allocation is required for supplier payments' });
                 return;
             }
             if (!Supplier_1.default.getById(parsedSupplierId, database_1.default)) {
@@ -139,11 +141,12 @@ function createPayment(req, res) {
                 payment_method,
                 reference_no,
                 notes,
-                po_allocations,
+                po_allocations: hasPoAllocs ? po_allocations : [],
+                purchase_allocations: hasPurchaseAllocs ? purchase_allocations : [],
                 userId: req.user.id,
             });
             const supplier = Supplier_1.default.getById(parsedSupplierId, database_1.default);
-            (0, activityLogger_1.logCRUD)(activityLogger_1.ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created supplier payment - $${parsedAmount} to ${supplier?.supplier_name || 'Unknown'}`, req.user.id, { supplier_id: parsedSupplierId, amount: parsedAmount, payment_method, po_allocations: po_allocations.length });
+            (0, activityLogger_1.logCRUD)(activityLogger_1.ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created supplier payment - $${parsedAmount} to ${supplier?.supplier_name || 'Unknown'}`, req.user.id, { supplier_id: parsedSupplierId, amount: parsedAmount, payment_method, allocation_count: (po_allocations || []).length + (purchase_allocations || []).length });
             req.activityLogged = true;
             res.status(201).json({ success: true, data: Payment_1.default.getById(database_1.default, paymentId) });
             return;
@@ -257,13 +260,21 @@ function getPaymentReceipt(req, res) {
             entityEmail = supplier.entity_email || '';
             currentBalance = (0, currency_1.parseCurrency)(supplier.current_balance);
             previousBalance = (0, currency_1.parseCurrency)(currentBalance + (0, currency_1.parseCurrency)(payment.amount));
-            allocations = database_1.default.prepare(`
+            const poRows = database_1.default.prepare(`
         SELECT pa.po_id as invoice_id, po.po_no as invoice_no, pa.amount
         FROM po_allocations pa
         LEFT JOIN purchase_orders po ON pa.po_id = po.id
         WHERE pa.payment_id = ?
         ORDER BY pa.id
       `).all(id);
+            const purchaseRows = database_1.default.prepare(`
+        SELECT pa.purchase_id as invoice_id, p.purchase_no as invoice_no, pa.amount
+        FROM purchase_allocations pa
+        LEFT JOIN purchases p ON pa.purchase_id = p.id
+        WHERE pa.payment_id = ?
+        ORDER BY pa.id
+      `).all(id);
+            allocations = [...poRows, ...purchaseRows];
         }
         const amount = (0, currency_1.parseCurrency)(payment.amount);
         const settingsRows = database_1.default.prepare("SELECT key, value FROM settings WHERE key IN ('company_name','company_address','company_phone','company_email','company_tax_id')").all();

@@ -23,9 +23,19 @@ function getDashboard(req: Request, res: Response): void {
 
 function getDemand(req: Request, res: Response): void {
   try {
-    const { category, trend, recommendation, modelType } = req.query;
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const { category, trend, recommendation, modelType, search } = req.query;
     let forecasts = generateAllForecasts();
 
+    if (search) {
+      const term = String(search).toLowerCase();
+      forecasts = forecasts.filter(
+        f =>
+          f.itemCode.toLowerCase().includes(term) ||
+          f.itemName.toLowerCase().includes(term)
+      );
+    }
     if (category) {
       forecasts = forecasts.filter(f => f.category === category);
     }
@@ -39,7 +49,26 @@ function getDemand(req: Request, res: Response): void {
       forecasts = forecasts.filter(f => f.modelType === modelType);
     }
 
-    res.json({ success: true, data: forecasts });
+    // Filter-then-slice: the forecast list is generated in memory, so
+    // paging happens in JS after the filters narrow it.
+    const total = forecasts.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const start = (page - 1) * limit;
+    const rows = forecasts.slice(start, start + limit);
+
+    // Flat envelope (data = list, pagination a sibling) — the shape the
+    // client's `getPaged` helper parses.
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: total,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+      }
+    });
   } catch (error) {
     logger.error('Forecast demand error:', error);
     res.status(500).json({ error: 'Failed to fetch demand forecasts' });

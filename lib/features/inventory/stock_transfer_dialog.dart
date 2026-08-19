@@ -28,7 +28,7 @@ import '../../widgets/form_helpers.dart'
 import '../../widgets/searchable_select.dart';
 import 'inventory_providers.dart'
     show
-        itemsProvider,
+        allItemsProvider,
         movementTypeFilterProvider,
         stockBalancesProvider,
         stockMovementsProvider,
@@ -160,7 +160,7 @@ class _StockTransferDialogState extends ConsumerState<_StockTransferDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final items = ref.watch(itemsProvider).valueOrNull ?? const [];
+    final items = ref.watch(allItemsProvider).valueOrNull ?? const [];
     final warehouses = ref.watch(warehousesProvider).valueOrNull ?? const [];
 
     String warehouseLabel(int id) {

@@ -4,14 +4,38 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.toggleBOMActive = exports.deleteBOM = exports.updateBOM = exports.createBOM = exports.getBOMsByFinishedItem = exports.getBOMById = exports.getAllBOMs = void 0;
+const queryUtils_1 = require("../utils/queryUtils");
 const BOM_1 = __importDefault(require("../models/BOM"));
 const activityLogger_1 = require("../services/activityLogger");
 const database_1 = __importDefault(require("../config/database"));
 const logger_1 = __importDefault(require("../utils/logger"));
 const getAllBOMs = (req, res, next) => {
     try {
-        const boms = BOM_1.default.getAll(database_1.default);
-        res.json(boms);
+        const page = (0, queryUtils_1.getQueryInteger)(req.query.page, 1);
+        const limit = (0, queryUtils_1.getQueryInteger)(req.query.limit, 10);
+        const search = (0, queryUtils_1.getQueryParam)(req.query.search);
+        const sortBy = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
+        const sortOrder = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
+        const { rows, total, pageNum, limitNum } = BOM_1.default.getAll({
+            search: search || undefined,
+            sortBy: sortBy || undefined,
+            sortOrder: sortOrder || undefined,
+            page,
+            limit
+        }, database_1.default);
+        // Flat envelope (data = list, pagination a sibling) — the shape the
+        // client's `getPaged` helper parses.
+        res.json({
+            success: true,
+            data: rows,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: Math.ceil(total / limitNum),
+                totalItems: total,
+                hasNext: pageNum < Math.ceil(total / limitNum),
+                hasPrev: pageNum > 1
+            }
+        });
     }
     catch (error) {
         next(error);

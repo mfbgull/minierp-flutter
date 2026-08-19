@@ -1,10 +1,10 @@
 // Purchase orders list screen — a read-only grid over `GET
-// /purchase-orders` (**bare array**; no search/page params, so sorting and
-// filtering stay client-side like the items screen). Rendered with
-// PlutoGrid via the shared [PlutoGridScreen] mixin: F2/Enter + double-tap
-// open the PO detail, and the keyboard-hint status bar sits beneath the
-// grid. Sits at the shell branch `/purchasing` (the web app hosts the PO
-// tab inside the purchasing module).
+// /purchase-orders` (**server-paginated**; search and sorting happen
+// server-side, grid-pagination §6 — the endpoint returns a `pagination`
+// block). Rendered with PlutoGrid via the shared [PlutoGridScreen]
+// mixin: F2/Enter + double-tap open the PO detail, and the
+// [ServerPaginationBar] sits beneath the grid. Sits at the shell branch
+// `/purchasing`.
 
 import 'dart:async';
 
@@ -16,10 +16,14 @@ import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/po_status.dart';
 import '../../data/models/purchase_order.dart' show PurchaseOrder;
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
+import '../../features/purchases/purchase_return_form_dialog.dart'
+    show ReturnSource, showPurchaseReturnFormDialog;
 import 'purchase_order_detail_dialog.dart';
 import 'purchase_order_form_dialog.dart';
 import 'purchase_order_providers.dart';
@@ -37,6 +41,11 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
 
+  /// Row id → model for the row-menu return action — the grid rows are
+  /// built from the page models, so the menu can pre-seed the return
+  /// form with the exact PO (its number + warehouse).
+  final Map<int, PurchaseOrder> _ordersById = {};
+
   @override
   void dispose() {
     _debounce?.cancel();
@@ -49,39 +58,48 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       ref.read(purchaseOrdersSearchProvider.notifier).state = value.trim();
+      // A new search starts back at page 1.
+      if (ref.read(purchaseOrdersPageProvider) != 1) {
+        ref.read(purchaseOrdersPageProvider.notifier).state = 1;
+      }
     });
   }
 
-  /// Client-side search over the loaded rows (the endpoint has no search
-  /// param) — overrides the mixin's unfiltered clear+append.
-  List<PurchaseOrder> _filteredRows(List<PurchaseOrder> orders) {
-    final search = ref.read(purchaseOrdersSearchProvider).toLowerCase();
-    if (search.isEmpty) return orders;
-    return orders
-        .where(
-          (po) =>
-              po.poNo.toLowerCase().contains(search) ||
-              po.supplierName.toLowerCase().contains(search),
-        )
-        .toList();
-  }
-
+  /// The purchase-orders provider returns a `PagedResponse` envelope —
+  /// unwrap the current page's items as the grid rows.
   @override
-  void syncGridRows(AsyncValue<Object?> value) {
-    final manager = gridStateManager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      final rows = _filteredRows(value.value as List<PurchaseOrder>);
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, row) in rows.indexed)
-          withSerialCell(gridRowFor(row), index),
-      ]);
+  Iterable<PurchaseOrder> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<PurchaseOrder>).items;
+
+  /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
+  String? _sortColumnFor(String field) => switch (field) {
+    'poNo' => 'po_no',
+    'date' => 'po_date',
+    'supplier' => 'supplier_name',
+    'status' => 'status',
+    'total' => 'total_amount',
+    'balance' => 'balance_amount',
+    'expected' => 'expected_delivery_date',
+    _ => null,
+  };
+
+  /// Column sort maps to the server-side sort provider (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    ref.read(purchaseOrdersSortProvider.notifier).state = sort.isNone
+        ? null
+        : PurchaseOrderSort(
+            sortBy,
+            sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC',
+          );
+    if (ref.read(purchaseOrdersPageProvider) != 1) {
+      ref.read(purchaseOrdersPageProvider.notifier).state = 1;
     }
   }
-
-  void _refilter() => syncGridRows(ref.read(purchaseOrdersProvider));
 
   @override
   void openRowDetail(int poId) {
@@ -89,7 +107,9 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
     showPurchaseOrderDetailDialog(context, poId: poId);
   }
 
-  /// Opt into the per-row ⋮ actions menu (View detail).
+  /// Opt into the per-row ⋮ actions menu (View detail + Process Return —
+  /// the latter opens the return entry form pre-seeded with this PO; the
+  /// form loads the PO detail and shows only received lines).
   @override
   bool get hasRowActions => true;
 
@@ -98,17 +118,33 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
     final id = row.cells['id']?.value as int?;
     if (id == null || id <= 0) return null;
     final l10n = AppLocalizations.of(context)!;
+    final po = _ordersById[id];
     return [
       GridRowAction(
         icon: Icons.visibility_outlined,
         label: l10n.commonView,
         onTap: () => showPurchaseOrderDetailDialog(context, poId: id),
       ),
+      if (po != null && po.status != 'Draft')
+        GridRowAction(
+          icon: Icons.assignment_return_outlined,
+          label: l10n.purchasesProcessreturn,
+          onTap: () => showPurchaseReturnFormDialog(
+            context,
+            source: ReturnSource.purchaseOrder(
+              id: po.id,
+              no: po.poNo,
+              warehouseId: po.warehouseId,
+            ),
+          ),
+        ),
     ];
   }
 
   @override
-  PlutoRow gridRowFor(PurchaseOrder po) => PlutoRow(
+  PlutoRow gridRowFor(PurchaseOrder po) {
+    _ordersById[po.id] = po;
+    return PlutoRow(
     cells: {
       'id': PlutoCell(value: po.id),
       'poNo': PlutoCell(value: po.poNo),
@@ -116,22 +152,25 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
       'supplier': PlutoCell(value: po.supplierName),
       'status': PlutoCell(value: po.status),
       'total': PlutoCell(value: po.totalAmount),
+      'balance': PlutoCell(value: po.balanceAmount),
       'expected': PlutoCell(value: po.expectedDeliveryDate ?? ''),
     },
-  );
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final orders = ref.watch(purchaseOrdersProvider);
     final l10n = AppLocalizations.of(context)!;
+    // The full filtered list feeds the CSV export.
+    final filtered = ref.watch(filteredPurchaseOrdersProvider);
 
     // Keep the grid in sync with provider transitions (loading → data).
-    // The mixin listener routes through the overridden syncGridRows, so
-    // the client-side search applies on every load/refresh too.
+    // The mixin listener routes through the default syncGridRows, which
+    // unwraps the PagedResponse via gridRowsFrom.
     watchGridProvider(purchaseOrdersProvider);
-    // Client-side search re-runs the filter over the loaded rows without
-    // refetching.
-    ref.listen(purchaseOrdersSearchProvider, (previous, next) => _refilter());
+
+    final filteredRows = filtered.valueOrNull ?? const <PurchaseOrder>[];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -147,16 +186,12 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
             // pure builder runs over the currently-filtered rows and
             // the shared save helper owns the FilePicker + toast.
             TextButton.icon(
-              onPressed: orders.isLoading ||
-                      _filteredRows(orders.valueOrNull ?? const []).isEmpty
+              onPressed: orders.isLoading || filteredRows.isEmpty
                   ? null
                   : () => saveCsv(
                       context,
                       suggestedName: csvSuggestedName('purchase-orders'),
-                      csv: buildPurchaseOrdersCsv(
-                        l10n,
-                        _filteredRows(orders.valueOrNull ?? const []),
-                      ),
+                      csv: buildPurchaseOrdersCsv(l10n, filteredRows),
                       successMessage: l10n.purchaseordersExported,
                       errorMessage: l10n.purchaseordersExportfailed,
                     ),
@@ -175,6 +210,25 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
         Expanded(
           child: gridScreenBody(orders, provider: purchaseOrdersProvider),
         ),
+        if (orders.valueOrNull case final page?)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(purchaseOrdersLimitProvider),
+            itemLabel: l10n.purchaseordersPurchaseorders,
+            onPageChanged: (p) =>
+                ref.read(purchaseOrdersPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(purchaseOrdersLimitProvider.notifier).state = limit;
+              if (ref.read(purchaseOrdersPageProvider) != 1) {
+                ref.read(purchaseOrdersPageProvider.notifier).state = 1;
+              }
+            },
+          ),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -271,6 +325,35 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
         renderer: (ctx) => Align(
           alignment: Alignment.centerRight,
           child: Text(Formatters.currency(ctx.cell.value as num? ?? 0)),
+        ),
+      ),
+      PlutoColumn(
+        title: l10n.purchaseordersBalance,
+        field: 'balance',
+        type: PlutoColumnType.number(format: '#,###.00'),
+        width: 110,
+        readOnly: true,
+        textAlign: PlutoColumnTextAlign.end,
+        titleTextAlign: PlutoColumnTextAlign.end,
+        enableContextMenu: false,
+        renderer: (ctx) => Builder(
+          builder: (cellContext) {
+            final scheme = Theme.of(cellContext).colorScheme;
+            final balance = ctx.cell.value as num? ?? 0;
+            return Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                Formatters.currency(balance),
+                style: Theme.of(cellContext).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  // Outstanding → error tone; fully paid → green.
+                  color: balance > 0
+                      ? scheme.error
+                      : const Color(0xff16a34a),
+                ),
+              ),
+            );
+          },
         ),
       ),
       PlutoColumn(

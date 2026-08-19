@@ -13,6 +13,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
 import '../../widgets/detail_tab_grid.dart';
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/status_badge.dart';
 import '../purchase_orders/purchase_order_detail_dialog.dart'
     show showPurchaseOrderDetailDialog;
@@ -30,24 +31,85 @@ class SupplierPosTab extends ConsumerStatefulWidget {
 }
 
 class _SupplierPosTabState extends ConsumerState<SupplierPosTab> {
+  /// Current page / per-page size for the server-side pagination.
+  int _page = 1;
+  int _limit = 10;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final pos = ref.watch(supplierPurchaseOrdersProvider(widget.supplierId));
+    final pos = ref.watch(
+      supplierPurchaseOrdersPagedProvider(
+        SupplierPurchaseOrdersArgs(
+          supplierId: widget.supplierId,
+          page: _page,
+          limit: _limit,
+        ),
+      ),
+    );
+
+    // After a status change / deletion the current page can fall past the
+    // last page — clamp back so the tab doesn't strand the user on an
+    // empty page.
+    ref.listen(
+      supplierPurchaseOrdersPagedProvider(
+        SupplierPurchaseOrdersArgs(
+          supplierId: widget.supplierId,
+          page: _page,
+          limit: _limit,
+        ),
+      ),
+      (previous, next) {
+        final value = next.valueOrNull;
+        if (value == null || value.items.isNotEmpty) return;
+        if (value.totalPages > 0 && _page > value.totalPages) {
+          setState(() => _page = value.totalPages);
+        }
+      },
+    );
 
     return switch (pos) {
-      AsyncData(:final value) => value.isEmpty
+      AsyncData(:final value) => value.items.isEmpty
           ? _empty(context, l10n.suppliersNopos)
-          : DetailTabGrid<PurchaseOrder>(
-              data: value,
-              buildColumns: (l10n) => _columns(context, l10n),
-              gridRowFor: _gridRowFor,
-              hiddenFields: const ['data'],
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: DetailTabGrid<PurchaseOrder>(
+                    data: value.items,
+                    buildColumns: (l10n) => _columns(context, l10n),
+                    gridRowFor: _gridRowFor,
+                    hiddenFields: const ['data'],
+                  ),
+                ),
+                ServerPaginationBar(
+                  page: value.currentPage,
+                  totalPages: value.totalPages,
+                  totalItems: value.totalItems,
+                  hasNext: value.hasNext,
+                  hasPrev: value.hasPrev,
+                  limit: _limit,
+                  itemLabel: l10n.purchaseordersPurchaseorders,
+                  onPageChanged: (p) => setState(() => _page = p),
+                  onLimitChanged: (limit) => setState(() {
+                    _limit = limit;
+                    _page = 1;
+                  }),
+                ),
+                const SizedBox(height: 12),
+              ],
             ),
       AsyncError(:final error) => DetailError(
         message: error is ApiError ? error.message : '$error',
-        onRetry: () =>
-            ref.invalidate(supplierPurchaseOrdersProvider(widget.supplierId)),
+        onRetry: () => ref.invalidate(
+          supplierPurchaseOrdersPagedProvider(
+            SupplierPurchaseOrdersArgs(
+              supplierId: widget.supplierId,
+              page: _page,
+              limit: _limit,
+            ),
+          ),
+        ),
       ),
       _ => const Center(child: CircularProgressIndicator()),
     };
@@ -166,6 +228,8 @@ class _SupplierPosTabState extends ConsumerState<SupplierPosTab> {
       PlutoColumn(
         title: l10n.suppliersActions,
         field: 'actions',
+        // Pinned to the right edge — stays reachable when the grid scrolls.
+        frozen: PlutoColumnFrozen.end,
         type: PlutoColumnType.text(),
         width: 64,
         readOnly: true,

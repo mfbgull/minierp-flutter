@@ -315,6 +315,25 @@ Update invoice. Reverses old stock movements and creates new ones.
 ### GET /invoices/:id/payments
 Get all payments allocated to an invoice.
 
+### POST /invoices/:id/return
+Process a customer return — reverses the sale's stock (restocked into the
+`warehouse_id` when provided, otherwise the warehouse the sale was dispatched
+from), posts the GL/ledger reversal and applies the disposition.
+
+```json
+{
+  "reason": "Damaged goods",
+  "disposition": "credit",        // "refund" | "credit" | "adjust"
+  "warehouse_id": 1,              // optional restock target
+  "items": [
+    { "invoice_item_id": 10, "return_quantity": 2 }
+  ]
+}
+```
+
+### GET /invoices/returns
+List invoice-return history (paginated).
+
 ---
 
 ## Payments
@@ -326,7 +345,12 @@ List payments (paginated, sortable, searchable).
 Get single payment with allocations.
 
 ### POST /payments
-Create payment with invoice allocations.
+Create payment with allocations. Customer payments allocate across
+`invoice_allocations`; supplier payments allocate across
+`po_allocations` (purchase orders) and/or `purchase_allocations`
+(direct purchases) — a supplier payment must carry at least one
+allocation of either kind, and each line amount is validated against
+that document's remaining balance.
 
 ```json
 {
@@ -338,6 +362,20 @@ Create payment with invoice allocations.
   "invoice_allocations": [
     { "invoice_id": 1, "amount": 300 },
     { "invoice_id": 2, "amount": 200 }
+  ]
+}
+```
+
+Supplier payment against a direct purchase:
+
+```json
+{
+  "supplier_id": 3,
+  "payment_date": "2026-08-06",
+  "amount": 250,
+  "payment_method": "Cash",
+  "purchase_allocations": [
+    { "purchase_id": 12, "amount": 250 }
   ]
 }
 ```
@@ -359,6 +397,7 @@ Allocate an existing payment to invoices.
 |---|---|---|
 | GET | /purchase-orders | List purchase orders |
 | GET | /purchase-orders/:id | Get PO with items |
+| GET | /purchase-orders/:id/payments | Get payments allocated to the PO |
 | POST | /purchase-orders | Create PO |
 | PUT | /purchase-orders/:id | Update PO |
 | DELETE | /purchase-orders/:id | Delete PO |
@@ -379,10 +418,77 @@ Allocate an existing payment to invoices.
 | POST | /purchases | Record a direct purchase |
 | GET | /purchases | List purchases |
 | GET | /purchases/:id | Get single purchase |
+| GET | /purchases/:id/payments | Get payments allocated to the purchase |
 | DELETE | /purchases/:id | Delete purchase |
 | GET | /purchases/summary/item/:item_id | Purchase summary by item |
 | GET | /purchases/summary/daterange | Purchase summary by date range |
 | GET | /purchases/top-suppliers | Top suppliers report |
+
+`POST /purchases` accepts an optional `supplier_id` — when provided the
+server resolves the supplier name, links the purchase, and posts the AP
+supplier-ledger entry (debit) so the purchase can be paid via
+`POST /payments` with `purchase_allocations`. `invoice_no` / `remarks`
+are also accepted.
+
+```json
+{
+  "item_id": 4,
+  "warehouse_id": 1,
+  "quantity": 10,
+  "unit_cost": 25,
+  "purchase_date": "2026-08-06",
+  "supplier_id": 3,
+  "invoice_no": "SUP-2026-881",
+  "remarks": "Rush order"
+}
+```
+
+`GET /purchases/:id/payments` returns the payment history for one
+purchase (`payment_no`, `payment_date`, `payment_method`, `reference_no`,
+`notes`, per-purchase `amount`) — the same row shape as the invoice
+payments endpoint. `GET /purchase-orders/:id/payments` is the PO
+analogue (`po_allocations`).
+
+Both `GET /purchases` and `GET /purchases/:id` rows also carry
+`paid_amount` / `balance_amount` (allocated from `purchase_allocations`),
+and the list accepts `sortBy=paid_amount` / `balance_amount`.
+
+---
+
+## Purchase Returns
+
+First-class purchase return documents (`purchase_returns` header + lines) with
+full reversal on void. A return reduces stock from the **source document's
+warehouse** (the form never asks). The old `POST /purchases/:id/return`,
+`POST /purchase-orders/:id/return-receipt` and `GET /purchases/returns`
+endpoints were removed with the redesign.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | /purchase-returns | List return headers (paginated; `search`, `status`, `start_date`, `end_date`, `type`, `warehouse_id`) |
+| GET | /purchase-returns/:id | Get one return (header + items) |
+| POST | /purchase-returns | Create a return |
+| POST | /purchase-returns/:id/void | Void a return (full reversal: stock, GL, credit note) |
+
+`POST /purchase-returns` body — `source_type` is `PURCHASE` (a direct
+purchase) or `PURCHASE_ORDER`; each line's `source_item_id` is the source
+line id (`purchases.id` or `purchase_order_items.id`).
+
+```json
+{
+  "return_date": "2026-08-05",
+  "source_type": "PURCHASE",
+  "source_id": 12,
+  "warehouse_id": 1,
+  "reason": "Damaged on delivery",
+  "items": [
+    { "source_item_id": 12, "quantity": 4 }
+  ]
+}
+```
+
+`POST /purchase-returns/:id/void` body: `{ "reason": "..." }` (optional). The
+server rejects (400) returns that are not `POSTED`.
 
 ---
 

@@ -1,9 +1,10 @@
 // Production + BOM repository — typed against the server controllers
 // (`productionController.ts` / `bomController.ts`, PORTING.md §2).
 //
-// Envelope variants on the server — note BOMs and productions are
-// **bare** (no `{success, data}` envelope):
-// - `GET /boms` → bare `[Bom]`
+// Envelope variants on the server — list endpoints are **paged** (the
+// flat `{success, data, pagination}` envelope from grid-pagination §7),
+// details/writes stay **bare**:
+// - `GET /boms` → paged `{ data: [Bom], pagination }` (search + sort)
 // - `GET /boms/:id` → bare `BomDetail` (includes `items`)
 // - `GET /boms/by-item/:itemId` → bare `[Bom]` (active only)
 // - `POST /boms` → bare `BomDetail` (201)
@@ -11,7 +12,8 @@
 // - `PATCH /boms/:id/toggle-active` → bare `BomDetail`
 // - `DELETE /boms/:id` → bare `{ message }` (rejects when the BOM is
 //   referenced by productions)
-// - `GET /productions` → bare `[Production]` (filters below)
+// - `GET /productions` → paged `{ data: [Production], pagination }`
+//   (search + sort; existing filters preserved)
 // - `GET /productions/:id` → bare `Production` (includes `inputs`)
 // - `POST /productions` → bare `Production` (201)
 // - `GET /productions/summary/item/:itemId` → bare `{...}`
@@ -24,32 +26,8 @@ import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/bom.dart';
 import '../models/production.dart';
 import 'api_result.dart';
+import 'paged_request.dart' show PagedRequest, PagedResponse;
 import 'repository_client.dart';
-
-/// Filters for `GET /productions` (all optional server-side).
-class ProductionFilters {
-  const ProductionFilters({
-    this.startDate,
-    this.endDate,
-    this.outputItemId,
-    this.warehouseId,
-    this.limit,
-  });
-
-  final String? startDate;
-  final String? endDate;
-  final int? outputItemId;
-  final int? warehouseId;
-  final int? limit;
-
-  Map<String, dynamic> toQuery() => {
-    if (startDate != null) 'start_date': startDate,
-    if (endDate != null) 'end_date': endDate,
-    if (outputItemId != null) 'output_item_id': outputItemId,
-    if (warehouseId != null) 'warehouse_id': warehouseId,
-    if (limit != null) 'limit': limit,
-  };
-}
 
 class ProductionRepository {
   ProductionRepository(this._api);
@@ -58,10 +36,15 @@ class ProductionRepository {
 
   // ---- BOMs ----
 
-  Future<ApiResult<List<Bom>>> boms() => _api.getRawList(
-    ApiEndpoints.boms,
-    parseItem: (Object? json) => Bom.fromJson(json as Map<String, dynamic>),
-  );
+  /// One page of BOMs — `GET /boms` now returns the flat paged envelope
+  /// (grid-pagination §7.2, with `search` + sort).
+  Future<ApiResult<PagedResponse<Bom>>> bomsPaged(PagedRequest request) =>
+      _api.getPaged(
+        ApiEndpoints.boms,
+        queryParameters: request.toQuery(),
+        parseItem: (Object? json) =>
+            Bom.fromJson(json as Map<String, dynamic>),
+      );
 
   Future<ApiResult<BomDetail>> bom(int id) => _api.getRaw(
     '${ApiEndpoints.boms}/$id',
@@ -108,11 +91,13 @@ class ProductionRepository {
             Production.fromJson(json as Map<String, dynamic>),
       );
 
-  Future<ApiResult<List<Production>>> productions([
-    ProductionFilters filters = const ProductionFilters(),
-  ]) => _api.getRawList(
+  /// One page of productions — `GET /productions` now returns the flat
+  /// paged envelope (grid-pagination §7.1, with `search` + sort).
+  Future<ApiResult<PagedResponse<Production>>> productionsPaged(
+    PagedRequest request,
+  ) => _api.getPaged(
     ApiEndpoints.productions,
-    queryParameters: filters.toQuery(),
+    queryParameters: request.toQuery(),
     parseItem: (Object? json) =>
         Production.fromJson(json as Map<String, dynamic>),
   );

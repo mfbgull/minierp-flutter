@@ -62,7 +62,7 @@ function getPayment(req: Request, res: Response): void {
 
 function createPayment(req: AuthRequest, res: Response): void {
   try {
-    const { customer_id, supplier_id, payment_date, amount, payment_method, reference_no, notes, invoice_allocations, po_allocations } = req.body;
+    const { customer_id, supplier_id, payment_date, amount, payment_method, reference_no, notes, invoice_allocations, po_allocations, purchase_allocations } = req.body;
 
     if ((!customer_id && !supplier_id) || !payment_date || !amount || amount <= 0) {
       res.status(400).json({ success: false, error: 'Customer ID or Supplier ID, payment date, and amount are required' });
@@ -136,8 +136,10 @@ function createPayment(req: AuthRequest, res: Response): void {
 
     if (supplier_id) {
       const parsedSupplierId = parseInt(supplier_id, 10);
-      if (!po_allocations || !Array.isArray(po_allocations) || po_allocations.length === 0) {
-        res.status(400).json({ success: false, error: 'At least one PO allocation is required for supplier payments' });
+      const hasPoAllocs = po_allocations && Array.isArray(po_allocations) && po_allocations.length > 0;
+      const hasPurchaseAllocs = purchase_allocations && Array.isArray(purchase_allocations) && purchase_allocations.length > 0;
+      if (!hasPoAllocs && !hasPurchaseAllocs) {
+        res.status(400).json({ success: false, error: 'At least one PO or purchase allocation is required for supplier payments' });
         return;
       }
 
@@ -153,12 +155,13 @@ function createPayment(req: AuthRequest, res: Response): void {
         payment_method,
         reference_no,
         notes,
-        po_allocations,
+        po_allocations: hasPoAllocs ? po_allocations : [],
+        purchase_allocations: hasPurchaseAllocs ? purchase_allocations : [],
         userId: req.user!.id,
       });
 
       const supplier = SupplierModel.getById(parsedSupplierId, db);
-      logCRUD(ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created supplier payment - $${parsedAmount} to ${supplier?.supplier_name || 'Unknown'}`, req.user!.id, { supplier_id: parsedSupplierId, amount: parsedAmount, payment_method, po_allocations: po_allocations.length });
+      logCRUD(ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created supplier payment - $${parsedAmount} to ${supplier?.supplier_name || 'Unknown'}`, req.user!.id, { supplier_id: parsedSupplierId, amount: parsedAmount, payment_method, allocation_count: (po_allocations || []).length + (purchase_allocations || []).length });
       req.activityLogged = true;
 
       res.status(201).json({ success: true, data: PaymentModel.getById(db, paymentId) });
@@ -273,13 +276,21 @@ function getPaymentReceipt(req: Request, res: Response): void {
       currentBalance = parseCurrency(supplier.current_balance);
       previousBalance = parseCurrency(currentBalance + parseCurrency(payment.amount));
 
-      allocations = db.prepare(`
+      const poRows = db.prepare(`
         SELECT pa.po_id as invoice_id, po.po_no as invoice_no, pa.amount
         FROM po_allocations pa
         LEFT JOIN purchase_orders po ON pa.po_id = po.id
         WHERE pa.payment_id = ?
         ORDER BY pa.id
       `).all(id) as { invoice_id: number; invoice_no: string; amount: number }[];
+      const purchaseRows = db.prepare(`
+        SELECT pa.purchase_id as invoice_id, p.purchase_no as invoice_no, pa.amount
+        FROM purchase_allocations pa
+        LEFT JOIN purchases p ON pa.purchase_id = p.id
+        WHERE pa.payment_id = ?
+        ORDER BY pa.id
+      `).all(id) as { invoice_id: number; invoice_no: string; amount: number }[];
+      allocations = [...poRows, ...purchaseRows];
     }
 
     const amount = parseCurrency(payment.amount);

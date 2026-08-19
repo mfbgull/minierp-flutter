@@ -3,9 +3,9 @@
 // suppliers, purchase orders, …) wires the same plumbing: a
 // `PlutoGridStateManager` fed by clear+append from a Riverpod provider,
 // localized columns built once, F2/Enter/double-tap opening the row's
-// detail via `rowDetailShortcutActions`, the hidden-id row pattern, the
-// error-panel-or-grid body and the [GridStatusBar] beneath the grid.
-// This mixin owns that plumbing; the screen supplies the data mapping
+// detail via `rowDetailShortcutActions`, the hidden-id row pattern, and
+// the error-panel-or-grid body. This mixin owns that plumbing; the
+// screen supplies the data mapping
 // (columns, row mapper, detail opener) and its own toolbar.
 //
 // `T` is the grid's row type (Item, PurchaseOrder, Customer, …). Most
@@ -22,7 +22,6 @@ import 'package:pluto_grid/pluto_grid.dart';
 
 import '../data/repositories/api_result.dart' show ApiError;
 import '../l10n/app_localizations.dart';
-import 'grid_status_bar.dart';
 import 'pluto_grid_shortcuts.dart';
 import 'screen_error_panel.dart';
 
@@ -151,6 +150,10 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
   PlutoColumn _buildActionsColumn(AppLocalizations l10n) => PlutoColumn(
     title: l10n.commonActions,
     field: 'actions',
+    // Pinned to the right edge — the ⋮ menu stays reachable when the
+    // grid scrolls horizontally (PlutoGrid unfreezes automatically only
+    // when the non-frozen columns total ≤ 200px, its built-in guard).
+    frozen: PlutoColumnFrozen.end,
     type: PlutoColumnType.text(),
     width: 64,
     readOnly: true,
@@ -208,11 +211,16 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
               children: [
                 Icon(entry.icon, size: 18, color: entry.color),
                 const SizedBox(width: 8),
-                Text(
-                  entry.label,
-                  style: entry.color == null
-                      ? null
-                      : TextStyle(color: entry.color),
+                // Flexible so longer action labels (e.g. "Return to
+                // Supplier") shrink instead of overflowing the popup.
+                Flexible(
+                  child: Text(
+                    entry.label,
+                    overflow: TextOverflow.ellipsis,
+                    style: entry.color == null
+                        ? null
+                        : TextStyle(color: entry.color),
+                  ),
                 ),
               ],
             ),
@@ -314,10 +322,8 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
 
-    // The grid fills the space; the keyboard-hint status bar sits beneath
-    // it (attached via its top border), exactly where AG-Grid draws its
-    // status bar. The bar renders only with the grid — the error panel
-    // path in gridScreenBody returns before this.
+    // The grid fills the space. The error-panel path in gridScreenBody
+    // returns before this.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -332,6 +338,8 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
               rows: <PlutoRow>[],
               onLoaded: (event) {
                 gridStateManager = event.stateManager;
+                if (!mounted) return;
+                setState(() {});
                 // The id column exists only to carry the row's record id
                 // to the detail handlers — hide it (cells stay readable
                 // via `row.cells['id']`, so it survives client-side
@@ -365,7 +373,6 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
             ),
           ),
         ),
-        const GridStatusBar(),
       ],
     );
   }

@@ -1,8 +1,10 @@
 // Stock by warehouse screen — PORTING.md §6. Read-only grid over
-// `GET /inventory/stock-balances` (bare array) rendered with PlutoGrid via
-// the shared [PlutoGridScreen] mixin. Each row is an item×warehouse
-// balance; double-tap/F2 drills into the item's detail dialog (its
-// stock-by-warehouse breakdown is what this screen aggregates).
+// `GET /inventory/stock-balances` (server-paginated, `search` +
+// `warehouse_code` filters) rendered with PlutoGrid via the shared
+// [PlutoGridScreen] mixin. Each row is an item×warehouse balance;
+// double-tap/F2 drills into the item's detail dialog (its
+// stock-by-warehouse breakdown is what this screen aggregates). Search /
+// warehouse filter / sorting / paging all refetch server-side.
 //
 // The item/warehouse code columns are hidden (they are id-like), so
 // [hiddenGridColumnFields] hides them alongside the record-id column; the
@@ -16,10 +18,21 @@ import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/stock_balance.dart' show StockBalance;
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
-import 'inventory_providers.dart' show stockBalancesProvider, stockBalancesSearchProvider;
+import 'inventory_providers.dart'
+    show
+        GridSort,
+        stockBalancesLimitProvider,
+        stockBalancesPageProvider,
+        stockBalancesProvider,
+        stockBalancesSearchProvider,
+        stockBalancesSortProvider,
+        stockBalancesWarehouseFilterProvider,
+        warehousesProvider;
 import 'item_detail_dialog.dart';
 
 class StockByWarehouseScreen extends ConsumerStatefulWidget {
@@ -47,40 +60,45 @@ class _StockByWarehouseScreenState extends ConsumerState<StockByWarehouseScreen>
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       ref.read(stockBalancesSearchProvider.notifier).state = value.trim();
+      // A new search starts back at page 1.
+      if (ref.read(stockBalancesPageProvider) != 1) {
+        ref.read(stockBalancesPageProvider.notifier).state = 1;
+      }
     });
   }
 
-  /// Client-side search over the loaded rows (the endpoint has no search
-  /// param) — overrides the mixin's unfiltered clear+append.
-  List<StockBalance> _filteredRows(List<StockBalance> balances) {
-    final search = ref.read(stockBalancesSearchProvider).toLowerCase();
-    if (search.isEmpty) return balances;
-    return balances
-        .where(
-          (b) =>
-              b.itemCode.toLowerCase().contains(search) ||
-              b.itemName.toLowerCase().contains(search) ||
-              b.warehouseName.toLowerCase().contains(search),
-        )
-        .toList();
-  }
-
+  /// The stock-balances provider returns a `PagedResponse` envelope —
+  /// unwrap the current page's items as the grid rows.
   @override
-  void syncGridRows(AsyncValue<Object?> value) {
-    final manager = gridStateManager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      final rows = _filteredRows(value.value as List<StockBalance>);
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, row) in rows.indexed)
-          withSerialCell(gridRowFor(row), index),
-      ]);
+  Iterable<StockBalance> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<StockBalance>).items;
+
+  /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
+  String? _sortColumnFor(String field) => switch (field) {
+    'code' => 'item_code',
+    'item' => 'item_name',
+    'warehouse' => 'warehouse_name',
+    'qty' => 'quantity',
+    _ => null,
+  };
+
+  /// Column sort maps to the server-side sort provider (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    ref.read(stockBalancesSortProvider.notifier).state = sort.isNone
+        ? null
+        : GridSort(
+            sortBy,
+            sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC',
+          );
+    if (ref.read(stockBalancesPageProvider) != 1) {
+      ref.read(stockBalancesPageProvider.notifier).state = 1;
     }
   }
-
-  void _refilter() => syncGridRows(ref.read(stockBalancesProvider));
 
   @override
   List<String> get hiddenGridColumnFields => const ['id', 'code', 'codeWh'];
@@ -124,21 +142,49 @@ class _StockByWarehouseScreenState extends ConsumerState<StockByWarehouseScreen>
   @override
   Widget build(BuildContext context) {
     final balances = ref.watch(stockBalancesProvider);
+    final page = balances.valueOrNull;
+    final warehouses = ref.watch(warehousesProvider).valueOrNull ?? const [];
+    final selectedWarehouse = ref.watch(stockBalancesWarehouseFilterProvider);
     final l10n = AppLocalizations.of(context)!;
 
     // Keep the grid in sync with provider transitions (loading → data).
-    // The mixin listener routes through the overridden syncGridRows, so
-    // the client-side search applies on every load/refresh too.
+    // Search / warehouse filter refetch server-side through the paged
+    // provider (it watches both), so no client-side refilter is needed.
     watchGridProvider(stockBalancesProvider);
-    // Client-side search re-runs the filter over the loaded rows without
-    // refetching.
-    ref.listen(stockBalancesSearchProvider, (previous, next) => _refilter());
+
+    String warehouseLabel(String code) {
+      if (code.isEmpty) return l10n.stockbywarehouseAllwarehouses;
+      final match = warehouses.where((w) => w.warehouseCode == code);
+      return match.isEmpty ? code : '${match.first.warehouseCode} — ${match.first.warehouseName ?? ''}';
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Toolbar: client-side search (item code/name, warehouse) + refresh.
+        // Toolbar: warehouse dropdown + server-side search (item code/name,
+        // warehouse) + refresh.
         ScreenToolbar(
+          filters: [
+            ScreenToolbarDropdown<String>(
+              value: selectedWarehouse,
+              items: [
+                '',
+                for (final w in warehouses) w.warehouseCode,
+              ],
+              labelBuilder: warehouseLabel,
+              hint: l10n.stockbywarehouseAllwarehouses,
+              width: 210,
+              prefixIcon: Icons.warehouse_outlined,
+              onChanged: (value) {
+                ref.read(stockBalancesWarehouseFilterProvider.notifier).state =
+                    value ?? '';
+                // A new filter starts back at page 1.
+                if (ref.read(stockBalancesPageProvider) != 1) {
+                  ref.read(stockBalancesPageProvider.notifier).state = 1;
+                }
+              },
+            ),
+          ],
           searchController: _searchController,
           searchHint: l10n.commonSearch,
           onSearchChanged: _onSearchChanged,
@@ -147,6 +193,24 @@ class _StockByWarehouseScreenState extends ConsumerState<StockByWarehouseScreen>
         Expanded(
           child: gridScreenBody(balances, provider: stockBalancesProvider),
         ),
+        if (page != null)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(stockBalancesLimitProvider),
+            itemLabel: l10n.stockbywarehouseStock,
+            onPageChanged: (p) =>
+                ref.read(stockBalancesPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(stockBalancesLimitProvider.notifier).state = limit;
+              if (ref.read(stockBalancesPageProvider) != 1) {
+                ref.read(stockBalancesPageProvider.notifier).state = 1;
+              }
+            },
+          ),
       ],
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
@@ -5,15 +7,14 @@ import 'package:pluto_grid/pluto_grid.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/production.dart';
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import 'production_detail_dialog.dart';
 import 'production_form_dialog.dart';
 import 'production_providers.dart';
-
-/// Provider for the search text in the production screen.
-final searchTextProvider = StateProvider<String>((ref) => '');
 
 class ProductionScreen extends ConsumerStatefulWidget {
   const ProductionScreen({super.key});
@@ -24,12 +25,26 @@ class ProductionScreen extends ConsumerStatefulWidget {
 
 class _ProductionScreenState extends ConsumerState<ProductionScreen>
     with PlutoGridScreen<Production, ProductionScreen> {
+  Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      ref.read(searchTextProvider.notifier).state = value.trim();
+      // A new search starts back at page 1.
+      if (ref.read(productionsPageProvider) != 1) {
+        ref.read(productionsPageProvider.notifier).state = 1;
+      }
+    });
   }
 
   @override
@@ -38,23 +53,38 @@ class _ProductionScreenState extends ConsumerState<ProductionScreen>
     showProductionDetailDialog(context, productionId: productionId);
   }
 
+  /// The productions provider returns a `PagedResponse` envelope —
+  /// unwrap the current page's items as the grid rows.
   @override
-  Iterable<Production> gridRowsFrom(Object? value) {
-    // Client-side search filter over the loaded rows (the mixin's
-    // [PlutoGridScreen.gridRowsFrom] is called from the provider listener,
-    // so this uses ref.read, not ref.watch).
-    final searchText = ref.read(searchTextProvider);
-    final lowerSearch = searchText.toLowerCase();
-    if (lowerSearch.isEmpty) return super.gridRowsFrom(value);
-    return super.gridRowsFrom(value).where((p) {
-      return p.productionNo.toLowerCase().contains(lowerSearch) ||
-          (p.outputItemName?.toLowerCase().contains(lowerSearch) ?? false) ||
-          (p.outputItemCode?.toLowerCase().contains(lowerSearch) ?? false) ||
-          (p.batchNo?.toLowerCase().contains(lowerSearch) ?? false) ||
-          (p.remarks?.toLowerCase().contains(lowerSearch) ?? false) ||
-          (p.finishedGoodsWarehouseName?.toLowerCase().contains(lowerSearch) ??
-              false);
-    });
+  Iterable<Production> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<Production>).items;
+
+  /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
+  String? _sortColumnFor(String field) => switch (field) {
+    'productionNo' => 'production_no',
+    'date' => 'production_date',
+    'output' => 'output_item_name',
+    'warehouse' => 'warehouse_name',
+    'qty' => 'output_quantity',
+    'unitCost' => 'unit_cost',
+    'totalCost' => 'total_batch_cost',
+    'batchNo' => 'batch_no',
+    _ => null,
+  };
+
+  /// Column sort maps to the server-side sort provider (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    ref.read(productionsSortProvider.notifier).state = sort.isNone
+        ? null
+        : ProductionSort(sortBy, sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC');
+    if (ref.read(productionsPageProvider) != 1) {
+      ref.read(productionsPageProvider.notifier).state = 1;
+    }
   }
 
   /// Opt into the per-row ⋮ actions menu (View detail).
@@ -100,14 +130,13 @@ class _ProductionScreenState extends ConsumerState<ProductionScreen>
   Widget build(BuildContext context) {
     final productions = ref.watch(productionsProvider);
     final l10n = AppLocalizations.of(context)!;
+    // The full filtered list feeds the CSV export.
+    final filtered = ref.watch(filteredProductionsProvider);
 
     // Keep the grid in sync with provider transitions (loading → data).
     watchGridProvider(productionsProvider);
-    // The client-side search re-runs the filter over the loaded rows
-    // without refetching (gridRowsFrom reads the provider directly).
-    ref.listen(searchTextProvider, (previous, next) {
-      syncGridRows(ref.read(productionsProvider));
-    });
+
+    final filteredRows = filtered.valueOrNull ?? const <Production>[];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -116,22 +145,16 @@ class _ProductionScreenState extends ConsumerState<ProductionScreen>
         ScreenToolbar(
           searchController: _searchController,
           searchHint: l10n.commonSearch,
-          onSearchChanged: (text) =>
-              ref.read(searchTextProvider.notifier).state = text,
+          onSearchChanged: _onSearchChanged,
           onRefresh: () => ref.invalidate(productionsProvider),
           actions: [
             TextButton.icon(
-              onPressed:
-                  productions.isLoading ||
-                      (productions.valueOrNull?.isEmpty ?? true)
+              onPressed: productions.isLoading || filteredRows.isEmpty
                   ? null
                   : () => saveCsv(
                       context,
                       suggestedName: csvSuggestedName('productions'),
-                      csv: buildProductionsCsv(
-                        l10n,
-                        productions.valueOrNull!,
-                      ),
+                      csv: buildProductionsCsv(l10n, filteredRows),
                       successMessage: l10n.productionExported,
                       errorMessage: l10n.productionExportfailed,
                     ),
@@ -150,6 +173,25 @@ class _ProductionScreenState extends ConsumerState<ProductionScreen>
         Expanded(
           child: gridScreenBody(productions, provider: productionsProvider),
         ),
+        if (productions.valueOrNull case final page?)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(productionsLimitProvider),
+            itemLabel: l10n.productionProductions,
+            onPageChanged: (p) =>
+                ref.read(productionsPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(productionsLimitProvider.notifier).state = limit;
+              if (ref.read(productionsPageProvider) != 1) {
+                ref.read(productionsPageProvider.notifier).state = 1;
+              }
+            },
+          ),
+        const SizedBox(height: 16),
       ],
     );
   }

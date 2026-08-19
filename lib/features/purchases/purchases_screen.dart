@@ -1,11 +1,11 @@
 // Direct purchases list screen — a read-only grid over `GET /purchases`
-// (**bare array**; no search/page params, so sorting and filtering stay
-// client-side like the items screen). Rendered with PlutoGrid via the
-// shared [PlutoGridScreen] mixin: F2/Enter + double-tap open the
-// purchase detail, whose Process Return action drives the return-
-// processing flow. Sits in the purchasing module shell alongside the
-// PO and purchase-returns tabs (the web app hosts `/purchases` in the
-// same module).
+// (**server-paginated**; search and sorting happen server-side,
+// grid-pagination §6 — the endpoint returns a `pagination` block).
+// Rendered with PlutoGrid via the shared [PlutoGridScreen] mixin:
+// F2/Enter + double-tap open the purchase detail, the row menu offers
+// View and Return (the return entry form, pre-seeded with this
+// purchase), and the [ServerPaginationBar] sits beneath the grid. Sits
+// in the purchasing module shell.
 
 import 'dart:async';
 
@@ -15,12 +15,16 @@ import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/purchase.dart' show Purchase;
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import 'purchase_detail_dialog.dart';
 import 'purchase_form_dialog.dart';
 import 'purchase_providers.dart';
+import 'purchase_return_form_dialog.dart'
+    show ReturnSource, showPurchaseReturnFormDialog;
 
 class PurchasesScreen extends ConsumerStatefulWidget {
   const PurchasesScreen({super.key});
@@ -34,6 +38,11 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
 
+  /// Row id → model for the row-menu return action — the grid rows are
+  /// built from the page models, so the menu can hand the exact
+  /// [Purchase] (with its returnable qty + warehouse) to the form.
+  final Map<int, Purchase> _purchasesById = {};
+
   @override
   void dispose() {
     _debounce?.cancel();
@@ -46,41 +55,51 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       ref.read(purchasesSearchProvider.notifier).state = value.trim();
+      // A new search starts back at page 1.
+      if (ref.read(purchasesPageProvider) != 1) {
+        ref.read(purchasesPageProvider.notifier).state = 1;
+      }
     });
   }
 
-  /// Client-side search over the loaded rows (the endpoint has no search
-  /// param) — overrides the mixin's unfiltered clear+append.
-  List<Purchase> _filteredRows(List<Purchase> purchases) {
-    final search = ref.read(purchasesSearchProvider).toLowerCase();
-    if (search.isEmpty) return purchases;
-    return purchases
-        .where(
-          (p) =>
-              p.purchaseNo.toLowerCase().contains(search) ||
-              p.itemName.toLowerCase().contains(search) ||
-              (p.supplierName?.toLowerCase().contains(search) ?? false) ||
-              p.warehouseName.toLowerCase().contains(search),
-        )
-        .toList();
-  }
-
+  /// The purchases provider returns a `PagedResponse` envelope — unwrap
+  /// the current page's items as the grid rows.
   @override
-  void syncGridRows(AsyncValue<Object?> value) {
-    final manager = gridStateManager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      final rows = _filteredRows(value.value as List<Purchase>);
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, row) in rows.indexed)
-          withSerialCell(gridRowFor(row), index),
-      ]);
+  Iterable<Purchase> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<Purchase>).items;
+
+  /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
+  String? _sortColumnFor(String field) => switch (field) {
+    'purchaseNo' => 'purchase_no',
+    'date' => 'purchase_date',
+    'item' => 'item_name',
+    'qty' => 'quantity',
+    'unitCost' => 'unit_cost',
+    'total' => 'total_cost',
+    'paid' => 'paid_amount',
+    'balance' => 'balance_amount',
+    'supplier' => 'supplier_name',
+    'warehouse' => 'warehouse_name',
+    _ => null,
+  };
+
+  /// Column sort maps to the server-side sort provider (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    ref.read(purchasesSortProvider.notifier).state = sort.isNone
+        ? null
+        : PurchaseSort(
+            sortBy,
+            sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC',
+          );
+    if (ref.read(purchasesPageProvider) != 1) {
+      ref.read(purchasesPageProvider.notifier).state = 1;
     }
   }
-
-  void _refilter() => syncGridRows(ref.read(purchasesProvider));
 
   @override
   void openRowDetail(int purchaseId) {
@@ -88,7 +107,9 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
     showPurchaseDetailDialog(context, purchaseId: purchaseId);
   }
 
-  /// Opt into the per-row ⋮ actions menu (View detail).
+  /// Opt into the per-row ⋮ actions menu (View detail + Return — the
+  /// latter opens the return entry form pre-seeded with this purchase;
+  /// hidden when nothing is returnable).
   @override
   bool get hasRowActions => true;
 
@@ -97,17 +118,33 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
     final id = row.cells['id']?.value as int?;
     if (id == null || id <= 0) return null;
     final l10n = AppLocalizations.of(context)!;
+    final purchase = _purchasesById[id];
     return [
       GridRowAction(
         icon: Icons.visibility_outlined,
         label: l10n.commonView,
         onTap: () => showPurchaseDetailDialog(context, purchaseId: id),
       ),
+      if (purchase != null && purchase.returnableQty > 0)
+        GridRowAction(
+          icon: Icons.assignment_return_outlined,
+          label: l10n.purchasesReturn,
+          onTap: () => showPurchaseReturnFormDialog(
+            context,
+            source: ReturnSource.purchase(
+              id: purchase.id,
+              no: purchase.purchaseNo,
+              warehouseId: purchase.warehouseId,
+            ),
+          ),
+        ),
     ];
   }
 
   @override
-  PlutoRow gridRowFor(Purchase purchase) => PlutoRow(
+  PlutoRow gridRowFor(Purchase purchase) {
+    _purchasesById[purchase.id] = purchase;
+    return PlutoRow(
     cells: {
       'id': PlutoCell(value: purchase.id),
       'purchaseNo': PlutoCell(value: purchase.purchaseNo),
@@ -116,11 +153,14 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
       'qty': PlutoCell(value: purchase.quantity),
       'unitCost': PlutoCell(value: purchase.unitCost),
       'total': PlutoCell(value: purchase.totalCost),
+      'paid': PlutoCell(value: purchase.paidAmount),
+      'balance': PlutoCell(value: purchase.balanceAmount),
       'supplier': PlutoCell(value: purchase.supplierName ?? ''),
       'warehouse': PlutoCell(value: purchase.warehouseName),
       'invoiceNo': PlutoCell(value: purchase.invoiceNo ?? ''),
     },
-  );
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,12 +168,9 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
     final l10n = AppLocalizations.of(context)!;
 
     // Keep the grid in sync with provider transitions (loading → data).
-    // The mixin listener routes through the overridden syncGridRows, so
-    // the client-side search applies on every load/refresh too.
+    // The mixin listener routes through the default syncGridRows, which
+    // unwraps the PagedResponse via gridRowsFrom.
     watchGridProvider(purchasesProvider);
-    // Client-side search re-runs the filter over the loaded rows without
-    // refetching.
-    ref.listen(purchasesSearchProvider, (previous, next) => _refilter());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -153,6 +190,25 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
           ],
         ),
         Expanded(child: gridScreenBody(purchases, provider: purchasesProvider)),
+        if (purchases.valueOrNull case final page?)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(purchasesLimitProvider),
+            itemLabel: l10n.purchasesPurchases,
+            onPageChanged: (p) =>
+                ref.read(purchasesPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(purchasesLimitProvider.notifier).state = limit;
+              if (ref.read(purchasesPageProvider) != 1) {
+                ref.read(purchasesPageProvider.notifier).state = 1;
+              }
+            },
+          ),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -245,6 +301,36 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
       ),
       moneyColumn('unitCost', l10n.purchasesUnitcost, 100),
       moneyColumn('total', l10n.purchasesTotalcol, 110),
+      moneyColumn('paid', l10n.salesTotalpaid, 105),
+      PlutoColumn(
+        title: l10n.salesBalance,
+        field: 'balance',
+        type: PlutoColumnType.number(format: '#,###.00'),
+        width: 105,
+        readOnly: true,
+        textAlign: PlutoColumnTextAlign.end,
+        titleTextAlign: PlutoColumnTextAlign.end,
+        enableContextMenu: false,
+        renderer: (ctx) => Builder(
+          builder: (cellContext) {
+            final scheme = Theme.of(cellContext).colorScheme;
+            final balance = ctx.cell.value as num? ?? 0;
+            return Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                Formatters.currency(balance),
+                style: Theme.of(cellContext).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  // Fully paid → green; outstanding → the error tone.
+                  color: balance > 0
+                      ? scheme.error
+                      : const Color(0xff16a34a),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
       textColumn('supplier', l10n.purchasesSuppliercol, 170),
       textColumn('warehouse', l10n.purchasesWarehousecol, 130),
       textColumn('invoiceNo', l10n.purchasesInvoicenumber, 110),

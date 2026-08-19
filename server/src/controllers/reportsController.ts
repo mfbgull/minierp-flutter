@@ -15,6 +15,16 @@ function getARAgingReport(req: Request, res: Response): void {
   }
 }
 
+function getAPAgingReport(req: Request, res: Response): void {
+  try {
+    const asOfDate = (getQueryParam(req.query.asOfDate)) || new Date().toISOString().split('T')[0];
+    res.json({ success: true, data: ReportsModel.getAPAgingReport(asOfDate as string, db) });
+  } catch (error) {
+    logger.error('Error fetching AP aging report:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch AP aging report' });
+  }
+}
+
 function getCustomerStatements(req: Request, res: Response): void {
   try {
     const customerId = String(req.query.customerId || '');
@@ -309,7 +319,7 @@ function getBatchTraceabilityReport(req: Request, res: Response): void {
 }
 
 export default {
-  getARAgingReport, getCustomerStatements, getTopDebtors, getDSOMetric, getReceivablesSummary,
+  getARAgingReport, getAPAgingReport, getCustomerStatements, getTopDebtors, getDSOMetric, getReceivablesSummary,
   getSalesSummary, getSalesByCustomer, getSalesByItem, getStockLevelReport, getLowStockReport,
   getStockValuationReport, getInventoryMovementReport, getProfitLossReport, getCashFlowReport,
   getPurchaseSummary, getSupplierAnalysis, getProductionSummary, getBOMUsageReport,

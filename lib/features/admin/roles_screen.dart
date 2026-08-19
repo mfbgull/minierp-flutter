@@ -310,6 +310,8 @@ class _RolesScreenState extends ConsumerState<RolesScreen>
       PlutoColumn(
         title: l10n.commonActions,
         field: 'actions',
+        // Pinned to the right edge — stays reachable when the grid scrolls.
+        frozen: PlutoColumnFrozen.end,
         type: PlutoColumnType.text(),
         width: 80,
         readOnly: true,

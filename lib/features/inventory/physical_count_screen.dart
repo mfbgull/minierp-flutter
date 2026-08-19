@@ -1,11 +1,9 @@
 // Physical counts list screen — PORTING.md §6. Read-only grid over
-// `GET /inventory/physical-counts` (enveloped array) rendered with
-// PlutoGrid via the shared [PlutoGridScreen] mixin. Double-tap/F2 opens
-// the count's detail dialog (header + counted item lines); the grid row's
-// hidden `id` cell carries the count id.
-//
-// The search field is disabled: the counts endpoint has no search param,
-// so there is nothing honest to filter against.
+// `GET /inventory/physical-counts` (server-paginated, `search` filter)
+// rendered with PlutoGrid via the shared [PlutoGridScreen] mixin.
+// Double-tap/F2 opens the count's detail dialog (header + counted item
+// lines); the grid row's hidden `id` cell carries the count id. Search /
+// sorting / paging all refetch server-side through the paged endpoint.
 
 import 'dart:async';
 
@@ -14,12 +12,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../data/models/physical_count.dart' show PhysicalCount;
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'inventory_providers.dart'
-    show physicalCountsProvider, physicalCountsSearchProvider;
+    show
+        GridSort,
+        physicalCountsLimitProvider,
+        physicalCountsPageProvider,
+        physicalCountsProvider,
+        physicalCountsSearchProvider,
+        physicalCountsSortProvider;
+import 'new_physical_count_dialog.dart';
 import 'physical_count_detail_dialog.dart';
 
 class PhysicalCountScreen extends ConsumerStatefulWidget {
@@ -47,40 +54,45 @@ class _PhysicalCountScreenState extends ConsumerState<PhysicalCountScreen>
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       ref.read(physicalCountsSearchProvider.notifier).state = value.trim();
+      // A new search starts back at page 1.
+      if (ref.read(physicalCountsPageProvider) != 1) {
+        ref.read(physicalCountsPageProvider.notifier).state = 1;
+      }
     });
   }
 
-  /// Client-side search over the loaded rows (the endpoint has no search
-  /// param) — overrides the mixin's unfiltered clear+append.
-  List<PhysicalCount> _filteredRows(List<PhysicalCount> counts) {
-    final search = ref.read(physicalCountsSearchProvider).toLowerCase();
-    if (search.isEmpty) return counts;
-    return counts
-        .where(
-          (c) =>
-              c.countNo.toLowerCase().contains(search) ||
-              (c.warehouseName?.toLowerCase().contains(search) ?? false) ||
-              c.status.toLowerCase().contains(search),
-        )
-        .toList();
-  }
-
+  /// The physical-counts provider returns a `PagedResponse` envelope —
+  /// unwrap the current page's items as the grid rows.
   @override
-  void syncGridRows(AsyncValue<Object?> value) {
-    final manager = gridStateManager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      final rows = _filteredRows(value.value as List<PhysicalCount>);
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, row) in rows.indexed)
-          withSerialCell(gridRowFor(row), index),
-      ]);
+  Iterable<PhysicalCount> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<PhysicalCount>).items;
+
+  /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
+  String? _sortColumnFor(String field) => switch (field) {
+    'countNo' => 'count_no',
+    'date' => 'count_date',
+    'warehouse' => 'warehouse_name',
+    'status' => 'status',
+    _ => null,
+  };
+
+  /// Column sort maps to the server-side sort provider (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    ref.read(physicalCountsSortProvider.notifier).state = sort.isNone
+        ? null
+        : GridSort(
+            sortBy,
+            sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC',
+          );
+    if (ref.read(physicalCountsPageProvider) != 1) {
+      ref.read(physicalCountsPageProvider.notifier).state = 1;
     }
   }
-
-  void _refilter() => syncGridRows(ref.read(physicalCountsProvider));
 
   @override
   void openRowDetail(int rowId) {
@@ -131,30 +143,58 @@ class _PhysicalCountScreenState extends ConsumerState<PhysicalCountScreen>
   @override
   Widget build(BuildContext context) {
     final counts = ref.watch(physicalCountsProvider);
+    final page = counts.valueOrNull;
     final l10n = AppLocalizations.of(context)!;
 
     // Keep the grid in sync with provider transitions (loading → data).
-    // The mixin listener routes through the overridden syncGridRows, so
-    // the client-side search applies on every load/refresh too.
+    // Search refetches server-side through the paged provider (it
+    // watches the search provider), so no client-side refilter is needed.
     watchGridProvider(physicalCountsProvider);
-    // Client-side search re-runs the filter over the loaded rows without
-    // refetching.
-    ref.listen(physicalCountsSearchProvider, (previous, next) => _refilter());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Toolbar: client-side search (count no / warehouse / status) +
+        // Toolbar: server-side search (count no / warehouse / status) +
         // refresh.
         ScreenToolbar(
           searchController: _searchController,
           searchHint: l10n.commonSearch,
           onSearchChanged: _onSearchChanged,
           onRefresh: () => ref.invalidate(physicalCountsProvider),
+          primaryActions: [
+            FilledButton.icon(
+              onPressed: () async {
+                await showNewPhysicalCountDialog(context);
+                if (mounted) {
+                  ref.invalidate(physicalCountsProvider);
+                }
+              },
+              icon: const Icon(Icons.add_outlined, size: 18),
+              label: const Text('New Count'),
+            ),
+          ],
         ),
         Expanded(
           child: gridScreenBody(counts, provider: physicalCountsProvider),
         ),
+        if (page != null)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(physicalCountsLimitProvider),
+            itemLabel: l10n.physicalcountsPhysicalcounts,
+            onPageChanged: (p) =>
+                ref.read(physicalCountsPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(physicalCountsLimitProvider.notifier).state = limit;
+              if (ref.read(physicalCountsPageProvider) != 1) {
+                ref.read(physicalCountsPageProvider.notifier).state = 1;
+              }
+            },
+          ),
       ],
     );
   }

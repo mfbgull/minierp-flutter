@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { generateDocNo } from '../utils/sequence';
+import { sanitizeSortParams, QUOTATION_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { SalesOrderWithWarehouse, InvoiceWithUsername } from '../types';
 
 export interface Quotation {
@@ -76,11 +77,34 @@ export interface QuotationFilters {
   status?: string;
   customer_id?: number;
   customer_name?: string;
+  search?: string;
   start_date?: string;
   end_date?: string;
   warehouse_id?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  page?: number;
 }
+
+interface PaginatedQuotations {
+  rows: Quotation[];
+  total: number;
+  pageNum: number;
+  limitNum: number;
+}
+
+// Whitelisted sort columns → qualified SQL column for the list query (the
+// warehouse/user joins make bare names ambiguous).
+const QUOTATION_SORT_COLUMN_MAP: Record<string, string> = {
+  quotation_no: 'q.quotation_no',
+  quotation_date: 'q.quotation_date',
+  customer_name: 'q.customer_name',
+  status: 'q.status',
+  total_amount: 'q.total_amount',
+  expiry_date: 'q.expiry_date',
+  created_at: 'q.created_at',
+};
 
 class QuotationModel {
   /**
@@ -241,10 +265,14 @@ class QuotationModel {
   }
 
   /**
-   * Get all quotations with filters
+   * Get all quotations with filters — paged. Returns the canonical
+   * `{ rows, total, pageNum, limitNum }` shape (grid-pagination §1).
    */
-  static getAll(filters: QuotationFilters = {}, db: Database.Database): Quotation[] {
-    let query = `
+  static getAll(filters: QuotationFilters = {}, db: Database.Database): PaginatedQuotations {
+    const pageNum = filters.page || 1;
+    const limitNum = filters.limit || 10;
+
+    const select = `
       SELECT
         q.*,
         w.warehouse_code,
@@ -255,50 +283,70 @@ class QuotationModel {
       LEFT JOIN users u ON q.created_by = u.id
       WHERE 1=1
     `;
-
+    const conditions: string[] = [];
     const params: any[] = [];
 
     if (filters.status) {
-      query += ` AND q.status = ?`;
+      conditions.push('q.status = ?');
       params.push(filters.status);
     }
 
     if (filters.customer_id) {
-      query += ` AND q.customer_id = ?`;
+      conditions.push('q.customer_id = ?');
       params.push(filters.customer_id);
     }
 
     if (filters.customer_name) {
-      query += ` AND q.customer_name LIKE ?`;
+      conditions.push('q.customer_name LIKE ?');
       params.push(`%${filters.customer_name}%`);
     }
 
+    if (filters.search) {
+      conditions.push('(q.quotation_no LIKE ? OR q.customer_name LIKE ?)');
+      const term = `%${filters.search}%`;
+      params.push(term, term);
+    }
+
     if (filters.start_date) {
-      query += ` AND q.quotation_date >= ?`;
+      conditions.push('q.quotation_date >= ?');
       params.push(filters.start_date);
     }
 
     if (filters.end_date) {
-      query += ` AND q.quotation_date <= ?`;
+      conditions.push('q.quotation_date <= ?');
       params.push(filters.end_date);
     }
 
     if (filters.warehouse_id) {
-      query += ` AND q.warehouse_id = ?`;
+      conditions.push('q.warehouse_id = ?');
       params.push(filters.warehouse_id);
     }
 
-    query += ` ORDER BY q.quotation_date DESC, q.created_at DESC`;
+    const where = conditions.length ? ` AND ${conditions.join(' AND ')}` : '';
 
-    if (filters.limit) {
-      query += ` LIMIT ?`;
-      params.push(filters.limit);
-    }
+    // Sort — whitelisted via sqlSanitizer, mapped to qualified columns
+    // (default matches the pre-paging behavior: newest quotation first).
+    const { column, order } = sanitizeSortParams(
+      filters.sortBy || 'quotation_date',
+      filters.sortOrder || 'DESC',
+      QUOTATION_SORT_COLUMNS,
+      'quotation_date',
+      'DESC'
+    );
+    const sortColumn = QUOTATION_SORT_COLUMN_MAP[column] || 'q.quotation_date';
 
-    const quotations = db.prepare(query).all(...params) as Quotation[];
+    const offset = (pageNum - 1) * limitNum;
+    const quotations = db
+      .prepare(`${select}${where} ORDER BY ${sortColumn} ${order}, q.id DESC LIMIT ? OFFSET ?`)
+      .all(...params, limitNum, offset) as Quotation[];
 
-    // Get items for each quotation
-    return quotations.map(quotation => {
+    const countRow = db
+      .prepare(`SELECT COUNT(*) as total FROM quotations q WHERE 1=1${where}`)
+      .get(...params) as { total: number };
+
+    // Get items for each quotation (only the page's rows — avoids loading
+    // items for the full unfiltered table).
+    const rows = quotations.map(quotation => {
       const items = db.prepare(`
         SELECT
           id, quotation_id, item_id, item_code, item_name,
@@ -313,6 +361,8 @@ class QuotationModel {
         items
       };
     });
+
+    return { rows, total: countRow.total, pageNum, limitNum };
   }
 
   /**

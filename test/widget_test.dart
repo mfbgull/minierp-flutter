@@ -32,10 +32,19 @@ import 'package:minierp_app/features/sales/invoice_providers.dart'
     show invoicesFromDateProvider, invoicesToDateProvider;
 import 'package:minierp_app/features/sales/invoice_return_providers.dart'
     show invoiceReturnsFromDateProvider, invoiceReturnsToDateProvider;
+import 'package:minierp_app/features/sales/invoice_returns_screen.dart'
+    show InvoiceReturnsScreen;
 import 'package:minierp_app/features/sales_orders/sales_order_providers.dart'
     show salesOrdersFromDateProvider, salesOrdersToDateProvider;
 import 'package:minierp_app/features/quotations/quotation_providers.dart'
     show quotationsFromDateProvider, quotationsToDateProvider;
+import 'package:minierp_app/features/purchases/purchase_return_providers.dart'
+    show
+        purchaseReturnsFromDateProvider,
+        purchaseReturnsToDateProvider;
+import 'package:minierp_app/features/purchases/purchase_returns_screen.dart'
+    show PurchaseReturnsScreen;
+import 'package:minierp_app/l10n/app_localizations.dart';
 import 'package:minierp_app/features/auth/change_password_screen.dart';
 import 'package:minierp_app/features/admin/admin_models.dart' show Role;
 import 'package:minierp_app/features/reports/reports_dashboard_screen.dart';
@@ -281,14 +290,23 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   /// When true, the status POST rejects with a 400 (failure-path test).
   bool rejectPoStatus = false;
 
-  /// Captured process-return body + stateful returned qty for purchase
-  /// #1 — the /purchases GET fakes read it so a return POST flips the
-  /// list/detail rows.
-  Map<String, dynamic>? lastPurchaseReturnBody;
+  /// Stateful returned qty for purchase #1 — the /purchases GET fakes
+  /// read it so the detail/list show the cumulative returned quantity.
   num purchase1ReturnedQty = 0;
 
-  /// When true, the return POST rejects with a 400 (failure-path test).
-  bool rejectPurchaseReturn = false;
+  /// Captured `POST /purchase-returns` body (the return entry form).
+  Map<String, dynamic>? lastPurchaseReturnCreateBody;
+
+  /// Captured `POST /purchase-returns/:id/void` (the void dialog).
+  int? lastPurchaseReturnVoidId;
+  Map<String, dynamic>? lastPurchaseReturnVoidBody;
+
+  /// Stateful return #1 status — the /purchase-returns GET fake reads it
+  /// so a void POST flips the badge on refetch.
+  String purchaseReturn1Status = 'POSTED';
+
+  /// Last /purchase-returns query params (filter assertions).
+  Map<String, dynamic>? lastPurchaseReturnsQuery;
 
   /// Stateful physical-count #1 workflow status — the /physical-counts
   /// fakes read it so a complete/cancel POST flips the badge on refetch.
@@ -297,6 +315,12 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   /// When true, the physical-count complete POST rejects with a 400
   /// (failure-path test).
   bool rejectPcComplete = false;
+
+  /// When true, item 4's stock sits only in the Raw Materials warehouse
+  /// (2, WH-RAW) — as if it was transferred out of WH-MAIN (1) since
+  /// receipt. The purchase-return entry form then asks which warehouse
+  /// to return from.
+  bool item4StockInSecondary = false;
 
   /// System quantities for PC-2026-001's item lines (fake variance calc).
   static const Map<int, num> pc1SystemQty = {4: 100.0, 5: 50.0};
@@ -1038,9 +1062,8 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       });
     }
     if (options.path == '/purchase-orders' && options.method == 'GET') {
-      // Bare array — the real getPurchaseOrders shape (no envelope, no
-      // pagination; the client grid sorts/filters client-side).
-      return _json([
+      final q = options.queryParameters;
+      var rows = [
         {
           'id': 1,
           'po_no': 'PO-2026-001',
@@ -1051,7 +1074,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'total_amount': 1500.0,
           'paid_amount': 500.0,
           'balance_amount': 1000.0,
-          'status': 'Draft',
+          'status': po1Status,
           'expected_delivery_date': '2026-02-01',
         },
         {
@@ -1067,7 +1090,39 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'status': 'Completed',
           'expected_delivery_date': null,
         },
-      ]);
+      ];
+      // Bare array for the full-list consumers (`.list(supplierId:)` —
+      // the supplier POs tab / payment modal's getRawList); paged
+      // envelope for the grid's listPaged (page param present).
+      if (q['page'] == null) {
+        return _json(rows);
+      }
+      final search = (q['search'] as String?) ?? '';
+      if (search.isNotEmpty) {
+        final term = search.toLowerCase();
+        rows = rows
+            .where(
+              (po) =>
+                  (po['po_no'] as String).toLowerCase().contains(term) ||
+                  (po['supplier_name'] as String).toLowerCase().contains(term),
+            )
+            .toList();
+      }
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final start = (page - 1) * limit;
+      final pageRows = rows.skip(start).take(limit).toList();
+      return _json({
+        'success': true,
+        'data': pageRows,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': (rows.length + limit - 1) ~/ limit,
+          'totalItems': rows.length,
+          'hasNext': start + limit < rows.length,
+          'hasPrev': page > 1,
+        },
+      });
     }
     if (options.path == '/purchase-orders/1' && options.method == 'GET') {
       // Bare object with items — the real getPurchaseOrder shape.
@@ -1217,9 +1272,11 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       return _json(receipt, status: 201);
     }
     if (options.path == '/purchases' && options.method == 'GET') {
-      // Bare array — the real Purchase.getAll shape (joined item/warehouse/
-      // user fields; no envelope, no pagination).
-      return _json([
+      // Paged envelope — the real Purchase.getAll shape since Phase 6
+      // (joined item/warehouse/user fields; server-side search/sort).
+      final q = options.queryParameters;
+      final search = (q['search'] as String?) ?? '';
+      var rows = [
         {
           'id': 1,
           'purchase_no': 'PUR-2026-001',
@@ -1257,7 +1314,33 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'returned_quantity': 0,
           'created_by_username': 'admin',
         },
-      ]);
+      ];
+      if (search.isNotEmpty) {
+        final term = search.toLowerCase();
+        rows = rows
+            .where(
+              (p) =>
+                  (p['purchase_no'] as String).toLowerCase().contains(term) ||
+                  (p['item_name'] as String).toLowerCase().contains(term) ||
+                  (p['supplier_name'] as String).toLowerCase().contains(term),
+            )
+            .toList();
+      }
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final start = (page - 1) * limit;
+      final pageRows = rows.skip(start).take(limit).toList();
+      return _json({
+        'success': true,
+        'data': pageRows,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': (rows.length + limit - 1) ~/ limit,
+          'totalItems': rows.length,
+          'hasNext': start + limit < rows.length,
+          'hasPrev': page > 1,
+        },
+      });
     }
     if (options.path == '/purchases/1' && options.method == 'GET') {
       // Bare object — the real getPurchase shape (same joined fields).
@@ -1281,68 +1364,183 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'created_by_username': 'admin',
       });
     }
-    if (options.path == '/purchases/1/return' && options.method == 'POST') {
+    if (options.path == '/purchase-returns' && options.method == 'POST') {
       final body = options.data as Map<String, dynamic>;
-      lastPurchaseReturnBody = body;
-      if (rejectPurchaseReturn) {
-        return _json({
-          'error': 'Insufficient stock remaining to return',
-        }, status: 400);
-      }
-      final qty = (body['quantity'] as num).toDouble();
-      purchase1ReturnedQty += qty;
-      // Enveloped — the real returnPurchaseItems shape.
+      lastPurchaseReturnCreateBody = body;
+      final items = (body['items'] as List).cast<Map<String, dynamic>>();
+      final totalQty = items.fold<num>(
+        0,
+        (sum, item) => sum + ((item['quantity'] as num?) ?? 0),
+      );
+      // Enveloped 201 — the real createPurchaseReturn shape (header).
       return _json({
         'success': true,
-        'message': 'Return processed successfully',
-        'data': {'returnedQuantity': qty, 'totalCost': qty * 10.0},
-      });
+        'message': 'Purchase return PR-2026-0099 created successfully',
+        'data': {
+          'id': 99,
+          'return_no': 'PR-2026-0099',
+          'return_date': body['return_date'],
+          'return_type': body['source_type'] == 'PURCHASE'
+              ? 'PURCHASE_RETURN'
+              : 'PO_RETURN',
+          'source_type': body['source_type'],
+          'source_id': body['source_id'],
+          'source_no': 'SRC-2026-001',
+          'warehouse_id': body['warehouse_id'],
+          'warehouse_name': 'Main Warehouse',
+          'reason': body['reason'],
+          'status': 'POSTED',
+          'total_qty': totalQty,
+          'total_amount': 0,
+          'voided_at': null,
+          'voided_by': null,
+          'voided_reason': null,
+          'created_by': 1,
+          'created_by_username': 'admin',
+          'created_at': '2026-08-17 10:00:00',
+          'line_count': items.length,
+        },
+      }, status: 201);
     }
-    if (options.path == '/purchases/returns' && options.method == 'GET') {
-      // Bare array — the real Purchase.getReturnHistory shape (negative-
-      // quantity stock movements; no envelope, no pagination).
-      return _json([
+    if (options.path == '/purchase-returns' && options.method == 'GET') {
+      // Paged envelope — the redesigned return-header endpoint
+      // (PurchaseReturnModel.getAll): headers only, no embedded lines.
+      // Status/date filtering mirrors the real server-side filters
+      // (`status`, `start_date`, `end_date`). Row 1's status is stateful
+      // so a void POST flips its badge on refetch.
+      final q = options.queryParameters;
+      lastPurchaseReturnsQuery = q;
+      var rows = [
         {
           'id': 1,
-          'movement_no': 'SM-2026-0018',
-          'item_id': 1,
-          'warehouse_id': 1,
-          'quantity': -5.0,
-          'unit_cost': 10.0,
-          'reference_doctype': 'PURCHASE_RETURN',
-          'reference_docno': 'PUR-2026-011',
-          'remarks': 'Damaged on delivery',
+          'return_no': 'PR-2026-0001',
           'return_date': '2026-02-10',
-          'created_at': '2026-02-10 10:30:00',
-          'created_by': 1,
-          'item_code': 'RM001',
-          'item_name': 'Raw Material A',
-          'unit_of_measure': 'kg',
+          'return_type': 'PURCHASE_RETURN',
+          'source_type': 'PURCHASE',
+          'source_id': 11,
+          'source_no': 'PUR-2026-011',
+          'warehouse_id': 1,
           'warehouse_code': 'WH-MAIN',
           'warehouse_name': 'Main Warehouse',
+          'reason': 'Damaged on delivery',
+          'status': purchaseReturn1Status,
+          'total_qty': 5.0,
+          'total_amount': 50.0,
+          'credit_note_id': 1,
+          'credit_no': 'CN-2026-0001',
+          'voided_at': null,
+          'voided_by': null,
+          'voided_reason': null,
+          'created_by': 1,
           'created_by_username': 'admin',
+          'created_at': '2026-02-10 10:30:00',
+          'line_count': 1,
         },
         {
           'id': 2,
-          'movement_no': 'SM-2026-0021',
-          'item_id': 2,
-          'warehouse_id': 2,
-          'quantity': -2.0,
-          'unit_cost': 40.0,
-          'reference_doctype': 'PO_RETURN',
-          'reference_docno': 'PO-2026-002',
-          'remarks': null,
+          'return_no': 'PR-2026-0002',
           'return_date': '2026-02-12',
-          'created_at': '2026-02-12 09:15:00',
-          'created_by': 1,
-          'item_code': 'FG002',
-          'item_name': 'Finished Good B',
-          'unit_of_measure': 'pcs',
+          'return_type': 'PO_RETURN',
+          'source_type': 'PURCHASE_ORDER',
+          'source_id': 2,
+          'source_no': 'PO-2026-002',
+          'warehouse_id': 2,
           'warehouse_code': 'WH-SEC',
           'warehouse_name': 'Secondary Warehouse',
+          'reason': null,
+          'status': 'VOIDED',
+          'total_qty': 2.0,
+          'total_amount': 80.0,
+          'credit_note_id': null,
+          'credit_no': null,
+          'voided_at': '2026-02-13 09:00:00',
+          'voided_by': 1,
+          'voided_reason': 'Wrong stock',
+          'created_by': 1,
           'created_by_username': 'admin',
+          'created_at': '2026-02-12 09:15:00',
+          'line_count': 2,
         },
-      ]);
+      ];
+      final search = (q['search'] as String?) ?? '';
+      if (search.isNotEmpty) {
+        final term = search.toLowerCase();
+        final all = [...rows];
+        rows = all
+            .where(
+              (r) =>
+                  (r['return_no'] as String).toLowerCase().contains(term) ||
+                  (r['source_no'] as String).toLowerCase().contains(term),
+            )
+            .toList();
+      }
+      final status = q['status'] as String?;
+      if (status != null && status.isNotEmpty) {
+        rows = rows.where((r) => r['status'] == status).toList();
+      }
+      final startDate = q['start_date'] as String?;
+      final endDate = q['end_date'] as String?;
+      if (startDate != null || endDate != null) {
+        rows = rows
+            .where((r) {
+              final date = r['return_date'] as String;
+              final afterStart = startDate == null || date.compareTo(startDate) >= 0;
+              final beforeEnd = endDate == null || date.compareTo(endDate) <= 0;
+              return afterStart && beforeEnd;
+            })
+            .toList();
+      }
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final start = (page - 1) * limit;
+      final pageRows = rows.skip(start).take(limit).toList();
+      return _json({
+        'success': true,
+        'data': pageRows,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': (rows.length + limit - 1) ~/ limit,
+          'totalItems': rows.length,
+          'hasNext': start + limit < rows.length,
+          'hasPrev': page > 1,
+        },
+      });
+    }
+    if (options.path == '/purchase-returns/1/void' &&
+        options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastPurchaseReturnVoidId = 1;
+      lastPurchaseReturnVoidBody = body;
+      purchaseReturn1Status = 'VOIDED';
+      // Enveloped — the real voidPurchaseReturn shape (header, now
+      // VOIDED with the void metadata populated).
+      return _json({
+        'success': true,
+        'message': 'Purchase return PR-2026-0001 voided successfully',
+        'data': {
+          'id': 1,
+          'return_no': 'PR-2026-0001',
+          'return_date': '2026-02-10',
+          'return_type': 'PURCHASE_RETURN',
+          'source_type': 'PURCHASE',
+          'source_id': 11,
+          'source_no': 'PUR-2026-011',
+          'warehouse_id': 1,
+          'warehouse_name': 'Main Warehouse',
+          'reason': 'Damaged on delivery',
+          'status': 'VOIDED',
+          'total_qty': 5.0,
+          'total_amount': 50.0,
+          'credit_no': 'CN-2026-0001',
+          'voided_at': '2026-08-17 11:00:00',
+          'voided_by': 1,
+          'voided_reason': body['reason'],
+          'created_by': 1,
+          'created_by_username': 'admin',
+          'created_at': '2026-02-10 10:30:00',
+          'line_count': 1,
+        },
+      });
     }
     if (options.path == '/suppliers' && options.method == 'POST') {
       final body = options.data as Map<String, dynamic>;
@@ -1475,22 +1673,49 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'is_active': 1,
         },
       ];
-      // The server filters code/name/description on `search`.
-      final search = options.queryParameters['search'] as String?;
-      final data = (search == null || search.isEmpty)
-          ? allItems
-          : allItems
-                .where(
-                  (i) =>
-                      (i['item_code'] as String).toLowerCase().contains(
-                        search.toLowerCase(),
-                      ) ||
-                      (i['item_name'] as String).toLowerCase().contains(
-                        search.toLowerCase(),
-                      ),
-                )
-                .toList();
-      return _json({'success': true, 'data': data});
+      // The server filters code/name/description on `search`, applies the
+      // low-stock rule on `low_stock=1`, then slices page/limit.
+      final q = options.queryParameters;
+      final search = (q['search'] as String?) ?? '';
+      final lowStock = q['low_stock'] == '1';
+      final filtered = allItems
+          .where((i) {
+            final matchesSearch =
+                search.isEmpty ||
+                (i['item_code'] as String).toLowerCase().contains(
+                  search.toLowerCase(),
+                ) ||
+                (i['item_name'] as String).toLowerCase().contains(
+                  search.toLowerCase(),
+                );
+            if (!matchesSearch) return false;
+            if (!lowStock) return true;
+            final stock = i['current_stock'] as num;
+            final reorder = i['reorder_level'] as num?;
+            return reorder != null && reorder > 0 && stock <= reorder;
+          })
+          .toList();
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final totalPages = (filtered.length / limit).ceil();
+      final start = (page - 1) * limit;
+      final end = start + limit > filtered.length
+          ? filtered.length
+          : start + limit;
+      final data = start >= filtered.length
+          ? <Map<String, dynamic>>[]
+          : filtered.sublist(start, end);
+      return _json({
+        'success': true,
+        'data': data,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': totalPages,
+          'totalItems': filtered.length,
+          'hasNext': page < totalPages,
+          'hasPrev': page > 1,
+        },
+      });
     }
     if (options.path == '/inventory/items/1' && options.method == 'PUT') {
       final body = options.data as Map<String, dynamic>;
@@ -1521,6 +1746,50 @@ class _AuthFakeAdapter implements HttpClientAdapter {
             'warehouse_code': 'WH-SEC',
             'warehouse_name': 'Secondary Warehouse',
             'quantity': 2,
+          },
+        ],
+      });
+    }
+    if (options.path == '/inventory/items/4') {
+      // Bare detail for the purchase-form fixtures' line items — stock
+      // held in the receipt warehouse (WH-MAIN, id 1) so the return
+      // entry form keeps the warehouse locked unless a test shifts it.
+      return _json({
+        'id': 4,
+        'item_code': 'RM001',
+        'item_name': 'Raw Material A',
+        'unit_of_measure': 'kg',
+        'stock_by_warehouse': item4StockInSecondary
+            ? [
+                {
+                  'warehouse_id': 2,
+                  'warehouse_code': 'WH-RAW',
+                  'warehouse_name': 'Raw Materials',
+                  'quantity': 200,
+                },
+              ]
+            : [
+                {
+                  'warehouse_id': 1,
+                  'warehouse_code': 'WH-MAIN',
+                  'warehouse_name': 'Main Warehouse',
+                  'quantity': 200,
+                },
+              ],
+      });
+    }
+    if (options.path == '/inventory/items/5') {
+      return _json({
+        'id': 5,
+        'item_code': 'FG002',
+        'item_name': 'Finished Good B',
+        'unit_of_measure': 'pcs',
+        'stock_by_warehouse': [
+          {
+            'warehouse_id': 1,
+            'warehouse_code': 'WH-MAIN',
+            'warehouse_name': 'Main Warehouse',
+            'quantity': 10,
           },
         ],
       });
@@ -1731,11 +2000,13 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     }
     if (options.path == '/inventory/stock-movements' &&
         options.method == 'GET') {
-      // Bare array — the real StockMovementModel.getAll shape, honoring
-      // the `movement_type` query filter like the model's getAll.
+      // Paged envelope — the real StockMovementModel.getAll shape,
+      // honoring the `movement_type` filter + page/limit slicing like
+      // the model.
       lastMovementQuery = options.queryParameters;
-      final type = options.queryParameters['movement_type'] as String?;
-      return _json([
+      final q = options.queryParameters;
+      final type = q['movement_type'] as String?;
+      final filtered = [
         for (final row in [
           _movementPurchaseRow(),
           _movementSaleRow(),
@@ -1744,7 +2015,28 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           _movementTransferInRow(),
         ])
           if (type == null || type.isEmpty || row['movement_type'] == type) row,
-      ]);
+      ];
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final totalPages = (filtered.length / limit).ceil();
+      final start = (page - 1) * limit;
+      final end = start + limit > filtered.length
+          ? filtered.length
+          : start + limit;
+      final data = start >= filtered.length
+          ? <Map<String, dynamic>>[]
+          : filtered.sublist(start, end);
+      return _json({
+        'success': true,
+        'data': data,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': totalPages,
+          'totalItems': filtered.length,
+          'hasNext': page < totalPages,
+          'hasPrev': page > 1,
+        },
+      });
     }
     if (options.path == '/inventory/stock-movements' &&
         options.method == 'POST') {
@@ -1795,8 +2087,10 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     }
     if (options.path == '/inventory/stock-balances' &&
         options.method == 'GET') {
-      // Bare array — the real stockBalances shape (item×warehouse rows).
-      return _json([
+      // Paged envelope — the real stockBalances shape (item×warehouse
+      // rows), sliced by page/limit like the model.
+      final q = options.queryParameters;
+      final rows = [
         {
           'item_id': 1,
           'item_code': 'FG001',
@@ -1815,39 +2109,76 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'warehouse_name': 'Raw Materials',
           'quantity': 200.0,
         },
-      ]);
+      ];
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final totalPages = (rows.length / limit).ceil();
+      final start = (page - 1) * limit;
+      final end = start + limit > rows.length ? rows.length : start + limit;
+      final data = start >= rows.length
+          ? <Map<String, dynamic>>[]
+          : rows.sublist(start, end);
+      return _json({
+        'success': true,
+        'data': data,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': totalPages,
+          'totalItems': rows.length,
+          'hasNext': page < totalPages,
+          'hasPrev': page > 1,
+        },
+      });
     }
     if (options.path == '/inventory/physical-counts' &&
         options.method == 'GET') {
-      // Enveloped array — the real PhysicalCountModel.getAll shape.
+      // Paged envelope — the real PhysicalCountModel.getAll shape,
+      // sliced by page/limit like the model.
+      final q = options.queryParameters;
+      final rows = [
+        {
+          'id': 1,
+          'count_no': 'PC-2026-001',
+          'count_date': '2026-03-01',
+          'warehouse_id': 1,
+          'warehouse_name': 'Main Warehouse',
+          'status': pc1Status,
+          'created_by': 1,
+          'total_items': 10,
+          'counted_items': 0,
+          'variance_items': 0,
+        },
+        {
+          'id': 2,
+          'count_no': 'PC-2026-002',
+          'count_date': '2026-03-05',
+          'warehouse_id': 1,
+          'warehouse_name': 'Main Warehouse',
+          'status': 'Completed',
+          'created_by': 1,
+          'total_items': 10,
+          'counted_items': 10,
+          'variance_items': 2,
+        },
+      ];
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final totalPages = (rows.length / limit).ceil();
+      final start = (page - 1) * limit;
+      final end = start + limit > rows.length ? rows.length : start + limit;
+      final data = start >= rows.length
+          ? <Map<String, dynamic>>[]
+          : rows.sublist(start, end);
       return _json({
         'success': true,
-        'data': [
-          {
-            'id': 1,
-            'count_no': 'PC-2026-001',
-            'count_date': '2026-03-01',
-            'warehouse_id': 1,
-            'warehouse_name': 'Main Warehouse',
-            'status': pc1Status,
-            'created_by': 1,
-            'total_items': 10,
-            'counted_items': 0,
-            'variance_items': 0,
-          },
-          {
-            'id': 2,
-            'count_no': 'PC-2026-002',
-            'count_date': '2026-03-05',
-            'warehouse_id': 1,
-            'warehouse_name': 'Main Warehouse',
-            'status': 'Completed',
-            'created_by': 1,
-            'total_items': 10,
-            'counted_items': 10,
-            'variance_items': 2,
-          },
-        ],
+        'data': data,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': totalPages,
+          'totalItems': rows.length,
+          'hasNext': page < totalPages,
+          'hasPrev': page > 1,
+        },
       });
     }
     if (options.path == '/inventory/physical-counts/1') {
@@ -2780,10 +3111,12 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       });
     }
     if (options.path == '/invoices/returns' && options.method == 'GET') {
-      // Bare array — the real InvoiceModel.getReturnHistory shape
-      // (positive-quantity RETURN stock movements; no envelope, no
-      // pagination).
-      return _json([
+      // Paged envelope — the real InvoiceModel.getReturnHistory shape
+      // (positive-quantity RETURN stock movements) since Phase 5.
+      final q = options.queryParameters;
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final rows = [
         {
           'id': 1,
           'movement_no': 'SM-2026-0031',
@@ -2830,7 +3163,20 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'customer_id': 2,
           'customer_name': 'Beta Ltd',
         },
-      ]);
+      ];
+      final start = (page - 1) * limit;
+      final pageRows = rows.skip(start).take(limit).toList();
+      return _json({
+        'success': true,
+        'data': pageRows,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': (rows.length + limit - 1) ~/ limit,
+          'totalItems': rows.length,
+          'hasNext': start + limit < rows.length,
+          'hasPrev': page > 1,
+        },
+      });
     }
     if (options.path == '/payments' && options.method == 'GET') {
       final q = options.queryParameters;
@@ -3024,18 +3370,62 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'created_by_username': 'Fawad',
         },
       ];
-      // The server filters by the CSV `status` param only.
+      // Server-side filters (status CSV, search, date range) mirror the
+      // real getInvoices behavior.
       final statuses = (q['status'] as String?)?.split(',') ?? const [];
-      final rows = statuses.isEmpty
-          ? all
-          : all.where((i) => statuses.contains(i['status'])).toList();
-      return _json({'success': true, 'data': rows});
+      final search = (q['search'] as String?) ?? '';
+      final startDate = (q['start_date'] as String?) ?? '';
+      final endDate = (q['end_date'] as String?) ?? '';
+      var rows = all;
+      if (statuses.isNotEmpty) {
+        rows = rows.where((i) => statuses.contains(i['status'])).toList();
+      }
+      if (search.isNotEmpty) {
+        final term = search.toLowerCase();
+        rows = rows
+            .where(
+              (i) =>
+                  (i['invoice_no'] as String).toLowerCase().contains(term) ||
+                  (i['customer_name'] as String).toLowerCase().contains(term),
+            )
+            .toList();
+      }
+      if (startDate.isNotEmpty) {
+        rows = rows
+            .where(
+              (i) => (i['invoice_date'] as String).compareTo(startDate) >= 0,
+            )
+            .toList();
+      }
+      if (endDate.isNotEmpty) {
+        rows = rows
+            .where(
+              (i) => (i['invoice_date'] as String).compareTo(endDate) <= 0,
+            )
+            .toList();
+      }
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final start = (page - 1) * limit;
+      final pageRows = rows.skip(start).take(limit).toList();
+      return _json({
+        'success': true,
+        'data': pageRows,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': (rows.length + limit - 1) ~/ limit,
+          'totalItems': rows.length,
+          'hasNext': start + limit < rows.length,
+          'hasPrev': page > 1,
+        },
+      });
     }
     if (options.path == '/quotations' && options.method == 'GET') {
-      // Bare array — the real getQuotations shape (no envelope, no
-      // pagination; the client grid sorts/filters client-side).
+      // Paged envelope — the real getQuotations shape since Phase 5
+      // (server-side filters/sort; the client grid pages through it).
       lastQuotationsQuery = options.queryParameters;
-      return _json([
+      final q = options.queryParameters;
+      var rows = [
         {
           'id': 1,
           'quotation_no': 'QT-2026-001',
@@ -3090,7 +3480,26 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'created_at': '2026-02-02 11:00:00',
           'updated_at': '2026-02-02 11:00:00',
         },
-      ]);
+      ];
+      final status = (q['status'] as String?) ?? '';
+      if (status.isNotEmpty) {
+        rows = rows.where((i) => i['status'] == status).toList();
+      }
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final start = (page - 1) * limit;
+      final pageRows = rows.skip(start).take(limit).toList();
+      return _json({
+        'success': true,
+        'data': pageRows,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': (rows.length + limit - 1) ~/ limit,
+          'totalItems': rows.length,
+          'hasNext': start + limit < rows.length,
+          'hasPrev': page > 1,
+        },
+      });
     }
     if (options.path == '/quotations/1' && options.method == 'GET') {
       // Bare object with items — the real getQuotation shape.
@@ -3189,10 +3598,11 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       }, status: 201);
     }
     if (options.path == '/sales-orders' && options.method == 'GET') {
-      // Bare array — the real getSalesOrders shape (no envelope, no
-      // pagination; the client grid sorts/filters client-side).
+      // Paged envelope — the real getSalesOrders shape since Phase 5
+      // (server-side filters/sort; the client grid pages through it).
       lastSalesOrdersQuery = options.queryParameters;
-      return _json([
+      final q = options.queryParameters;
+      var rows = [
         {
           'id': 1,
           'so_no': 'SO-2026-001',
@@ -3252,7 +3662,26 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'created_at': '2026-02-02 11:00:00',
           'updated_at': '2026-02-02 11:00:00',
         },
-      ]);
+      ];
+      final status = (q['status'] as String?) ?? '';
+      if (status.isNotEmpty) {
+        rows = rows.where((i) => i['status'] == status).toList();
+      }
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final start = (page - 1) * limit;
+      final pageRows = rows.skip(start).take(limit).toList();
+      return _json({
+        'success': true,
+        'data': pageRows,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': (rows.length + limit - 1) ~/ limit,
+          'totalItems': rows.length,
+          'hasNext': start + limit < rows.length,
+          'hasPrev': page > 1,
+        },
+      });
     }
     if (options.path == '/sales-orders' && options.method == 'POST') {
       final body = options.data as Map<String, dynamic>;
@@ -3650,8 +4079,11 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     }
     // ── Production module (PORTING.md §13) ────────────────────────
     if (options.path == '/productions' && options.method == 'GET') {
-      // Bare array — the ProductionModel.getAll shape.
-      final rows = <Map<String, dynamic>>[
+      // Paged envelope — the ProductionModel.getAll shape since Phase 7
+      // (server-side search/sort).
+      final q = options.queryParameters;
+      final search = (q['search'] as String?) ?? '';
+      var rows = <Map<String, dynamic>>[
         {
           'id': 4,
           'production_no': 'PROD-2026-0044',
@@ -3681,7 +4113,34 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         },
       ];
       if (production4Deleted) rows.removeAt(0);
-      return _json(rows);
+      if (search.isNotEmpty) {
+        final term = search.toLowerCase();
+        rows = rows
+            .where(
+              (p) =>
+                  (p['production_no'] as String).toLowerCase().contains(term) ||
+                  (p['output_item_name'] as String).toLowerCase().contains(
+                    term,
+                  ) ||
+                  (p['batch_no'] as String).toLowerCase().contains(term),
+            )
+            .toList();
+      }
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final start = (page - 1) * limit;
+      final pageRows = rows.skip(start).take(limit).toList();
+      return _json({
+        'success': true,
+        'data': pageRows,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': (rows.length + limit - 1) ~/ limit,
+          'totalItems': rows.length,
+          'hasNext': start + limit < rows.length,
+          'hasPrev': page > 1,
+        },
+      });
     }
     if (options.path == '/productions/4' && options.method == 'GET') {
       productionDetailFetchCount++;
@@ -3754,7 +4213,11 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     }
 
     if (options.path == '/boms' && options.method == 'GET') {
-      return _json([
+      // Paged envelope — the BOMModel.getAll shape since Phase 7
+      // (server-side search/sort).
+      final q = options.queryParameters;
+      final search = (q['search'] as String?) ?? '';
+      var rows = <Map<String, dynamic>>[
         {
           'id': 1,
           'bom_no': 'BOM-2026-0001',
@@ -3771,7 +4234,35 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'item_count': 2,
           'total_material_cost': 27.5,
         },
-      ]);
+      ];
+      if (search.isNotEmpty) {
+        final term = search.toLowerCase();
+        rows = rows
+            .where(
+              (b) =>
+                  (b['bom_no'] as String).toLowerCase().contains(term) ||
+                  (b['bom_name'] as String).toLowerCase().contains(term) ||
+                  (b['finished_item_name'] as String).toLowerCase().contains(
+                    term,
+                  ),
+            )
+            .toList();
+      }
+      final page = int.tryParse('${q['page']}') ?? 1;
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final start = (page - 1) * limit;
+      final pageRows = rows.skip(start).take(limit).toList();
+      return _json({
+        'success': true,
+        'data': pageRows,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': (rows.length + limit - 1) ~/ limit,
+          'totalItems': rows.length,
+          'hasNext': start + limit < rows.length,
+          'hasPrev': page > 1,
+        },
+      });
     }
     if (options.path == '/boms/1' && options.method == 'GET') {
       bomDetailFetchCount++;
@@ -4072,10 +4563,35 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         },
       ];
       final category = lastForecastDemandQuery?['category'];
-      final rows = category == 'Parts'
-          ? [demandRows.first]
-          : demandRows;
-      return _json({'success': true, 'data': rows});
+      var rows = category == 'Parts' ? [demandRows.first] : demandRows;
+      // Server-side search (item code / name) + filter-then-slice paging.
+      final search =
+          (lastForecastDemandQuery?['search'] as String?)?.toLowerCase() ??
+          '';
+      if (search.isNotEmpty) {
+        rows = rows
+            .where(
+              (r) =>
+                  (r['itemCode'] as String).toLowerCase().contains(search) ||
+                  (r['itemName'] as String).toLowerCase().contains(search),
+            )
+            .toList();
+      }
+      final page = int.tryParse('${lastForecastDemandQuery?['page']}') ?? 1;
+      final limit = int.tryParse('${lastForecastDemandQuery?['limit']}') ?? 10;
+      final start = (page - 1) * limit;
+      final pageRows = rows.skip(start).take(limit).toList();
+      return _json({
+        'success': true,
+        'data': pageRows,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': (rows.length + limit - 1) ~/ limit,
+          'totalItems': rows.length,
+          'hasNext': start + limit < rows.length,
+          'hasPrev': page > 1,
+        },
+      });
     }
     if (options.path == '/forecasts/trends') {
       lastTrendsItemId = (options.queryParameters['itemId'] as num?)?.toInt();
@@ -5301,19 +5817,18 @@ void main() {
     expect(find.text('120'), findsOneWidget);
   });
 
-  testWidgets('items screen shows the keyboard hint status bar', (
+  testWidgets('items screen shows the server pagination bar', (
     tester,
   ) async {
     useWideSurface(tester);
     await bootToItems(tester);
 
-    // AG-Grid-style status bar beneath the grid: arrow-key cell
-    // navigation + the Enter/F2 open-detail shortcuts (the keys bound by
-    // rowDetailShortcutActions).
-    expect(find.text('↑ ↓ ← →'), findsOneWidget);
-    expect(find.text('Enter / F2'), findsOneWidget);
-    expect(find.text('Navigate'), findsOneWidget);
-    expect(find.text('Open'), findsOneWidget);
+    // Server-side pagination bar beneath the grid (the keyboard-hint
+    // status bar was removed with the paging rollout): page indicator,
+    // item count, per-page selector + prev/next chevrons.
+    expect(find.text('Page 1 of 1'), findsOneWidget);
+    expect(find.text('· 5 Items'), findsOneWidget);
+    expect(find.text('per page'), findsOneWidget);
   });
 
   testWidgets('items screen search sends the server search param', (
@@ -6102,10 +6617,6 @@ void main() {
     // Offset envelope → pagination bar (2 rows at limit 50 = 1 page).
     expect(find.text('Page 1 of 1'), findsOneWidget);
     expect(find.text('· 2 logs'), findsOneWidget);
-    // Keyboard hint status bar (shared GridStatusBar, like the other
-    // read-only grid screens).
-    expect(find.text('↑ ↓ ← →'), findsOneWidget);
-    expect(find.text('Enter / F2'), findsOneWidget);
   });
 
   testWidgets('activity log search filters the grid server-side', (
@@ -7371,7 +7882,7 @@ void main() {
     if (file.existsSync()) file.deleteSync();
   });
 
-  testWidgets('sales screen search filters client-side (no server param)', (
+  testWidgets('sales screen search refetches from the server', (
     tester,
   ) async {
     useWideSurface(tester);
@@ -7382,12 +7893,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
-    // The endpoint has no search param — the request stays unfiltered.
-    expect(adapter.lastInvoicesQuery?.containsKey('search'), isFalse);
+    // Search is server-side — the request carries the term and the
+    // grid + summary follow the server-filtered result.
+    expect(adapter.lastInvoicesQuery?['search'], 'acme');
     expect(find.text('INV-2026-440955'), findsOneWidget);
     expect(find.text('INV-2026-440956'), findsNothing);
-    // Summary re-totals over the filtered rows (the total also appears
-    // in the filtered grid row itself).
+    // Summary re-totals over the server-filtered rows.
     expect(find.text('1,500.00'), findsWidgets);
     expect(find.text('2,600.00'), findsNothing);
   });
@@ -7611,19 +8122,60 @@ void main() {
     expect(find.text('Return Qty'), findsOneWidget);
   });
 
-  testWidgets('invoice returns screen shows the keyboard hint status bar', (
+  testWidgets('invoice returns shows compact cards under the mobile breakpoint', (
     tester,
   ) async {
-    useWideSurface(tester);
+    // Pump the screen directly at a sub-768px width (the full app's
+    // shell keeps the desktop dashboard alive, which overflows at narrow
+    // widths — not this screen's concern). Same pattern as the purchase
+    // returns mobile test.
+    tester.view.physicalSize = const Size(600, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     final adapter = _AuthFakeAdapter();
-    await bootToInvoiceReturns(tester, adapter);
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: InvoiceReturnsScreen()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // The screen seeds a date range from the preferences — clear it so
+    // the fixture rows (May 2026) are all visible.
+    clearScreenDates(
+      tester,
+      [invoiceReturnsFromDateProvider, invoiceReturnsToDateProvider],
+    );
+    await tester.pumpAndSettle();
 
-    // The same AG-Grid-style status bar the other grids render (the
-    // offstage grids' bars are skipped by the default finders).
-    expect(find.text('↑ ↓ ← →'), findsOneWidget);
-    expect(find.text('Enter / F2'), findsOneWidget);
-    expect(find.text('Navigate'), findsOneWidget);
-    expect(find.text('Open'), findsOneWidget);
+    // Cards (no Pluto grid) render both fixture rows with their item,
+    // return no, stats and customer/warehouse meta.
+    expect(find.byType(PlutoGrid), findsNothing);
+    expect(find.text('Widget A'), findsOneWidget);
+    expect(find.text('Widget B'), findsOneWidget);
+    expect(find.textContaining('SM-2026-0031'), findsOneWidget);
+    expect(find.text('400.00'), findsOneWidget); // 4 × 100 return value
+    expect(find.text('90.00'), findsOneWidget); // 2 × 45 return value
+    expect(find.text('Main Warehouse'), findsOneWidget);
+    expect(find.text('Acme Corp'), findsOneWidget);
+    expect(find.text('Damaged on delivery'), findsOneWidget);
+
+    // Tapping a card opens the detail modal (Close button is dialog-only).
+    await tester.tap(find.text('Widget A'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextButton, 'Close'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('invoice returns screen F2 opens the return detail dialog', (
@@ -7762,6 +8314,19 @@ void main() {
       findsOneWidget,
     );
 
+    // Pick the restock warehouse (required — invoices don't track one).
+    // Scoped to the dialog: the edit-form customer selector behind it is
+    // also a SearchableSelect<int>.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(SearchableSelect<int>),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Warehouse').last);
+    await tester.pumpAndSettle();
+
     final dialogFields = find.descendant(
       of: find.byType(Dialog),
       matching: find.byType(TextFormField),
@@ -7777,6 +8342,7 @@ void main() {
     expect((items.single as Map)['return_quantity'], 4);
     expect(body['reason'], 'Damaged');
     expect(body['disposition'], 'credit');
+    expect(body['warehouse_id'], 1);
     // Toast with the net return from the enveloped data payload; the
     // dialog popped itself.
     expect(
@@ -7838,6 +8404,19 @@ void main() {
     await tester.tap(find.text('Process Return'));
     await tester.pumpAndSettle();
 
+    // Pick the restock warehouse before submitting (scoped to the
+    // dialog — the invoice grid behind it has no other <int> select, but
+    // the dialog's own selects are ambiguous without the scope).
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(SearchableSelect<int>),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Warehouse').last);
+    await tester.pumpAndSettle();
+
     final dialogFields = find.descendant(
       of: find.byType(Dialog),
       matching: find.byType(TextFormField),
@@ -7850,6 +8429,79 @@ void main() {
     // the dialog stays open.
     expect(find.text('Cannot return a cancelled invoice'), findsOneWidget);
     expect(find.text('Invoice Return'), findsOneWidget);
+  });
+
+  testWidgets('invoice row menu Process Return opens the return dialog', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSales(tester, adapter);
+
+    // Open the first invoice row's ⋮ menu → Process Return (hidden only
+    // for Draft / Cancelled / fully-Returned invoices; invoice 1 is
+    // Unpaid).
+    final gridMenuButton = find
+        .descendant(
+          of: find.byType(PlutoGrid),
+          matching: find.byIcon(Icons.more_vert),
+        )
+        .first;
+    await tester.tap(gridMenuButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Process Return'), findsOneWidget);
+    await tester.tap(find.text('Process Return'));
+    await tester.pumpAndSettle();
+
+    // The dialog fetches fresh detail (qty 10, returned 0 → 10 available)
+    // and defaults the disposition to credit (balance still owed).
+    expect(find.text('Invoice Return'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(Dialog), matching: find.text('Widget A')),
+      findsOneWidget,
+    );
+
+    // The restock warehouse is required — submitting without one blocks.
+    final dialogFields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextFormField),
+    );
+    await tester.enterText(dialogFields.first, '4');
+    await tester.tap(find.widgetWithText(FilledButton, 'Return'));
+    await tester.pumpAndSettle();
+    // The message appears twice: the picker's hint + the error banner.
+    expect(
+      find.text('Select a warehouse to restock into'),
+      findsNWidgets(2),
+    );
+    expect(adapter.lastInvoiceReturnBody, isNull);
+
+    // Pick the restock warehouse and submit successfully.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(SearchableSelect<int>),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Main Warehouse').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(dialogFields.at(1), 'Damaged');
+    await tester.tap(find.widgetWithText(FilledButton, 'Return'));
+    await tester.pumpAndSettle();
+
+    final body = adapter.lastInvoiceReturnBody!;
+    expect((body['items'] as List).single['invoice_item_id'], 10);
+    expect((body['items'] as List).single['return_quantity'], 4);
+    expect(body['reason'], 'Damaged');
+    expect(body['disposition'], 'credit');
+    expect(body['warehouse_id'], 1);
+    expect(
+      find.textContaining('Return processed successfully'),
+      findsOneWidget,
+    );
+    expect(find.text('Invoice Return'), findsNothing);
   });
 
   // Payments module (PORTING.md §5/§6) — the second server-paginated
@@ -8945,9 +9597,6 @@ void main() {
     // Server pagination block → bar (25 suppliers at limit 10 = 3 pages).
     expect(find.text('Page 1 of 3'), findsOneWidget);
     expect(find.text('· 25 Suppliers'), findsOneWidget);
-    // Keyboard hint status bar (shared GridStatusBar, like the items grid).
-    expect(find.text('↑ ↓ ← →'), findsOneWidget);
-    expect(find.text('Enter / F2'), findsOneWidget);
   });
 
   testWidgets('customers screen renders the server-paged grid', (tester) async {
@@ -9831,23 +10480,205 @@ void main() {
     final adapter = _AuthFakeAdapter();
     await bootToPurchaseReturns(tester, adapter);
 
-    // Rows from the bare-array fake (return no + item), the localized
-    // type badges, the qty magnitudes and the currency-formatted values.
-    expect(find.text('SM-2026-0018'), findsOneWidget);
-    expect(find.text('SM-2026-0021'), findsOneWidget);
-    expect(find.text('Raw Material A'), findsOneWidget);
-    expect(find.text('Finished Good B'), findsOneWidget);
+    // Rows from the header fake (return no + source doc), the localized
+    // type badges, the total qty magnitudes and the currency-formatted
+    // totals.
+    expect(find.text('PR-2026-0001'), findsOneWidget);
+    expect(find.text('PR-2026-0002'), findsOneWidget);
+    expect(find.text('PUR-2026-011'), findsOneWidget); // source doc
+    expect(find.text('PO-2026-002'), findsOneWidget);
     expect(find.text('Purchase Return'), findsOneWidget); // type badge
     expect(find.text('PO Return'), findsOneWidget);
-    expect(find.text('5'), findsOneWidget); // |quantity| of row 1
-    expect(find.text('10.00'), findsOneWidget); // unit cost, row 1
-    expect(find.text('50.00'), findsOneWidget); // 5 × 10 return value
-    expect(find.text('40.00'), findsOneWidget); // unit cost, row 2
-    expect(find.text('80.00'), findsOneWidget); // 2 × 40 return value
+    expect(find.text('5'), findsOneWidget); // total qty of row 1
+    expect(find.text('50.00'), findsOneWidget); // total amount, row 1
+    expect(find.text('2'), findsWidgets); // total qty of row 2
+    expect(find.text('80.00'), findsOneWidget); // total amount, row 2
+    // Status column badges — row 1 Posted, row 2 Voided (fixture).
+    expect(find.text('Posted'), findsOneWidget);
+    expect(find.text('Voided'), findsOneWidget);
     // Grid column headers.
     expect(find.text('Return No'), findsOneWidget);
     expect(find.text('Return Date'), findsOneWidget);
     expect(find.text('Type'), findsOneWidget);
+  });
+
+  testWidgets('purchase returns status filter sends the status param', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseReturns(tester, adapter);
+
+    // Open the toolbar status dropdown (a SearchableSelect) and pick
+    // Posted — the grid then refetches with the server status param.
+    await tester.tap(find.byType(SearchableSelect<String?>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Posted').last);
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastPurchaseReturnsQuery?['status'], 'POSTED');
+    // Row 1 (Posted) remains; row 2 (Voided) is filtered out server-side.
+    expect(find.text('PR-2026-0001'), findsOneWidget);
+    expect(find.text('PR-2026-0002'), findsNothing);
+
+    // Switch to Voided → only row 2 remains.
+    await tester.tap(find.byType(SearchableSelect<String?>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Voided').last);
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastPurchaseReturnsQuery?['status'], 'VOIDED');
+    expect(find.text('PR-2026-0002'), findsOneWidget);
+    expect(find.text('PR-2026-0001'), findsNothing);
+  });
+
+  testWidgets('purchase returns date-range filter sends start/end dates', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseReturns(tester, adapter);
+
+    // The toolbar's pill picker is present (its own interaction is
+    // covered by date_range_picker_test.dart).
+    expect(find.byType(DateRangeFilter), findsOneWidget);
+
+    // Set the range through the providers — the same pattern as the
+    // activity-log date-range test.
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(PurchaseReturnsScreen)),
+    );
+    container.read(purchaseReturnsFromDateProvider.notifier).state =
+        DateTime(2026, 2, 11);
+    await tester.pumpAndSettle();
+    container.read(purchaseReturnsToDateProvider.notifier).state =
+        DateTime(2026, 2, 12);
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastPurchaseReturnsQuery?['start_date'], '2026-02-11');
+    expect(adapter.lastPurchaseReturnsQuery?['end_date'], '2026-02-12');
+    // Only row 2 (2026-02-12) falls inside the range.
+    expect(find.text('PR-2026-0002'), findsOneWidget);
+    expect(find.text('PR-2026-0001'), findsNothing);
+
+    // The clear button resets the range and refetches without dates.
+    await tester.tap(find.byTooltip('Clear'));
+    await tester.pumpAndSettle();
+    expect(adapter.lastPurchaseReturnsQuery?['start_date'], isNull);
+    expect(adapter.lastPurchaseReturnsQuery?['end_date'], isNull);
+    expect(find.text('PR-2026-0001'), findsOneWidget);
+  });
+
+  testWidgets('purchase returns row menu Void posts the void + flips badge', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseReturns(tester, adapter);
+
+    // Row 1's ⋮ menu offers Void (row 2 is already VOIDED → View only).
+    final gridMenuButton = find
+        .descendant(
+          of: find.byType(PlutoGrid),
+          matching: find.byIcon(Icons.more_vert),
+        )
+        .first;
+    await tester.tap(gridMenuButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Void'), findsOneWidget);
+    await tester.tap(find.text('Void'));
+    await tester.pumpAndSettle();
+
+    // Confirmation dialog with an optional reason field.
+    expect(find.text('Void Return'), findsOneWidget);
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(TextField),
+      ),
+      'Wrong goods received',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Void'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastPurchaseReturnVoidId, 1);
+    expect(
+      adapter.lastPurchaseReturnVoidBody?['reason'],
+      'Wrong goods received',
+    );
+    expect(find.text('Return voided successfully'), findsOneWidget);
+    expect(find.text('Void Return'), findsNothing);
+
+    // The refetched grid shows both rows voided now.
+    expect(find.text('Voided'), findsNWidgets(2));
+    expect(find.text('Posted'), findsNothing);
+  });
+
+  testWidgets('purchase returns shows compact cards under the mobile breakpoint', (
+    tester,
+  ) async {
+    // Pump the returns screen directly at a sub-768px width (the full
+    // app's shell keeps the desktop dashboard alive, which overflows at
+    // narrow widths — not this screen's concern).
+    tester.view.physicalSize = const Size(600, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final adapter = _AuthFakeAdapter();
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: PurchaseReturnsScreen()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Cards (no Pluto grid) render both fixture headers with their
+    // badges, reference docs, stats and row 1's reason.
+    expect(find.byType(PlutoGrid), findsNothing);
+    expect(find.text('PR-2026-0001'), findsOneWidget);
+    expect(find.text('PR-2026-0002'), findsOneWidget);
+    expect(find.textContaining('PUR-2026-011'), findsOneWidget);
+    expect(find.text('Posted'), findsOneWidget);
+    expect(find.text('Voided'), findsOneWidget);
+    expect(find.text('Purchase Return'), findsOneWidget); // type badge
+    expect(find.text('PO Return'), findsOneWidget);
+    expect(find.text('5'), findsOneWidget); // total qty of row 1
+    expect(find.text('50.00'), findsOneWidget); // total amount, row 1
+    expect(find.text('80.00'), findsOneWidget); // total amount, row 2
+    expect(find.text('Damaged on delivery'), findsOneWidget);
+
+    // Tapping a card opens the detail modal (Close button is dialog-only).
+    await tester.tap(find.text('PR-2026-0001'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextButton, 'Close'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.pumpAndSettle();
+
+    // The posted card's ⋮ menu offers Void; voiding flips the badge.
+    await tester.tap(find.byIcon(Icons.more_vert).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Void'), findsOneWidget);
+    await tester.tap(find.text('Void'));
+    await tester.pumpAndSettle();
+    expect(find.text('Void Return'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Void'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.lastPurchaseReturnVoidId, 1);
+    expect(find.text('Return voided successfully'), findsOneWidget);
+    // Both cards now voided after the refetch.
+    expect(find.text('Voided'), findsNWidgets(2));
+    expect(find.text('Posted'), findsNothing);
   });
 
   testWidgets('purchase returns grid exports the rows to CSV', (tester) async {
@@ -9896,28 +10727,13 @@ void main() {
     expect(file.existsSync(), isTrue);
     final content = file.readAsStringSync();
     expect(content, contains('Return No'));
-    expect(content, contains('SM-2026-0018'));
-    expect(content, contains('Raw Material A'));
+    expect(content, contains('PR-2026-0001'));
+    expect(content, contains('PUR-2026-011'));
     expect(content, contains('Purchase Return'));
-    expect(content, contains('50.00')); // 5 × 10 return value
-    expect(content, contains('SM-2026-0021'));
-    expect(content, contains('80.00')); // 2 × 40 return value
+    expect(content, contains('50.00')); // 5 × 10 total amount
+    expect(content, contains('PR-2026-0002'));
+    expect(content, contains('80.00')); // 2 × 40 total amount
     if (file.existsSync()) file.deleteSync();
-  });
-
-  testWidgets('purchase returns screen shows the keyboard hint status bar', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToPurchaseReturns(tester, adapter);
-
-    // The same AG-Grid-style status bar the other grids render (the
-    // offstage PO grid's bar is skipped by the default finders).
-    expect(find.text('↑ ↓ ← →'), findsOneWidget);
-    expect(find.text('Enter / F2'), findsOneWidget);
-    expect(find.text('Navigate'), findsOneWidget);
-    expect(find.text('Open'), findsOneWidget);
   });
 
   testWidgets('purchasing shell defaults to PO and switches to returns', (
@@ -9930,14 +10746,206 @@ void main() {
     // Default tab = the purchase orders grid; the returns rows are
     // offstage (IndexedStack) and skipped by the default finders.
     expect(find.text('PO-2026-001'), findsOneWidget);
-    expect(find.text('SM-2026-0018'), findsNothing);
+    expect(find.text('PR-2026-0001'), findsNothing);
 
     await tester.tap(find.text('Purchase Returns'));
     await tester.pumpAndSettle();
 
-    expect(find.text('SM-2026-0018'), findsOneWidget);
+    expect(find.text('PR-2026-0001'), findsOneWidget);
     expect(find.text('PO-2026-001'), findsNothing);
   });
+
+  testWidgets('returns tab New Return: source picker → purchase form → POST', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseReturns(tester, adapter);
+
+    // New Return opens the source picker (default: Direct Purchase tab).
+    await tester.tap(find.text('New Return'));
+    await tester.pumpAndSettle();
+    expect(find.text('Select Return Source'), findsOneWidget);
+    expect(find.text('PUR-2026-001'), findsOneWidget);
+
+    // Picking a purchase opens the pre-filled multi-line form.
+    await tester.tap(find.text('PUR-2026-001'));
+    await tester.pumpAndSettle();
+    expect(find.text('Direct Purchase — PUR-2026-001'), findsOneWidget);
+    expect(find.text('Raw Material A'), findsWidgets);
+
+    // Enter a return qty + a reason (the dialog's two text fields; the
+    // toolbar search field behind the dialog is excluded), then submit.
+    final dialogFields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(dialogFields.first, '50');
+    await tester.enterText(dialogFields.at(1), 'Damaged');
+    await tester.tap(find.widgetWithText(FilledButton, 'Return to Supplier'));
+    await tester.pumpAndSettle();
+
+    final body = adapter.lastPurchaseReturnCreateBody!;
+    expect(body['source_type'], 'PURCHASE');
+    expect(body['source_id'], 1);
+    expect(body['warehouse_id'], 1);
+    expect(body['reason'], 'Damaged');
+    expect(body['return_date'], isoDate(DateTime.now()));
+    final items = (body['items'] as List).cast<Map<String, dynamic>>();
+    expect(items.single['source_item_id'], 1);
+    expect(items.single['quantity'], 50);
+    // Toast with the computed return amount; the form popped itself.
+    expect(
+      find.textContaining('Return processed successfully'),
+      findsOneWidget,
+    );
+    expect(find.text('Direct Purchase — PUR-2026-001'), findsNothing);
+  });
+
+  testWidgets('purchases row menu Return opens the pre-seeded form', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Purchases'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Open the first row's ⋮ menu → Return.
+    final gridMenuButton = find
+        .descendant(
+          of: find.byType(PlutoGrid),
+          matching: find.byIcon(Icons.more_vert),
+        )
+        .first;
+    await tester.tap(gridMenuButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Return to Supplier'), findsOneWidget);
+    await tester.tap(find.text('Return to Supplier'));
+    await tester.pumpAndSettle();
+
+    // Form pre-seeded with PUR-2026-001 (the first purchase row).
+    expect(find.text('Direct Purchase — PUR-2026-001'), findsOneWidget);
+    final dialogFields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(dialogFields.first, '25');
+    await tester.tap(find.widgetWithText(FilledButton, 'Return to Supplier'));
+    await tester.pumpAndSettle();
+
+    final body = adapter.lastPurchaseReturnCreateBody!;
+    expect(body['source_type'], 'PURCHASE');
+    expect(body['source_id'], 1);
+    expect((body['items'] as List).single['quantity'], 25);
+  });
+
+  testWidgets('PO row menu Process Return opens the form with received lines', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..po1Status = 'Submitted';
+    await bootToPurchaseOrders(tester, adapter);
+
+    // Open the first PO row's ⋮ menu → Process Return.
+    final gridMenuButton = find
+        .descendant(
+          of: find.byType(PlutoGrid),
+          matching: find.byIcon(Icons.more_vert),
+        )
+        .first;
+    await tester.tap(gridMenuButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Process Return'), findsOneWidget);
+    await tester.tap(find.text('Process Return'));
+    await tester.pumpAndSettle();
+
+    // The form loads the PO detail and lists only received lines:
+    // item 2 (received 10) is returnable; item 1 (received 0) is not.
+    expect(find.text('Purchase Order — PO-2026-001'), findsOneWidget);
+    expect(find.text('Finished Good B'), findsOneWidget);
+    expect(find.text('Raw Material A'), findsNothing);
+
+    final dialogFields = find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(dialogFields.first, '4');
+    await tester.tap(find.widgetWithText(FilledButton, 'Return to Supplier'));
+    await tester.pumpAndSettle();
+
+    final body = adapter.lastPurchaseReturnCreateBody!;
+    expect(body['source_type'], 'PURCHASE_ORDER');
+    expect(body['source_id'], 1);
+    final items = (body['items'] as List).cast<Map<String, dynamic>>();
+    expect(items.single['source_item_id'], 2); // the received PO line
+    expect(items.single['quantity'], 4);
+  });
+
+  testWidgets(
+    'purchase return form asks for the warehouse when stock moved since '
+    'receipt',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter()..item4StockInSecondary = true;
+      // The purchase fixture is item 4, whose stock lives only in the
+      // Raw Materials warehouse (id 2) — as if it was transferred out of
+      // the receipt warehouse WH-MAIN (id 1) since receipt.
+      await bootToPurchaseReturns(tester, adapter);
+      await tester.tap(find.text('New Return'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('PUR-2026-001'));
+      await tester.pumpAndSettle();
+
+      // Enter a return qty — the form now detects the receipt warehouse
+      // can't cover it and switches to a picker with a warning.
+      final dialogFields = find.descendant(
+        of: find.byType(Dialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(dialogFields.first, '1');
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          "This item's stock no longer sits in the receipt warehouse — "
+          'select the warehouse to return from',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Icons.lock_outline), findsNothing);
+
+      // Picking the warehouse the stock moved to posts the return with
+      // its id.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(Dialog),
+          matching: find.byType(SearchableSelect<int>),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // The picker's id-2 option is the warehouse the stock moved to
+      // (named 'Raw Materials' in the fixtures — the same id the item
+      // detail's stock_by_warehouse reports). Scoped to the option's
+      // InkWell: the bare text also appears in grid cells behind the
+      // dialog, so tapping by text would hit the modal barrier instead.
+      expect(find.widgetWithText(InkWell, 'Raw Materials'), findsOneWidget);
+      await tester.tap(find.widgetWithText(InkWell, 'Raw Materials'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Return to Supplier'));
+      await tester.pumpAndSettle();
+
+      final body = adapter.lastPurchaseReturnCreateBody!;
+      expect(body['source_type'], 'PURCHASE');
+      expect(body['source_id'], 1);
+      expect(body['warehouse_id'], 2); // the warehouse stock sits in now
+      expect((body['items'] as List).single['quantity'], 1);
+    },
+  );
 
   testWidgets('purchase orders screen New PO button opens the create form', (
     tester,
@@ -10435,142 +11443,6 @@ void main() {
     expect(find.text('Raw Material A'), findsOneWidget);
     expect(find.text('Alpha Traders'), findsOneWidget);
     expect(find.text('INV-101'), findsOneWidget);
-  });
-
-  testWidgets('process return posts quantity + reason and refetches', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToPurchaseOrders(tester, adapter);
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.text('Purchases'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // Open the detail dialog for PUR-2026-001 (double-tap the row).
-    await tester.tap(find.text('PUR-2026-001'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('PUR-2026-001'));
-    await tester.pumpAndSettle();
-
-    // Detail shows the Process Return action, then opens the return form.
-    expect(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Process Return'),
-      ),
-      findsOneWidget,
-    );
-    await tester.tap(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Process Return'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // Fill qty + reason and submit.
-    await tester.enterText(find.byType(TextFormField).first, '50');
-    await tester.enterText(find.byType(TextFormField).at(1), 'Damaged');
-    await tester.tap(find.widgetWithText(FilledButton, 'Return to Supplier'));
-    await tester.pumpAndSettle();
-
-    expect(adapter.lastPurchaseReturnBody?['quantity'], 50);
-    expect(adapter.lastPurchaseReturnBody?['reason'], 'Damaged');
-    expect(adapter.purchase1ReturnedQty, 50);
-    // Toast (with the returned value from the enveloped data payload) +
-    // the detail refetched: the Returned Qty tile reads 50 (the stateful
-    // GET was re-read) and 50 remain returnable.
-    expect(
-      find.textContaining('Return processed successfully'),
-      findsOneWidget,
-    );
-    expect(find.text('50'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Process Return'),
-      ),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('process return validates qty against the available amount', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToPurchaseOrders(tester, adapter);
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.text('Purchases'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // Open the detail dialog for PUR-2026-001 and the return form.
-    await tester.tap(find.text('PUR-2026-001'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('PUR-2026-001'));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Process Return'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // 500 exceeds the 100 available — the validator blocks the POST.
-    await tester.enterText(find.byType(TextFormField).first, '500');
-    await tester.tap(find.widgetWithText(FilledButton, 'Return to Supplier'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('Return quantity exceeds the available quantity'),
-      findsOneWidget,
-    );
-    expect(adapter.lastPurchaseReturnBody, isNull);
-  });
-
-  testWidgets('process return surfaces a server rejection', (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter()..rejectPurchaseReturn = true;
-    await bootToPurchaseOrders(tester, adapter);
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.text('Purchases'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // Open the detail dialog for PUR-2026-001 and the return form.
-    await tester.tap(find.text('PUR-2026-001'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('PUR-2026-001'));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Process Return'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField).first, '50');
-    await tester.tap(find.widgetWithText(FilledButton, 'Return to Supplier'));
-    await tester.pumpAndSettle();
-
-    // The server's message surfaces in the ErrorBanner; the dialog stays
-    // open with the submit action available and no quantity recorded.
-    expect(find.text('Insufficient stock remaining to return'), findsOneWidget);
-    expect(find.text('Return to Supplier'), findsOneWidget);
-    expect(adapter.purchase1ReturnedQty, 0);
   });
 
   testWidgets('items screen F2 opens the item detail dialog', (tester) async {
@@ -11967,9 +12839,10 @@ void main() {
     await tester.tap(find.text('Adjustment').last);
     await tester.pumpAndSettle();
 
-    // The list refetched with the movement_type query param and now shows
-    // only the adjustment row.
-    expect(adapter.lastMovementQuery, {'movement_type': 'ADJUSTMENT'});
+    // The list refetched with the movement_type query param (plus the
+    // paged request's page/limit/sortOrder) and now shows only the
+    // adjustment row.
+    expect(adapter.lastMovementQuery, containsPair('movement_type', 'ADJUSTMENT'));
     expect(find.text('SM-2026-0102'), findsOneWidget);
     expect(find.text('SM-2026-0100'), findsNothing);
     expect(find.text('SM-2026-0101'), findsNothing);
@@ -11992,7 +12865,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Adjustment').last);
     await tester.pumpAndSettle();
-    expect(adapter.lastMovementQuery, {'movement_type': 'ADJUSTMENT'});
+    expect(adapter.lastMovementQuery, containsPair('movement_type', 'ADJUSTMENT'));
 
     // Back to All — the refetch drops the query param.
     await tester.tap(find.byType(SearchableSelect<String>));

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../data/repositories/api_result.dart';
+import '../../data/repositories/paged_request.dart' show PagedRequest, PagedResponse;
 import '../../data/repositories/repository_client.dart';
 import 'forecast_models.dart';
 
@@ -45,13 +46,16 @@ class ForecastRepository {
         ForecastDashboardData.fromJson(json as Map<String, dynamic>),
   );
 
-  /// Demand forecast for every item, filtered server-side. The server
-  /// recomputes the forecasts on each call.
-  Future<ApiResult<List<ForecastDemand>>> demand(
+  /// One page of demand forecasts, filtered server-side. The server
+  /// recomputes the forecasts on each call, then filters and slices by
+  /// page/limit (grid-pagination §7.3 — the endpoint returns the flat
+  /// paged envelope).
+  Future<ApiResult<PagedResponse<ForecastDemand>>> demandPaged(
     ForecastDemandFilters filters,
-  ) => _api.getList(
+    PagedRequest request,
+  ) => _api.getPaged(
     '${ApiEndpoints.forecasts}/demand',
-    queryParameters: filters.toQuery(),
+    queryParameters: {...filters.toQuery(), ...request.toQuery()},
     parseItem: (Object? json) =>
         ForecastDemand.fromJson(json as Map<String, dynamic>),
   );
