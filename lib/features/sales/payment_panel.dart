@@ -15,6 +15,7 @@ import '../../data/models/invoice.dart'
     show InvoicePaymentRecord, PaymentMethod;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/searchable_select.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Payment methods offered by the reference dropdown. Matches the
 /// server's expense payment-method options; wallet methods feed the
@@ -177,7 +178,7 @@ class PaymentPanelState extends State<PaymentPanel> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       // The body scrolls internally so the panel fits the right column's

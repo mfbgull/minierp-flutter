@@ -6,16 +6,15 @@
 // vocabulary).
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 
 import '../../l10n/app_localizations.dart';
 
 /// Return badge colors — teal (returns restock the warehouse, unlike
 /// purchase returns which leave it): the light color plus the darker
 /// variant used as text on dark themes.
-(Color, Color?) invoiceReturnTypeColors(String type) => switch (type) {
-  'RETURN' => (Colors.teal, Colors.tealAccent),
-  _ => (Colors.blueGrey, Colors.blueGrey),
-};
+Color invoiceReturnTypeColors(ColorScheme scheme, String type) =>
+    StatusColors(scheme).invoiceReturnType(type);
 
 /// Localized return label (falls back to the raw server value).
 String invoiceReturnTypeLabel(AppLocalizations l10n, String type) =>

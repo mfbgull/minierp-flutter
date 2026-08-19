@@ -32,6 +32,7 @@ import '../../widgets/form_helpers.dart'
 import '../../widgets/searchable_select.dart';
 import 'calculations/production_calculations.dart';
 import 'production_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// One read-only material row of the production form — derived from
 /// the selected BOM (scaled to the entered output quantity) with the
@@ -664,7 +665,7 @@ class _BomInputsTable extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: scheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(
@@ -725,7 +726,7 @@ class _ShortfallPanel extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -786,7 +787,7 @@ class _CostPreviewRow extends StatelessWidget {
               color: Theme.of(
                 context,
               ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppBorderRadius.smRadius,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

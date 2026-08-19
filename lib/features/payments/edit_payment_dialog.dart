@@ -20,6 +20,7 @@ import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
 import '../../widgets/searchable_select.dart';
 import '../sales/payment_panel.dart' show kPaymentMethods;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the edit dialog for [payment]. [onSaved] runs after a successful
 /// PUT so the caller can invalidate its providers.
@@ -173,7 +174,7 @@ class _PaymentEditDialogState extends ConsumerState<PaymentEditDialog> {
                                 vertical: 10,
                               ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: AppBorderRadius.smRadius,
                               ),
                               suffixIcon: const Icon(
                                 Icons.calendar_today,

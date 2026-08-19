@@ -17,6 +17,7 @@ import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class ApAgingReportScreen extends ConsumerStatefulWidget {
   const ApAgingReportScreen({super.key});
@@ -181,7 +182,7 @@ class _ApAgingReportScreenState extends ConsumerState<ApAgingReportScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(

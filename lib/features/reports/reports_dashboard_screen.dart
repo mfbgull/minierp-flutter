@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../l10n/app_localizations.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Slug → localized title — the single source of truth for both the hub
 /// cards and the router's placeholder title for not-yet-ported reports.
@@ -172,15 +173,15 @@ class _ReportCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Material(
       color: scheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: AppBorderRadius.mdRadius,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppBorderRadius.mdRadius,
         child: Container(
           height: 64,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: AppBorderRadius.mdRadius,
             border: Border.all(color: scheme.outlineVariant),
           ),
           child: Row(

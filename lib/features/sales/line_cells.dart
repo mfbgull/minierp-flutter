@@ -19,6 +19,7 @@ import 'calculations/invoice_line_calc.dart'
     show CalcItemLineInput, lineIssue, LineErrorSeverity;
 import 'line_items_grid.dart';
 import 'models/sales_forms.dart' show DiscountScope, EditedField;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Re-assert focus on a cell editor after it mounts. A TextField's
 /// `autofocus` only registers the enclosing FocusScope's autofocus
@@ -341,7 +342,7 @@ class _LineCellState extends State<LineCell> {
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(3),
+            borderRadius: AppBorderRadius.xsRadius,
           ),
           child: Text(data.unitOfMeasure, style: const TextStyle(fontSize: 10)),
         ),
@@ -824,14 +825,14 @@ class _DescriptionCellState extends State<DescriptionCell> {
     final texts = AppLocalizations.of(overlayContext)!;
     return Material(
       elevation: 6,
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: AppBorderRadius.xsRadius,
       clipBehavior: Clip.antiAlias,
       child: Container(
         constraints: const BoxConstraints(maxHeight: 300),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           border: Border.all(color: theme.colorScheme.outlineVariant),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: AppBorderRadius.xsRadius,
         ),
         child: _filtered.isEmpty
             ? Padding(

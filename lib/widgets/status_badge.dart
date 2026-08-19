@@ -1,32 +1,34 @@
 import 'package:flutter/material.dart';
 
-/// Colored status chip — port of `references/utils/statusColors.ts`
-/// (PORTING.md §6). Pass the status text plus its light/dark colors from
-/// the status-color map; e.g. invoice statuses
-/// (Unpaid / Partially Paid / Paid / Overdue).
+import '../core/theme/app_border_radius.dart';
+
+/// Colored status chip — M3-aware: uses tonal surface tinting for the
+/// background instead of hardcoded alpha.
 class StatusBadge extends StatelessWidget {
   const StatusBadge({
     super.key,
     required this.status,
-    this.color = Colors.blueGrey,
+    this.color,
+    @Deprecated('M3 handles dark mode natively via ColorScheme')
     this.darkColor,
   });
 
   final String status;
-  final Color color;
+  final Color? color;
+  @Deprecated('M3 handles dark mode natively via ColorScheme')
   final Color? darkColor;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fg = isDark ? darkColor ?? color : color;
+    final scheme = Theme.of(context).colorScheme;
+    final fg = color ?? scheme.outline;
     final bg = fg.withValues(alpha: 0.14);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: AppBorderRadius.badge,
       ),
       child: Text(
         status,

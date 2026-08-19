@@ -17,6 +17,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Provider that fetches the full return detail (header + items).
 final _returnDetailProvider =
@@ -80,7 +81,7 @@ class _PurchaseReturnDetailDialog extends ConsumerWidget {
     AppLocalizations l10n,
     PurchaseReturn pr,
   ) {
-    final (color, darkColor) = returnTypeColors(pr.returnType);
+    final color = returnTypeColors(Theme.of(context).colorScheme, pr.returnType);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -108,7 +109,6 @@ class _PurchaseReturnDetailDialog extends ConsumerWidget {
               StatusBadge(
                 status: returnTypeLabel(l10n, pr.returnType),
                 color: color,
-                darkColor: darkColor,
               ),
             ],
           ),
@@ -190,7 +190,7 @@ class _ItemsTable extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: scheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Column(
         children: [

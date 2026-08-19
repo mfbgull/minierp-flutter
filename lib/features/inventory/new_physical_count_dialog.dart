@@ -15,6 +15,7 @@ import '../../widgets/form_helpers.dart'
 import '../../widgets/searchable_select.dart';
 import './inventory_providers.dart'
     show physicalCountsProvider, warehousesProvider;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 Future<void> showNewPhysicalCountDialog(BuildContext context) {
   return showDialog<void>(
@@ -166,7 +167,7 @@ class _NewPhysicalCountDialogState extends ConsumerState<_NewPhysicalCountDialog
                         horizontal: 12,
                         vertical: 10,
                       ),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
                       suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
                     ),
                     onTap: _pickDate,

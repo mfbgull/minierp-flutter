@@ -59,7 +59,7 @@ class _ActivityLogDetailDialog extends StatelessWidget {
                   ),
                   StatusBadge(
                     status: log.logLevel,
-                    color: activityLogLevelColor(log.logLevel),
+                    color: activityLogLevelColor(scheme, log.logLevel),
                   ),
                 ],
               ),

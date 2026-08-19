@@ -76,21 +76,21 @@ class IncomeStatementReportScreen extends ConsumerWidget {
           _MetricCard(
             label: l10n.reportsRevenue,
             value: Formatters.currency(data.revenue),
-            color: Colors.green,
+            color: theme.colorScheme.primary,
           ),
           const SizedBox(height: 12),
           // COGS
           _MetricCard(
             label: l10n.reportsCogs,
             value: Formatters.currency(data.cogs),
-            color: Colors.orange,
+            color: theme.colorScheme.tertiary,
           ),
           const SizedBox(height: 12),
           // Gross Profit
           _MetricCard(
             label: l10n.reportsGrossprofit,
             value: Formatters.currency(data.grossProfit),
-            color: data.grossProfit >= 0 ? Colors.green : Colors.red,
+            color: data.grossProfit >= 0 ? theme.colorScheme.primary : theme.colorScheme.error,
             bold: true,
           ),
           const SizedBox(height: 24),
@@ -100,14 +100,14 @@ class IncomeStatementReportScreen extends ConsumerWidget {
           _MetricCard(
             label: l10n.reportsExpenses,
             value: Formatters.currency(data.expenses),
-            color: Colors.orange,
+            color: theme.colorScheme.tertiary,
           ),
           const SizedBox(height: 12),
           // Net Income
           _MetricCard(
             label: l10n.reportsNetincome,
             value: Formatters.currency(data.netIncome),
-            color: data.netIncome >= 0 ? Colors.green : Colors.red,
+            color: data.netIncome >= 0 ? theme.colorScheme.primary : theme.colorScheme.error,
             bold: true,
           ),
         ],

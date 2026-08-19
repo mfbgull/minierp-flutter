@@ -18,6 +18,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/detail_error.dart';
 import 'customer_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class CustomerStatementTab extends ConsumerStatefulWidget {
   const CustomerStatementTab({super.key, required this.customerId});
@@ -224,7 +225,7 @@ class _CustomerStatementTabState extends ConsumerState<CustomerStatementTab> {
             elevation: 0,
             color: scheme.surfaceContainerLow,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppBorderRadius.mdRadius,
               side: BorderSide(color: scheme.outlineVariant),
             ),
             clipBehavior: Clip.antiAlias,
@@ -332,7 +333,7 @@ class _CustomerStatementTabState extends ConsumerState<CustomerStatementTab> {
               cell(
                 t.credit > 0 ? Formatters.currency(t.credit) : '',
                 amount: true,
-                style: TextStyle(color: Colors.green.shade700),
+                style: TextStyle(color: scheme.primary),
               ),
               cell(Formatters.currency(balance), amount: true),
             ],
@@ -370,7 +371,7 @@ class _CustomerStatementTabState extends ConsumerState<CustomerStatementTab> {
       elevation: 0,
       color: scheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppBorderRadius.mdRadius,
         side: BorderSide(color: scheme.outlineVariant),
       ),
       child: Padding(

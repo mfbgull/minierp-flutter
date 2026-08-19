@@ -27,6 +27,7 @@ import '../../widgets/searchable_select.dart';
 import '../payments/payments_providers.dart' show paymentsProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'supplier_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the web-style Record Payment modal with [supplier] pre-bound.
 Future<void> showSupplierPaymentModal(
@@ -330,7 +331,7 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
                                               ),
                                           border: OutlineInputBorder(
                                             borderRadius:
-                                                BorderRadius.circular(8),
+                                                AppBorderRadius.smRadius,
                                           ),
                                           suffixIcon: const Icon(
                                             Icons.calendar_today,

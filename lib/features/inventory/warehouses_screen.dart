@@ -10,6 +10,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
@@ -228,7 +229,7 @@ class _WarehousesScreenState extends ConsumerState<WarehousesScreen>
           alignment: Alignment.centerLeft,
           child: StatusBadge(
             status: active ? l10n.statusActive : l10n.statusInactive,
-            color: active ? Colors.green : Colors.blueGrey,
+            color: StatusColors.of(context).active(active),
           ),
         );
       },

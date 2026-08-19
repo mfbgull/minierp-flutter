@@ -46,6 +46,7 @@ import '../features/preferences/preference_providers.dart'
         userPresetsProvider,
         weekStartProvider;
 import '../l10n/app_localizations.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// The picker's selection mode ([DateRangeFilter.mode]).
 enum DateRangeMode { range, singleDate }
@@ -246,7 +247,7 @@ class _DateRangeFilterState extends ConsumerState<DateRangeFilter> {
             decoration: BoxDecoration(
               color: scheme.surface,
               border: Border.all(color: scheme.outline),
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: AppBorderRadius.badge,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -350,7 +351,7 @@ class _DateRangeFilterState extends ConsumerState<DateRangeFilter> {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
         color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: AppBorderRadius.badge,
       ),
       child: Text(
         label,
@@ -749,12 +750,12 @@ class _RangePopover extends ConsumerWidget {
       color: scheme.surface,
       elevation: 16,
       shadowColor: scheme.shadow,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: AppBorderRadius.lgRadius,
       clipBehavior: Clip.antiAlias,
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(color: scheme.outlineVariant),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppBorderRadius.lgRadius,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -807,7 +808,7 @@ class _RangePopover extends ConsumerWidget {
                             ),
                             decoration: BoxDecoration(
                               color: scheme.error,
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: AppBorderRadius.xsRadius,
                             ),
                             child: Icon(
                               Icons.close,
@@ -1011,10 +1012,10 @@ class _RangePopover extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 1),
       child: Material(
         color: active ? scheme.inverseSurface : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppBorderRadius.smRadius,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             child: Row(

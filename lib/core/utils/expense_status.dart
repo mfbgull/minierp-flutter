@@ -3,6 +3,7 @@
 // the web's `references/utils/statusColors.ts` conventions).
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 
 import '../../l10n/app_localizations.dart';
 
@@ -21,11 +22,5 @@ String expenseStatusLabel(AppLocalizations l10n, String status) =>
 
 /// Status chip color (light) — port of the statusColors conventions in
 /// PORTING.md §6.
-Color expenseStatusColor(String status) => switch (status) {
-  'Draft' => Colors.blueGrey,
-  'Submitted' => Colors.blue,
-  'Approved' => Colors.green,
-  'Paid' => Colors.teal,
-  'Cancelled' => Colors.red,
-  _ => Colors.blueGrey,
-};
+Color expenseStatusColor(ColorScheme scheme, String status) =>
+    StatusColors(scheme).expense(status);

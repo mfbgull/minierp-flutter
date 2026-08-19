@@ -442,7 +442,7 @@ class _PurchaseReturnsScreenState extends ConsumerState<PurchaseReturnsScreen>
         renderer: (ctx) => Builder(
           builder: (cellContext) {
             final type = ctx.cell.value as String? ?? '';
-            final (color, darkColor) = returnTypeColors(type);
+            final color = returnTypeColors(Theme.of(context).colorScheme, type);
             return Align(
               alignment: Alignment.centerLeft,
               child: StatusBadge(
@@ -451,7 +451,6 @@ class _PurchaseReturnsScreenState extends ConsumerState<PurchaseReturnsScreen>
                   type,
                 ),
                 color: color,
-                darkColor: darkColor,
               ),
             );
           },
@@ -467,7 +466,7 @@ class _PurchaseReturnsScreenState extends ConsumerState<PurchaseReturnsScreen>
         renderer: (ctx) => Builder(
           builder: (cellContext) {
             final status = ctx.cell.value as String? ?? '';
-            final (color, darkColor) = purchaseReturnStatusColors(status);
+            final color = purchaseReturnStatusColors(Theme.of(context).colorScheme, status);
             return Align(
               alignment: Alignment.centerLeft,
               child: StatusBadge(
@@ -476,7 +475,6 @@ class _PurchaseReturnsScreenState extends ConsumerState<PurchaseReturnsScreen>
                   status,
                 ),
                 color: color,
-                darkColor: darkColor,
               ),
             );
           },
@@ -512,8 +510,8 @@ class _CompactReturnCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final r = purchaseReturn;
 
-    final (typeColor, typeDark) = returnTypeColors(r.returnType);
-    final (statusColor, statusDark) = purchaseReturnStatusColors(r.status);
+    final typeColor = returnTypeColors(Theme.of(context).colorScheme, r.returnType);
+    final statusColor = purchaseReturnStatusColors(Theme.of(context).colorScheme, r.status);
     final reason = r.reason?.trim();
 
     return Card(
@@ -556,7 +554,6 @@ class _CompactReturnCard extends StatelessWidget {
                   StatusBadge(
                     status: purchaseReturnStatusLabel(l10n, r.status),
                     color: statusColor,
-                    darkColor: statusDark,
                   ),
                   const SizedBox(width: 4),
                   // Per-card ⋮ menu — View + Void, mirroring the desktop
@@ -628,7 +625,6 @@ class _CompactReturnCard extends StatelessWidget {
                   StatusBadge(
                     status: returnTypeLabel(l10n, r.returnType),
                     color: typeColor,
-                    darkColor: typeDark,
                   ),
                 ],
               ),

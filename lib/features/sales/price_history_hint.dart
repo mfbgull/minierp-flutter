@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/price_history.dart' show ItemPriceHistory;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Compact anchored card: last price + delta vs the price being typed,
 /// lowest/highest, and the transaction count. Purely informational — it
@@ -32,14 +33,14 @@ class PriceHistoryHint extends StatelessWidget {
     return IgnorePointer(
       child: Material(
         elevation: 6,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: AppBorderRadius.smRadius,
         child: Container(
           width: 232,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
             border: Border.all(color: theme.colorScheme.outlineVariant),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: AppBorderRadius.smRadius,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

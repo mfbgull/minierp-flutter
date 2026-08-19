@@ -29,6 +29,7 @@ import '../sales/invoice_providers.dart' show invoicesProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'customer_providers.dart';
 import '../../widgets/payment_receipt_pdf.dart' show buildPaymentReceiptPdf;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the web-style Record Payment modal with [customer] pre-bound.
 Future<void> showCustomerPaymentModal(
@@ -309,13 +310,13 @@ class _CustomerPaymentModalState extends ConsumerState<CustomerPaymentModal> {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.12),
+                    color: scheme.primary.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.check,
                     size: 36,
-                    color: Colors.green,
+                    color: scheme.primary,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -407,7 +408,7 @@ class _CustomerPaymentModalState extends ConsumerState<CustomerPaymentModal> {
                                               ),
                                           border: OutlineInputBorder(
                                             borderRadius:
-                                                BorderRadius.circular(8),
+                                                AppBorderRadius.smRadius,
                                           ),
                                           suffixIcon: const Icon(
                                             Icons.calendar_today,

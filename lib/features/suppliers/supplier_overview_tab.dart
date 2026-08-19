@@ -13,6 +13,7 @@ import '../../data/repositories/purchase_order_repository.dart' show POSummary;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
 import 'supplier_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class SupplierOverviewTab extends ConsumerWidget {
   const SupplierOverviewTab({super.key, required this.supplierId});
@@ -95,7 +96,7 @@ class SupplierOverviewTab extends ConsumerWidget {
             elevation: 0,
             color: scheme.surfaceContainerLow,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppBorderRadius.mdRadius,
               side: BorderSide(color: scheme.outlineVariant),
             ),
             child: Padding(
@@ -127,7 +128,7 @@ class SupplierOverviewTab extends ConsumerWidget {
                     label: l10n.suppliersCompleted,
                     count: summary.completedPos,
                     total: totalPos,
-                    color: Colors.green,
+                    color: scheme.primary,
                   ),
                 ],
               ),
@@ -202,7 +203,7 @@ class SupplierOverviewTab extends ConsumerWidget {
       elevation: 0,
       color: Theme.of(context).colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppBorderRadius.mdRadius,
         side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
@@ -261,7 +262,7 @@ class _SummaryCard extends StatelessWidget {
         elevation: 0,
         color: scheme.surfaceContainerLow,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppBorderRadius.mdRadius,
           side: BorderSide(color: scheme.outlineVariant),
         ),
         child: Padding(
@@ -320,7 +321,7 @@ class _StatusBar extends StatelessWidget {
         ),
         Expanded(
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: AppBorderRadius.xsRadius,
             child: LinearProgressIndicator(
               value: fraction,
               minHeight: 8,

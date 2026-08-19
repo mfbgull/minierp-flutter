@@ -6,17 +6,15 @@
 // the core CSV export can reuse it without importing from features.
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 
 import '../../l10n/app_localizations.dart';
 
 /// Return-type badge colors — Purchase Return red (stock leaves),
 /// PO Return orange: the light color plus the darker variant used as text
 /// on dark themes.
-(Color, Color?) returnTypeColors(String type) => switch (type) {
-  'PURCHASE_RETURN' => (Colors.red, Colors.redAccent),
-  'PO_RETURN' => (Colors.orange, Colors.orangeAccent),
-  _ => (Colors.blueGrey, Colors.blueGrey),
-};
+Color returnTypeColors(ColorScheme scheme, String type) =>
+    StatusColors(scheme).returnType(type);
 
 /// Localized return-type label (falls back to the raw server value).
 String returnTypeLabel(AppLocalizations l10n, String type) => switch (type) {

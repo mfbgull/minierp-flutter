@@ -25,6 +25,7 @@ import '../../widgets/searchable_select.dart';
 import 'employee_models.dart';
 import 'employee_providers.dart';
 import 'employee_repository.dart' show employeeRepositoryProvider;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the create ([employee] == null) or edit form dialog.
 Future<void> showEmployeeFormDialog(
@@ -855,7 +856,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
   InputDecoration _decoration() => InputDecoration(
     isDense: true,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
   );
 }
 
@@ -871,7 +872,7 @@ class _ErrorBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Row(
         children: [

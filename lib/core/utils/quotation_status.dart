@@ -4,20 +4,15 @@
 // conventions).
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 
 import '../../l10n/app_localizations.dart';
 
 /// Quotation status badge colors — Draft gray, Sent blue, Accepted green,
 /// Expired orange, Converted teal, Rejected grey: the light color plus
 /// the darker variant used as text on dark themes.
-(Color, Color?) quotationStatusColors(String status) => switch (status) {
-  'Sent' => (Colors.lightBlue, Colors.lightBlueAccent),
-  'Accepted' => (Colors.green, Colors.lightGreen),
-  'Expired' => (Colors.orange, Colors.orangeAccent),
-  'Converted' => (Colors.teal, Colors.tealAccent),
-  'Rejected' => (Colors.grey, Colors.blueGrey),
-  _ => (Colors.blueGrey, Colors.blueGrey),
-};
+Color quotationStatusColors(ColorScheme scheme, String status) =>
+    StatusColors(scheme).quotation(status);
 
 /// Localized quotation status label (falls back to the raw server value).
 String quotationStatusLabel(AppLocalizations l10n, String status) =>

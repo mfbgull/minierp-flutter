@@ -22,6 +22,7 @@ import '../../widgets/searchable_select.dart';
 import '../payments/payments_providers.dart' show paymentsProvider;
 import 'invoice_providers.dart' show invoicesProvider;
 import 'payment_panel.dart' show kPaymentMethods;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the record-payment dialog for one invoice.
 Future<void> showInvoicePaymentDialog(
@@ -163,7 +164,7 @@ class _InvoicePaymentDialogState extends ConsumerState<InvoicePaymentDialog> {
                           color: scheme.surfaceContainerHighest.withValues(
                             alpha: 0.5,
                           ),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: AppBorderRadius.smRadius,
                           border: Border.all(color: scheme.outlineVariant),
                         ),
                         child: Column(

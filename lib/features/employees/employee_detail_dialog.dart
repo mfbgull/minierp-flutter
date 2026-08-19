@@ -5,6 +5,7 @@
 // Salary; the tabs use the shared detail-row widgets.
 
 import 'package:flutter/material.dart';
+import 'package:minierp_app/core/theme/status_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
@@ -23,6 +24,7 @@ import 'employee_models.dart';
 import 'employee_providers.dart';
 import 'employee_repository.dart' show employeeRepositoryProvider;
 import 'salary_pay_dialog.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the detail dialog for one employee.
 Future<void> showEmployeeDetailDialog(
@@ -143,14 +145,14 @@ class _EmployeeDetailDialogState extends ConsumerState<EmployeeDetailDialog> {
     final selected = _tab == index;
     return InkWell(
       onTap: () => setState(() => _tab = index),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: AppBorderRadius.smRadius,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: selected
               ? scheme.primary.withValues(alpha: 0.12)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: AppBorderRadius.smRadius,
         ),
         child: Text(
           label,
@@ -180,7 +182,7 @@ class _EmployeeDetailDialogState extends ConsumerState<EmployeeDetailDialog> {
               status: employee.isActive
                   ? l10n.statusActive
                   : l10n.statusInactive,
-              color: employee.isActive ? Colors.green : Colors.blueGrey,
+              color: StatusColors.of(context).active(employee.isActive),
             ),
           ],
         ),

@@ -14,6 +14,7 @@ import '../data/repositories/api_result.dart' show ApiError;
 import '../l10n/app_localizations.dart';
 import 'detail_error.dart';
 import 'detail_labels.dart' show detailSectionLabel;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class PaymentHistorySection extends ConsumerWidget {
   const PaymentHistorySection({
@@ -78,7 +79,7 @@ class _PaymentsTable extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: scheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Column(
         children: [

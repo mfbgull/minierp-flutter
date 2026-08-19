@@ -17,6 +17,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/detail_error.dart';
 import 'supplier_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class SupplierStatementTab extends ConsumerStatefulWidget {
   const SupplierStatementTab({super.key, required this.supplierId});
@@ -223,7 +224,7 @@ class _SupplierStatementTabState extends ConsumerState<SupplierStatementTab> {
             elevation: 0,
             color: scheme.surfaceContainerLow,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppBorderRadius.mdRadius,
               side: BorderSide(color: scheme.outlineVariant),
             ),
             clipBehavior: Clip.antiAlias,
@@ -424,7 +425,7 @@ class _SupplierStatementTabState extends ConsumerState<SupplierStatementTab> {
       elevation: 0,
       color: scheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppBorderRadius.mdRadius,
         side: BorderSide(color: scheme.outlineVariant),
       ),
       child: Padding(

@@ -18,6 +18,7 @@ import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class DsoReportScreen extends ConsumerWidget {
   const DsoReportScreen({super.key});
@@ -95,7 +96,7 @@ class DsoReportScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: AppBorderRadius.mdRadius,
           border: Border.all(color: scheme.outlineVariant),
         ),
         child: Row(
@@ -135,7 +136,7 @@ class DsoReportScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: scheme.primaryContainer.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppBorderRadius.mdRadius,
               border: Border.all(color: scheme.primary.withValues(alpha: 0.3)),
             ),
             child: Column(

@@ -17,6 +17,7 @@ import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class CashFlowReportScreen extends ConsumerWidget {
   const CashFlowReportScreen({super.key});
@@ -101,7 +102,7 @@ class CashFlowReportScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: AppBorderRadius.mdRadius,
           border: Border.all(color: scheme.outlineVariant),
         ),
         child: Column(
@@ -152,7 +153,7 @@ class CashFlowReportScreen extends ConsumerWidget {
                 l10n.reportsNetcashflow,
                 Formatters.currency(m.netCashFlow),
                 positive ? Icons.trending_up : Icons.trending_down,
-                valueColor: positive ? Colors.green.shade700 : scheme.error,
+                valueColor: positive ? scheme.primary : scheme.error,
               ),
             ],
           ),
@@ -168,12 +169,12 @@ class CashFlowReportScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: (positive ? Colors.green : scheme.error).withValues(
+              color: (positive ? scheme.primary : scheme.error).withValues(
                 alpha: 0.08,
               ),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: AppBorderRadius.mdRadius,
               border: Border.all(
-                color: (positive ? Colors.green : scheme.error).withValues(
+                color: (positive ? scheme.primary : scheme.error).withValues(
                   alpha: 0.3,
                 ),
               ),
@@ -184,7 +185,7 @@ class CashFlowReportScreen extends ConsumerWidget {
                 Icon(
                   positive ? Icons.trending_up : Icons.trending_down,
                   size: 18,
-                  color: positive ? Colors.green.shade700 : scheme.error,
+                  color: positive ? scheme.primary : scheme.error,
                 ),
                 const SizedBox(width: 8),
                 Expanded(

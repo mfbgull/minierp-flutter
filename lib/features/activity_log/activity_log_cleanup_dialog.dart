@@ -16,6 +16,7 @@ import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import 'activity_log_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the cleanup dialog (admin users only — the caller gates the
 /// button on `auth.user.isAdmin`).
@@ -93,7 +94,7 @@ class _CleanupDialogState extends ConsumerState<_CleanupDialog> {
               decoration: InputDecoration(
                 labelText: l10n.activitylogCleanupdays,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppBorderRadius.smRadius,
                 ),
                 isDense: true,
               ),

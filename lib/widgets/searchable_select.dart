@@ -17,6 +17,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class SearchableSelect<T> extends StatelessWidget {
   const SearchableSelect({
@@ -395,7 +396,7 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
           width: width,
           child: Material(
             elevation: 6,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: AppBorderRadius.xsRadius,
             clipBehavior: Clip.antiAlias,
             child: Column(
               mainAxisSize: MainAxisSize.min,

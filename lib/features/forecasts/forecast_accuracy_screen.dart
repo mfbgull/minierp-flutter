@@ -19,6 +19,7 @@ import '../../widgets/screen_error_panel.dart';
 import 'forecast_models.dart';
 import 'forecast_providers.dart';
 import 'forecast_repository.dart' show forecastRepositoryProvider;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class ForecastAccuracyScreen extends ConsumerStatefulWidget {
   const ForecastAccuracyScreen({super.key});
@@ -60,7 +61,7 @@ class _ForecastAccuracyScreenState
                   ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFDCFCE7),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: AppBorderRadius.smRadius,
                   ),
                   child: Row(
                     children: [
@@ -374,7 +375,7 @@ class _AccuracyBody extends StatelessWidget {
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: AppBorderRadius.smRadius,
                     ),
                   ),
                 ),

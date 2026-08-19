@@ -13,6 +13,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/screen_error_panel.dart';
 import 'report_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class ArSummaryReportScreen extends ConsumerWidget {
   const ArSummaryReportScreen({super.key});
@@ -169,7 +170,7 @@ class ArSummaryReportScreen extends ConsumerWidget {
         color: accent
             ? scheme.primaryContainer.withValues(alpha: 0.3)
             : scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppBorderRadius.mdRadius,
         border: Border.all(
           color: accent ? scheme.primary.withValues(alpha: 0.3) : scheme.outlineVariant,
         ),
@@ -223,7 +224,7 @@ class ArSummaryReportScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: AppBorderRadius.smRadius,
                 border: Border.all(color: scheme.outlineVariant),
               ),
               child: Column(
@@ -319,7 +320,7 @@ class ArSummaryReportScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               ClipRRect(
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: AppBorderRadius.xsRadius,
                 child: LinearProgressIndicator(
                   value: (amount / safeMax).clamp(0, 1).toDouble(),
                   minHeight: 8,

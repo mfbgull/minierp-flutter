@@ -27,6 +27,7 @@ import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
 import '../../widgets/searchable_select.dart';
 import 'inventory_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the stock ledger for [itemId]; [itemLabel] is the item
 /// code/name shown in the header.
@@ -172,7 +173,7 @@ class _LedgerBody extends ConsumerWidget {
                     ),
                     contentPadding: EdgeInsets.zero,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: AppBorderRadius.smRadius,
                     ),
                   ),
                   onChanged: (value) =>

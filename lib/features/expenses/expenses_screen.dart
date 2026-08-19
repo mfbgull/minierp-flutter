@@ -31,6 +31,7 @@ import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'expense_form_dialog.dart';
 import 'expense_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class ExpensesScreen extends ConsumerStatefulWidget {
   const ExpensesScreen({super.key});
@@ -277,7 +278,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Row(
@@ -440,7 +441,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
               alignment: Alignment.centerLeft,
               child: StatusBadge(
                 status: expenseStatusLabel(l10n, status),
-                color: expenseStatusColor(status),
+                color: expenseStatusColor(Theme.of(cellContext).colorScheme, status),
               ),
             );
           },

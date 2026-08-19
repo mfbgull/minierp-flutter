@@ -21,6 +21,7 @@ import 'supplier_payments_tab.dart';
 import 'supplier_pos_tab.dart';
 import 'supplier_providers.dart';
 import 'supplier_statement_tab.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class SupplierDetailScreen extends ConsumerStatefulWidget {
   const SupplierDetailScreen({super.key, required this.supplierId});
@@ -159,7 +160,7 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
             elevation: 0,
             color: scheme.surfaceContainerLow,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppBorderRadius.mdRadius,
               side: BorderSide(color: scheme.outlineVariant),
             ),
             child: Padding(

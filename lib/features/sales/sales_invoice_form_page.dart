@@ -67,6 +67,7 @@ import 'models/sales_forms.dart' show DiscountScope;
 import 'payment_panel.dart'
     show PaymentPanel, PaymentPanelState, kPaymentMethods;
 import 'price_history_hint.dart' show PriceHistoryHint;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Create ([invoice] == null) or edit page for an invoice.
 class SalesInvoiceFormPage extends ConsumerStatefulWidget {
@@ -1077,7 +1078,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
           border: Border.all(
             color: Theme.of(context).colorScheme.outlineVariant,
           ),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: AppBorderRadius.xsRadius,
         ),
         child: const CircularProgressIndicator(),
       );
@@ -1288,7 +1289,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         color: Theme.of(
           context,
         ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1371,7 +1372,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         color: Theme.of(
           context,
         ).colorScheme.errorContainer.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Text(
         _error!,

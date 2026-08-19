@@ -333,7 +333,7 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
         renderer: (ctx) => Builder(
           builder: (cellContext) {
             final status = ctx.cell.value as String? ?? '';
-            final (color, darkColor) = quotationStatusColors(status);
+            final color = quotationStatusColors(Theme.of(context).colorScheme, status);
             return Align(
               alignment: Alignment.centerLeft,
               child: StatusBadge(
@@ -342,7 +342,6 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
                   status,
                 ),
                 color: color,
-                darkColor: darkColor,
               ),
             );
           },

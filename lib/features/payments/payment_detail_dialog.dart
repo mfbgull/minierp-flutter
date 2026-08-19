@@ -137,7 +137,7 @@ class _DetailBody extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              StatusBadge(status: payment.paymentMethod, color: Colors.teal),
+              StatusBadge(status: payment.paymentMethod, color: Theme.of(context).colorScheme.tertiary),
             ],
           ),
         ),

@@ -266,7 +266,7 @@ class AppShell extends ConsumerWidget {
 
 /// Custom left rail: a scrollable, extended-style navigation with the app
 /// mark on top. Scrollable because the module list exceeds typical window
-/// heights; keeps Material look with selected-state highlighting.
+/// heights; uses M3 color tokens for selection indicators.
 class _NavRail extends StatelessWidget {
   const _NavRail({
     required this.destinations,
@@ -367,7 +367,7 @@ class _NavItem extends StatelessWidget {
                   height: 18,
                   decoration: BoxDecoration(
                     color: scheme.primary,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
             ],

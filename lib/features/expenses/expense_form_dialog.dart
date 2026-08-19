@@ -29,6 +29,7 @@ import '../../widgets/form_helpers.dart';
 import '../../widgets/searchable_select.dart';
 import 'expense_category_dialog.dart';
 import 'expense_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the create ([expense] == null) or edit form dialog.
 Future<void> showExpenseFormDialog(BuildContext context, {Expense? expense}) {
@@ -496,7 +497,7 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
   InputDecoration _decoration() => InputDecoration(
     isDense: true,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
   );
 }
 
@@ -512,7 +513,7 @@ class _ErrorBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Row(
         children: [

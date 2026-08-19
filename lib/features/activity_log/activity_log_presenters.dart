@@ -3,6 +3,7 @@
 // dialog (AGENTS.md self-audit: no duplicated logic across the module).
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 
 import '../../core/utils/formatters.dart';
 
@@ -15,9 +16,5 @@ String formatActivityTimestamp(String raw) {
 
 /// Log-level badge colors (INFO teal, WARN amber, ERROR red — matches the
 /// web app's activity-log row tinting).
-Color activityLogLevelColor(String level) => switch (level.toUpperCase()) {
-  'ERROR' => Colors.red,
-  'WARN' || 'WARNING' => Colors.orange,
-  'DEBUG' => Colors.blueGrey,
-  _ => Colors.teal,
-};
+Color activityLogLevelColor(ColorScheme scheme, String level) =>
+    StatusColors(scheme).activityLogLevel(level);

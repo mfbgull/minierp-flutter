@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 
 import 'detail_labels.dart' show detailSectionLabel;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// A label:value info grid — each row is a fixed-width label (the same
 /// [detailSectionLabel] used by the dialogs) beside the value.
@@ -90,7 +91,7 @@ class DetailTiles extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppBorderRadius.smRadius,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -20,6 +20,7 @@ import '../../widgets/searchable_select.dart';
 import 'admin_models.dart';
 import 'admin_providers.dart';
 import 'admin_repository.dart' show adminRepositoryProvider;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the create ([user] == null) or edit form dialog.
 Future<void> showUserFormDialog(BuildContext context, {User? user}) {
@@ -259,7 +260,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                               vertical: 10,
                             ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: AppBorderRadius.smRadius,
                             ),
                           ),
                         ),
@@ -307,7 +308,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         ),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.errorContainer,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: AppBorderRadius.smRadius,
                         ),
                         child: Text(
                           _error!,
@@ -355,6 +356,6 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
   InputDecoration _decoration() => InputDecoration(
     isDense: true,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
   );
 }

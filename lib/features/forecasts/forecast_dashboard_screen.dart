@@ -13,6 +13,7 @@ import '../../l10n/app_localizations.dart';
 import 'forecast_models.dart';
 import 'forecast_providers.dart';
 import 'forecast_repository.dart' show ForecastDemandFilters;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class ForecastDashboardScreen extends ConsumerWidget {
   const ForecastDashboardScreen({super.key});
@@ -222,7 +223,7 @@ class _AlertCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppBorderRadius.mdRadius,
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Row(
@@ -254,7 +255,7 @@ class _AlertCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: AppBorderRadius.badge,
             ),
             child: Text(
               label,
@@ -290,7 +291,7 @@ class _TrendItem extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppBorderRadius.mdRadius,
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Row(
@@ -309,7 +310,7 @@ class _TrendItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: AppBorderRadius.smRadius,
             ),
             child: Text(
               '${forecast.trendPercentage.toStringAsFixed(0)}%',
@@ -424,7 +425,7 @@ class _DashboardSkeleton extends StatelessWidget {
             height: 24,
             decoration: BoxDecoration(
               color: scheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: AppBorderRadius.smRadius,
             ),
           ),
           const SizedBox(height: 16),
@@ -440,7 +441,7 @@ class _DashboardSkeleton extends StatelessWidget {
                     height: 96,
                     decoration: BoxDecoration(
                       color: scheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: AppBorderRadius.mdRadius,
                     ),
                   ),
                 ),
@@ -456,7 +457,7 @@ class _DashboardSkeleton extends StatelessWidget {
                 height: 56,
                 decoration: BoxDecoration(
                   color: scheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppBorderRadius.mdRadius,
                 ),
               ),
             ),

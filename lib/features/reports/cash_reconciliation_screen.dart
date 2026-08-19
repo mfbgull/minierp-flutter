@@ -26,6 +26,7 @@ import '../../widgets/date_range_picker.dart' show DateRangeFilter, DateRangeMod
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class CashReconciliationScreen extends ConsumerStatefulWidget {
   const CashReconciliationScreen({super.key});
@@ -274,7 +275,7 @@ class _CashReconciliationScreenState
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: _row(
@@ -487,7 +488,7 @@ class _SummaryBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppBorderRadius.mdRadius,
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(

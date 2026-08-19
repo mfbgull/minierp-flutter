@@ -14,6 +14,7 @@ import '../../widgets/detail_error.dart';
 import 'admin_models.dart';
 import 'admin_providers.dart';
 import 'admin_repository.dart' show adminRepositoryProvider;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the permissions editor for one role.
 Future<void> showRolePermissionsDialog(
@@ -115,7 +116,7 @@ class _RolePermissionsDialogState extends ConsumerState<RolePermissionsDialog> {
                       ),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: AppBorderRadius.smRadius,
                       ),
                       child: Text(
                         _error!,

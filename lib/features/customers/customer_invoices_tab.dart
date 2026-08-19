@@ -11,7 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/formatters.dart';
-import '../../core/utils/invoice_status.dart' show invoiceStatusLabel;
+import '../../core/utils/invoice_status.dart' show invoiceStatusColor, invoiceStatusLabel;
 import '../../data/models/invoice.dart' show Invoice;
 import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
 import '../../data/repositories/invoice_repository.dart'
@@ -239,7 +239,7 @@ class _CustomerInvoicesTabState extends ConsumerState<CustomerInvoicesTab> {
             alignment: Alignment.centerLeft,
             child: StatusBadge(
               status: invoiceStatusLabel(l10n, status),
-              color: _invoiceStatusColor(status),
+              color: invoiceStatusColor(Theme.of(context).colorScheme, status),
             ),
           );
         },
@@ -276,15 +276,6 @@ class _CustomerInvoicesTabState extends ConsumerState<CustomerInvoicesTab> {
       ),
     ];
   }
-
-  Color _invoiceStatusColor(String status) => switch (status) {
-    'Paid' => Colors.green,
-    'Partially Paid' => const Color(0xFFD97706),
-    'Overdue' => const Color(0xFFB91C1C),
-    'Draft' || 'Sent' || 'Cancelled' || 'Returned' || 'Partially Returned' =>
-      Colors.blueGrey,
-    _ => const Color(0xFFDC2626), // Unpaid + unknown
-  };
 
   PlutoRow _gridRowFor(Invoice invoice) => PlutoRow(
     cells: {

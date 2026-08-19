@@ -4,6 +4,7 @@
 // messages are feature-specific l10n keys, passed in by the caller.
 
 import 'package:flutter/material.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// `14.0` → "14", `12.5` → "12.5" — trims the trailing `.0` that
 /// `double.toString()` would add to whole numbers in form prefills.
@@ -44,7 +45,7 @@ ValueChanged<String> submitOnEnter(VoidCallback onSubmit) => (_) => onSubmit();
 InputDecoration formInputDecoration({String? hintText}) => InputDecoration(
   isDense: true,
   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+  border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
   hintText: hintText,
 );
 
@@ -61,7 +62,7 @@ class ErrorBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Row(
         children: [
