@@ -16,28 +16,21 @@ import '../../l10n/app_localizations.dart';
 /// Slug → localized title — the single source of truth for both the hub
 /// cards and the router's placeholder title for not-yet-ported reports.
 final Map<String, String Function(AppLocalizations)> reportTitles = {
-  'sales-summary': (l) => l.reportsSalessummaryreport,
-  'sales-by-customer': (l) => l.reportsSalesbycustomerreport,
-  'sales-by-item': (l) => l.reportsSalesbyitemreport,
-  'stock-level': (l) => l.reportsStocklevelreport,
-  'low-stock': (l) => l.reportsLowstockalertreport,
-  'stock-valuation': (l) => l.reportsStockvaluationreport,
-  'inventory-movement': (l) => l.reportsInventorymovementreport,
   'profit-loss': (l) => l.reportsProfitlossreport,
   'cash-flow': (l) => l.reportsCashflowreport,
   'cash-reconciliation': (l) => l.reportsCashreconciliation,
-  'expenses': (l) => l.reportsExpensesreport,
   'ar-aging': (l) => l.reportsTabsAr_aging,
   'ar-summary': (l) => l.reportsTabsReceivables_summary,
   'customer-statements': (l) => l.reportsCustomerstatementsreport,
   'top-debtors': (l) => l.reportsTopdebtorsreport,
   'dso': (l) => l.reportsDsoreport,
-  'purchase-summary': (l) => l.reportsPurchasesummaryreport,
-  'supplier-analysis': (l) => l.reportsSupplieranalysisreport,
-  'production-summary': (l) => l.reportsProductionsummaryreport,
-  'bom-usage': (l) => l.reportsBomusage,
   'ap-aging': (l) => l.reportsTabsAp_aging,
   'balance-sheet': (l) => l.reportsBalanceSheet,
+  'trial-balance': (l) => l.reportsTabsTrial_balance,
+  'general-ledger': (l) => l.reportsTabsGeneral_ledger,
+  'income-statement': (l) => l.reportsTabsIncome_statement,
+  'tax-summary': (l) => l.reportsTabsTax_summary,
+  'batch-traceability': (l) => l.reportsTabsBatch_traceability,
 };
 
 class _ReportEntry {
@@ -58,21 +51,6 @@ class _ReportCategory {
 /// Category groups mirroring the web dashboard (18 entries; batch
 /// traceability is not part of the web hub).
 final List<_ReportCategory> _reportCategories = [
-  _ReportCategory((l) => l.reportsCategorySales, Icons.trending_up, const [
-    _ReportEntry('sales-summary', Icons.receipt_long_outlined),
-    _ReportEntry('sales-by-customer', Icons.people_outline),
-    _ReportEntry('sales-by-item', Icons.inventory_2_outlined),
-  ]),
-  _ReportCategory(
-    (l) => l.reportsCategoryInventory,
-    Icons.inventory_2_outlined,
-    const [
-      _ReportEntry('stock-level', Icons.shelves),
-      _ReportEntry('low-stock', Icons.warning_amber_outlined),
-      _ReportEntry('stock-valuation', Icons.paid_outlined),
-      _ReportEntry('inventory-movement', Icons.swap_vert),
-    ],
-  ),
   _ReportCategory(
     (l) => l.reportsCategoryFinancial,
     Icons.payments_outlined,
@@ -81,7 +59,6 @@ final List<_ReportCategory> _reportCategories = [
       _ReportEntry('balance-sheet', Icons.account_balance_outlined),
       _ReportEntry('cash-flow', Icons.account_balance_wallet_outlined),
       _ReportEntry('cash-reconciliation', Icons.fact_check_outlined),
-      _ReportEntry('expenses', Icons.credit_card),
     ],
   ),
   _ReportCategory(
@@ -96,14 +73,6 @@ final List<_ReportCategory> _reportCategories = [
     ],
   ),
   _ReportCategory(
-    (l) => l.reportsCategoryPurchase,
-    Icons.shopping_cart_outlined,
-    const [
-      _ReportEntry('purchase-summary', Icons.shopping_cart_checkout_outlined),
-      _ReportEntry('supplier-analysis', Icons.local_shipping_outlined),
-    ],
-  ),
-  _ReportCategory(
     (l) => l.reportsCategoryAp,
     Icons.hourglass_bottom_outlined,
     const [
@@ -111,14 +80,20 @@ final List<_ReportCategory> _reportCategories = [
     ],
   ),
   _ReportCategory(
-    (l) => l.reportsCategoryProduction,
-    Icons.factory_outlined,
+    (l) => l.reportsCategoryInventory,
+    Icons.inventory_2_outlined,
     const [
-      _ReportEntry(
-        'production-summary',
-        Icons.precision_manufacturing_outlined,
-      ),
-      _ReportEntry('bom-usage', Icons.account_tree_outlined),
+      _ReportEntry('batch-traceability', Icons.bug_report_outlined),
+    ],
+  ),
+  _ReportCategory(
+    (l) => l.reportsCategoryAccounting,
+    Icons.account_balance_outlined,
+    const [
+      _ReportEntry('trial-balance', Icons.balance_outlined),
+      _ReportEntry('general-ledger', Icons.list_alt_outlined),
+      _ReportEntry('income-statement', Icons.assessment_outlined),
+      _ReportEntry('tax-summary', Icons.receipt_long_outlined),
     ],
   ),
 ];

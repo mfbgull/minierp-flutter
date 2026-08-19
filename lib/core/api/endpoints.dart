@@ -50,6 +50,7 @@ abstract final class ApiEndpoints {
   static const purchases = '/purchases';
   static const suppliers = '/suppliers';
   static const purchaseOrders = '/purchase-orders';
+  static const purchaseReturns = '/purchase-returns';
 
   // Reports (§11) — first batch; add each endpoint as its report screen
   // is ported.
@@ -74,6 +75,13 @@ abstract final class ApiEndpoints {
   static const reportBomUsage = '/reports/bom-usage';
   static const reportArSummary = '/reports/ar-summary';
   static const reportCashReconciliation = '/reports/cash-reconciliation';
+  static const reportApAging = '/reports/ap-aging';
+  static const reportBalanceSheet = '/reports/balance-sheet';
+  static const reportTrialBalance = '/reports/trial-balance';
+  static const reportGeneralLedger = '/reports/general-ledger';
+  static const reportIncomeStatement = '/reports/income-statement';
+  static const reportTaxSummary = '/reports/tax-summary';
+  static const reportBatchTraceability = '/reports/batch-traceability';
 
   // Misc
   static const customers = '/customers';

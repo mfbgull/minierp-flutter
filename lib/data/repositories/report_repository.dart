@@ -10,26 +10,21 @@ import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../data/models/report.dart'
     show
+        ApAgingReport,
         ArAgingReport,
         ArSummaryReport,
-        BomUsageReport,
+        BalanceSheetReport,
+        BatchTraceabilityReport,
         CashFlowReport,
         CashReconciliation,
         CustomerStatementRow,
         DSOMetric,
-        ExpensesReport,
-        InventoryMovementReport,
-        LowStockReportRow,
-        ProductionSummaryReport,
+        GeneralLedgerRow,
+        IncomeStatementReport,
         ProfitLossReport,
-        PurchaseSummaryReport,
-        SalesByCustomerRow,
-        SalesByItemRow,
-        SalesSummaryReport,
-        StockLevelReport,
-        StockValuationReport,
-        SupplierAnalysisRow,
-        TopDebtorRow;
+        TaxSummaryReport,
+        TopDebtorRow,
+        TrialBalanceReport;
 import 'api_result.dart';
 import 'repository_client.dart';
 
@@ -47,55 +42,6 @@ class ReportRepository {
         : <String, dynamic>{'asOfDate': asOfDate},
     parse: (Object? json) =>
         ArAgingReport.fromJson(json as Map<String, dynamic>),
-  );
-
-  /// GET /reports/sales-summary — stats + per-invoice detail over a date
-  /// range (the server defaults to the last month when omitted).
-  Future<ApiResult<SalesSummaryReport>> salesSummary({
-    String? fromDate,
-    String? toDate,
-  }) => _api.get(
-    ApiEndpoints.reportSalesSummary,
-    queryParameters: {'fromDate': ?fromDate, 'toDate': ?toDate},
-    parse: (Object? json) =>
-        SalesSummaryReport.fromJson(json as Map<String, dynamic>),
-  );
-
-  /// GET /reports/low-stock — items at or below their reorder level
-  /// (no query params).
-  Future<ApiResult<List<LowStockReportRow>>> lowStock() => _api.getList(
-    ApiEndpoints.reportLowStock,
-    parseItem: (Object? json) =>
-        LowStockReportRow.fromJson(json as Map<String, dynamic>),
-  );
-
-  /// GET /reports/stock-level — every active item with its current stock,
-  /// reorder level and derived status (no query params).
-  Future<ApiResult<StockLevelReport>> stockLevel() => _api.get(
-    ApiEndpoints.reportStockLevel,
-    parse: (Object? json) =>
-        StockLevelReport.fromJson(json as Map<String, dynamic>),
-  );
-
-  /// GET /reports/stock-valuation — inventory value per item (batch
-  /// tracked or standard-cost fallback; no query params).
-  Future<ApiResult<StockValuationReport>> stockValuation() => _api.get(
-    ApiEndpoints.reportStockValuation,
-    parse: (Object? json) =>
-        StockValuationReport.fromJson(json as Map<String, dynamic>),
-  );
-
-  /// GET /reports/sales-by-customer — per-customer sales over a date
-  /// range. The endpoint returns a **bare array** and requires both
-  /// dates (the server 400s without them).
-  Future<ApiResult<List<SalesByCustomerRow>>> salesByCustomer({
-    required String fromDate,
-    required String toDate,
-  }) => _api.getList(
-    ApiEndpoints.reportSalesByCustomer,
-    queryParameters: {'fromDate': fromDate, 'toDate': toDate},
-    parseItem: (Object? json) =>
-        SalesByCustomerRow.fromJson(json as Map<String, dynamic>),
   );
 
   /// GET /reports/dso — Days Sales Outstanding metric. The server
@@ -130,50 +76,6 @@ class ReportRepository {
     queryParameters: {'fromDate': fromDate, 'toDate': toDate},
     parse: (Object? json) =>
         ProfitLossReport.fromJson(json as Map<String, dynamic>),
-  );
-
-  /// GET /reports/inventory-movement — stock movements over a date
-  /// range (dates optional; the server defaults to no filter). The
-  /// endpoint also accepts an optional `itemId`, but the web port
-  /// omits the item picker (same call as the other report ports).
-  Future<ApiResult<InventoryMovementReport>> inventoryMovement({
-    String? fromDate,
-    String? toDate,
-  }) => _api.get(
-    ApiEndpoints.reportInventoryMovement,
-    queryParameters: {'fromDate': ?fromDate, 'toDate': ?toDate},
-    parse: (Object? json) =>
-        InventoryMovementReport.fromJson(json as Map<String, dynamic>),
-  );
-
-  /// GET /reports/purchase-summary — purchase orders over a date range.
-  /// The endpoint requires both dates.
-  Future<ApiResult<PurchaseSummaryReport>> purchaseSummary({
-    required String fromDate,
-    required String toDate,
-  }) => _api.get(
-    ApiEndpoints.reportPurchaseSummary,
-    queryParameters: {'fromDate': fromDate, 'toDate': toDate},
-    parse: (Object? json) =>
-        PurchaseSummaryReport.fromJson(json as Map<String, dynamic>),
-  );
-
-  /// GET /reports/expenses — expense rows over a date range, optionally
-  /// narrowed to one category. The endpoint requires both dates (the
-  /// server returns a 400 without either).
-  Future<ApiResult<ExpensesReport>> expenses({
-    required String fromDate,
-    required String toDate,
-    String? category,
-  }) => _api.get(
-    ApiEndpoints.reportExpenses,
-    queryParameters: {
-      'fromDate': fromDate,
-      'toDate': toDate,
-      'category': ?category,
-    },
-    parse: (Object? json) =>
-        ExpensesReport.fromJson(json as Map<String, dynamic>),
   );
 
   /// GET /reports/customer-statements — per-customer statement summary
@@ -211,61 +113,6 @@ class ReportRepository {
             TopDebtorRow.fromJson(json as Map<String, dynamic>),
       );
 
-  /// GET /reports/sales-by-item — per-item sales over a date range.
-  /// Returns a **bare array** and requires both dates (the server 400s
-  /// without them).
-  Future<ApiResult<List<SalesByItemRow>>> salesByItem({
-    required String fromDate,
-    required String toDate,
-  }) => _api.getList(
-    ApiEndpoints.reportSalesByItem,
-    queryParameters: {'fromDate': fromDate, 'toDate': toDate},
-    parseItem: (Object? json) =>
-        SalesByItemRow.fromJson(json as Map<String, dynamic>),
-  );
-
-  /// GET /reports/supplier-analysis — per-supplier purchase totals over a
-  /// date range. Returns a **bare array** and requires both dates (the
-  /// server 400s without them).
-  Future<ApiResult<List<SupplierAnalysisRow>>> supplierAnalysis({
-    required String fromDate,
-    required String toDate,
-  }) => _api.getList(
-    ApiEndpoints.reportSupplierAnalysis,
-    queryParameters: {'fromDate': fromDate, 'toDate': toDate},
-    parseItem: (Object? json) =>
-        SupplierAnalysisRow.fromJson(json as Map<String, dynamic>),
-  );
-
-  /// GET /reports/production-summary — production runs + period totals
-  /// over a date range. The endpoint requires both dates.
-  Future<ApiResult<ProductionSummaryReport>> productionSummary({
-    required String fromDate,
-    required String toDate,
-  }) => _api.get(
-    ApiEndpoints.reportProductionSummary,
-    queryParameters: {'fromDate': fromDate, 'toDate': toDate},
-    parse: (Object? json) =>
-        ProductionSummaryReport.fromJson(json as Map<String, dynamic>),
-  );
-
-  /// GET /reports/bom-usage — BOM usage over a date range (all-time when
-  /// dates are omitted), optionally narrowed to one finished item.
-  Future<ApiResult<BomUsageReport>> bomUsage({
-    String? fromDate,
-    String? toDate,
-    int? itemId,
-  }) => _api.get(
-    ApiEndpoints.reportBomUsage,
-    queryParameters: {
-      'fromDate': ?fromDate,
-      'toDate': ?toDate,
-      'itemId': ?itemId,
-    },
-    parse: (Object? json) =>
-        BomUsageReport.fromJson(json as Map<String, dynamic>),
-  );
-
   /// GET /reports/ar-summary — rolling receivables summary as of a date
   /// (server default: today). Takes an optional `asOfDate` query param.
   Future<ApiResult<ArSummaryReport>> arSummary({String? asOfDate}) => _api.get(
@@ -302,6 +149,93 @@ class ReportRepository {
     parse: (Object? json) =>
         CashReconciliation.fromJson(json as Map<String, dynamic>),
   );
+
+  /// GET /reports/ap-aging — per-supplier aging buckets + column totals.
+  /// The server defaults `asOfDate` to today when omitted.
+  Future<ApiResult<ApAgingReport>> apAging({String? asOfDate}) => _api.get(
+    ApiEndpoints.reportApAging,
+    queryParameters: asOfDate == null
+        ? null
+        : <String, dynamic>{'asOfDate': asOfDate},
+    parse: (Object? json) =>
+        ApAgingReport.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// GET /reports/balance-sheet — assets / liabilities / equity as of a
+  /// date. The server defaults `asOfDate` to today when omitted.
+  Future<ApiResult<BalanceSheetReport>> balanceSheet({String? asOfDate}) =>
+      _api.get(
+        ApiEndpoints.reportBalanceSheet,
+        queryParameters: asOfDate == null
+            ? null
+            : <String, dynamic>{'asOfDate': asOfDate},
+        parse: (Object? json) =>
+            BalanceSheetReport.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// GET /reports/trial-balance — account balances as of a date.
+  Future<ApiResult<TrialBalanceReport>> trialBalance({String? asOfDate}) =>
+      _api.get(
+        ApiEndpoints.reportTrialBalance,
+        queryParameters: asOfDate == null
+            ? null
+            : <String, dynamic>{'asOfDate': asOfDate},
+        parse: (Object? json) =>
+            TrialBalanceReport.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// GET /reports/general-ledger — ledger entries within a date range.
+  Future<ApiResult<List<GeneralLedgerRow>>> generalLedger({
+    required String startDate,
+    required String endDate,
+  }) =>
+      _api.getList(
+        ApiEndpoints.reportGeneralLedger,
+        queryParameters: <String, dynamic>{
+          'startDate': startDate,
+          'endDate': endDate,
+        },
+        parseItem: (Object? json) =>
+            GeneralLedgerRow.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// GET /reports/income-statement — revenue, COGS, expenses, net income.
+  Future<ApiResult<IncomeStatementReport>> incomeStatement({
+    required String startDate,
+    required String endDate,
+  }) =>
+      _api.get(
+        ApiEndpoints.reportIncomeStatement,
+        queryParameters: <String, dynamic>{
+          'startDate': startDate,
+          'endDate': endDate,
+        },
+        parse: (Object? json) =>
+            IncomeStatementReport.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// GET /reports/tax-summary — total tax for a date range.
+  Future<ApiResult<TaxSummaryReport>> taxSummary({
+    required String startDate,
+    required String endDate,
+  }) =>
+      _api.get(
+        ApiEndpoints.reportTaxSummary,
+        queryParameters: <String, dynamic>{
+          'startDate': startDate,
+          'endDate': endDate,
+        },
+        parse: (Object? json) =>
+            TaxSummaryReport.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// GET /reports/batch-traceability/:itemId — stock movements for an item.
+  Future<ApiResult<BatchTraceabilityReport>> batchTraceability(int itemId) =>
+      _api.get(
+        '${ApiEndpoints.reportBatchTraceability}/$itemId',
+        parse: (Object? json) =>
+            BatchTraceabilityReport.fromJson(json as Map<String, dynamic>),
+      );
 }
 
 final reportRepositoryProvider = Provider<ReportRepository>(
