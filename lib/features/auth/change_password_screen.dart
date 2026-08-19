@@ -7,6 +7,7 @@ import '../../data/repositories/api_result.dart'
 import '../../data/repositories/auth_repository.dart'
     show authRepositoryProvider;
 import '../../l10n/app_localizations.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Change-password screen — completes the auth module (PORTING.md §3).
 ///
@@ -235,7 +236,7 @@ class _ErrorBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Row(
         children: [

@@ -27,6 +27,7 @@ import '../inventory/item_detail_dialog.dart' show showItemDetailDialog;
 import 'forecast_models.dart';
 import 'forecast_providers.dart';
 import 'forecast_repository.dart' show ForecastDemandFilters;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class DemandForecastScreen extends ConsumerStatefulWidget {
   const DemandForecastScreen({super.key});
@@ -209,7 +210,7 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
                   width: 44,
                   height: 6,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
+                    borderRadius: AppBorderRadius.xsRadius,
                     child: LinearProgressIndicator(
                       value: (value / 100).clamp(0.0, 1.0),
                       backgroundColor: scheme.surfaceContainerHighest,
@@ -350,7 +351,7 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
                   vertical: 8,
                 ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppBorderRadius.smRadius,
                 ),
               ),
             ),
@@ -384,7 +385,7 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
                 horizontal: 8,
                 vertical: 8,
               ),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
             ),
           ),
         ),
@@ -442,7 +443,7 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
             horizontal: 12,
             vertical: 8,
           ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
         ),
       ),
     );
@@ -477,7 +478,7 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
             horizontal: 12,
             vertical: 8,
           ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
         ),
       ),
     );
@@ -513,7 +514,7 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
             horizontal: 12,
             vertical: 8,
           ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
         ),
       ),
     );
@@ -660,7 +661,7 @@ class _CompactForecastCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: recColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: AppBorderRadius.smRadius,
                   ),
                   child: Text(
                     recLabel,

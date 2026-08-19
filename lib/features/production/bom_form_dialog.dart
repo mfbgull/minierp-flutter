@@ -25,6 +25,7 @@ import '../../widgets/form_helpers.dart'
 import '../../widgets/searchable_select.dart';
 import 'calculations/production_calculations.dart' show bomMaterialCost;
 import 'production_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Mutable BOM material line.
 class _BomLine {
@@ -424,7 +425,7 @@ class _BomFormDialogState extends ConsumerState<BomFormDialog> {
                   border: Border.all(
                     color: Theme.of(context).colorScheme.outlineVariant,
                   ),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: AppBorderRadius.xsRadius,
                 ),
                 child: Text(
                   Formatters.currency(item?.standardCost ?? 0),
@@ -445,7 +446,7 @@ class _BomFormDialogState extends ConsumerState<BomFormDialog> {
                   border: Border.all(
                     color: Theme.of(context).colorScheme.outlineVariant,
                   ),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: AppBorderRadius.xsRadius,
                 ),
                 child: Text(
                   Formatters.currency(lineCost),
@@ -489,7 +490,7 @@ class _MaterialCostBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Row(
         children: [

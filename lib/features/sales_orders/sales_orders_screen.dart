@@ -330,7 +330,7 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
         renderer: (ctx) => Builder(
           builder: (cellContext) {
             final status = ctx.cell.value as String? ?? '';
-            final (color, darkColor) = soStatusColors(status);
+            final color = soStatusColors(Theme.of(context).colorScheme, status);
             return Align(
               alignment: Alignment.centerLeft,
               child: StatusBadge(
@@ -339,7 +339,6 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
                   status,
                 ),
                 color: color,
-                darkColor: darkColor,
               ),
             );
           },

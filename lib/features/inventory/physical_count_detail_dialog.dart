@@ -4,6 +4,7 @@
 // hidden `id` cell supplies the count id.
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/physical_count.dart'
@@ -105,13 +106,7 @@ class _DetailBody extends StatelessWidget {
               ),
               StatusBadge(
                 status: c.status,
-                color: switch (c.status) {
-                  'Draft' => Colors.blueGrey,
-                  'In Progress' => Colors.orange,
-                  'Completed' => Colors.green,
-                  'Cancelled' => Colors.red,
-                  _ => Theme.of(context).colorScheme.primary,
-                },
+                color: StatusColors.of(context).physicalCount(c.status),
               ),
             ],
           ),

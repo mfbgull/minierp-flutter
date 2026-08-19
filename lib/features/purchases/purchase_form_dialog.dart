@@ -38,6 +38,7 @@ import '../purchase_orders/purchase_order_providers.dart'
     show poSupplierOptionsProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'purchase_providers.dart' show purchasesProvider;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the new-purchase dialog (create only).
 Future<void> showPurchaseFormDialog(BuildContext context) {
@@ -405,7 +406,7 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
               color: Theme.of(
                 context,
               ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppBorderRadius.smRadius,
             ),
             child: Row(
               children: [
@@ -610,7 +611,7 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
                       height: 38,
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: AppBorderRadius.mdRadius,
                       ),
                       child: Icon(
                         Icons.shopping_cart_outlined,

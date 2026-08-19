@@ -14,6 +14,7 @@ import '../../widgets/date_range_picker.dart' show DateRangeFilter, DateRangeMod
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class BalanceSheetReportScreen extends ConsumerWidget {
   const BalanceSheetReportScreen({super.key});
@@ -190,7 +191,7 @@ class BalanceSheetReportScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppBorderRadius.mdRadius,
               border: Border.all(color: scheme.outlineVariant),
             ),
             child: Column(
@@ -217,7 +218,7 @@ class BalanceSheetReportScreen extends ConsumerWidget {
                           ? Icons.check_circle_outline
                           : Icons.error_outline,
                       color: data.totals.balanced
-                          ? Colors.green
+                          ? scheme.primary
                           : scheme.error,
                       size: 20,
                     ),
@@ -226,7 +227,7 @@ class BalanceSheetReportScreen extends ConsumerWidget {
                       data.totals.balanced ? 'Balanced' : 'Out of Balance',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: data.totals.balanced
-                            ? Colors.green
+                            ? scheme.primary
                             : scheme.error,
                         fontWeight: FontWeight.w700,
                       ),

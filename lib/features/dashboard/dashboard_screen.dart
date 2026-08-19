@@ -37,6 +37,7 @@ import 'dashboard_layout_controller.dart'
         dashboardLayoutControllerProvider;
 import 'dashboard_panel_catalog.dart' show panelById;
 import 'dashboard_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Landing screen behind the auth gate — renders the server-side
 /// aggregated KPIs (GET /dashboard/summary, PORTING.md §10). The
@@ -339,7 +340,7 @@ class _CashPositionCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: accent.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: AppBorderRadius.mdRadius,
             border: Border.all(color: accent.withValues(alpha: 0.35)),
           ),
           child: Column(
@@ -427,7 +428,7 @@ class _CashTotalCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppBorderRadius.mdRadius,
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
@@ -628,7 +629,7 @@ class _PanelFrameState extends ConsumerState<_PanelFrame> {
                   padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
                     color: scheme.surface,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: AppBorderRadius.xsRadius,
                     boxShadow: [
                       BoxShadow(
                         color: scheme.shadow.withValues(alpha: 0.15),
@@ -1324,7 +1325,7 @@ class _ArSummaryBody extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(5),
+                          borderRadius: AppBorderRadius.xsRadius,
                           child: LinearProgressIndicator(
                             value: (bucket.amount / safeMax)
                                 .clamp(0, 1)
@@ -1460,7 +1461,7 @@ class _TopCustomersBody extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(3),
+                      borderRadius: AppBorderRadius.xsRadius,
                       child: LinearProgressIndicator(
                         value: (customer.totalRevenue / safeMax)
                             .clamp(0, 1)

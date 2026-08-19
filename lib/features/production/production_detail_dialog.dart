@@ -22,6 +22,7 @@ import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import 'production_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the read-only detail dialog for [productionId].
 Future<void> showProductionDetailDialog(
@@ -218,7 +219,7 @@ class _InputsTable extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(

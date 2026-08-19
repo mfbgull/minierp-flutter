@@ -24,6 +24,7 @@ import '../data/repositories/api_result.dart' show ApiError;
 import '../l10n/app_localizations.dart';
 import 'pluto_grid_shortcuts.dart';
 import 'screen_error_panel.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// The shared `#` serial-number column prepended to every grid (the
 /// invoice line grid's `#` column is the in-app convention). The renderer
@@ -72,18 +73,48 @@ class GridRowAction {
   final Color? color;
 }
 
-/// Theme-aware PlutoGrid configuration: PlutoGrid ships a light default
-/// and a separate `PlutoGridConfiguration.dark` — it does *not* follow
-/// the ambient Theme brightness on its own. Every grid screen routes
-/// through this so dark mode is respected app-wide.
+/// Theme-aware PlutoGrid configuration: maps M3 [ColorScheme] tokens
+/// into PlutoGrid's [PlutoGridStyleConfig] so the grid visually matches
+/// the rest of the app.
 PlutoGridConfiguration plutoGridConfigurationFor(
   BuildContext context, {
   PlutoGridShortcut? shortcut,
 }) {
   final sc = shortcut ?? const PlutoGridShortcut();
-  return Theme.of(context).brightness == Brightness.dark
-      ? PlutoGridConfiguration.dark(shortcut: sc)
-      : PlutoGridConfiguration(shortcut: sc);
+  final scheme = Theme.of(context).colorScheme;
+  final textTheme = Theme.of(context).textTheme;
+
+  return PlutoGridConfiguration(
+    shortcut: sc,
+    style: PlutoGridStyleConfig(
+      gridBackgroundColor: scheme.surface,
+      rowColor: scheme.surface,
+      evenRowColor: scheme.surfaceContainerLow,
+      oddRowColor: scheme.surface,
+      activatedColor: scheme.primaryContainer.withValues(alpha: 0.3),
+      checkedColor: scheme.primaryContainer.withValues(alpha: 0.2),
+      cellColorInEditState: scheme.surfaceContainerHighest,
+      cellColorInReadOnlyState: scheme.surfaceContainerLow,
+      dragTargetColumnColor: scheme.primaryContainer.withValues(alpha: 0.3),
+      menuBackgroundColor: scheme.surface,
+      gridBorderColor: scheme.outlineVariant,
+      borderColor: scheme.outlineVariant,
+      activatedBorderColor: scheme.primary,
+      inactivatedBorderColor: scheme.outlineVariant,
+      iconColor: scheme.onSurfaceVariant,
+      disabledIconColor: scheme.onSurface.withValues(alpha: 0.12),
+      columnTextStyle: textTheme.titleSmall?.copyWith(
+        color: scheme.onSurface,
+        decoration: TextDecoration.none,
+        fontWeight: FontWeight.w600,
+      ) ?? const TextStyle(),
+      cellTextStyle: textTheme.bodyMedium?.copyWith(
+        color: scheme.onSurface,
+      ) ?? const TextStyle(),
+      gridBorderRadius: AppBorderRadius.smRadius,
+      gridPopupBorderRadius: AppBorderRadius.smRadius,
+    ),
+  );
 }
 
 /// Mixin over any [ConsumerState] providing the read-only grid skeleton.

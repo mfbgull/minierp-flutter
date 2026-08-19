@@ -45,6 +45,7 @@ import '../payments/payments_providers.dart' show paymentsProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'purchase_order_pdf.dart' show buildA4PurchaseOrderPdf;
 import 'purchase_order_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the create ([detail] == null) or edit form dialog.
 Future<void> showPurchaseOrderFormDialog(
@@ -743,7 +744,7 @@ class _PurchaseOrderFormDialogState
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
               border: Border.all(color: scheme.outlineVariant),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppBorderRadius.smRadius,
               color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
             ),
             child: Text(
@@ -1131,7 +1132,7 @@ class _PurchaseOrderFormDialogState
                       height: 38,
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: AppBorderRadius.mdRadius,
                       ),
                       child: Icon(
                         Icons.assignment_outlined,

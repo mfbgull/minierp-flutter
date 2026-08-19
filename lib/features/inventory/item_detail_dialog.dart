@@ -4,6 +4,7 @@
 // row's hidden `id` cell supplies the item id.
 
 import 'package:flutter/material.dart';
+import 'package:minierp_app/core/theme/status_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
@@ -18,6 +19,7 @@ import '../../widgets/status_badge.dart';
 import 'inventory_providers.dart';
 import 'item_form_dialog.dart';
 import 'stock_ledger_dialog.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the read-only detail dialog for [itemId].
 Future<void> showItemDetailDialog(BuildContext context, {required int itemId}) {
@@ -103,7 +105,7 @@ class _DetailBody extends StatelessWidget {
                     status: item.isActive
                         ? l10n.statusActive
                         : l10n.statusInactive,
-                    color: item.isActive ? Colors.green : Colors.blueGrey,
+                    color: StatusColors.of(context).active(item.isActive),
                   ),
                   if (item.isBelowReorder) ...[
                     const SizedBox(height: 6),
@@ -253,7 +255,7 @@ class _DetailBody extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: scheme.primary.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: AppBorderRadius.badge,
       ),
       child: Text(
         label,
@@ -282,7 +284,7 @@ class _DetailBody extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: scheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Column(
         children: [

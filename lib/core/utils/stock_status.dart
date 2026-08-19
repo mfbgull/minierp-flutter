@@ -4,6 +4,7 @@
 // localized + colored (AGENTS.md self-audit: duplicated_logic == false).
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 
 import '../../l10n/app_localizations.dart';
 
@@ -17,9 +18,5 @@ String stockStatusLabel(AppLocalizations l10n, String status) =>
     };
 
 /// Semantic color for a stock status (green / amber / red).
-Color stockStatusColor(String status) => switch (status.toLowerCase()) {
-  'in stock' => Colors.green.shade700,
-  'low stock' => Colors.amber.shade800,
-  'out of stock' => Colors.red.shade700,
-  _ => Colors.grey.shade600,
-};
+Color stockStatusColor(ColorScheme scheme, String status) =>
+    StatusColors(scheme).stock(status);

@@ -28,6 +28,7 @@ import '../../widgets/status_badge.dart';
 import 'quotation_form_dialog.dart';
 import 'quotation_pdf.dart' show buildA4QuotationPdf;
 import 'quotation_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the read-only detail dialog for [quotationId].
 Future<void> showQuotationDetailDialog(
@@ -78,7 +79,7 @@ class _DetailBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final expiry = detail.expiryDate;
-    final (color, darkColor) = quotationStatusColors(detail.status);
+    final color = quotationStatusColors(Theme.of(context).colorScheme, detail.status);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -113,7 +114,6 @@ class _DetailBody extends StatelessWidget {
               StatusBadge(
                 status: quotationStatusLabel(l10n, detail.status),
                 color: color,
-                darkColor: darkColor,
               ),
             ],
           ),
@@ -232,7 +232,7 @@ class _ItemsTable extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: scheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Column(
         children: [

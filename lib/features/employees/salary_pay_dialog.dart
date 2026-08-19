@@ -20,6 +20,7 @@ import '../../features/sales/payment_panel.dart' show kPaymentMethods;
 import 'employee_models.dart';
 import 'employee_providers.dart';
 import 'employee_repository.dart' show employeeRepositoryProvider;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the salary pay modal for one employee.
 Future<void> showSalaryPayDialog(
@@ -264,7 +265,7 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
                         ),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.errorContainer,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: AppBorderRadius.smRadius,
                         ),
                         child: Text(
                           _error!,
@@ -313,6 +314,6 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
   InputDecoration _decoration() => InputDecoration(
     isDense: true,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
   );
 }

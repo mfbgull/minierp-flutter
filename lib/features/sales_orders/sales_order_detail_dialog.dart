@@ -28,6 +28,7 @@ import '../../widgets/status_badge.dart';
 import 'sales_order_form_dialog.dart';
 import 'sales_order_pdf.dart' show buildA4SalesOrderPdf;
 import 'sales_order_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the read-only detail dialog for [soId].
 Future<void> showSalesOrderDetailDialog(
@@ -77,7 +78,7 @@ class _DetailBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final delivery = detail.deliveryDate;
-    final (color, darkColor) = soStatusColors(detail.status);
+    final color = soStatusColors(Theme.of(context).colorScheme, detail.status);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -112,7 +113,6 @@ class _DetailBody extends StatelessWidget {
               StatusBadge(
                 status: soStatusLabel(l10n, detail.status),
                 color: color,
-                darkColor: darkColor,
               ),
             ],
           ),
@@ -222,7 +222,7 @@ class _ItemsTable extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: scheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Column(
         children: [

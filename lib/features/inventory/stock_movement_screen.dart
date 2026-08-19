@@ -9,6 +9,7 @@
 // filters — only type is exposed so far).
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
@@ -279,10 +280,10 @@ class _StockMovementScreenState extends ConsumerState<StockMovementScreen>
             child: StatusBadge(
               status: type,
               color: switch (type) {
-                'PURCHASE' || 'PRODUCTION' => Colors.green,
-                'SALE' || 'TRANSFER' => Colors.orange,
-                'ADJUSTMENT' => Colors.purple,
-                _ => Colors.blueGrey,
+                'PURCHASE' || 'PRODUCTION' => StatusColors.of(context).success,
+                'SALE' || 'TRANSFER' => StatusColors.of(context).warning,
+                'ADJUSTMENT' => StatusColors.of(context).info,
+                _ => Theme.of(context).colorScheme.outline,
               },
             ),
           );

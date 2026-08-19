@@ -8,6 +8,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
@@ -132,13 +133,7 @@ class _PhysicalCountScreenState extends ConsumerState<PhysicalCountScreen>
     },
   );
 
-  Color _statusColor(String status, ColorScheme scheme) => switch (status) {
-    'Draft' => Colors.blueGrey,
-    'In Progress' => Colors.orange,
-    'Completed' => Colors.green,
-    'Cancelled' => Colors.red,
-    _ => scheme.primary,
-  };
+  Color _statusColor(String status, ColorScheme scheme) => StatusColors(scheme).physicalCount(status);
 
   @override
   Widget build(BuildContext context) {

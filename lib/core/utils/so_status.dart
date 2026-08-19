@@ -5,20 +5,15 @@
 // CSV export can reuse it without importing from features.
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 
 import '../../l10n/app_localizations.dart';
 
 /// SO status badge colors — Draft gray, Confirmed blue, Delivered green,
 /// Invoiced teal, Completed green, Cancelled grey: the light color plus
 /// the darker variant used as text on dark themes.
-(Color, Color?) soStatusColors(String status) => switch (status) {
-  'Confirmed' => (Colors.blue, Colors.lightBlueAccent),
-  'Delivered' => (Colors.green, Colors.lightGreen),
-  'Invoiced' => (Colors.teal, Colors.tealAccent),
-  'Completed' => (Colors.green, Colors.lightGreen),
-  'Cancelled' => (Colors.grey, Colors.blueGrey),
-  _ => (Colors.blueGrey, Colors.blueGrey),
-};
+Color soStatusColors(ColorScheme scheme, String status) =>
+    StatusColors(scheme).so(status);
 
 /// Localized SO status label (falls back to the raw server value).
 String soStatusLabel(AppLocalizations l10n, String status) => switch (status) {

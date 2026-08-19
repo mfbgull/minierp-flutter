@@ -7,6 +7,7 @@
 // been used by production records).
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
@@ -24,6 +25,7 @@ import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'bom_form_dialog.dart';
 import 'production_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the BOM detail dialog for [bomId].
 Future<void> showBomDetailDialog(BuildContext context, {required int bomId}) {
@@ -153,12 +155,7 @@ class _DetailBody extends ConsumerWidget {
               const SizedBox(width: 12),
               StatusBadge(
                 status: bom.isActive ? l10n.statusActive : l10n.statusInactive,
-                color: bom.isActive
-                    ? const Color(0xFF059669)
-                    : const Color(0xFF6B7280),
-                darkColor: bom.isActive
-                    ? const Color(0xFF10B981)
-                    : const Color(0xFF86EFAC),
+                color: StatusColors.of(context).active(bom.isActive),
               ),
             ],
           ),
@@ -258,7 +255,7 @@ class _MaterialsTable extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(

@@ -38,6 +38,7 @@ import 'activity_log_cleanup_dialog.dart';
 import 'activity_log_detail_dialog.dart';
 import 'activity_log_presenters.dart';
 import 'activity_log_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class ActivityLogScreen extends ConsumerStatefulWidget {
   const ActivityLogScreen({super.key});
@@ -213,7 +214,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen>
               alignment: Alignment.centerLeft,
               child: StatusBadge(
                 status: level,
-                color: activityLogLevelColor(level),
+                color: activityLogLevelColor(Theme.of(cellContext).colorScheme, level),
               ),
             );
           },
@@ -425,7 +426,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen>
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Row(

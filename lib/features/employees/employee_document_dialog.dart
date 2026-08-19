@@ -19,6 +19,7 @@ import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
 import 'employee_providers.dart';
 import 'employee_repository.dart' show employeeRepositoryProvider;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Extensions the server's upload filter accepts (`documentFilter` in
 /// `server/src/middleware/upload.ts`).
@@ -321,7 +322,7 @@ class _EmployeeDocumentDialogState
                         ),
                         decoration: BoxDecoration(
                           color: scheme.errorContainer,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: AppBorderRadius.smRadius,
                         ),
                         child: Text(
                           _error!,
@@ -388,6 +389,6 @@ class _EmployeeDocumentDialogState
   InputDecoration _decoration() => InputDecoration(
     isDense: true,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+    border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
   );
 }

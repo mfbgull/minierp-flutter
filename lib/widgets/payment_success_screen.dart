@@ -73,10 +73,10 @@ class PaymentSuccessScreen extends ConsumerWidget {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.12),
+                  color: scheme.primary.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check, size: 36, color: Colors.green),
+                child: Icon(Icons.check, size: 36, color: scheme.primary),
               ),
               const SizedBox(height: 16),
               Text(

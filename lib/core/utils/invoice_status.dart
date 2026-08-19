@@ -4,6 +4,7 @@
 // `references/utils/statusColors.ts` conventions).
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 
 import '../../l10n/app_localizations.dart';
 
@@ -26,15 +27,5 @@ String invoiceStatusLabel(AppLocalizations l10n, String status) =>
 
 /// Status chip color (light) — port of the statusColors conventions in
 /// PORTING.md §6.
-Color invoiceStatusColor(String status) => switch (status) {
-  'Draft' => Colors.blueGrey,
-  'Sent' => Colors.lightBlue,
-  'Unpaid' => Colors.orange,
-  'Partially Paid' => Colors.amber,
-  'Paid' => Colors.green,
-  'Overdue' => Colors.red,
-  'Cancelled' => Colors.grey,
-  'Returned' => Colors.purple,
-  'Partially Returned' => Colors.deepPurple,
-  _ => Colors.blueGrey,
-};
+Color invoiceStatusColor(ColorScheme scheme, String status) =>
+    StatusColors(scheme).invoice(status);

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/auth/auth_notifier.dart';
 import '../../l10n/app_localizations.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Login screen — PORTING.md §3.
 ///
@@ -182,7 +183,7 @@ class _ErrorBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Row(
         children: [

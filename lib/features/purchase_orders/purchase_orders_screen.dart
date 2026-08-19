@@ -298,7 +298,7 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
         renderer: (ctx) => Builder(
           builder: (cellContext) {
             final status = ctx.cell.value as String? ?? '';
-            final (color, darkColor) = poStatusColors(status);
+            final color = poStatusColors(Theme.of(context).colorScheme, status);
             return Align(
               alignment: Alignment.centerLeft,
               child: StatusBadge(
@@ -307,7 +307,6 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
                   status,
                 ),
                 color: color,
-                darkColor: darkColor,
               ),
             );
           },

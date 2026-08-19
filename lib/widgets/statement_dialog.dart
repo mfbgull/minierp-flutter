@@ -23,6 +23,7 @@ import 'detail_error.dart';
 import 'detail_labels.dart';
 import 'detail_rows.dart';
 import 'ledger_table.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// What differs between the customer and supplier statements: the
 /// localized strings and the `autoDispose` family provider that fetches
@@ -196,7 +197,7 @@ class _StatementTable extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: scheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Column(
         children: [

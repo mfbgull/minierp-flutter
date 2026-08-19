@@ -17,6 +17,7 @@ import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class ProfitLossReportScreen extends ConsumerWidget {
   const ProfitLossReportScreen({super.key});
@@ -101,7 +102,7 @@ class ProfitLossReportScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: AppBorderRadius.mdRadius,
           border: Border.all(color: scheme.outlineVariant),
         ),
         child: Column(
@@ -194,7 +195,7 @@ class ProfitLossReportScreen extends ConsumerWidget {
             Container(
               decoration: BoxDecoration(
                 color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: AppBorderRadius.mdRadius,
                 border: Border.all(color: scheme.outlineVariant),
               ),
               child: Column(

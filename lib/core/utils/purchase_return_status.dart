@@ -6,16 +6,14 @@
 // can reuse it without importing from features.
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 
 import '../../l10n/app_localizations.dart';
 
 /// Return-status badge colors — Posted green, Voided red (the light color
 /// plus the darker variant used as text on dark themes).
-(Color, Color?) purchaseReturnStatusColors(String status) => switch (status) {
-  'POSTED' => (Colors.green, Colors.lightGreen),
-  'VOIDED' => (Colors.red, Colors.redAccent),
-  _ => (Colors.blueGrey, Colors.blueGrey),
-};
+Color purchaseReturnStatusColors(ColorScheme scheme, String status) =>
+    StatusColors(scheme).purchaseReturnStatus(status);
 
 /// Localized return-status label (falls back to the raw server value).
 String purchaseReturnStatusLabel(AppLocalizations l10n, String status) =>

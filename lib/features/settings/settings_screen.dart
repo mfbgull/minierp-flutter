@@ -27,6 +27,7 @@ import '../preferences/preference_providers.dart'
 import '../reports/report_providers.dart'
     show globalReportFromDateProvider, globalReportToDateProvider;
 import 'settings_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Keys configured on the Integrations module's service forms — excluded
 /// here to avoid two editing surfaces for the same store (PORTING.md §13
@@ -372,7 +373,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: scheme.tertiaryContainer,
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: AppBorderRadius.badge,
                     ),
                     child: Text(
                       l10n.settingsUnsaved,

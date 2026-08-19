@@ -118,7 +118,7 @@ class _SummaryStrip extends StatelessWidget {
             report.balanced ? '✓ ${l10n.reportsBalanced}' : '✗ Not Balanced',
             '',
             theme,
-            color: report.balanced ? Colors.green : Colors.red,
+            color: report.balanced ? theme.colorScheme.primary : theme.colorScheme.error,
           ),
         ],
       ),

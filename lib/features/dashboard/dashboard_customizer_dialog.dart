@@ -21,6 +21,7 @@ import 'dashboard_layout_controller.dart'
     show dashboardLayoutControllerProvider;
 import 'dashboard_panel_catalog.dart'
     show cashStripDefinition, dashboardPanelLabel, panelById;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the customizer dialog from the dashboard toolbar.
 Future<void> showDashboardCustomizerDialog(BuildContext context) {
@@ -103,7 +104,7 @@ class _DashboardCustomizerDialogState
                 prefixIcon: const Icon(Icons.search, size: 20),
                 hintText: l10n.dashboardcardsSearch,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppBorderRadius.smRadius,
                 ),
               ),
             ),
@@ -491,7 +492,7 @@ class _SizeSelector extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           border: Border.all(color: Theme.of(context).colorScheme.outline),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: AppBorderRadius.smRadius,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

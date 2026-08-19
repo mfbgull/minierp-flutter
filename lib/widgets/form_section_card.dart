@@ -5,6 +5,7 @@
 // duplicated_logic == false).
 
 import 'package:flutter/material.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class FormSectionCard extends StatelessWidget {
   const FormSectionCard({
@@ -25,7 +26,7 @@ class FormSectionCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppBorderRadius.mdRadius,
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
@@ -38,7 +39,7 @@ class FormSectionCard extends StatelessWidget {
                 height: 26,
                 decoration: BoxDecoration(
                   color: scheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(7),
+                  borderRadius: AppBorderRadius.smRadius,
                 ),
                 child: Icon(icon, size: 16, color: scheme.onPrimaryContainer),
               ),

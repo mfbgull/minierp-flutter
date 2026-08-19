@@ -5,19 +5,15 @@
 // so the core CSV export can reuse it without importing from features.
 
 import 'package:flutter/material.dart';
+import '../../core/theme/status_colors.dart';
 
 import '../../l10n/app_localizations.dart';
 
 /// PO status badge colors — Draft gray, Submitted blue, Partially Received
 /// yellow, Completed green, Cancelled gray: the light color plus the
 /// darker variant used as text on dark themes.
-(Color, Color?) poStatusColors(String status) => switch (status) {
-  'Submitted' => (Colors.blue, Colors.lightBlueAccent),
-  'Partially Received' => (Colors.amber, Colors.orangeAccent),
-  'Completed' => (Colors.green, Colors.lightGreen),
-  'Cancelled' => (Colors.grey, Colors.blueGrey),
-  _ => (Colors.blueGrey, Colors.blueGrey),
-};
+Color poStatusColors(ColorScheme scheme, String status) =>
+    StatusColors(scheme).po(status);
 
 /// Localized PO status label (falls back to the raw server value).
 String poStatusLabel(AppLocalizations l10n, String status) => switch (status) {

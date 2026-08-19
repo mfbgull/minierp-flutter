@@ -32,6 +32,7 @@ import '../../widgets/searchable_select.dart';
 import '../sales/invoice_providers.dart' show invoicesProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'payments_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the Record Payment dialog (customer + allocations).
 Future<void> showRecordPaymentDialog(BuildContext context) {
@@ -352,7 +353,7 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
                           vertical: 10,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: AppBorderRadius.smRadius,
                         ),
                         suffixIcon: const Icon(Icons.calendar_today, size: 16),
                       ),

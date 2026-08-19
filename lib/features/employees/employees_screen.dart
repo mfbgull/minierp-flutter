@@ -15,6 +15,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:minierp_app/core/theme/status_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
@@ -33,6 +34,7 @@ import 'employee_models.dart';
 import 'employee_providers.dart';
 import 'employee_repository.dart' show employeeRepositoryProvider;
 import 'salary_pay_dialog.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class EmployeesScreen extends ConsumerStatefulWidget {
   const EmployeesScreen({super.key});
@@ -232,7 +234,7 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen>
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Row(
@@ -247,7 +249,7 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen>
           Icon(
             Icons.check_circle_outline,
             size: 16,
-            color: Colors.green.shade600,
+            color: scheme.primary,
           ),
           const SizedBox(width: 4),
           Text('$active ${l10n.employeesActivecount}'),
@@ -390,7 +392,7 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen>
               alignment: Alignment.centerLeft,
               child: StatusBadge(
                 status: active ? l10n.statusActive : l10n.statusInactive,
-                color: active ? Colors.green : Colors.blueGrey,
+                color: StatusColors.of(context).active(active),
               ),
             );
           },

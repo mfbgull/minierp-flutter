@@ -102,7 +102,7 @@ class _ItemSelector extends ConsumerWidget {
 
     return Row(
       children: [
-        Icon(Icons.inventory_2_outlined, size: 18, color: Colors.grey[600]),
+        Icon(Icons.inventory_2_outlined, size: 18, color: Theme.of(context).colorScheme.outline),
         const SizedBox(width: 8),
         Text('${l10n.fieldsItem}: ', style: Theme.of(context).textTheme.bodyMedium),
         const SizedBox(width: 8),

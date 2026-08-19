@@ -19,6 +19,7 @@ import '../../widgets/screen_error_panel.dart';
 import 'integration_models.dart';
 import 'integrations_providers.dart';
 import 'integrations_repository.dart' show integrationsRepositoryProvider;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class IntegrationsScreen extends ConsumerWidget {
   const IntegrationsScreen({super.key});
@@ -245,7 +246,7 @@ class _ServiceCardState extends ConsumerState<_ServiceCard> {
                     color: configured
                         ? const Color(0xFFDCFCE7)
                         : scheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: AppBorderRadius.badge,
                   ),
                   child: Text(
                     configured

@@ -34,7 +34,7 @@ class _InvoiceReturnDetailDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final (color, darkColor) = invoiceReturnTypeColors(
+    final color = invoiceReturnTypeColors(Theme.of(context).colorScheme, 
       salesReturn.referenceDocType,
     );
 
@@ -72,7 +72,6 @@ class _InvoiceReturnDetailDialog extends StatelessWidget {
                       salesReturn.referenceDocType,
                     ),
                     color: color,
-                    darkColor: darkColor,
                   ),
                 ],
               ),

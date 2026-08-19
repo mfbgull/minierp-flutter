@@ -19,6 +19,7 @@ import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show allItemsProvider;
 import 'forecast_models.dart';
 import 'forecast_providers.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class ForecastTrendsScreen extends ConsumerStatefulWidget {
   const ForecastTrendsScreen({super.key});
@@ -82,7 +83,7 @@ class _ForecastTrendsScreenState extends ConsumerState<ForecastTrendsScreen> {
                       vertical: 8,
                     ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: AppBorderRadius.smRadius,
                     ),
                   ),
                 ),

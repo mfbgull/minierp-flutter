@@ -26,6 +26,7 @@ import 'customer_payment_modal.dart' show showCustomerPaymentModal;
 import 'customer_payments_tab.dart';
 import 'customer_providers.dart';
 import 'customer_statement_tab.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class CustomerDetailScreen extends ConsumerStatefulWidget {
   const CustomerDetailScreen({super.key, required this.customerId});
@@ -171,7 +172,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
             elevation: 0,
             color: scheme.surfaceContainerLow,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppBorderRadius.mdRadius,
               side: BorderSide(color: scheme.outlineVariant),
             ),
             child: Padding(

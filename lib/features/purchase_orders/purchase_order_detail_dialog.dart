@@ -30,6 +30,7 @@ import 'purchase_order_form_dialog.dart';
 import 'purchase_order_pdf.dart' show buildA4PurchaseOrderPdf;
 import 'purchase_order_providers.dart';
 import 'receive_goods_dialog.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the read-only detail dialog for [poId].
 Future<void> showPurchaseOrderDetailDialog(
@@ -79,7 +80,7 @@ class _DetailBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final expected = detail.expectedDeliveryDate;
-    final (color, darkColor) = poStatusColors(detail.status);
+    final color = poStatusColors(Theme.of(context).colorScheme, detail.status);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -117,7 +118,6 @@ class _DetailBody extends ConsumerWidget {
               StatusBadge(
                 status: poStatusLabel(l10n, detail.status),
                 color: color,
-                darkColor: darkColor,
               ),
             ],
           ),
@@ -245,7 +245,7 @@ class _ItemsTable extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: scheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Column(
         children: [
@@ -457,7 +457,7 @@ class _ReceiptsTable extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: scheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
       ),
       child: Column(
         children: [

@@ -45,6 +45,7 @@ import 'invoice_pdf.dart' show buildA4InvoicePdf;
 import 'invoice_payment_dialog.dart' show showInvoicePaymentDialog;
 import 'invoice_providers.dart';
 import 'invoice_return_dialog.dart' show showInvoiceReturnDialog;
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Invoice-status options for the filter dropdown (display → server
 /// value; `All` = null = param omitted).
@@ -377,7 +378,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: AppBorderRadius.smRadius,
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Row(
@@ -385,7 +386,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           Icon(Icons.receipt_long_outlined, size: 18, color: scheme.primary),
           const SizedBox(width: 14),
           stat(l10n.salesTotalsales, totalSales, scheme.primary),
-          stat(l10n.salesTotalpaid, totalPaid, Colors.green.shade700),
+          stat(l10n.salesTotalpaid, totalPaid, scheme.primary),
           stat(l10n.salesTotaldue, totalDue, scheme.error),
         ],
       ),
@@ -539,7 +540,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
               alignment: Alignment.centerLeft,
               child: StatusBadge(
                 status: invoiceStatusLabel(l10n, status),
-                color: invoiceStatusColor(status),
+                color: invoiceStatusColor(Theme.of(cellContext).colorScheme, status),
               ),
             );
           },

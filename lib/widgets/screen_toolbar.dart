@@ -35,6 +35,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import 'searchable_select.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// The Ctrl+F / Ctrl+N / Ctrl+R / Ctrl+E chords as shown in the UI
 /// (universal key names, so not localized). These must stay in sync with
@@ -96,7 +97,7 @@ class ScreenToolbarDropdown<T> extends StatelessWidget {
             horizontal: 12,
             vertical: 8,
           ),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
         ),
       ),
     );
@@ -269,7 +270,7 @@ class ScreenToolbarState extends State<ScreenToolbar> {
                 ? '${widget.searchHint ?? l10n.commonSearch}'
                     ' ($kShortcutFindChord)'
                 : widget.searchHint ?? l10n.commonSearch,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
             suffixIcon: widget.onClearAll != null && widget.hasActiveFilters
                 ? IconButton(
                     icon: const Icon(Icons.filter_alt_off, size: 18),
