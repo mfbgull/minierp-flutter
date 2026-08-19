@@ -28,28 +28,23 @@ import 'features/preferences/preference_providers.dart'
     show resetUserPreferences;
 import 'features/production/production_shell.dart';
 import 'data/models/invoice.dart' show Invoice;
+import 'features/reports/ap_aging_report_screen.dart';
 import 'features/reports/ar_aging_report_screen.dart';
 import 'features/reports/ar_summary_report_screen.dart';
-import 'features/reports/bom_usage_report_screen.dart';
+import 'features/reports/balance_sheet_report_screen.dart';
 import 'features/reports/cash_flow_report_screen.dart';
 import 'features/reports/cash_reconciliation_screen.dart';
 import 'features/reports/dso_report_screen.dart';
-import 'features/reports/expenses_report_screen.dart';
-import 'features/reports/inventory_movement_report_screen.dart';
-import 'features/reports/low_stock_report_screen.dart';
-import 'features/reports/production_summary_report_screen.dart';
 import 'features/reports/profit_loss_report_screen.dart';
-import 'features/reports/purchase_summary_report_screen.dart';
 import 'features/reports/top_debtors_report_screen.dart';
 import 'features/reports/customer_statements_report_screen.dart';
+import 'features/reports/trial_balance_report_screen.dart';
+import 'features/reports/general_ledger_report_screen.dart';
+import 'features/reports/income_statement_report_screen.dart';
+import 'features/reports/tax_summary_report_screen.dart';
+import 'features/reports/batch_traceability_report_screen.dart';
 import 'features/reports/reports_dashboard_screen.dart'
     show ReportsDashboardScreen, reportTitles;
-import 'features/reports/sales_by_customer_report_screen.dart';
-import 'features/reports/sales_by_item_report_screen.dart';
-import 'features/reports/sales_summary_report_screen.dart';
-import 'features/reports/supplier_analysis_report_screen.dart';
-import 'features/reports/stock_level_report_screen.dart';
-import 'features/reports/stock_valuation_report_screen.dart';
 import 'features/sales/invoice_print_preview_page.dart';
 import 'features/sales/sales_invoice_form_page.dart';
 import 'features/sales_orders/sales_shell.dart';
@@ -188,35 +183,22 @@ final routerProvider = Provider<GoRouter>((ref) {
                           final slug = state.pathParameters['report'] ?? '';
                           return switch (slug) {
                             'ar-summary' => const ArSummaryReportScreen(),
+                            'ap-aging' => const ApAgingReportScreen(),
                             'ar-aging' => const ArAgingReportScreen(),
-                            'sales-summary' =>
-                              const SalesSummaryReportScreen(),
-                            'low-stock' => const LowStockReportScreen(),
-                            'stock-level' => const StockLevelReportScreen(),
-                            'stock-valuation' =>
-                              const StockValuationReportScreen(),
-                            'sales-by-customer' =>
-                              const SalesByCustomerReportScreen(),
+                            'balance-sheet' => const BalanceSheetReportScreen(),
+                            'trial-balance' => const TrialBalanceReportScreen(),
+                            'general-ledger' => const GeneralLedgerReportScreen(),
+                            'income-statement' => const IncomeStatementReportScreen(),
+                            'tax-summary' => const TaxSummaryReportScreen(),
+                            'batch-traceability' => const BatchTraceabilityReportScreen(),
                             'dso' => const DsoReportScreen(),
-                            'expenses' => const ExpensesReportScreen(),
                             'cash-flow' => const CashFlowReportScreen(),
                             'cash-reconciliation' =>
                               const CashReconciliationScreen(),
                             'profit-loss' => const ProfitLossReportScreen(),
-                            'inventory-movement' =>
-                              const InventoryMovementReportScreen(),
-                            'purchase-summary' =>
-                              const PurchaseSummaryReportScreen(),
                             'top-debtors' => const TopDebtorsReportScreen(),
                             'customer-statements' =>
                               const CustomerStatementsReportScreen(),
-                            'sales-by-item' =>
-                              const SalesByItemReportScreen(),
-                            'supplier-analysis' =>
-                              const SupplierAnalysisReportScreen(),
-                            'production-summary' =>
-                              const ProductionSummaryReportScreen(),
-                            'bom-usage' => const BomUsageReportScreen(),
                             _ => ModulePlaceholderScreen(
                               title:
                                   reportTitles[slug]?.call(

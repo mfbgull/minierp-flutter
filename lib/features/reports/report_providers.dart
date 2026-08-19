@@ -6,36 +6,26 @@ import '../../core/utils/date_utils.dart' show isoDate;
 import '../activity_log/activity_log_providers.dart'
     show activityLogFromDateProvider, activityLogToDateProvider;
 import '../../data/models/customer.dart' show Customer;
-import '../../data/models/item.dart' show Item;
 import '../../data/models/report.dart'
     show
         ApAgingReport,
         ArAgingReport,
         ArSummaryReport,
         BalanceSheetReport,
-        BomUsageReport,
+        BatchTraceabilityReport,
         CashFlowReport,
         CashReconciliation,
         CustomerStatementRow,
         DSOMetric,
-        ExpensesReport,
-        InventoryMovementReport,
-        LowStockReportRow,
-        ProductionSummaryReport,
+        GeneralLedgerRow,
+        IncomeStatementReport,
         ProfitLossReport,
-        PurchaseSummaryReport,
-        SalesByCustomerRow,
-        SalesByItemRow,
-        SalesSummaryReport,
-        StockLevelReport,
-        StockValuationReport,
-        SupplierAnalysisRow,
-        TopDebtorRow;
+        TaxSummaryReport,
+        TopDebtorRow,
+        TrialBalanceReport;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/customer_repository.dart'
     show customerRepositoryProvider;
-import '../../data/repositories/inventory_repository.dart'
-    show inventoryRepositoryProvider;
 import '../../data/repositories/paged_request.dart'
     show PagedRequest;
 import '../../data/repositories/report_repository.dart'
@@ -50,7 +40,6 @@ DateTime _today() {
 
 // ── AR aging ─────────────────────────────────────────────────────────
 
-/// Loads GET /reports/ar-aging (server default: as of today).
 /// As-of date for the AR aging report (defaults to today).
 final reportArAgingAsOfDateProvider = StateProvider<DateTime?>(
   (ref) => _today(),
@@ -68,98 +57,9 @@ final arAgingProvider = FutureProvider<ArAgingReport>((ref) async {
   };
 });
 
-// ── Sales summary ────────────────────────────────────────────────────
-
-/// Date-range filters for the sales summary report (the endpoint
-/// requires both dates). Defaults mirror the web app's
-/// `SalesSummaryReport` initial state: last month → today.
-final reportSalesFromDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).from);
-final reportSalesToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
-
-/// Loads GET /reports/sales-summary, re-running when the date range
-/// changes (the screen's From/To buttons write these providers).
-final salesSummaryProvider = FutureProvider<SalesSummaryReport>((ref) async {
-  final from = ref.watch(reportSalesFromDateProvider) ?? initialRange(ref).from;
-  final to = ref.watch(reportSalesToDateProvider) ?? initialRange(ref).to;
-  final result = await ref
-      .watch(reportRepositoryProvider)
-      .salesSummary(fromDate: isoDate(from), toDate: isoDate(to));
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
-
-// ── Low stock ────────────────────────────────────────────────────────
-
-/// Loads GET /reports/low-stock.
-final lowStockReportProvider = FutureProvider<List<LowStockReportRow>>((
-  ref,
-) async {
-  final result = await ref.watch(reportRepositoryProvider).lowStock();
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
-
-// ── Stock level ──────────────────────────────────────────────────────
-
-/// Loads GET /reports/stock-level.
-final stockLevelReportProvider = FutureProvider<StockLevelReport>((ref) async {
-  final result = await ref.watch(reportRepositoryProvider).stockLevel();
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
-
-// ── Stock valuation ──────────────────────────────────────────────────
-
-/// Loads GET /reports/stock-valuation.
-final stockValuationReportProvider = FutureProvider<StockValuationReport>((
-  ref,
-) async {
-  final result = await ref.watch(reportRepositoryProvider).stockValuation();
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
-
-// ── Sales by customer ────────────────────────────────────────────────
-
-/// Date-range filters for the sales-by-customer report. Defaults mirror
-/// the web app's `SalesByCustomerReport` initial state: last month →
-/// today (the endpoint requires both dates).
-final reportSalesByCustomerFromDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).from);
-final reportSalesByCustomerToDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).to);
-
-/// Loads GET /reports/sales-by-customer, re-running when the date range
-/// changes (the screen's From/To buttons write these providers).
-final salesByCustomerReportProvider = FutureProvider<List<SalesByCustomerRow>>((
-  ref,
-) async {
-  final from =
-      ref.watch(reportSalesByCustomerFromDateProvider) ?? initialRange(ref).from;
-  final to = ref.watch(reportSalesByCustomerToDateProvider) ?? initialRange(ref).to;
-  final result = await ref
-      .watch(reportRepositoryProvider)
-      .salesByCustomer(fromDate: isoDate(from), toDate: isoDate(to));
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
-
 // ── DSO ──────────────────────────────────────────────────────────────
 
-/// Date-range filters for the DSO report. Defaults mirror the web app's
-/// `DSOReport` initial state: last month → today (the endpoint defaults
-/// to the last 30 days when both are omitted, so these are always sent).
+/// Date-range filters for the DSO report.
 final reportDsoFromDateProvider =
     StateProvider<DateTime?>((ref) => initialRange(ref).from);
 final reportDsoToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
@@ -179,8 +79,7 @@ final dsoReportProvider = FutureProvider<DSOMetric>((ref) async {
 
 // ── Cash flow ────────────────────────────────────────────────────────
 
-/// Date-range filters for the cash flow report (the endpoint requires
-/// both dates). Defaults mirror the web app: last month → today.
+/// Date-range filters for the cash flow report.
 final reportCashFlowFromDateProvider =
     StateProvider<DateTime?>((ref) => initialRange(ref).from);
 final reportCashFlowToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
@@ -200,8 +99,7 @@ final cashFlowReportProvider = FutureProvider<CashFlowReport>((ref) async {
 
 // ── Profit & loss ────────────────────────────────────────────────────
 
-/// Date-range filters for the P&L report (the endpoint requires both
-/// dates). Defaults mirror the web app: last month → today.
+/// Date-range filters for the P&L report.
 final reportProfitLossFromDateProvider =
     StateProvider<DateTime?>((ref) => initialRange(ref).from);
 final reportProfitLossToDateProvider =
@@ -220,127 +118,18 @@ final profitLossReportProvider = FutureProvider<ProfitLossReport>((ref) async {
   };
 });
 
-// ── Inventory movement ───────────────────────────────────────────────
-
-/// Date-range filters for the inventory movement report. Defaults mirror
-/// the web app: last month → today (the endpoint tolerates both omitted).
-final reportMovementFromDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).from);
-final reportMovementToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
-
-/// Loads GET /reports/inventory-movement, re-running when the date range
-/// changes.
-final inventoryMovementReportProvider = FutureProvider<InventoryMovementReport>(
-  (ref) async {
-    final from = ref.watch(reportMovementFromDateProvider);
-    final to = ref.watch(reportMovementToDateProvider);
-    final result = await ref
-        .watch(reportRepositoryProvider)
-        .inventoryMovement(
-          fromDate: from == null ? null : isoDate(from),
-          toDate: to == null ? null : isoDate(to),
-        );
-    return switch (result) {
-      ApiSuccess(:final data) => data,
-      ApiFailure(:final error) => throw error,
-    };
-  },
-);
-
-// ── Purchase summary ─────────────────────────────────────────────────
-
-/// Date-range filters for the purchase summary report. Defaults mirror
-/// the web app: last 3 months → today (the endpoint requires both
-/// dates).
-final reportPurchaseFromDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).from);
-final reportPurchaseToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
-
-/// Loads GET /reports/purchase-summary, re-running when the date range
-/// changes.
-final purchaseSummaryReportProvider = FutureProvider<PurchaseSummaryReport>((
-  ref,
-) async {
-  final from = ref.watch(reportPurchaseFromDateProvider) ?? initialRange(ref).from;
-  final to = ref.watch(reportPurchaseToDateProvider) ?? initialRange(ref).to;
-  final result = await ref
-      .watch(reportRepositoryProvider)
-      .purchaseSummary(fromDate: isoDate(from), toDate: isoDate(to));
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
-
-// ── Top debtors ──────────────────────────────────────────────────────
-
-/// Row limit for the top-debtors report (5/10/20/50, default 10 — same
-/// options as the web page's filter).
-final topDebtorsLimitProvider = StateProvider<int>((ref) => 10);
-
-/// Loads GET /reports/top-debtors, re-running when the limit changes.
-final topDebtorsReportProvider = FutureProvider<List<TopDebtorRow>>((
-  ref,
-) async {
-  final limit = ref.watch(topDebtorsLimitProvider);
-  final result = await ref
-      .watch(reportRepositoryProvider)
-      .topDebtors(limit: limit);
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
-
-// ── Expenses report ─────────────────────────────────────────────────
-
-/// Date-range filters for the expenses report (the endpoint requires
-/// both dates). Defaults mirror the web app's `ExpensesReport` initial
-/// state: last month → today.
-final reportExpensesFromDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).from);
-final reportExpensesToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
-
-/// Active category filter for the expenses report — null means "all
-/// categories" (the `category` query param is omitted).
-final reportExpensesCategoryProvider = StateProvider<String?>((ref) => null);
-
-/// Loads GET /reports/expenses, re-running when the date range or the
-/// selected category changes.
-final expensesReportProvider = FutureProvider<ExpensesReport>((ref) async {
-  final from = ref.watch(reportExpensesFromDateProvider) ?? initialRange(ref).from;
-  final to = ref.watch(reportExpensesToDateProvider) ?? initialRange(ref).to;
-  final category = ref.watch(reportExpensesCategoryProvider);
-  final result = await ref
-      .watch(reportRepositoryProvider)
-      .expenses(
-        fromDate: isoDate(from),
-        toDate: isoDate(to),
-        category: category,
-      );
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
-
 // ── Customer statements ─────────────────────────────────────────────
 
-/// Date-range filters for the customer statements report. Defaults mirror
-/// the web app's `CustomerStatementsReport` initial state: last 3 months
-/// → today (the endpoint tolerates omitted dates, but the port always
-/// sends them).
+/// Date-range filters for the customer statements report.
 final reportStatementsFromDateProvider =
     StateProvider<DateTime?>((ref) => initialRange(ref).from);
 final reportStatementsToDateProvider =
     StateProvider<DateTime?>((ref) => initialRange(ref).to);
 
-/// Active customer filter for the customer statements report — null means
-/// "All Customers" (the `customerId` query param is omitted).
+/// Active customer filter for the customer statements report.
 final reportStatementsCustomerIdProvider = StateProvider<int?>((ref) => null);
 
-/// All customers for the customer statements customer picker (reuses the
-/// same large-page pattern as the payments dialog).
+/// All customers for the customer statements customer picker.
 final customersForReportProvider = FutureProvider<List<Customer>>((ref) async {
   final result = await ref
       .watch(customerRepositoryProvider)
@@ -371,77 +160,17 @@ final customerStatementsReportProvider =
   };
 });
 
-// ── Sales by item ────────────────────────────────────────────────────
+// ── Top debtors ──────────────────────────────────────────────────────
 
-/// Date-range filters for the sales-by-item report. Defaults mirror the
-/// web app's `SalesByItemReport` initial state: last month → today (the
-/// endpoint requires both dates).
-final reportSalesByItemFromDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).from);
-final reportSalesByItemToDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).to);
+/// Row limit for the top-debtors report.
+final topDebtorsLimitProvider = StateProvider<int>((ref) => 10);
 
-/// Loads GET /reports/sales-by-item, re-running when the date range
-/// changes.
-final salesByItemReportProvider = FutureProvider<List<SalesByItemRow>>((
-  ref,
-) async {
-  final from = ref.watch(reportSalesByItemFromDateProvider) ?? initialRange(ref).from;
-  final to = ref.watch(reportSalesByItemToDateProvider) ?? initialRange(ref).to;
+/// Loads GET /reports/top-debtors, re-running when the limit changes.
+final topDebtorsReportProvider = FutureProvider<List<TopDebtorRow>>((ref) async {
+  final limit = ref.watch(topDebtorsLimitProvider);
   final result = await ref
       .watch(reportRepositoryProvider)
-      .salesByItem(fromDate: isoDate(from), toDate: isoDate(to));
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
-
-// ── Supplier analysis ────────────────────────────────────────────────
-
-/// Date-range filters for the supplier-analysis report. Defaults mirror
-/// the web app's `SupplierAnalysisReport` initial state: last 3 months
-/// → today (the endpoint requires both dates).
-final reportSupplierFromDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).from);
-final reportSupplierToDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).to);
-
-/// Loads GET /reports/supplier-analysis, re-running when the date range
-/// changes.
-final supplierAnalysisReportProvider = FutureProvider<List<SupplierAnalysisRow>>(
-  (ref) async {
-    final from = ref.watch(reportSupplierFromDateProvider) ?? initialRange(ref).from;
-    final to = ref.watch(reportSupplierToDateProvider) ?? initialRange(ref).to;
-    final result = await ref
-        .watch(reportRepositoryProvider)
-        .supplierAnalysis(fromDate: isoDate(from), toDate: isoDate(to));
-    return switch (result) {
-      ApiSuccess(:final data) => data,
-      ApiFailure(:final error) => throw error,
-    };
-  },
-);
-
-// ── Production summary ───────────────────────────────────────────────
-
-/// Date-range filters for the production-summary report. Defaults mirror
-/// the web app's `ProductionSummaryReport` initial state: last month →
-/// today (the endpoint requires both dates).
-final reportProductionFromDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).from);
-final reportProductionToDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).to);
-
-/// Loads GET /reports/production-summary, re-running when the date range
-/// changes.
-final productionSummaryReportProvider =
-    FutureProvider<ProductionSummaryReport>((ref) async {
-  final from = ref.watch(reportProductionFromDateProvider) ?? initialRange(ref).from;
-  final to = ref.watch(reportProductionToDateProvider) ?? initialRange(ref).to;
-  final result = await ref
-      .watch(reportRepositoryProvider)
-      .productionSummary(fromDate: isoDate(from), toDate: isoDate(to));
+      .topDebtors(limit: limit);
   return switch (result) {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,
@@ -450,17 +179,13 @@ final productionSummaryReportProvider =
 
 // ── Cash reconciliation ──────────────────────────────────────────────
 
-/// The single reconciliation date (defaults to today). The report is a
-/// single-day view — the screen's date button writes this provider.
-final reportReconciliationDateProvider = StateProvider<DateTime?>((
-  ref,
-) => initialRange(ref).to);
+/// The single reconciliation date (defaults to today).
+final reportReconciliationDateProvider = StateProvider<DateTime?>(
+  (ref) => initialRange(ref).to,
+);
 
-/// Loads GET /reports/cash-reconciliation, re-running when the date
-/// changes.
-final cashReconciliationProvider = FutureProvider<CashReconciliation>((
-  ref,
-) async {
+/// Loads GET /reports/cash-reconciliation, re-running when the date changes.
+final cashReconciliationProvider = FutureProvider<CashReconciliation>((ref) async {
   final date = ref.watch(reportReconciliationDateProvider) ?? _today();
   final result = await ref
       .watch(reportRepositoryProvider)
@@ -476,52 +201,6 @@ final cashReconciliationProvider = FutureProvider<CashReconciliation>((
 /// Loads GET /reports/ar-summary (server default: as of today).
 final arSummaryProvider = FutureProvider<ArSummaryReport>((ref) async {
   final result = await ref.watch(reportRepositoryProvider).arSummary();
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
-
-// ── BOM usage ────────────────────────────────────────────────────────
-
-/// Date-range filters for the bom-usage report. Defaults mirror the web
-/// app's `BOMUsageReport` initial state: last month → today (the
-/// endpoint tolerates omitted dates, but the port always sends them).
-final reportBomFromDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).from);
-final reportBomToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
-
-/// Active finished-item filter for the bom-usage report — null means
-/// "All Items" (the `itemId` query param is omitted).
-final reportBomItemIdProvider = StateProvider<int?>((ref) => null);
-
-/// All finished items for the bom-usage parent-item picker (reuses the
-/// inventory repository's items list — the same source the web page's
-/// `/inventory/items` select uses). Fetched as one large page with the
-/// `is_finished_good` filter.
-final finishedItemsForReportProvider = FutureProvider<List<Item>>((ref) async {
-  final result = await ref
-      .watch(inventoryRepositoryProvider)
-      .items(const PagedRequest(limit: 10000, extra: {'is_finished_good': '1'}));
-  return switch (result) {
-    ApiSuccess(:final data) => data.items,
-    ApiFailure(:final error) => throw error,
-  };
-});
-
-/// Loads GET /reports/bom-usage, re-running when the date range or the
-/// selected finished item changes.
-final bomUsageReportProvider = FutureProvider<BomUsageReport>((ref) async {
-  final from = ref.watch(reportBomFromDateProvider) ?? initialRange(ref).from;
-  final to = ref.watch(reportBomToDateProvider) ?? initialRange(ref).to;
-  final itemId = ref.watch(reportBomItemIdProvider);
-  final result = await ref
-      .watch(reportRepositoryProvider)
-      .bomUsage(
-        fromDate: isoDate(from),
-        toDate: isoDate(to),
-        itemId: itemId,
-      );
   return switch (result) {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,
@@ -568,10 +247,7 @@ final balanceSheetProvider = FutureProvider<BalanceSheetReport>((ref) async {
 
 // ── Global report date range ───────────────────────────────────────
 
-/// App-wide default From/To range, set from the dashboard's date-range
-/// picker. Every report page inherits this range via
-/// [applyGlobalReportRange]; each page's own From/To pickers can still
-/// change that page's range afterwards.
+/// App-wide default From/To range, set from the dashboard's date-range picker.
 final globalReportFromDateProvider = StateProvider<DateTime?>(
   (ref) => initialRange(ref).from,
 );
@@ -580,30 +256,106 @@ final globalReportToDateProvider = StateProvider<DateTime?>(
 );
 
 /// Every report page's From/To provider pair — the targets of the
-/// dashboard's global date range. Top-level finals initialize lazily,
-/// so this list may safely reference providers declared above.
+/// dashboard's global date range.
+final reportTrialBalanceAsOfDateProvider = StateProvider<DateTime?>(
+  (ref) => null,
+);
+final trialBalanceProvider = FutureProvider<TrialBalanceReport>((ref) async {
+  final asOf = ref.watch(reportTrialBalanceAsOfDateProvider);
+  final repo = ref.watch(reportRepositoryProvider);
+  final result = await repo.trialBalance(
+    asOfDate: asOf?.toIso8601String().split('T').first,
+  );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+final reportGeneralLedgerFromDateProvider = StateProvider<DateTime?>(
+  (ref) => initialRange(ref).from,
+);
+final reportGeneralLedgerToDateProvider = StateProvider<DateTime?>(
+  (ref) => initialRange(ref).to,
+);
+final generalLedgerProvider = FutureProvider<List<GeneralLedgerRow>>((ref) async {
+  final from = ref.watch(reportGeneralLedgerFromDateProvider);
+  final to = ref.watch(reportGeneralLedgerToDateProvider);
+  final repo = ref.watch(reportRepositoryProvider);
+  final result = await repo.generalLedger(
+    startDate: from?.toIso8601String().split('T').first ?? '',
+    endDate: to?.toIso8601String().split('T').first ?? '',
+  );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+final reportIncomeStatementFromDateProvider = StateProvider<DateTime?>(
+  (ref) => initialRange(ref).from,
+);
+final reportIncomeStatementToDateProvider = StateProvider<DateTime?>(
+  (ref) => initialRange(ref).to,
+);
+final incomeStatementProvider = FutureProvider<IncomeStatementReport>((ref) async {
+  final from = ref.watch(reportIncomeStatementFromDateProvider);
+  final to = ref.watch(reportIncomeStatementToDateProvider);
+  final repo = ref.watch(reportRepositoryProvider);
+  final result = await repo.incomeStatement(
+    startDate: from?.toIso8601String().split('T').first ?? '',
+    endDate: to?.toIso8601String().split('T').first ?? '',
+  );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+final reportTaxSummaryFromDateProvider = StateProvider<DateTime?>(
+  (ref) => initialRange(ref).from,
+);
+final reportTaxSummaryToDateProvider = StateProvider<DateTime?>(
+  (ref) => initialRange(ref).to,
+);
+final taxSummaryProvider = FutureProvider<TaxSummaryReport>((ref) async {
+  final from = ref.watch(reportTaxSummaryFromDateProvider);
+  final to = ref.watch(reportTaxSummaryToDateProvider);
+  final repo = ref.watch(reportRepositoryProvider);
+  final result = await repo.taxSummary(
+    startDate: from?.toIso8601String().split('T').first ?? '',
+    endDate: to?.toIso8601String().split('T').first ?? '',
+  );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+final batchTraceabilityItemIdProvider = StateProvider<int>(
+  (ref) => 0,
+);
+final batchTraceabilityProvider = FutureProvider<BatchTraceabilityReport>((ref) async {
+  final itemId = ref.watch(batchTraceabilityItemIdProvider);
+  if (itemId <= 0) throw Exception('No item selected');
+  final repo = ref.watch(reportRepositoryProvider);
+  final result = await repo.batchTraceability(itemId);
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
 final List<(StateProvider<DateTime?>, StateProvider<DateTime?>)>
     _reportRangePairs = [
-      (reportSalesFromDateProvider, reportSalesToDateProvider),
-      (reportSalesByCustomerFromDateProvider, reportSalesByCustomerToDateProvider),
       (reportDsoFromDateProvider, reportDsoToDateProvider),
       (reportCashFlowFromDateProvider, reportCashFlowToDateProvider),
       (reportProfitLossFromDateProvider, reportProfitLossToDateProvider),
-      (reportMovementFromDateProvider, reportMovementToDateProvider),
-      (reportPurchaseFromDateProvider, reportPurchaseToDateProvider),
-      (reportExpensesFromDateProvider, reportExpensesToDateProvider),
       (reportStatementsFromDateProvider, reportStatementsToDateProvider),
-      (reportSalesByItemFromDateProvider, reportSalesByItemToDateProvider),
-      (reportSupplierFromDateProvider, reportSupplierToDateProvider),
-      (reportProductionFromDateProvider, reportProductionToDateProvider),
-      (reportBomFromDateProvider, reportBomToDateProvider),
       (activityLogFromDateProvider, activityLogToDateProvider),
     ];
 
-/// Applies [from]..[to] to every report page's range providers — called
-/// when the dashboard's global picker changes so all pages inherit the
-/// new range. Pages keep their own pickers; a page stays on this range
-/// until the global range changes again.
+/// Applies [from]..[to] to every report page's range providers.
 void applyGlobalReportRange(WidgetRef ref, DateTime from, DateTime to) {
   for (final (fromProvider, toProvider) in _reportRangePairs) {
     ref.read(fromProvider.notifier).state = from;
