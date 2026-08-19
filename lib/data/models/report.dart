@@ -787,3 +787,258 @@ class BalanceSheetReport {
   final BalanceSheetEquity equity;
   final BalanceSheetTotals totals;
 }
+
+// ── Trial Balance (GET /reports/trial-balance) ──────────────────────
+
+class TrialBalanceAccount {
+  const TrialBalanceAccount({
+    required this.accountCode,
+    required this.accountName,
+    required this.accountType,
+    required this.totalDebit,
+    required this.totalCredit,
+    required this.balance,
+    required this.isZero,
+  });
+
+  factory TrialBalanceAccount.fromJson(Map<String, dynamic> json) => TrialBalanceAccount(
+    accountCode: asString(json['account_code']) ?? '',
+    accountName: asString(json['account_name']) ?? '',
+    accountType: asString(json['account_type']) ?? '',
+    totalDebit: asNum(json['total_debit']) ?? 0,
+    totalCredit: asNum(json['total_credit']) ?? 0,
+    balance: asNum(json['balance']) ?? 0,
+    isZero: json['is_zero'] == true,
+  );
+
+  final String accountCode;
+  final String accountName;
+  final String accountType;
+  final num totalDebit;
+  final num totalCredit;
+  final num balance;
+  final bool isZero;
+}
+
+class TrialBalanceReport {
+  const TrialBalanceReport({
+    required this.asOfDate,
+    required this.accounts,
+    required this.totalDebit,
+    required this.totalCredit,
+    required this.balanced,
+    this.note,
+  });
+
+  factory TrialBalanceReport.fromJson(Map<String, dynamic> json) => TrialBalanceReport(
+    asOfDate: asString(json['asOfDate']) ?? '',
+    accounts: [
+      for (final row in json['accounts'] as List? ?? const [])
+        TrialBalanceAccount.fromJson(row as Map<String, dynamic>),
+    ],
+    totalDebit: asNum(json['total_debit']) ?? 0,
+    totalCredit: asNum(json['total_credit']) ?? 0,
+    balanced: json['balanced'] == true,
+    note: asString(json['note']),
+  );
+
+  final String asOfDate;
+  final List<TrialBalanceAccount> accounts;
+  final num totalDebit;
+  final num totalCredit;
+  final bool balanced;
+  final String? note;
+}
+
+// ── General Ledger (GET /reports/general-ledger) ─────────────────────
+
+class GeneralLedgerRow {
+  const GeneralLedgerRow({
+    required this.id,
+    this.customerId,
+    required this.transactionType,
+    required this.referenceNo,
+    required this.debit,
+    required this.credit,
+    required this.balance,
+    required this.transactionDate,
+    this.remarks,
+  });
+
+  factory GeneralLedgerRow.fromJson(Map<String, dynamic> json) => GeneralLedgerRow(
+    id: asInt(json['id']) ?? 0,
+    customerId: asInt(json['customer_id']),
+    transactionType: asString(json['transaction_type']) ?? '',
+    referenceNo: asString(json['reference_no']) ?? '',
+    debit: asNum(json['debit']) ?? 0,
+    credit: asNum(json['credit']) ?? 0,
+    balance: asNum(json['balance']) ?? 0,
+    transactionDate: asString(json['transaction_date']) ?? '',
+    remarks: asString(json['remarks']),
+  );
+
+  final int id;
+  final int? customerId;
+  final String transactionType;
+  final String referenceNo;
+  final num debit;
+  final num credit;
+  final num balance;
+  final String transactionDate;
+  final String? remarks;
+}
+
+// ── Income Statement (GET /reports/income-statement) ─────────────────
+
+class IncomeStatementReport {
+  const IncomeStatementReport({
+    required this.startDate,
+    required this.endDate,
+    required this.revenue,
+    required this.cogs,
+    required this.expenses,
+    required this.netIncome,
+    required this.grossProfit,
+  });
+
+  factory IncomeStatementReport.fromJson(Map<String, dynamic> json) => IncomeStatementReport(
+    startDate: asString(json['startDate']) ?? '',
+    endDate: asString(json['endDate']) ?? '',
+    revenue: asNum(json['revenue']) ?? 0,
+    cogs: asNum(json['cogs']) ?? 0,
+    expenses: asNum(json['expenses']) ?? 0,
+    netIncome: asNum(json['netIncome']) ?? 0,
+    grossProfit: asNum(json['grossProfit']) ?? 0,
+  );
+
+  final String startDate;
+  final String endDate;
+  final num revenue;
+  final num cogs;
+  final num expenses;
+  final num netIncome;
+  final num grossProfit;
+}
+
+// ── Tax Summary (GET /reports/tax-summary) ───────────────────────────
+
+class TaxSummaryReport {
+  const TaxSummaryReport({
+    required this.totalTax,
+  });
+
+  factory TaxSummaryReport.fromJson(Map<String, dynamic> json) => TaxSummaryReport(
+    totalTax: asNum(json['total_tax']) ?? 0,
+  );
+
+  final num totalTax;
+}
+
+// ── Batch Traceability (GET /reports/batch-traceability/:itemId) ─────
+
+class BatchTraceabilityItem {
+  const BatchTraceabilityItem({
+    required this.id,
+    required this.itemCode,
+    required this.itemName,
+    required this.unitOfMeasure,
+  });
+
+  factory BatchTraceabilityItem.fromJson(Map<String, dynamic> json) => BatchTraceabilityItem(
+    id: asInt(json['id']) ?? 0,
+    itemCode: asString(json['item_code']) ?? '',
+    itemName: asString(json['item_name']) ?? '',
+    unitOfMeasure: asString(json['unit_of_measure']) ?? '',
+  );
+
+  final int id;
+  final String itemCode;
+  final String itemName;
+  final String unitOfMeasure;
+}
+
+class BatchTraceabilityBatch {
+  const BatchTraceabilityBatch({
+    required this.id,
+    required this.batchNo,
+    required this.warehouseName,
+    required this.sourceType,
+    required this.sourceId,
+    required this.quantityOriginal,
+    required this.quantityRemaining,
+    required this.quantitySold,
+    required this.unitCost,
+    required this.receivedDate,
+  });
+
+  factory BatchTraceabilityBatch.fromJson(Map<String, dynamic> json) => BatchTraceabilityBatch(
+    id: asInt(json['id']) ?? 0,
+    batchNo: asString(json['batch_no']) ?? '',
+    warehouseName: asString(json['warehouse_name']) ?? '',
+    sourceType: asString(json['source_type']) ?? '',
+    sourceId: asInt(json['source_id']) ?? 0,
+    quantityOriginal: asNum(json['quantity_original']) ?? 0,
+    quantityRemaining: asNum(json['quantity_remaining']) ?? 0,
+    quantitySold: asNum(json['quantity_sold']) ?? 0,
+    unitCost: asNum(json['unit_cost']) ?? 0,
+    receivedDate: asString(json['received_date']) ?? '',
+  );
+
+  final int id;
+  final String batchNo;
+  final String warehouseName;
+  final String sourceType;
+  final int sourceId;
+  final num quantityOriginal;
+  final num quantityRemaining;
+  final num quantitySold;
+  final num unitCost;
+  final String receivedDate;
+}
+
+class BatchTraceabilitySummary {
+  const BatchTraceabilitySummary({
+    required this.totalBatches,
+    required this.activeBatches,
+    required this.totalOriginal,
+    required this.totalSold,
+    required this.totalRemaining,
+  });
+
+  factory BatchTraceabilitySummary.fromJson(Map<String, dynamic> json) => BatchTraceabilitySummary(
+    totalBatches: asInt(json['totalBatches']) ?? 0,
+    activeBatches: asInt(json['activeBatches']) ?? 0,
+    totalOriginal: asNum(json['totalOriginal']) ?? 0,
+    totalSold: asNum(json['totalSold']) ?? 0,
+    totalRemaining: asNum(json['totalRemaining']) ?? 0,
+  );
+
+  final int totalBatches;
+  final int activeBatches;
+  final num totalOriginal;
+  final num totalSold;
+  final num totalRemaining;
+}
+
+class BatchTraceabilityReport {
+  const BatchTraceabilityReport({
+    required this.item,
+    required this.batches,
+    required this.summary,
+  });
+
+  factory BatchTraceabilityReport.fromJson(Map<String, dynamic> json) => BatchTraceabilityReport(
+    item: BatchTraceabilityItem.fromJson(json['item'] as Map<String, dynamic>),
+    batches: [
+      for (final row in json['batches'] as List? ?? const [])
+        BatchTraceabilityBatch.fromJson(row as Map<String, dynamic>),
+    ],
+    summary: BatchTraceabilitySummary.fromJson(
+      json['summary'] as Map<String, dynamic>? ?? const {},
+    ),
+  );
+
+  final BatchTraceabilityItem item;
+  final List<BatchTraceabilityBatch> batches;
+  final BatchTraceabilitySummary summary;
+}

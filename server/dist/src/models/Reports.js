@@ -387,17 +387,69 @@ function getBatchTraceability(db, itemId) {
     const item = db.prepare('SELECT id, item_code, item_name, unit_of_measure FROM items WHERE id = ?').get(itemId);
     if (!item)
         return null;
-    const currentStock = db.prepare('SELECT warehouse_id, quantity FROM stock_balances WHERE item_id = ? AND quantity > 0').all(itemId);
-    const movements = db.prepare(`
-    SELECT sm.movement_no, sm.movement_type, sm.quantity, sm.movement_date, sm.reference_doctype, sm.reference_docno, sm.remarks, w.warehouse_name
-    FROM stock_movements sm JOIN warehouses w ON sm.warehouse_id = w.id WHERE sm.item_id = ? ORDER BY sm.movement_date DESC LIMIT 50
+    // Fetch all batches for this item with sold/remaining quantities
+    const batches = db.prepare(`
+    SELECT
+      sb.id,
+      sb.batch_no,
+      sb.item_id,
+      sb.warehouse_id,
+      w.warehouse_name,
+      sb.source_type,
+      sb.source_id,
+      sb.quantity_original,
+      sb.quantity_remaining,
+      sb.unit_cost,
+      sb.received_date,
+      (sb.quantity_original - sb.quantity_remaining) as quantity_sold
+    FROM stock_batches sb
+    JOIN warehouses w ON sb.warehouse_id = w.id
+    WHERE sb.item_id = ?
+    ORDER BY sb.received_date DESC
   `).all(itemId);
+    // Summary
+    const totalOriginal = batches.reduce((s, b) => s + b.quantity_original, 0);
+    const totalRemaining = batches.reduce((s, b) => s + b.quantity_remaining, 0);
+    const totalSold = batches.reduce((s, b) => s + b.quantity_sold, 0);
+    const activeBatches = batches.filter(b => b.quantity_remaining > 0).length;
     return {
         item,
-        currentStock,
-        movements,
-        summary: { warehousesWithStock: currentStock.length, recentMovements: movements.length }
+        batches,
+        summary: {
+            totalBatches: batches.length,
+            activeBatches,
+            totalOriginal,
+            totalSold,
+            totalRemaining,
+        }
     };
+}
+function getAPAgingReport(asOfDate, db) {
+    // AP Aging mirrors AR Aging but queries purchase orders instead of
+    // invoices. Each supplier's outstanding amount is split into aging
+    // buckets based on the due_date of their purchase orders.
+    const agingData = db.prepare(`
+    SELECT s.supplier_name, s.supplier_code,
+      SUM(po.balance_amount) as total_outstanding,
+      SUM(CASE WHEN julianday(?) - julianday(po.due_date) <= 0 THEN po.balance_amount ELSE 0 END) as current_amount,
+      SUM(CASE WHEN julianday(?) - julianday(po.due_date) > 0 AND julianday(?) - julianday(po.due_date) <= 30 THEN po.balance_amount ELSE 0 END) as days_1_30,
+      SUM(CASE WHEN julianday(?) - julianday(po.due_date) > 30 AND julianday(?) - julianday(po.due_date) <= 60 THEN po.balance_amount ELSE 0 END) as days_31_60,
+      SUM(CASE WHEN julianday(?) - julianday(po.due_date) > 60 AND julianday(?) - julianday(po.due_date) <= 90 THEN po.balance_amount ELSE 0 END) as days_61_90,
+      SUM(CASE WHEN julianday(?) - julianday(po.due_date) > 90 THEN po.balance_amount ELSE 0 END) as days_over_90
+    FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.id
+    WHERE po.status IN ('Approved', 'Received', 'Partial') AND po.balance_amount > 0
+    GROUP BY po.supplier_id, s.supplier_name, s.supplier_code ORDER BY total_outstanding DESC
+  `).all(asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate);
+    const summary = db.prepare(`
+    SELECT SUM(balance_amount) as "totalPayables",
+      SUM(CASE WHEN julianday(?) - julianday(due_date) <= 0 THEN balance_amount ELSE 0 END) as current_amount,
+      SUM(CASE WHEN julianday(?) - julianday(due_date) > 0 AND julianday(?) - julianday(due_date) <= 30 THEN balance_amount ELSE 0 END) as total_1_30,
+      SUM(CASE WHEN julianday(?) - julianday(due_date) > 30 AND julianday(?) - julianday(due_date) <= 60 THEN balance_amount ELSE 0 END) as total_31_60,
+      SUM(CASE WHEN julianday(?) - julianday(due_date) > 60 AND julianday(?) - julianday(due_date) <= 90 THEN balance_amount ELSE 0 END) as total_61_90,
+      SUM(CASE WHEN julianday(?) - julianday(due_date) > 90 THEN balance_amount ELSE 0 END) as total_over_90
+    FROM purchase_orders WHERE status IN ('Approved', 'Received', 'Partial') AND balance_amount > 0
+  `).get(asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate);
+    return { asOfDate, agingBuckets: agingData, summary };
 }
 function getAPSummary(asOfDate, db) {
     const summary = db.prepare(`
@@ -982,7 +1034,7 @@ function getExpenseReport(startDate, endDate, category, db) {
     return { summary: { totalAmount, totalExpenses, averageAmount }, expenses, categoryBreakdown };
 }
 exports.default = {
-    getARAgingReport, getCustomerStatements, getTopDebtors, getDSOMetric,
+    getARAgingReport, getAPAgingReport, getCustomerStatements, getTopDebtors, getDSOMetric,
     getReceivablesSummary, getSalesSummary, getSalesByCustomer, getSalesByItem,
     getStockValuationReport, getInventoryMovementReport, getSupplierAnalysis,
     getAPSummary, getProfitLossReport, getBalanceSheet, getIncomeStatement,

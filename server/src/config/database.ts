@@ -4,6 +4,7 @@ import fs from 'fs';
 import * as bcrypt from 'bcrypt';
 import logger from '../utils/logger';
 import { getNextSequenceNumber } from '../utils/sequence';
+import { backfillPurchaseReturns } from '../utils/purchaseReturnBackfill';
 
 // Database file path - use DATABASE_PATH env var if set (Electron), otherwise default
 const dbDir = process.env.DATABASE_PATH || path.join(__dirname, '../../../database');
@@ -446,6 +447,57 @@ function runPurchasesMigration(): void {
   }
 }
 
+function runPurchaseSupplierPaymentMigration(): void {
+  try {
+    const columnCheck = db.prepare(`
+      SELECT COUNT(*) as count FROM pragma_table_info('purchases')
+      WHERE name='supplier_id'
+    `).get() as { count: number };
+
+    if (columnCheck.count === 0) {
+      logger.info('Running purchase supplier/payment migration...');
+
+      const migrationSQL = fs.readFileSync(
+        path.join(__dirname, '../migrations/add-purchase-supplier-payment.sql'),
+        'utf8'
+      );
+
+      db.exec(migrationSQL);
+
+      logger.info('✅ Purchase supplier/payment migration completed!');
+    }
+
+    // The column can exist without the allocations table (partial
+    // migration / restored DB) — ensure the table + indexes too. Kept
+    // separate from the file above: re-running that file would fail on
+    // the duplicate ALTER TABLE ADD COLUMN.
+    const tableCheck = db.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE type='table' AND name='purchase_allocations'
+    `).get() as { name: string } | undefined;
+    if (!tableCheck) {
+      logger.info('Adding purchase_allocations table...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS purchase_allocations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            payment_id INTEGER NOT NULL,
+            purchase_id INTEGER NOT NULL,
+            amount DECIMAL(15,2) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,
+            FOREIGN KEY (purchase_id) REFERENCES purchases(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_purchase_allocations_payment ON purchase_allocations(payment_id);
+        CREATE INDEX IF NOT EXISTS idx_purchase_allocations_purchase ON purchase_allocations(purchase_id);
+        CREATE INDEX IF NOT EXISTS idx_purchases_supplier_id ON purchases(supplier_id);
+      `);
+      logger.info('✅ purchase_allocations table added');
+    }
+  } catch (error: any) {
+    logger.error('Purchase supplier/payment migration error:', error.message);
+  }
+}
+
 function runPurchaseReturnMigration(): void {
   try {
     const hasReturnedQty = db.prepare(`
@@ -469,6 +521,57 @@ function runPurchaseReturnMigration(): void {
     }
   } catch (error: any) {
     logger.error('Purchase return fields migration error:', error.message);
+  }
+}
+
+function runPurchaseReturnsTablesMigration(): void {
+  try {
+    const tableCheck = db.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE type='table' AND name='purchase_returns'
+    `).get() as { name: string } | undefined;
+
+    if (!tableCheck) {
+      logger.info('Running purchase returns tables migration...');
+
+      const migrationSQL = fs.readFileSync(
+        path.join(__dirname, '../migrations/add-purchase-returns-tables.sql'),
+        'utf8'
+      );
+
+      db.exec(migrationSQL);
+
+      logger.info('✅ Purchase returns tables migration completed!');
+    } else {
+      // Recovery: ensure the stock_movements.purchase_return_id column
+      // exists even if the table predates the column (partial migration).
+      const hasColumn = db.prepare(`
+        SELECT COUNT(*) as count FROM pragma_table_info('stock_movements')
+        WHERE name='purchase_return_id'
+      `).get() as { count: number };
+      if (hasColumn.count === 0) {
+        logger.info('Adding missing stock_movements.purchase_return_id column...');
+        db.exec('ALTER TABLE stock_movements ADD COLUMN purchase_return_id INTEGER REFERENCES purchase_returns(id)');
+        logger.info('✅ stock_movements.purchase_return_id column added');
+      }
+    }
+  } catch (error: any) {
+    logger.error('Purchase returns tables migration error:', error.message);
+  }
+}
+
+// Backfill purchase_returns / purchase_return_items from the legacy
+// negative return movements created by the old flows (see
+// utils/purchaseReturnBackfill.ts for the logic — extracted so it is
+// unit-testable). Idempotent: only processes unlinked movements.
+function runPurchaseReturnsBackfill(): void {
+  try {
+    const count = backfillPurchaseReturns(db);
+    if (count > 0) {
+      logger.info(`✅ Backfilled ${count} purchase returns from legacy movements`);
+    }
+  } catch (error: any) {
+    logger.error('Purchase returns backfill error:', error.message);
   }
 }
 
@@ -517,6 +620,39 @@ function runBOMMigration(): void {
     }
   } catch (error: any) {
     logger.error('BOM migration error:', error.message);
+  }
+}
+
+function runBOMItemsColumnMigration(): void {
+  // `init.sql` created bom_items with `raw_material_id`, but every
+  // BOMModel query joins on `item_id` (the add-bom-tables migration's
+  // schema). Fresh DBs from init.sql and pre-existing DBs both keep the
+  // old column name unless the server also creates it — rename it
+  // in place so the BOM list/detail queries work.
+  try {
+    const bomItemsExists = db.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE type='table' AND name='bom_items'
+    `).get() as { name: string } | undefined;
+    if (!bomItemsExists) return;
+
+    const hasItemId = db.prepare(`
+      SELECT COUNT(*) as count FROM pragma_table_info('bom_items')
+      WHERE name='item_id'
+    `).get() as { count: number };
+    if (hasItemId.count > 0) return;
+
+    const hasRawMaterialId = db.prepare(`
+      SELECT COUNT(*) as count FROM pragma_table_info('bom_items')
+      WHERE name='raw_material_id'
+    `).get() as { count: number };
+    if (hasRawMaterialId.count === 0) return;
+
+    logger.info('Renaming bom_items.raw_material_id → item_id...');
+    db.exec('ALTER TABLE bom_items RENAME COLUMN raw_material_id TO item_id');
+    logger.info('✅ bom_items.raw_material_id renamed to item_id');
+  } catch (error: any) {
+    logger.error('BOM items column migration error:', error.message);
   }
 }
 
@@ -889,9 +1025,13 @@ function runMissingFKIndexesMigration(): void {
 initializeDatabase();
 runExpensesMigration();
 runPurchasesMigration();
+runPurchaseSupplierPaymentMigration();
 runPurchaseReturnMigration();
+runPurchaseReturnsTablesMigration();
+runPurchaseReturnsBackfill();
 runProductionsMigration();
 runBOMMigration();
+runBOMItemsColumnMigration();
 runSalesMigration();
 runSupplierLedgerMigration();
 runActivityLogMigration();
@@ -923,6 +1063,7 @@ runCashAccountsMigration();
 runOpeningBalancesMigration();
 runUserPreferencesMigration();
 runUnbatchedStockReconciliation();
+runOrphanedBatchCleanup();
 
 // Rollback support: run if --rollback flag is passed
 if (process.argv.includes('--rollback')) {
@@ -1072,6 +1213,11 @@ function seedDefaultPermissions(): void {
       { name: 'purchase_orders:create', module: 'purchase_orders', action: 'create', description: 'Create purchase orders' },
       { name: 'purchase_orders:update', module: 'purchase_orders', action: 'update', description: 'Update purchase orders' },
       { name: 'purchase_orders:delete', module: 'purchase_orders', action: 'delete', description: 'Delete purchase orders' },
+
+      // Purchase Returns
+      { name: 'purchase_returns:read', module: 'purchase_returns', action: 'read', description: 'View purchase returns' },
+      { name: 'purchase_returns:create', module: 'purchase_returns', action: 'create', description: 'Create purchase returns' },
+      { name: 'purchase_returns:void', module: 'purchase_returns', action: 'void', description: 'Void purchase returns' },
 
       // Expenses
       { name: 'expenses:read', module: 'expenses', action: 'read', description: 'View expenses' },
@@ -1818,6 +1964,37 @@ function runUserPreferencesMigration(): void {
     }
   } catch (error: any) {
     logger.error('User preferences migration error:', error.message);
+  }
+}
+
+function runOrphanedBatchCleanup(): void {
+  // Remove orphaned stock_batches that reference deleted purchases
+  // or have invalid data (zero cost/qty). Nullifies dangling batch_id
+  // references in stock_movements first. Idempotent — safe on every start.
+  try {
+    const orphanedCheck = db.prepare(`
+      SELECT COUNT(*) as count FROM stock_batches sb
+      WHERE (sb.source_type = 'PURCHASE' AND sb.source_id > 0
+             AND NOT EXISTS (SELECT 1 FROM purchases WHERE id = sb.source_id)
+             AND NOT EXISTS (SELECT 1 FROM goods_receipt_items WHERE id = sb.source_id))
+         OR sb.unit_cost <= 0
+         OR sb.quantity_original <= 0
+    `).get() as { count: number };
+
+    if (orphanedCheck.count > 0) {
+      logger.info(`Running orphaned batch cleanup (${orphanedCheck.count} orphaned row(s))...`);
+
+      const migrationSQL = fs.readFileSync(
+        path.join(__dirname, '../migrations/cleanup-orphaned-stock-batches.sql'),
+        'utf8'
+      );
+
+      db.exec(migrationSQL);
+
+      logger.info('✅ Orphaned batch cleanup completed!');
+    }
+  } catch (error: any) {
+    logger.error('Orphaned batch cleanup error:', error.message);
   }
 }
 
