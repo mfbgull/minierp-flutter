@@ -457,46 +457,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsReportsdashboard => 'Reports Dashboard';
 
   @override
-  String get reportsLowstockalertreport => 'Low Stock Alert Report';
-
-  @override
-  String get reportsStockvaluationreport => 'Stock Valuation Report';
-
-  @override
-  String get reportsSalessummaryreport => 'Sales Summary Report';
-
-  @override
   String get reportsProfitlossreport => 'Profit & Loss Report';
 
   @override
   String get reportsCashflowreport => 'Cash Flow Report';
 
   @override
-  String get reportsExpensesreport => 'Expenses Report';
-
-  @override
-  String get reportsStocklevelreport => 'Stock Level Report';
-
-  @override
-  String get reportsInventorymovementreport => 'Inventory Movement Report';
-
-  @override
   String get reportsTopdebtorsreport => 'Top Debtors Report';
-
-  @override
-  String get reportsSupplieranalysisreport => 'Supplier Analysis Report';
-
-  @override
-  String get reportsPurchasesummaryreport => 'Purchase Summary Report';
-
-  @override
-  String get reportsProductionsummaryreport => 'Production Summary Report';
-
-  @override
-  String get reportsSalesbyitemreport => 'Sales by Item Report';
-
-  @override
-  String get reportsSalesbycustomerreport => 'Sales by Customer Report';
 
   @override
   String get reportsCustomerstatementsreport => 'Customer Statements Report';
@@ -666,6 +633,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get productionProduction => 'Production';
 
   @override
+  String get productionProductions => 'Productions';
+
+  @override
   String get productionNewproduction => 'New Production';
 
   @override
@@ -676,6 +646,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stockmovementsStockmovements => 'Stock Movements';
+
+  @override
+  String get inventoryItems => 'Items';
+
+  @override
+  String get stockbywarehouseBalances => 'Stock Balances';
+
+  @override
+  String get physicalcountsPhysicalcounts => 'Physical Counts';
 
   @override
   String get stockmovementsNewmovement => 'New Movement';
@@ -809,6 +788,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get forecastsDemandtitle => 'Demand Forecast';
+
+  @override
+  String get forecastsDemand => 'Demand Forecasts';
 
   @override
   String get forecastsForecasttrends => 'Forecast Trends';
@@ -982,6 +964,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bomBillofmaterials => 'Bill of Materials (BOM)';
+
+  @override
+  String get bomBoms => 'BOMs';
 
   @override
   String get bomNewbom => 'New BOM';
@@ -1186,6 +1171,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchasesPurchases => 'Purchases';
 
   @override
+  String get purchasesPurchaseReturns => 'Purchase Returns';
+
+  @override
   String get purchasesNewpurchase => 'New Purchase';
 
   @override
@@ -1226,6 +1214,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get purchasesRecordpurchase => 'Record Purchase';
+
+  @override
+  String get purchasesDocument => 'Document';
+
+  @override
+  String get purchasesSupplierrequiredforpayment =>
+      'Select a supplier to record a payment';
+
+  @override
+  String get purchaseordersSubtitle =>
+      'Order stock from suppliers and track the PO\'s payment status';
 
   @override
   String get purchasesTotalpurchasescard => 'Total Purchases';
@@ -1391,6 +1390,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchasesReturnnoitems => 'No returns found';
 
   @override
+  String get purchasesReturnloaderror => 'Failed to load returns';
+
+  @override
   String get purchasesReturnvalue => 'Total Return Value';
 
   @override
@@ -1410,6 +1412,59 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get purchasesPoreturn => 'PO Return';
+
+  @override
+  String get purchasesNewreturn => 'New Return';
+
+  @override
+  String get purchasesReturnsourcepicker => 'Select Return Source';
+
+  @override
+  String get purchasesReturnsourcetype => 'Source Type';
+
+  @override
+  String get purchasesReturnsourcedirect => 'Direct Purchase';
+
+  @override
+  String get purchasesReturnsourcepo => 'Purchase Order';
+
+  @override
+  String get purchasesReturnsourcenone => 'No matching source documents';
+
+  @override
+  String get purchasesReturnwarehouse => 'Restock Warehouse';
+
+  @override
+  String get purchasesReturnitems => 'Items to Return';
+
+  @override
+  String get purchasesReturnempty =>
+      'No items can be returned from this document';
+
+  @override
+  String get purchasesAlreadyreturned => 'Already Returned';
+
+  @override
+  String get purchasesAvailable => 'Available';
+
+  @override
+  String get purchasesVoid => 'Void';
+
+  @override
+  String get purchasesVoidreturn => 'Void Return';
+
+  @override
+  String get purchasesVoidreturnsure =>
+      'This reverses the stock movement, GL entry and supplier credit note.';
+
+  @override
+  String get purchasesVoidreason => 'Void Reason';
+
+  @override
+  String get purchasesVoidreasonplaceholder => 'Enter reason for voiding...';
+
+  @override
+  String get purchasesReturnvoided => 'Return voided successfully';
 
   @override
   String get salesInvoices => 'Invoices';
@@ -1491,9 +1546,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get salesReceipt => 'Receipt';
-
-  @override
-  String get inventoryItems => 'Items';
 
   @override
   String get inventoryItemsin => 'Items in';
@@ -2369,6 +2421,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonNoresults => 'No results found';
 
   @override
+  String get commonEntries => 'entries';
+
+  @override
   String get commonRequired => 'Required';
 
   @override
@@ -2645,16 +2700,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cashreconVariance => 'Variance';
 
   @override
-  String get commonNavigate => 'Navigate';
-
-  @override
   String get commonNext => 'Next';
 
   @override
   String get commonOf => 'of';
-
-  @override
-  String get commonOpen => 'Open';
 
   @override
   String get commonPage => 'Page';
@@ -2852,16 +2901,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsAvgordervalue => 'Avg. Order Value';
 
   @override
-  String get reportsAvgsellingprice => 'Avg. Selling Price';
-
-  @override
   String get reportsBalance => 'Balance';
 
   @override
   String get reportsClosingbalance => 'Closing Balance';
-
-  @override
-  String get reportsCompletedquantity => 'Completed Quantity';
 
   @override
   String get reportsCurrent => 'Current';
@@ -2897,16 +2940,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsLastpurchase => 'Last Purchase';
 
   @override
-  String get reportsLastused => 'Last Used';
-
-  @override
-  String get reportsMinimumstock => 'Minimum Stock';
-
-  @override
   String get reportsMovementno => 'Movement No';
-
-  @override
-  String get reportsMovementtype => 'Movement Type';
 
   @override
   String get reportsNetcashflow => 'Net Cash Flow';
@@ -2924,46 +2958,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsOpeningbalance => 'Opening Balance';
 
   @override
-  String get reportsOutputitem => 'Output Item';
-
-  @override
-  String get reportsOutputquantity => 'Output Quantity';
-
-  @override
-  String get reportsParentitem => 'Parent Item';
-
-  @override
   String get reportsPeriod => 'Period';
-
-  @override
-  String get reportsProductiondate => 'Production Date';
-
-  @override
-  String get reportsProductionorder => 'Production Order';
-
-  @override
-  String get reportsReceived => 'Received Amount';
-
-  @override
-  String get reportsScrappedquantity => 'Scrapped Quantity';
-
-  @override
-  String get reportsSellingprice => 'Selling Price';
-
-  @override
-  String get reportsShortage => 'Shortage';
 
   @override
   String get reportsTotalar => 'Total AR';
 
   @override
   String get reportsTotalcogs => 'Cost of Goods Sold (COGS)';
-
-  @override
-  String get reportsTotalcomponents => 'Total Components';
-
-  @override
-  String get reportsTotalcost => 'Total Cost';
 
   @override
   String get reportsTotalcredits => 'Total Credits';
@@ -2996,9 +2997,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsTotalpurchasevalue => 'Total Purchase Value';
 
   @override
-  String get reportsTotalquantitysold => 'Total Quantity Sold';
-
-  @override
   String get reportsTotalrevenue => 'Total Revenue';
 
   @override
@@ -3011,13 +3009,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsUnitcost => 'Unit Cost';
 
   @override
-  String get reportsUsagecount => 'Usage Count';
-
-  @override
   String get reportsValuationmethod => 'Valuation Method';
 
   @override
   String get salesPaymentdate => 'Payment Date';
+
+  @override
+  String get salesreturnsReturns => 'Invoice Returns';
 
   @override
   String get salesreturnsReturndate => 'Return Date';
@@ -3881,13 +3879,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get employeesTotalsalary => 'Total Salary';
 
   @override
+  String get expensesAddcategory => 'Add Category';
+
+  @override
   String get expensesAllcategories => 'All Categories';
 
   @override
   String get expensesAllstatuses => 'All Statuses';
 
   @override
+  String get expensesCategories => 'Expense Categories';
+
+  @override
+  String get expensesCategorycreated => 'Expense category created';
+
+  @override
+  String get expensesCategorydeleted => 'Expense category deleted';
+
+  @override
+  String get expensesCategoryname => 'Category Name';
+
+  @override
   String get expensesCount => 'expenses';
+
+  @override
+  String expensesDeletecategoryconfirm(Object categoryName) {
+    return 'Delete category \"$categoryName\"? This cannot be undone.';
+  }
 
   @override
   String get expensesDeleteconfirmdesc =>
@@ -3907,6 +3925,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get expensesErrorCategoryRequired => 'Category is required';
+
+  @override
+  String get expensesErrorCategorynameRequired => 'Category name is required';
 
   @override
   String get expensesExpensedate => 'Expense Date';
@@ -4399,6 +4420,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchasesReturnqtyinvalid => 'Enter a valid return quantity';
 
   @override
+  String get purchasesReturnstockmoved =>
+      'This item\'s stock no longer sits in the receipt warehouse — select the warehouse to return from';
+
+  @override
+  String get purchasesReturnwarehousenostock =>
+      'The selected warehouse doesn\'t have enough stock for the returned items';
+
+  @override
+  String get purchasesReturnpickhint =>
+      'Select the warehouse holding this stock';
+
+  @override
   String get quotationsAdditem => 'Add Item';
 
   @override
@@ -4454,19 +4487,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quotationsUnitprice => 'Unit Price';
 
   @override
-  String get reportsAllitems => 'All Items';
-
-  @override
   String get reportsAsOf => 'As of';
-
-  @override
-  String get reportsAverageexpense => 'Average Expense';
-
-  @override
-  String get reportsBatchtracked => 'Batch Tracked';
-
-  @override
-  String get reportsBomusage => 'BOM Usage';
 
   @override
   String get reportsCashflownegative =>
@@ -4503,19 +4524,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsExportfailed => 'Failed to export report';
 
   @override
-  String get reportsItemssold => 'Items Sold';
-
-  @override
   String get reportsLastinvoicedate => 'Last Invoice Date';
 
   @override
-  String get reportsLegacyitems => 'Legacy Items';
-
-  @override
   String get reportsLowstockcount => 'low stock items';
-
-  @override
-  String get reportsNetmovement => 'Net Movement';
 
   @override
   String get reportsPaidamount => 'Paid Amount';
@@ -4527,40 +4539,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsQuantitysold => 'Quantity Sold';
 
   @override
-  String get reportsReturnvalue => 'Returns Value';
-
-  @override
-  String get reportsShortagetotal => 'Shortage total';
-
-  @override
   String get reportsStockstatus => 'Stock Status';
 
   @override
   String get reportsTotalamount => 'Total Amount';
 
   @override
-  String get reportsTotalinbound => 'Total Inbound';
-
-  @override
-  String get reportsTotalinventoryvalue => 'Total Inventory Value';
-
-  @override
-  String get reportsTotalitems => 'Total Items';
-
-  @override
-  String get reportsTotaloutbound => 'Total Outbound';
-
-  @override
-  String get reportsTotaloutputquantity => 'Total Output Quantity';
-
-  @override
-  String get reportsTotalproductionorders => 'Total Production Orders';
-
-  @override
   String get reportsTotalreceivables => 'Total Receivables';
 
   @override
-  String get reportsTotalrecords => 'Total Records';
+  String get reportsTotalpayables => 'Total Payables';
 
   @override
   String get salesAdditem => 'Add Item';
@@ -4754,6 +4742,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get salesreturnsReturnreason => 'Reason for Return';
 
   @override
+  String get salesreturnsReturnwarehouse => 'Restock Warehouse';
+
+  @override
+  String get salesreturnsReturnwarehouserequired =>
+      'Select a warehouse to restock into';
+
+  @override
   String get salesreturnsReturnreasonplaceholder =>
       'Enter reason for return...';
 
@@ -4869,6 +4864,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statusSubmitted => 'Submitted';
+
+  @override
+  String get statusPosted => 'Posted';
+
+  @override
+  String get statusVoided => 'Voided';
 
   @override
   String get stockmovementsAdjustmenthint => 'e.g. -10 or 10';
@@ -5113,22 +5114,121 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bomDeactivated => 'BOM deactivated';
 
   @override
-  String get reportsCategorySales => 'Sales Reports';
-
-  @override
-  String get reportsCategoryInventory => 'Inventory Reports';
-
-  @override
   String get reportsCategoryFinancial => 'Financial Reports';
 
   @override
   String get reportsCategoryAr => 'Accounts Receivable';
 
   @override
-  String get reportsCategoryPurchase => 'Purchase Reports';
+  String get reportsCategoryAp => 'Accounts Payable';
 
   @override
-  String get reportsCategoryProduction => 'Production Reports';
+  String get reportsTabsAp_aging => 'AP Aging';
+
+  @override
+  String get reportsCategoryInventory => 'Inventory Reports';
+
+  @override
+  String get reportsTabsBatch_traceability => 'Batch Traceability';
+
+  @override
+  String get reportsCategoryAccounting => 'Accounting Reports';
+
+  @override
+  String get reportsTabsTrial_balance => 'Trial Balance';
+
+  @override
+  String get reportsTabsGeneral_ledger => 'General Ledger';
+
+  @override
+  String get reportsTabsIncome_statement => 'Income Statement';
+
+  @override
+  String get reportsTabsTax_summary => 'Tax Summary';
+
+  @override
+  String get reportsSelectitem => 'Select Item';
+
+  @override
+  String get reportsNodata => 'No data available';
+
+  @override
+  String get reportsMovementtype => 'Movement Type';
+
+  @override
+  String get reportsDate => 'Date';
+
+  @override
+  String get reportsQuantity => 'Quantity';
+
+  @override
+  String get reportsExpenses => 'Expenses';
+
+  @override
+  String get reportsBalanceSheet => 'Balance Sheet';
+
+  @override
+  String get reportsTrialbalance => 'Trial Balance';
+
+  @override
+  String get reportsAccountcode => 'Account Code';
+
+  @override
+  String get reportsAccountname => 'Account Name';
+
+  @override
+  String get reportsAccounttype => 'Account Type';
+
+  @override
+  String get reportsTotaldebit => 'Total Debit';
+
+  @override
+  String get reportsTotalcredit => 'Total Credit';
+
+  @override
+  String get reportsBalanced => 'Balanced';
+
+  @override
+  String get reportsGeneralledger => 'General Ledger';
+
+  @override
+  String get reportsDebit => 'Debit';
+
+  @override
+  String get reportsCredit => 'Credit';
+
+  @override
+  String get reportsReferenceno => 'Reference No';
+
+  @override
+  String get reportsTransactiontype => 'Transaction Type';
+
+  @override
+  String get reportsIncomestatement => 'Income Statement';
+
+  @override
+  String get reportsRevenue => 'Revenue';
+
+  @override
+  String get reportsCogs => 'Cost of Goods Sold';
+
+  @override
+  String get reportsNetincome => 'Net Income';
+
+  @override
+  String get reportsTaxsummary => 'Tax Summary';
+
+  @override
+  String get reportsTotaltax => 'Total Tax';
+
+  @override
+  String get reportsBatchtraceability => 'Batch Traceability';
+
+  @override
+  String get reportsWarehouseswithstock => 'Warehouses with Stock';
+
+  @override
+  String get reportsRecentmovements => 'Recent Movements';
 
   @override
   String get salesNoproductsfound => 'No products found';

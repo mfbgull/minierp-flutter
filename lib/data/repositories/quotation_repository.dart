@@ -1,11 +1,12 @@
 // Quotation repository — typed against docs/API.md §Quotations and the
 // server `salesController` shapes (PORTING.md §2).
 //
-// Envelope variants observed on the server — quotations are **bare**,
-// like sales orders:
-// - `GET /quotations` → bare `[Quotation]` (no envelope, no pagination;
-//   filters: status, customer_id, customer_name, start_date, end_date,
-//   warehouse_id, limit)
+// Envelope variants observed on the server — quotations are **bare**, like
+// sales orders for the detail/create/update routes:
+// - `GET /quotations` → **enveloped + `pagination` block** (server-paged
+//   since grid-pagination Phase 5; filters: status, customer_id,
+//   customer_name, search, start_date, end_date, warehouse_id,
+//   page, limit, sortBy, sortOrder)
 // - `GET /quotations/:id` → bare `{...quotation, items}`
 // - `DELETE /quotations/:id` → enveloped `{success, message}` (the
 //   server's deleteQuotation uses sendSuccess — use the enveloped delete)
@@ -17,6 +18,7 @@ import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/quotation.dart'
     show Quotation, QuotationConvertResult, QuotationDetail;
 import 'api_result.dart';
+import 'paged_request.dart' show PagedRequest, PagedResponse;
 import 'repository_client.dart';
 
 class QuotationRepository {
@@ -24,13 +26,24 @@ class QuotationRepository {
 
   final RepositoryClient _api;
 
-  /// All quotations — bare array (no search/page params used; the grid
-  /// keeps sorting/filtering client-side like the SO/items screens).
+  /// All quotations — full list (the grid now uses [listPaged]; this
+  /// stays for any consumer that needs the whole list in one fetch).
   Future<ApiResult<List<Quotation>>> list({
     Map<String, dynamic>? queryParameters,
   }) => _api.getRawList(
     ApiEndpoints.quotations,
     queryParameters: queryParameters,
+    parseItem: (Object? json) =>
+        Quotation.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// One page of quotations (`GET /quotations`) — server-paginated like
+  /// the other converted lists. `status` rides in `extra`.
+  Future<ApiResult<PagedResponse<Quotation>>> listPaged(
+    PagedRequest request,
+  ) => _api.getPaged(
+    ApiEndpoints.quotations,
+    queryParameters: request.toQuery(),
     parseItem: (Object? json) =>
         Quotation.fromJson(json as Map<String, dynamic>),
   );

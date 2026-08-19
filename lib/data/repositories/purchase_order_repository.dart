@@ -1,20 +1,24 @@
 // Purchase order repository — typed against docs/API.md §Purchase Orders
 // and the server `purchaseOrderController` shapes (PORTING.md §2).
 //
-// Envelope variants observed on the server — note POs are **bare**:
-// - `GET /purchase-orders` → bare `[PurchaseOrder]` (no envelope, no
-//   pagination; filters: supplier_id, status, start_date, end_date,
-//   limit)
+// Envelope variants observed on the server — note POs are **bare** except
+// the list endpoint:
+// - `GET /purchase-orders` → **enveloped + `pagination` block**
+//   (server-paged since grid-pagination Phase 6; filters: supplier_id,
+//   status, search, start_date, end_date, page, limit, sortBy,
+//   sortOrder)
 // - `GET /purchase-orders/:id` → bare `{...po, items}`
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
+import '../models/invoice.dart' show InvoicePaymentRecord;
 import '../models/json_helpers.dart' show asInt, asNum;
 import '../models/purchase_order.dart'
     show GoodsReceipt, PurchaseOrder, PurchaseOrderDetail, PurchaseOrderItem;
 import 'api_result.dart';
+import 'paged_request.dart' show PagedRequest, PagedResponse;
 import 'repository_client.dart';
 
 class PurchaseOrderRepository {
@@ -22,10 +26,10 @@ class PurchaseOrderRepository {
 
   final RepositoryClient _api;
 
-  /// All purchase orders — bare array (the list endpoint has no search or
-  /// page; the grid keeps sorting/filtering client-side like items).
-  /// [supplierId] filters with the server's `supplier_id` query param
-  /// (the supplier detail POs tab / payment modal's allocation source).
+  /// All purchase orders — full list (the grid now uses [listPaged]; this
+  /// stays for consumers that need the whole list in one fetch — the
+  /// supplier detail POs tab / payment modal's allocation source, which
+  /// filter by `supplier_id`).
   Future<ApiResult<List<PurchaseOrder>>> list({int? supplierId}) =>
       _api.getRawList(
         ApiEndpoints.purchaseOrders,
@@ -35,6 +39,18 @@ class PurchaseOrderRepository {
         parseItem: (Object? json) =>
             PurchaseOrder.fromJson(json as Map<String, dynamic>),
       );
+
+  /// One page of purchase orders (`GET /purchase-orders`) —
+  /// server-paginated like the other converted lists. `status` rides in
+  /// `extra`.
+  Future<ApiResult<PagedResponse<PurchaseOrder>>> listPaged(
+    PagedRequest request,
+  ) => _api.getPaged(
+    ApiEndpoints.purchaseOrders,
+    queryParameters: request.toQuery(),
+    parseItem: (Object? json) =>
+        PurchaseOrder.fromJson(json as Map<String, dynamic>),
+  );
 
   /// `GET /purchase-orders/summary/supplier/:supplierId` — **bare object**
   /// `POSummary` (`total_pos`, `total_value`, `draft_pos`, …). The server
@@ -118,6 +134,17 @@ class PurchaseOrderRepository {
   /// allows Draft deletions (and cascades the line items).
   Future<ApiResult<void>> deletePo(int id) =>
       _api.delete('${ApiEndpoints.purchaseOrders}/$id');
+
+  /// Payments allocated to this PO (`GET /purchase-orders/:id/payments`
+  /// — enveloped list; each row is the payment header plus the per-PO
+  /// allocation amount, newest first). Same row shape as the invoice
+  /// payments endpoint, so it parses into [InvoicePaymentRecord].
+  Future<ApiResult<List<InvoicePaymentRecord>>> payments(int poId) =>
+      _api.getList(
+        '${ApiEndpoints.purchaseOrders}/$poId/payments',
+        parseItem: (Object? json) =>
+            InvoicePaymentRecord.fromJson(json as Map<String, dynamic>),
+      );
 
   /// Goods-receipt history for a PO — **bare array** of `GoodsReceipt`
   /// (receipt_no, date, warehouse, per-receipt qty/value aggregates).

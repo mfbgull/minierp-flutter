@@ -16,7 +16,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/searchable_select.dart';
-import '../inventory/inventory_providers.dart' show itemsProvider;
+import '../inventory/inventory_providers.dart' show allItemsProvider;
 import 'forecast_models.dart';
 import 'forecast_providers.dart';
 
@@ -33,7 +33,7 @@ class _ForecastTrendsScreenState extends ConsumerState<ForecastTrendsScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final trends = ref.watch(forecastTrendsProvider);
-    final items = ref.watch(itemsProvider).valueOrNull ?? const [];
+    final items = ref.watch(allItemsProvider).valueOrNull ?? const [];
     final selectedItem = ref.watch(forecastTrendsItemProvider);
 
     // Finished goods only (reference: `is_finished_good === 1/true`).

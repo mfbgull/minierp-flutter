@@ -6,7 +6,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const queryUtils_1 = require("../utils/queryUtils");
 const PurchaseOrder_1 = __importDefault(require("../models/PurchaseOrder"));
 const SupplierLedger_1 = __importDefault(require("../models/SupplierLedger"));
-const accountingService_1 = __importDefault(require("../services/accountingService"));
 const database_1 = __importDefault(require("../config/database"));
 const logger_1 = __importDefault(require("../utils/logger"));
 function createPurchaseOrder(req, res) {
@@ -56,20 +55,40 @@ function createPurchaseOrder(req, res) {
 }
 function getPurchaseOrders(req, res) {
     try {
+        const page = (0, queryUtils_1.getQueryInteger)(req.query.page, 1);
+        const limit = (0, queryUtils_1.getQueryInteger)(req.query.limit, 10);
         const supplierIdParam = (0, queryUtils_1.getQueryParam)(req.query.supplier_id);
         const statusParam = (0, queryUtils_1.getQueryParam)(req.query.status);
+        const search = (0, queryUtils_1.getQueryParam)(req.query.search);
         const startDateParam = (0, queryUtils_1.getQueryParam)(req.query.start_date);
         const endDateParam = (0, queryUtils_1.getQueryParam)(req.query.end_date);
-        const limitParam = (0, queryUtils_1.getQueryParam)(req.query.limit);
+        const sortBy = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
+        const sortOrder = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
         const filters = {
             supplier_id: supplierIdParam ? Number(supplierIdParam) : undefined,
             status: statusParam,
+            search: search || undefined,
             start_date: startDateParam,
             end_date: endDateParam,
-            limit: limitParam ? parseInt(String(limitParam)) : undefined
+            sortBy: sortBy || undefined,
+            sortOrder: sortOrder || undefined,
+            page,
+            limit
         };
-        const pos = PurchaseOrder_1.default.getAll(filters, database_1.default);
-        res.json(pos);
+        const { rows, total, pageNum, limitNum } = PurchaseOrder_1.default.getAll(filters, database_1.default);
+        // Flat envelope (data = list, pagination a sibling) — the shape the
+        // client's `getPaged` helper parses.
+        res.json({
+            success: true,
+            data: rows,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: Math.ceil(total / limitNum),
+                totalItems: total,
+                hasNext: pageNum < Math.ceil(total / limitNum),
+                hasPrev: pageNum > 1
+            }
+        });
     }
     catch (error) {
         logger_1.default.error('Get POs error:', error);
@@ -199,6 +218,16 @@ function updateStatus(req, res) {
         res.status(500).json({ error: error.message || 'Failed to update purchase order status' });
     }
 }
+function getPurchaseOrderPayments(req, res) {
+    try {
+        const payments = PurchaseOrder_1.default.getPayments(Number(req.params.id), database_1.default);
+        res.json({ success: true, data: payments });
+    }
+    catch (error) {
+        logger_1.default.error('Get PO payments error:', error);
+        res.status(500).json({ error: 'Failed to get purchase order payments' });
+    }
+}
 function getGoodsReceipts(req, res) {
     try {
         const receipts = PurchaseOrder_1.default.getReceipts(Number(req.params.id), database_1.default);
@@ -252,41 +281,6 @@ function createGoodsReceipt(req, res) {
     catch (error) {
         logger_1.default.error('Create goods receipt error:', error);
         res.status(500).json({ error: error.message || 'Failed to create goods receipt' });
-    }
-}
-function returnReceiptItems(req, res) {
-    try {
-        const { id } = req.params;
-        const poId = parseInt(id, 10);
-        const userId = req.user.id;
-        const { items, reason } = req.body;
-        if (!items || items.length === 0) {
-            res.status(400).json({ error: 'At least one item must be returned' });
-            return;
-        }
-        for (const item of items) {
-            if (!item.po_item_id || !item.return_quantity || item.return_quantity <= 0) {
-                res.status(400).json({ error: 'Each return item must have po_item_id and a positive return_quantity' });
-                return;
-            }
-        }
-        let result;
-        database_1.default.transaction(() => {
-            result = PurchaseOrder_1.default.returnReceiptItems(poId, items, userId, database_1.default, reason);
-            // Post GL reversal — Dr AP, Cr Inventory
-            accountingService_1.default.postPurchaseReturnEntry(database_1.default, {
-                purchaseId: poId,
-                purchaseNo: `PO-${poId}`,
-                returnAmount: result.totalAmount,
-                returnDate: new Date().toISOString().split('T')[0],
-                userId,
-            });
-        })();
-        res.json({ success: true, message: 'Return processed successfully', data: result });
-    }
-    catch (error) {
-        logger_1.default.error('Return receipt items error:', error);
-        res.status(400).json({ error: error.message || 'Failed to process return' });
     }
 }
 function getPendingOrders(req, res) {
@@ -363,9 +357,9 @@ exports.default = {
     updateLineItem,
     deleteLineItem,
     updateStatus,
+    getPurchaseOrderPayments,
     getGoodsReceipts,
     createGoodsReceipt,
-    returnReceiptItems,
     getPendingOrders,
     getSummaryBySupplier,
     getSupplierBalance,

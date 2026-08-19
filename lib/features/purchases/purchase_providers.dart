@@ -1,25 +1,95 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/models/invoice.dart' show InvoicePaymentRecord;
 import '../../data/models/purchase.dart' show Purchase;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
+import '../../data/repositories/paged_request.dart'
+    show PagedRequest, PagedResponse;
 import '../../data/repositories/purchase_repository.dart'
     show purchaseRepositoryProvider;
 
-/// Direct purchases (`GET /purchases`, **bare array** — no search/page
-/// params, so the grid keeps sorting/filtering client-side like the
-/// items screen). The screen invalidates it on refresh, and the
-/// return-processing dialog invalidates it after a successful return.
-final purchasesProvider = FutureProvider<List<Purchase>>((ref) async {
-  final result = await ref.watch(purchaseRepositoryProvider).list();
+/// Server-side search term (purchase no / item / supplier); empty omits
+/// the param. The endpoint gained a `search` param (grid-pagination §6).
+final purchasesSearchProvider = StateProvider<String>((ref) => '');
+
+/// Current page (1-based) for the server-side pagination.
+final purchasesPageProvider = StateProvider<int>((ref) => 1);
+
+/// Rows per page; changing it resets to page 1 (the screen does that).
+final purchasesLimitProvider = StateProvider<int>((ref) => 10);
+
+/// Server-side sort — the API column name (from the server's
+/// `PURCHASE_SORT_COLUMNS` whitelist) plus the order.
+class PurchaseSort {
+  const PurchaseSort(this.column, this.order);
+
+  final String column;
+
+  /// `ASC` or `DESC`.
+  final String order;
+}
+
+/// Active server-side sort; null = server default (purchase_date DESC).
+final purchasesSortProvider = StateProvider<PurchaseSort?>((ref) => null);
+
+/// One page of direct purchases — server-paginated like customers/suppliers
+/// (`GET /purchases` returns a `pagination` block). Re-runs when any of
+/// the paging/filter state changes; the screen invalidates it on refresh,
+/// and the return-processing dialog invalidates it after a successful
+/// return.
+final purchasesProvider = FutureProvider<PagedResponse<Purchase>>((ref) async {
+  final search = ref.watch(purchasesSearchProvider);
+  final page = ref.watch(purchasesPageProvider);
+  final limit = ref.watch(purchasesLimitProvider);
+  final sort = ref.watch(purchasesSortProvider);
+
+  final result = await ref.watch(purchaseRepositoryProvider).listPaged(
+    PagedRequest(
+      page: page,
+      limit: limit,
+      search: search.isEmpty ? null : search,
+      sortBy: sort?.column,
+      sortOrder: sort?.order ?? 'ASC',
+    ),
+  );
+
   return switch (result) {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,
   };
 });
 
-/// Client-side search term for the purchases grid (no search param on
-/// the endpoint — the screen filters the loaded rows).
-final purchasesSearchProvider = StateProvider<String>((ref) => '');
+/// The full *filtered* purchase list (one large page) — used when a
+/// consumer needs the whole filtered set (e.g. detail lookups across
+/// pages). Watches the same filters as [purchasesProvider] but ignores
+/// page/limit/sort.
+final filteredPurchasesProvider =
+    FutureProvider<List<Purchase>>((ref) async {
+      final search = ref.watch(purchasesSearchProvider);
+
+      final result = await ref.watch(purchaseRepositoryProvider).listPaged(
+        PagedRequest(page: 1, limit: 10000, search: search.isEmpty ? null : search),
+      );
+
+      return switch (result) {
+        ApiSuccess(:final data) => data.items,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+/// Payment history for one purchase (`GET /purchases/:id/payments`,
+/// enveloped list). autoDispose: each dialog instance owns its fetch, so
+/// closing it frees the state.
+final purchasePaymentsProvider = FutureProvider.autoDispose
+    .family<List<InvoicePaymentRecord>, int>((ref, purchaseId) async {
+      final result = await ref
+          .watch(purchaseRepositoryProvider)
+          .payments(purchaseId);
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
 
 /// Purchase detail (`GET /purchases/:id`, bare object). autoDispose:
 /// each dialog instance owns its fetch, so closing it frees the state.

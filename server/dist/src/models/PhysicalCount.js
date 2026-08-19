@@ -1,5 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const sqlSanitizer_1 = require("../utils/sqlSanitizer");
+// Whitelisted sort columns → qualified SQL column for the list query
+// (the users join makes bare `created_at` ambiguous).
+const COUNT_SORT_COLUMN_MAP = {
+    count_no: 'pc.count_no',
+    count_date: 'pc.count_date',
+    warehouse_name: 'w.warehouse_name',
+    status: 'pc.status',
+    created_at: 'pc.created_at',
+};
 class PhysicalCountModel {
     static generateCountNo(db) {
         const year = new Date().getFullYear();
@@ -60,8 +70,10 @@ class PhysicalCountModel {
       WHERE pc.id = ?
     `).get(id);
     }
-    static getAll(db) {
-        return db.prepare(`
+    static getAll(filters = {}, db) {
+        const pageNum = filters.page || 1;
+        const limitNum = filters.limit || 10;
+        const select = `
       SELECT
         pc.*,
         w.warehouse_code,
@@ -73,8 +85,29 @@ class PhysicalCountModel {
       FROM physical_counts pc
       JOIN warehouses w ON pc.warehouse_id = w.id
       LEFT JOIN users u ON pc.created_by = u.id
-      ORDER BY pc.created_at DESC
-    `).all();
+      WHERE 1=1
+    `;
+        const conditions = [];
+        const params = [];
+        if (filters.search) {
+            conditions.push('(pc.count_no LIKE ? OR w.warehouse_name LIKE ? OR pc.status LIKE ?)');
+            const term = `%${filters.search}%`;
+            params.push(term, term, term);
+        }
+        const where = conditions.length ? ` AND ${conditions.join(' AND ')}` : '';
+        // Sort — whitelisted via sqlSanitizer, mapped to qualified columns
+        // (default matches the pre-paging behavior: newest count first).
+        const { column, order } = (0, sqlSanitizer_1.sanitizeSortParams)(filters.sortBy || 'created_at', filters.sortOrder || 'DESC', sqlSanitizer_1.PHYSICAL_COUNT_SORT_COLUMNS, 'created_at', 'DESC');
+        const sortColumn = COUNT_SORT_COLUMN_MAP[column] || 'pc.created_at';
+        const offset = (pageNum - 1) * limitNum;
+        const query = `${select}${where} ORDER BY ${sortColumn} ${order}, pc.id DESC LIMIT ? OFFSET ?`;
+        const countQuery = `SELECT COUNT(*) as total FROM physical_counts pc
+       JOIN warehouses w ON pc.warehouse_id = w.id
+       LEFT JOIN users u ON pc.created_by = u.id
+       WHERE 1=1${where}`;
+        const countRow = db.prepare(countQuery).get(...params);
+        const rows = db.prepare(query).all(...params, limitNum, offset);
+        return { rows, total: countRow.total, pageNum, limitNum };
     }
     static getItems(countId, db) {
         return db.prepare(`

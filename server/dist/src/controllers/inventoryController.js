@@ -13,10 +13,37 @@ const database_1 = __importDefault(require("../config/database"));
 const logger_1 = __importDefault(require("../utils/logger"));
 function getItems(req, res) {
     try {
-        const items = Item_1.default.getAll(req.query, database_1.default);
+        const page = (0, queryUtils_1.getQueryInteger)(req.query.page, 1);
+        const limit = (0, queryUtils_1.getQueryInteger)(req.query.limit, 10);
+        const search = (0, queryUtils_1.getQueryParam)(req.query.search);
+        const category = (0, queryUtils_1.getQueryParam)(req.query.category);
+        const sortBy = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
+        const sortOrder = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
+        const lowStock = (0, queryUtils_1.getQueryParam)(req.query.low_stock);
+        const isRawMaterial = (0, queryUtils_1.getQueryParam)(req.query.is_raw_material);
+        const isFinishedGood = (0, queryUtils_1.getQueryParam)(req.query.is_finished_good);
+        const truthy = (v) => v === '1' || v?.toLowerCase() === 'true';
+        const { rows, total, pageNum, limitNum } = Item_1.default.getAll({
+            search: search || undefined,
+            category: category || undefined,
+            lowStock: truthy(lowStock),
+            is_raw_material: isRawMaterial === undefined ? undefined : truthy(isRawMaterial),
+            is_finished_good: isFinishedGood === undefined ? undefined : truthy(isFinishedGood),
+            sortBy: sortBy || undefined,
+            sortOrder: sortOrder || undefined,
+            page,
+            limit
+        }, database_1.default);
         res.json({
             success: true,
-            data: items
+            data: rows,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: Math.ceil(total / limitNum),
+                totalItems: total,
+                hasNext: pageNum < Math.ceil(total / limitNum),
+                hasPrev: pageNum > 1
+            }
         });
     }
     catch (error) {
@@ -153,7 +180,7 @@ function getUnitsOfMeasure(req, res) {
 }
 function getWarehouses(req, res) {
     try {
-        const warehouses = Warehouse_1.default.getAllActive(database_1.default);
+        const warehouses = Warehouse_1.default.getStockSummary(database_1.default);
         res.json({
             success: true,
             data: warehouses
@@ -258,8 +285,34 @@ function deleteWarehouse(req, res) {
 }
 function getStockMovements(req, res) {
     try {
-        const movements = StockMovement_1.default.getAll(req.query, database_1.default);
-        res.json(movements);
+        const page = (0, queryUtils_1.getQueryInteger)(req.query.page, 1);
+        const limit = (0, queryUtils_1.getQueryInteger)(req.query.limit, 10);
+        const movementType = (0, queryUtils_1.getQueryParam)(req.query.movement_type);
+        const sortBy = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
+        const sortOrder = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
+        const search = (0, queryUtils_1.getQueryParam)(req.query.search);
+        const { rows, total, pageNum, limitNum } = StockMovement_1.default.getAll({
+            movement_type: movementType,
+            search,
+            sortBy,
+            sortOrder,
+            page,
+            limit
+        }, database_1.default);
+        // Flat envelope matching the customers/suppliers shape the client's
+        // `getPaged` helper expects: `data` is the item list and `pagination`
+        // is a sibling of `data` (NOT nested inside it).
+        res.json({
+            success: true,
+            data: rows,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: Math.ceil(total / limitNum),
+                totalItems: total,
+                hasNext: pageNum < Math.ceil(total / limitNum),
+                hasPrev: pageNum > 1
+            }
+        });
     }
     catch (error) {
         logger_1.default.error('Get stock movements error:', error);
@@ -360,8 +413,31 @@ function getItemLedger(req, res) {
 }
 function getStockBalances(req, res) {
     try {
-        const balances = StockMovement_1.default.getStockBalances(database_1.default);
-        res.json(balances);
+        const page = (0, queryUtils_1.getQueryInteger)(req.query.page, 1);
+        const limit = (0, queryUtils_1.getQueryInteger)(req.query.limit, 10);
+        const search = (0, queryUtils_1.getQueryParam)(req.query.search);
+        const warehouseCode = (0, queryUtils_1.getQueryParam)(req.query.warehouse_code);
+        const sortBy = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
+        const sortOrder = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
+        const { rows, total, pageNum, limitNum } = StockMovement_1.default.getStockBalances({
+            search: search || undefined,
+            warehouse_code: warehouseCode || undefined,
+            sortBy: sortBy || undefined,
+            sortOrder: sortOrder || undefined,
+            page,
+            limit
+        }, database_1.default);
+        res.json({
+            success: true,
+            data: rows,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: Math.ceil(total / limitNum),
+                totalItems: total,
+                hasNext: pageNum < Math.ceil(total / limitNum),
+                hasPrev: pageNum > 1
+            }
+        });
     }
     catch (error) {
         logger_1.default.error('Get stock balances error:', error);
@@ -370,10 +446,28 @@ function getStockBalances(req, res) {
 }
 function getPhysicalCounts(req, res) {
     try {
-        const counts = PhysicalCount_1.default.getAll(database_1.default);
+        const page = (0, queryUtils_1.getQueryInteger)(req.query.page, 1);
+        const limit = (0, queryUtils_1.getQueryInteger)(req.query.limit, 10);
+        const search = (0, queryUtils_1.getQueryParam)(req.query.search);
+        const sortBy = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
+        const sortOrder = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
+        const { rows, total, pageNum, limitNum } = PhysicalCount_1.default.getAll({
+            search: search || undefined,
+            sortBy: sortBy || undefined,
+            sortOrder: sortOrder || undefined,
+            page,
+            limit
+        }, database_1.default);
         res.json({
             success: true,
-            data: counts
+            data: rows,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: Math.ceil(total / limitNum),
+                totalItems: total,
+                hasNext: pageNum < Math.ceil(total / limitNum),
+                hasPrev: pageNum > 1
+            }
         });
     }
     catch (error) {

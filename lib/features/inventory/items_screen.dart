@@ -1,16 +1,16 @@
 // Items list screen — PORTING.md §5/§6: the first authenticated data
-// screen. A read-only grid over `GET /inventory/items` (enveloped array,
-// server-side `search` + flag filters) rendered with PlutoGrid via the
-// shared [PlutoGridScreen] mixin. Sits at the shell branch root
-// `/inventory` (the web app hosts it at `/inventory/items`).
+// screen. A read-only grid over `GET /inventory/items` (server-paginated,
+// `search` + `low_stock` filters) rendered with PlutoGrid via the shared
+// [PlutoGridScreen] mixin. Sits at the shell branch root `/inventory`
+// (the web app hosts it at `/inventory/items`).
 //
 // The provider is the single source of truth and the screen never mutates
-// rows directly; sorting/filtering stay client-side because the items
-// endpoint returns the full list.
+// rows directly; search / low-stock toggle / sorting / paging all
+// refetch server-side through the paged endpoint.
 //
 // Low-stock highlighting: the grid's row cells carry `stock` and
 // `reorder`, so both the row tint and the stock-cell renderer can decide
-// without an item-lookup map — this survives client-side re-sorting.
+// without an item-lookup map.
 
 import 'dart:async';
 
@@ -20,7 +20,9 @@ import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/item.dart' show Item;
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
@@ -68,7 +70,45 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       ref.read(itemsSearchProvider.notifier).state = value.trim();
+      // A new search starts back at page 1.
+      if (ref.read(itemsPageProvider) != 1) {
+        ref.read(itemsPageProvider.notifier).state = 1;
+      }
     });
+  }
+
+  /// The items provider returns a `PagedResponse` envelope — unwrap the
+  /// current page's items as the grid rows.
+  @override
+  Iterable<Item> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<Item>).items;
+
+  /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
+  String? _sortColumnFor(String field) => switch (field) {
+    'code' => 'item_code',
+    'name' => 'item_name',
+    'category' => 'category',
+    'stock' => 'current_stock',
+    'reorder' => 'reorder_level',
+    _ => null,
+  };
+
+  /// Column sort maps to the server-side sort provider (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    ref.read(itemsSortProvider.notifier).state = sort.isNone
+        ? null
+        : GridSort(
+            sortBy,
+            sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC',
+          );
+    if (ref.read(itemsPageProvider) != 1) {
+      ref.read(itemsPageProvider.notifier).state = 1;
+    }
   }
 
   /// Opt into the per-row ⋮ actions menu (View / Edit).
@@ -117,6 +157,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
   Widget build(BuildContext context) {
     final items = ref.watch(itemsProvider);
     final lowStockOnly = ref.watch(itemsLowStockOnlyProvider);
+    final page = items.valueOrNull;
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
 
@@ -130,19 +171,20 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
           searchController: _searchController,
           searchHint: l10n.commonSearch,
           onSearchChanged: _onSearchChanged,
-          // The low-stock endpoint has no search param — the field is
-          // disabled (and visually dimmed) while the toggle is active
-          // instead of silently dropping the term.
-          searchEnabled: !lowStockOnly,
           filters: [
             FilterChip(
               label: Text(l10n.inventoryLowstock),
               selected: lowStockOnly,
               // Setting the state re-runs itemsProvider automatically
               // (it watches the toggle) — no manual invalidate needed.
-              onSelected: (selected) =>
-                  ref.read(itemsLowStockOnlyProvider.notifier).state =
-                      selected,
+              onSelected: (selected) {
+                ref.read(itemsLowStockOnlyProvider.notifier).state =
+                    selected;
+                // A new filter starts back at page 1.
+                if (ref.read(itemsPageProvider) != 1) {
+                  ref.read(itemsPageProvider.notifier).state = 1;
+                }
+              },
             ),
           ],
           onRefresh: () => ref.invalidate(itemsProvider),
@@ -163,6 +205,24 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
                 : Colors.transparent,
           ),
         ),
+        if (page != null)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(itemsLimitProvider),
+            itemLabel: l10n.inventoryItems,
+            onPageChanged: (p) =>
+                ref.read(itemsPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(itemsLimitProvider.notifier).state = limit;
+              if (ref.read(itemsPageProvider) != 1) {
+                ref.read(itemsPageProvider.notifier).state = 1;
+              }
+            },
+          ),
       ],
     );
   }

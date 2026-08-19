@@ -99,7 +99,7 @@ final customerLedgerProvider = FutureProvider.autoDispose
     });
 
 /// The customer's invoices (`GET /invoices?customer_id=<id>` — the server
-/// accepts `customer_id`; the Invoices tab + customer metrics use it).
+/// accepts `customer_id`; the customer metrics use it). Full list.
 /// autoDispose: owned by the detail page.
 final customerInvoicesProvider = FutureProvider.autoDispose
     .family<List<Invoice>, int>((ref, customerId) async {
@@ -112,13 +112,105 @@ final customerInvoicesProvider = FutureProvider.autoDispose
       };
     });
 
+/// Paged fetch args for [customerInvoicesPagedProvider] — the family key
+/// is the (customerId, page, limit) triple so each page owns its state.
+class CustomerInvoicesArgs {
+  const CustomerInvoicesArgs({
+    required this.customerId,
+    required this.page,
+    required this.limit,
+  });
+
+  final int customerId;
+  final int page;
+  final int limit;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CustomerInvoicesArgs &&
+      other.customerId == customerId &&
+      other.page == page &&
+      other.limit == limit;
+
+  @override
+  int get hashCode => Object.hash(customerId, page, limit);
+}
+
+/// Bumped by [invalidateCustomerQueries] so an open paged tab refetches
+/// its current page after a mutation (the family key — page/limit — is
+/// invisible to the mutating code).
+final customerTabsVersionProvider = StateProvider<int>((ref) => 0);
+
+/// One page of the customer's invoices (`GET /invoices?customer_id=<id>`
+/// + `page`/`limit` — the endpoint is server-paginated). The Invoices
+/// tab renders this with a [ServerPaginationBar].
+final customerInvoicesPagedProvider = FutureProvider.autoDispose
+    .family<PagedResponse<Invoice>, CustomerInvoicesArgs>((ref, args) async {
+      ref.watch(customerTabsVersionProvider);
+      final result = await ref.watch(invoiceRepositoryProvider).invoicesPaged(
+        PagedRequest(
+          page: args.page,
+          limit: args.limit,
+          extra: {'customer_id': args.customerId},
+        ),
+      );
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
 /// The customer's payments (`GET /payments?customerId=<id>` — the web
-/// Payments tab's query). autoDispose: owned by the detail page.
+/// Payments tab's query). Full list. autoDispose: owned by the detail page.
 final customerPaymentsProvider = FutureProvider.autoDispose
     .family<List<Payment>, int>((ref, customerId) async {
       final result = await ref
           .watch(invoiceRepositoryProvider)
           .paymentsForCustomer(customerId);
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+/// Paged fetch args for [customerPaymentsPagedProvider].
+class CustomerPaymentsArgs {
+  const CustomerPaymentsArgs({
+    required this.customerId,
+    required this.page,
+    required this.limit,
+  });
+
+  final int customerId;
+  final int page;
+  final int limit;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CustomerPaymentsArgs &&
+      other.customerId == customerId &&
+      other.page == page &&
+      other.limit == limit;
+
+  @override
+  int get hashCode => Object.hash(customerId, page, limit);
+}
+
+/// One page of the customer's payments (`GET /payments?customerId=<id>`
+/// + `page`/`limit` — server-paginated like the payments module; default
+/// sort `payment_date DESC` matches the module). The Payments tab renders
+/// this with a [ServerPaginationBar].
+final customerPaymentsPagedProvider = FutureProvider.autoDispose
+    .family<PagedResponse<Payment>, CustomerPaymentsArgs>((ref, args) async {
+      ref.watch(customerTabsVersionProvider);
+      final result = await ref.watch(invoiceRepositoryProvider).payments(
+        PagedRequest(
+          page: args.page,
+          limit: args.limit,
+          sortOrder: 'DESC',
+          extra: {'customerId': args.customerId},
+        ),
+      );
       return switch (result) {
         ApiSuccess(:final data) => data,
         ApiFailure(:final error) => throw error,
@@ -178,5 +270,8 @@ void invalidateCustomerQueries(WidgetRef ref, int customerId) {
   ref.invalidate(customerLedgerProvider(customerId));
   ref.invalidate(customerInvoicesProvider(customerId));
   ref.invalidate(customerPaymentsProvider(customerId));
+  // The paged tab providers watch this version, so the page the user is
+  // currently on refetches after any mutation.
+  ref.read(customerTabsVersionProvider.notifier).state++;
   ref.read(customerStatementVersionProvider.notifier).state++;
 }

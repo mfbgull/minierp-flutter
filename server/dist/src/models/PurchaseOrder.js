@@ -6,7 +6,22 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const StockMovement_1 = __importDefault(require("./StockMovement"));
 const accountingService_1 = __importDefault(require("../services/accountingService"));
 const sequence_1 = require("../utils/sequence");
+const sqlSanitizer_1 = require("../utils/sqlSanitizer");
 const logger_1 = __importDefault(require("../utils/logger"));
+// Whitelisted sort columns → qualified SQL column for the list query (the
+// supplier/warehouse/user/allocations joins make bare names ambiguous).
+const PURCHASE_ORDER_SORT_COLUMN_MAP = {
+    po_no: 'po.po_no',
+    po_date: 'po.po_date',
+    supplier_name: 's.supplier_name',
+    status: 'po.status',
+    total_amount: 'po.total_amount',
+    // Computed in the SELECT (total − paid allocations); SQLite resolves
+    // the alias in ORDER BY.
+    balance_amount: 'balance_amount',
+    expected_delivery_date: 'po.expected_delivery_date',
+    created_at: 'po.created_at',
+};
 class PurchaseOrderModel {
     static create(data, userId, db) {
         const { supplier_id, po_date, expected_delivery_date, status = 'Draft', notes, warehouse_id, items } = data;
@@ -83,7 +98,9 @@ class PurchaseOrderModel {
         return `BATCH-${year % 100}-PUR-${nextNo.toString().padStart(4, '0')}`;
     }
     static getAll(filters = {}, db) {
-        let query = `
+        const pageNum = filters.page || 1;
+        const limitNum = filters.limit || 10;
+        const select = `
       SELECT
         po.*,
         s.supplier_name,
@@ -104,29 +121,44 @@ class PurchaseOrderModel {
       ) pa ON po.id = pa.po_id
       WHERE 1=1
     `;
+        const conditions = [];
         const params = [];
         if (filters.supplier_id) {
-            query += ` AND po.supplier_id = ?`;
+            conditions.push('po.supplier_id = ?');
             params.push(filters.supplier_id);
         }
         if (filters.status) {
-            query += ` AND po.status = ?`;
+            conditions.push('po.status = ?');
             params.push(filters.status);
         }
+        if (filters.search) {
+            conditions.push('(po.po_no LIKE ? OR s.supplier_name LIKE ?)');
+            const term = `%${filters.search}%`;
+            params.push(term, term);
+        }
         if (filters.start_date) {
-            query += ` AND po.po_date >= ?`;
+            conditions.push('po.po_date >= ?');
             params.push(filters.start_date);
         }
         if (filters.end_date) {
-            query += ` AND po.po_date <= ?`;
+            conditions.push('po.po_date <= ?');
             params.push(filters.end_date);
         }
-        query += ` ORDER BY po.po_date DESC, po.created_at DESC`;
-        if (filters.limit) {
-            query += ` LIMIT ?`;
-            params.push(filters.limit);
-        }
-        return db.prepare(query).all(...params);
+        const where = conditions.length ? ` AND ${conditions.join(' AND ')}` : '';
+        // Sort — whitelisted via sqlSanitizer, mapped to qualified columns
+        // (default matches the pre-paging behavior: newest PO first).
+        const { column, order } = (0, sqlSanitizer_1.sanitizeSortParams)(filters.sortBy || 'po_date', filters.sortOrder || 'DESC', sqlSanitizer_1.PURCHASE_ORDER_SORT_COLUMNS, 'po_date', 'DESC');
+        const sortColumn = PURCHASE_ORDER_SORT_COLUMN_MAP[column] || 'po.po_date';
+        const offset = (pageNum - 1) * limitNum;
+        const pos = db
+            .prepare(`${select}${where} ORDER BY ${sortColumn} ${order}, po.id DESC LIMIT ? OFFSET ?`)
+            .all(...params, limitNum, offset);
+        const countRow = db
+            .prepare(`SELECT COUNT(*) as total FROM purchase_orders po
+        JOIN suppliers s ON po.supplier_id = s.id
+        WHERE 1=1${where}`)
+            .get(...params);
+        return { rows: pos, total: countRow.total, pageNum, limitNum };
     }
     static getById(id, db) {
         try {
@@ -403,6 +435,20 @@ class PurchaseOrderModel {
       ORDER BY gr.receipt_date DESC, gr.created_at DESC
     `).all(poId);
     }
+    /**
+     * Payments allocated to this PO (`po_allocations`) — the payment
+     * header joined with the per-PO allocation amount, newest first.
+     * Mirrors `InvoiceModel.getPayments`; the client renders these as the
+     * PO's payment history.
+     */
+    static getPayments(poId, db) {
+        return db.prepare(`
+      SELECT p.id, p.payment_no, p.payment_date, p.payment_method,
+             p.reference_no, p.notes, pa.amount
+      FROM po_allocations pa JOIN payments p ON pa.payment_id = p.id
+      WHERE pa.po_id = ? ORDER BY p.payment_date DESC, p.id DESC
+    `).all(poId);
+    }
     static addReceipt(data, userId, db) {
         const { po_id, receipt_date, warehouse_id, remarks, items } = data;
         if (!items || items.length === 0) {
@@ -546,135 +592,6 @@ class PurchaseOrderModel {
         });
         return transaction();
     }
-    /**
-     * Return (reverse) items that were previously received via a Goods Receipt.
-     * This reduces received_quantity on the PO item, reverses stock via an
-     * ADJUSTMENT movement, updates stock_balances, and recalculates the PO status.
-     *
-     * @param poId - Purchase Order ID
-     * @param items - Array of { po_item_id, return_quantity }
-     * @param userId - User performing the return
-     * @param db - Database connection
-     * @param reason - Optional reason for the return
-     * @returns Summary of returned items
-     */
-    static returnReceiptItems(poId, items, userId, db, reason) {
-        if (!items || items.length === 0) {
-            throw new Error('At least one item must be returned');
-        }
-        const po = this.getById(poId, db);
-        if (!po)
-            throw new Error('Purchase Order not found');
-        if (po.status === 'Draft') {
-            throw new Error('Cannot return items from a Draft Purchase Order');
-        }
-        const transaction = db.transaction(() => {
-            let totalQuantity = 0;
-            let totalAmount = 0;
-            let returnedCount = 0;
-            for (const returnItem of items) {
-                if (returnItem.return_quantity <= 0) {
-                    throw new Error('Return quantity must be positive');
-                }
-                const poItem = db.prepare(`
-          SELECT * FROM purchase_order_items WHERE id = ?
-        `).get(returnItem.po_item_id);
-                if (!poItem) {
-                    throw new Error(`Purchase Order Item ${returnItem.po_item_id} not found`);
-                }
-                if (poItem.po_id !== poId) {
-                    throw new Error(`Item ${poItem.id} does not belong to PO ${poId}`);
-                }
-                // Net received = received_quantity - already returned
-                const netReceived = (poItem.received_quantity || 0) - (poItem.returned_quantity || 0);
-                if (returnItem.return_quantity > netReceived) {
-                    throw new Error(`Return quantity (${returnItem.return_quantity}) exceeds net received quantity ` +
-                        `(${netReceived}) for PO item ${poItem.id}`);
-                }
-                const returnAmount = returnItem.return_quantity * poItem.unit_price;
-                // Reduce PO item received_quantity (net effect)
-                db.prepare(`
-          UPDATE purchase_order_items
-          SET received_quantity = received_quantity - ?,
-              returned_quantity = COALESCE(returned_quantity, 0) + ?
-          WHERE id = ?
-        `).run(returnItem.return_quantity, returnItem.return_quantity, returnItem.po_item_id);
-                // Create ADJUSTMENT stock movement (negative qty = removal)
-                const movementNo = StockMovement_1.default.generateMovementNo(db);
-                db.prepare(`
-          INSERT INTO stock_movements (
-            movement_no, item_id, warehouse_id, movement_type,
-            quantity, unit_cost, reference_doctype, reference_docno,
-            remarks, movement_date, created_by
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(movementNo, poItem.item_id, po.warehouse_id, 'ADJUSTMENT', -returnItem.return_quantity, poItem.unit_price, 'PO_RETURN', po.po_no, `Stock reversed - PO ${po.po_no} item return${reason ? ': ' + reason : ''}`, new Date().toISOString().split('T')[0], userId);
-                // Update stock_balances
-                const existingBalance = db.prepare(`
-          SELECT * FROM stock_balances
-          WHERE item_id = ? AND warehouse_id = ?
-        `).get(poItem.item_id, po.warehouse_id);
-                if (existingBalance) {
-                    db.prepare(`
-            UPDATE stock_balances
-            SET quantity = quantity - ?,
-                last_updated = CURRENT_TIMESTAMP
-            WHERE item_id = ? AND warehouse_id = ?
-          `).run(returnItem.return_quantity, poItem.item_id, po.warehouse_id);
-                }
-                // Batch costing: reduce the cost layers (oldest first, FIFO) for
-                // the stock going back to the supplier, so batch coverage stays in
-                // sync with on-hand stock.
-                let toReturn = returnItem.return_quantity;
-                const batches = db.prepare(`
-          SELECT id, quantity_remaining
-          FROM stock_batches
-          WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
-          ORDER BY received_date ASC, id ASC
-        `).all(poItem.item_id, po.warehouse_id);
-                for (const batch of batches) {
-                    if (toReturn <= 0)
-                        break;
-                    const consume = Math.min(toReturn, batch.quantity_remaining);
-                    db.prepare(`
-            UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?
-          `).run(consume, batch.id);
-                    toReturn -= consume;
-                }
-                // If the batches didn't fully cover the return (legacy stock with no
-                // batch rows), the remainder is unbatchable stock — leave it as-is;
-                // the reconciliation migration will fold it into a batch later.
-                // Update items.current_stock
-                db.prepare(`
-          UPDATE items
-          SET current_stock = (
-            SELECT COALESCE(SUM(quantity), 0)
-            FROM stock_balances
-            WHERE item_id = ?
-          )
-          WHERE id = ?
-        `).run(poItem.item_id, poItem.item_id);
-                totalQuantity += returnItem.return_quantity;
-                totalAmount += returnAmount;
-                returnedCount++;
-            }
-            // Recalculate PO status after return
-            const newStatus = this.calculateStatus(poId, db);
-            if (newStatus !== po.status) {
-                db.prepare(`
-          UPDATE purchase_orders
-          SET status = ?, updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `).run(newStatus, poId);
-            }
-            // Log activity
-            db.prepare(`
-        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(userId, 'RETURN', 'PurchaseOrder', poId, `Return processed for ${returnedCount} item(s) (${totalQuantity} units, ${totalAmount.toFixed(2)}) on PO ${po.po_no}${reason ? ': ' + reason : ''}`);
-            return { returnedCount, totalQuantity, totalAmount };
-        });
-        return transaction();
-    }
     static generateReceiptNo(db) {
         return (0, sequence_1.generateDocNo)(db, 'GR');
     }
@@ -711,7 +628,7 @@ class PurchaseOrderModel {
     `).get(supplierId);
     }
     static getPendingOrders(db) {
-        return this.getAll({ status: 'Submitted' }, db);
+        return this.getAll({ status: 'Submitted', limit: 1000 }, db).rows;
     }
 }
 // Import SupplierLedgerModel at the bottom to avoid circular dependency

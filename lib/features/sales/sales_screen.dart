@@ -1,8 +1,9 @@
 // Sales (invoices) list screen — PORTING.md §5/§6: read-only PlutoGrid
-// over `GET /invoices` with a server-side status filter (CSV param) and
-// client-side search + date range (the endpoint has no search/date
-// params). Full dataset, client-side grid sort — the items-screen
-// convention.
+// over `GET /invoices` with server-side status/search/date filters and
+// server-side paging + sort (grid-pagination §5 — the endpoint returns
+// a `pagination` block). The grid renders one page; the summary strip
+// and CSV export run over the full *filtered* list
+// ([filteredInvoicesProvider]).
 //
 // Grid state: same pattern as ItemsScreen/ExpensesScreen — rows are fed
 // through the PlutoGridStateManager (clear + append) on provider
@@ -20,7 +21,6 @@ import 'package:go_router/go_router.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/csv_export.dart';
-import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../core/utils/invoice_status.dart';
 import '../../core/utils/print_utils.dart' show printPdfBytes;
@@ -28,19 +28,23 @@ import '../../data/models/invoice.dart' show Invoice, InvoicePaymentRecord;
 import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
 import '../../data/repositories/invoice_repository.dart'
     show invoiceRepositoryProvider;
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart'
     show plutoGridConfigurationFor, serialGridColumn, withSerialCell;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
-import 'calculations/invoice_rules.dart' show canShowDeleteAction;
+import 'calculations/invoice_rules.dart'
+    show canReturnInvoice, canShowDeleteAction;
 import 'invoice_pdf.dart' show buildA4InvoicePdf;
 import 'invoice_payment_dialog.dart' show showInvoicePaymentDialog;
 import 'invoice_providers.dart';
+import 'invoice_return_dialog.dart' show showInvoiceReturnDialog;
 
 /// Invoice-status options for the filter dropdown (display → server
 /// value; `All` = null = param omitted).
@@ -53,7 +57,7 @@ const List<(String, String?)> _statusOptions = [
 ];
 
 /// The per-row ⋮ menu actions for an invoice row.
-enum _InvoiceRowAction { view, edit, payment, print, delete }
+enum _InvoiceRowAction { view, edit, payment, returnItem, print, delete }
 
 class SalesScreen extends ConsumerStatefulWidget {
   const SalesScreen({super.key});
@@ -90,6 +94,10 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       ref.read(invoicesSearchProvider.notifier).state = value.trim();
+      // A new search starts back at page 1.
+      if (ref.read(invoicesPageProvider) != 1) {
+        ref.read(invoicesPageProvider.notifier).state = 1;
+      }
     });
   }
 
@@ -105,36 +113,18 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     ref.read(invoicesFromDateProvider.notifier).state = null;
     ref.read(invoicesToDateProvider.notifier).state = null;
     ref.read(invoicesSearchProvider.notifier).state = '';
-  }
-
-  /// Client-side filtering (search term + date range) over the loaded
-  /// rows — the server only supports the status filter.
-  List<Invoice> _filteredRows(AsyncValue<List<Invoice>> invoices) {
-    final rows = invoices.valueOrNull ?? const <Invoice>[];
-    final search = ref.read(invoicesSearchProvider).toLowerCase();
-    final from = ref.read(invoicesFromDateProvider);
-    final to = ref.read(invoicesToDateProvider);
-    if (search.isEmpty && from == null && to == null) return rows;
-    return rows.where((inv) {
-      if (search.isNotEmpty &&
-          !inv.invoiceNo.toLowerCase().contains(search) &&
-          !(inv.customerName ?? '').toLowerCase().contains(search)) {
-        return false;
-      }
-      final iso = inv.invoiceDate;
-      if (from != null && iso.compareTo(isoDate(from)) < 0) return false;
-      if (to != null && iso.compareTo(isoDate(to)) > 0) return false;
-      return true;
-    }).toList();
+    if (ref.read(invoicesPageProvider) != 1) {
+      ref.read(invoicesPageProvider.notifier).state = 1;
+    }
   }
 
   /// Pushes the provider state into the grid manager (clear + append,
   /// with the loading overlay toggled). No-op until `onLoaded`.
-  void _applyInvoices(AsyncValue<List<Invoice>> value) {
+  void _applyInvoices(AsyncValue<PagedResponse<Invoice>> value) {
     final manager = _stateManager;
     if (manager == null) return;
 
-    final rows = _filteredRows(value);
+    final rows = value.value?.items ?? const <Invoice>[];
     manager.removeAllRows();
     manager.appendRows([
       for (final (index, inv) in rows.indexed)
@@ -179,11 +169,14 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     final l10n = AppLocalizations.of(cellContext)!;
 
     // Payment is offered while anything is still owed (Unpaid /
-    // Partially Paid / Overdue / Sent / Draft with a balance); Delete
-    // follows the shared rule (Draft/Unpaid with no money moved).
+    // Partially Paid / Overdue / Sent / Draft with a balance); Return
+    // follows the shared rule (hidden for Draft / Cancelled / fully
+    // Returned); Delete follows the shared rule (Draft/Unpaid with no
+    // money moved).
     final canPay = invoice.balanceAmount > 0 &&
         invoice.status != 'Cancelled' &&
         invoice.status != 'Returned';
+    final canReturn = canReturnInvoice(invoice);
     final canDelete = canShowDeleteAction(invoice);
 
     final action = await showMenu<_InvoiceRowAction>(
@@ -224,6 +217,19 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 const Icon(Icons.payments_outlined, size: 18),
                 const SizedBox(width: 8),
                 Text(l10n.paymentsRecordpayment),
+              ],
+            ),
+          ),
+        if (canReturn)
+          PopupMenuItem(
+            value: _InvoiceRowAction.returnItem,
+            child: Row(
+              children: [
+                const Icon(Icons.assignment_return_outlined, size: 18),
+                const SizedBox(width: 8),
+                // Flexible so the label shrinks instead of overflowing
+                // the popup (same as the shared grid row-action menu).
+                Flexible(child: Text(l10n.salesreturnsProcessreturn)),
               ],
             ),
           ),
@@ -268,6 +274,11 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           context.push('/sales/form', extra: invoice);
         case _InvoiceRowAction.payment:
           await showInvoicePaymentDialog(context, invoice: invoice);
+        case _InvoiceRowAction.returnItem:
+          // The return dialog fetches the fresh invoice detail itself
+          // (so returned_qty is current) — same entry the print-preview
+          // page's Process Return button uses.
+          await showInvoiceReturnDialog(context, invoiceId: invoice.id);
         case _InvoiceRowAction.print:
           _printInvoice(invoice);
         case _InvoiceRowAction.delete:
@@ -330,12 +341,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     }
   }
 
-  Widget _summaryStrip(
-    AppLocalizations l10n,
-    AsyncValue<List<Invoice>> invoices,
-  ) {
+  Widget _summaryStrip(AppLocalizations l10n, List<Invoice> rows) {
     final scheme = Theme.of(context).colorScheme;
-    final rows = _filteredRows(invoices);
     final totalSales = rows.fold<num>(0, (sum, i) => sum + i.totalAmount);
     final totalPaid = rows.fold<num>(0, (sum, i) => sum + i.paidAmount);
     final totalDue = rows.fold<num>(0, (sum, i) => sum + i.balanceAmount);
@@ -385,7 +392,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     );
   }
 
-  Widget _buildBody(AsyncValue<List<Invoice>> invoices) {
+  Widget _buildBody(AsyncValue<PagedResponse<Invoice>> invoices) {
     final errorMessage = switch (invoices) {
       AsyncError(:final error) => error is ApiError ? error.message : null,
       _ => null,
@@ -421,13 +428,14 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           );
           _applyInvoices(ref.read(invoicesProvider));
         },
+        onSorted: _onGridSorted,
         onRowDoubleTap: (event) {
           final id = event.row.cells['id']?.value as int?;
           if (id == null || id <= 0) return;
           // The grid row only exists when the provider has data, so the
           // lookup always succeeds (defensive no-op otherwise).
           final invoices =
-              ref.read(invoicesProvider).valueOrNull ?? const <Invoice>[];
+              ref.read(invoicesProvider).valueOrNull?.items ?? const <Invoice>[];
           final matches = invoices.where((i) => i.id == id);
           if (matches.isEmpty) return;
           // Double-tap → print preview (not the edit form); the preview
@@ -442,6 +450,35 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         ),
       ),
     );
+  }
+
+  /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
+  String? _sortColumnFor(String field) => switch (field) {
+    'invoice_no' => 'invoice_no',
+    'invoice_date' => 'invoice_date',
+    'customer_name' => 'customer_name',
+    'status' => 'status',
+    'total_amount' => 'total_amount',
+    'paid_amount' => 'paid_amount',
+    'balance_amount' => 'balance_amount',
+    _ => null,
+  };
+
+  /// Column sort maps to the server-side sort provider (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  void _onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    ref.read(invoicesSortProvider.notifier).state = sort.isNone
+        ? null
+        : InvoiceSort(
+            sortBy,
+            sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC',
+          );
+    if (ref.read(invoicesPageProvider) != 1) {
+      ref.read(invoicesPageProvider.notifier).state = 1;
+    }
   }
 
   /// Column set — dense data-screen conventions (PORTING.md §6), read-only
@@ -567,6 +604,8 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       PlutoColumn(
         title: l10n.customersActions,
         field: 'actions',
+        // Pinned to the right edge — stays reachable when the grid scrolls.
+        frozen: PlutoColumnFrozen.end,
         type: PlutoColumnType.text(),
         width: 64,
         readOnly: true,
@@ -599,25 +638,17 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final invoices = ref.watch(invoicesProvider);
-    // Client-side filters drive the date-button labels and the summary
-    // strip, so they must be watched here for the build to re-run.
+    // The full filtered list feeds the summary strip + CSV export.
+    final filtered = ref.watch(filteredInvoicesProvider);
+    // Filters drive the date-button labels and the summary strip, so
+    // they must be watched here for the build to re-run.
     ref.watch(invoicesSearchProvider);
     ref.watch(invoicesFromDateProvider);
     ref.watch(invoicesToDateProvider);
+    ref.watch(invoicesStatusProvider);
     // Keep the grid in sync with provider changes after first load
-    // (loading flags, status-filter refetches) — same as ExpensesScreen.
+    // (loading flags, page/filter refetches) — same as ExpensesScreen.
     ref.listen(invoicesProvider, (previous, next) => _applyInvoices(next));
-    // Client-side filters (search term + date range) re-run the filter
-    // over the loaded rows without refetching.
-    ref.listen(invoicesSearchProvider, (previous, next) {
-      _applyInvoices(ref.read(invoicesProvider));
-    });
-    ref.listen(invoicesFromDateProvider, (previous, next) {
-      _applyInvoices(ref.read(invoicesProvider));
-    });
-    ref.listen(invoicesToDateProvider, (previous, next) {
-      _applyInvoices(ref.read(invoicesProvider));
-    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -639,13 +670,24 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 return value ?? '';
               },
               width: 170,
-              onChanged: (v) =>
-                  ref.read(invoicesStatusProvider.notifier).state = v,
+              onChanged: (v) {
+                ref.read(invoicesStatusProvider.notifier).state = v;
+                // A new status filter starts back at page 1.
+                if (ref.read(invoicesPageProvider) != 1) {
+                  ref.read(invoicesPageProvider.notifier).state = 1;
+                }
+              },
             ),
             DateRangeFilter(
               width: 120,
               fromProvider: invoicesFromDateProvider,
               toProvider: invoicesToDateProvider,
+              onChanged: () {
+                // A new date range starts back at page 1.
+                if (ref.read(invoicesPageProvider) != 1) {
+                  ref.read(invoicesPageProvider.notifier).state = 1;
+                }
+              },
             ),
           ],
           onRefresh: _refresh,
@@ -658,12 +700,15 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             // rows are loaded.
             TextButton.icon(
               onPressed:
-                  invoices.isLoading || _filteredRows(invoices).isEmpty
+                  invoices.isLoading || (filtered.valueOrNull ?? const []).isEmpty
                   ? null
                   : () => saveCsv(
                       context,
                       suggestedName: csvSuggestedName('invoices'),
-                      csv: buildInvoicesCsv(l10n, _filteredRows(invoices)),
+                      csv: buildInvoicesCsv(
+                        l10n,
+                        filtered.valueOrNull ?? const [],
+                      ),
                       successMessage: l10n.salesExported,
                       errorMessage: l10n.salesExportfailed,
                     ),
@@ -682,9 +727,28 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         const SizedBox(height: 10),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _summaryStrip(l10n, invoices),
+          child: _summaryStrip(l10n, filtered.valueOrNull ?? const []),
         ),
         Expanded(child: _buildBody(invoices)),
+        if (invoices.valueOrNull case final page?)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(invoicesLimitProvider),
+            itemLabel: l10n.salesInvoices,
+            onPageChanged: (p) =>
+                ref.read(invoicesPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(invoicesLimitProvider.notifier).state = limit;
+              if (ref.read(invoicesPageProvider) != 1) {
+                ref.read(invoicesPageProvider.notifier).state = 1;
+              }
+            },
+          ),
+        const SizedBox(height: 16),
       ],
     );
   }

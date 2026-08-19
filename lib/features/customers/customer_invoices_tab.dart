@@ -20,6 +20,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/detail_error.dart';
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/status_badge.dart';
 import '../sales/calculations/invoice_rules.dart'
     show canCancelInvoice, canShowDeleteAction;
@@ -40,24 +41,86 @@ class CustomerInvoicesTab extends ConsumerStatefulWidget {
 }
 
 class _CustomerInvoicesTabState extends ConsumerState<CustomerInvoicesTab> {
+  /// Current page / per-page size for the server-side pagination (same
+  /// pattern as the sales screen; the paged provider key carries both).
+  int _page = 1;
+  int _limit = 10;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final invoices = ref.watch(customerInvoicesProvider(widget.customerId));
+    final invoices = ref.watch(
+      customerInvoicesPagedProvider(
+        CustomerInvoicesArgs(
+          customerId: widget.customerId,
+          page: _page,
+          limit: _limit,
+        ),
+      ),
+    );
+
+    // After a delete/cancel the current page can fall past the last
+    // page — clamp back so the tab doesn't strand the user on an empty
+    // page (the provider then refetches the corrected page).
+    ref.listen(
+      customerInvoicesPagedProvider(
+        CustomerInvoicesArgs(
+          customerId: widget.customerId,
+          page: _page,
+          limit: _limit,
+        ),
+      ),
+      (previous, next) {
+        final value = next.valueOrNull;
+        if (value == null || value.items.isNotEmpty) return;
+        if (value.totalPages > 0 && _page > value.totalPages) {
+          setState(() => _page = value.totalPages);
+        }
+      },
+    );
 
     return switch (invoices) {
-      AsyncData(:final value) => value.isEmpty
+      AsyncData(:final value) => value.items.isEmpty
           ? _empty(context, l10n.customersNoinvoices)
-          : DetailTabGrid<Invoice>(
-              data: value,
-              buildColumns: (l10n) => _columns(context, l10n),
-              gridRowFor: _gridRowFor,
-              hiddenFields: const ['data'],
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: DetailTabGrid<Invoice>(
+                    data: value.items,
+                    buildColumns: (l10n) => _columns(context, l10n),
+                    gridRowFor: _gridRowFor,
+                    hiddenFields: const ['data'],
+                  ),
+                ),
+                ServerPaginationBar(
+                  page: value.currentPage,
+                  totalPages: value.totalPages,
+                  totalItems: value.totalItems,
+                  hasNext: value.hasNext,
+                  hasPrev: value.hasPrev,
+                  limit: _limit,
+                  itemLabel: l10n.salesInvoices,
+                  onPageChanged: (p) => setState(() => _page = p),
+                  onLimitChanged: (limit) => setState(() {
+                    _limit = limit;
+                    _page = 1;
+                  }),
+                ),
+                const SizedBox(height: 12),
+              ],
             ),
       AsyncError(:final error) => DetailError(
         message: error is ApiError ? error.message : '$error',
-        onRetry: () =>
-            ref.invalidate(customerInvoicesProvider(widget.customerId)),
+        onRetry: () => ref.invalidate(
+          customerInvoicesPagedProvider(
+            CustomerInvoicesArgs(
+              customerId: widget.customerId,
+              page: _page,
+              limit: _limit,
+            ),
+          ),
+        ),
       ),
       _ => const Center(child: CircularProgressIndicator()),
     };
@@ -185,6 +248,8 @@ class _CustomerInvoicesTabState extends ConsumerState<CustomerInvoicesTab> {
       PlutoColumn(
         title: l10n.customersActions,
         field: 'actions',
+        // Pinned to the right edge — stays reachable when the grid scrolls.
+        frozen: PlutoColumnFrozen.end,
         type: PlutoColumnType.text(),
         width: 64,
         readOnly: true,

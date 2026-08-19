@@ -2,25 +2,30 @@
 // server `inventoryController` shapes (PORTING.md §2).
 //
 // Envelope variants observed on the server — note items are split:
-// - `GET /inventory/items` → `{success, data: [Item]}` (no pagination;
-//   filters: category, search, is_raw_material, is_finished_good)
+// - `GET /inventory/items` → `{success, data: [Item], pagination}`
+//   (server-paginated; filters: category, search, low_stock,
+//   is_raw_material, is_finished_good)
 // - `GET /inventory/items/:id` → **bare** `{...item, stock_by_warehouse}`
 // - `POST/PUT /inventory/items(/:id)` → **bare** `Item`
 // - `DELETE /inventory/items/:id` → `{success, message}`
 // - `GET /inventory/items-categories` → bare `[{category}]`
-// - `GET /inventory/items-low-stock` → bare `[Item]`
+// - `GET /inventory/items-low-stock` → bare `[Item]` (kept for external
+//   consumers; the app routes through the paged `/items?low_stock=1`)
 // - `GET /inventory/items-uom` → bare `[string]`
 // - `GET /inventory/warehouses` → `{success, data: [Warehouse]}`
 // - `GET /inventory/warehouses/:id` → **bare** `{...warehouse, stock_summary}`
 // - `POST /inventory/warehouses` → **bare** `Warehouse` (201)
 // - `PUT /inventory/warehouses/:id` → **bare** `Warehouse`
 // - `DELETE /inventory/warehouses/:id` → `{success, message}`
-// - `GET /inventory/stock-movements` → bare `[StockMovement]`
+// - `GET /inventory/stock-movements` → `{success, data: [...],
+//   pagination}` (server-paginated, same contract as customers)
 // - `POST /inventory/stock-movements` → bare `StockMovement` (201)
 // - `GET /inventory/stock-summary` → bare `[{...}]`
 // - `GET /inventory/stock-ledger/:itemId` → bare `[{...}]`
-// - `GET /inventory/stock-balances` → bare `[StockBalance]`
-// - `GET /inventory/physical-counts` → `{success, data: [PhysicalCount]}`
+// - `GET /inventory/stock-balances` → `{success, data: [...], pagination}`
+//   (server-paginated; filters: search, warehouse_code)
+// - `GET /inventory/physical-counts` → `{success, data: [...], pagination}`
+//   (server-paginated; filter: search)
 // - `GET /inventory/physical-counts/:id` → `{...count, items}`
 // - `POST /inventory/physical-counts` → **bare** `PhysicalCount` (201)
 // - `POST /inventory/physical-counts/:id/items` → `PhysicalCountItem`
@@ -38,6 +43,7 @@ import '../models/stock_balance.dart' show StockBalance;
 import '../models/stock_movement.dart' show StockMovement;
 import '../models/warehouse.dart' show Warehouse;
 import 'api_result.dart';
+import 'paged_request.dart';
 import 'repository_client.dart';
 
 /// One row of the `stock_by_warehouse` array on `GET /inventory/items/:id`.
@@ -116,21 +122,17 @@ class InventoryRepository {
 
   // --- Items (existing) ---
 
-  Future<ApiResult<List<Item>>> items({
-    String? category,
-    String? search,
-    bool? isRawMaterial,
-    bool? isFinishedGood,
-  }) => _api.getList(
-    ApiEndpoints.items,
-    queryParameters: {
-      if (category != null && category.isNotEmpty) 'category': category,
-      if (search != null && search.isNotEmpty) 'search': search,
-      'is_raw_material': ?isRawMaterial,
-      'is_finished_good': ?isFinishedGood,
-    },
-    parseItem: (Object? json) => Item.fromJson(json as Map<String, dynamic>),
-  );
+  /// One page of items — server-paginated (`GET /inventory/items` returns
+  /// a `pagination` block; filters: category, search, low_stock,
+  /// is_raw_material, is_finished_good). The low-stock toggle rides in
+  /// `request.extra` as `low_stock=1`.
+  Future<ApiResult<PagedResponse<Item>>> items(PagedRequest request) =>
+      _api.getPaged(
+        ApiEndpoints.items,
+        queryParameters: request.toQuery(),
+        parseItem: (Object? json) =>
+            Item.fromJson(json as Map<String, dynamic>),
+      );
 
   Future<ApiResult<Item>> item(int id) => _api.getRaw(
     '${ApiEndpoints.items}/$id',
@@ -169,11 +171,6 @@ class InventoryRepository {
     parseItem: (Object? json) => json?.toString() ?? '',
   );
 
-  Future<ApiResult<List<Item>>> lowStock() => _api.getRawList(
-    ApiEndpoints.itemsLowStock,
-    parseItem: (Object? json) => Item.fromJson(json as Map<String, dynamic>),
-  );
-
   // --- Warehouses ---
 
   Future<ApiResult<List<Warehouse>>> warehouses() => _api.getList(
@@ -209,16 +206,16 @@ class InventoryRepository {
 
   // --- Stock movements ---
 
-  /// List stock movements, optionally filtered by `movement_type` (the
-  /// endpoint also accepts date_from/date_to/item_id — not exposed yet).
-  Future<ApiResult<List<StockMovement>>> stockMovements({
-    String? movementType,
-  }) => _api.getRawList(
+  /// One page of stock movements — server-paginated like customers
+  /// (`GET /inventory/stock-movements` returns a `pagination` block). The
+  /// screen's movement-type filter rides along in `request.extra` as the
+  /// `movement_type` query param; the endpoint also accepts
+  /// date_from/date_to/item_id/search — not exposed yet.
+  Future<ApiResult<PagedResponse<StockMovement>>> stockMovements(
+    PagedRequest request,
+  ) => _api.getPaged(
     ApiEndpoints.stockMovements,
-    queryParameters: {
-      if (movementType != null && movementType.isNotEmpty)
-        'movement_type': movementType,
-    },
+    queryParameters: request.toQuery(),
     parseItem: (Object? json) =>
         StockMovement.fromJson(json as Map<String, dynamic>),
   );
@@ -259,16 +256,28 @@ class InventoryRepository {
         StockMovement.fromJson(json as Map<String, dynamic>),
   );
 
-  Future<ApiResult<List<StockBalance>>> stockBalances() => _api.getRawList(
+  /// One page of stock balances — server-paginated (`GET
+  /// /inventory/stock-balances` returns a `pagination` block; filters:
+  /// search, warehouse_code).
+  Future<ApiResult<PagedResponse<StockBalance>>> stockBalances(
+    PagedRequest request,
+  ) => _api.getPaged(
     ApiEndpoints.stockBalances,
+    queryParameters: request.toQuery(),
     parseItem: (Object? json) =>
         StockBalance.fromJson(json as Map<String, dynamic>),
   );
 
   // --- Physical counts ---
 
-  Future<ApiResult<List<PhysicalCount>>> physicalCounts() => _api.getList(
+  /// One page of physical counts — server-paginated (`GET
+  /// /inventory/physical-counts` returns a `pagination` block; filter:
+  /// search).
+  Future<ApiResult<PagedResponse<PhysicalCount>>> physicalCounts(
+    PagedRequest request,
+  ) => _api.getPaged(
     ApiEndpoints.physicalCounts,
+    queryParameters: request.toQuery(),
     parseItem: (Object? json) =>
         PhysicalCount.fromJson(json as Map<String, dynamic>),
   );

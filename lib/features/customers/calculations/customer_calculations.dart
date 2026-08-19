@@ -71,9 +71,14 @@ LedgerTotals calculateLedgerTotals(
       if (e.transactionType == 'INVOICE' && returned.contains(e.referenceNo)) {
         return false;
       }
-      // Exclude PAYMENT entries linked to returned invoices
+      // Exclude PAYMENT entries linked to returned invoices. A payment can
+      // be allocated across several invoices; the server returns the
+      // comma-joined list in `linked_invoice_no`, so check every member.
       final linked = e.linkedInvoiceNo;
-      if (linked != null && returned.contains(linked)) return false;
+      if (linked != null && linked.isNotEmpty) {
+        final linkedNos = linked.split(',').map((s) => s.trim());
+        if (linkedNos.any(returned.contains)) return false;
+      }
     }
     return true;
   }).toList();

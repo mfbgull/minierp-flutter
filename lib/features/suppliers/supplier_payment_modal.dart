@@ -11,7 +11,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
-import '../../core/utils/print_utils.dart' show printPdfBytes;
 import '../../data/models/purchase_order.dart' show PurchaseOrder;
 import '../../data/models/supplier.dart' show Supplier;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -20,11 +19,10 @@ import '../../data/repositories/invoice_repository.dart'
 import '../../data/repositories/purchase_order_repository.dart'
     show purchaseOrderRepositoryProvider;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/app_toast.dart';
 import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
-import '../../widgets/payment_receipt_pdf.dart' show buildPaymentReceiptPdf;
+import '../../widgets/payment_success_screen.dart' show PaymentSuccessScreen;
 import '../../widgets/searchable_select.dart';
 import '../payments/payments_providers.dart' show paymentsProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
@@ -264,88 +262,17 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
     }
   }
 
-  Future<void> _printReceipt() async {
-    final l10n = AppLocalizations.of(context)!;
-    final id = _lastPaymentId;
-    if (id == null) return;
-    try {
-      final result = await ref.read(invoiceRepositoryProvider).payment(id);
-      final payment = switch (result) {
-        ApiSuccess(:final data) => data,
-        ApiFailure() => null,
-      };
-      if (payment == null) return;
-      final bytes = await buildPaymentReceiptPdf(
-        payment,
-        entityName: widget.supplier.supplierName,
-      );
-      if (!mounted) return;
-      await printPdfBytes(bytes, 'receipt-$id.pdf', context);
-    } catch (error) {
-      if (mounted) {
-        showAppToast(context, '${l10n.errorsFailed}: $error', isError: true);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
 
     if (_lastPaymentId != null) {
-      return Dialog(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check,
-                    size: 36,
-                    color: Colors.green,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  l10n.suppliersPaymentrecordedsuccess,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.suppliersWhatnext,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                FilledButton.icon(
-                  onPressed: _printReceipt,
-                  icon: const Icon(Icons.print_outlined, size: 18),
-                  label: Text(l10n.suppliersPrintreceipta4),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(l10n.commonClose),
-                ),
-              ],
-            ),
-          ),
-        ),
+      return PaymentSuccessScreen(
+        title: l10n.suppliersPaymentrecordedsuccess,
+        subtitle: l10n.suppliersWhatnext,
+        paymentId: _lastPaymentId!,
+        entityName: widget.supplier.supplierName,
       );
     }
 

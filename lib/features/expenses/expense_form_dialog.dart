@@ -27,6 +27,7 @@ import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
 import '../../widgets/searchable_select.dart';
+import 'expense_category_dialog.dart';
 import 'expense_providers.dart';
 
 /// Opens the create ([expense] == null) or edit form dialog.
@@ -125,6 +126,17 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
     final picked = await pickDate(context, initialDate: _expenseDate);
     if (picked == null || !mounted) return;
     setState(() => _expenseDate = picked);
+  }
+
+  /// Quick-add a category without leaving the form — the dialog POSTs
+  /// to `/expenses/categories` and returns the new name, which is
+  /// selected immediately (`_withCurrent` keeps it in the dropdown even
+  /// before the provider refresh lands).
+  Future<void> _addCategory() async {
+    final created = await showExpenseCategoryDialog(context);
+    if (created != null && mounted) {
+      setState(() => _category = created);
+    }
   }
 
   Map<String, dynamic> _buildBody() {
@@ -275,11 +287,31 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                             child: FormFieldShell(
                               label: l10n.fieldsCategory,
                               required: true,
-                              child: SearchableSelect<String>(
-                                items: categoryItems,
-                                selected: _category,
-                                labelBuilder: (v) => v,
-                                onChanged: (v) => setState(() => _category = v),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: SearchableSelect<String>(
+                                      items: categoryItems,
+                                      selected: _category,
+                                      labelBuilder: (v) => v,
+                                      onChanged: (v) =>
+                                          setState(() => _category = v),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  // Quick-add: opens the category dialog,
+                                  // then selects the created category.
+                                  IconButton(
+                                    tooltip: l10n.expensesAddcategory,
+                                    onPressed: _submitting
+                                        ? null
+                                        : _addCategory,
+                                    icon: const Icon(
+                                      Icons.add_circle_outline,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),

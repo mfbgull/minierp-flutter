@@ -466,6 +466,144 @@ void main() {
       ));
     });
 
+    test('multi-invoice linked payment is excluded when any invoice is returned', () {
+      // Mirrors the real-world regression: INV-738460 is fully returned
+      // and paid by PAY005 (also paying INV-789768) + PAY007. The server
+      // returns every allocated invoice comma-joined in
+      // `linked_invoice_no`, so the payment must be excluded if ANY
+      // member is a fully returned invoice — and each entry appears
+      // exactly once (no duplicate rows).
+      final totals = calculateLedgerTotals(
+        [
+          LedgerEntry(
+            id: 1,
+            transactionDate: '2026-08-13',
+            transactionType: 'INVOICE',
+            referenceNo: 'INV-2026-120373',
+            description: '',
+            debit: 600,
+            credit: 0,
+            balance: 600,
+          ),
+          LedgerEntry(
+            id: 2,
+            transactionDate: '2026-08-14',
+            transactionType: 'PAYMENT',
+            referenceNo: 'PAY003',
+            description: 'Payment against INV-2026-120373',
+            debit: 0,
+            credit: 600,
+            balance: 0,
+            linkedInvoiceNo: 'INV-2026-120373',
+          ),
+          LedgerEntry(
+            id: 3,
+            transactionDate: '2026-08-14',
+            transactionType: 'INVOICE',
+            referenceNo: 'INV-2026-738460',
+            description: '',
+            debit: 600,
+            credit: 0,
+            balance: 600,
+          ),
+          LedgerEntry(
+            id: 4,
+            transactionDate: '2026-08-14',
+            transactionType: 'INVOICE',
+            referenceNo: 'INV-2026-789768',
+            description: '',
+            debit: 600,
+            credit: 0,
+            balance: 1200,
+          ),
+          LedgerEntry(
+            id: 5,
+            transactionDate: '2026-08-15',
+            transactionType: 'PAYMENT',
+            referenceNo: 'PAY004',
+            description: 'Payment against INV-2026-789768',
+            debit: 0,
+            credit: 500,
+            balance: 700,
+            linkedInvoiceNo: 'INV-2026-789768',
+          ),
+          LedgerEntry(
+            id: 6,
+            transactionDate: '2026-08-15',
+            transactionType: 'PAYMENT',
+            referenceNo: 'PAY005',
+            description: 'Payment against INV-2026-789768, INV-2026-738460',
+            debit: 0,
+            credit: 400,
+            balance: 300,
+            linkedInvoiceNo: 'INV-2026-789768, INV-2026-738460',
+          ),
+          LedgerEntry(
+            id: 7,
+            transactionDate: '2026-08-15',
+            transactionType: 'INVOICE',
+            referenceNo: 'INV-2026-557668',
+            description: '',
+            debit: 600,
+            credit: 0,
+            balance: 900,
+          ),
+          LedgerEntry(
+            id: 8,
+            transactionDate: '2026-08-16',
+            transactionType: 'PAYMENT',
+            referenceNo: 'PAY006',
+            description: 'Payment against INV-2026-557668',
+            debit: 0,
+            credit: 600,
+            balance: 300,
+            linkedInvoiceNo: 'INV-2026-557668',
+          ),
+          LedgerEntry(
+            id: 9,
+            transactionDate: '2026-08-16',
+            transactionType: 'PAYMENT',
+            referenceNo: 'PAY007',
+            description: 'Payment against INV-2026-738460',
+            debit: 0,
+            credit: 300,
+            balance: 0,
+            linkedInvoiceNo: 'INV-2026-738460',
+          ),
+          LedgerEntry(
+            id: 10,
+            transactionDate: '2026-08-16',
+            transactionType: 'RETURN',
+            referenceNo: 'INV-2026-738460',
+            description: 'Return on Invoice INV-2026-738460',
+            debit: 0,
+            credit: 600,
+            balance: -600,
+            linkedInvoiceNo: 'INV-2026-738460',
+          ),
+          LedgerEntry(
+            id: 11,
+            transactionDate: '2026-08-16',
+            transactionType: 'REFUND',
+            referenceNo: 'PAY008',
+            description: 'Refund PAY008 for return on INV-2026-738460',
+            debit: 600,
+            credit: 0,
+            balance: 0,
+            linkedInvoiceNo: 'INV-2026-738460',
+          ),
+        ],
+        returnedInvoiceNos: {'INV-2026-738460'},
+      );
+      // Returned-invoice activity excluded from the subtotals: its INVOICE
+      // entry, PAY005 (any member returned) and PAY007 drop out, along
+      // with the RETURN/REFUND pair.
+      expect(totals.debit, 1800);
+      expect(totals.credit, 1700);
+      // Balance counts ALL entries once each → 3000 − 3000 = 0.
+      expect(totals.balance, 0);
+    });
+
     test('invoice aggregates and credit utilization', () {
       const invoices = [
         Invoice(

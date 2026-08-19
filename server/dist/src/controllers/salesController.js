@@ -8,6 +8,7 @@ const SalesOrder_1 = __importDefault(require("../models/SalesOrder"));
 const Invoice_1 = __importDefault(require("../models/Invoice"));
 const database_1 = __importDefault(require("../config/database"));
 const logger_1 = __importDefault(require("../utils/logger"));
+const queryUtils_1 = require("../utils/queryUtils");
 function parseIdParam(req, res) {
     const id = Number(req.params.id);
     if (isNaN(id) || id <= 0) {
@@ -53,17 +54,38 @@ function createQuotation(req, res) {
 }
 function getQuotations(req, res) {
     try {
+        const page = (0, queryUtils_1.getQueryInteger)(req.query.page, 1);
+        const limit = (0, queryUtils_1.getQueryInteger)(req.query.limit, 10);
+        const search = (0, queryUtils_1.getQueryParam)(req.query.search);
+        const sortBy = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
+        const sortOrder = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
         const filters = {
             status: req.query.status,
             customer_id: req.query.customer_id ? Number(req.query.customer_id) : undefined,
             customer_name: req.query.customer_name,
+            search: search || undefined,
             start_date: req.query.start_date,
             end_date: req.query.end_date,
             warehouse_id: req.query.warehouse_id ? Number(req.query.warehouse_id) : undefined,
-            limit: req.query.limit ? parseInt(String(req.query.limit)) : undefined
+            sortBy: sortBy || undefined,
+            sortOrder: sortOrder || undefined,
+            page,
+            limit
         };
-        const quotations = Quotation_1.default.getAll(filters, database_1.default);
-        res.json(quotations);
+        const { rows, total, pageNum, limitNum } = Quotation_1.default.getAll(filters, database_1.default);
+        // Flat envelope (data = list, pagination a sibling) — the shape the
+        // client's `getPaged` helper parses.
+        res.json({
+            success: true,
+            data: rows,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: Math.ceil(total / limitNum),
+                totalItems: total,
+                hasNext: pageNum < Math.ceil(total / limitNum),
+                hasPrev: pageNum > 1
+            }
+        });
     }
     catch (error) {
         logger_1.default.error('Get quotations error:', error);
@@ -192,18 +214,39 @@ function createSalesOrder(req, res) {
 }
 function getSalesOrders(req, res) {
     try {
+        const page = (0, queryUtils_1.getQueryInteger)(req.query.page, 1);
+        const limit = (0, queryUtils_1.getQueryInteger)(req.query.limit, 10);
+        const search = (0, queryUtils_1.getQueryParam)(req.query.search);
+        const sortBy = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
+        const sortOrder = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
         const filters = {
             status: req.query.status,
             customer_id: req.query.customer_id ? Number(req.query.customer_id) : undefined,
             customer_name: req.query.customer_name,
+            search: search || undefined,
             start_date: req.query.start_date,
             end_date: req.query.end_date,
             warehouse_id: req.query.warehouse_id ? Number(req.query.warehouse_id) : undefined,
             source_type: req.query.source_type,
-            limit: req.query.limit ? parseInt(String(req.query.limit)) : undefined
+            sortBy: sortBy || undefined,
+            sortOrder: sortOrder || undefined,
+            page,
+            limit
         };
-        const salesOrders = SalesOrder_1.default.getAll(filters, database_1.default);
-        res.json(salesOrders);
+        const { rows, total, pageNum, limitNum } = SalesOrder_1.default.getAll(filters, database_1.default);
+        // Flat envelope (data = list, pagination a sibling) — the shape the
+        // client's `getPaged` helper parses.
+        res.json({
+            success: true,
+            data: rows,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: Math.ceil(total / limitNum),
+                totalItems: total,
+                hasNext: pageNum < Math.ceil(total / limitNum),
+                hasPrev: pageNum > 1
+            }
+        });
     }
     catch (error) {
         logger_1.default.error('Get sales orders error:', error);

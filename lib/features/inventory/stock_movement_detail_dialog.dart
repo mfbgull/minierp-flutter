@@ -25,6 +25,7 @@ import '../../widgets/detail_labels.dart' show detailDash, detailSectionLabel;
 import '../../widgets/detail_rows.dart' show DetailInfoRows;
 import 'inventory_providers.dart'
     show
+        allStockMovementsProvider,
         movementTypeFilterProvider,
         stockBalancesProvider,
         stockMovementDetailProvider,
@@ -68,14 +69,15 @@ class _StockMovementDetailDialog extends ConsumerWidget {
       _ => movement,
     };
     // The counterpart is looked up in the unfiltered list (the tab's own
-    // filter may have hidden it) — see [_findCounterpart]. This can fetch
-    // the full list on demand when the tab was opened under a filter; a
-    // failed fetch simply shows no link.
-    final allMovements = ref.watch(stockMovementsProvider(null));
+    // filter may have hidden it) — see [_findCounterpart]. Fetched
+    // independently of the tab's paged provider, which only holds the
+    // current page; a failed fetch simply shows no link.
+    final allMovements = ref.watch(allStockMovementsProvider);
     final linked = switch (allMovements) {
       AsyncData(:final value) => _findCounterpart(m, value),
       _ => null,
     };
+
 
     final rows = <(String, String)>[
       ('Movement No', m.movementNo),

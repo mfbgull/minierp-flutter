@@ -1,10 +1,10 @@
 // Quotations list screen — a read-only grid over `GET /quotations`
-// (**bare array**; no search/page params, so sorting and filtering stay
-// client-side like the items screen). Rendered with PlutoGrid via the
-// shared [PlutoGridScreen] mixin: F2/Enter + double-tap open the
-// quotation detail, and the keyboard-hint status bar sits beneath the
-// grid. Sits in the `/sales` branch's Quotations tab (the web app hosts
-// the list at `/quotations` inside the sales module).
+// (**server-paginated**; search/status/date filters and sorting happen
+// server-side, grid-pagination §5 — the endpoint returns a `pagination`
+// block). Rendered with PlutoGrid via the shared [PlutoGridScreen]
+// mixin: F2/Enter + double-tap open the quotation detail, and the
+// [ServerPaginationBar] sits beneath the grid. Sits in the `/sales`
+// branch's Quotations tab.
 
 import 'dart:async';
 
@@ -13,12 +13,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/csv_export.dart';
-import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../core/utils/quotation_status.dart';
 import '../../data/models/quotation.dart' show Quotation;
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
@@ -56,6 +57,10 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       ref.read(quotationsSearchProvider.notifier).state = value.trim();
+      // A new search starts back at page 1.
+      if (ref.read(quotationsPageProvider) != 1) {
+        ref.read(quotationsPageProvider.notifier).state = 1;
+      }
     });
   }
 
@@ -71,51 +76,45 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
     ref.read(quotationsFromDateProvider.notifier).state = null;
     ref.read(quotationsToDateProvider.notifier).state = null;
     ref.read(quotationsSearchProvider.notifier).state = '';
-  }
-
-  /// Client-side filtering (search term + status + date range) over the
-  /// loaded rows — the endpoint only serves the full list, so every
-  /// filter runs here.
-  List<Quotation> _filteredRows(List<Quotation> quotations) {
-    final search = ref.read(quotationsSearchProvider).toLowerCase();
-    final status = ref.read(quotationsStatusProvider);
-    final from = ref.read(quotationsFromDateProvider);
-    final to = ref.read(quotationsToDateProvider);
-    if (search.isEmpty && status == null && from == null && to == null) {
-      return quotations;
+    if (ref.read(quotationsPageProvider) != 1) {
+      ref.read(quotationsPageProvider.notifier).state = 1;
     }
-    return quotations.where((q) {
-      if (search.isNotEmpty &&
-          !q.quotationNo.toLowerCase().contains(search) &&
-          !q.customerName.toLowerCase().contains(search)) {
-        return false;
-      }
-      if (status != null && q.status != status) return false;
-      final iso = q.quotationDate;
-      if (from != null && iso.compareTo(isoDate(from)) < 0) return false;
-      if (to != null && iso.compareTo(isoDate(to)) > 0) return false;
-      return true;
-    }).toList();
   }
 
-  /// Provider → grid sync that honours the active client-side filters
-  /// (overrides the mixin's unfiltered clear+append).
+  /// The quotations provider returns a `PagedResponse` envelope — unwrap
+  /// the current page's items as the grid rows.
   @override
-  void syncGridRows(AsyncValue<Object?> value) {
-    final manager = gridStateManager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      final rows = _filteredRows(value.value as List<Quotation>);
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, row) in rows.indexed)
-          withSerialCell(gridRowFor(row), index),
-      ]);
+  Iterable<Quotation> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<Quotation>).items;
+
+  /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
+  String? _sortColumnFor(String field) => switch (field) {
+    'quotationNo' => 'quotation_no',
+    'date' => 'quotation_date',
+    'customer' => 'customer_name',
+    'status' => 'status',
+    'total' => 'total_amount',
+    'expiry' => 'expiry_date',
+    _ => null,
+  };
+
+  /// Column sort maps to the server-side sort provider (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    ref.read(quotationsSortProvider.notifier).state = sort.isNone
+        ? null
+        : QuotationSort(
+            sortBy,
+            sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC',
+          );
+    if (ref.read(quotationsPageProvider) != 1) {
+      ref.read(quotationsPageProvider.notifier).state = 1;
     }
   }
-
-  void _refilter() => syncGridRows(ref.read(quotationsProvider));
 
   /// Opt into the per-row ⋮ actions menu (View detail).
   @override
@@ -152,26 +151,22 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
   Widget build(BuildContext context) {
     final quotations = ref.watch(quotationsProvider);
     final l10n = AppLocalizations.of(context)!;
+    // The full filtered list feeds the CSV export.
+    final filtered = ref.watch(filteredQuotationsProvider);
 
     // Keep the grid in sync with provider transitions (loading → data).
-    // The mixin listener routes through the overridden syncGridRows, so
-    // filtering applies on every load/refresh too.
+    // The mixin listener routes through the default syncGridRows, which
+    // unwraps the PagedResponse via gridRowsFrom.
     watchGridProvider(quotationsProvider);
-    // Client-side filters re-run the filter over the loaded rows without
-    // refetching.
-    ref.listen(quotationsSearchProvider, (previous, next) => _refilter());
-    ref.listen(quotationsStatusProvider, (previous, next) => _refilter());
-    ref.listen(quotationsFromDateProvider, (previous, next) => _refilter());
-    ref.listen(quotationsToDateProvider, (previous, next) => _refilter());
 
-    // The client-side filters drive the search-clear button and the
-    // dropdown, so they must be watched here for the build to re-run.
+    // The filters drive the search-clear button and the dropdown, so they
+    // must be watched here for the build to re-run.
     ref.watch(quotationsSearchProvider);
     ref.watch(quotationsStatusProvider);
     ref.watch(quotationsFromDateProvider);
     ref.watch(quotationsToDateProvider);
 
-    final filteredRows = _filteredRows(quotations.valueOrNull ?? const []);
+    final filteredRows = filtered.valueOrNull ?? const <Quotation>[];
     // Status filter options — `(label, server value)` pairs with `All` =
     // null (localized, so built per build).
     final statusOptions = <(String, String?)>[
@@ -205,13 +200,24 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
                 return value ?? '';
               },
               width: 170,
-              onChanged: (v) =>
-                  ref.read(quotationsStatusProvider.notifier).state = v,
+              onChanged: (v) {
+                ref.read(quotationsStatusProvider.notifier).state = v;
+                // A new status filter starts back at page 1.
+                if (ref.read(quotationsPageProvider) != 1) {
+                  ref.read(quotationsPageProvider.notifier).state = 1;
+                }
+              },
             ),
             DateRangeFilter(
               width: 120,
               fromProvider: quotationsFromDateProvider,
               toProvider: quotationsToDateProvider,
+              onChanged: () {
+                // A new date range starts back at page 1.
+                if (ref.read(quotationsPageProvider) != 1) {
+                  ref.read(quotationsPageProvider.notifier).state = 1;
+                }
+              },
             ),
           ],
           onRefresh: () => ref.invalidate(quotationsProvider),
@@ -227,10 +233,7 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
                   : () => saveCsv(
                       context,
                       suggestedName: csvSuggestedName('quotations'),
-                      csv: buildQuotationsCsv(
-                        l10n,
-                        _filteredRows(quotations.valueOrNull ?? const []),
-                      ),
+                      csv: buildQuotationsCsv(l10n, filteredRows),
                       successMessage: l10n.quotationsExported,
                       errorMessage: l10n.quotationsExportfailed,
                     ),
@@ -249,6 +252,25 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
         Expanded(
           child: gridScreenBody(quotations, provider: quotationsProvider),
         ),
+        if (quotations.valueOrNull case final page?)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(quotationsLimitProvider),
+            itemLabel: l10n.quotationsQuotations,
+            onPageChanged: (p) =>
+                ref.read(quotationsPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(quotationsLimitProvider.notifier).state = limit;
+              if (ref.read(quotationsPageProvider) != 1) {
+                ref.read(quotationsPageProvider.notifier).state = 1;
+              }
+            },
+          ),
+        const SizedBox(height: 16),
       ],
     );
   }

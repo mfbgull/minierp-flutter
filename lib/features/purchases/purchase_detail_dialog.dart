@@ -2,9 +2,9 @@
 // via the F2/Enter shortcut. Fetches `GET /purchases/:id` (bare object,
 // the same joined shape as the list rows) via
 // [purchaseDetailProvider]; the grid row's hidden `id` cell supplies
-// the purchase id. Renders the header (purchase no + item), an info
-// grid, quantity/cost tiles, and a Process Return action that opens the
-// return-processing dialog (hidden when nothing is returnable).
+// the purchase id. Renders the header (purchase no + item) and an info
+// grid with quantity/cost tiles. Returns are entered from the purchase
+// row menu (or the purchase-returns tab), not from this dialog.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +16,8 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
-import 'process_return_dialog.dart';
+import '../../widgets/payment_history_section.dart'
+    show PaymentHistorySection;
 import 'purchase_providers.dart';
 
 /// Opens the detail dialog for [purchaseId].
@@ -58,13 +59,13 @@ class _PurchaseDetailDialog extends ConsumerWidget {
   }
 }
 
-class _DetailBody extends StatelessWidget {
+class _DetailBody extends ConsumerWidget {
   const _DetailBody({required this.detail});
 
   final Purchase detail;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
 
     return Column(
@@ -140,6 +141,12 @@ class _DetailBody extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 14),
+                PaymentHistorySection(
+                  payments: ref.watch(purchasePaymentsProvider(detail.id)),
+                  onRetry: () =>
+                      ref.invalidate(purchasePaymentsProvider(detail.id)),
+                ),
               ],
             ),
           ),
@@ -150,15 +157,6 @@ class _DetailBody extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (detail.returnableQty > 0) ...[
-                FilledButton.icon(
-                  onPressed: () =>
-                      showProcessReturnDialog(context, purchase: detail),
-                  icon: const Icon(Icons.assignment_return_outlined, size: 18),
-                  label: Text(l10n.purchasesProcessreturn),
-                ),
-                const SizedBox(width: 4),
-              ],
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(l10n.commonClose),

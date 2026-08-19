@@ -1,9 +1,10 @@
-// BOM list — a read-only grid over `GET /boms` (**bare array** — no
-// search/page params, so sorting and filtering stay client-side).
-// Rendered with PlutoGrid via the shared [PlutoGridScreen] mixin:
-// F2/Enter + double-tap open the BOM detail; the keyboard-hint
-// status bar sits beneath the grid. Sits on the `BOM` tab of the
-// production shell (the web app hosts the BOM list at `/bom`).
+// BOM list — a read-only grid over `GET /boms` (**server-paginated**;
+// search and sorting happen server-side, grid-pagination §7.2 — the
+// endpoint returns a `pagination` block). Rendered with PlutoGrid via
+// the shared [PlutoGridScreen] mixin: F2/Enter + double-tap open the
+// BOM detail, and the [ServerPaginationBar] sits beneath the grid. Sits
+// on the `BOM` tab of the production shell (the web app hosts the BOM
+// list at `/bom`).
 
 import 'dart:async';
 
@@ -14,7 +15,9 @@ import 'package:pluto_grid/pluto_grid.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/bom.dart';
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
@@ -46,41 +49,44 @@ class _BomScreenState extends ConsumerState<BomScreen>
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       ref.read(bomsSearchProvider.notifier).state = value.trim();
+      // A new search starts back at page 1.
+      if (ref.read(bomsPageProvider) != 1) {
+        ref.read(bomsPageProvider.notifier).state = 1;
+      }
     });
   }
 
-  /// Client-side search over the loaded rows (the endpoint has no search
-  /// param) — overrides the mixin's unfiltered clear+append.
-  List<Bom> _filteredRows(List<Bom> boms) {
-    final search = ref.read(bomsSearchProvider).toLowerCase();
-    if (search.isEmpty) return boms;
-    return boms
-        .where(
-          (bom) =>
-              bom.bomName.toLowerCase().contains(search) ||
-              bom.bomNo.toLowerCase().contains(search) ||
-              (bom.finishedItemName?.toLowerCase().contains(search) ?? false) ||
-              (bom.finishedItemCode?.toLowerCase().contains(search) ?? false),
-        )
-        .toList();
-  }
-
+  /// The boms provider returns a `PagedResponse` envelope — unwrap the
+  /// current page's items as the grid rows.
   @override
-  void syncGridRows(AsyncValue<Object?> value) {
-    final manager = gridStateManager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      final rows = _filteredRows(value.value as List<Bom>);
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, row) in rows.indexed)
-          withSerialCell(gridRowFor(row), index),
-      ]);
+  Iterable<Bom> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<Bom>).items;
+
+  /// Grid field → server sort column (whitelist in sqlSanitizer.ts).
+  String? _sortColumnFor(String field) => switch (field) {
+    'bomNo' => 'bom_no',
+    'name' => 'bom_name',
+    'finished' => 'finished_item_name',
+    'qty' => 'quantity',
+    'items' => 'item_count',
+    'cost' => 'total_material_cost',
+    _ => null,
+  };
+
+  /// Column sort maps to the server-side sort provider (this endpoint is
+  /// server-paginated, so ordering happens on the server).
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    ref.read(bomsSortProvider.notifier).state = sort.isNone
+        ? null
+        : BomSort(sortBy, sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC');
+    if (ref.read(bomsPageProvider) != 1) {
+      ref.read(bomsPageProvider.notifier).state = 1;
     }
   }
-
-  void _refilter() => syncGridRows(ref.read(bomsProvider));
 
   @override
   void openRowDetail(int bomId) {
@@ -127,14 +133,13 @@ class _BomScreenState extends ConsumerState<BomScreen>
   Widget build(BuildContext context) {
     final boms = ref.watch(bomsProvider);
     final l10n = AppLocalizations.of(context)!;
+    // The full filtered list feeds the CSV export.
+    final filtered = ref.watch(filteredBomsProvider);
 
     // Keep the grid in sync with provider transitions (loading → data).
-    // The mixin listener routes through the overridden syncGridRows, so
-    // the client-side search applies on every load/refresh too.
     watchGridProvider(bomsProvider);
-    // Client-side search re-runs the filter over the loaded rows without
-    // refetching.
-    ref.listen(bomsSearchProvider, (previous, next) => _refilter());
+
+    final filteredRows = filtered.valueOrNull ?? const <Bom>[];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -147,16 +152,12 @@ class _BomScreenState extends ConsumerState<BomScreen>
           onRefresh: () => ref.invalidate(bomsProvider),
           actions: [
             TextButton.icon(
-              onPressed: boms.isLoading ||
-                      _filteredRows(boms.valueOrNull ?? const []).isEmpty
+              onPressed: boms.isLoading || filteredRows.isEmpty
                   ? null
                   : () => saveCsv(
                       context,
                       suggestedName: csvSuggestedName('boms'),
-                      csv: buildBomsCsv(
-                        l10n,
-                        _filteredRows(boms.valueOrNull ?? const []),
-                      ),
+                      csv: buildBomsCsv(l10n, filteredRows),
                       successMessage: l10n.bomExported,
                       errorMessage: l10n.bomExportfailed,
                     ),
@@ -173,6 +174,25 @@ class _BomScreenState extends ConsumerState<BomScreen>
           ],
         ),
         Expanded(child: gridScreenBody(boms, provider: bomsProvider)),
+        if (boms.valueOrNull case final page?)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(bomsLimitProvider),
+            itemLabel: l10n.bomBoms,
+            onPageChanged: (p) =>
+                ref.read(bomsPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(bomsLimitProvider.notifier).state = limit;
+              if (ref.read(bomsPageProvider) != 1) {
+                ref.read(bomsPageProvider.notifier).state = 1;
+              }
+            },
+          ),
+        const SizedBox(height: 16),
       ],
     );
   }

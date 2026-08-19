@@ -25,11 +25,13 @@ import '../../core/auth/auth_notifier.dart' show authProvider;
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/activity_log.dart' show ActivityCount, ActivityLog;
+import '../../data/repositories/api_result.dart' show ApiError;
 import '../../data/repositories/paged_request.dart' show OffsetPagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'activity_log_cleanup_dialog.dart';
@@ -225,6 +227,33 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen>
     final logs = ref.watch(activityLogsProvider);
     final page = logs.valueOrNull;
     final l10n = AppLocalizations.of(context)!;
+
+    // Explicit failure panel before the grid so provider errors are not
+    // silently swallowed by the shared grid mixin.
+    if (logs.hasError) {
+      final message = logs.error is ApiError
+          ? (logs.error as ApiError).message
+          : '$logs.error';
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: _toolbar(l10n, logs),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _statsStrip(l10n),
+          ),
+          Expanded(
+            child: ScreenErrorPanel(
+              message: message,
+              onRetry: () => ref.invalidate(activityLogsProvider),
+            ),
+          ),
+        ],
+      );
+    }
 
     // Keep the grid in sync with provider transitions (loading → data).
     watchGridProvider(activityLogsProvider);

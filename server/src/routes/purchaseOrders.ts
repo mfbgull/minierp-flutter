@@ -2,7 +2,6 @@ import express from 'express';
 const router = express.Router();
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
-import { sensitiveOperationLimiter } from '../middleware/rateLimiter';
 import purchaseOrderController from '../controllers/purchaseOrderController';
 
 router.use(authenticateToken);
@@ -23,11 +22,12 @@ router.delete('/purchase-orders/:id/items/:itemId', requirePermission('purchase_
 router.post('/purchase-orders/:id/status', requirePermission('purchase_orders', 'update'), purchaseOrderController.updateStatus);
 router.get('/purchase-orders/pending', requirePermission('purchase_orders', 'read'), purchaseOrderController.getPendingOrders);
 
+// Payments (history allocated to this PO)
+router.get('/purchase-orders/:id/payments', requirePermission('purchase_orders', 'read'), purchaseOrderController.getPurchaseOrderPayments);
+
 // Goods Receipts
 router.get('/purchase-orders/:id/receipts', requirePermission('purchase_orders', 'read'), purchaseOrderController.getGoodsReceipts);
 router.post('/purchase-orders/:id/receipts', requirePermission('purchase_orders', 'create'), purchaseOrderController.createGoodsReceipt);
-router.post('/purchase-orders/:id/return-receipt', requirePermission('purchase_orders', 'update'), sensitiveOperationLimiter, purchaseOrderController.returnReceiptItems);
-
 // Summary & Reporting
 router.get('/purchase-orders/summary/supplier/:supplierId', requirePermission('purchase_orders', 'read'), purchaseOrderController.getSummaryBySupplier);
 

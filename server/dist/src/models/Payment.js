@@ -222,14 +222,16 @@ class PaymentModel {
             if (!data.payment_date) {
                 throw new Error('Payment date is required');
             }
-            if (!data.po_allocations || data.po_allocations.length === 0) {
-                throw new Error('At least one PO allocation is required');
+            const poAllocs = data.po_allocations || [];
+            const purchaseAllocs = data.purchase_allocations || [];
+            if (poAllocs.length === 0 && purchaseAllocs.length === 0) {
+                throw new Error('At least one PO or purchase allocation is required');
             }
             const supplier = db.prepare('SELECT id FROM suppliers WHERE id = ?').get(data.supplier_id);
             if (!supplier) {
                 throw new Error(`Supplier ${data.supplier_id} not found`);
             }
-            for (const alloc of data.po_allocations) {
+            for (const alloc of poAllocs) {
                 const poId = parseInt(alloc.po_id, 10);
                 const po = db.prepare(`
           SELECT po.id, po.supplier_id, po.total_amount, COALESCE(SUM(pa.amount), 0) as paid_amount
@@ -251,27 +253,59 @@ class PaymentModel {
                     throw new Error(`Allocation amount (${(0, currency_1.parseCurrency)(alloc.amount).toFixed(2)}) for PO ${poId} exceeds the remaining balance (${remainingBalance.toFixed(2)})`);
                 }
             }
+            for (const alloc of purchaseAllocs) {
+                const purchaseId = parseInt(alloc.purchase_id, 10);
+                const purchase = db.prepare(`
+          SELECT p.id, p.supplier_id, p.total_cost, COALESCE(SUM(pa.amount), 0) as paid_amount
+          FROM purchases p
+          LEFT JOIN purchase_allocations pa ON pa.purchase_id = p.id
+          WHERE p.id = ? GROUP BY p.id
+        `).get(purchaseId);
+                if (!purchase) {
+                    throw new Error(`Purchase ${purchaseId} not found`);
+                }
+                if (!purchase.supplier_id || purchase.supplier_id !== data.supplier_id) {
+                    throw new Error(`Purchase ${purchaseId} does not belong to supplier ${data.supplier_id}`);
+                }
+                if (!alloc.amount || alloc.amount <= 0) {
+                    throw new Error(`Allocation amount for purchase ${purchaseId} must be greater than 0`);
+                }
+                const remainingBalance = Math.max(0, (0, currency_1.parseCurrency)(purchase.total_cost) - (0, currency_1.parseCurrency)(purchase.paid_amount));
+                if ((0, currency_1.parseCurrency)(alloc.amount) > remainingBalance) {
+                    throw new Error(`Allocation amount (${(0, currency_1.parseCurrency)(alloc.amount).toFixed(2)}) for purchase ${purchaseId} exceeds the remaining balance (${remainingBalance.toFixed(2)})`);
+                }
+            }
             const paymentNo = this.generatePaymentNo(db);
             const paymentResult = db.prepare(`
         INSERT INTO payments (payment_no, supplier_id, payment_date, amount, payment_method, reference_no, notes)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(paymentNo, data.supplier_id, data.payment_date, data.amount, data.payment_method || 'Cash', data.reference_no || '', data.notes || '');
             const paymentId = paymentResult.lastInsertRowid;
-            for (const alloc of data.po_allocations) {
+            for (const alloc of poAllocs) {
                 const poId = parseInt(alloc.po_id, 10);
                 db.prepare('INSERT INTO po_allocations (payment_id, po_id, amount) VALUES (?, ?, ?)').run(paymentId, poId, alloc.amount);
             }
+            for (const alloc of purchaseAllocs) {
+                const purchaseId = parseInt(alloc.purchase_id, 10);
+                db.prepare('INSERT INTO purchase_allocations (payment_id, purchase_id, amount) VALUES (?, ?, ?)').run(paymentId, purchaseId, alloc.amount);
+            }
             const currentBalance = SupplierLedger_1.default.getBalance(data.supplier_id, db);
             const newBalance = currentBalance - (0, currency_1.parseCurrency)(data.amount);
-            const poNumbers = data.po_allocations.map((alloc) => {
+            const poNumbers = poAllocs.map((alloc) => {
                 const poId = parseInt(alloc.po_id, 10);
                 const po = db.prepare('SELECT po_no FROM purchase_orders WHERE id = ?').get(poId);
                 return po?.po_no || `PO #${poId}`;
             });
+            const purchaseNumbers = purchaseAllocs.map((alloc) => {
+                const purchaseId = parseInt(alloc.purchase_id, 10);
+                const p = db.prepare('SELECT purchase_no FROM purchases WHERE id = ?').get(purchaseId);
+                return p?.purchase_no || `Purchase #${purchaseId}`;
+            });
+            const references = [...poNumbers, ...purchaseNumbers];
             db.prepare(`
         INSERT INTO supplier_ledger (supplier_id, transaction_date, transaction_type, reference_no, debit, credit, balance, description)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(data.supplier_id, data.payment_date, 'PAYMENT', paymentNo, 0, data.amount, newBalance, `Payment against ${poNumbers.join(', ')}`);
+      `).run(data.supplier_id, data.payment_date, 'PAYMENT', paymentNo, 0, data.amount, newBalance, `Payment against ${references.join(', ')}`);
             db.prepare('UPDATE suppliers SET current_balance = ? WHERE id = ?').run(newBalance, data.supplier_id);
             return paymentId;
         })();
@@ -334,6 +368,7 @@ class PaymentModel {
         db.transaction(() => {
             const allocations = db.prepare('SELECT * FROM payment_allocations WHERE payment_id = ?').all(id);
             db.prepare('DELETE FROM payment_allocations WHERE payment_id = ?').run(id);
+            db.prepare('DELETE FROM purchase_allocations WHERE payment_id = ?').run(id);
             db.prepare('DELETE FROM payments WHERE id = ?').run(id);
             db.prepare('DELETE FROM customer_ledger WHERE reference_no = ?').run(existing.payment_no);
             db.prepare('DELETE FROM supplier_ledger WHERE reference_no = ?').run(existing.payment_no);

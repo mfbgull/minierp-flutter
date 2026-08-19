@@ -36,6 +36,10 @@ class InvoiceRepository {
 
   final RepositoryClient _api;
 
+  /// All invoices — the full-list `GET /invoices` response (the grid now
+  /// uses [invoicesPaged]; this stays for pickers/dialogs that need the
+  /// whole list in one fetch, e.g. the Record Payment allocation list
+  /// and the Process Return picker).
   Future<ApiResult<List<Invoice>>> invoices({InvoiceFilters? filters}) =>
       _api.getList(
         ApiEndpoints.invoices,
@@ -43,6 +47,18 @@ class InvoiceRepository {
         parseItem: (Object? json) =>
             Invoice.fromJson(json as Map<String, dynamic>),
       );
+
+  /// One page of invoices (`GET /invoices`) — server-paginated like
+  /// customers/suppliers (enveloped + `pagination` block). `search`,
+  /// `start_date`/`end_date` and `status` ride in `extra`.
+  Future<ApiResult<PagedResponse<Invoice>>> invoicesPaged(
+    PagedRequest request,
+  ) => _api.getPaged(
+    ApiEndpoints.invoices,
+    queryParameters: request.toQuery(),
+    parseItem: (Object? json) =>
+        Invoice.fromJson(json as Map<String, dynamic>),
+  );
 
   /// Bare object with customer details + items (`GET /invoices/:id`).
   Future<ApiResult<Invoice>> invoice(int id) => _api.getRaw(
@@ -171,10 +187,23 @@ class InvoiceRepository {
     parse: (Object? json) => Invoice.fromJson(json as Map<String, dynamic>),
   );
 
-  /// Invoice-return history — bare array (the endpoint has no search or
-  /// page; the grid keeps sorting/filtering client-side like items).
+  /// Invoice-return history — full list (the grid now uses
+  /// [returnsPaged]; this stays for any consumer that needs the whole
+  /// list in one fetch).
   Future<ApiResult<List<SalesReturn>>> returns() => _api.getRawList(
     '${ApiEndpoints.invoices}/returns',
+    parseItem: (Object? json) =>
+        SalesReturn.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// One page of invoice-return history (`GET /invoices/returns`) —
+  /// server-paginated like the other converted lists. `search`,
+  /// `warehouse_name` and the date range ride in `extra`.
+  Future<ApiResult<PagedResponse<SalesReturn>>> returnsPaged(
+    PagedRequest request,
+  ) => _api.getPaged(
+    '${ApiEndpoints.invoices}/returns',
+    queryParameters: request.toQuery(),
     parseItem: (Object? json) =>
         SalesReturn.fromJson(json as Map<String, dynamic>),
   );
@@ -189,12 +218,18 @@ class InvoiceRepository {
     required List<Map<String, dynamic>> items,
     String? reason,
     String? disposition,
+
+    /// The warehouse the returned goods are restocked into
+    /// (`warehouse_id`). When omitted the server restocks into the
+    /// warehouse the sale was dispatched from.
+    int? warehouseId,
   }) => _api.post(
     '${ApiEndpoints.invoices}/$id/return',
     body: {
       'items': items,
       if (reason != null && reason.isNotEmpty) 'reason': reason,
       'disposition': ?disposition,
+      'warehouse_id': ?warehouseId,
     },
     parse: (Object? json) =>
         SalesReturnResult.fromJson(json as Map<String, dynamic>),

@@ -37,19 +37,40 @@ function recordProduction(req, res) {
 }
 function getProductions(req, res) {
     try {
+        const page = (0, queryUtils_1.getQueryInteger)(req.query.page, 1);
+        const limit = (0, queryUtils_1.getQueryInteger)(req.query.limit, 10);
         const startDateParam = (0, queryUtils_1.getQueryParam)(req.query.start_date);
         const endDateParam = (0, queryUtils_1.getQueryParam)(req.query.end_date);
         const outputItemIdParam = (0, queryUtils_1.getQueryParam)(req.query.output_item_id);
         const warehouseIdParam = (0, queryUtils_1.getQueryParam)(req.query.warehouse_id);
-        const limitParam = (0, queryUtils_1.getQueryParam)(req.query.limit);
+        const search = (0, queryUtils_1.getQueryParam)(req.query.search);
+        const sortBy = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
+        const sortOrder = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
         const filters = {
             start_date: startDateParam,
             end_date: endDateParam,
             output_item_id: outputItemIdParam ? Number(outputItemIdParam) : undefined,
             warehouse_id: warehouseIdParam ? Number(warehouseIdParam) : undefined,
-            limit: limitParam ? parseInt(String(limitParam)) : undefined
+            search: search || undefined,
+            sortBy: sortBy || undefined,
+            sortOrder: sortOrder || undefined,
+            page,
+            limit
         };
-        res.json(Production_1.default.getAll(filters, database_1.default));
+        const { rows, total, pageNum, limitNum } = Production_1.default.getAll(filters, database_1.default);
+        // Flat envelope (data = list, pagination a sibling) — the shape the
+        // client's `getPaged` helper parses.
+        res.json({
+            success: true,
+            data: rows,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: Math.ceil(total / limitNum),
+                totalItems: total,
+                hasNext: pageNum < Math.ceil(total / limitNum),
+                hasPrev: pageNum > 1
+            }
+        });
     }
     catch (error) {
         logger_1.default.error('Get productions error:', error);

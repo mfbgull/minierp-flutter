@@ -1,5 +1,6 @@
 import { multiplyCurrency, addCurrency, subtractCurrency, parseCurrency } from '../utils/currency';
 import { getNextSequenceNumber } from '../utils/sequence';
+import { sanitizeSortParams, INVOICE_SORT_COLUMNS, INVOICE_RETURN_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import Database from 'better-sqlite3';
 import logger from '../utils/logger';
 import StockMovementModel from './StockMovement';
@@ -101,14 +102,55 @@ export interface UpdateInvoiceDTO {
 
 export interface InvoiceFilters {
   status?: string;
+  /** Multiple status values (`Paid,Partially Paid`) — the CSV `status`
+   * param splits into this list and becomes an `IN` clause. */
+  statuses?: string[];
   customer_id?: number;
   customer_name?: string;
+  search?: string;
   start_date?: string;
   end_date?: string;
   source_type?: string;
   so_id?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  page?: number;
 }
+
+interface PaginatedInvoices {
+  rows: Invoice[];
+  total: number;
+  pageNum: number;
+  limitNum: number;
+}
+
+// Whitelisted sort columns → qualified SQL column for the list query (the
+// customer/sales-order/quotation/user joins make bare names ambiguous).
+const INVOICE_SORT_COLUMN_MAP: Record<string, string> = {
+  invoice_no: 'i.invoice_no',
+  invoice_date: 'i.invoice_date',
+  customer_name: 'COALESCE(c.customer_name, i.customer_name)',
+  status: 'i.status',
+  total_amount: 'i.total_amount',
+  paid_amount: 'i.paid_amount',
+  balance_amount: 'i.balance_amount',
+  due_date: 'i.due_date',
+  created_at: 'i.created_at',
+};
+
+// Whitelisted sort columns → qualified SQL column for the returns query
+// (the item/warehouse/user/invoice joins make bare names ambiguous).
+const INVOICE_RETURN_SORT_COLUMN_MAP: Record<string, string> = {
+  movement_no: 'sm.movement_no',
+  return_date: 'sm.movement_date',
+  item_name: 'i.item_name',
+  customer_name: 'inv.customer_name',
+  warehouse_name: 'w.warehouse_name',
+  quantity: 'sm.quantity',
+  unit_cost: 'sm.unit_cost',
+  created_at: 'sm.created_at',
+};
 
 class InvoiceModel {
   /**
@@ -164,10 +206,14 @@ class InvoiceModel {
   }
 
   /**
-   * Get all invoices with filters
+   * Get all invoices with filters — paged. Returns the canonical
+   * `{ rows, total, pageNum, limitNum }` shape (grid-pagination §1).
    */
-  static getAll(filters: InvoiceFilters = {}, db: Database.Database): Invoice[] {
-    let query = `
+  static getAll(filters: InvoiceFilters = {}, db: Database.Database): PaginatedInvoices {
+    const pageNum = filters.page || 1;
+    const limitNum = filters.limit || 10;
+
+    const select = `
       SELECT
         i.*,
         COALESCE(c.customer_name, i.customer_name) as customer_name,
@@ -181,71 +227,96 @@ class InvoiceModel {
       LEFT JOIN users u ON i.created_by = u.id
       WHERE 1=1
     `;
-
+    const conditions: string[] = [];
     const params: any[] = [];
 
-    if (filters.status) {
-      query += ` AND i.status = ?`;
-      params.push(filters.status);
+    if (filters.statuses && filters.statuses.length > 0) {
+      conditions.push(`i.status IN (${filters.statuses.map(() => '?').join(',')})`);
+      params.push(...filters.statuses);
     }
 
     if (filters.customer_id) {
-      query += ` AND i.customer_id = ?`;
+      conditions.push('i.customer_id = ?');
       params.push(filters.customer_id);
     }
 
     if (filters.customer_name) {
-      query += ` AND i.customer_name LIKE ?`;
+      conditions.push('i.customer_name LIKE ?');
       params.push(`%${filters.customer_name}%`);
     }
 
+    if (filters.search) {
+      conditions.push(
+        '(i.invoice_no LIKE ? OR COALESCE(c.customer_name, i.customer_name) LIKE ?)'
+      );
+      const term = `%${filters.search}%`;
+      params.push(term, term);
+    }
+
     if (filters.start_date) {
-      query += ` AND i.invoice_date >= ?`;
+      conditions.push('i.invoice_date >= ?');
       params.push(filters.start_date);
     }
 
     if (filters.end_date) {
-      query += ` AND i.invoice_date <= ?`;
+      conditions.push('i.invoice_date <= ?');
       params.push(filters.end_date);
     }
 
     if (filters.source_type) {
-      query += ` AND i.source_type = ?`;
+      conditions.push('i.source_type = ?');
       params.push(filters.source_type);
     }
 
     if (filters.so_id) {
-      query += ` AND i.so_id = ?`;
+      conditions.push('i.so_id = ?');
       params.push(filters.so_id);
     }
 
-     query += ` ORDER BY i.invoice_date DESC, i.created_at DESC`;
+    const where = conditions.length ? ` AND ${conditions.join(' AND ')}` : '';
 
-     if (filters.limit) {
-       query += ` LIMIT ?`;
-       params.push(filters.limit);
-     }
+    // Sort — whitelisted via sqlSanitizer, mapped to qualified columns
+    // (default matches the pre-paging behavior: newest invoice first).
+    const { column, order } = sanitizeSortParams(
+      filters.sortBy || 'invoice_date',
+      filters.sortOrder || 'DESC',
+      INVOICE_SORT_COLUMNS,
+      'invoice_date',
+      'DESC'
+    );
+    const sortColumn = INVOICE_SORT_COLUMN_MAP[column] || 'i.invoice_date';
 
-     const invoices = db.prepare(query).all(...params) as Invoice[];
+    const offset = (pageNum - 1) * limitNum;
+    const invoices = db
+      .prepare(`${select}${where} ORDER BY ${sortColumn} ${order}, i.id DESC LIMIT ? OFFSET ?`)
+      .all(...params, limitNum, offset) as Invoice[];
 
-     // Get items for each invoice
-     return invoices.map(invoice => {
-       const items = db.prepare(`
-         SELECT
-           ii.id, ii.invoice_id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount,
-           ii.tax_rate, ii.discount_type, ii.discount_value,
-           i.item_code, i.item_name
-         FROM invoice_items ii
-         LEFT JOIN items i ON ii.item_id = i.id
-         WHERE ii.invoice_id = ?
-         ORDER BY ii.id
-       `).all(invoice.id) as InvoiceItem[];
+    const countRow = db
+      .prepare(`SELECT COUNT(*) as total FROM invoices i
+        LEFT JOIN customers c ON i.customer_id = c.id
+        WHERE 1=1${where}`)
+      .get(...params) as { total: number };
 
-       return {
-         ...invoice,
-         items
-       };
-     });
+    // Get items for each invoice
+    const rows = invoices.map(invoice => {
+      const items = db.prepare(`
+        SELECT
+          ii.id, ii.invoice_id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount,
+          ii.tax_rate, ii.discount_type, ii.discount_value,
+          i.item_code, i.item_name
+        FROM invoice_items ii
+        LEFT JOIN items i ON ii.item_id = i.id
+        WHERE ii.invoice_id = ?
+        ORDER BY ii.id
+      `).all(invoice.id) as InvoiceItem[];
+
+      return {
+        ...invoice,
+        items
+      };
+    });
+
+    return { rows, total: countRow.total, pageNum, limitNum };
    }
 
    /**
@@ -421,7 +492,8 @@ class InvoiceModel {
     items: Array<{ item_id: number; quantity: number; unit_price: number }>,
     invoiceNo: string,
     userId: number,
-    referenceDoctype: string
+    referenceDoctype: string,
+    explicitWarehouseId?: number
   ): void {
     for (const item of items) {
       // Find all SALE movements for this item + invoice (they have batch_id links)
@@ -442,7 +514,12 @@ class InvoiceModel {
         continue;
       }
 
-      const warehouseId = saleMovements[0].warehouse_id;
+      // A customer return is restocked into the warehouse the user chose
+      // (return form); otherwise it goes back to the warehouse the sale
+      // was dispatched from. Batch-quantity restore below stays on the
+      // ORIGINAL sale batches either way — the chosen warehouse only
+      // affects where the visible stock-summary movement lands.
+      const warehouseId = explicitWarehouseId ?? saleMovements[0].warehouse_id;
 
       // Calculate how much was ALREADY returned for this item on this invoice
       const alreadyReturned = db.prepare(`
@@ -839,54 +916,12 @@ class InvoiceModel {
   }
 
   /**
-   * Get invoices by status filter (used when status is provided without other filters)
+   * Get invoices by status filter — delegates to the paged query so the
+   * status-CSV path and the paged list share one definition. Kept for
+   * backward compatibility (returns the full unfiltered-by-page set).
    */
   static getByStatus(statusList: string[], db: Database.Database): Invoice[] {
-    let query = `
-      SELECT
-        i.*,
-        COALESCE(c.customer_name, i.customer_name) as customer_name,
-        so.so_no,
-        q.quotation_no,
-        u.username as created_by_username
-      FROM invoices i
-      LEFT JOIN customers c ON i.customer_id = c.id
-      LEFT JOIN sales_orders so ON i.so_id = so.id
-      LEFT JOIN quotations q ON i.quotation_id = q.id
-      LEFT JOIN users u ON i.created_by = u.id
-      WHERE 1=1
-    `;
-    
-    const params: any[] = [];
-    
-    if (statusList.length > 0) {
-      const placeholders = statusList.map(() => '?').join(',');
-      query += ` AND i.status IN (${placeholders})`;
-      params.push(...statusList);
-    }
-    
-     query += ` ORDER BY i.created_at DESC`;
-
-     const invoices = db.prepare(query).all(...params) as Invoice[];
-
-     // Get items for each invoice
-     return invoices.map(invoice => {
-       const items = db.prepare(`
-         SELECT
-           ii.id, ii.invoice_id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount,
-           ii.tax_rate, ii.discount_type, ii.discount_value,
-           i.item_code, i.item_name
-         FROM invoice_items ii
-         LEFT JOIN items i ON ii.item_id = i.id
-         WHERE ii.invoice_id = ?
-         ORDER BY ii.id
-       `).all(invoice.id) as InvoiceItem[];
-    
-      return {
-        ...invoice,
-        items
-      };
-    });
+    return this.getAll({ statuses: statusList }, db).rows;
   }
 
   static getWithCustomer(id: number, db: Database.Database) {
@@ -942,19 +977,29 @@ class InvoiceModel {
   }
 
   /**
-   * Return a list of all invoice-return stock movements for the returns history page.
-   * Filters by reference_doctype = 'RETURN' (from invoice return processing).
+   * Return a list of all invoice-return stock movements for the returns
+   * history page — paged. Filters by reference_doctype = 'RETURN' (from
+   * invoice return processing). Returns the canonical `{ rows, total,
+   * pageNum, limitNum }` shape.
    */
   static getReturnHistory(
     filters: {
       start_date?: string;
       end_date?: string;
       item_id?: number;
+      search?: string;
+      warehouse_name?: string;
+      sortBy?: string;
+      sortOrder?: string;
+      page?: number;
       limit?: number;
     } = {},
     db: Database.Database
-  ): any[] {
-    let query = `
+  ): { rows: any[]; total: number; pageNum: number; limitNum: number } {
+    const pageNum = filters.page || 1;
+    const limitNum = filters.limit || 10;
+
+    const select = `
       SELECT
         sm.id,
         sm.movement_no,
@@ -984,32 +1029,64 @@ class InvoiceModel {
       WHERE sm.reference_doctype = 'RETURN'
         AND sm.quantity > 0
     `;
-
+    const conditions: string[] = [];
     const params: any[] = [];
 
     if (filters.start_date) {
-      query += ' AND sm.movement_date >= ?';
+      conditions.push('sm.movement_date >= ?');
       params.push(filters.start_date);
     }
 
     if (filters.end_date) {
-      query += ' AND sm.movement_date <= ?';
+      conditions.push('sm.movement_date <= ?');
       params.push(filters.end_date);
     }
 
     if (filters.item_id) {
-      query += ' AND sm.item_id = ?';
+      conditions.push('sm.item_id = ?');
       params.push(filters.item_id);
     }
 
-    query += ' ORDER BY sm.movement_date DESC, sm.created_at DESC';
-
-    if (filters.limit) {
-      query += ' LIMIT ?';
-      params.push(filters.limit);
+    if (filters.warehouse_name) {
+      conditions.push('w.warehouse_name = ?');
+      params.push(filters.warehouse_name);
     }
 
-    return db.prepare(query).all(...params) as any[];
+    if (filters.search) {
+      conditions.push(
+        '(sm.movement_no LIKE ? OR i.item_name LIKE ? OR inv.customer_name LIKE ? OR sm.reference_docno LIKE ?)'
+      );
+      const term = `%${filters.search}%`;
+      params.push(term, term, term, term);
+    }
+
+    const where = conditions.length ? ` AND ${conditions.join(' AND ')}` : '';
+
+    // Sort — whitelisted via sqlSanitizer, mapped to qualified columns
+    // (default matches the pre-paging behavior: newest return first).
+    const { column, order } = sanitizeSortParams(
+      filters.sortBy || 'return_date',
+      filters.sortOrder || 'DESC',
+      INVOICE_RETURN_SORT_COLUMNS,
+      'return_date',
+      'DESC'
+    );
+    const sortColumn = INVOICE_RETURN_SORT_COLUMN_MAP[column] || 'sm.movement_date';
+
+    const offset = (pageNum - 1) * limitNum;
+    const rows = db
+      .prepare(`${select}${where} ORDER BY ${sortColumn} ${order}, sm.id DESC LIMIT ? OFFSET ?`)
+      .all(...params, limitNum, offset) as any[];
+
+    const countRow = db
+      .prepare(`SELECT COUNT(*) as total FROM stock_movements sm
+        JOIN items i ON sm.item_id = i.id
+        JOIN warehouses w ON sm.warehouse_id = w.id
+        LEFT JOIN invoices inv ON sm.reference_docno = inv.invoice_no
+        WHERE sm.reference_doctype = 'RETURN' AND sm.quantity > 0${where}`)
+      .get(...params) as { total: number };
+
+    return { rows, total: countRow.total, pageNum, limitNum };
   }
 }
 

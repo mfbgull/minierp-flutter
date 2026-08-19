@@ -7,15 +7,9 @@ import '../../core/i18n/locale_provider.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/screen_shortcuts.dart';
-import '../dashboard/dashboard_providers.dart'
-    show
-        dashboardArSummaryProvider,
-        dashboardCashPositionProvider,
-        dashboardSummaryProvider,
-        invalidateDashboardKpiCards,
-        dashboardTopCustomersProvider;
 import '../preferences/preference_providers.dart'
     show userPreferencesProvider;
+import 'module_refresh.dart' show moduleRefreshOnVisit;
 
 /// One module in the shell's navigation. [label] is resolved with the
 /// active localization; [path] is the router branch root; [adminOnly]
@@ -247,22 +241,14 @@ class AppShell extends ConsumerWidget {
               destinations: visible,
               selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
               onSelect: (index) {
-                final branchIndex = shellDestinations.indexOf(visible[index]);
-                // The dashboard branch is kept alive by the
-                // StatefulShellRoute (its FutureProviders cache), so
-                // invalidate its providers on every visit to reflect
-                // work done on other modules (sales, expenses, ...).
-                if (branchIndex == 0) {
-                  // KPI strip cards fetch per-card values and need
-                  // their own invalidation (a new sale / invoice stays
-                  // stale otherwise until hot restart).
-                  invalidateDashboardKpiCards(ref);
-                  ref
-                    ..invalidate(dashboardSummaryProvider)
-                    ..invalidate(dashboardArSummaryProvider)
-                    ..invalidate(dashboardCashPositionProvider)
-                    ..invalidate(dashboardTopCustomersProvider(5));
-                }
+                final dest = visible[index];
+                final branchIndex = shellDestinations.indexOf(dest);
+                // Refresh the selected module's data on every visit:
+                // the StatefulShellRoute keeps every branch alive, so
+                // its providers would otherwise serve data cached at
+                // the first visit (module_refresh.dart). Re-clicking
+                // the current module refreshes it too.
+                moduleRefreshOnVisit[dest.path]?.call(ref);
                 navigationShell.goBranch(
                   branchIndex,
                   initialLocation: branchIndex == navigationShell.currentIndex,

@@ -5,6 +5,7 @@ import SalesOrderModel from '../models/SalesOrder';
 import InvoiceModel from '../models/Invoice';
 import db from '../config/database';
 import logger from '../utils/logger';
+import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 
 function parseIdParam(req: Request, res: Response): number | null {
   const id = Number(req.params.id);
@@ -69,18 +70,41 @@ function createQuotation(req: AuthRequest, res: Response): void {
 
 function getQuotations(req: Request, res: Response): void {
   try {
+    const page = getQueryInteger(req.query.page, 1);
+    const limit = getQueryInteger(req.query.limit, 10);
+    const search = getQueryParam(req.query.search);
+    const sortBy = getQueryParam(req.query.sortBy);
+    const sortOrder = getQueryParam(req.query.sortOrder);
+
     const filters = {
       status: req.query.status as string | undefined,
       customer_id: req.query.customer_id ? Number(req.query.customer_id) : undefined,
       customer_name: req.query.customer_name as string | undefined,
+      search: search || undefined,
       start_date: req.query.start_date as string | undefined,
       end_date: req.query.end_date as string | undefined,
       warehouse_id: req.query.warehouse_id ? Number(req.query.warehouse_id) : undefined,
-      limit: req.query.limit ? parseInt(String(req.query.limit)) : undefined
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
+      page,
+      limit
     };
 
-    const quotations = QuotationModel.getAll(filters, db);
-    res.json(quotations);
+    const { rows, total, pageNum, limitNum } = QuotationModel.getAll(filters, db);
+
+    // Flat envelope (data = list, pagination a sibling) — the shape the
+    // client's `getPaged` helper parses.
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
+      }
+    });
   } catch (error: any) {
     logger.error('Get quotations error:', error);
     res.status(500).json({ error: 'Failed to fetch quotations' });
@@ -231,19 +255,42 @@ function createSalesOrder(req: AuthRequest, res: Response): void {
 
 function getSalesOrders(req: Request, res: Response): void {
   try {
+    const page = getQueryInteger(req.query.page, 1);
+    const limit = getQueryInteger(req.query.limit, 10);
+    const search = getQueryParam(req.query.search);
+    const sortBy = getQueryParam(req.query.sortBy);
+    const sortOrder = getQueryParam(req.query.sortOrder);
+
     const filters = {
       status: req.query.status as string | undefined,
       customer_id: req.query.customer_id ? Number(req.query.customer_id) : undefined,
       customer_name: req.query.customer_name as string | undefined,
+      search: search || undefined,
       start_date: req.query.start_date as string | undefined,
       end_date: req.query.end_date as string | undefined,
       warehouse_id: req.query.warehouse_id ? Number(req.query.warehouse_id) : undefined,
       source_type: req.query.source_type as string | undefined,
-      limit: req.query.limit ? parseInt(String(req.query.limit)) : undefined
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
+      page,
+      limit
     };
 
-    const salesOrders = SalesOrderModel.getAll(filters, db);
-    res.json(salesOrders);
+    const { rows, total, pageNum, limitNum } = SalesOrderModel.getAll(filters, db);
+
+    // Flat envelope (data = list, pagination a sibling) — the shape the
+    // client's `getPaged` helper parses.
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
+      }
+    });
   } catch (error: any) {
     logger.error('Get sales orders error:', error);
     res.status(500).json({ error: 'Failed to fetch sales orders' });

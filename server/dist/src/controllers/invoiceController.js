@@ -29,23 +29,43 @@ const { createLedgerEntry, updateCustomerBalance, calculateInvoiceBalance, updat
  */
 function getInvoices(req, res) {
     try {
-        const { customerId, status } = req.query;
-        const filters = {};
-        if (customerId) {
-            filters.customer_id = parseInt(customerId, 10);
-        }
-        if (status) {
-            const statusList = status.split(',').map((s) => s.trim());
-            let invoices = Invoice_1.default.getByStatus(statusList, database_1.default);
-            if (customerId) {
-                const cid = parseInt(customerId, 10);
-                invoices = invoices.filter(inv => inv.customer_id === cid);
+        const page = (0, queryUtils_1.getQueryInteger)(req.query.page, 1);
+        const limit = (0, queryUtils_1.getQueryInteger)(req.query.limit, 10);
+        const search = (0, queryUtils_1.getQueryParam)(req.query.search);
+        const sortBy = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
+        const sortOrder = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
+        const customerIdParam = (0, queryUtils_1.getQueryParam)(req.query.customer_id) ?? (0, queryUtils_1.getQueryParam)(req.query.customerId);
+        const statusParam = (0, queryUtils_1.getQueryParam)(req.query.status);
+        const startDate = (0, queryUtils_1.getQueryParam)(req.query.start_date);
+        const endDate = (0, queryUtils_1.getQueryParam)(req.query.end_date);
+        const filters = {
+            statuses: statusParam
+                ? statusParam.split(',').map((s) => s.trim())
+                : undefined,
+            customer_id: customerIdParam ? parseInt(customerIdParam, 10) : undefined,
+            search: search || undefined,
+            start_date: startDate || undefined,
+            end_date: endDate || undefined,
+            sortBy: sortBy || undefined,
+            sortOrder: sortOrder || undefined,
+            page,
+            limit
+        };
+        const { rows, total, pageNum, limitNum } = Invoice_1.default.getAll(filters, database_1.default);
+        // Flat envelope matching the customers/suppliers shape the client's
+        // `getPaged` helper expects: `data` is the item list and `pagination`
+        // is a sibling of `data` (NOT nested inside it).
+        res.json({
+            success: true,
+            data: rows,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: Math.ceil(total / limitNum),
+                totalItems: total,
+                hasNext: pageNum < Math.ceil(total / limitNum),
+                hasPrev: pageNum > 1
             }
-            res.json({ success: true, data: invoices });
-            return;
-        }
-        const invoices = Invoice_1.default.getAll(filters, database_1.default);
-        res.json({ success: true, data: invoices });
+        });
     }
     catch (error) {
         logger_1.default.error('Get invoices error:', { error });
@@ -525,6 +545,16 @@ function returnInvoiceItems(req, res) {
         const rawReason = body.reason;
         const rawDeductionType = body.deduction_type; // 'percentage' | 'flat' | undefined
         const rawDeductionValue = Number(body.deduction_value) || 0;
+        // Optional restock warehouse — a customer return is restocked where
+        // the user chooses; when omitted the server restocks into the
+        // warehouse the sale was dispatched from (backward compatible).
+        const rawWarehouseId = body.warehouse_id;
+        const warehouseId = rawWarehouseId === undefined || rawWarehouseId === null || rawWarehouseId === ''
+            ? undefined
+            : Number(rawWarehouseId);
+        if (warehouseId !== undefined && (!Number.isInteger(warehouseId) || warehouseId <= 0)) {
+            return res.status(400).json({ error: 'A valid warehouse_id is required' });
+        }
         const returnItems = Array.isArray(rawItems) ? rawItems : [];
         const reason = rawReason || (returnItems.length > 0 ? returnItems[0].reason || '' : '');
         const disposition = rawDisposition;
@@ -590,8 +620,9 @@ function returnInvoiceItems(req, res) {
                 database_1.default.prepare(`UPDATE invoice_items SET returned_qty = returned_qty + ? WHERE id = ?`)
                     .run(returnItem.return_quantity, returnItem.invoice_item_id);
             }
-            // Reverse stock for the returned items using the same batch-aware logic
-            Invoice_1.default.reverseStockForItems(database_1.default, processedItems, invoice.invoice_no, userId, 'RETURN');
+            // Reverse stock for the returned items using the same batch-aware logic —
+            // restocked into the user-chosen warehouse when provided.
+            Invoice_1.default.reverseStockForItems(database_1.default, processedItems, invoice.invoice_no, userId, 'RETURN', warehouseId);
             // Calculate the total return amount (with item discounts applied)
             const returnAmount = processedItems.reduce((sum, item) => {
                 const grossAmount = Number(item.quantity) * Number(item.unit_price);
@@ -816,18 +847,40 @@ function returnInvoiceItems(req, res) {
  */
 function getInvoiceReturnHistory(req, res) {
     try {
+        const page = (0, queryUtils_1.getQueryInteger)(req.query.page, 1);
+        const limit = (0, queryUtils_1.getQueryInteger)(req.query.limit, 10);
+        const search = (0, queryUtils_1.getQueryParam)(req.query.search);
+        const warehouseName = (0, queryUtils_1.getQueryParam)(req.query.warehouse_name);
+        const sortBy = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
+        const sortOrder = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
         const startDateParam = (0, queryUtils_1.getQueryParam)(req.query.start_date);
         const endDateParam = (0, queryUtils_1.getQueryParam)(req.query.end_date);
         const itemIdParam = (0, queryUtils_1.getQueryParam)(req.query.item_id);
-        const limitParam = (0, queryUtils_1.getQueryParam)(req.query.limit);
         const filters = {
-            start_date: startDateParam,
-            end_date: endDateParam,
+            start_date: startDateParam || undefined,
+            end_date: endDateParam || undefined,
             item_id: itemIdParam ? Number(itemIdParam) : undefined,
-            limit: limitParam ? parseInt(String(limitParam)) : undefined
+            search: search || undefined,
+            warehouse_name: warehouseName || undefined,
+            sortBy: sortBy || undefined,
+            sortOrder: sortOrder || undefined,
+            page,
+            limit
         };
-        const returns = Invoice_1.default.getReturnHistory(filters, database_1.default);
-        res.json(returns);
+        const { rows, total, pageNum, limitNum } = Invoice_1.default.getReturnHistory(filters, database_1.default);
+        // Flat envelope (data = list, pagination a sibling) — the shape the
+        // client's `getPaged` helper parses.
+        res.json({
+            success: true,
+            data: rows,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: Math.ceil(total / limitNum),
+                totalItems: total,
+                hasNext: pageNum < Math.ceil(total / limitNum),
+                hasPrev: pageNum > 1
+            }
+        });
     }
     catch (error) {
         logger_1.default.error('Get invoice return history error:', { error });

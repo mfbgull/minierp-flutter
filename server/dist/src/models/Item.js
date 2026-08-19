@@ -1,31 +1,50 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const sqlSanitizer_1 = require("../utils/sqlSanitizer");
 class ItemModel {
     constructor(database) {
         this.db = database;
     }
     static getAll(filters = {}, db) {
-        let query = 'SELECT * FROM items WHERE is_active = 1';
+        const pageNum = filters.page || 1;
+        const limitNum = filters.limit || 10;
+        // The low-stock rule mirrors the old `getLowStock` predicates:
+        // at/below the reorder level with a positive threshold. `reorder_level 0`
+        // (or null) means no reorder threshold.
+        const conditions = ['is_active = 1'];
         const params = [];
         if (filters.category) {
-            query += ' AND category = ?';
+            conditions.push('category = ?');
             params.push(filters.category);
         }
         if (filters.search) {
-            query += ' AND (item_code LIKE ? OR item_name LIKE ? OR description LIKE ?)';
+            conditions.push('(item_code LIKE ? OR item_name LIKE ? OR description LIKE ?)');
             const searchTerm = `%${filters.search}%`;
             params.push(searchTerm, searchTerm, searchTerm);
         }
         if (filters.is_raw_material !== undefined) {
-            query += ' AND is_raw_material = ?';
+            conditions.push('is_raw_material = ?');
             params.push(filters.is_raw_material ? 1 : 0);
         }
         if (filters.is_finished_good !== undefined) {
-            query += ' AND is_finished_good = ?';
+            conditions.push('is_finished_good = ?');
             params.push(filters.is_finished_good ? 1 : 0);
         }
-        query += ' ORDER BY item_name';
-        return db.prepare(query).all(...params);
+        if (filters.lowStock) {
+            conditions.push('current_stock < reorder_level AND reorder_level > 0');
+        }
+        const where = `WHERE ${conditions.join(' AND ')}`;
+        // Sort — whitelisted via sqlSanitizer (default matches the
+        // pre-paging behavior: alphabetical by item name).
+        const { column, order } = (0, sqlSanitizer_1.sanitizeSortParams)(filters.sortBy || 'item_name', filters.sortOrder || 'ASC', sqlSanitizer_1.ITEM_SORT_COLUMNS, 'item_name', 'ASC');
+        const offset = (pageNum - 1) * limitNum;
+        const rows = db
+            .prepare(`SELECT * FROM items ${where} ORDER BY ${column} ${order} LIMIT ? OFFSET ?`)
+            .all(...params, limitNum, offset);
+        const countRow = db
+            .prepare(`SELECT COUNT(*) as total FROM items ${where}`)
+            .get(...params);
+        return { rows, total: countRow.total, pageNum, limitNum };
     }
     static getById(id, db) {
         return db.prepare('SELECT * FROM items WHERE id = ?').get(id);
@@ -110,14 +129,10 @@ class ItemModel {
         ]));
     }
     static getLowStock(db) {
-        return db.prepare(`
-      SELECT *
-      FROM items
-      WHERE is_active = 1
-      AND current_stock < reorder_level
-      AND reorder_level > 0
-      ORDER BY item_name
-    `).all();
+        // Delegates to the paged query so `GET /inventory/items-low-stock`
+        // and the paged `GET /inventory/items?low_stock=1` share one query
+        // definition (and the same low-stock predicates).
+        return ItemModel.getAll({ lowStock: true }, db).rows;
     }
 }
 exports.default = ItemModel;

@@ -2,6 +2,10 @@ import db from '../config/database';
 import ItemModel from '../models/Item';
 import WarehouseModel from '../models/Warehouse';
 import StockMovementModel from '../models/StockMovement';
+import PurchaseModel from '../models/Purchase';
+import PurchaseOrderModel from '../models/PurchaseOrder';
+import PaymentModel from '../models/Payment';
+import SupplierLedgerModel from '../models/SupplierLedger';
 
 describe('ItemModel', () => {
   let createdItemId: number;
@@ -59,34 +63,53 @@ describe('ItemModel', () => {
   });
 
   describe('getAll', () => {
-    it('returns all active items', () => {
-      const items = ItemModel.getAll({}, db);
-      expect(Array.isArray(items)).toBe(true);
-      expect(items.length).toBeGreaterThan(0);
+    it('returns all active items paged', () => {
+      const { rows, total, pageNum, limitNum } = ItemModel.getAll({}, db);
+      expect(Array.isArray(rows)).toBe(true);
+      expect(rows.length).toBeGreaterThan(0);
+      expect(total).toBeGreaterThan(0);
+      expect(pageNum).toBe(1);
+      expect(limitNum).toBe(10);
+      expect(rows.length).toBeLessThanOrEqual(10);
     });
 
     it('filters by category', () => {
-      const items = ItemModel.getAll({ category: 'Test' }, db);
-      expect(items.length).toBeGreaterThan(0);
-      items.forEach(item => {
+      const { rows } = ItemModel.getAll({ category: 'Test' }, db);
+      expect(rows.length).toBeGreaterThan(0);
+      rows.forEach(item => {
         expect(item.category).toBe('Test');
       });
     });
 
     it('filters by search term', () => {
-      const items = ItemModel.getAll({ search: 'Model Test' }, db);
-      expect(items.length).toBeGreaterThan(0);
+      const { rows } = ItemModel.getAll({ search: 'Model Test' }, db);
+      expect(rows.length).toBeGreaterThan(0);
     });
 
     it('returns empty array for non-matching search', () => {
-      const items = ItemModel.getAll({ search: 'zzzznonexistent' }, db);
-      expect(items.length).toBe(0);
+      const { rows } = ItemModel.getAll({ search: 'zzzznonexistent' }, db);
+      expect(rows.length).toBe(0);
     });
 
     it('excludes inactive items', () => {
-      const items = ItemModel.getAll({}, db);
-      items.forEach(item => {
+      const { rows } = ItemModel.getAll({}, db);
+      rows.forEach(item => {
         expect(item.is_active).toBe(1);
+      });
+    });
+
+    it('pages with page/limit', () => {
+      const { rows, total, pageNum } = ItemModel.getAll({ page: 2, limit: 5 }, db);
+      expect(pageNum).toBe(2);
+      expect(rows.length).toBeLessThanOrEqual(5);
+      expect(total).toBeGreaterThanOrEqual(rows.length);
+    });
+
+    it('filters by low stock (current_stock < reorder_level > 0)', () => {
+      const { rows } = ItemModel.getAll({ lowStock: true }, db);
+      rows.forEach(item => {
+        expect(item.reorder_level).toBeGreaterThan(0);
+        expect(item.current_stock).toBeLessThan(item.reorder_level!);
       });
     });
   });
@@ -136,8 +159,8 @@ describe('ItemModel', () => {
     });
 
     it('deleted item does not appear in getAll', () => {
-      const items = ItemModel.getAll({}, db);
-      const found = items.find(i => i.id === createdItemId);
+      const { rows } = ItemModel.getAll({}, db);
+      const found = rows.find(i => i.id === createdItemId);
       expect(found).toBeUndefined();
     });
   });
@@ -284,41 +307,57 @@ describe('StockMovementModel', () => {
   });
 
   describe('getAll', () => {
-    it('returns all movements', () => {
-      const movements = StockMovementModel.getAll({}, db);
-      expect(Array.isArray(movements)).toBe(true);
-      expect(movements.length).toBeGreaterThan(0);
+    it('returns all movements paged', () => {
+      const { rows, total, pageNum, limitNum } = StockMovementModel.getAll({}, db);
+      expect(Array.isArray(rows)).toBe(true);
+      expect(rows.length).toBeGreaterThan(0);
+      expect(total).toBeGreaterThan(0);
+      expect(pageNum).toBe(1);
+      expect(limitNum).toBe(10);
+      expect(rows.length).toBeLessThanOrEqual(10);
     });
 
     it('filters by item_id', () => {
-      const movements = StockMovementModel.getAll({ item_id: 1 }, db);
-      expect(movements.length).toBeGreaterThan(0);
-      movements.forEach(m => {
+      const { rows } = StockMovementModel.getAll({ item_id: 1 }, db);
+      expect(rows.length).toBeGreaterThan(0);
+      rows.forEach(m => {
         expect(m.item_id).toBe(1);
       });
     });
 
     it('filters by movement_type', () => {
-      const movements = StockMovementModel.getAll({ movement_type: 'in' }, db);
-      expect(movements.length).toBeGreaterThan(0);
-      movements.forEach(m => {
+      const { rows } = StockMovementModel.getAll({ movement_type: 'in' }, db);
+      expect(rows.length).toBeGreaterThan(0);
+      rows.forEach(m => {
         expect(m.movement_type).toBe('in');
       });
     });
 
-    it('respects limit', () => {
-      const movements = StockMovementModel.getAll({ limit: 5 }, db);
-      expect(movements.length).toBeLessThanOrEqual(5);
+    it('respects limit as the page size', () => {
+      const { rows } = StockMovementModel.getAll({ limit: 5 }, db);
+      expect(rows.length).toBeLessThanOrEqual(5);
+    });
+
+    it('pages with page/limit', () => {
+      const { rows, total, pageNum } = StockMovementModel.getAll({ page: 2, limit: 5 }, db);
+      expect(pageNum).toBe(2);
+      expect(rows.length).toBeLessThanOrEqual(5);
+      expect(total).toBeGreaterThanOrEqual(rows.length);
+    });
+
+    it('filters by search', () => {
+      const { rows } = StockMovementModel.getAll({ search: 'Model' }, db);
+      expect(rows.length).toBeGreaterThanOrEqual(0);
     });
   });
 
   describe('getById', () => {
     it('returns movement by ID', () => {
-      const movements = StockMovementModel.getAll({ limit: 1 }, db);
-      if (movements.length > 0) {
-        const movement = StockMovementModel.getById(movements[0].id, db);
+      const { rows } = StockMovementModel.getAll({ limit: 1 }, db);
+      if (rows.length > 0) {
+        const movement = StockMovementModel.getById(rows[0].id, db);
         expect(movement).toBeDefined();
-        expect(movement?.id).toBe(movements[0].id);
+        expect(movement?.id).toBe(rows[0].id);
       }
     });
 
@@ -422,6 +461,195 @@ describe('StockMovementModel', () => {
           testItemId, testWhId, 0, db
         );
       }).toThrow('consumeFromOldestBatches: quantity must be positive, got 0');
+    });
+  });
+
+  describe('Purchase supplier/payment flow', () => {
+    let itemId: number;
+    let warehouseId = 1;
+    let supplierId: number;
+    let purchaseId: number;
+    let purchaseNo: string;
+
+    beforeAll(() => {
+      itemId = ItemModel.create({
+        item_code: `PURCH-SUP-${Date.now()}`,
+        item_name: 'Supplier Payment Test Item',
+        category: 'Test',
+        unit_of_measure: 'Nos',
+        standard_cost: 25,
+        standard_selling_price: 40,
+      }, 1, db);
+
+      const result = db.prepare(`
+        INSERT INTO suppliers (supplier_code, supplier_name, is_active)
+        VALUES (?, ?, 1)
+      `).run(`MODEL-SUP-${Date.now()}`, 'Model Supplier Payment Test');
+      supplierId = Number(result.lastInsertRowid);
+    });
+
+    afterAll(() => {
+      db.prepare(`DELETE FROM stock_movements WHERE item_id = ?`).run(itemId);
+      db.prepare(`DELETE FROM stock_balances WHERE item_id = ?`).run(itemId);
+      db.prepare(`DELETE FROM stock_batches WHERE item_id = ?`).run(itemId);
+      db.prepare(`DELETE FROM supplier_ledger WHERE supplier_id = ?`).run(supplierId);
+      db.prepare(`DELETE FROM suppliers WHERE id = ?`).run(supplierId);
+      ItemModel.delete(itemId, db);
+    });
+
+    it('records a purchase linked to a supplier and posts the AP ledger entry', () => {
+      const purchase = PurchaseModel.recordPurchase({
+        item_id: itemId,
+        warehouse_id: warehouseId,
+        quantity: 10,
+        unit_cost: 25,
+        supplier_id: supplierId,
+        purchase_date: '2026-08-01',
+      }, 1, db);
+
+      purchaseId = purchase.id;
+      purchaseNo = purchase.purchase_no;
+      expect(purchase.supplier_id).toBe(supplierId);
+      expect(purchase.supplier_name).toBe('Model Supplier Payment Test');
+      expect(purchase.total_cost).toBe(250);
+
+      const entry = SupplierLedgerModel.getTransactions(supplierId, db).find(
+        (e) => e.transaction_type === 'PURCHASE' && e.reference_no === purchaseNo
+      );
+      expect(entry).toBeDefined();
+      expect(entry?.debit).toBe(250);
+      expect(SupplierLedgerModel.getBalance(supplierId, db)).toBe(250);
+    });
+
+    it('allocates a supplier payment against the purchase and reduces the balance', () => {
+      const paymentId = PaymentModel.createSupplierPayment(db, {
+        supplier_id: supplierId,
+        payment_date: '2026-08-02',
+        amount: 100,
+        payment_method: 'Cash',
+        po_allocations: [],
+        purchase_allocations: [{ purchase_id: String(purchaseId), amount: 100 }],
+        userId: 1,
+      });
+      expect(paymentId).toBeGreaterThan(0);
+
+      const alloc = db.prepare(
+        'SELECT * FROM purchase_allocations WHERE payment_id = ?'
+      ).get(paymentId) as { purchase_id: number; amount: number };
+      expect(alloc.purchase_id).toBe(purchaseId);
+      expect(alloc.amount).toBe(100);
+      expect(SupplierLedgerModel.getBalance(supplierId, db)).toBe(150);
+    });
+
+    it('rejects an allocation exceeding the remaining purchase balance', () => {
+      expect(() =>
+        PaymentModel.createSupplierPayment(db, {
+          supplier_id: supplierId,
+          payment_date: '2026-08-03',
+          amount: 200,
+          payment_method: 'Cash',
+          po_allocations: [],
+          purchase_allocations: [{ purchase_id: String(purchaseId), amount: 200 }],
+          userId: 1,
+        })
+      ).toThrow(/exceeds the remaining balance/);
+    });
+
+    it('rejects payments without any PO or purchase allocation', () => {
+      expect(() =>
+        PaymentModel.createSupplierPayment(db, {
+          supplier_id: supplierId,
+          payment_date: '2026-08-03',
+          amount: 50,
+          payment_method: 'Cash',
+          po_allocations: [],
+          userId: 1,
+        })
+      ).toThrow(/At least one PO or purchase allocation/);
+    });
+
+    it('lists the payment history for the purchase', () => {
+      const history = PurchaseModel.getPayments(purchaseId, db);
+      expect(history).toHaveLength(1);
+      expect(history[0].amount).toBe(100);
+      expect(history[0].payment_no).toMatch(/^PAY/);
+    });
+
+    it('exposes paid/balance amounts on the purchase row', () => {
+      const row = PurchaseModel.getById(purchaseId, db);
+      expect(row?.paid_amount).toBe(100);
+      expect(row?.balance_amount).toBe(150);
+
+      const { rows } = PurchaseModel.getAll({}, db);
+      const listed = rows.find((r) => r.id === purchaseId);
+      expect(listed?.paid_amount).toBe(100);
+      expect(listed?.balance_amount).toBe(150);
+    });
+
+    it('blocks deleting a purchase that has recorded payments', () => {
+      expect(() => PurchaseModel.delete(purchaseId, 1, db)).toThrow(
+        /Cannot delete purchase with recorded payments/
+      );
+    });
+
+    it('deleting the payment restores the balance and allows purchase deletion', () => {
+      const paymentId = (db.prepare(
+        'SELECT payment_id FROM purchase_allocations WHERE purchase_id = ?'
+      ).get(purchaseId) as { payment_id: number }).payment_id;
+      PaymentModel.delete(db, paymentId);
+
+      // Payment removed → only the purchase entry remains.
+      expect(SupplierLedgerModel.getBalance(supplierId, db)).toBe(250);
+
+      PurchaseModel.delete(purchaseId, 1, db);
+      expect(SupplierLedgerModel.getBalance(supplierId, db)).toBe(0);
+    });
+  });
+
+  describe('PO payment history', () => {
+    let poSupplierId: number;
+    let poId: number;
+
+    beforeAll(() => {
+      const result = db.prepare(`
+        INSERT INTO suppliers (supplier_code, supplier_name, is_active)
+        VALUES (?, ?, 1)
+      `).run(`MODEL-PO-SUP-${Date.now()}`, 'Model PO Payment Test');
+      poSupplierId = Number(result.lastInsertRowid);
+
+      const po = PurchaseOrderModel.create({
+        supplier_id: poSupplierId,
+        po_date: '2026-08-01',
+        status: 'Draft',
+        items: [{ item_id: 1, quantity: 5, unit_price: 20 }],
+      }, 1, db);
+      poId = po.id;
+    });
+
+    afterAll(() => {
+      PaymentModel.delete(db, (db.prepare(
+        'SELECT payment_id FROM po_allocations WHERE po_id = ? LIMIT 1'
+      ).get(poId) as { payment_id: number }).payment_id);
+      PurchaseOrderModel.delete(poId, 1, db);
+      db.prepare(`DELETE FROM supplier_ledger WHERE supplier_id = ?`).run(poSupplierId);
+      db.prepare(`DELETE FROM suppliers WHERE id = ?`).run(poSupplierId);
+    });
+
+    it('returns the payments allocated to a PO', () => {
+      PaymentModel.createSupplierPayment(db, {
+        supplier_id: poSupplierId,
+        payment_date: '2026-08-02',
+        amount: 60,
+        payment_method: 'Bank Transfer',
+        po_allocations: [{ po_id: String(poId), amount: 60 }],
+        purchase_allocations: [],
+        userId: 1,
+      });
+
+      const history = PurchaseOrderModel.getPayments(poId, db);
+      expect(history).toHaveLength(1);
+      expect(history[0].amount).toBe(60);
+      expect(history[0].payment_method).toBe('Bank Transfer');
     });
   });
 

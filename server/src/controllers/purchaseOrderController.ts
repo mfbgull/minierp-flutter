@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
-import { getQueryParam } from '../utils/queryUtils';
+import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
 import PurchaseOrderModel from '../models/PurchaseOrder';
 import SupplierLedgerModel from '../models/SupplierLedger';
-import AccountingService from '../services/accountingService';
 import db from '../config/database';
 import logger from '../utils/logger';
 
@@ -65,23 +64,43 @@ function createPurchaseOrder(req: AuthRequest, res: Response): void {
 
 function getPurchaseOrders(req: Request, res: Response): void {
   try {
+    const page = getQueryInteger(req.query.page, 1);
+    const limit = getQueryInteger(req.query.limit, 10);
     const supplierIdParam = getQueryParam(req.query.supplier_id);
     const statusParam = getQueryParam(req.query.status);
+    const search = getQueryParam(req.query.search);
     const startDateParam = getQueryParam(req.query.start_date);
     const endDateParam = getQueryParam(req.query.end_date);
-    const limitParam = getQueryParam(req.query.limit);
+    const sortBy = getQueryParam(req.query.sortBy);
+    const sortOrder = getQueryParam(req.query.sortOrder);
 
     const filters = {
       supplier_id: supplierIdParam ? Number(supplierIdParam) : undefined,
       status: statusParam as string | undefined,
+      search: search || undefined,
       start_date: startDateParam as string | undefined,
       end_date: endDateParam as string | undefined,
-      limit: limitParam ? parseInt(String(limitParam)) : undefined
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
+      page,
+      limit
     };
 
-    const pos = PurchaseOrderModel.getAll(filters, db);
+    const { rows, total, pageNum, limitNum } = PurchaseOrderModel.getAll(filters, db);
 
-    res.json(pos);
+    // Flat envelope (data = list, pagination a sibling) — the shape the
+    // client's `getPaged` helper parses.
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
+      }
+    });
   } catch (error) {
     logger.error('Get POs error:', error);
     res.status(500).json({ error: 'Failed to get purchase orders' });
@@ -251,6 +270,16 @@ function updateStatus(req: AuthRequest, res: Response): void {
   }
 }
 
+function getPurchaseOrderPayments(req: Request, res: Response): void {
+  try {
+    const payments = PurchaseOrderModel.getPayments(Number(req.params.id), db);
+    res.json({ success: true, data: payments });
+  } catch (error) {
+    logger.error('Get PO payments error:', error);
+    res.status(500).json({ error: 'Failed to get purchase order payments' });
+  }
+}
+
 function getGoodsReceipts(req: Request, res: Response): void {
   try {
     const receipts = PurchaseOrderModel.getReceipts(Number(req.params.id), db);
@@ -319,47 +348,6 @@ function createGoodsReceipt(req: AuthRequest, res: Response): void {
   } catch (error: any) {
     logger.error('Create goods receipt error:', error);
     res.status(500).json({ error: error.message || 'Failed to create goods receipt' });
-  }
-}
-
-function returnReceiptItems(req: AuthRequest, res: Response): void {
-  try {
-    const { id } = req.params;
-    const poId = parseInt(id as string, 10);
-    const userId = req.user!.id;
-    const { items, reason } = req.body;
-
-    if (!items || items.length === 0) {
-      res.status(400).json({ error: 'At least one item must be returned' });
-      return;
-    }
-
-    for (const item of items) {
-      if (!item.po_item_id || !item.return_quantity || item.return_quantity <= 0) {
-        res.status(400).json({ error: 'Each return item must have po_item_id and a positive return_quantity' });
-        return;
-      }
-    }
-
-    let result: { returnedCount: number; totalQuantity: number; totalAmount: number };
-
-    db.transaction(() => {
-      result = PurchaseOrderModel.returnReceiptItems(poId, items, userId, db, reason);
-
-      // Post GL reversal — Dr AP, Cr Inventory
-      AccountingService.postPurchaseReturnEntry(db, {
-        purchaseId: poId,
-        purchaseNo: `PO-${poId}`,
-        returnAmount: result.totalAmount,
-        returnDate: new Date().toISOString().split('T')[0],
-        userId,
-      });
-    })();
-
-    res.json({ success: true, message: 'Return processed successfully', data: result! });
-  } catch (error: any) {
-    logger.error('Return receipt items error:', error);
-    res.status(400).json({ error: error.message || 'Failed to process return' });
   }
 }
 
@@ -447,9 +435,9 @@ export default {
   updateLineItem,
   deleteLineItem,
   updateStatus,
+  getPurchaseOrderPayments,
   getGoodsReceipts,
   createGoodsReceipt,
-  returnReceiptItems,
   getPendingOrders,
   getSummaryBySupplier,
   getSupplierBalance,

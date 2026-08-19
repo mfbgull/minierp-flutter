@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import logger from '../utils/logger';
+import { sanitizeSortParams, STOCK_BALANCE_SORT_COLUMNS, STOCK_MOVEMENT_SORT_COLUMNS } from '../utils/sqlSanitizer';
 
 interface StockMovement {
   id: number;
@@ -29,8 +30,58 @@ interface MovementFilters {
   movement_type?: string;
   date_from?: string;
   date_to?: string;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: string;
+  page?: number;
   limit?: number;
 }
+
+interface StockBalanceFilters {
+  search?: string;
+  warehouse_code?: string;
+  warehouse_id?: number;
+  sortBy?: string;
+  sortOrder?: string;
+  page?: number;
+  limit?: number;
+}
+
+interface PaginatedStockBalances {
+  rows: StockMovement[];
+  total: number;
+  pageNum: number;
+  limitNum: number;
+}
+
+// Whitelisted sort columns → qualified SQL column for the stock-balances
+// query (joined aliases; qualification avoids ambiguity).
+const BALANCE_SORT_COLUMN_MAP: Record<string, string> = {
+  item_code: 'i.item_code',
+  item_name: 'i.item_name',
+  warehouse_name: 'w.warehouse_name',
+  quantity: 'sb.quantity',
+};
+
+interface PaginatedMovements {
+  rows: StockMovement[];
+  total: number;
+  pageNum: number;
+  limitNum: number;
+}
+
+// Whitelisted sort columns → qualified SQL column (the grid sorts on
+// joined aliases like `item_name`; qualification avoids ambiguity).
+const SORT_COLUMN_MAP: Record<string, string> = {
+  movement_no: 'sm.movement_no',
+  movement_date: 'sm.movement_date',
+  item_name: 'i.item_name',
+  warehouse_name: 'w.warehouse_name',
+  movement_type: 'sm.movement_type',
+  quantity: 'sm.quantity',
+  reference_docno: 'sm.reference_docno',
+  created_at: 'sm.created_at',
+};
 
 interface RecordMovementDTO {
   item_id: number;
@@ -141,8 +192,11 @@ class StockMovementModel {
     return `STK-${year}-${nextNo.toString().padStart(4, '0')}`;
   }
 
-  static getAll(filters: MovementFilters = {}, db: Database.Database): StockMovement[] {
-    let query = `
+  static getAll(filters: MovementFilters = {}, db: Database.Database): PaginatedMovements {
+    const pageNum = filters.page || 1;
+    const limitNum = filters.limit || 10;
+
+    const select = `
       SELECT
         sm.*,
         i.item_code,
@@ -159,41 +213,69 @@ class StockMovementModel {
       LEFT JOIN stock_batches sb ON sm.batch_id = sb.id
       WHERE 1=1
     `;
+    const conditions: string[] = [];
     const params: any[] = [];
 
     if (filters.item_id) {
-      query += ' AND sm.item_id = ?';
+      conditions.push('sm.item_id = ?');
       params.push(filters.item_id);
     }
 
     if (filters.warehouse_id) {
-      query += ' AND sm.warehouse_id = ?';
+      conditions.push('sm.warehouse_id = ?');
       params.push(filters.warehouse_id);
     }
 
     if (filters.movement_type) {
-      query += ' AND sm.movement_type = ?';
+      conditions.push('sm.movement_type = ?');
       params.push(filters.movement_type);
     }
 
     if (filters.date_from) {
-      query += ' AND sm.movement_date >= ?';
+      conditions.push('sm.movement_date >= ?');
       params.push(filters.date_from);
     }
 
     if (filters.date_to) {
-      query += ' AND sm.movement_date <= ?';
+      conditions.push('sm.movement_date <= ?');
       params.push(filters.date_to);
     }
 
-    query += ' ORDER BY sm.movement_date DESC, sm.created_at DESC';
-
-    if (filters.limit) {
-      query += ' LIMIT ?';
-      params.push(filters.limit);
+    if (filters.search) {
+      conditions.push(
+        '(sm.movement_no LIKE ? OR i.item_name LIKE ? OR i.item_code LIKE ? OR COALESCE(sm.reference_docno, \'\') LIKE ? OR w.warehouse_name LIKE ?)'
+      );
+      const term = `%${filters.search}%`;
+      params.push(term, term, term, term, term);
     }
 
-    return db.prepare(query).all(...params) as StockMovement[];
+    const where = conditions.length ? ` AND ${conditions.join(' AND ')}` : '';
+
+    // Sort — whitelisted via sqlSanitizer, mapped to qualified columns
+    // (default matches the pre-paging behavior: newest movement first).
+    const { column, order } = sanitizeSortParams(
+      filters.sortBy || 'movement_date',
+      filters.sortOrder || 'DESC',
+      STOCK_MOVEMENT_SORT_COLUMNS,
+      'movement_date',
+      'DESC'
+    );
+    const sortColumn = SORT_COLUMN_MAP[column] || 'sm.movement_date';
+
+    const offset = (pageNum - 1) * limitNum;
+    const query =
+      `${select}${where} ORDER BY ${sortColumn} ${order}, sm.id DESC LIMIT ? OFFSET ?`;
+
+    const countQuery =
+      `SELECT COUNT(*) as total FROM stock_movements sm
+       JOIN items i ON sm.item_id = i.id
+       JOIN warehouses w ON sm.warehouse_id = w.id
+       WHERE 1=1${where}`;
+    const countRow = db.prepare(countQuery).get(...params) as { total: number };
+
+    const rows = db.prepare(query).all(...params, limitNum, offset) as StockMovement[];
+
+    return { rows, total: countRow.total, pageNum, limitNum };
   }
 
   static getById(id: number, db: Database.Database): StockMovement | undefined {
@@ -380,8 +462,14 @@ class StockMovementModel {
     `).run(value, journalEntryId, id);
   }
 
-  static getStockBalances(db: Database.Database) {
-    return db.prepare(`
+  static getStockBalances(
+    filters: StockBalanceFilters = {},
+    db: Database.Database
+  ): PaginatedStockBalances {
+    const pageNum = filters.page || 1;
+    const limitNum = filters.limit || 10;
+
+    const select = `
       SELECT
         sb.*,
         i.item_code,
@@ -392,8 +480,55 @@ class StockMovementModel {
       FROM stock_balances sb
       JOIN items i ON sb.item_id = i.id
       JOIN warehouses w ON sb.warehouse_id = w.id
-      ORDER BY i.item_code, w.warehouse_code
-    `).all();
+      WHERE 1=1
+    `;
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (filters.search) {
+      conditions.push(
+        '(i.item_code LIKE ? OR i.item_name LIKE ? OR w.warehouse_name LIKE ?)'
+      );
+      const term = `%${filters.search}%`;
+      params.push(term, term, term);
+    }
+
+    if (filters.warehouse_code) {
+      conditions.push('w.warehouse_code = ?');
+      params.push(filters.warehouse_code);
+    }
+
+    if (filters.warehouse_id !== undefined) {
+      conditions.push('sb.warehouse_id = ?');
+      params.push(filters.warehouse_id);
+    }
+
+    const where = conditions.length ? ` AND ${conditions.join(' AND ')}` : '';
+
+    // Sort — whitelisted via sqlSanitizer, mapped to qualified columns
+    // (default matches the pre-paging behavior: item code then warehouse).
+    const { column, order } = sanitizeSortParams(
+      filters.sortBy || 'item_code',
+      filters.sortOrder || 'ASC',
+      STOCK_BALANCE_SORT_COLUMNS,
+      'item_code',
+      'ASC'
+    );
+    const sortColumn = BALANCE_SORT_COLUMN_MAP[column] || 'i.item_code';
+
+    const offset = (pageNum - 1) * limitNum;
+    const query =
+      `${select}${where} ORDER BY ${sortColumn} ${order}, sb.item_id, w.warehouse_code LIMIT ? OFFSET ?`;
+    const countQuery =
+      `SELECT COUNT(*) as total FROM stock_balances sb
+       JOIN items i ON sb.item_id = i.id
+       JOIN warehouses w ON sb.warehouse_id = w.id
+       WHERE 1=1${where}`;
+
+    const countRow = db.prepare(countQuery).get(...params) as { total: number };
+    const rows = db.prepare(query).all(...params, limitNum, offset) as StockMovement[];
+
+    return { rows, total: countRow.total, pageNum, limitNum };
   }
 
   static getOriginalWarehouseForItem(db: Database.Database, itemId: number, invoiceNo: string): number | undefined {

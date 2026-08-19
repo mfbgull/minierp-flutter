@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import BOMModel from '../models/BOM';
 import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
@@ -7,8 +8,33 @@ import logger from '../utils/logger';
 
 export const getAllBOMs = (req: Request, res: Response, next: NextFunction): void => {
   try {
-    const boms = BOMModel.getAll(db);
-    res.json(boms);
+    const page = getQueryInteger(req.query.page, 1);
+    const limit = getQueryInteger(req.query.limit, 10);
+    const search = getQueryParam(req.query.search);
+    const sortBy = getQueryParam(req.query.sortBy);
+    const sortOrder = getQueryParam(req.query.sortOrder);
+
+    const { rows, total, pageNum, limitNum } = BOMModel.getAll({
+      search: search || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortOrder || undefined,
+      page,
+      limit
+    }, db);
+
+    // Flat envelope (data = list, pagination a sibling) — the shape the
+    // client's `getPaged` helper parses.
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        hasNext: pageNum < Math.ceil(total / limitNum),
+        hasPrev: pageNum > 1
+      }
+    });
   } catch (error) {
     next(error);
   }

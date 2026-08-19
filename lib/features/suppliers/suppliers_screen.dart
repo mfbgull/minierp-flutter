@@ -496,6 +496,8 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen>
       PlutoColumn(
         title: l10n.suppliersActions,
         field: 'actions',
+        // Pinned to the right edge — stays reachable when the grid scrolls.
+        frozen: PlutoColumnFrozen.end,
         type: PlutoColumnType.text(),
         width: 64,
         readOnly: true,

@@ -65,6 +65,41 @@ void main() {
       );
     });
 
+    test('comma-joined linked invoices never match a single group', () {
+      // The server joins a multi-invoice payment's allocations into a
+      // comma-separated `linked_invoice_no`; the raw string matches no
+      // single group key, so the entry is rendered ungrouped.
+      expect(
+        extractInvoiceNo(
+          _entry(
+            id: 7,
+            type: 'PAYMENT',
+            ref: 'PAY-6',
+            linked: 'INV-A, INV-B',
+          ),
+        ),
+        'INV-A, INV-B',
+      );
+
+      final nodes = groupLedgerByInvoice([
+        _entry(id: 1, type: 'INVOICE', ref: 'INV-A', debit: 100),
+        _entry(id: 2, type: 'INVOICE', ref: 'INV-B', debit: 100),
+        _entry(
+          id: 3,
+          type: 'PAYMENT',
+          ref: 'PAY-6',
+          linked: 'INV-A, INV-B',
+          credit: 40,
+        ),
+      ]);
+
+      expect(nodes, hasLength(3));
+      expect(nodes[0], isA<InvoiceGroupNode>());
+      expect(nodes[1], isA<InvoiceGroupNode>());
+      expect(nodes[2], isA<UngroupedNode>());
+      expect((nodes[2] as UngroupedNode).entry.entry.referenceNo, 'PAY-6');
+    });
+
     test('falls back to a for/against/on description match', () {
       expect(
         extractInvoiceNo(
