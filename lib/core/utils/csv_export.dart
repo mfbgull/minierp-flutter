@@ -47,25 +47,18 @@ import '../../data/models/purchase_return.dart' show PurchaseReturn;
 import '../../data/models/quotation.dart' show Quotation;
 import '../../data/models/report.dart'
     show
+        ApAgingReport,
         ArAgingReport,
-        BomUsageReport,
+        BalanceSheetReport,
+        BatchTraceabilityReport,
         CashFlowReport,
         CashReconciliation,
         CustomerStatementRow,
         DSOMetric,
-        ExpensesReport,
-        InventoryMovementReport,
-        LowStockReportRow,
-        ProductionSummaryReport,
+        GeneralLedgerRow,
         ProfitLossReport,
-        PurchaseSummaryReport,
-        SalesByCustomerRow,
-        SalesByItemRow,
-        SalesSummaryReport,
-        StockLevelReport,
-        StockValuationReport,
-        SupplierAnalysisRow,
-        TopDebtorRow;
+        TopDebtorRow,
+        TrialBalanceReport;
 import '../../data/models/sales_order.dart' show SalesOrder;
 import '../../data/models/sales_return.dart' show SalesReturn;
 import '../../data/models/stock_movement.dart' show StockMovement;
@@ -78,7 +71,6 @@ import 'movement_type_label.dart';
 import 'po_status.dart';
 import 'purchase_return_type.dart';
 import 'quotation_status.dart';
-import 'stock_status.dart';
 import 'so_status.dart';
 
 /// Strips leading spreadsheet-formula characters (`=`, `+`, `-`, `@`)
@@ -194,9 +186,9 @@ String buildInvoiceReturnsCsv(
 }
 
 /// Builds the CSV text for the purchase-returns grid (Return No | Date |
-/// Item | Qty | Unit Cost | Total | Type | Warehouse | Remarks —
-/// mirroring the grid's columns; the Type column uses the same localized
-/// badge label as the grid).
+/// Reference | Qty | Value | Type | Status — mirroring the grid's
+/// columns; the Type/Status columns use the same localized badge labels
+/// as the grid).
 String buildPurchaseReturnsCsv(
   AppLocalizations l10n,
   List<PurchaseReturn> returns,
@@ -205,25 +197,21 @@ String buildPurchaseReturnsCsv(
     [
       l10n.purchasesReturnno,
       l10n.purchasesReturndate,
-      l10n.fieldsItem,
+      l10n.fieldsReference,
       l10n.purchasesReturnqty,
-      l10n.purchasesUnitcost,
       l10n.purchasesReturnvalue,
       l10n.purchasesReturntype,
-      l10n.fieldsWarehouse,
-      l10n.fieldsNotes,
+      l10n.fieldsStatus,
     ],
     returns,
     (r) => [
-      sanitizeCsvCell(r.movementNo.isEmpty ? '—' : r.movementNo),
+      sanitizeCsvCell(r.returnNo.isEmpty ? '—' : r.returnNo),
       r.returnDate.isEmpty ? '—' : Formatters.date(r.returnDate),
-      sanitizeCsvCell(r.itemName.isEmpty ? '—' : r.itemName),
-      Formatters.number(r.returnQty),
-      Formatters.currency(r.unitCost),
-      Formatters.currency(r.returnValue),
-      sanitizeCsvCell(returnTypeLabel(l10n, r.referenceDocType)),
-      sanitizeCsvCell(r.warehouseName.isEmpty ? '—' : r.warehouseName),
-      sanitizeCsvCell((r.remarks?.isEmpty ?? true) ? '—' : r.remarks!),
+      sanitizeCsvCell(r.sourceNo.isEmpty ? '—' : r.sourceNo),
+      Formatters.number(r.totalQty),
+      Formatters.currency(r.totalAmount),
+      sanitizeCsvCell(returnTypeLabel(l10n, r.returnType)),
+      sanitizeCsvCell(r.status.isEmpty ? '—' : r.status),
     ],
   );
 }
@@ -386,45 +374,6 @@ String buildExpensesCsv(AppLocalizations l10n, List<Expense> expenses) {
   );
 }
 
-/// Builds the CSV text for the AR aging report (Customer | Code | Total
-/// Outstanding | Current | 1-30 | 31-60 | 61-90 | 90+ — mirroring the
-/// grid's columns).
-/// Builds the CSV text for the expenses report (Expense No | Date |
-/// Category | Description | Vendor | Reference No | Payment Method |
-/// Project | Amount | Status — mirroring the report grid's columns;
-/// the status uses the same localized label as the grid's badge).
-String buildExpensesReportCsv(AppLocalizations l10n, ExpensesReport report) {
-  return _buildGridCsv(
-    [
-      l10n.expensesExpenseno,
-      l10n.fieldsDate,
-      l10n.fieldsCategory,
-      l10n.expensesDescription,
-      l10n.expensesVendor,
-      l10n.expensesReferenceno,
-      l10n.expensesPaymentmethod,
-      l10n.expensesProject,
-      l10n.fieldsAmount,
-      l10n.fieldsStatus,
-    ],
-    report.rows,
-    (r) => [
-      sanitizeCsvCell(r.expenseNo.isEmpty ? '—' : r.expenseNo),
-      r.expenseDate.isEmpty ? '—' : Formatters.date(r.expenseDate),
-      sanitizeCsvCell(r.expenseCategory.isEmpty ? '—' : r.expenseCategory),
-      sanitizeCsvCell((r.description?.isEmpty ?? true) ? '—' : r.description!),
-      sanitizeCsvCell((r.vendorName?.isEmpty ?? true) ? '—' : r.vendorName!),
-      sanitizeCsvCell((r.referenceNo?.isEmpty ?? true) ? '—' : r.referenceNo!),
-      sanitizeCsvCell(
-        (r.paymentMethod?.isEmpty ?? true) ? '—' : r.paymentMethod!,
-      ),
-      sanitizeCsvCell((r.project?.isEmpty ?? true) ? '—' : r.project!),
-      Formatters.currency(r.amount),
-      sanitizeCsvCell(expenseStatusLabel(l10n, r.status)),
-    ],
-  );
-}
-
 String buildArAgingCsv(AppLocalizations l10n, ArAgingReport report) {
   return _buildGridCsv(
     [
@@ -451,163 +400,61 @@ String buildArAgingCsv(AppLocalizations l10n, ArAgingReport report) {
   );
 }
 
-/// Builds the CSV text for the low stock report (Item | Code | Category
-/// | Current | Minimum | Shortage | Reorder — mirroring the grid's
-/// columns).
-String buildLowStockCsv(AppLocalizations l10n, List<LowStockReportRow> rows) {
+String buildApAgingCsv(AppLocalizations l10n, ApAgingReport report) {
   return _buildGridCsv(
     [
-      l10n.inventoryItemname,
-      l10n.inventoryItemcode,
-      l10n.fieldsCategory,
-      l10n.inventoryCurrentstock,
-      l10n.reportsMinimumstock,
-      l10n.reportsShortage,
-      l10n.inventoryReorderlevel,
+      l10n.fieldsSupplier,
+      'Supplier Code',
+      l10n.reportsTotaloutstanding,
+      l10n.reportsCurrent,
+      l10n.reportsDays1_30,
+      l10n.reportsDays31_60,
+      l10n.reportsDays61_90,
+      l10n.reportsDays90plus,
     ],
-    rows,
-    (r) => [
-      sanitizeCsvCell(r.itemName.isEmpty ? '—' : r.itemName),
-      sanitizeCsvCell(r.itemCode.isEmpty ? '—' : r.itemCode),
-      sanitizeCsvCell(r.itemCategory.isEmpty ? '—' : r.itemCategory),
-      Formatters.number(r.currentStock),
-      Formatters.number(r.minimumStock),
-      Formatters.number(r.shortage),
-      Formatters.number(r.reorderLevel),
+    report.buckets,
+    (b) => [
+      sanitizeCsvCell(b.supplierName.isEmpty ? '—' : b.supplierName),
+      sanitizeCsvCell(b.supplierCode.isEmpty ? '—' : b.supplierCode),
+      Formatters.currency(b.totalOutstanding),
+      Formatters.currency(b.currentAmount),
+      Formatters.currency(b.days1_30),
+      Formatters.currency(b.days31_60),
+      Formatters.currency(b.days61_90),
+      Formatters.currency(b.daysOver90),
     ],
   );
 }
 
-/// Builds the CSV text for the sales summary report (Date | Invoice No |
-/// Customer | Total | Items | Paid | Due | Status — mirroring the
-/// grid's columns; the Status column uses the same localized label as
-/// the grid's badge).
-String buildSalesSummaryCsv(AppLocalizations l10n, SalesSummaryReport report) {
-  return _buildGridCsv(
-    [
-      l10n.fieldsDate,
-      l10n.salesInvoiceno,
-      l10n.fieldsCustomer,
-      l10n.salesTotalsales,
-      l10n.reportsItems,
-      l10n.salesTotalpaid,
-      l10n.salesTotaldue,
-      l10n.fieldsStatus,
-    ],
-    report.sales,
-    (r) => [
-      r.invoiceDate.isEmpty ? '—' : Formatters.date(r.invoiceDate),
-      sanitizeCsvCell(r.invoiceNo.isEmpty ? '—' : r.invoiceNo),
-      sanitizeCsvCell(r.customerName.isEmpty ? '—' : r.customerName),
-      Formatters.currency(r.totalSales),
-      Formatters.number(r.totalItems),
-      Formatters.currency(r.paidAmount),
-      Formatters.currency(r.balanceAmount),
-      sanitizeCsvCell(invoiceStatusLabel(l10n, r.status)),
-    ],
-  );
-}
-
-/// Builds the CSV text for the sales-invoices grid (Invoice No | Date |
-/// Customer | Status | Total | Paid | Due | Created By — mirroring the
-/// grid's columns; the Status column uses the same localized label as
-/// the grid's badge).
-/// Builds the CSV text for the stock level report (Item | Code |
-/// Category | UOM | Current | Min | Reorder | Price | Status —
-/// mirroring the grid's columns; the Status column uses the same
-/// localized label as the grid's badge).
-String buildStockLevelCsv(AppLocalizations l10n, StockLevelReport report) {
-  return _buildGridCsv(
-    [
-      l10n.inventoryItemname,
-      l10n.inventoryItemcode,
-      l10n.fieldsCategory,
-      l10n.commonUom,
-      l10n.inventoryCurrentstock,
-      l10n.reportsMinimumstock,
-      l10n.inventoryReorderlevel,
-      l10n.reportsSellingprice,
-      l10n.fieldsStatus,
-    ],
-    report.rows,
-    (r) => [
-      sanitizeCsvCell(r.itemName.isEmpty ? '—' : r.itemName),
-      sanitizeCsvCell(r.itemCode.isEmpty ? '—' : r.itemCode),
-      sanitizeCsvCell(r.itemCategory.isEmpty ? '—' : r.itemCategory),
-      sanitizeCsvCell(r.unitOfMeasure.isEmpty ? '—' : r.unitOfMeasure),
-      Formatters.number(r.currentStock),
-      Formatters.number(r.minimumStock),
-      Formatters.number(r.reorderLevel),
-      Formatters.currency(r.standardSellingPrice),
-      sanitizeCsvCell(stockStatusLabel(l10n, r.stockStatus)),
-    ],
-  );
-}
-
-/// Builds the CSV text for the stock valuation report (Item | Code |
-/// Category | UOM | Stock | Unit Cost | Total Value | Method —
-/// mirroring the grid's columns).
-String buildStockValuationCsv(
+String buildBalanceSheetCsv(
   AppLocalizations l10n,
-  StockValuationReport report,
+  BalanceSheetReport report,
 ) {
-  return _buildGridCsv(
-    [
-      l10n.inventoryItemname,
-      l10n.inventoryItemcode,
-      l10n.fieldsCategory,
-      l10n.commonUom,
-      l10n.inventoryCurrentstock,
-      l10n.reportsUnitcost,
-      l10n.reportsTotalvalue,
-      l10n.reportsValuationmethod,
-    ],
-    report.rows,
-    (r) => [
-      sanitizeCsvCell(r.itemName.isEmpty ? '—' : r.itemName),
-      sanitizeCsvCell(r.itemCode.isEmpty ? '—' : r.itemCode),
-      sanitizeCsvCell(r.itemCategory.isEmpty ? '—' : r.itemCategory),
-      sanitizeCsvCell(r.unitOfMeasure.isEmpty ? '—' : r.unitOfMeasure),
-      Formatters.number(r.currentStock),
-      Formatters.currency(r.unitCost),
-      Formatters.currency(r.totalValue),
-      sanitizeCsvCell(r.valuationMethod.isEmpty ? '—' : r.valuationMethod),
-    ],
-  );
-}
-
-/// Builds the CSV text for the sales-by-customer report (Customer | Code
-/// | Email | Phone | Invoices | Sales | Items | Avg Order | Last
-/// Purchase — mirroring the grid's columns).
-String buildSalesByCustomerCsv(
-  AppLocalizations l10n,
-  List<SalesByCustomerRow> rows,
-) {
-  return _buildGridCsv(
-    [
-      l10n.fieldsCustomer,
-      l10n.fieldsCustomerCode,
-      l10n.fieldsEmail,
-      l10n.fieldsPhone,
-      l10n.reportsTotalinvoices,
-      l10n.reportsTotalsales,
-      l10n.reportsItems,
-      l10n.reportsAvgordervalue,
-      l10n.reportsLastpurchase,
-    ],
-    rows,
-    (r) => [
-      sanitizeCsvCell(r.customerName.isEmpty ? '—' : r.customerName),
-      sanitizeCsvCell(r.customerCode.isEmpty ? '—' : r.customerCode),
-      sanitizeCsvCell(r.email.isEmpty ? '—' : r.email),
-      sanitizeCsvCell(r.phone.isEmpty ? '—' : r.phone),
-      Formatters.number(r.totalInvoices),
-      Formatters.currency(r.totalSales),
-      Formatters.number(r.totalItems),
-      Formatters.currency(r.averageOrderValue),
-      r.lastPurchaseDate.isEmpty ? '—' : Formatters.date(r.lastPurchaseDate),
-    ],
-  );
+  final buf = StringBuffer();
+  buf.writeln('Balance Sheet,,${Formatters.date(report.asOfDate)}');
+  buf.writeln();
+  buf.writeln('Assets,,');
+  buf.writeln('Inventory,,${Formatters.currency(report.assets.inventory)}');
+  buf.writeln('Accounts Receivable,,${Formatters.currency(report.assets.accountsReceivable)}');
+  buf.writeln('Cash,,${Formatters.currency(report.assets.cash)}');
+  buf.writeln('${l10n.commonTotal},,${Formatters.currency(report.assets.total)}');
+  buf.writeln();
+  buf.writeln('Liabilities,,');
+  buf.writeln('Accounts Payable,,${Formatters.currency(report.liabilities.accountsPayable)}');
+  buf.writeln('${l10n.commonTotal},,${Formatters.currency(report.liabilities.total)}');
+  buf.writeln();
+  buf.writeln('Equity,,');
+  buf.writeln('Opening Retained Earnings,,${Formatters.currency(report.equity.openingRetainedEarnings)}');
+  buf.writeln('Net Income (YTD),,${Formatters.currency(report.equity.netIncomeYtd)}');
+  buf.writeln('Revenue (YTD),,${Formatters.currency(report.equity.revenueYtd)}');
+  buf.writeln('COGS (YTD),,${Formatters.currency(report.equity.cogsYtd)}');
+  buf.writeln('Expenses (YTD),,${Formatters.currency(report.equity.expensesYtd)}');
+  buf.writeln('${l10n.commonTotal},,${Formatters.currency(report.equity.total)}');
+  buf.writeln();
+  buf.writeln('Total Assets,,${Formatters.currency(report.totals.totalAssets)}');
+  buf.writeln('Total Liabilities & Equity,,${Formatters.currency(report.totals.totalLiabAndEquity)}');
+  buf.writeln('Balanced,,${report.totals.balanced ? "Yes" : "No"}');
+  return buf.toString();
 }
 
 /// Builds the CSV text for the DSO report — a Metric | Value table
@@ -724,74 +571,6 @@ String buildProfitLossCsv(AppLocalizations l10n, ProfitLossReport report) {
   );
 }
 
-/// Builds the CSV text for the inventory movement report (Date |
-/// Movement No | Item | Code | Warehouse | Type | Qty | Unit Cost —
-/// mirroring the grid's columns; the type uses the same localized label
-/// as the grid).
-String buildInventoryMovementCsv(
-  AppLocalizations l10n,
-  InventoryMovementReport report,
-) {
-  return _buildGridCsv(
-    [
-      l10n.fieldsDate,
-      l10n.reportsMovementno,
-      l10n.inventoryItemname,
-      l10n.inventoryItemcode,
-      l10n.fieldsWarehouse,
-      l10n.reportsMovementtype,
-      l10n.fieldsQuantity,
-      l10n.reportsUnitcost,
-    ],
-    report.rows,
-    (r) => [
-      r.movementDate.isEmpty ? '—' : Formatters.date(r.movementDate),
-      sanitizeCsvCell(r.movementNo.isEmpty ? '—' : r.movementNo),
-      sanitizeCsvCell(r.itemName.isEmpty ? '—' : r.itemName),
-      sanitizeCsvCell(r.itemCode.isEmpty ? '—' : r.itemCode),
-      sanitizeCsvCell(r.warehouseName.isEmpty ? '—' : r.warehouseName),
-      sanitizeCsvCell(movementTypeLabel(l10n, r.movementType)),
-      Formatters.number(r.quantity),
-      Formatters.currency(r.unitCost),
-    ],
-  );
-}
-
-/// Builds the CSV text for the purchase summary report (PO Date | PO No
-/// | Supplier | Total Cost | Items | Received | Balance | Status —
-/// mirroring the grid's columns; the status uses the same localized
-/// label as the grid's badge).
-String buildPurchaseSummaryCsv(
-  AppLocalizations l10n,
-  PurchaseSummaryReport report,
-) {
-  return _buildGridCsv(
-    [
-      l10n.fieldsDate,
-      l10n.purchaseordersPono,
-      l10n.fieldsSupplier,
-      l10n.reportsTotalcost,
-      l10n.reportsItems,
-      l10n.reportsReceived,
-      l10n.reportsBalance,
-      l10n.fieldsStatus,
-    ],
-    report.rows,
-    (r) => [
-      r.purchaseDate.isEmpty ? '—' : Formatters.date(r.purchaseDate),
-      sanitizeCsvCell(
-        r.purchaseOrderNumber.isEmpty ? '—' : r.purchaseOrderNumber,
-      ),
-      sanitizeCsvCell(r.supplierName.isEmpty ? '—' : r.supplierName),
-      Formatters.currency(r.totalCost),
-      Formatters.number(r.totalItems),
-      Formatters.currency(r.receivedAmount),
-      Formatters.currency(r.balanceAmount),
-      sanitizeCsvCell(poStatusLabel(l10n, r.status)),
-    ],
-  );
-}
-
 /// Builds the CSV text for the top-debtors report (Customer | Code |
 /// Outstanding | Invoiced | Invoice Count — mirroring the grid's
 /// columns).
@@ -839,123 +618,6 @@ String buildCustomerStatementsCsv(
       Formatters.currency(r.totalDebits),
       Formatters.currency(r.totalCredits),
       Formatters.currency(r.closingBalance),
-    ],
-  );
-}
-
-/// Builds the CSV text for the sales-by-item report (Item Name | Code |
-/// Category | Total Quantity Sold | Total Sales | Avg. Selling Price —
-/// mirroring the grid's columns).
-String buildSalesByItemCsv(AppLocalizations l10n, List<SalesByItemRow> rows) {
-  return _buildGridCsv(
-    [
-      l10n.inventoryItemname,
-      l10n.inventoryItemcode,
-      l10n.fieldsCategory,
-      l10n.reportsTotalquantitysold,
-      l10n.reportsTotalsales,
-      l10n.reportsAvgsellingprice,
-    ],
-    rows,
-    (r) => [
-      sanitizeCsvCell(r.itemName.isEmpty ? '—' : r.itemName),
-      sanitizeCsvCell(r.itemCode.isEmpty ? '—' : r.itemCode),
-      sanitizeCsvCell(r.itemCategory.isEmpty ? '—' : r.itemCategory),
-      Formatters.number(r.totalQuantitySold),
-      Formatters.currency(r.totalSales),
-      Formatters.currency(r.averageSellingPrice),
-    ],
-  );
-}
-
-/// Builds the CSV text for the supplier-analysis report (Supplier | Code
-/// | Email | Phone | Total Orders | Total Purchase Value | Avg. Order
-/// Value | On-time Delivery Rate | Last Purchase — mirroring the grid's
-/// columns).
-String buildSupplierAnalysisCsv(
-  AppLocalizations l10n,
-  List<SupplierAnalysisRow> rows,
-) {
-  return _buildGridCsv(
-    [
-      l10n.suppliersSuppliername,
-      l10n.suppliersSuppliercode,
-      l10n.fieldsEmail,
-      l10n.fieldsPhone,
-      l10n.reportsTotalorders,
-      l10n.reportsTotalpurchasevalue,
-      l10n.reportsAvgordervalue,
-      l10n.reportsOntimedeliveryrate,
-      l10n.reportsLastpurchase,
-    ],
-    rows,
-    (r) => [
-      sanitizeCsvCell(r.supplierName.isEmpty ? '—' : r.supplierName),
-      sanitizeCsvCell(r.supplierCode.isEmpty ? '—' : r.supplierCode),
-      sanitizeCsvCell(r.email.isEmpty ? '—' : r.email),
-      sanitizeCsvCell(r.phone.isEmpty ? '—' : r.phone),
-      Formatters.number(r.totalOrders),
-      Formatters.currency(r.totalPurchaseValue),
-      Formatters.currency(r.averageOrderValue),
-      Formatters.number(r.onTimeDeliveryRate),
-      r.lastPurchaseDate.isEmpty ? '—' : Formatters.date(r.lastPurchaseDate),
-    ],
-  );
-}
-
-/// Builds the CSV text for the production-summary report (Date | Order |
-/// Output Item | Output Qty | Completed Qty | Scrapped Qty | Status —
-/// mirroring the grid's columns).
-String buildProductionSummaryCsv(
-  AppLocalizations l10n,
-  ProductionSummaryReport report,
-) {
-  return _buildGridCsv(
-    [
-      l10n.reportsProductiondate,
-      l10n.reportsProductionorder,
-      l10n.reportsOutputitem,
-      l10n.reportsOutputquantity,
-      l10n.reportsCompletedquantity,
-      l10n.reportsScrappedquantity,
-      l10n.fieldsStatus,
-    ],
-    report.rows,
-    (r) => [
-      r.productionDate.isEmpty ? '—' : Formatters.date(r.productionDate),
-      sanitizeCsvCell(r.productionOrderNumber.isEmpty ? '—' : r.productionOrderNumber),
-      sanitizeCsvCell(r.outputItemName.isEmpty ? '—' : r.outputItemName),
-      Formatters.number(r.outputQuantity),
-      Formatters.number(r.completedQuantity),
-      Formatters.number(r.scrappedQuantity),
-      sanitizeCsvCell(r.status.isEmpty ? '—' : r.status),
-    ],
-  );
-}
-
-/// Builds the CSV text for the bom-usage report (BOM Name | Parent Item
-/// | Usage Count | Last Used | Total Components | Status — mirroring the
-/// grid's columns).
-String buildBomUsageCsv(AppLocalizations l10n, BomUsageReport report) {
-  return _buildGridCsv(
-    [
-      l10n.bomName,
-      l10n.reportsParentitem,
-      l10n.reportsUsagecount,
-      l10n.reportsLastused,
-      l10n.reportsTotalcomponents,
-      l10n.fieldsStatus,
-    ],
-    report.rows,
-    (r) => [
-      sanitizeCsvCell(r.bomName.isEmpty ? '—' : r.bomName),
-      sanitizeCsvCell(r.parentItemName.isEmpty ? '—' : r.parentItemName),
-      Formatters.number(r.usageCount),
-      r.lastUsedDate == null || r.lastUsedDate!.isEmpty
-          ? '—'
-          : Formatters.date(r.lastUsedDate!),
-      Formatters.number(r.totalComponents),
-      sanitizeCsvCell(r.status.isEmpty ? '—' : r.status),
     ],
   );
 }
@@ -1094,6 +756,93 @@ String buildBomsCsv(AppLocalizations l10n, List<Bom> boms) {
       Formatters.number(bom.itemCount ?? 0),
       Formatters.currency(bom.totalMaterialCost ?? 0),
       sanitizeCsvCell(bom.isActive ? l10n.statusActive : l10n.statusInactive),
+    ],
+  );
+}
+
+/// Builds the CSV text for the trial-balance grid (Account Code | Name
+/// | Type | Debit | Credit | Balance).
+String buildTrialBalanceCsv(
+  AppLocalizations l10n,
+  TrialBalanceReport report,
+) {
+  return _buildGridCsv(
+    [
+      l10n.reportsAccountcode,
+      l10n.reportsAccountname,
+      l10n.reportsAccounttype,
+      l10n.reportsTotaldebit,
+      l10n.reportsTotalcredit,
+      l10n.reportsBalance,
+    ],
+    report.accounts,
+    (a) => [
+      sanitizeCsvCell(a.accountCode),
+      sanitizeCsvCell(a.accountName),
+      sanitizeCsvCell(a.accountType),
+      Formatters.currency(a.totalDebit),
+      Formatters.currency(a.totalCredit),
+      Formatters.currency(a.balance),
+    ],
+  );
+}
+
+/// Builds the CSV text for the general-ledger grid (Date | Type |
+/// Reference | Debit | Credit | Balance | Remarks).
+String buildGeneralLedgerCsv(
+  AppLocalizations l10n,
+  List<GeneralLedgerRow> rows,
+) {
+  return _buildGridCsv(
+    [
+      l10n.reportsDate,
+      l10n.reportsTransactiontype,
+      l10n.reportsReferenceno,
+      l10n.reportsDebit,
+      l10n.reportsCredit,
+      l10n.reportsBalance,
+      l10n.fieldsNotes,
+    ],
+    rows,
+    (r) => [
+      r.transactionDate.isEmpty ? '—' : Formatters.date(r.transactionDate),
+      sanitizeCsvCell(r.transactionType),
+      sanitizeCsvCell(r.referenceNo),
+      Formatters.currency(r.debit),
+      Formatters.currency(r.credit),
+      Formatters.currency(r.balance),
+      sanitizeCsvCell((r.remarks?.isEmpty ?? true) ? '—' : r.remarks!),
+    ],
+  );
+}
+
+/// Builds the CSV text for the batch-traceability grid (batch rows
+/// with original/sold/remaining quantities).
+String buildBatchTraceabilityCsv(
+  AppLocalizations l10n,
+  BatchTraceabilityReport report,
+) {
+  return _buildGridCsv(
+    [
+      'Batch No',
+      l10n.fieldsWarehouse,
+      'Source',
+      l10n.reportsDate,
+      'Unit Cost',
+      'Original',
+      'Sold',
+      'Remaining',
+    ],
+    report.batches,
+    (b) => [
+      sanitizeCsvCell(b.batchNo.isEmpty ? '—' : b.batchNo),
+      sanitizeCsvCell(b.warehouseName),
+      sanitizeCsvCell('${b.sourceType} #${b.sourceId}'),
+      b.receivedDate.isEmpty ? '—' : Formatters.date(b.receivedDate),
+      Formatters.currency(b.unitCost),
+      Formatters.number(b.quantityOriginal),
+      Formatters.number(b.quantitySold),
+      Formatters.number(b.quantityRemaining),
     ],
   );
 }

@@ -157,18 +157,25 @@ function createPOSSale(req: AuthRequest, res: Response): void {
           unit_price: item.unit_price,
         });
 
-        // Deduct stock
-        StockMovementModel.recordMovement({
-          item_id: item.item_id,
-          warehouse_id: warehouse_id,
-          quantity: -item.quantity,
-          movement_type: 'SALE',
-          unit_cost: item.unit_price,
-          reference_doctype: 'POS',
-          reference_docno: transactionNo,
-          movement_date: sale_date,
-          remarks: `POS Sale: ${transactionNo} - ${itemRecord.item_name}`
-        }, userId, db);
+        // Deduct stock via FIFO batch consumption
+        const consumption = InvoiceModel.consumeFromOldestBatches(
+          item.item_id, warehouse_id, item.quantity, db
+        );
+        for (const entry of consumption) {
+          const batchLabel = entry.batchId ? `(batch ${entry.batchId})` : '(legacy stock)';
+          StockMovementModel.recordMovement({
+            item_id: item.item_id,
+            warehouse_id: warehouse_id,
+            quantity: -entry.consumed,
+            movement_type: 'SALE',
+            unit_cost: entry.unitCost,
+            reference_doctype: 'POS',
+            reference_docno: transactionNo,
+            movement_date: sale_date,
+            remarks: `POS Sale: ${transactionNo} - ${itemRecord.item_name} ${batchLabel}`,
+            batch_id: entry.batchId ?? undefined,
+          }, userId, db);
+        }
 
         itemDetails.push({
           sale_id: invoiceId,
