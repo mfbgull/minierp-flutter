@@ -79,6 +79,8 @@ class InvoiceItem {
     required this.discountType,
     required this.discountValue,
     required this.returnedQty,
+    this.expiryDate,
+    this.isExpiredAtSale = false,
   });
 
   factory InvoiceItem.fromJson(Map<String, dynamic> json) => InvoiceItem(
@@ -94,6 +96,8 @@ class InvoiceItem {
     discountType: asString(json['discount_type']) ?? 'none',
     discountValue: asNum(json['discount_value']) ?? 0,
     returnedQty: asNum(json['returned_qty']) ?? 0,
+    expiryDate: asString(json['expiry_date']),
+    isExpiredAtSale: asBool(json['is_expired_at_sale']),
   );
 
   final int id;
@@ -108,6 +112,8 @@ class InvoiceItem {
   final String discountType; // 'none' | 'percentage' | 'flat'
   final num discountValue;
   final num returnedQty;
+  final String? expiryDate;
+  final bool isExpiredAtSale;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -122,6 +128,8 @@ class InvoiceItem {
     'discount_type': discountType,
     'discount_value': discountValue,
     'returned_qty': returnedQty,
+    if (expiryDate != null) 'expiry_date': expiryDate,
+    'is_expired_at_sale': isExpiredAtSale ? 1 : 0,
   };
 }
 
@@ -322,6 +330,7 @@ class Invoice {
     this.company,
     this.payment,
     this.paymentMethods,
+    this.expiryNotes,
   });
 
   factory Invoice.fromJson(Map<String, dynamic> json) => Invoice(
@@ -364,6 +373,7 @@ class Invoice {
     warehouseId: asInt(json['warehouse_id']),
     warehouseCode: asString(json['warehouse_code']),
     warehouseName: asString(json['warehouse_name']),
+    expiryNotes: asString(json['expiry_notes']),
     company: json['company'] is Map<String, dynamic>
         ? CompanyInfo.fromJson(json['company'] as Map<String, dynamic>)
         : null,
@@ -410,6 +420,7 @@ class Invoice {
   final int? warehouseId;
   final String? warehouseCode;
   final String? warehouseName;
+  final String? expiryNotes;
   final CompanyInfo? company;
   final InvoicePayment? payment;
   final List<PaymentMethod>? paymentMethods;
@@ -455,6 +466,7 @@ class Invoice {
     if (warehouseId != null) 'warehouse_id': warehouseId,
     if (warehouseCode != null) 'warehouse_code': warehouseCode,
     if (warehouseName != null) 'warehouse_name': warehouseName,
+    if (expiryNotes != null) 'expiry_notes': expiryNotes,
     if (company != null) 'company': company!.toJson(),
     if (payment != null) 'payment': payment!.toJson(),
     if (paymentMethods != null)

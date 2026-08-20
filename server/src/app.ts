@@ -37,6 +37,7 @@ import accountingRoutes from './routes/accounting';
 import customReportsRoutes from './routes/customReports';
 import preferencesRoutes from './routes/preferences';
 import searchRoutes from './routes/search';
+import stockBatchesRoutes, { initStockBatchesRoutes } from './routes/stockBatches';
 import path from 'path';
 import fs from 'fs';
 
@@ -233,6 +234,7 @@ app.use('/api/accounting', accountingRoutes);
 app.use('/api/reports/custom', customReportsRoutes);
 app.use('/api/preferences', preferencesRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api', initStockBatchesRoutes(db));
 
 // Serve static files from client/dist in production
 // This MUST come AFTER API routes

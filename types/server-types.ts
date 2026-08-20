@@ -49,6 +49,8 @@ export interface Item {
   is_raw_material: boolean;
   is_finished_good: boolean;
   is_purchased: boolean;
+  has_expiry?: boolean;
+  near_expiry_threshold_days?: number;
   created_at?: string;
   updated_at?: string;
 }

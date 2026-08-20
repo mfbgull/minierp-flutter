@@ -45,12 +45,12 @@ class PurchaseOrderModel {
             // Insert PO items
             const itemStmt = db.prepare(`
         INSERT INTO purchase_order_items (
-          po_id, item_id, quantity, unit_price, amount
-        ) VALUES (?, ?, ?, ?, ?)
+          po_id, item_id, quantity, unit_price, amount, expiry_date
+        ) VALUES (?, ?, ?, ?, ?, ?)
       `);
             for (const item of items) {
                 const amount = item.quantity * item.unit_price;
-                itemStmt.run(poId, item.item_id, item.quantity, item.unit_price, amount);
+                itemStmt.run(poId, item.item_id, item.quantity, item.unit_price, amount, item.expiry_date || null);
             }
             // Create AP ledger entry (if submitted)
             if (status === 'Submitted') {
@@ -516,9 +516,9 @@ class PurchaseOrderModel {
           INSERT INTO stock_batches (
             batch_no, item_id, warehouse_id, source_type,
             source_id, quantity_original, quantity_remaining,
-            unit_cost, received_date
-          ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?)
-        `).run(batchNo, poItem.item_id, warehouse_id, receiptItemId, receiptItem.received_quantity, receiptItem.received_quantity, poItem.unit_price, receipt_date);
+            unit_cost, received_date, expiry_date
+          ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?)
+        `).run(batchNo, poItem.item_id, warehouse_id, receiptItemId, receiptItem.received_quantity, receiptItem.received_quantity, poItem.unit_price, receipt_date, poItem.expiry_date || null);
                 const batchId = batchResult.lastInsertRowid;
                 // Create stock movement using atomic movement number generation
                 const movementNo = StockMovement_1.default.generateMovementNo(db);

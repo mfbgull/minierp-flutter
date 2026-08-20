@@ -36,6 +36,7 @@ interface PurchaseOrderItem {
   received_quantity: number;
   unit_price: number;
   amount: number;
+  expiry_date?: string | null;
   item_code?: string;
   item_name?: string;
   unit_of_measure?: string;
@@ -156,13 +157,13 @@ class PurchaseOrderModel {
       // Insert PO items
       const itemStmt = db.prepare(`
         INSERT INTO purchase_order_items (
-          po_id, item_id, quantity, unit_price, amount
-        ) VALUES (?, ?, ?, ?, ?)
+          po_id, item_id, quantity, unit_price, amount, expiry_date
+        ) VALUES (?, ?, ?, ?, ?, ?)
       `);
 
       for (const item of items) {
         const amount = item.quantity * item.unit_price;
-        itemStmt.run(poId, item.item_id, item.quantity, item.unit_price, amount);
+        itemStmt.run(poId, item.item_id, item.quantity, item.unit_price, amount, (item as any).expiry_date || null);
       }
 
       // Create AP ledger entry (if submitted)
@@ -747,7 +748,7 @@ class PurchaseOrderModel {
       for (const receiptItem of items) {
         const poItem = db.prepare(`
           SELECT * FROM purchase_order_items WHERE id = ?
-        `).get(receiptItem.po_item_id) as { po_id: number; item_id: number; quantity: number; received_quantity: number; unit_price: number };
+        `).get(receiptItem.po_item_id) as { po_id: number; item_id: number; quantity: number; received_quantity: number; unit_price: number; expiry_date?: string | null };
 
         const receiptItemResult = receiptItemStmt.run(receiptId, receiptItem.po_item_id, poItem.item_id, receiptItem.received_quantity);
         const receiptItemId = receiptItemResult.lastInsertRowid as number;
@@ -771,8 +772,8 @@ class PurchaseOrderModel {
           INSERT INTO stock_batches (
             batch_no, item_id, warehouse_id, source_type,
             source_id, quantity_original, quantity_remaining,
-            unit_cost, received_date
-          ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?)
+            unit_cost, received_date, expiry_date
+          ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?)
         `).run(
           batchNo,
           poItem.item_id,
@@ -781,7 +782,8 @@ class PurchaseOrderModel {
           receiptItem.received_quantity,
           receiptItem.received_quantity,
           poItem.unit_price,
-          receipt_date
+          receipt_date,
+          poItem.expiry_date || null
         );
         const batchId = batchResult.lastInsertRowid as number;
 

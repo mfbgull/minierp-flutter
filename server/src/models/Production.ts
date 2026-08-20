@@ -89,6 +89,7 @@ interface CreateProductionDTO {
   bom_id?: number;
   remarks?: string;
   overhead_cost?: number;
+  expiry_date?: string;
 }
 
 class ProductionModel {
@@ -126,7 +127,8 @@ class ProductionModel {
       input_items,
       bom_id,
       remarks,
-      overhead_cost
+      overhead_cost,
+      expiry_date
     } = data;
 
     const materialsWarehouseId = raw_materials_warehouse_id || warehouse_id;
@@ -272,8 +274,8 @@ class ProductionModel {
         INSERT INTO stock_batches (
           batch_no, item_id, warehouse_id, source_type,
           source_id, quantity_original, quantity_remaining,
-          unit_cost, received_date
-        ) VALUES (?, ?, ?, 'PRODUCTION', ?, ?, ?, ?, ?)
+          unit_cost, received_date, expiry_date
+        ) VALUES (?, ?, ?, 'PRODUCTION', ?, ?, ?, ?, ?, ?)
       `).run(
         batchNo,
         output_item_id,
@@ -282,7 +284,8 @@ class ProductionModel {
         output_quantity,
         output_quantity,
         costPerUnit,
-        production_date
+        production_date,
+        expiry_date || null
       );
 
       const batchRecord = db.prepare(`

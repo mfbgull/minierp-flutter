@@ -333,10 +333,28 @@ export class PaymentModel {
 
       const paymentNo = this.generatePaymentNo(db);
 
+      // When the payment settles exactly one PO (and no purchases), reflect it on
+      // the denormalized payments.purchase_order_id so PO-level reporting joins
+      // correctly. Multi-PO / mixed allocations stay NULL — the column is
+      // single-valued and po_allocations remains the authoritative record.
+      const singlePoId =
+        poAllocs.length === 1 && purchaseAllocs.length === 0
+          ? parseInt(poAllocs[0].po_id, 10)
+          : null;
+
       const paymentResult = db.prepare(`
-        INSERT INTO payments (payment_no, supplier_id, payment_date, amount, payment_method, reference_no, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(paymentNo, data.supplier_id, data.payment_date, data.amount, data.payment_method || 'Cash', data.reference_no || '', data.notes || '');
+        INSERT INTO payments (payment_no, supplier_id, payment_date, amount, payment_method, reference_no, notes, purchase_order_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        paymentNo,
+        data.supplier_id,
+        data.payment_date,
+        data.amount,
+        data.payment_method || 'Cash',
+        data.reference_no || '',
+        data.notes || '',
+        singlePoId,
+      );
 
       const paymentId = paymentResult.lastInsertRowid as number;
 

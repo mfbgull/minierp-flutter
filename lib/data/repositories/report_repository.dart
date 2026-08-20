@@ -19,6 +19,8 @@ import '../../data/models/report.dart'
         CashReconciliation,
         CustomerStatementRow,
         DSOMetric,
+        ExpiryAlert,
+        ExpiryReportRow,
         GeneralLedgerRow,
         IncomeStatementReport,
         ProfitLossReport,
@@ -235,6 +237,32 @@ class ReportRepository {
         '${ApiEndpoints.reportBatchTraceability}/$itemId',
         parse: (Object? json) =>
             BatchTraceabilityReport.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// GET /reports/expiry — batches with expiry info, filtered by warehouse,
+  /// status, and a threshold-day override.
+  Future<ApiResult<List<ExpiryReportRow>>> expiryReport({
+    int? warehouseId,
+    int? thresholdDays,
+    String? status,
+  }) => _api.getRawList(
+    ApiEndpoints.reportExpiry,
+    queryParameters: <String, dynamic>{
+      if (warehouseId != null) 'warehouse_id': warehouseId,
+      if (thresholdDays != null) 'threshold_days': thresholdDays,
+      if (status != null) 'status': status,
+    },
+    parseItem: (Object? json) =>
+        ExpiryReportRow.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// GET /dashboard/expiry-alerts — top batches expiring within [days].
+  Future<ApiResult<List<ExpiryAlert>>> expiryAlerts({int days = 30}) =>
+      _api.getRawList(
+        ApiEndpoints.dashboardExpiryAlerts,
+        queryParameters: <String, dynamic>{'days': days},
+        parseItem: (Object? json) =>
+            ExpiryAlert.fromJson(json as Map<String, dynamic>),
       );
 }
 

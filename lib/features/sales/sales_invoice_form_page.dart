@@ -40,9 +40,12 @@ import '../../data/models/invoice.dart'
         PaymentMethod;
 import '../../data/models/item.dart' show Item, SaleType;
 import '../../data/models/price_history.dart' show ItemPriceHistory;
+import '../../data/models/stock_batch.dart' show StockBatch;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/invoice_repository.dart'
     show invoiceRepositoryProvider;
+import '../../data/repositories/inventory_repository.dart'
+    show inventoryRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/confirm_dialog.dart';
@@ -861,6 +864,82 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     };
   }
 
+  /// Sale-time expiry guard (item-expiry spec §2.10/2.11): before posting,
+  /// inspects the soonest-expiring available batch of every expiry-tracked
+  /// item. Blocks on expired stock (confirm dialog); toasts on near-expiry.
+  /// Batch-lookup failures never block the sale.
+  Future<bool> _confirmExpiry() async {
+    final l10n = AppLocalizations.of(context)!;
+    final items = ref.read(invoiceItemsProvider).valueOrNull ?? const <Item>[];
+    final repo = ref.read(inventoryRepositoryProvider);
+    final expired = <String>[];
+    final near = <String>[];
+    for (final line in _filledLines) {
+      final itemId = int.tryParse(line.itemId);
+      if (itemId == null) continue;
+      final item = items.where((i) => i.id == itemId).firstOrNull;
+      if (item?.hasExpiry != true) continue;
+      final result = await repo.getBatches(itemId: itemId);
+      if (result case ApiFailure()) continue;
+      final batches = (result as ApiSuccess<List<StockBatch>>)
+          .data
+          .where((b) => !b.halted);
+      if (batches.isEmpty) continue;
+      String? soonestExpiry;
+      StockBatch? soonest;
+      for (final b in batches) {
+        final e = b.expiryDate;
+        if (e == null) continue;
+        if (soonestExpiry == null ||
+            DateTime.parse(e).isBefore(DateTime.parse(soonestExpiry))) {
+          soonestExpiry = e;
+          soonest = b;
+        }
+      }
+      if (soonest == null || soonestExpiry == null) continue;
+      final days =
+          DateTime.parse(soonestExpiry).difference(DateTime.now()).inDays;
+      final name = item?.itemName ?? line.description;
+      if (days < 0) {
+        expired.add('$name · ${soonest.batchNo}');
+      } else if (days <= (item?.nearExpiryThresholdDays ?? 30)) {
+        near.add(
+          l10n.nearExpirySaleWarning(
+            name,
+            soonest.batchNo,
+            Formatters.date(soonestExpiry),
+          ),
+        );
+      }
+    }
+    if (expired.isEmpty && near.isEmpty) return true;
+    if (!mounted) return true;
+    if (expired.isNotEmpty) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.soldAfterExpiry),
+          content: Text('${l10n.expiredStockConfirm}\n\n${expired.join('\n')}'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.commonCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l10n.commonConfirm),
+            ),
+          ],
+        ),
+      );
+      return proceed ?? false;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(near.join('\n')), duration: const Duration(seconds: 4)),
+    );
+    return true;
+  }
+
   /// Validates and posts the invoice. Commits any in-flight grid cell so
   /// the edit being typed is included (spec §8.22). Returns the saved
   /// [Invoice] on success, `null` when validation or the API failed.
@@ -881,6 +960,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       _showError(_invalidQuantityMessage);
       return null;
     }
+    if (!await _confirmExpiry()) return null;
     _errorTimer?.cancel();
     setState(() {
       _submitting = true;

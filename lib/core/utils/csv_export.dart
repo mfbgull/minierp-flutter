@@ -55,6 +55,7 @@ import '../../data/models/report.dart'
         CashReconciliation,
         CustomerStatementRow,
         DSOMetric,
+        ExpiryReportRow,
         GeneralLedgerRow,
         ProfitLossReport,
         TopDebtorRow,
@@ -832,6 +833,8 @@ String buildBatchTraceabilityCsv(
       'Original',
       'Sold',
       'Remaining',
+      l10n.expiryDate,
+      l10n.expiryStatus,
     ],
     report.batches,
     (b) => [
@@ -843,6 +846,46 @@ String buildBatchTraceabilityCsv(
       Formatters.number(b.quantityOriginal),
       Formatters.number(b.quantitySold),
       Formatters.number(b.quantityRemaining),
+      b.expiryDate != null ? Formatters.date(b.expiryDate!) : '—',
+      b.status ?? 'normal',
+    ],
+  );
+}
+
+/// Expiry report CSV — mirrors [ExpiryReportScreen]'s grid columns.
+String buildExpiryReportCsv(
+  AppLocalizations l10n,
+  List<ExpiryReportRow> rows,
+) {
+  return _buildGridCsv(
+    [
+      l10n.inventoryItemcode,
+      l10n.inventoryItemname,
+      l10n.fieldsBatchno,
+      l10n.fieldsWarehouse,
+      l10n.inventoryQtyremaining,
+      l10n.fieldsUnitcost,
+      l10n.totalValue,
+      l10n.fieldsDate,
+      l10n.expiryDate,
+      l10n.expiryStatus,
+      l10n.daysUntilExpiry,
+      l10n.statusHalted,
+    ],
+    rows,
+    (r) => [
+      sanitizeCsvCell(r.itemCode),
+      sanitizeCsvCell(r.itemName),
+      sanitizeCsvCell(r.batchNo),
+      sanitizeCsvCell(r.warehouseName),
+      Formatters.number(r.quantityRemaining),
+      Formatters.currency(r.unitCost),
+      Formatters.currency(r.totalValue),
+      r.receivedDate.isEmpty ? '—' : Formatters.date(r.receivedDate),
+      r.expiryDate != null ? Formatters.date(r.expiryDate!) : '—',
+      r.status,
+      r.daysUntilExpiry?.toString() ?? '—',
+      r.halted ? l10n.statusHalted : '—',
     ],
   );
 }

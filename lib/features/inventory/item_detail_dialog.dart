@@ -9,8 +9,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/item.dart' show Item, SaleType;
-import '../../data/repositories/api_result.dart' show ApiError;
-import '../../data/repositories/inventory_repository.dart' show ItemDetail;
+import '../../data/models/stock_batch.dart' show BatchStatus, StockBatch;
+import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiResult, ApiSuccess;
+import '../../data/repositories/inventory_repository.dart'
+    show ItemDetail, inventoryRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
@@ -19,6 +21,7 @@ import '../../widgets/status_badge.dart';
 import 'inventory_providers.dart';
 import 'item_form_dialog.dart';
 import 'stock_ledger_dialog.dart';
+import 'batch_management_screen.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the read-only detail dialog for [itemId].
@@ -199,6 +202,7 @@ class _DetailBody extends StatelessWidget {
                 detailSectionLabel(context, l10n.inventoryStockbywarehouse),
                 const SizedBox(height: 6),
                 _warehouseTable(context, l10n),
+                if (item.hasExpiry) _BatchExpirySummary(item: item),
               ],
             ),
           ),
@@ -225,6 +229,15 @@ class _DetailBody extends StatelessWidget {
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 label: Text(l10n.inventoryEdit),
               ),
+              if (detail.item.hasExpiry)
+                TextButton.icon(
+                  onPressed: () => showBatchManagementScreen(
+                    context,
+                    itemId: detail.item.id,
+                  ),
+                  icon: const Icon(Icons.layers_outlined, size: 18),
+                  label: Text(l10n.manageBatches),
+                ),
               const SizedBox(width: 4),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -338,6 +351,70 @@ class _DetailBody extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Batch expiry summary for the item detail dialog — counts total /
+/// near-expiry / expired batches and links to the batch manager.
+class _BatchExpirySummary extends ConsumerWidget {
+  const _BatchExpirySummary({required this.item});
+
+  final Item item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    return FutureBuilder<ApiResult<List<StockBatch>>>(
+      future:
+          ref.read(inventoryRepositoryProvider).getBatches(itemId: item.id),
+      builder: (context, snap) {
+        if (!snap.hasData) return const SizedBox.shrink();
+        final result = snap.data!;
+        if (result case ApiFailure(:final error)) {
+          return Text(
+            error.message,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          );
+        }
+        final batches = (result as ApiSuccess<List<StockBatch>>).data;
+        if (batches.isEmpty) return const SizedBox.shrink();
+        final threshold = item.nearExpiryThresholdDays ?? 30;
+        final total = batches.length;
+        final near = batches
+            .where(
+              (b) =>
+                  b.computeStatus(nearExpiryThresholdDays: threshold) ==
+                  BatchStatus.nearExpiry,
+            )
+            .length;
+        final expired = batches
+            .where(
+              (b) =>
+                  b.computeStatus(nearExpiryThresholdDays: threshold) ==
+                  BatchStatus.expired,
+            )
+            .length;
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.batchesSummary(expired, near, total),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 6),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    showBatchManagementScreen(context, itemId: item.id),
+                icon: const Icon(Icons.layers_outlined, size: 16),
+                label: Text(l10n.manageBatches),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

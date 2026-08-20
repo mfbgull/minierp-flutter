@@ -139,12 +139,41 @@ class _InvoicePrintPreviewPageState
     } else if (!ready) {
       body = const Center(child: CircularProgressIndicator());
     } else {
-      body = PdfPreview(
-        build: _previewBuild,
-        pdfFileName: '${widget.invoice.invoiceNo}.pdf',
-        // The page owns its actions (Print in the app bar, Cancel via
-        // back); the built-in bar would duplicate them.
-        useActions: false,
+      final expiryNotes = _detail?.expiryNotes?.trim();
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (expiryNotes != null && expiryNotes.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _detail!.items
+                            ?.any((i) => i.isExpiredAtSale) ==
+                        true
+                    ? Colors.red.shade50
+                    : Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _detail!.items
+                              ?.any((i) => i.isExpiredAtSale) ==
+                          true
+                      ? Colors.red.shade200
+                      : Colors.orange.shade200,
+                ),
+              ),
+              child: Text(expiryNotes),
+            ),
+          Expanded(
+            child: PdfPreview(
+              build: _previewBuild,
+              pdfFileName: '${widget.invoice.invoiceNo}.pdf',
+              // The page owns its actions (Print in the app bar, Cancel
+              // via back); the built-in bar would duplicate them.
+              useActions: false,
+            ),
+          ),
+        ],
       );
     }
 

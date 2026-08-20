@@ -41,6 +41,8 @@ interface CreateItemDTO {
   sale_type?: 'packed' | 'loose';
   qty_decimal_precision?: number;
   rounding_step?: number | null;
+  has_expiry?: boolean;
+  near_expiry_threshold_days?: number;
 }
 
 interface UpdateItemDTO {
@@ -58,6 +60,8 @@ interface UpdateItemDTO {
   sale_type?: 'packed' | 'loose';
   qty_decimal_precision?: number;
   rounding_step?: number | null;
+  has_expiry?: boolean;
+  near_expiry_threshold_days?: number;
 }
 
 interface ItemFilters {
@@ -169,8 +173,9 @@ class ItemModel {
         unit_of_measure, reorder_level, standard_cost, standard_selling_price,
         is_raw_material, is_finished_good, is_purchased, is_manufactured,
         sale_type, qty_decimal_precision, rounding_step,
+        has_expiry, near_expiry_threshold_days,
         created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -189,6 +194,8 @@ class ItemModel {
       data.sale_type === 'loose' ? 'loose' : 'packed',
       data.qty_decimal_precision || 0,
       data.rounding_step ?? null,
+      data.has_expiry ? 1 : 0,
+      data.near_expiry_threshold_days ?? 30,
       userId
     );
 
@@ -212,6 +219,8 @@ class ItemModel {
           sale_type = ?,
           qty_decimal_precision = ?,
           rounding_step = ?,
+          has_expiry = ?,
+          near_expiry_threshold_days = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
@@ -231,6 +240,8 @@ class ItemModel {
       data.sale_type === 'loose' ? 'loose' : 'packed',
       data.qty_decimal_precision || 0,
       data.rounding_step ?? null,
+      data.has_expiry ? 1 : 0,
+      data.near_expiry_threshold_days ?? 30,
       id
     );
   }

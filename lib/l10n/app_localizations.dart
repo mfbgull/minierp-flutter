@@ -344,6 +344,12 @@ abstract class AppLocalizations {
   /// **'Low Stock'**
   String get dashboardcardPanelLowstock;
 
+  /// No description provided for @dashboardcardPanelExpiryalerts.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiring Soon'**
+  String get dashboardcardPanelExpiryalerts;
+
   /// No description provided for @dashboardcardCashstrip.
   ///
   /// In en, this message translates to:
@@ -10315,6 +10321,262 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close'**
   String get searchClose;
+
+  /// No description provided for @expiryTracking.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Tracking'**
+  String get expiryTracking;
+
+  /// No description provided for @trackExpiryDates.
+  ///
+  /// In en, this message translates to:
+  /// **'Track expiry dates'**
+  String get trackExpiryDates;
+
+  /// No description provided for @nearExpiryThreshold.
+  ///
+  /// In en, this message translates to:
+  /// **'Near-expiry threshold (days)'**
+  String get nearExpiryThreshold;
+
+  /// No description provided for @expiryDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Date'**
+  String get expiryDate;
+
+  /// No description provided for @expirySelectDateOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Select date (optional)'**
+  String get expirySelectDateOptional;
+
+  /// No description provided for @batchManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch Management'**
+  String get batchManagement;
+
+  /// No description provided for @expiryStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Status'**
+  String get expiryStatus;
+
+  /// No description provided for @statusNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get statusNormal;
+
+  /// No description provided for @statusNearExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Near Expiry'**
+  String get statusNearExpiry;
+
+  /// No description provided for @statusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get statusExpired;
+
+  /// No description provided for @statusHalted.
+  ///
+  /// In en, this message translates to:
+  /// **'Halted'**
+  String get statusHalted;
+
+  /// No description provided for @haltBatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Halt Batch'**
+  String get haltBatch;
+
+  /// No description provided for @unhaltBatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Unhalt Batch'**
+  String get unhaltBatch;
+
+  /// No description provided for @haltReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Halt Reason'**
+  String get haltReason;
+
+  /// No description provided for @haltReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (optional)'**
+  String get haltReasonHint;
+
+  /// No description provided for @manageBatches.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Batches'**
+  String get manageBatches;
+
+  /// No description provided for @expiryNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Notice'**
+  String get expiryNotice;
+
+  /// No description provided for @nearExpiryNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Near-Expiry Notice'**
+  String get nearExpiryNotice;
+
+  /// No description provided for @soldAfterExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Sold after expiry'**
+  String get soldAfterExpiry;
+
+  /// No description provided for @expiringSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiring Soon'**
+  String get expiringSoon;
+
+  /// No description provided for @expiryReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Report'**
+  String get expiryReport;
+
+  /// No description provided for @expiryAlerts.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Alerts'**
+  String get expiryAlerts;
+
+  /// No description provided for @thresholdDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Threshold (days)'**
+  String get thresholdDays;
+
+  /// No description provided for @expiryWarehouseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse'**
+  String get expiryWarehouseLabel;
+
+  /// No description provided for @daysUntilExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Days Until Expiry'**
+  String get daysUntilExpiry;
+
+  /// No description provided for @totalValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Value'**
+  String get totalValue;
+
+  /// No description provided for @exportCsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Export CSV'**
+  String get exportCsv;
+
+  /// No description provided for @filters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get filters;
+
+  /// No description provided for @noExpiringBatches.
+  ///
+  /// In en, this message translates to:
+  /// **'No expiring batches'**
+  String get noExpiringBatches;
+
+  /// No description provided for @fieldsBatchno.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch No'**
+  String get fieldsBatchno;
+
+  /// No description provided for @fieldsSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get fieldsSource;
+
+  /// No description provided for @fieldsUnitcost.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit Cost'**
+  String get fieldsUnitcost;
+
+  /// No description provided for @inventoryQtyoriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Original Qty'**
+  String get inventoryQtyoriginal;
+
+  /// No description provided for @inventoryQtyremaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining Qty'**
+  String get inventoryQtyremaining;
+
+  /// No description provided for @commonRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get commonRetry;
+
+  /// No description provided for @commonSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get commonSaved;
+
+  /// No description provided for @daysRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days remaining'**
+  String daysRemaining(Object days);
+
+  /// No description provided for @daysExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days after expiry'**
+  String daysExpired(Object days);
+
+  /// No description provided for @batchesSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Batches: {total} total, {near} near-expiry, {expired} expired'**
+  String batchesSummary(Object expired, Object near, Object total);
+
+  /// No description provided for @confirmSellExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'This item expired {days} days ago. Are you sure you want to sell it?'**
+  String confirmSellExpired(Object days);
+
+  /// No description provided for @expiredStockConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'The following batches are expired. Selling expired stock may violate policy. Continue anyway?'**
+  String get expiredStockConfirm;
+
+  /// No description provided for @nearExpirySaleWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Selling {itemName} from batch {batchNo} expiring on {expiryDate}'**
+  String nearExpirySaleWarning(
+    Object batchNo,
+    Object expiryDate,
+    Object itemName,
+  );
 }
 
 class _AppLocalizationsDelegate

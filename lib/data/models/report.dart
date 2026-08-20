@@ -969,6 +969,8 @@ class BatchTraceabilityBatch {
     required this.quantitySold,
     required this.unitCost,
     required this.receivedDate,
+    this.expiryDate,
+    this.status,
   });
 
   factory BatchTraceabilityBatch.fromJson(Map<String, dynamic> json) => BatchTraceabilityBatch(
@@ -982,6 +984,8 @@ class BatchTraceabilityBatch {
     quantitySold: asNum(json['quantity_sold']) ?? 0,
     unitCost: asNum(json['unit_cost']) ?? 0,
     receivedDate: asString(json['received_date']) ?? '',
+    expiryDate: asString(json['expiry_date']),
+    status: asString(json['status']),
   );
 
   final int id;
@@ -994,6 +998,87 @@ class BatchTraceabilityBatch {
   final num quantitySold;
   final num unitCost;
   final String receivedDate;
+  final String? expiryDate;
+  final String? status;
+}
+
+/// One row of the expiry report (`GET /reports/expiry`).
+class ExpiryReportRow {
+  const ExpiryReportRow({
+    required this.itemCode,
+    required this.itemName,
+    required this.batchNo,
+    required this.warehouseName,
+    required this.quantityRemaining,
+    required this.unitCost,
+    required this.receivedDate,
+    this.expiryDate,
+    required this.status,
+    this.halted = false,
+  });
+
+  factory ExpiryReportRow.fromJson(Map<String, dynamic> json) => ExpiryReportRow(
+    itemCode: asString(json['item_code']) ?? '',
+    itemName: asString(json['item_name']) ?? '',
+    batchNo: asString(json['batch_no']) ?? '',
+    warehouseName: asString(json['warehouse_name']) ?? '',
+    quantityRemaining: asNum(json['quantity_remaining']) ?? 0,
+    unitCost: asNum(json['unit_cost']) ?? 0,
+    receivedDate: asString(json['received_date']) ?? '',
+    expiryDate: asString(json['expiry_date']),
+    status: asString(json['status']) ?? 'normal',
+    halted: asBool(json['halted']),
+  );
+
+  final String itemCode;
+  final String itemName;
+  final String batchNo;
+  final String warehouseName;
+  final num quantityRemaining;
+  final num unitCost;
+  final String receivedDate;
+  final String? expiryDate;
+  final String status;
+  final bool halted;
+
+  num get totalValue => quantityRemaining * unitCost;
+
+  /// Days until expiry (negative when already expired); null when no date.
+  int? get daysUntilExpiry {
+    if (expiryDate == null) return null;
+    final expiry = DateTime.tryParse(expiryDate!);
+    if (expiry == null) return null;
+    return expiry.difference(DateTime.now()).inDays;
+  }
+}
+
+/// One row of the dashboard expiry-alerts feed
+/// (`GET /dashboard/expiry-alerts`).
+class ExpiryAlert {
+  const ExpiryAlert({
+    required this.itemId,
+    required this.itemName,
+    required this.batchNo,
+    required this.warehouseName,
+    required this.expiryDate,
+    required this.daysRemaining,
+  });
+
+  factory ExpiryAlert.fromJson(Map<String, dynamic> json) => ExpiryAlert(
+    itemId: asInt(json['item_id']) ?? 0,
+    itemName: asString(json['item_name']) ?? '',
+    batchNo: asString(json['batch_no']) ?? '',
+    warehouseName: asString(json['warehouse_name']) ?? '',
+    expiryDate: asString(json['expiry_date']) ?? '',
+    daysRemaining: asInt(json['days_remaining']) ?? 0,
+  );
+
+  final int itemId;
+  final String itemName;
+  final String batchNo;
+  final String warehouseName;
+  final String expiryDate;
+  final int daysRemaining;
 }
 
 class BatchTraceabilitySummary {

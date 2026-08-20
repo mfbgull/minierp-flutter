@@ -42,6 +42,8 @@ class Item {
     this.qtyDecimalPrecision,
     this.roundingStep,
     this.isActive = true,
+    this.hasExpiry = false,
+    this.nearExpiryThresholdDays,
     this.createdBy,
     this.createdAt,
     this.updatedAt,
@@ -69,6 +71,8 @@ class Item {
     qtyDecimalPrecision: asNum(json['qty_decimal_precision']),
     roundingStep: asNum(json['rounding_step']),
     isActive: asBool(json['is_active'], fallback: true),
+    hasExpiry: asBool(json['has_expiry']),
+    nearExpiryThresholdDays: asNum(json['near_expiry_threshold_days']),
     createdBy: asInt(json['created_by']),
     createdAt: asString(json['created_at']),
     updatedAt: asString(json['updated_at']),
@@ -101,6 +105,8 @@ class Item {
   final num? qtyDecimalPrecision;
   final num? roundingStep;
   final bool isActive;
+  final bool hasExpiry;
+  final num? nearExpiryThresholdDays;
   final int? createdBy;
   final String? createdAt;
   final String? updatedAt;
@@ -129,6 +135,9 @@ class Item {
       'qty_decimal_precision': qtyDecimalPrecision,
     if (roundingStep != null) 'rounding_step': roundingStep,
     'is_active': isActive ? 1 : 0,
+    'has_expiry': hasExpiry ? 1 : 0,
+    if (nearExpiryThresholdDays != null)
+      'near_expiry_threshold_days': nearExpiryThresholdDays,
     if (createdBy != null) 'created_by': createdBy,
     if (createdAt != null) 'created_at': createdAt,
     if (updatedAt != null) 'updated_at': updatedAt,

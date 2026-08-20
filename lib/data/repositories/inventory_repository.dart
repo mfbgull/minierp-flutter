@@ -39,6 +39,7 @@ import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/item.dart' show Item;
 import '../models/physical_count.dart' show PhysicalCount, PhysicalCountItem;
+import '../models/stock_batch.dart' show StockBatch;
 import '../models/stock_balance.dart' show StockBalance;
 import '../models/stock_movement.dart' show StockMovement;
 import '../models/warehouse.dart' show Warehouse;
@@ -326,6 +327,50 @@ class InventoryRepository {
 
   Future<ApiResult<void>> deletePhysicalCount(int id) =>
       _api.delete('${ApiEndpoints.physicalCounts}/$id');
+
+  // --- Stock batches (item expiry tracking) ---
+
+  /// List batches for an optional item/warehouse filter.
+  /// `GET /inventory/stock-batches?item_id=&warehouse_id=`.
+  Future<ApiResult<List<StockBatch>>> getBatches({
+    int? itemId,
+    int? warehouseId,
+  }) => _api.getRawList(
+    ApiEndpoints.stockBatches,
+    queryParameters: {
+      if (itemId != null) 'item_id': itemId,
+      if (warehouseId != null) 'warehouse_id': warehouseId,
+    },
+    parseItem: (Object? json) =>
+        StockBatch.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// Patch a batch's expiry date (`PATCH /inventory/stock-batches/:id`).
+  Future<ApiResult<void>> updateBatchExpiry(
+    int batchId,
+    String? expiryDate,
+  ) => _api.patchRaw(
+    '${ApiEndpoints.stockBatches}/$batchId',
+    body: {'expiry_date': expiryDate},
+    parse: (_) {},
+  );
+
+  /// Halt a batch with an optional reason
+  /// (`PATCH /inventory/stock-batches/:id/halt`).
+  Future<ApiResult<void>> haltBatch(
+    int batchId, {
+    String? reason,
+  }) => _api.patchRaw(
+    '${ApiEndpoints.stockBatches}/$batchId/halt',
+    body: {if (reason != null && reason.isNotEmpty) 'halted_reason': reason},
+    parse: (_) {},
+  );
+
+  /// Unhalt a batch (`PATCH /inventory/stock-batches/:id/unhalt`).
+  Future<ApiResult<void>> unhaltBatch(int batchId) => _api.patchRaw(
+    '${ApiEndpoints.stockBatches}/$batchId/unhalt',
+    parse: (_) {},
+  );
 }
 
 final inventoryRepositoryProvider = Provider<InventoryRepository>(

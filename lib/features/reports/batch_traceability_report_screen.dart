@@ -5,6 +5,7 @@ import 'package:pluto_grid/pluto_grid.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart' show BatchTraceabilityReport;
+import '../../data/models/stock_batch.dart' show BatchStatus;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../data/models/item.dart' show Item;
@@ -188,6 +189,51 @@ class _BatchTraceabilityContent extends StatelessWidget {
                     PlutoColumn(title: 'Original', field: 'original', type: PlutoColumnType.number(format: '#,###.##'), width: 90, textAlign: PlutoColumnTextAlign.end, titleTextAlign: PlutoColumnTextAlign.end),
                     PlutoColumn(title: 'Sold', field: 'sold', type: PlutoColumnType.number(format: '#,###.##'), width: 90, textAlign: PlutoColumnTextAlign.end, titleTextAlign: PlutoColumnTextAlign.end),
                     PlutoColumn(title: 'Remaining', field: 'remaining', type: PlutoColumnType.number(format: '#,###.##'), width: 100, textAlign: PlutoColumnTextAlign.end, titleTextAlign: PlutoColumnTextAlign.end),
+                    PlutoColumn(
+                      title: l10n.expiryDate,
+                      field: 'expiry',
+                      type: PlutoColumnType.text(),
+                      width: 110,
+                    ),
+                    PlutoColumn(
+                      title: l10n.expiryStatus,
+                      field: 'status',
+                      type: PlutoColumnType.text(),
+                      width: 120,
+                      renderer: (ctx) {
+                        final status = BatchStatus.fromString(
+                          ctx.cell.value as String?,
+                        );
+                        final color = switch (status) {
+                          BatchStatus.normal => const Color(0xff16a34a),
+                          BatchStatus.nearExpiry => const Color(0xffd97706),
+                          BatchStatus.expired => theme.colorScheme.error,
+                          BatchStatus.halted => theme.colorScheme.onSurfaceVariant,
+                        };
+                        final label = switch (status) {
+                          BatchStatus.normal => l10n.statusNormal,
+                          BatchStatus.nearExpiry => l10n.statusNearExpiry,
+                          BatchStatus.expired => l10n.statusExpired,
+                          BatchStatus.halted => l10n.statusHalted,
+                        };
+                        return Container(
+                          alignment: Alignment.centerLeft,
+                          child: Chip(
+                            visualDensity: VisualDensity.compact,
+                            labelPadding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                            ),
+                            label: Text(
+                              label,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: color,
+                              ),
+                            ),
+                            backgroundColor: color.withValues(alpha: 0.14),
+                          ),
+                        );
+                      },
+                    ),
                   ],
                   rows: [
                     for (final b in report.batches)
@@ -200,6 +246,12 @@ class _BatchTraceabilityContent extends StatelessWidget {
                         'original': PlutoCell(value: b.quantityOriginal),
                         'sold': PlutoCell(value: b.quantitySold),
                         'remaining': PlutoCell(value: b.quantityRemaining),
+                        'expiry': PlutoCell(
+                          value: b.expiryDate != null
+                              ? Formatters.date(b.expiryDate!)
+                              : '',
+                        ),
+                        'status': PlutoCell(value: b.status ?? 'normal'),
                       }),
                   ],
                   onLoaded: (e) => e.stateManager.setSelectingMode(PlutoGridSelectingMode.none),

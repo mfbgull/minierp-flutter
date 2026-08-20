@@ -25,6 +25,7 @@ export interface Invoice {
   discount_value?: number;
   notes?: string;
   terms?: string;
+  expiry_notes?: string;
   created_by: number;
   created_by_username?: string;
   created_at: string;
@@ -47,6 +48,8 @@ export interface InvoiceItem {
   discount_type: 'none' | 'percentage' | 'flat';
   discount_value: number;
   returned_qty: number;
+  expiry_date?: string | null;
+  is_expired_at_sale?: boolean;
 }
 
 export interface CreateInvoiceDTO {
@@ -167,6 +170,76 @@ class InvoiceModel {
   }
 
   /**
+   * After stock consumption, denormalize expiry info onto invoice items
+   * and build the invoice-level expiry_notes string.
+   *
+   * @param invoiceId - The invoice to process
+   * @param consumptions - Array of { itemId, consumption[] } per line item
+   * @param db - Database connection
+   */
+  static denormalizeExpiryInfo(
+    invoiceId: number,
+    consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }>,
+    db: Database.Database
+  ): void {
+    const today = new Date().toISOString().split('T')[0];
+    const expiryNotes: string[] = [];
+
+    for (const { itemId, consumption } of consumptions) {
+      // Get ALL invoice item rows for this item (handles duplicate lines)
+      const invoiceItems = db.prepare(
+        'SELECT id, item_id FROM invoice_items WHERE invoice_id = ? AND item_id = ?'
+      ).all(invoiceId, itemId) as Array<{ id: number; item_id: number }>;
+
+      if (invoiceItems.length === 0) continue;
+
+      // Look up expiry dates from consumed batches
+      const batchIds = consumption.filter(c => c.batchId !== null).map(c => c.batchId as number);
+      if (batchIds.length === 0) continue;
+
+      const batches = db.prepare(
+        `SELECT id, expiry_date FROM stock_batches WHERE id IN (${batchIds.map(() => '?').join(',')})`
+      ).all(...batchIds) as Array<{ id: number; expiry_date: string | null }>;
+
+      // Find the earliest expiry date across consumed batches
+      const expiryDates = batches
+        .filter(b => b.expiry_date)
+        .map(b => b.expiry_date!)
+        .sort();
+
+      if (expiryDates.length === 0) continue;
+
+      const earliestExpiry = expiryDates[0];
+      const isExpired = earliestExpiry < today;
+
+      // Get item name for the note
+      const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
+      const itemName = item?.item_name || `Item ${itemId}`;
+
+      // Update ALL invoice item rows for this item with expiry info
+      for (const ii of invoiceItems) {
+        db.prepare(
+          'UPDATE invoice_items SET expiry_date = ?, is_expired_at_sale = ? WHERE id = ?'
+        ).run(earliestExpiry, isExpired ? 1 : 0, ii.id);
+      }
+
+      // Build note line (only once per item, not per line)
+      if (isExpired) {
+        const expiryDate = new Date(earliestExpiry);
+        const todayDate = new Date(today);
+        const daysExpired = Math.floor((todayDate.getTime() - expiryDate.getTime()) / (1000 * 60 * 60 * 24));
+        expiryNotes.push(`• ${itemName} — expired on ${earliestExpiry} (sold ${daysExpired} days after expiry)`);
+      }
+    }
+
+    // Build the expiry_notes string
+    if (expiryNotes.length > 0) {
+      const notes = `⚠️ Expiry Notice\n${expiryNotes.join('\n')}`;
+      db.prepare('UPDATE invoices SET expiry_notes = ? WHERE id = ?').run(notes, invoiceId);
+    }
+  }
+
+  /**
    * Get invoice by ID with items and source links
    */
   static getById(id: number, db: Database.Database): Invoice | undefined {
@@ -192,6 +265,7 @@ class InvoiceModel {
        SELECT
          ii.id, ii.invoice_id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount,
          ii.tax_rate, ii.discount_type, ii.discount_value,
+         ii.expiry_date, ii.is_expired_at_sale,
          i.item_code, i.item_name
        FROM invoice_items ii
        LEFT JOIN items i ON ii.item_id = i.id
@@ -303,6 +377,7 @@ class InvoiceModel {
         SELECT
           ii.id, ii.invoice_id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount,
           ii.tax_rate, ii.discount_type, ii.discount_value,
+          ii.expiry_date, ii.is_expired_at_sale,
           i.item_code, i.item_name
         FROM invoice_items ii
         LEFT JOIN items i ON ii.item_id = i.id
@@ -854,6 +929,7 @@ class InvoiceModel {
         SELECT
           ii.id, ii.invoice_id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount,
           ii.tax_rate, ii.discount_type, ii.discount_value,
+          ii.expiry_date, ii.is_expired_at_sale,
           i.item_code, i.item_name
         FROM invoice_items ii
         LEFT JOIN items i ON ii.item_id = i.id

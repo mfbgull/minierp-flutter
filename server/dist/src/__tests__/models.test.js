@@ -398,6 +398,115 @@ describe('StockMovementModel', () => {
                 StockMovement_1.default.consumeFromOldestBatches(testItemId, testWhId, 0, database_1.default);
             }).toThrow('consumeFromOldestBatches: quantity must be positive, got 0');
         });
+        // ── FEFO edge-case tests ────────────────────────────────────
+        it('FEFO: consumes nearest-expiry batch first when has_expiry=1', () => {
+            // Clean slate
+            database_1.default.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
+            // Update item to have expiry tracking
+            database_1.default.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
+            // Batch A: expires in 60 days, 30 units @ cost 10
+            database_1.default.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'FEFO-A', 'PURCHASE', 0, 30, 30, 10, '2026-01-01', date('now', '+60 days'))`).run(testItemId, testWhId);
+            // Batch B: expires in 10 days, 30 units @ cost 20
+            database_1.default.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'FEFO-B', 'PURCHASE', 0, 30, 30, 20, '2026-06-01', date('now', '+10 days'))`).run(testItemId, testWhId);
+            // Set stock_balances to 60
+            database_1.default.prepare('UPDATE stock_balances SET quantity = 60 WHERE item_id = ? AND warehouse_id = ?').run(testItemId, testWhId);
+            // Consume 40: should take 30 from Batch B (nearest expiry) first, then 10 from A
+            const consumption = StockMovement_1.default.consumeFromOldestBatches(testItemId, testWhId, 40, database_1.default);
+            expect(consumption).toHaveLength(2);
+            expect(consumption[0].unitCost).toBe(20); // Batch B consumed first
+            expect(consumption[0].consumed).toBe(30);
+            expect(consumption[1].unitCost).toBe(10); // Batch A consumed second
+            expect(consumption[1].consumed).toBe(10);
+            // Restore item to non-expiry for other tests
+            database_1.default.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
+        });
+        it('FEFO: skips halted batches', () => {
+            database_1.default.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
+            database_1.default.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
+            // Batch A: halted, 30 units
+            database_1.default.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date, halted)
+        VALUES (?, ?, 'HALT-A', 'PURCHASE', 0, 30, 30, 10, '2026-01-01', date('now', '+30 days'), 1)`).run(testItemId, testWhId);
+            // Batch B: not halted, 30 units
+            database_1.default.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date, halted)
+        VALUES (?, ?, 'HALT-B', 'PURCHASE', 0, 30, 30, 20, '2026-01-01', date('now', '+30 days'), 0)`).run(testItemId, testWhId);
+            database_1.default.prepare('UPDATE stock_balances SET quantity = 60 WHERE item_id = ? AND warehouse_id = ?').run(testItemId, testWhId);
+            // Consume 20: should only come from Batch B (halted A is skipped)
+            const consumption = StockMovement_1.default.consumeFromOldestBatches(testItemId, testWhId, 20, database_1.default);
+            expect(consumption).toHaveLength(1);
+            expect(consumption[0].unitCost).toBe(20); // Only Batch B
+            expect(consumption[0].consumed).toBe(20);
+            // Batch A should still have 30 remaining (untouched)
+            const batchA = database_1.default.prepare('SELECT quantity_remaining FROM stock_batches WHERE batch_no = ?').get('HALT-A');
+            expect(batchA.quantity_remaining).toBe(30);
+            database_1.default.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
+        });
+        it('FEFO: excludes expired batches (expiry_date < today)', () => {
+            database_1.default.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
+            database_1.default.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
+            // Batch A: expired 5 days ago, 30 units
+            database_1.default.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'EXP-A', 'PURCHASE', 0, 30, 30, 10, '2026-01-01', date('now', '-5 days'))`).run(testItemId, testWhId);
+            // Batch B: not expired, 30 units
+            database_1.default.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'EXP-B', 'PURCHASE', 0, 30, 30, 20, '2026-06-01', date('now', '+30 days'))`).run(testItemId, testWhId);
+            database_1.default.prepare('UPDATE stock_balances SET quantity = 60 WHERE item_id = ? AND warehouse_id = ?').run(testItemId, testWhId);
+            // Consume 20: should only come from Batch B (expired A is excluded)
+            const consumption = StockMovement_1.default.consumeFromOldestBatches(testItemId, testWhId, 20, database_1.default);
+            expect(consumption).toHaveLength(1);
+            expect(consumption[0].unitCost).toBe(20); // Only Batch B
+            // Batch A should still have 30 remaining
+            const batchA = database_1.default.prepare('SELECT quantity_remaining FROM stock_batches WHERE batch_no = ?').get('EXP-A');
+            expect(batchA.quantity_remaining).toBe(30);
+            database_1.default.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
+        });
+        it('FEFO: throws when all batches are halted/expired but stock_balances > 0', () => {
+            database_1.default.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
+            database_1.default.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
+            // Batch A: halted
+            database_1.default.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, halted)
+        VALUES (?, ?, 'BLOCKED-A', 'PURCHASE', 0, 30, 30, 10, '2026-01-01', 1)`).run(testItemId, testWhId);
+            // Batch B: expired
+            database_1.default.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'BLOCKED-B', 'PURCHASE', 0, 30, 30, 20, '2026-06-01', date('now', '-10 days'))`).run(testItemId, testWhId);
+            database_1.default.prepare('UPDATE stock_balances SET quantity = 60 WHERE item_id = ? AND warehouse_id = ?').run(testItemId, testWhId);
+            // Should throw — stock exists but all batches are blocked
+            expect(() => {
+                StockMovement_1.default.consumeFromOldestBatches(testItemId, testWhId, 10, database_1.default);
+            }).toThrow('All batches for');
+            database_1.default.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
+        });
+        it('FEFO: NULL expiry dates consumed after dated ones', () => {
+            database_1.default.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
+            database_1.default.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
+            // Batch A: no expiry date (NULL), 30 units
+            database_1.default.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'NULL-A', 'PURCHASE', 0, 30, 30, 10, '2026-01-01', NULL)`).run(testItemId, testWhId);
+            // Batch B: has expiry date (far future), 30 units
+            database_1.default.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'NULL-B', 'PURCHASE', 0, 30, 30, 20, '2026-06-01', date('now', '+90 days'))`).run(testItemId, testWhId);
+            database_1.default.prepare('UPDATE stock_balances SET quantity = 60 WHERE item_id = ? AND warehouse_id = ?').run(testItemId, testWhId);
+            // Consume 40: should take 30 from B (has expiry) first, then 10 from A (NULL expiry)
+            const consumption = StockMovement_1.default.consumeFromOldestBatches(testItemId, testWhId, 40, database_1.default);
+            expect(consumption).toHaveLength(2);
+            expect(consumption[0].unitCost).toBe(20); // Batch B first (dated)
+            expect(consumption[0].consumed).toBe(30);
+            expect(consumption[1].unitCost).toBe(10); // Batch A second (NULL)
+            expect(consumption[1].consumed).toBe(10);
+            database_1.default.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
+        });
+        it('legacy: uses standard_cost when no batch rows exist', () => {
+            database_1.default.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
+            database_1.default.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
+            // Set stock_balances to 50 but no batch rows (legacy stock)
+            database_1.default.prepare('UPDATE stock_balances SET quantity = 50 WHERE item_id = ? AND warehouse_id = ?').run(testItemId, testWhId);
+            const consumption = StockMovement_1.default.consumeFromOldestBatches(testItemId, testWhId, 20, database_1.default);
+            expect(consumption).toHaveLength(1);
+            expect(consumption[0].batchId).toBeNull(); // No batch
+            expect(consumption[0].consumed).toBe(20);
+            expect(consumption[0].unitCost).toBe(10); // Falls back to standard_cost
+        });
     });
     describe('Purchase supplier/payment flow', () => {
         let itemId;

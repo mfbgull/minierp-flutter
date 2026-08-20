@@ -47,7 +47,7 @@ class PurchaseModel {
             throw new Error('unit_cost must be non-negative');
         if (!data.purchase_date)
             throw new Error('purchase_date is required');
-        const { item_id, warehouse_id, quantity, unit_cost, supplier_id, supplier_name, purchase_date, invoice_no, remarks } = data;
+        const { item_id, warehouse_id, quantity, unit_cost, supplier_id, supplier_name, purchase_date, invoice_no, remarks, expiry_date } = data;
         // A linked supplier wins over any free-text name: resolve the
         // display name from the suppliers table so the purchase always
         // shows the supplier's current name.
@@ -76,9 +76,9 @@ class PurchaseModel {
         INSERT INTO stock_batches (
           batch_no, item_id, warehouse_id, source_type,
           source_id, quantity_original, quantity_remaining,
-          unit_cost, received_date
-        ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?)
-      `).run(batchNo, item_id, warehouse_id, purchaseId, quantity, quantity, unit_cost, purchase_date);
+          unit_cost, received_date, expiry_date
+        ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?)
+      `).run(batchNo, item_id, warehouse_id, purchaseId, quantity, quantity, unit_cost, purchase_date, expiry_date || null);
             const batchRecord = db.prepare(`
         SELECT id FROM stock_batches
         WHERE source_type = 'PURCHASE' AND source_id = ?

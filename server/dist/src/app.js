@@ -41,6 +41,7 @@ const accounting_1 = __importDefault(require("./routes/accounting"));
 const customReports_1 = __importDefault(require("./routes/customReports"));
 const preferences_1 = __importDefault(require("./routes/preferences"));
 const search_1 = __importDefault(require("./routes/search"));
+const stockBatches_1 = require("./routes/stockBatches");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 // Create Express app
@@ -213,6 +214,7 @@ app.use('/api/accounting', accounting_1.default);
 app.use('/api/reports/custom', customReports_1.default);
 app.use('/api/preferences', preferences_1.default);
 app.use('/api/search', search_1.default);
+app.use('/api', (0, stockBatches_1.initStockBatchesRoutes)(database_1.default));
 // Serve static files from client/dist in production
 // This MUST come AFTER API routes
 if (process.env.NODE_ENV === 'production') {

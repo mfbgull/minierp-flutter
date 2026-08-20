@@ -220,6 +220,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
 
     // Insert invoice items and deduct stock via FIFO batch consumption
     let cogsTotal = 0;
+    const consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }> = [];
     for (const item of items) {
       const warehouseId = InvoiceModel.findWarehouseForItem(
         db,
@@ -266,7 +267,13 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
         );
         cogsTotal += entry.consumed * entry.unitCost;
       }
+
+      // Track consumption for expiry denormalization
+      consumptions.push({ itemId: item.item_id, consumption });
     }
+
+    // Denormalize expiry info onto invoice items and build expiry_notes
+    InvoiceModel.denormalizeExpiryInfo(invoiceId, consumptions, db);
 
       // Create customer ledger entry (debit to increase AR)
       createLedgerEntry(
