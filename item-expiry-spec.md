@@ -122,7 +122,20 @@ ALTER TABLE productions ADD COLUMN expiry_date DATE;
 
 For produced items that have expiry tracking (e.g., manufactured food products). Flows into the output batch on production completion.
 
-### 2.5 `purchases` table — no schema change needed
+### 2.5 `invoices` table — add `override_sale` column
+
+```sql
+ALTER TABLE invoices ADD COLUMN override_sale INTEGER DEFAULT 0;
+```
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| `override_sale` | INTEGER | 0 | Whether this invoice was created via an expired batch override sale. Set to 1 when the user confirms selling expired stock through the override dialog. |
+
+**Why a separate flag instead of relying on `expiry_notes`?**
+The `expiry_notes` field is populated based on batch expiry at creation time. An override sale clears the batch expiry before selling, so `expiry_notes` may not indicate the override. The `override_sale` flag provides a definitive record that the sale bypassed the normal FEFO expiry block.
+
+### 2.6 `purchases` table — no schema change needed
 
 Direct purchases already create a batch. The expiry date will be entered via the purchase form and passed through to the batch creation.
 
@@ -347,11 +360,29 @@ ALTER TABLE invoices ADD COLUMN expiry_notes TEXT;
 
 4. If no lines have any expiry concerns, `expiry_notes` remains NULL.
 
+**Override sale support:** The `denormalizeExpiryInfo()` method accepts an optional `expiryOverrides` parameter — a `Record<number, string | null>` mapping batch IDs to their original expiry dates. This is used when the frontend performs an expired batch override:
+
+1. Frontend stashes original expiry dates: `{ batchId: "2026-07-01" }`
+2. Frontend clears batch `expiry_date` via API (so FEFO allows consumption)
+3. Frontend sends `expired_batch_overrides: { batchId: "2026-07-01" }` in the invoice creation body
+4. Server's `denormalizeExpiryInfo` checks the override map when batch `expiry_date` is NULL
+5. This ensures `invoice_items.expiry_date`, `is_expired_at_sale`, and `invoices.expiry_notes` are correctly populated even on override sales
+
+```typescript
+denormalizeExpiryInfo(
+  invoiceId: number,
+  consumptions: Array<{ itemId: number; consumption: ConsumptionResult[] }>,
+  db: Database.Database,
+  expiryOverrides?: Record<number, string | null>  // NEW
+): void
+```
+
 **Rules:**
 - `expiry_notes` is **system-managed** — not exposed in create/update invoice endpoints.
 - It's regenerated only at invoice creation time, never on subsequent edits.
 - Displayed on the invoice detail dialog and on printed/PDF invoices.
 - The Flutter invoice model gets a new `expiryNotes` field.
+- `override_sale` is set to `1` when `expired_batch_overrides` is present in the request body.
 
 ---
 
@@ -458,13 +489,22 @@ class StockBatch {
 }
 ```
 
-### 4.8 Invoice Detail — show expiry info
+### 4.8 Invoice Detail — show expiry info + override indicator
 
 **File:** `lib/features/invoices/invoice_detail_dialog.dart`
 
 On each invoice item line, if the batch had expiry info:
 - Show a small icon (⚠️ or 🕐) next to the item name
 - On hover/tap, show: "Expiry: DD/MM/YYYY" and "Sold X days after expiry" if expired
+
+**Override sale indicator:**
+- If `invoice.overrideSale == true`, show a prominent ⚠️ **"Override Sale"** badge/card above the expiry notes section
+- The badge uses amber/orange styling to indicate this sale bypassed normal FEFO expiry blocking
+- This is displayed on:
+  - Invoice detail dialog (print preview page)
+  - Invoice PDF output (in the expiry notice box)
+  - Sales list view (PlutoGrid column with ⚠️ icon + tooltip)
+  - CSV export ("Override" column with "Yes" value)
 
 **Invoice expiry_notes section:**
 - If `invoice.expiryNotes` is not null, show a prominent warning/info section at the bottom of the invoice detail (separate from user `notes`):
@@ -523,15 +563,31 @@ Exportable to CSV.
 
 Add `Expiry Date` and `Status` columns to the existing batch traceability report.
 
-### 4.12 POS / Sales Order — FEFO consumption warning
+### 4.12 POS / Sales Order — FEFO consumption warning + override flow
 
-**Files:** `lib/features/pos/`, `lib/features/sales/`
+**Files:** `lib/features/pos/`, `lib/features/sales/sales_invoice_form_page.dart`
 
 When a sale is being processed and the FEFO-consumed batch is expired or near-expiry:
 
 1. Show a **toast/snackbar warning**: "⚠️ Item [X] is being sold from batch [BATCH-XX] expiring on DD/MM/YYYY"
-2. If expired, show a **confirmation dialog**: "This item expired X days ago. Are you sure you want to sell it?"
-3. The sale proceeds if the user confirms.
+2. If expired, show a **3-button confirmation dialog**:
+   - **Cancel** — abort the sale
+   - **Confirm** — proceed with sale (blocks expired batch consumption server-side)
+   - **Override & Sell** — clears batch expiry, sells, then restores (see override flow below)
+3. The sale proceeds if the user confirms or overrides.
+
+**Expired Batch Override Flow:**
+
+When the user clicks "Override & Sell":
+
+1. **Stash original dates**: Frontend stores `{ batchId: originalExpiryDate }` in `_expiredBatchOverrides` map
+2. **Show confirmation**: Snackbar confirms "N batches overridden for this sale"
+3. **Clear expiry**: Before posting the invoice, frontend calls `PATCH /stock-batches/:id` to clear `expiry_date` on each overridden batch (so FEFO allows consumption)
+4. **Post invoice**: Invoice creation body includes `expired_batch_overrides: { batchId: originalDate }` and `override_sale: true`
+5. **Denormalize**: Server's `denormalizeExpiryInfo` uses the override map to populate `expiry_notes` and `is_expired_at_sale` even though batch expiry was cleared
+6. **Restore dates**: In a `finally{}` block, frontend restores original `expiry_date` on all overridden batches via `PATCH /stock-batches/:id`
+
+This ensures batch records remain accurate while the invoice correctly reflects the original expiry information.
 
 ### 4.13 Item Detail Dialog — batch expiry summary
 
@@ -712,15 +768,20 @@ ALTER TABLE invoice_items ADD COLUMN is_expired_at_sale BOOLEAN DEFAULT 0;
 -- Invoice header: system-generated expiry summary note
 ALTER TABLE invoices ADD COLUMN expiry_notes TEXT;
 
+-- Invoice header: override sale flag
+ALTER TABLE invoices ADD COLUMN override_sale INTEGER DEFAULT 0;
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_stock_batches_expiry ON stock_batches(expiry_date) WHERE expiry_date IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_stock_batches_halted ON stock_batches(halted) WHERE halted = 1;
 CREATE INDEX IF NOT EXISTS idx_items_has_expiry ON items(has_expiry);
 ```
 
-### 6.2 Migration Runner
+### 6.2 Migration Runners
 
 Add `runExpiryTrackingMigration()` to `server/src/config/database.ts` following the existing pattern (check for column existence, run SQL if missing).
+
+Add `runOverrideSaleMigration()` as a separate runner for the `override_sale` column. This is a separate migration because it was added after the initial expiry tracking implementation.
 
 ### 6.3 Existing Data
 
@@ -741,7 +802,9 @@ Add `runExpiryTrackingMigration()` to `server/src/config/database.ts` following 
 | `src/models/Purchase.ts` | Edit | Pass `expiry_date` through to batch creation |
 | `src/models/PurchaseOrder.ts` | Edit | Pass `expiry_date` from PO item to batch in `addReceipt()` |
 | `src/models/Production.ts` | Edit | Pass `expiry_date` to output batch |
-| `src/models/Invoice.ts` | Edit | Denormalize expiry onto invoice items, populate `expiry_notes` column |
+| `src/models/Invoice.ts` | Edit | Denormalize expiry onto invoice items, populate `expiry_notes` column, accept `expiryOverrides` param |
+| `src/controllers/invoiceController.ts` | Edit | Pass `expired_batch_overrides` and `override_sale` to model |
+| `src/migrations/add-override-sale-column.sql` | **New** | Separate migration for `override_sale` column |
 | `src/types/index.ts` | Edit | Add expiry fields to `StockBatch`, `Purchase`, etc. |
 | `src/controllers/` (multiple) | Edit | Accept `expiry_date` in create/update endpoints |
 | `src/routes/` (new or extended) | Edit | Batch halt/unhalt/expiry-update endpoints, expiry report |
@@ -751,7 +814,7 @@ Add `runExpiryTrackingMigration()` to `server/src/config/database.ts` following 
 | File | Change Type | Description |
 |------|-------------|-------------|
 | `data/models/item.dart` | Edit | Add `hasExpiry`, `nearExpiryThresholdDays` |
-| `data/models/invoice.dart` | Edit | Add `expiryNotes` field to Invoice model, add `expiryDate`/`isExpiredAtSale` to InvoiceItem |
+| `data/models/invoice.dart` | Edit | Add `expiryNotes`, `overrideSale` fields to Invoice model, add `expiryDate`/`isExpiredAtSale` to InvoiceItem |
 | `data/models/stock_batch.dart` | **New or Edit** | Add `expiryDate`, `halted`, `haltedReason`, computed `isExpired`/`isNearExpiry` |
 | `data/repositories/inventory_repository.dart` | Edit | Add batch management API calls |
 | `features/inventory/item_form_dialog.dart` | Edit | Add expiry toggle + threshold field |
@@ -762,7 +825,11 @@ Add `runExpiryTrackingMigration()` to `server/src/config/database.ts` following 
 | `features/production/` (production form) | Edit | Add expiry date for output item |
 | `features/invoices/invoice_detail_dialog.dart` | Edit | Show expiry info per line + `expiry_notes` section |
 | `features/pos/` | Edit | FEFO expiry warning dialog |
-| `features/sales/` | Edit | FEFO expiry warning dialog |
+| `features/sales/sales_invoice_form_page.dart` | Edit | FEFO expiry warning dialog + override flow with clear/restore |
+| `features/sales/sales_screen.dart` | Edit | Add ⚠️ override indicator column to PlutoGrid |
+| `features/sales/invoice_print_preview_page.dart` | Edit | Add ⚠️ "Override Sale" badge |
+| `features/sales/invoice_pdf.dart` | Edit | Add ⚡ "Override Sale" label in expiry notice |
+| `core/utils/csv_export.dart` | Edit | Add "Override" column to invoice CSV export |
 | `features/dashboard/` | Edit | Add expiry alert widget |
 | `features/reports/expiry_report_screen.dart` | **New** | Expiry report screen |
 | `features/reports/batch_traceability_report_screen.dart` | Edit | Add expiry columns |
@@ -1028,7 +1095,35 @@ behavior is: "you cleared the expiry, so the system treats it as undated."
 | `POST /purchases` with `expiry_date` | ✅ Batch created with `expiry_date` |
 | `POST /purchase-orders/:id/receipts` | ✅ Reads `expiry_date` from PO item → batch |
 
-### 11.7 Known Limitation
+### 11.7 Override Sale Indicator — Verified
+
+| Component | Status |
+|-----------|--------|
+| `invoices.override_sale` column | ✅ Migrated via `add-override-sale-column.sql` |
+| Server sets `override_sale: 1` when `expired_batch_overrides` present | ✅ Verified |
+| Flutter `Invoice` model includes `overrideSale` field | ✅ Added to constructor, `fromJson`, `toJson` |
+| Invoice print preview: ⚠️ "Override Sale" badge | ✅ Displayed above expiry notes when `overrideSale == true` |
+| Invoice PDF: ⚡ "Override Sale" label | ✅ Displayed in expiry notice box |
+| Sales list (PlutoGrid): ⚠️ column with tooltip | ✅ 40px column between Status and Total |
+| CSV export: "Override" column | ✅ Outputs "Yes" for override sales |
+
+### 11.8 E2E Override Flow Test — 19/19 Pass
+
+Full lifecycle test covering:
+
+| Test | What it verifies |
+|------|------------------|
+| Setup | Customer + item (has_expiry=true) + 2 purchases (expired + future batches) |
+| FEFO picks future batch | Sale without override succeeds, future batch consumed first (FEFO), expired untouched |
+| Override clears + sells | Halt future batch → clear expired batch expiry_date → sell from cleared batch → succeeds |
+| Expiry notes populated | Override sale produces `expiry_notes: "⚠️ Expiry Notice\n• Widget — expired on..."` |
+| Invoice items have expiry fields | `expiry_date` and `is_expired_at_sale=1` on invoice items |
+| override_sale flag set | `override_sale: 1` on invoice when `expired_batch_overrides` present |
+| Batch date restored | After override sale, batch `expiry_date` restored to original |
+| Halt blocks consumption | Halt both batches → sale fails with "all batches halted/expired" |
+| Unhalt restores access | Unhalt both batches → sale succeeds again |
+
+### 11.9 Known Limitation
 
 - `denormalizeExpiryInfo` runs inside the invoice creation transaction. If the
   invoice has duplicate lines for the same item, both lines get the same
@@ -1036,3 +1131,5 @@ behavior is: "you cleared the expiry, so the system treats it as undated."
   cases but may need refinement if different lines consume from different batches.
 - The `expiry_notes` field is system-managed and not exposed in create/update
   endpoints. This is intentional — users cannot tamper with it.
+- Override sales clear `expiry_date` before selling and restore after. The
+  `override_sale` flag preserves the record that the sale bypassed FEFO blocking.
