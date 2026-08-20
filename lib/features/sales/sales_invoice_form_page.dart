@@ -148,6 +148,12 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   List<InvoicePaymentRecord> _existingPayments = const [];
   final Set<int> _deletedPayments = {};
   int _methodSeq = 1;
+
+  /// Original expiry dates for batches overridden during this sale.
+  /// Map key = batch ID, value = original expiry_date string.
+  /// Populated by `_confirmExpiry()` when user picks "Override & Sell";
+  /// consumed by `_save()` to clear-before / restore-after posting.
+  Map<int, String?> _expiredBatchOverrides = {};
   bool _recordingPayment = false;
 
   // Price-history hint (rate cell).
@@ -861,19 +867,27 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       if (notes.isNotEmpty) 'notes': notes,
       if (_isEdit && _deletedPayments.isNotEmpty)
         'deleted_payments': _deletedPayments.toList(),
+      if (_expiredBatchOverrides.isNotEmpty)
+        'expired_batch_overrides': _expiredBatchOverrides,
     };
   }
 
   /// Sale-time expiry guard (item-expiry spec §2.10/2.11): before posting,
   /// inspects the soonest-expiring available batch of every expiry-tracked
-  /// item. Blocks on expired stock (confirm dialog); toasts on near-expiry.
-  /// Batch-lookup failures never block the sale.
+  /// item. Blocks on expired stock (confirm dialog with Override option);
+  /// toasts on near-expiry. Batch-lookup failures never block the sale.
+  ///
+  /// When the user picks **Override & Sell**, the original expiry dates are
+  /// stashed in [_expiredBatchOverrides]. `_save()` clears them before
+  /// posting (so FEFO doesn't block) and restores them after.
   Future<bool> _confirmExpiry() async {
     final l10n = AppLocalizations.of(context)!;
     final items = ref.read(invoiceItemsProvider).valueOrNull ?? const <Item>[];
     final repo = ref.read(inventoryRepositoryProvider);
     final expired = <String>[];
     final near = <String>[];
+    // Track all expired batch objects for the override flow.
+    final expiredBatches = <StockBatch>[];
     for (final line in _filledLines) {
       final itemId = int.tryParse(line.itemId);
       if (itemId == null) continue;
@@ -902,6 +916,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       final name = item?.itemName ?? line.description;
       if (days < 0) {
         expired.add('$name · ${soonest.batchNo}');
+        expiredBatches.add(soonest);
       } else if (days <= (item?.nearExpiryThresholdDays ?? 30)) {
         near.add(
           l10n.nearExpirySaleWarning(
@@ -915,25 +930,49 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     if (expired.isEmpty && near.isEmpty) return true;
     if (!mounted) return true;
     if (expired.isNotEmpty) {
-      final proceed = await showDialog<bool>(
+      final action = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(l10n.soldAfterExpiry),
-          content: Text('${l10n.expiredStockConfirm}\n\n${expired.join('\n')}'),
+          content: Text(
+            '${l10n.overrideExpiredBody}\n\n${expired.join('\n')}',
+          ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
+              onPressed: () => Navigator.of(ctx).pop('cancel'),
               child: Text(l10n.commonCancel),
             ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('confirm'),
               child: Text(l10n.commonConfirm),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop('override'),
+              child: Text(l10n.overrideExpiredSale),
             ),
           ],
         ),
       );
-      return proceed ?? false;
+      if (action == 'override') {
+        // Stash original dates so _save() can restore them after posting.
+        _expiredBatchOverrides = {
+          for (final b in expiredBatches) b.id: b.expiryDate,
+        };
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                l10n.batchOverrideCleared(expiredBatches.length),
+              ),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return true;
+      }
+      return action == 'confirm';
     }
+    // Near-expiry only — toast, no dialog.
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(near.join('\n')), duration: const Duration(seconds: 4)),
     );
@@ -966,33 +1005,57 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       _submitting = true;
       _error = null;
     });
-    final repo = ref.read(invoiceRepositoryProvider);
-    final result = _isEdit
-        ? await repo.update(widget.invoice!.id, _buildBody())
-        : await repo.create(_buildBody());
-    if (!mounted) return null;
 
-    switch (result) {
-      case ApiSuccess(:final data):
-        // Create mode: record any positive payment methods against the
-        // fresh invoice, sequentially (a failed method doesn't block the
-        // rest — matches edit-mode's non-blocking "keep trying" posting).
-        if (!_isEdit &&
-            _recordPayment &&
-            _paymentMethods.any((m) => m.amount > 0)) {
-          final bodies = [
-            for (final m in _paymentMethods)
-              if (m.amount > 0)
-                _paymentBody(m, invoiceId: data.id, invoiceNo: data.invoiceNo),
-          ];
-          await _postPaymentBodies(bodies, stopOnFirstFailure: false);
-        }
-        return data;
-      case ApiFailure(:final error):
-        setState(() => _submitting = false);
-        _showError(error.message);
-        return null;
+    // --- Expired-batch override: clear expiry dates before posting so
+    //     FEFO doesn't block the sale. Restore after regardless of outcome.
+    final repo = ref.read(inventoryRepositoryProvider);
+    if (_expiredBatchOverrides.isNotEmpty) {
+      for (final entry in _expiredBatchOverrides.entries) {
+        await repo.updateBatchExpiry(entry.key, null);
+      }
     }
+
+    Invoice? savedInvoice;
+    try {
+      final invRepo = ref.read(invoiceRepositoryProvider);
+      final result = _isEdit
+          ? await invRepo.update(widget.invoice!.id, _buildBody())
+          : await invRepo.create(_buildBody());
+      if (!mounted) return null;
+
+      switch (result) {
+        case ApiSuccess(:final data):
+          savedInvoice = data;
+          // Create mode: record any positive payment methods against the
+          // fresh invoice, sequentially (a failed method doesn't block the
+          // rest — matches edit-mode's non-blocking "keep trying" posting).
+          if (!_isEdit &&
+              _recordPayment &&
+              _paymentMethods.any((m) => m.amount > 0)) {
+            final bodies = [
+              for (final m in _paymentMethods)
+                if (m.amount > 0)
+                  _paymentBody(m, invoiceId: data.id, invoiceNo: data.invoiceNo),
+            ];
+            await _postPaymentBodies(bodies, stopOnFirstFailure: false);
+          }
+          break;
+        case ApiFailure(:final error):
+          setState(() => _submitting = false);
+          _showError(error.message);
+          return null;
+      }
+    } finally {
+      // Restore original expiry dates on overridden batches so stock
+      // records remain accurate after the sale posts.
+      if (_expiredBatchOverrides.isNotEmpty) {
+        for (final entry in _expiredBatchOverrides.entries) {
+          await repo.updateBatchExpiry(entry.key, entry.value);
+        }
+        _expiredBatchOverrides = {};
+      }
+    }
+    return savedInvoice;
   }
 
   Future<void> _submit() async {

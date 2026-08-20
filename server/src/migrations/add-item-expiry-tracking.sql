@@ -37,6 +37,10 @@ ALTER TABLE invoice_items ADD COLUMN is_expired_at_sale BOOLEAN DEFAULT 0;
 -- Separate from user-editable notes field
 ALTER TABLE invoices ADD COLUMN expiry_notes TEXT;
 
+-- ── Invoices: override sale flag ─────────────
+-- Indicates invoice was created using expired-batch override flow
+ALTER TABLE invoices ADD COLUMN override_sale INTEGER DEFAULT 0;
+
 -- ── Indexes ─────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_stock_batches_expiry ON stock_batches(expiry_date) WHERE expiry_date IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_stock_batches_halted ON stock_batches(halted) WHERE halted = 1;

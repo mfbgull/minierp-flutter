@@ -141,6 +141,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
               'invoice_date': PlutoCell(value: inv.invoiceDate),
               'customer_name': PlutoCell(value: inv.customerName ?? ''),
               'status': PlutoCell(value: inv.status),
+              'override_sale': PlutoCell(value: inv.overrideSale),
               'total_amount': PlutoCell(value: inv.totalAmount),
               'paid_amount': PlutoCell(value: inv.paidAmount),
               'balance_amount': PlutoCell(value: inv.balanceAmount),
@@ -545,6 +546,32 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             );
           },
         ),
+      ),
+      PlutoColumn(
+        title: '',
+        field: 'override_sale',
+        type: PlutoColumnType.text(),
+        width: 40,
+        readOnly: true,
+        enableContextMenu: false,
+        enableFilterMenuItem: false,
+        enableHideColumnMenuItem: false,
+        enableSetColumnsMenuItem: false,
+        renderer: (ctx) {
+          final isOverride = ctx.cell.value == true || ctx.cell.value == 1;
+          if (!isOverride) return const SizedBox.shrink();
+          return Align(
+            alignment: Alignment.center,
+            child: Tooltip(
+              message: 'Override Sale',
+              child: Icon(
+                Icons.warning_amber_rounded,
+                size: 16,
+                color: Colors.amber.shade700,
+              ),
+            ),
+          );
+        },
       ),
       PlutoColumn(
         title: l10n.salesTotalsales,

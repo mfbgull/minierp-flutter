@@ -485,9 +485,26 @@ pw.Widget _buildSummarySection(
                   ),
                   borderRadius: pw.BorderRadius.circular(4),
                 ),
-                child: pw.Text(
-                  invoice.expiryNotes!.trim(),
-                  style: pw.TextStyle(fontSize: 9, color: PdfColors.grey800),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    if (invoice.overrideSale)
+                      pw.Container(
+                        padding: const pw.EdgeInsets.only(bottom: 6),
+                        child: pw.Text(
+                          '⚡ Override Sale',
+                          style: pw.TextStyle(
+                            fontSize: 9,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.orange800,
+                          ),
+                        ),
+                      ),
+                    pw.Text(
+                      invoice.expiryNotes!.trim(),
+                      style: pw.TextStyle(fontSize: 9, color: PdfColors.grey800),
+                    ),
+                  ],
                 ),
               ),
             ],

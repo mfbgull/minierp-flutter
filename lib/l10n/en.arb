@@ -1745,5 +1745,8 @@
   "batchesSummary": "Batches: {total} total, {near} near-expiry, {expired} expired",
   "confirmSellExpired": "This item expired {days} days ago. Are you sure you want to sell it?",
   "expiredStockConfirm": "The following batches are expired. Selling expired stock may violate policy. Continue anyway?",
-  "nearExpirySaleWarning": "Selling {itemName} from batch {batchNo} expiring on {expiryDate}"
+  "nearExpirySaleWarning": "Selling {itemName} from batch {batchNo} expiring on {expiryDate}",
+  "overrideExpiredSale": "Override & Sell",
+  "overrideExpiredBody": "The following batches are expired. Override will temporarily clear their expiry date to allow this sale.",
+  "batchOverrideCleared": "{count} expired batch(es) overridden for this sale"
 }

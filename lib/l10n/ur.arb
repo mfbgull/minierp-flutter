@@ -1699,5 +1699,8 @@
   "batchesSummary": "بیچز: کل {total}، قریبی مونثی {near}، ختم شدہ {expired}",
   "confirmSellExpired": "یہ آئٹم {days} دن پہلے ختم ہو چکا ہے۔ کیا آپ واقعی اسے بیچنا چاہتے ہیں؟",
   "expiredStockConfirm": "درج ذیل بیچز ختم ہو چکے ہیں۔ ختم شدہ اسٹاک بیچنا پالیسی کی خلاف ورزی ہو سکتی ہے۔ پھر بھی جاری رکھیں؟",
-  "nearExpirySaleWarning": "{itemName} بیچ {batchNo} سے بیچ رہے ہیں جو {expiryDate} کو ختم ہو رہا ہے"
+  "nearExpirySaleWarning": "{itemName} بیچ {batchNo} سے بیچ رہے ہیں جو {expiryDate} کو ختم ہو رہا ہے",
+  "overrideExpiredSale": "آورائیڈ اور بیچیں",
+  "overrideExpiredBody": "درج ذیل بیچز ختم ہو چکے ہیں۔ آورائیڈ ان کی مونثی تاریخ کو عارضی طور پر صاف کرے گا تاکہ یہ فروخت ممکن ہو سکے۔",
+  "batchOverrideCleared": "{count} ختم شدہ بیچ(es) اس فروخت کے لیے آورائیڈ کیے گئے"
 }

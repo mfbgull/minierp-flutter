@@ -1068,6 +1068,26 @@ function runExpiryTrackingMigration(): void {
   }
 }
 
+function runOverrideSaleMigration(): void {
+  try {
+    const columnCheck = db.prepare(
+      `SELECT COUNT(*) as count FROM pragma_table_info('invoices') WHERE name='override_sale'`
+    ).get() as { count: number };
+
+    if (columnCheck.count === 0) {
+      logger.info('Running override sale column migration...');
+      const sql = fs.readFileSync(
+        path.join(__dirname, '../migrations/add-override-sale-column.sql'),
+        'utf8'
+      );
+      db.exec(sql);
+      logger.info('✅ Override sale column migration completed!');
+    }
+  } catch (error: any) {
+    logger.error('Override sale migration error:', error.message);
+  }
+}
+
 initializeDatabase();
 runExpensesMigration();
 runPurchasesMigration();
@@ -1105,6 +1125,7 @@ runPhysicalCountsMigration();
 runForecastEnhancementsMigration();
 runCustomReportsMigration();
 runExpiryTrackingMigration();
+runOverrideSaleMigration();
 runDashboardLayoutsMigration();
 runLooseItemMigration();
 runCashAccountsMigration();

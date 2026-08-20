@@ -5394,4 +5394,16 @@ class AppLocalizationsUr extends AppLocalizations {
   ) {
     return '$itemName بیچ $batchNo سے بیچ رہے ہیں جو $expiryDate کو ختم ہو رہا ہے';
   }
+
+  @override
+  String get overrideExpiredSale => 'آورائیڈ اور بیچیں';
+
+  @override
+  String get overrideExpiredBody =>
+      'درج ذیل بیچز ختم ہو چکے ہیں۔ آورائیڈ ان کی مونثی تاریخ کو عارضی طور پر صاف کرے گا تاکہ یہ فروخت ممکن ہو سکے۔';
+
+  @override
+  String batchOverrideCleared(Object count) {
+    return '$count ختم شدہ بیچ(es) اس فروخت کے لیے آورائیڈ کیے گئے';
+  }
 }

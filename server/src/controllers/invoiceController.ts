@@ -148,6 +148,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       total_amount,
       record_payment,
       payment,
+      expired_batch_overrides,
     } = req.body as {
       invoice_no?: string;
       customer_id: number | string;
@@ -163,6 +164,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       total_amount: number | string;
       record_payment?: boolean;
       payment?: PaymentDTO;
+      expired_batch_overrides?: Record<number, string | null>;
     };
 
     if (!customer_id || !invoice_date || !items || items.length === 0) {
@@ -215,7 +217,8 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       discount_type,
       discount_value,
       terms,
-      items
+      items,
+      override_sale: expired_batch_overrides && Object.keys(expired_batch_overrides).length > 0 ? 1 : 0,
     }, userId);
 
     // Insert invoice items and deduct stock via FIFO batch consumption
@@ -272,8 +275,10 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       consumptions.push({ itemId: item.item_id, consumption });
     }
 
-    // Denormalize expiry info onto invoice items and build expiry_notes
-    InvoiceModel.denormalizeExpiryInfo(invoiceId, consumptions, db);
+    // Denormalize expiry info onto invoice items and build expiry_notes.
+    // expired_batch_overrides provides original expiry dates for batches
+    // whose dates were temporarily cleared to unblock FEFO consumption.
+    InvoiceModel.denormalizeExpiryInfo(invoiceId, consumptions, db, expired_batch_overrides);
 
       // Create customer ledger entry (debit to increase AR)
       createLedgerEntry(

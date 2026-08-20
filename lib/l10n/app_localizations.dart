@@ -10577,6 +10577,24 @@ abstract class AppLocalizations {
     Object expiryDate,
     Object itemName,
   );
+
+  /// No description provided for @overrideExpiredSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Override & Sell'**
+  String get overrideExpiredSale;
+
+  /// No description provided for @overrideExpiredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The following batches are expired. Override will temporarily clear their expiry date to allow this sale.'**
+  String get overrideExpiredBody;
+
+  /// No description provided for @batchOverrideCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} expired batch(es) overridden for this sale'**
+  String batchOverrideCleared(Object count);
 }
 
 class _AppLocalizationsDelegate
