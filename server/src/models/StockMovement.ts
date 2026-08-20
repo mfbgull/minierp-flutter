@@ -591,25 +591,76 @@ class StockMovementModel {
       );
     }
 
-    const batches = db.prepare(`
-      SELECT id, quantity_remaining, unit_cost
-      FROM stock_batches
-      WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
-      ORDER BY received_date ASC, id ASC
-    `).all(itemId, warehouseId) as Array<{
-      id: number;
-      quantity_remaining: number;
-      unit_cost: number;
-    }>;
+    // Check if item has expiry tracking — determines FEFO vs FIFO
+    const itemRow = db.prepare('SELECT has_expiry, standard_cost, item_name FROM items WHERE id = ?').get(itemId) as { has_expiry: number; standard_cost: number; item_name: string } | undefined;
+    const useFEFO = itemRow?.has_expiry === 1;
+
+    let batches: Array<{ id: number; quantity_remaining: number; unit_cost: number }>;
+    let totalBatchTrackedQty = 0;
+
+    if (useFEFO) {
+      // FEFO path: skip halted batches, exclude expired batches,
+      // sort by expiry_date ASC (NULLs last), then received_date ASC
+      batches = db.prepare(`
+        SELECT id, quantity_remaining, unit_cost
+        FROM stock_batches
+        WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+          AND (halted = 0 OR halted IS NULL)
+          AND (expiry_date IS NULL OR expiry_date >= date('now'))
+        ORDER BY
+          CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END,
+          expiry_date ASC,
+          received_date ASC,
+          id ASC
+      `).all(itemId, warehouseId) as Array<{
+        id: number;
+        quantity_remaining: number;
+        unit_cost: number;
+      }>;
+
+      // Check if stock exists but all batches are halted/expired.
+      // Count ALL non-zero batches (including halted/expired) to distinguish
+      // legacy stock from real batch-tracked stock that's all blocked.
+      if (batches.length === 0 && availableQty > 0) {
+        const allBatches = db.prepare(`
+          SELECT SUM(quantity_remaining) as total
+          FROM stock_batches
+          WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+        `).get(itemId, warehouseId) as { total: number } | undefined;
+        totalBatchTrackedQty = allBatches?.total ?? 0;
+      }
+    } else {
+      // FIFO path: original behavior, no expiry/halt filtering
+      batches = db.prepare(`
+        SELECT id, quantity_remaining, unit_cost
+        FROM stock_batches
+        WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+        ORDER BY received_date ASC, id ASC
+      `).all(itemId, warehouseId) as Array<{
+        id: number;
+        quantity_remaining: number;
+        unit_cost: number;
+      }>;
+    }
 
     // Legacy case: positive warehouse stock but no batch rows. This is
     // stock that was added before batch costing was enabled. Use
     // standard_cost for the entire consumption; do not throw.
     if (batches.length === 0) {
-      const item = db.prepare('SELECT standard_cost, item_name FROM items WHERE id = ?').get(itemId) as { standard_cost: number; item_name: string } | undefined;
-      const fallbackCost = item?.standard_cost ?? 0;
+      // FEFO edge case: stock exists in batches but ALL are halted/expired.
+      // Do not fall through to legacy fallback — throw with a clear message.
+      if (useFEFO && totalBatchTrackedQty > 0) {
+        throw new Error(
+          `All batches for ${itemRow?.item_name || `item ${itemId}`} in warehouse ${warehouseId} ` +
+          `are either halted or expired. Available in stock_balances: ${availableQty}, ` +
+          `but none are available for FEFO consumption. ` +
+          `Unhalt or un-expire batches, or adjust stock.`
+        );
+      }
+
+      const fallbackCost = itemRow?.standard_cost ?? 0;
       logger.warn(
-        `[BatchCosting] No batch rows for ${item?.item_name || 'item'} in warehouse. ` +
+        `[BatchCosting] No batch rows for ${itemRow?.item_name || 'item'} in warehouse. ` +
         `Using standard_cost (${fallbackCost}) for the entire ${quantity} units (legacy stock).`
       );
       return [{ batchId: null, consumed: quantity, unitCost: fallbackCost }];

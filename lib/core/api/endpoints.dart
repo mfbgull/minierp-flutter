@@ -38,6 +38,7 @@ abstract final class ApiEndpoints {
   static const physicalCounts = '/inventory/physical-counts';
   static const physicalCountComplete = '/inventory/physical-counts';
   static const physicalCountItems = '/inventory/physical-counts';
+  static const stockBatches = '/inventory/stock-batches';
 
   // Sales
   static const invoices = '/invoices';
@@ -78,6 +79,8 @@ abstract final class ApiEndpoints {
   static const reportApAging = '/reports/ap-aging';
   static const reportBalanceSheet = '/reports/balance-sheet';
   static const reportTrialBalance = '/reports/trial-balance';
+  static const reportExpiry = '/reports/expiry';
+  static const dashboardExpiryAlerts = '/dashboard/expiry-alerts';
   static const reportGeneralLedger = '/reports/general-ledger';
   static const reportIncomeStatement = '/reports/income-statement';
   static const reportTaxSummary = '/reports/tax-summary';

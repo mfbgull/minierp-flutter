@@ -22,7 +22,9 @@ import '../../data/models/report.dart'
         ProfitLossReport,
         TaxSummaryReport,
         TopDebtorRow,
-        TrialBalanceReport;
+        TrialBalanceReport,
+        ExpiryAlert,
+        ExpiryReportRow;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/customer_repository.dart'
     show customerRepositoryProvider;
@@ -340,6 +342,54 @@ final batchTraceabilityProvider = FutureProvider<BatchTraceabilityReport>((ref) 
   if (itemId <= 0) throw Exception('No item selected');
   final repo = ref.watch(reportRepositoryProvider);
   final result = await repo.batchTraceability(itemId);
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+// ── Expiry report ───────────────────────────────────────────────────
+
+/// Optional warehouse filter for the expiry report.
+final expiryReportWarehouseIdProvider = StateProvider<int?>((ref) => null);
+
+/// Status filter: 'all' | 'expired' | 'near_expiry' | 'normal'.
+final expiryReportStatusProvider = StateProvider<String>((ref) => 'all');
+
+/// Threshold-days override (null = item default).
+final expiryReportThresholdProvider = StateProvider<int?>((ref) => null);
+
+/// Loads GET /reports/expiry, re-running when any filter changes.
+final expiryReportProvider =
+    FutureProvider.autoDispose<List<ExpiryReportRow>>((ref) async {
+  final warehouseId = ref.watch(expiryReportWarehouseIdProvider);
+  final status = ref.watch(expiryReportStatusProvider);
+  final threshold = ref.watch(expiryReportThresholdProvider);
+  final result = await ref
+      .watch(reportRepositoryProvider)
+      .expiryReport(
+        warehouseId: warehouseId,
+        status: status == 'all' ? null : status,
+        thresholdDays: threshold,
+      );
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+// ── Dashboard expiry alerts ─────────────────────────────────────────
+
+/// Look-ahead window (days) for the dashboard expiry-alerts feed.
+final expiryAlertsDaysProvider = StateProvider<int>((ref) => 30);
+
+/// Loads GET /dashboard/expiry-alerts, re-running when [days] changes.
+final expiryAlertsProvider =
+    FutureProvider.autoDispose<List<ExpiryAlert>>((ref) async {
+  final days = ref.watch(expiryAlertsDaysProvider);
+  final result = await ref
+      .watch(reportRepositoryProvider)
+      .expiryAlerts(days: days);
   return switch (result) {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,

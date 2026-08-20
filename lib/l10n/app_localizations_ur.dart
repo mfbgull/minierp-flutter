@@ -132,6 +132,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get dashboardcardPanelLowstock => 'کم اسٹاک';
 
   @override
+  String get dashboardcardPanelExpiryalerts => 'جلد ختم ہو رہا ہے';
+
+  @override
   String get dashboardcardCashstrip => 'نقدی اور بینک پوزیشن';
 
   @override
@@ -5250,4 +5253,145 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get searchClose => 'بند کریں';
+
+  @override
+  String get expiryTracking => 'مونثی ٹریکنگ';
+
+  @override
+  String get trackExpiryDates => 'مونثی کی تاریخ ٹریک کریں';
+
+  @override
+  String get nearExpiryThreshold => 'قریبی مونثی حد (دن)';
+
+  @override
+  String get expiryDate => 'مونثی کی تاریخ';
+
+  @override
+  String get expirySelectDateOptional => 'تاریخ منتخب کریں (اختیاری)';
+
+  @override
+  String get batchManagement => 'بیچ مینجمنٹ';
+
+  @override
+  String get expiryStatus => 'مونثی کی حیثیت';
+
+  @override
+  String get statusNormal => 'عام';
+
+  @override
+  String get statusNearExpiry => 'قریبی مونثی';
+
+  @override
+  String get statusExpired => 'ختم شدہ';
+
+  @override
+  String get statusHalted => 'روکا ہوا';
+
+  @override
+  String get haltBatch => 'بیچ روکیں';
+
+  @override
+  String get unhaltBatch => 'بیچ بحال کریں';
+
+  @override
+  String get haltReason => 'روکنے کی وجہ';
+
+  @override
+  String get haltReasonHint => 'وجہ (اختیاری)';
+
+  @override
+  String get manageBatches => 'بیچز منظم کریں';
+
+  @override
+  String get expiryNotice => 'مونثی کا نوٹس';
+
+  @override
+  String get nearExpiryNotice => 'قریبی مونثی کا نوٹس';
+
+  @override
+  String get soldAfterExpiry => 'مونثی کے بعد فروخت';
+
+  @override
+  String get expiringSoon => 'جلد ختم ہو رہا ہے';
+
+  @override
+  String get expiryReport => 'مونثی رپورٹ';
+
+  @override
+  String get expiryAlerts => 'مونثی الرٹس';
+
+  @override
+  String get thresholdDays => 'حد (دن)';
+
+  @override
+  String get expiryWarehouseLabel => 'گودام';
+
+  @override
+  String get daysUntilExpiry => 'مونثی تک دن';
+
+  @override
+  String get totalValue => 'کل مالیت';
+
+  @override
+  String get exportCsv => 'CSV ایکسپورٹ';
+
+  @override
+  String get filters => 'فلٹرز';
+
+  @override
+  String get noExpiringBatches => 'کوئی ختم ہونے والا بیچ نہیں';
+
+  @override
+  String get fieldsBatchno => 'بیچ نمبر';
+
+  @override
+  String get fieldsSource => 'ماخذ';
+
+  @override
+  String get fieldsUnitcost => 'اکائی لاگت';
+
+  @override
+  String get inventoryQtyoriginal => 'اصل مقدار';
+
+  @override
+  String get inventoryQtyremaining => 'باقی مقدار';
+
+  @override
+  String get commonRetry => 'دوبارہ کوشش';
+
+  @override
+  String get commonSaved => 'محفوظ';
+
+  @override
+  String daysRemaining(Object days) {
+    return '$days دن باقی';
+  }
+
+  @override
+  String daysExpired(Object days) {
+    return 'مونثی کے $days دن بعد';
+  }
+
+  @override
+  String batchesSummary(Object expired, Object near, Object total) {
+    return 'بیچز: کل $total، قریبی مونثی $near، ختم شدہ $expired';
+  }
+
+  @override
+  String confirmSellExpired(Object days) {
+    return 'یہ آئٹم $days دن پہلے ختم ہو چکا ہے۔ کیا آپ واقعی اسے بیچنا چاہتے ہیں؟';
+  }
+
+  @override
+  String get expiredStockConfirm =>
+      'درج ذیل بیچز ختم ہو چکے ہیں۔ ختم شدہ اسٹاک بیچنا پالیسی کی خلاف ورزی ہو سکتی ہے۔ پھر بھی جاری رکھیں؟';
+
+  @override
+  String nearExpirySaleWarning(
+    Object batchNo,
+    Object expiryDate,
+    Object itemName,
+  ) {
+    return '$itemName بیچ $batchNo سے بیچ رہے ہیں جو $expiryDate کو ختم ہو رہا ہے';
+  }
 }

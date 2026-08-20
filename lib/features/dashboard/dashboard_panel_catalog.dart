@@ -92,6 +92,14 @@ const List<DashboardPanelDefinition> panelCatalog = [
     icon: Icons.warning_amber_outlined,
     defaultVisible: true,
   ),
+  DashboardPanelDefinition(
+    id: 'panel_expiry_alerts',
+    labelKey: 'dashboardcardPanelExpiryalerts',
+    row: 2,
+    flex: 2,
+    icon: Icons.event_busy_outlined,
+    defaultVisible: true,
+  ),
 ];
 
 /// The cash & bank strip — a single fixed block at the top of the
@@ -133,6 +141,8 @@ String dashboardPanelLabel(AppLocalizations l10n, String labelKey) {
       return l10n.dashboardcardPanelTopcustomers;
     case 'dashboardcardPanelLowstock':
       return l10n.dashboardcardPanelLowstock;
+    case 'dashboardcardPanelExpiryalerts':
+      return l10n.dashboardcardPanelExpiryalerts;
     case 'dashboardcardCashstrip':
       return l10n.dashboardcardCashstrip;
     default:

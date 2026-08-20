@@ -462,6 +462,157 @@ describe('StockMovementModel', () => {
         );
       }).toThrow('consumeFromOldestBatches: quantity must be positive, got 0');
     });
+
+    // ── FEFO edge-case tests ────────────────────────────────────
+
+    it('FEFO: consumes nearest-expiry batch first when has_expiry=1', () => {
+      // Clean slate
+      db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
+
+      // Update item to have expiry tracking
+      db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
+
+      // Batch A: expires in 60 days, 30 units @ cost 10
+      db.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'FEFO-A', 'PURCHASE', 0, 30, 30, 10, '2026-01-01', date('now', '+60 days'))`).run(testItemId, testWhId);
+
+      // Batch B: expires in 10 days, 30 units @ cost 20
+      db.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'FEFO-B', 'PURCHASE', 0, 30, 30, 20, '2026-06-01', date('now', '+10 days'))`).run(testItemId, testWhId);
+
+      // Set stock_balances to 60
+      db.prepare('UPDATE stock_balances SET quantity = 60 WHERE item_id = ? AND warehouse_id = ?').run(testItemId, testWhId);
+
+      // Consume 40: should take 30 from Batch B (nearest expiry) first, then 10 from A
+      const consumption = StockMovementModel.consumeFromOldestBatches(testItemId, testWhId, 40, db);
+
+      expect(consumption).toHaveLength(2);
+      expect(consumption[0].unitCost).toBe(20); // Batch B consumed first
+      expect(consumption[0].consumed).toBe(30);
+      expect(consumption[1].unitCost).toBe(10); // Batch A consumed second
+      expect(consumption[1].consumed).toBe(10);
+
+      // Restore item to non-expiry for other tests
+      db.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
+    });
+
+    it('FEFO: skips halted batches', () => {
+      db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
+      db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
+
+      // Batch A: halted, 30 units
+      db.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date, halted)
+        VALUES (?, ?, 'HALT-A', 'PURCHASE', 0, 30, 30, 10, '2026-01-01', date('now', '+30 days'), 1)`).run(testItemId, testWhId);
+
+      // Batch B: not halted, 30 units
+      db.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date, halted)
+        VALUES (?, ?, 'HALT-B', 'PURCHASE', 0, 30, 30, 20, '2026-01-01', date('now', '+30 days'), 0)`).run(testItemId, testWhId);
+
+      db.prepare('UPDATE stock_balances SET quantity = 60 WHERE item_id = ? AND warehouse_id = ?').run(testItemId, testWhId);
+
+      // Consume 20: should only come from Batch B (halted A is skipped)
+      const consumption = StockMovementModel.consumeFromOldestBatches(testItemId, testWhId, 20, db);
+
+      expect(consumption).toHaveLength(1);
+      expect(consumption[0].unitCost).toBe(20); // Only Batch B
+      expect(consumption[0].consumed).toBe(20);
+
+      // Batch A should still have 30 remaining (untouched)
+      const batchA = db.prepare('SELECT quantity_remaining FROM stock_batches WHERE batch_no = ?').get('HALT-A') as { quantity_remaining: number };
+      expect(batchA.quantity_remaining).toBe(30);
+
+      db.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
+    });
+
+    it('FEFO: excludes expired batches (expiry_date < today)', () => {
+      db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
+      db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
+
+      // Batch A: expired 5 days ago, 30 units
+      db.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'EXP-A', 'PURCHASE', 0, 30, 30, 10, '2026-01-01', date('now', '-5 days'))`).run(testItemId, testWhId);
+
+      // Batch B: not expired, 30 units
+      db.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'EXP-B', 'PURCHASE', 0, 30, 30, 20, '2026-06-01', date('now', '+30 days'))`).run(testItemId, testWhId);
+
+      db.prepare('UPDATE stock_balances SET quantity = 60 WHERE item_id = ? AND warehouse_id = ?').run(testItemId, testWhId);
+
+      // Consume 20: should only come from Batch B (expired A is excluded)
+      const consumption = StockMovementModel.consumeFromOldestBatches(testItemId, testWhId, 20, db);
+
+      expect(consumption).toHaveLength(1);
+      expect(consumption[0].unitCost).toBe(20); // Only Batch B
+
+      // Batch A should still have 30 remaining
+      const batchA = db.prepare('SELECT quantity_remaining FROM stock_batches WHERE batch_no = ?').get('EXP-A') as { quantity_remaining: number };
+      expect(batchA.quantity_remaining).toBe(30);
+
+      db.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
+    });
+
+    it('FEFO: throws when all batches are halted/expired but stock_balances > 0', () => {
+      db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
+      db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
+
+      // Batch A: halted
+      db.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, halted)
+        VALUES (?, ?, 'BLOCKED-A', 'PURCHASE', 0, 30, 30, 10, '2026-01-01', 1)`).run(testItemId, testWhId);
+
+      // Batch B: expired
+      db.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'BLOCKED-B', 'PURCHASE', 0, 30, 30, 20, '2026-06-01', date('now', '-10 days'))`).run(testItemId, testWhId);
+
+      db.prepare('UPDATE stock_balances SET quantity = 60 WHERE item_id = ? AND warehouse_id = ?').run(testItemId, testWhId);
+
+      // Should throw — stock exists but all batches are blocked
+      expect(() => {
+        StockMovementModel.consumeFromOldestBatches(testItemId, testWhId, 10, db);
+      }).toThrow('All batches for');
+
+      db.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
+    });
+
+    it('FEFO: NULL expiry dates consumed after dated ones', () => {
+      db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
+      db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
+
+      // Batch A: no expiry date (NULL), 30 units
+      db.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'NULL-A', 'PURCHASE', 0, 30, 30, 10, '2026-01-01', NULL)`).run(testItemId, testWhId);
+
+      // Batch B: has expiry date (far future), 30 units
+      db.prepare(`INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
+        VALUES (?, ?, 'NULL-B', 'PURCHASE', 0, 30, 30, 20, '2026-06-01', date('now', '+90 days'))`).run(testItemId, testWhId);
+
+      db.prepare('UPDATE stock_balances SET quantity = 60 WHERE item_id = ? AND warehouse_id = ?').run(testItemId, testWhId);
+
+      // Consume 40: should take 30 from B (has expiry) first, then 10 from A (NULL expiry)
+      const consumption = StockMovementModel.consumeFromOldestBatches(testItemId, testWhId, 40, db);
+
+      expect(consumption).toHaveLength(2);
+      expect(consumption[0].unitCost).toBe(20); // Batch B first (dated)
+      expect(consumption[0].consumed).toBe(30);
+      expect(consumption[1].unitCost).toBe(10); // Batch A second (NULL)
+      expect(consumption[1].consumed).toBe(10);
+
+      db.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
+    });
+
+    it('legacy: uses standard_cost when no batch rows exist', () => {
+      db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
+      db.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
+
+      // Set stock_balances to 50 but no batch rows (legacy stock)
+      db.prepare('UPDATE stock_balances SET quantity = 50 WHERE item_id = ? AND warehouse_id = ?').run(testItemId, testWhId);
+
+      const consumption = StockMovementModel.consumeFromOldestBatches(testItemId, testWhId, 20, db);
+
+      expect(consumption).toHaveLength(1);
+      expect(consumption[0].batchId).toBeNull(); // No batch
+      expect(consumption[0].consumed).toBe(20);
+      expect(consumption[0].unitCost).toBe(10); // Falls back to standard_cost
+    });
   });
 
   describe('Purchase supplier/payment flow', () => {
@@ -650,6 +801,101 @@ describe('StockMovementModel', () => {
       expect(history).toHaveLength(1);
       expect(history[0].amount).toBe(60);
       expect(history[0].payment_method).toBe('Bank Transfer');
+    });
+  });
+
+  describe('supplier payment purchase_order_id linking', () => {
+    let supId: number;
+    let poId: number;
+    let poId2: number;
+    let purchaseId: number;
+
+    beforeAll(() => {
+      const r = db.prepare(
+        `INSERT INTO suppliers (supplier_code, supplier_name, is_active) VALUES (?, ?, 1)`
+      ).run(`POID-SUP-${Date.now()}`, 'PO Id Link Test');
+      supId = Number(r.lastInsertRowid);
+
+      const po = PurchaseOrderModel.create(
+        { supplier_id: supId, po_date: '2026-08-01', status: 'Draft', items: [{ item_id: 1, quantity: 5, unit_price: 20 }] },
+        1,
+        db,
+      );
+      poId = po.id;
+      const po2 = PurchaseOrderModel.create(
+        { supplier_id: supId, po_date: '2026-08-01', status: 'Draft', items: [{ item_id: 1, quantity: 3, unit_price: 20 }] },
+        1,
+        db,
+      );
+      poId2 = po2.id;
+
+      const pr = db.prepare(
+        `INSERT INTO purchases (purchase_no, item_id, warehouse_id, quantity, unit_cost, total_cost, supplier_id, created_by, purchase_date)
+         VALUES (?, ?, 1, 1, 10, 10, ?, ?, '2026-08-01')`
+      ).run(`POID-PUR-${Date.now()}`, 1, supId, 1);
+      purchaseId = Number(pr.lastInsertRowid);
+    });
+
+    afterAll(() => {
+      const pids = db.prepare('SELECT id FROM payments WHERE supplier_id = ?').all(supId) as { id: number }[];
+      for (const p of pids) PaymentModel.delete(db, p.id);
+      if (purchaseId) db.prepare('DELETE FROM purchases WHERE id = ?').run(purchaseId);
+      PurchaseOrderModel.delete(poId, 1, db);
+      PurchaseOrderModel.delete(poId2, 1, db);
+      db.prepare('DELETE FROM supplier_ledger WHERE supplier_id = ?').run(supId);
+      db.prepare('DELETE FROM suppliers WHERE id = ?').run(supId);
+    });
+
+    it('sets purchase_order_id for a single-PO supplier payment', () => {
+      const paymentId = PaymentModel.createSupplierPayment(db, {
+        supplier_id: supId,
+        payment_date: '2026-08-02',
+        amount: 50,
+        po_allocations: [{ po_id: String(poId), amount: 50 }],
+        purchase_allocations: [],
+        userId: 1,
+      });
+      const row = db.prepare('SELECT purchase_order_id FROM payments WHERE id = ?').get(paymentId) as {
+        purchase_order_id: number | null;
+      };
+      expect(row.purchase_order_id).toBe(poId);
+      const alloc = db.prepare('SELECT po_id FROM po_allocations WHERE payment_id = ?').get(paymentId) as {
+        po_id: number;
+      };
+      expect(alloc.po_id).toBe(poId);
+    });
+
+    it('leaves purchase_order_id NULL for a multi-PO supplier payment', () => {
+      const paymentId = PaymentModel.createSupplierPayment(db, {
+        supplier_id: supId,
+        payment_date: '2026-08-03',
+        amount: 80,
+        po_allocations: [
+          { po_id: String(poId), amount: 50 },
+          { po_id: String(poId2), amount: 30 },
+        ],
+        purchase_allocations: [],
+        userId: 1,
+      });
+      const row = db.prepare('SELECT purchase_order_id FROM payments WHERE id = ?').get(paymentId) as {
+        purchase_order_id: number | null;
+      };
+      expect(row.purchase_order_id).toBeNull();
+    });
+
+    it('leaves purchase_order_id NULL for a mixed PO + purchase supplier payment', () => {
+      const paymentId = PaymentModel.createSupplierPayment(db, {
+        supplier_id: supId,
+        payment_date: '2026-08-04',
+        amount: 35,
+        po_allocations: [{ po_id: String(poId2), amount: 30 }],
+        purchase_allocations: [{ purchase_id: String(purchaseId), amount: 5 }],
+        userId: 1,
+      });
+      const row = db.prepare('SELECT purchase_order_id FROM payments WHERE id = ?').get(paymentId) as {
+        purchase_order_id: number | null;
+      };
+      expect(row.purchase_order_id).toBeNull();
     });
   });
 

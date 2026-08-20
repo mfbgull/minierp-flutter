@@ -68,6 +68,7 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
   // Item.
   int? _itemId;
   int? _warehouseId;
+  DateTime? _expiryDate;
   final _qtyController = TextEditingController();
   final _costController = TextEditingController();
 
@@ -141,6 +142,15 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
     if (picked != null && mounted) setState(() => _paymentDate = picked);
   }
 
+  Future<void> _pickExpiryDate() async {
+    final picked = await pickDate(
+      context,
+      initialDate: _expiryDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+    );
+    if (picked != null && mounted) setState(() => _expiryDate = picked);
+  }
+
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -162,6 +172,7 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
           supplierId: _supplierId,
           invoiceNo: _invoiceNoController.text,
           remarks: _remarksController.text,
+          expiryDate: _expiryDate != null ? isoDate(_expiryDate!) : null,
         );
     if (!mounted) return;
 
@@ -266,6 +277,34 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
   }
 
   // ── Sections ──────────────────────────────────────────────────
+
+  /// Expiry-date picker — only shown when the selected item tracks expiry.
+  Widget _expiryPicker(AppLocalizations l10n) {
+    final items = ref.watch(allItemsProvider).valueOrNull ?? const [];
+    final selectedItem = items.where((i) => i.id == _itemId).firstOrNull;
+    if (selectedItem?.hasExpiry != true) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 12),
+        FormFieldShell(
+          label: l10n.expiryDate,
+          child: SizedBox(
+            height: 42,
+            child: OutlinedButton.icon(
+              onPressed: _busy ? null : _pickExpiryDate,
+              icon: const Icon(Icons.calendar_today_outlined, size: 15),
+              label: Text(
+                _expiryDate != null
+                    ? Formatters.date(isoDate(_expiryDate!))
+                    : l10n.expirySelectDateOptional,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _documentSection(AppLocalizations l10n, List<Supplier> suppliers) {
     final supplierIds = [for (final s in suppliers) s.id];
@@ -399,6 +438,7 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
               ),
             ],
           ),
+          _expiryPicker(l10n),
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

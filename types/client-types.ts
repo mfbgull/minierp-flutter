@@ -53,6 +53,8 @@ export interface Item {
   is_finished_good?: boolean;
   is_purchased?: boolean;
   is_manufactured?: boolean;
+  has_expiry?: boolean;
+  near_expiry_threshold_days?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -82,6 +84,8 @@ export interface InvoiceItem {
   rate: number;
   tax: number;
   discount: Discount;
+  expiry_date?: string | null;
+  is_expired_at_sale?: boolean;
 }
 
 export interface InvoicePayment {
@@ -115,6 +119,7 @@ export interface Invoice {
   items?: InvoiceItem[];
   notes?: string;
   terms?: string;
+  expiry_notes?: string;
   created_by?: number;
   company?: CompanyInfo;
   payment?: InvoicePayment;

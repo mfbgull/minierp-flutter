@@ -43,6 +43,7 @@ import 'features/reports/general_ledger_report_screen.dart';
 import 'features/reports/income_statement_report_screen.dart';
 import 'features/reports/tax_summary_report_screen.dart';
 import 'features/reports/batch_traceability_report_screen.dart';
+import 'features/reports/expiry_report_screen.dart';
 import 'features/reports/reports_dashboard_screen.dart'
     show ReportsDashboardScreen, reportTitles;
 import 'features/sales/invoice_print_preview_page.dart';
@@ -191,6 +192,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                             'income-statement' => const IncomeStatementReportScreen(),
                             'tax-summary' => const TaxSummaryReportScreen(),
                             'batch-traceability' => const BatchTraceabilityReportScreen(),
+                            'expiry' => const ExpiryReportScreen(),
                             'dso' => const DsoReportScreen(),
                             'cash-flow' => const CashFlowReportScreen(),
                             'cash-reconciliation' =>

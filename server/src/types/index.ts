@@ -49,6 +49,8 @@ export interface Item {
   is_raw_material: boolean;
   is_finished_good: boolean;
   is_purchased: boolean;
+  has_expiry?: boolean;
+  near_expiry_threshold_days?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -540,6 +542,9 @@ export interface StockBatch {
   quantity_remaining: number;
   unit_cost: number;
   received_date: string;
+  expiry_date?: string | null;
+  halted?: boolean;
+  halted_reason?: string | null;
   created_at?: string;
   // Joined fields
   item_code?: string;
@@ -562,6 +567,9 @@ export interface BatchSummary {
   unit_cost: number;
   total_value: number;
   received_date: string;
+  expiry_date?: string | null;
+  halted?: boolean;
+  halted_reason?: string | null;
 }
 
 // ============ Activity Log Types ============

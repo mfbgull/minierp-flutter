@@ -59,10 +59,11 @@ class ItemModel {
         unit_of_measure, reorder_level, standard_cost, standard_selling_price,
         is_raw_material, is_finished_good, is_purchased, is_manufactured,
         sale_type, qty_decimal_precision, rounding_step,
+        has_expiry, near_expiry_threshold_days,
         created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-        const result = stmt.run(data.item_code, data.item_name, data.description || null, data.category || null, data.unit_of_measure || 'Nos', data.reorder_level || 0, data.standard_cost || 0, data.standard_selling_price || 0, data.is_raw_material ? 1 : 0, data.is_finished_good ? 1 : 0, data.is_purchased !== undefined ? (data.is_purchased ? 1 : 0) : 1, data.is_manufactured ? 1 : 0, data.sale_type === 'loose' ? 'loose' : 'packed', data.qty_decimal_precision || 0, data.rounding_step ?? null, userId);
+        const result = stmt.run(data.item_code, data.item_name, data.description || null, data.category || null, data.unit_of_measure || 'Nos', data.reorder_level || 0, data.standard_cost || 0, data.standard_selling_price || 0, data.is_raw_material ? 1 : 0, data.is_finished_good ? 1 : 0, data.is_purchased !== undefined ? (data.is_purchased ? 1 : 0) : 1, data.is_manufactured ? 1 : 0, data.sale_type === 'loose' ? 'loose' : 'packed', data.qty_decimal_precision || 0, data.rounding_step ?? null, data.has_expiry ? 1 : 0, data.near_expiry_threshold_days ?? 30, userId);
         return result.lastInsertRowid;
     }
     static update(id, data, db) {
@@ -82,10 +83,12 @@ class ItemModel {
           sale_type = ?,
           qty_decimal_precision = ?,
           rounding_step = ?,
+          has_expiry = ?,
+          near_expiry_threshold_days = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
-        return stmt.run(data.item_name, data.description || null, data.category || null, data.unit_of_measure, data.reorder_level || 0, data.standard_cost || 0, data.standard_selling_price || 0, data.is_raw_material ? 1 : 0, data.is_finished_good ? 1 : 0, data.is_purchased ? 1 : 0, data.is_manufactured ? 1 : 0, data.sale_type === 'loose' ? 'loose' : 'packed', data.qty_decimal_precision || 0, data.rounding_step ?? null, id);
+        return stmt.run(data.item_name, data.description || null, data.category || null, data.unit_of_measure, data.reorder_level || 0, data.standard_cost || 0, data.standard_selling_price || 0, data.is_raw_material ? 1 : 0, data.is_finished_good ? 1 : 0, data.is_purchased ? 1 : 0, data.is_manufactured ? 1 : 0, data.sale_type === 'loose' ? 'loose' : 'packed', data.qty_decimal_precision || 0, data.rounding_step ?? null, data.has_expiry ? 1 : 0, data.near_expiry_threshold_days ?? 30, id);
     }
     static delete(id, db) {
         const stmt = db.prepare('UPDATE items SET is_active = 0 WHERE id = ?');

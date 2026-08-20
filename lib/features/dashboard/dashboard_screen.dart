@@ -24,6 +24,9 @@ import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../reports/report_providers.dart'
     show applyGlobalReportRange, globalReportFromDateProvider, globalReportToDateProvider;
+import '../inventory/batch_management_screen.dart'
+    show showBatchManagementScreen;
+import '../reports/report_providers.dart' show expiryAlertsProvider;
 import 'cash_opening_balance_dialog.dart' show showCashOpeningBalanceDialog;
 import 'cash_position_detail_dialog.dart';
 import 'dashboard_customizer_dialog.dart' show showDashboardCustomizerDialog;
@@ -610,6 +613,7 @@ class _PanelFrameState extends ConsumerState<_PanelFrame> {
       ),
       'panel_top_customers' => const _TopCustomersPanel(),
       'panel_low_stock' => _LowStockPanel(items: widget.summary.lowStockItems),
+      'panel_expiry_alerts' => const _ExpiryAlertsPanel(),
       _ => const SizedBox.shrink(),
     };
 
@@ -1584,6 +1588,103 @@ class _LowStockPanel extends StatelessWidget {
                         );
                       },
                     ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExpiryAlertsPanel extends ConsumerWidget {
+  const _ExpiryAlertsPanel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    final alerts = ref.watch(expiryAlertsProvider);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.expiringSoon,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: switch (alerts) {
+                AsyncError(:final error) => Center(
+                    child: Text(
+                      error is ApiError ? error.message : '$error',
+                      style: TextStyle(color: scheme.onSurfaceVariant),
+                    ),
+                  ),
+                AsyncLoading() => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                AsyncData(:final value) => value.isEmpty
+                    ? Center(
+                        child: Text(
+                          l10n.noExpiringBatches,
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: value.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final a = value[index];
+                          final expired = a.daysRemaining < 0;
+                          final near = !expired && a.daysRemaining <= 30;
+                          final color = expired
+                              ? scheme.error
+                              : near
+                                  ? const Color(0xffd97706)
+                                  : scheme.onSurfaceVariant;
+                          return ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(
+                              expired
+                                  ? Icons.event_busy_outlined
+                                  : Icons.event_repeat_outlined,
+                              color: color,
+                            ),
+                            title: Text(
+                              a.itemName,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            subtitle: Text(
+                              '${a.batchNo} · ${a.warehouseName}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: Text(
+                              expired
+                                  ? l10n.daysExpired(a.daysRemaining.abs())
+                                  : l10n.daysRemaining(a.daysRemaining),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: color,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            onTap: () => showBatchManagementScreen(
+                              context,
+                              itemId: a.itemId,
+                            ),
+                          );
+                        },
+                      ),
+              _ => const SizedBox.shrink(),
+              },
             ),
           ],
         ),

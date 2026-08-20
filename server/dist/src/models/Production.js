@@ -37,7 +37,7 @@ class ProductionModel {
         return (0, sequence_1.generateDocNo)(db, 'PROD');
     }
     static recordProduction(data, userId, db) {
-        const { output_item_id, output_quantity, warehouse_id, raw_materials_warehouse_id, production_date, input_items, bom_id, remarks, overhead_cost } = data;
+        const { output_item_id, output_quantity, warehouse_id, raw_materials_warehouse_id, production_date, input_items, bom_id, remarks, overhead_cost, expiry_date } = data;
         const materialsWarehouseId = raw_materials_warehouse_id || warehouse_id;
         // Validate bom_id matches output_item_id
         if (bom_id) {
@@ -140,9 +140,9 @@ class ProductionModel {
         INSERT INTO stock_batches (
           batch_no, item_id, warehouse_id, source_type,
           source_id, quantity_original, quantity_remaining,
-          unit_cost, received_date
-        ) VALUES (?, ?, ?, 'PRODUCTION', ?, ?, ?, ?, ?)
-      `).run(batchNo, output_item_id, warehouse_id, productionId, output_quantity, output_quantity, costPerUnit, production_date);
+          unit_cost, received_date, expiry_date
+        ) VALUES (?, ?, ?, 'PRODUCTION', ?, ?, ?, ?, ?, ?)
+      `).run(batchNo, output_item_id, warehouse_id, productionId, output_quantity, output_quantity, costPerUnit, production_date, expiry_date || null);
             const batchRecord = db.prepare(`
         SELECT id FROM stock_batches
         WHERE source_type = 'PRODUCTION' AND source_id = ?

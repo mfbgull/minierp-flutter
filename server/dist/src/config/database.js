@@ -882,6 +882,24 @@ function runMissingFKIndexesMigration() {
         logger_1.default.error('Missing FK indexes migration error:', error.message);
     }
 }
+function runExpiryTrackingMigration() {
+    try {
+        // Check if migration already applied by looking for the has_expiry column
+        const columnCheck = db.prepare(`
+      SELECT COUNT(*) as count FROM pragma_table_info('items')
+      WHERE name='has_expiry'
+    `).get();
+        if (columnCheck.count === 0) {
+            logger_1.default.info('Running item expiry tracking migration...');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-item-expiry-tracking.sql'), 'utf8');
+            db.exec(migrationSQL);
+            logger_1.default.info('✅ Item expiry tracking migration completed!');
+        }
+    }
+    catch (error) {
+        logger_1.default.error('Expiry tracking migration error:', error.message);
+    }
+}
 initializeDatabase();
 runExpensesMigration();
 runPurchasesMigration();
@@ -917,6 +935,7 @@ runEmployeesMigration();
 runPhysicalCountsMigration();
 runForecastEnhancementsMigration();
 runCustomReportsMigration();
+runExpiryTrackingMigration();
 runDashboardLayoutsMigration();
 runLooseItemMigration();
 runCashAccountsMigration();

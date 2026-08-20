@@ -366,7 +366,25 @@ List<pw.Widget> _itemCell(
         ),
       );
 
-  // Item name with the item code beneath it (reference template).
+  // Item name with the item code beneath it (reference template), plus
+  // an expiry line when the consumed batch carried an expiry date.
+  final expiryLine = <pw.Widget>[];
+  if (item.expiryDate != null) {
+    expiryLine.add(
+      pw.Text(
+        item.isExpiredAtSale
+            ? 'Expired ${Formatters.date(item.expiryDate!)} '
+                '(sold after expiry)'
+            : 'Expiry: ${Formatters.date(item.expiryDate!)}',
+        style: pw.TextStyle(
+          fontSize: 7.5,
+          color: item.isExpiredAtSale
+              ? PdfColors.red
+              : PdfColor.fromInt(0xFFB45309),
+        ),
+      ),
+    );
+  }
   final nameCell = pw.Container(
     padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
     child: pw.Column(
@@ -381,6 +399,7 @@ List<pw.Widget> _itemCell(
             code.trim(),
             style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
           ),
+        ...expiryLine,
       ],
     ),
   );
@@ -423,6 +442,7 @@ pw.Widget _buildSummarySection(
   List<InvoicePaymentRecord> payments,
 ) {
   final notes = invoice.notes ?? '';
+  final items = invoice.items ?? const <InvoiceItem>[];
   final subtotal = _subtotal(invoice);
   final discount = _totalDiscount(invoice);
   final tax = _totalTax(invoice);
@@ -444,6 +464,31 @@ pw.Widget _buildSummarySection(
               pw.Text(
                 notes.trim(),
                 style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+              ),
+            ],
+            if ((invoice.expiryNotes ?? '').trim().isNotEmpty) ...[
+              if (notes.trim().isNotEmpty) pw.SizedBox(height: 12),
+              _sectionLabel('Expiry Notice'),
+              pw.SizedBox(height: 4),
+              pw.SizedBox(height: 4),
+              pw.Container(
+                padding: const pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(
+                  color: items.any((i) => i.isExpiredAtSale)
+                      ? PdfColors.red50
+                      : PdfColors.orange50,
+                  border: pw.Border.all(
+                    color: items.any((i) => i.isExpiredAtSale)
+                        ? PdfColors.red
+                        : PdfColors.orange,
+                    width: 0.8,
+                  ),
+                  borderRadius: pw.BorderRadius.circular(4),
+                ),
+                child: pw.Text(
+                  invoice.expiryNotes!.trim(),
+                  style: pw.TextStyle(fontSize: 9, color: PdfColors.grey800),
+                ),
               ),
             ],
             if (payments.isNotEmpty) ...[

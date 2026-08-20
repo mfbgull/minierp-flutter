@@ -132,6 +132,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboardcardPanelLowstock => 'Low Stock';
 
   @override
+  String get dashboardcardPanelExpiryalerts => 'Expiring Soon';
+
+  @override
   String get dashboardcardCashstrip => 'Cash & Bank Position';
 
   @override
@@ -5253,4 +5256,145 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchClose => 'Close';
+
+  @override
+  String get expiryTracking => 'Expiry Tracking';
+
+  @override
+  String get trackExpiryDates => 'Track expiry dates';
+
+  @override
+  String get nearExpiryThreshold => 'Near-expiry threshold (days)';
+
+  @override
+  String get expiryDate => 'Expiry Date';
+
+  @override
+  String get expirySelectDateOptional => 'Select date (optional)';
+
+  @override
+  String get batchManagement => 'Batch Management';
+
+  @override
+  String get expiryStatus => 'Expiry Status';
+
+  @override
+  String get statusNormal => 'Normal';
+
+  @override
+  String get statusNearExpiry => 'Near Expiry';
+
+  @override
+  String get statusExpired => 'Expired';
+
+  @override
+  String get statusHalted => 'Halted';
+
+  @override
+  String get haltBatch => 'Halt Batch';
+
+  @override
+  String get unhaltBatch => 'Unhalt Batch';
+
+  @override
+  String get haltReason => 'Halt Reason';
+
+  @override
+  String get haltReasonHint => 'Reason (optional)';
+
+  @override
+  String get manageBatches => 'Manage Batches';
+
+  @override
+  String get expiryNotice => 'Expiry Notice';
+
+  @override
+  String get nearExpiryNotice => 'Near-Expiry Notice';
+
+  @override
+  String get soldAfterExpiry => 'Sold after expiry';
+
+  @override
+  String get expiringSoon => 'Expiring Soon';
+
+  @override
+  String get expiryReport => 'Expiry Report';
+
+  @override
+  String get expiryAlerts => 'Expiry Alerts';
+
+  @override
+  String get thresholdDays => 'Threshold (days)';
+
+  @override
+  String get expiryWarehouseLabel => 'Warehouse';
+
+  @override
+  String get daysUntilExpiry => 'Days Until Expiry';
+
+  @override
+  String get totalValue => 'Total Value';
+
+  @override
+  String get exportCsv => 'Export CSV';
+
+  @override
+  String get filters => 'Filters';
+
+  @override
+  String get noExpiringBatches => 'No expiring batches';
+
+  @override
+  String get fieldsBatchno => 'Batch No';
+
+  @override
+  String get fieldsSource => 'Source';
+
+  @override
+  String get fieldsUnitcost => 'Unit Cost';
+
+  @override
+  String get inventoryQtyoriginal => 'Original Qty';
+
+  @override
+  String get inventoryQtyremaining => 'Remaining Qty';
+
+  @override
+  String get commonRetry => 'Retry';
+
+  @override
+  String get commonSaved => 'Saved';
+
+  @override
+  String daysRemaining(Object days) {
+    return '$days days remaining';
+  }
+
+  @override
+  String daysExpired(Object days) {
+    return '$days days after expiry';
+  }
+
+  @override
+  String batchesSummary(Object expired, Object near, Object total) {
+    return 'Batches: $total total, $near near-expiry, $expired expired';
+  }
+
+  @override
+  String confirmSellExpired(Object days) {
+    return 'This item expired $days days ago. Are you sure you want to sell it?';
+  }
+
+  @override
+  String get expiredStockConfirm =>
+      'The following batches are expired. Selling expired stock may violate policy. Continue anyway?';
+
+  @override
+  String nearExpirySaleWarning(
+    Object batchNo,
+    Object expiryDate,
+    Object itemName,
+  ) {
+    return 'Selling $itemName from batch $batchNo expiring on $expiryDate';
+  }
 }

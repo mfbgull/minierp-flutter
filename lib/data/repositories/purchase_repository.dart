@@ -86,6 +86,7 @@ class PurchaseRepository {
     int? supplierId,
     String? invoiceNo,
     String? remarks,
+    String? expiryDate,
   }) => _api.post(
     ApiEndpoints.purchases,
     body: {
@@ -99,6 +100,7 @@ class PurchaseRepository {
         'invoice_no': invoiceNo.trim(),
       if (remarks != null && remarks.trim().isNotEmpty)
         'remarks': remarks.trim(),
+      if (expiryDate != null) 'expiry_date': expiryDate,
     },
     parse: (Object? json) => Purchase.fromJson(json as Map<String, dynamic>),
   );

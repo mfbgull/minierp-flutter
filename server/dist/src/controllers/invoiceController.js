@@ -144,6 +144,7 @@ function createInvoice(req, res) {
             }, userId);
             // Insert invoice items and deduct stock via FIFO batch consumption
             let cogsTotal = 0;
+            const consumptions = [];
             for (const item of items) {
                 const warehouseId = Invoice_1.default.findWarehouseForItem(database_1.default, item.item_id, item.quantity, item.warehouse_id);
                 Invoice_1.default.createInvoiceItem(database_1.default, invoiceId, {
@@ -173,7 +174,11 @@ function createInvoice(req, res) {
                     }, userId, database_1.default);
                     cogsTotal += entry.consumed * entry.unitCost;
                 }
+                // Track consumption for expiry denormalization
+                consumptions.push({ itemId: item.item_id, consumption });
             }
+            // Denormalize expiry info onto invoice items and build expiry_notes
+            Invoice_1.default.denormalizeExpiryInfo(invoiceId, consumptions, database_1.default);
             // Create customer ledger entry (debit to increase AR)
             createLedgerEntry(parsedCustomerId, 'INVOICE', invoice_no, totalAmountNum, // debit
             0, // credit

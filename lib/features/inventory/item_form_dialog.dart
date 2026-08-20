@@ -55,6 +55,8 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
   bool _isFinishedGood = false;
   bool _isPurchased = true;
   bool _isManufactured = false;
+  bool _hasExpiry = false;
+  late TextEditingController _thresholdController;
 
   bool _submitting = false;
   String? _error;
@@ -86,6 +88,10 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     _isFinishedGood = item?.isFinishedGood ?? false;
     _isPurchased = item?.isPurchased ?? true;
     _isManufactured = item?.isManufactured ?? false;
+    _hasExpiry = item?.hasExpiry ?? false;
+    _thresholdController = TextEditingController(
+      text: numText(item?.nearExpiryThresholdDays ?? 30),
+    );
   }
 
   @override
@@ -96,6 +102,7 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     _reorderController.dispose();
     _costController.dispose();
     _priceController.dispose();
+    _thresholdController.dispose();
     super.dispose();
   }
 
@@ -124,6 +131,9 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
       'is_purchased': _isPurchased,
       'is_manufactured': _isManufactured,
       'sale_type': _saleType.value,
+      'has_expiry': _hasExpiry,
+      if (_hasExpiry && _thresholdController.text.isNotEmpty)
+        'near_expiry_threshold_days': int.parse(_thresholdController.text),
     };
   }
 
@@ -366,6 +376,50 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
                               _isManufactured,
                               (v) => setState(() => _isManufactured = v),
                             ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      FormFieldShell(
+                        label: l10n.expiryTracking,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              dense: true,
+                              title: Text(
+                                l10n.trackExpiryDates,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              value: _hasExpiry,
+                              onChanged: _submitting
+                                  ? null
+                                  : (v) => setState(() => _hasExpiry = v),
+                            ),
+                            if (_hasExpiry) ...[
+                              const SizedBox(height: 8),
+                              FormFieldShell(
+                                label: l10n.nearExpiryThreshold,
+                                child: TextFormField(
+                                  controller: _thresholdController,
+                                  enabled: !_submitting,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                    decimal: false,
+                                  ),
+                                  decoration: formInputDecoration(),
+                                  validator: (v) {
+                                    if (!_hasExpiry) return null;
+                                    final n = int.tryParse(v?.trim() ?? '');
+                                    if (n == null || n <= 0) {
+                                      return l10n.inventoryErrorNonnegative;
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

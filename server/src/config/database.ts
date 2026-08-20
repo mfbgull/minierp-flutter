@@ -849,6 +849,27 @@ function runSupplierPaymentMigration(): void {
   }
 }
 
+function runPaymentsPurchaseOrderIdMigration(): void {
+  try {
+    const columnCheck = db.prepare(`
+      SELECT COUNT(*) as count FROM pragma_table_info('payments')
+      WHERE name='purchase_order_id'
+    `).get() as { count: number };
+
+    if (columnCheck.count === 0) {
+      logger.info('Running payments purchase_order_id migration...');
+      const sql = fs.readFileSync(
+        path.join(__dirname, '../migrations/add-payments-purchase-order-id.sql'),
+        'utf8'
+      );
+      db.exec(sql);
+      logger.info('✅ Payments purchase_order_id migration completed!');
+    }
+  } catch (error: any) {
+    logger.error('Payments purchase_order_id migration error:', error.message);
+  }
+}
+
 function runSupplierBalanceMigration(): void {
   try {
     const columnCheck = db.prepare(`
@@ -1022,6 +1043,31 @@ function runMissingFKIndexesMigration(): void {
   }
 }
 
+function runExpiryTrackingMigration(): void {
+  try {
+    // Check if migration already applied by looking for the has_expiry column
+    const columnCheck = db.prepare(`
+      SELECT COUNT(*) as count FROM pragma_table_info('items')
+      WHERE name='has_expiry'
+    `).get() as { count: number };
+
+    if (columnCheck.count === 0) {
+      logger.info('Running item expiry tracking migration...');
+
+      const migrationSQL = fs.readFileSync(
+        path.join(__dirname, '../migrations/add-item-expiry-tracking.sql'),
+        'utf8'
+      );
+
+      db.exec(migrationSQL);
+
+      logger.info('✅ Item expiry tracking migration completed!');
+    }
+  } catch (error: any) {
+    logger.error('Expiry tracking migration error:', error.message);
+  }
+}
+
 initializeDatabase();
 runExpensesMigration();
 runPurchasesMigration();
@@ -1036,6 +1082,7 @@ runSalesMigration();
 runSupplierLedgerMigration();
 runActivityLogMigration();
 runSupplierPaymentMigration();
+runPaymentsPurchaseOrderIdMigration();
 runSupplierBalanceMigration();
 runRawMaterialsWarehouseMigration();
 runProductionInputsWarehouseMigration();
@@ -1057,6 +1104,7 @@ runEmployeesMigration();
 runPhysicalCountsMigration();
 runForecastEnhancementsMigration();
 runCustomReportsMigration();
+runExpiryTrackingMigration();
 runDashboardLayoutsMigration();
 runLooseItemMigration();
 runCashAccountsMigration();

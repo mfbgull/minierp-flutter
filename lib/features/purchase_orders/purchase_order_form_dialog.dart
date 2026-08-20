@@ -74,6 +74,10 @@ class _PoLine {
   final TextEditingController quantityController;
   final TextEditingController priceController;
 
+  /// Optional expiry date for expiry-tracked items (flows into the batch
+  /// at goods receipt).
+  DateTime? expiryDate;
+
   num get quantity => double.tryParse(quantityController.text) ?? 0;
   num get unitPrice => double.tryParse(priceController.text) ?? 0;
 
@@ -227,6 +231,7 @@ class _PurchaseOrderFormDialogState
     if (line.itemLineId == null) 'item_id': int.parse(line.itemId),
     'quantity': line.quantity,
     'unit_price': line.unitPrice,
+    if (line.expiryDate != null) 'expiry_date': isoDate(line.expiryDate!),
   };
 
   Map<String, dynamic> _paymentBody({required int poId}) => {
@@ -680,12 +685,32 @@ class _PurchaseOrderFormDialogState
     );
   }
 
+  Future<void> _pickLineExpiryDate(int index) async {
+    final line = _lines[index];
+    final picked = await pickDate(
+      context,
+      initialDate: line.expiryDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+    );
+    if (picked != null && mounted) {
+      setState(() => line.expiryDate = picked);
+    }
+  }
+
   Widget _lineRow(AppLocalizations l10n, int index) {
     final line = _lines[index];
     final items = ref.watch(poItemsProvider).valueOrNull ?? const <Item>[];
     final scheme = Theme.of(context).colorScheme;
     final amount = line.quantity * line.unitPrice;
-    return Row(
+    final selectedItem = items
+        .where((i) => i.id.toString() == line.itemId)
+        .firstOrNull;
+    final showExpiry = selectedItem?.hasExpiry == true;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
@@ -769,7 +794,26 @@ class _PurchaseOrderFormDialogState
           ),
         ),
       ],
-    );
+      ),
+      if (showExpiry) ...[
+        const SizedBox(height: 6),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: SizedBox(
+            height: 38,
+            child: OutlinedButton.icon(
+              onPressed: _submitting ? null : () => _pickLineExpiryDate(index),
+              icon: const Icon(Icons.calendar_today_outlined, size: 15),
+              label: Text(
+                line.expiryDate != null
+                    ? Formatters.date(isoDate(line.expiryDate!))
+                    : l10n.expirySelectDateOptional,
+              ),
+            ),
+          ),
+        ),
+      ],
+    ]);
   }
 
   Widget _itemsSection(AppLocalizations l10n) {

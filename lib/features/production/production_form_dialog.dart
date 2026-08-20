@@ -78,6 +78,10 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
   int? _rawMaterialsWarehouseId;
   int? _bomId;
 
+  /// Optional expiry date for the produced output batch (shown when the
+  /// output item tracks expiry).
+  DateTime? _expiryDate;
+
   /// The selected BOM's detail (material lines) — fetched on pick.
   BomDetail? _bomDetail;
   late DateTime _productionDate;
@@ -262,6 +266,16 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
     setState(() => _productionDate = picked);
   }
 
+  Future<void> _pickExpiryDate() async {
+    final picked = await pickDate(
+      context,
+      initialDate: _expiryDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _expiryDate = picked);
+  }
+
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_outputItemId == null) {
@@ -298,6 +312,7 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
       'production_date': isoDate(_productionDate),
       'bom_id': bom.id,
       if (remarks.isNotEmpty) 'remarks': remarks,
+      if (_expiryDate != null) 'expiry_date': isoDate(_expiryDate!),
       'overhead_cost': _overhead,
       'input_items': [
         for (final need in needs)
@@ -335,6 +350,9 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
         const <Warehouse>[];
     final outputItems =
         ref.watch(productionOutputItemsProvider).valueOrNull ?? const <Item>[];
+    final outputItem = _outputItemId == null
+        ? null
+        : outputItems.where((i) => i.id == _outputItemId).firstOrNull;
     final boms =
         ref.watch(productionBomOptionsProvider).valueOrNull ?? const <Bom>[];
     final shortfalls = _shortfalls;
@@ -456,6 +474,27 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
                           ),
                         ],
                       ),
+                      if (outputItem?.hasExpiry == true) ...[
+                        const SizedBox(height: 12),
+                        FormFieldShell(
+                          label: l10n.expiryDate,
+                          child: SizedBox(
+                            height: 44,
+                            child: OutlinedButton.icon(
+                              onPressed: _submitting ? null : _pickExpiryDate,
+                              icon: const Icon(
+                                Icons.calendar_today_outlined,
+                                size: 16,
+                              ),
+                              label: Text(
+                                _expiryDate != null
+                                    ? Formatters.date(isoDate(_expiryDate!))
+                                    : l10n.expirySelectDateOptional,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       // ── Warehouses + BOM ───────────────────────
                       Row(

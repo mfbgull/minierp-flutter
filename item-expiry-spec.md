@@ -956,3 +956,83 @@ gantt
     Integration tests                :3.8, after 3.1, 1d
     Localization + manual testing    :3.7, 3.9, after 3.1, 1d
 ```
+
+---
+
+## 11. Smoke Test Results (2026-08-20)
+
+Full end-to-end smoke tests were run against the live server on `localhost:3011`.
+All 11 core tests + 4 expired-batch override tests passed.
+
+### 11.1 FEFO Consumption Verified
+
+| Scenario | Expected | Actual |
+|----------|----------|--------|
+| Two batches, different expiry dates | Nearest-expiry consumed first | ✅ Batch with earlier expiry consumed first |
+| Expired batch available, future batch also available | Expired batch skipped | ✅ Expired batch untouched, future batch consumed |
+| All batches halted/expired, stock_balances > 0 | Error thrown | ✅ "All batches are halted or expired" |
+| Legacy stock (no batch rows) | Falls back to standard_cost | ✅ Returns `{ batchId: null, unitCost: standard_cost }` |
+
+### 11.2 Expired Batch Override Flow
+
+The system correctly blocks expired batch consumption by default. The override
+flow for the frontend "confirm and proceed" UX works as follows:
+
+```
+1. User attempts sale → FEFO blocks expired batch → error thrown
+2. Frontend catches error → shows confirmation dialog:
+   "This item expired X days ago. Are you sure you want to sell it?"
+3. User confirms → Frontend clears expiry_date via PATCH /stock-batches/:id
+4. Retry sale → Success (batch now treated as undated stock)
+5. Frontend restores expiry_date via PATCH /stock-batches/:id
+```
+
+**Verified:** Steps 1–5 work correctly end-to-end.
+
+**Design note:** The override clears `expiry_date` to NULL before the sale, so
+`denormalizeExpiryInfo` does not flag the line as expired (it was sold as undated
+stock). If you want `expiry_notes` to appear even on override sales, the
+`denormalizeExpiryInfo` method would need to preserve the original expiry date
+from the batch before the override. This is a product decision — the current
+behavior is: "you cleared the expiry, so the system treats it as undated."
+
+### 11.3 Invoice Expiry Notes
+
+| Scenario | `expiry_notes` | `invoice_items.expiry_date` |
+|----------|----------------|---------------------------|
+| Sale from non-expired batch | `null` | Set to batch's expiry date |
+| Sale from expired batch (override) | `null` (expiry was cleared) | `null` (no expiry on undated stock) |
+| Sale from expired batch (if FEFO allowed) | `⚠️ Expiry Notice\n• Item — expired on...` | Set to batch's expiry date, `is_expired_at_sale=1` |
+
+### 11.4 Batch Management API
+
+| Endpoint | Status |
+|----------|--------|
+| `GET /stock-batches?item_id=X` | ✅ Returns batches with `expiry_date`, `halted`, `halted_reason` |
+| `PATCH /stock-batches/:id` | ✅ Updates `expiry_date` |
+| `PATCH /stock-batches/:id/halt` | ✅ Sets `halted=1` with reason |
+| `PATCH /stock-batches/:id/unhalt` | ✅ Clears `halted` and `halted_reason` |
+
+### 11.5 Item CRUD
+
+| Operation | `has_expiry` | `near_expiry_threshold_days` |
+|-----------|-------------|------------------------------|
+| `POST /inventory/items` | ✅ Stored correctly | ✅ Defaults to 30 |
+| `PUT /inventory/items/:id` | ✅ Updated | ✅ Updated |
+| `GET /inventory/items/:id` | ✅ Returned | ✅ Returned |
+
+### 11.6 Purchase with Expiry
+
+| Operation | Status |
+|-----------|--------|
+| `POST /purchases` with `expiry_date` | ✅ Batch created with `expiry_date` |
+| `POST /purchase-orders/:id/receipts` | ✅ Reads `expiry_date` from PO item → batch |
+
+### 11.7 Known Limitation
+
+- `denormalizeExpiryInfo` runs inside the invoice creation transaction. If the
+  invoice has duplicate lines for the same item, both lines get the same
+  `expiry_date` (from the earliest consumed batch). This is correct for most
+  cases but may need refinement if different lines consume from different batches.
+- The `expiry_notes` field is system-managed and not exposed in create/update
+  endpoints. This is intentional — users cannot tamper with it.
