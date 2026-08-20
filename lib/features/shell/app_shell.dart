@@ -24,6 +24,7 @@ class ShellDestination {
     required this.icon,
     this.adminOnly = false,
     this.title,
+    this.hideInRail = false,
   });
 
   final String path;
@@ -35,6 +36,11 @@ class ShellDestination {
   /// branded differently (e.g. "Manufacturing" vs "Production") can keep
   /// the feature name in the app bar.
   final String Function(AppLocalizations)? title;
+
+  /// When true the module stays reachable (its router branch is still
+  /// built from [shellDestinations]) but is omitted from the sidebar
+  /// rail — e.g. Settings, which lives in the top app bar instead.
+  final bool hideInRail;
 }
 
 /// Single source of truth for the shell's module list — `app.dart` builds
@@ -125,6 +131,7 @@ final List<ShellDestination> shellDestinations = [
     path: '/settings',
     label: (l) => l.navSettings,
     icon: Icons.settings_outlined,
+    hideInRail: true,
   ),
 ];
 
@@ -173,7 +180,7 @@ class AppShell extends ConsumerWidget {
     final isAdmin = auth.user?.isAdmin ?? false;
     final visible = [
       for (final dest in shellDestinations)
-        if (!dest.adminOnly || isAdmin) dest,
+        if ((!dest.adminOnly || isAdmin) && !dest.hideInRail) dest,
     ];
     final current = shellDestinations[navigationShell.currentIndex];
     final selectedIndex = visible.indexWhere((d) => identical(d, current));
@@ -202,6 +209,11 @@ class AppShell extends ConsumerWidget {
             tooltip: 'Search (Ctrl+K)',
             icon: const Icon(Icons.search),
             onPressed: () => showGlobalSearchDialog(context),
+          ),
+          IconButton(
+            tooltip: l10n.navSettings,
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => context.go('/settings'),
           ),
           PopupMenuButton<Locale>(
             tooltip: l10n.commonLanguage,

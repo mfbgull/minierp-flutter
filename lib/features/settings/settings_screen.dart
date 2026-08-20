@@ -327,10 +327,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         _dateRangeSection(l10n),
                         const SizedBox(height: 16),
-                        for (final section in sections) ...[
-                          _sectionCard(l10n, section),
-                          const SizedBox(height: 16),
-                        ],
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final w = constraints.maxWidth;
+                            final cols = w >= 768 ? 3 : (w >= 520 ? 2 : 1);
+                            final cardW = (w - (cols - 1) * 16) / cols;
+                            return Wrap(
+                              spacing: 16,
+                              runSpacing: 16,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                for (final section in sections)
+                                  SizedBox(
+                                    width: cardW,
+                                    child: _sectionCard(l10n, section),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
