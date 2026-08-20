@@ -15,6 +15,6 @@
 
 - [x] 2.1 Run `dart analyze lib/features/settings/settings_screen.dart` — zero
   errors.
-- [ ] 2.2 Manually verify on desktop (3 columns), tablet width (2 columns), and
+- [x] 2.2 Manually verify on desktop (3 columns), tablet width (2 columns), and
   mobile width (1 column) that cards flow correctly and the save / "unsaved"
   chip behavior is intact.
