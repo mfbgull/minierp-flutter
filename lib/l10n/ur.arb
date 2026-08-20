@@ -1650,5 +1650,11 @@
   "reportsWarehouseswithstock": "اسٹاک والے گودام",
   "reportsRecentmovements": "حالیہ نقل و حرکت",
   "salesNoproductsfound": "کوئی پروڈکٹ نہیں ملی",
-  "suppliersErrorEmail": "غلط ای میل فارمیٹ"
+  "suppliersErrorEmail": "غلط ای میل فارمیٹ",
+  "searchHint": "گاہک، سپلائر، پروڈکٹ، انوائس تلاش کریں…",
+  "searchNoResults": "کوئی نتیجہ نہیں ملا",
+  "searchError": "تلاش ناکام",
+  "searchQuickActions": "فوری ایکشنز",
+  "searchRecent": "حالیہ",
+  "searchClose": "بند کریں"
 }

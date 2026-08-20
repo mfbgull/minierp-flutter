@@ -1696,5 +1696,11 @@
   "reportsWarehouseswithstock": "Warehouses with Stock",
   "reportsRecentmovements": "Recent Movements",
   "salesNoproductsfound": "No products found",
-  "suppliersErrorEmail": "Invalid email format"
+  "suppliersErrorEmail": "Invalid email format",
+  "searchHint": "Search customers, suppliers, products, invoices…",
+  "searchNoResults": "No results found",
+  "searchError": "Search failed",
+  "searchQuickActions": "Quick Actions",
+  "searchRecent": "Recent",
+  "searchClose": "Close"
 }

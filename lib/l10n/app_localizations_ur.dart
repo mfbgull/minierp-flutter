@@ -5232,4 +5232,22 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get suppliersErrorEmail => 'غلط ای میل فارمیٹ';
+
+  @override
+  String get searchHint => 'گاہک، سپلائر، پروڈکٹ، انوائس تلاش کریں…';
+
+  @override
+  String get searchNoResults => 'کوئی نتیجہ نہیں ملا';
+
+  @override
+  String get searchError => 'تلاش ناکام';
+
+  @override
+  String get searchQuickActions => 'فوری ایکشنز';
+
+  @override
+  String get searchRecent => 'حالیہ';
+
+  @override
+  String get searchClose => 'بند کریں';
 }
