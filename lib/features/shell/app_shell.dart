@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_notifier.dart';
 import '../../core/i18n/locale_provider.dart';
 import '../../core/theme/theme_mode_provider.dart';
+import '../../features/search/global_search_dialog.dart'
+    show showGlobalSearchDialog;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/screen_shortcuts.dart';
 import '../preferences/preference_providers.dart'
@@ -175,7 +178,8 @@ class AppShell extends ConsumerWidget {
     final current = shellDestinations[navigationShell.currentIndex];
     final selectedIndex = visible.indexWhere((d) => identical(d, current));
 
-    return Scaffold(
+    return _GlobalSearchHotkey(
+      child: Scaffold(
       appBar: AppBar(
         title: Text((current.title ?? current.label)(l10n)),
         actions: [
@@ -193,6 +197,11 @@ class AppShell extends ConsumerWidget {
             tooltip: l10n.changePasswordTitle,
             icon: const Icon(Icons.key_outlined),
             onPressed: () => context.push('/change-password'),
+          ),
+          IconButton(
+            tooltip: 'Search (Ctrl+K)',
+            icon: const Icon(Icons.search),
+            onPressed: () => showGlobalSearchDialog(context),
           ),
           PopupMenuButton<Locale>(
             tooltip: l10n.commonLanguage,
@@ -260,6 +269,7 @@ class AppShell extends ConsumerWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }
@@ -320,6 +330,47 @@ class _NavRail extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Registers a global Ctrl/Cmd+K handler that opens the search palette
+/// from anywhere in the app, independent of the screen-level shortcuts
+/// (screen_shortcuts.dart).
+class _GlobalSearchHotkey extends ConsumerStatefulWidget {
+  const _GlobalSearchHotkey({required this.child});
+
+  final Widget child;
+
+  @override
+  ConsumerState<_GlobalSearchHotkey> createState() =>
+      _GlobalSearchHotkeyState();
+}
+
+class _GlobalSearchHotkeyState extends ConsumerState<_GlobalSearchHotkey> {
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_handleKey);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKey);
+    super.dispose();
+  }
+
+  bool _handleKey(KeyEvent event) {
+    if (event is KeyDownEvent &&
+        (HardwareKeyboard.instance.isControlPressed ||
+            HardwareKeyboard.instance.isMetaPressed) &&
+        event.logicalKey == LogicalKeyboardKey.keyK) {
+      showGlobalSearchDialog(context);
+      return true;
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _NavItem extends StatelessWidget {

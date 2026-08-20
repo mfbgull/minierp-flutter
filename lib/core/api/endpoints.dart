@@ -106,4 +106,7 @@ abstract final class ApiEndpoints {
   static const users = '/users';
   static const roles = '/roles';
   static const customReports = '/custom-reports';
+
+  // Global search (command palette)
+  static const search = '/search';
 }

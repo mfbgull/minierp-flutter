@@ -5235,4 +5235,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get suppliersErrorEmail => 'Invalid email format';
+
+  @override
+  String get searchHint => 'Search customers, suppliers, products, invoices…';
+
+  @override
+  String get searchNoResults => 'No results found';
+
+  @override
+  String get searchError => 'Search failed';
+
+  @override
+  String get searchQuickActions => 'Quick Actions';
+
+  @override
+  String get searchRecent => 'Recent';
+
+  @override
+  String get searchClose => 'Close';
 }

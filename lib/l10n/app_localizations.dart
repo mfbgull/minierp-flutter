@@ -10279,6 +10279,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invalid email format'**
   String get suppliersErrorEmail;
+
+  /// No description provided for @searchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search customers, suppliers, products, invoices…'**
+  String get searchHint;
+
+  /// No description provided for @searchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results found'**
+  String get searchNoResults;
+
+  /// No description provided for @searchError.
+  ///
+  /// In en, this message translates to:
+  /// **'Search failed'**
+  String get searchError;
+
+  /// No description provided for @searchQuickActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Actions'**
+  String get searchQuickActions;
+
+  /// No description provided for @searchRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get searchRecent;
+
+  /// No description provided for @searchClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get searchClose;
 }
 
 class _AppLocalizationsDelegate
