@@ -26,6 +26,7 @@ export interface Invoice {
   notes?: string;
   terms?: string;
   expiry_notes?: string;
+  override_sale?: number;
   created_by: number;
   created_by_username?: string;
   created_at: string;
@@ -77,6 +78,7 @@ export interface CreateInvoiceDTO {
   // pass these so the invoice's amounts reflect the recorded payment.
   paid_amount?: number;
   balance_amount?: number;
+  override_sale?: number;
 }
 
 export interface CreateInvoiceItemDTO {
@@ -180,7 +182,8 @@ class InvoiceModel {
   static denormalizeExpiryInfo(
     invoiceId: number,
     consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }>,
-    db: Database.Database
+    db: Database.Database,
+    expiryOverrides?: Record<number, string | null>
   ): void {
     const today = new Date().toISOString().split('T')[0];
     const expiryNotes: string[] = [];
@@ -201,15 +204,21 @@ class InvoiceModel {
         `SELECT id, expiry_date FROM stock_batches WHERE id IN (${batchIds.map(() => '?').join(',')})`
       ).all(...batchIds) as Array<{ id: number; expiry_date: string | null }>;
 
+      // Merge DB expiry dates with frontend override dates.
+      // Overrides provide the *original* expiry_date that was temporarily
+      // cleared before posting to unblock FEFO consumption.
+      const effectiveDates: string[] = [];
+      for (const b of batches) {
+        const overrideDate = expiryOverrides?.[b.id];
+        const date = b.expiry_date ?? overrideDate ?? null;
+        if (date) effectiveDates.push(date);
+      }
+
+      if (effectiveDates.length === 0) continue;
+
       // Find the earliest expiry date across consumed batches
-      const expiryDates = batches
-        .filter(b => b.expiry_date)
-        .map(b => b.expiry_date!)
-        .sort();
-
-      if (expiryDates.length === 0) continue;
-
-      const earliestExpiry = expiryDates[0];
+      effectiveDates.sort();
+      const earliestExpiry = effectiveDates[0];
       const isExpired = earliestExpiry < today;
 
       // Get item name for the note
@@ -692,9 +701,9 @@ class InvoiceModel {
         invoice_no, customer_id, invoice_date, due_date, status,
         total_amount, paid_amount, balance_amount, notes,
         discount_scope, discount_type, discount_value, terms, created_by,
-        source_type
+        source_type, override_sale
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.invoice_no || null,
       data.customer_id,
@@ -710,7 +719,8 @@ class InvoiceModel {
       data.discount_value || 0,
       data.terms || null,
       userId,
-      data.source_type || null
+      data.source_type || null,
+      data.override_sale || 0
     );
     return result.lastInsertRowid as number;
   }
@@ -1006,15 +1016,14 @@ class InvoiceModel {
              c.phone as customer_phone, c.billing_address as customer_address
       FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id WHERE i.id = ?
     `).get(id);
-  }
-
-  static getItems(invoiceId: number, db: Database.Database) {
-    return db.prepare(`
-      SELECT ii.id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount, ii.tax_rate,
-             ii.discount_type, ii.discount_value, item.item_name, item.item_code
+  }  static getItems(invoiceId: number, db: Database.Database) {
+    return db.prepare(
+      `SELECT ii.id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount, ii.tax_rate,
+             ii.discount_type, ii.discount_value, ii.expiry_date, ii.is_expired_at_sale,
+             item.item_name, item.item_code
       FROM invoice_items ii LEFT JOIN items item ON ii.item_id = item.id
-      WHERE ii.invoice_id = ?
-    `).all(invoiceId);
+      WHERE ii.invoice_id = ?`
+    ).all(invoiceId);
   }
 
   static getPayments(invoiceId: number, db: Database.Database) {

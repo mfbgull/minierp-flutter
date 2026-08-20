@@ -331,6 +331,7 @@ class Invoice {
     this.payment,
     this.paymentMethods,
     this.expiryNotes,
+    this.overrideSale = false,
   });
 
   factory Invoice.fromJson(Map<String, dynamic> json) => Invoice(
@@ -374,6 +375,7 @@ class Invoice {
     warehouseCode: asString(json['warehouse_code']),
     warehouseName: asString(json['warehouse_name']),
     expiryNotes: asString(json['expiry_notes']),
+    overrideSale: asBool(json['override_sale']),
     company: json['company'] is Map<String, dynamic>
         ? CompanyInfo.fromJson(json['company'] as Map<String, dynamic>)
         : null,
@@ -421,6 +423,7 @@ class Invoice {
   final String? warehouseCode;
   final String? warehouseName;
   final String? expiryNotes;
+  final bool overrideSale;
   final CompanyInfo? company;
   final InvoicePayment? payment;
   final List<PaymentMethod>? paymentMethods;
@@ -467,6 +470,7 @@ class Invoice {
     if (warehouseCode != null) 'warehouse_code': warehouseCode,
     if (warehouseName != null) 'warehouse_name': warehouseName,
     if (expiryNotes != null) 'expiry_notes': expiryNotes,
+    if (overrideSale) 'override_sale': 1,
     if (company != null) 'company': company!.toJson(),
     if (payment != null) 'payment': payment!.toJson(),
     if (paymentMethods != null)

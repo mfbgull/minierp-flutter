@@ -120,6 +120,7 @@ export interface Invoice {
   notes?: string;
   terms?: string;
   expiry_notes?: string;
+  override_sale?: number;
   created_by?: number;
   company?: CompanyInfo;
   payment?: InvoicePayment;

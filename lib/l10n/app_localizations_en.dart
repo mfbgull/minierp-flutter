@@ -5397,4 +5397,16 @@ class AppLocalizationsEn extends AppLocalizations {
   ) {
     return 'Selling $itemName from batch $batchNo expiring on $expiryDate';
   }
+
+  @override
+  String get overrideExpiredSale => 'Override & Sell';
+
+  @override
+  String get overrideExpiredBody =>
+      'The following batches are expired. Override will temporarily clear their expiry date to allow this sale.';
+
+  @override
+  String batchOverrideCleared(Object count) {
+    return '$count expired batch(es) overridden for this sale';
+  }
 }

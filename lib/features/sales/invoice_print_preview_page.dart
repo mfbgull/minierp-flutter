@@ -162,7 +162,31 @@ class _InvoicePrintPreviewPageState
                       : Colors.orange.shade200,
                 ),
               ),
-              child: Text(expiryNotes),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_detail!.overrideSale)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded,
+                              size: 16, color: Colors.amber.shade700),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Override Sale',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              color: Colors.amber.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Text(expiryNotes),
+                ],
+              ),
             ),
           Expanded(
             child: PdfPreview(
