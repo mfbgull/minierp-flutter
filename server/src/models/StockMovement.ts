@@ -700,7 +700,96 @@ class StockMovementModel {
     return consumption;
   }
 
-  /**
+    /**
+   * INV-02: atomic two-warehouse transfer. Consumes FIFO layers at the
+   * source warehouse and inserts a mirrored TRANSFER batch at the
+   * destination inside ONE transaction. Both movements are written
+   * server-side; the IN leg's reference_docno carries the OUT leg's
+   * movement number so the pair stays linked.
+   */
+  static recordTransfer(
+    data: { item_id: number; from_warehouse_id: number; to_warehouse_id: number; quantity: number; remarks?: string | null },
+    userId: number,
+    db: Database.Database
+  ): { out: { id: number; movement_no: string }; in: { id: number; movement_no: string } } {
+    if (data.from_warehouse_id === data.to_warehouse_id) {
+      throw new Error('Source and destination warehouses must differ');
+    }
+    const qty = parseFloat(String(data.quantity));
+    if (!Number.isFinite(qty) || qty <= 0) {
+      throw new Error(`Transfer quantity must be positive, got ${data.quantity}`);
+    }
+
+    const run = db.transaction(() => {
+      // Availability is checked INSIDE the transaction by the consumer.
+      const consumption = this.consumeFromOldestBatches(
+        data.item_id,
+        data.from_warehouse_id,
+        qty,
+        db
+      );
+
+      // OUT leg (negative), batch-linked to the primary consumed layer.
+      const out = this.recordMovement({
+        item_id: data.item_id,
+        warehouse_id: data.from_warehouse_id,
+        movement_type: 'TRANSFER',
+        quantity: -qty,
+        unit_cost: consumption.length > 0 ? consumption[0].unitCost : undefined,
+        reference_doctype: 'TRANSFER',
+        remarks: data.remarks || `Transfer to warehouse ${data.to_warehouse_id}`,
+        batch_id: consumption.length > 0 && consumption[0].batchId !== null ? consumption[0].batchId : undefined
+      }, userId, db);
+
+      // Mirror cost layer at destination (TRANSFER-sourced).
+      const totalConsumed = consumption.reduce((s, c) => s + c.consumed, 0);
+      const avgCost = totalConsumed > 0
+        ? consumption.reduce((s, c) => s + c.consumed * c.unitCost, 0) / totalConsumed
+        : 0;
+
+      const nextNo = (() => {
+        db.prepare(`
+          INSERT INTO settings (key, value, updated_at)
+          VALUES ('BATCH_TRF_last_no', '1', CURRENT_TIMESTAMP)
+          ON CONFLICT(key) DO UPDATE SET
+            value = CAST(CAST(settings.value AS INTEGER) + 1 AS TEXT),
+            updated_at = CURRENT_TIMESTAMP
+        `).run();
+        const row = db.prepare(`SELECT value FROM settings WHERE key = 'BATCH_TRF_last_no'`).get() as { value: string };
+        return parseInt(row.value, 10);
+      })();
+      const batchNo = `BATCH-${new Date().getFullYear() % 100}-TRF-${nextNo.toString().padStart(4, '0')}`;
+      const today = new Date().toISOString().split('T')[0];
+      const mirrorBatch = db.prepare(`
+        INSERT INTO stock_batches (
+          batch_no, item_id, warehouse_id, source_type,
+          source_id, quantity_original, quantity_remaining,
+          unit_cost, received_date
+        ) VALUES (?, ?, ?, 'TRANSFER', ?, ?, ?, ?, ?)
+      `).run(batchNo, data.item_id, data.to_warehouse_id, out.id, qty, qty, avgCost, today);
+      const mirrorBatchId = mirrorBatch.lastInsertRowid as number;
+
+      // IN leg (positive), linked to the mirrored layer and back-referencing
+      // the OUT movement number.
+      const into = this.recordMovement({
+        item_id: data.item_id,
+        warehouse_id: data.to_warehouse_id,
+        movement_type: 'TRANSFER',
+        quantity: qty,
+        unit_cost: avgCost,
+        reference_doctype: 'TRANSFER',
+        reference_docno: out.movement_no,
+        remarks: data.remarks || `Transfer from warehouse ${data.from_warehouse_id}`,
+        batch_id: mirrorBatchId
+      }, userId, db);
+
+      return { out, in: into };
+    });
+
+    return run();
+  }
+
+/**
    * Record a batch-aware outgoing stock movement that consumes from oldest batches.
    * Creates one stock_movement per batch consumed, with batch_id and unit_cost.
    * For incoming movements (quantity >= 0), delegates to recordMovement.

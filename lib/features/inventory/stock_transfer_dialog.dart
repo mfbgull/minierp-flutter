@@ -1,17 +1,9 @@
 // Stock-transfer dialog — opened from the Stock Movements tab toolbar.
-// The server has no two-warehouse transfer endpoint: a transfer is two
-// `TRANSFER` movements (the schema keeps one signed `warehouse_id` per
-// row) — a negative OUT from the source warehouse, then a positive IN to
-// the destination. The incoming leg's `reference_docno` carries the
-// outgoing movement's server-generated number, linking the pair.
-//
-//   POST /inventory/stock-movements  {warehouse_id: source, quantity: -q}
-//   POST /inventory/stock-movements  {warehouse_id: dest,   quantity: +q,
-//                                     reference_docno: <out movement_no>}
-//
-// If the OUT leg fails (e.g. 'Insufficient stock') nothing is recorded;
-// if the IN leg fails the OUT leg is already on the server, so the error
-// banner prefixes that fact (the retry must not re-post the OUT leg).
+// INV-02: a transfer is ONE atomic server operation (`POST
+// /inventory/stock-transfers`). The server consumes FIFO cost layers at
+// the source warehouse, mirrors a TRANSFER batch at the destination and
+// writes both movements inside a single transaction — a failure leaves no
+// partial-transfer state behind.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,11 +52,6 @@ class _StockTransferDialogState extends ConsumerState<_StockTransferDialog> {
   bool _busy = false;
   String? _error;
 
-  /// The outgoing leg's movement number once it is on the server. Kept
-  /// across an incoming-leg failure so a retry re-posts only the IN leg
-  /// (never a second OUT).
-  String? _outMovementNo;
-
   @override
   void dispose() {
     _qtyController.dispose();
@@ -100,46 +87,19 @@ class _StockTransferDialogState extends ConsumerState<_StockTransferDialog> {
     });
     final repo = ref.read(inventoryRepositoryProvider);
 
-    // Leg 1 — OUT of the source warehouse. Nothing is recorded if this
-    // fails (the server validates the balance for negative quantities).
-    // Skipped on retry after an incoming-leg failure: [_outMovementNo]
-    // is already set, so only the IN leg re-posts.
-    if (_outMovementNo == null) {
-      final out = await repo.createStockMovement({
-        'item_id': _itemId!,
-        'warehouse_id': _sourceId!,
-        'quantity': -qty,
-        'movement_type': 'TRANSFER',
-        'reference_doctype': 'TRANSFER',
-        if (remarks.isNotEmpty) 'remarks': remarks,
-      });
-      if (!mounted) return;
-
-      switch (out) {
-        case ApiSuccess(:final data):
-          _outMovementNo = data.movementNo;
-        case ApiFailure(:final error):
-          setState(() {
-            _busy = false;
-            _error = error.message;
-          });
-          return;
-      }
-    }
-
-    // Leg 2 — IN to the destination, linked to the outgoing movement.
-    final incoming = await repo.createStockMovement({
+    // INV-02: one atomic server call. FIFO consumption at the source, a
+    // mirrored TRANSFER batch at the destination and both movements are
+    // written inside a single transaction — no partial-transfer state.
+    final result = await repo.createStockTransfer({
       'item_id': _itemId!,
-      'warehouse_id': _destId!,
+      'from_warehouse_id': _sourceId!,
+      'to_warehouse_id': _destId!,
       'quantity': qty,
-      'movement_type': 'TRANSFER',
-      'reference_doctype': 'TRANSFER',
-      'reference_docno': _outMovementNo!,
       if (remarks.isNotEmpty) 'remarks': remarks,
     });
     if (!mounted) return;
 
-    switch (incoming) {
+    switch (result) {
       case ApiSuccess():
         ref.invalidate(
           stockMovementsProvider(ref.read(movementTypeFilterProvider)),
@@ -148,11 +108,9 @@ class _StockTransferDialogState extends ConsumerState<_StockTransferDialog> {
         showAppToast(context, l10n.stockmovementsTransfermsg);
         Navigator.of(context).pop();
       case ApiFailure(:final error):
-        // The OUT leg is already on the server; flag it so a retry
-        // doesn't silently re-post the outgoing movement.
         setState(() {
           _busy = false;
-          _error = '${l10n.stockmovementsTransferpartialfail} ${error.message}';
+          _error = error.message;
         });
     }
   }

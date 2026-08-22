@@ -1,5 +1,19 @@
 import Database from 'better-sqlite3';
 import { sanitizeSortParams, PHYSICAL_COUNT_SORT_COLUMNS } from '../utils/sqlSanitizer';
+import StockMovementModel from './StockMovement';
+
+/** Next sequence number for ADJUSTMENT-sourced batch numbers. */
+function getNextBatchSequence(db: Database.Database): number {
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('BATCH_ADJ_last_no', '1', CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET
+      value = CAST(CAST(settings.value AS INTEGER) + 1 AS TEXT),
+      updated_at = CURRENT_TIMESTAMP
+  `).run();
+  const row = db.prepare(`SELECT value FROM settings WHERE key = 'BATCH_ADJ_last_no'`).get() as { value: string };
+  return parseInt(row.value, 10);
+}
 
 interface PhysicalCount {
   id: number;
@@ -245,9 +259,18 @@ class PhysicalCountModel {
       throw new Error(`Cannot record count for ${count.status} session`);
     }
 
-    const variance = countedQuantity - (db.prepare(
+    // INV-24: explicit null-safe read — a missing snapshot row is an error
+    // (abort), never silently treated as zero system quantity.
+    const snapshot = db.prepare(
       'SELECT system_quantity FROM physical_count_items WHERE count_id = ? AND item_id = ?'
-    ).get(countId, itemId) as { system_quantity: number } | undefined)?.system_quantity || 0;
+    ).get(countId, itemId) as { system_quantity: number } | undefined;
+    if (!snapshot) {
+      throw new Error(
+        `No snapshot row in physical_count_items for item ${itemId} in count ${countId} — ` +
+        `the count session must be (re)started so a snapshot exists before recording counts`
+      );
+    }
+    const variance = countedQuantity - snapshot.system_quantity;
 
     db.prepare(`
       UPDATE physical_count_items
@@ -274,26 +297,69 @@ class PhysicalCountModel {
       const adjustmentItems = items.filter(i => i.counted_quantity !== null && i.variance !== 0);
 
       for (const item of adjustmentItems) {
-        // Create stock movement for the adjustment
+        // INV-01: count completion reconciles ALL THREE tables — movements,
+        // balances AND cost layers — inside this one transaction.
+        let consumedCost = item.unit_cost;
+        let consumption: Array<{ batchId: number | null; consumed: number; unitCost: number }> = [];
+        if (item.variance < 0) {
+          // Shortage: consume FIFO-oldest layers at their actual costs.
+          consumption = StockMovementModel.consumeFromOldestBatches(
+            item.item_id,
+            count.warehouse_id,
+            Math.abs(item.variance),
+            db
+          );
+          const totalConsumed = consumption.reduce((s, c) => s + c.consumed, 0);
+          consumedCost = totalConsumed > 0
+            ? consumption.reduce((s, c) => s + c.consumed * c.unitCost, 0) / totalConsumed
+            : item.unit_cost;
+        }
+
+        // ADJUSTMENT movement via the shared sequential generator
+        // (INV-23 — no epoch-suffixed ad-hoc numbers).
+        const movementNo = StockMovementModel.generateMovementNo(db);
+        const primaryBatchId = consumption.length > 0 ? consumption[0].batchId : null;
         const movementResult = db.prepare(`
           INSERT INTO stock_movements (
             movement_no, item_id, warehouse_id, movement_type,
             quantity, unit_cost, reference_doctype, reference_docno,
-            remarks, movement_date, created_by
-          ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, ?, 'PhysicalCount', ?, ?, ?, ?)
+            remarks, movement_date, created_by, batch_id
+          ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, ?, 'PhysicalCount', ?, ?, ?, ?, ?)
         `).run(
-          `STK-${new Date().getFullYear()}-${Date.now()}`,
+          movementNo,
           item.item_id,
           count.warehouse_id,
           item.variance,
-          item.unit_cost,
+          consumedCost,
           count.count_no,
           `Physical count adjustment: ${item.variance > 0 ? '+' : ''}${item.variance} (system: ${item.system_quantity}, counted: ${item.counted_quantity})`,
           count.count_date,
-          userId
+          userId,
+          primaryBatchId
         );
 
         const movementId = movementResult.lastInsertRowid as number;
+
+        // Surplus: insert an ADJUSTMENT-sourced cost layer at item.unit_cost.
+        if (item.variance > 0) {
+          const nextBatchNo = getNextBatchSequence(db);
+          db.prepare(`
+            INSERT INTO stock_batches (
+              batch_no, item_id, warehouse_id, source_type,
+              source_id, quantity_original, quantity_remaining,
+              unit_cost, received_date
+            ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, ?, ?, ?, ?)
+          `).run(
+            `BATCH-${new Date().getFullYear() % 100}-ADJ-${nextBatchNo.toString().padStart(4, '0')}`,
+            item.item_id,
+            count.warehouse_id,
+            countId,
+            item.variance,
+            item.variance,
+            item.unit_cost,
+            count.count_date
+          );
+        }
 
         // Update stock_balances
         const existingBalance = db.prepare(
@@ -333,9 +399,10 @@ class PhysicalCountModel {
           WHERE count_id = ? AND item_id = ?
         `).run(movementId, countId, item.item_id);
 
-        // Post financial entry for adjustment
-        if (item.unit_cost && item.variance !== 0) {
-          const value = Math.abs(item.variance) * item.unit_cost;
+        // Post financial entry for adjustment — valued at the ACTUAL
+        // consumed layer costs on shortages (not the snapshot unit_cost).
+        if (consumedCost && item.variance !== 0) {
+          const value = Math.abs(item.variance) * consumedCost;
           const isRemoval = item.variance < 0;
           const accounts = isRemoval
             ? { debit: 'inventory_shrinkage', credit: 'inventory_asset' }
@@ -349,7 +416,7 @@ class PhysicalCountModel {
           `).run(
             movementId,
             count.count_date,
-            `Physical count: ${item.item_code} ${isRemoval ? 'shrinkage' : 'correction'} ${Math.abs(item.variance)} units @ ${item.unit_cost}`,
+            `Physical count: ${item.item_code} ${isRemoval ? 'shrinkage' : 'correction'} ${Math.abs(item.variance)} units @ ${consumedCost}`,
             accounts.debit,
             accounts.credit,
             value,
