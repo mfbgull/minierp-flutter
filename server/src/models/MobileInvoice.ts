@@ -245,7 +245,11 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
 
       const warehouseId = item.warehouse_id || findWarehouseForItem(db, item.item_id, item.quantity);
 
-      StockMovementModel.recordMovement({
+      // INV-03: mobile sales go through the SAME guarded, batch-consuming
+      // path as desktop invoices — availability is enforced inside the
+      // transaction and FIFO cost layers are consumed (no balance-only
+      // writes, no unbatched rows). GL posting happens below.
+      const movements = StockMovementModel.recordBatchMovement({
         item_id: item.item_id,
         warehouse_id: warehouseId,
         movement_type: 'SALE',
@@ -256,7 +260,9 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
         remarks: `Sold via Invoice ${invoiceId}`,
         movement_date: data.invoice_date,
       }, data.userId, db);
+
     }
+
 
     if (data.record_payment && data.payment) {
       const paymentAmount = data.payment.amount || 0;

@@ -309,56 +309,14 @@ function runCustomerARMigrations(): void {
     `);
     logger.info('✅ Invoice balance recalculation completed!');
 
-    logger.info('Recalculating stock balances from movements...');
-
-    const movementSums = db.prepare(`
-      SELECT item_id, warehouse_id, SUM(quantity) as total_qty
-      FROM stock_movements
-      GROUP BY item_id, warehouse_id
-    `).all() as { item_id: number; warehouse_id: number; total_qty: number }[];
-
-    for (const sum of movementSums) {
-      const existing = db.prepare('SELECT id, quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?').get(sum.item_id, sum.warehouse_id) as { id: number; quantity: number } | undefined;
-
-      if (existing) {
-        if (existing.quantity !== sum.total_qty) {
-          const item = db.prepare('SELECT item_code FROM items WHERE id = ?').get(sum.item_id) as { item_code: string } | undefined;
-          const wh = db.prepare('SELECT warehouse_code FROM warehouses WHERE id = ?').get(sum.warehouse_id) as { warehouse_code: string } | undefined;
-          logger.info(`Fixing ${item?.item_code} in ${wh?.warehouse_code}: ${existing.quantity} -> ${sum.total_qty}`);
-          db.prepare('UPDATE stock_balances SET quantity = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?').run(sum.total_qty, existing.id);
-        }
-      } else {
-        db.prepare('INSERT INTO stock_balances (item_id, warehouse_id, quantity) VALUES (?, ?, ?)').run(sum.item_id, sum.warehouse_id, sum.total_qty);
-      }
-    }
-
-    const orphanedBalances = db.prepare(`
-      SELECT sb.id, i.item_code, w.warehouse_code
-      FROM stock_balances sb
-      JOIN items i ON sb.item_id = i.id
-      JOIN warehouses w ON sb.warehouse_id = w.id
-      WHERE NOT EXISTS (
-        SELECT 1 FROM stock_movements sm
-        WHERE sm.item_id = sb.item_id AND sm.warehouse_id = sb.warehouse_id
-      )
-    `).all() as { id: number; item_code: string; warehouse_code: string }[];
-
-    for (const orphan of orphanedBalances) {
-      logger.info(`Removing orphaned balance: ${orphan.item_code} in ${orphan.warehouse_code}`);
-      db.prepare('DELETE FROM stock_balances WHERE id = ?').run(orphan.id);
-    }
-
-    logger.info('✅ Stock balances recalculated from movements!');
-
-    logger.info('Syncing item current_stock from stock_balances...');
-    db.exec(`
-      UPDATE items SET current_stock = (
-        SELECT COALESCE(SUM(quantity), 0)
-        FROM stock_balances
-        WHERE stock_balances.item_id = items.id
-      )
-    `);
-    logger.info('✅ Item stock synced from warehouse balances!');
+    // INV-09 (boot-task-gating): boot MUST NOT write to stock tables.
+    // The former self-heal (rewrite of stock_balances / items.current_stock
+    // and deletion of "orphaned" balances) masked every balance-side bug by
+    // overwriting them from SUM(stock_movements) on each start. It is now a
+    // read-only comparison; discrepancies are logged at startup and exposed
+    // read-only on GET /api/admin/health/stock-discrepancies. Repairs happen
+    // only via the explicit gated repair scripts.
+    logStockDiscrepancies();
 
     logger.info('Fixing payment ledger descriptions...');
     const paymentLedgerEntries = db.prepare(`
@@ -897,15 +855,18 @@ function runPaymentsCustomerNullableRebuild(): void {
             payment_method VARCHAR(50),
             reference_no VARCHAR(100),
             notes TEXT,
+            purchase_order_id INTEGER REFERENCES purchase_orders(id),
             created_by INTEGER,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (customer_id) REFERENCES customers(id),
             FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
             FOREIGN KEY (invoice_id) REFERENCES invoices(id),
+            FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
             FOREIGN KEY (created_by) REFERENCES users(id)
         );
-        INSERT INTO payments_new (id, payment_no, customer_id, supplier_id, invoice_id, payment_date, amount, payment_method, reference_no, notes, created_by, created_at)
-          SELECT id, payment_no, customer_id, supplier_id, invoice_id, payment_date, amount, payment_method, reference_no, notes, created_by, created_at FROM payments;
+        INSERT INTO payments_new (id, payment_no, customer_id, supplier_id, invoice_id, payment_date, amount, payment_method, reference_no, notes, purchase_order_id, created_by, created_at)
+          SELECT id, payment_no, customer_id, supplier_id, invoice_id, payment_date, amount, payment_method, reference_no, notes, purchase_order_id, created_by, created_at FROM payments;
+        CREATE INDEX IF NOT EXISTS idx_payments_purchase_order_id ON payments_new(purchase_order_id);
         DROP TABLE payments;
         ALTER TABLE payments_new RENAME TO payments;
         CREATE INDEX IF NOT EXISTS idx_payments_customer_id ON payments(customer_id);
@@ -1027,6 +988,201 @@ function runBatchSourceTypeRebuild(): void {
     throw new Error('FATAL: stock_batches rebuild failed to restore PRAGMA foreign_keys=ON');
   }
   logger.info('✅ stock_batches source_type widened and re-stamped');
+}
+
+function runStockCoverageReconciliation(): void {
+  // One-off reconciliation of known live drift (inventory-integrity Phase 4):
+  // stock_batches coverage must equal stock_balances.quantity per
+  // (item, warehouse) before the INV-21 CHECK constraints can be applied.
+  //  - Over-coverage: trimmed FIFO-newest-first.
+  //  - Under-coverage: a RECON layer is minted at the warehouse's inbound
+  //    weighted cost with a balancing journal entry.
+  // Idempotent: no-op when coverage already matches everywhere.
+  const mismatches = db.prepare(`
+    SELECT sb.item_id, sb.warehouse_id, sb.quantity AS balance_qty,
+           COALESCE((SELECT SUM(b.quantity_remaining) FROM stock_batches b
+                     WHERE b.item_id = sb.item_id AND b.warehouse_id = sb.warehouse_id), 0) AS covered
+    FROM stock_balances sb
+    HAVING ABS(sb.quantity - COALESCE((SELECT SUM(b.quantity_remaining) FROM stock_batches b
+                     WHERE b.item_id = sb.item_id AND b.warehouse_id = sb.warehouse_id), 0)) > 0.0005
+  `).all() as Array<{ item_id: number; warehouse_id: number; balance_qty: number; covered: number }>;
+
+  if (mismatches.length === 0) return;
+  logger.info(`Reconciling ${mismatches.length} batch/balance coverage mismatch(es)...`);
+
+  const run = db.transaction(() => {
+    for (const m of mismatches) {
+      const delta = m.balance_qty - m.covered; // >0 under-covered, <0 over-covered
+      if (delta < 0) {
+        let toTrim = -delta;
+        const layers = db.prepare(`
+          SELECT id, quantity_remaining FROM stock_batches
+          WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+          ORDER BY received_date DESC, id DESC
+        `).all(m.item_id, m.warehouse_id) as Array<{ id: number; quantity_remaining: number }>;
+        for (const layer of layers) {
+          if (toTrim <= 0.0005) break;
+          const trim = Math.min(layer.quantity_remaining, toTrim);
+          db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?').run(trim, layer.id);
+          toTrim -= trim;
+        }
+        logger.info(`  item ${m.item_id}/wh ${m.warehouse_id}: trimmed over-coverage by ${(-delta).toFixed(3)}`);
+      } else {
+        const avg = db.prepare(`
+          SELECT COALESCE(SUM(quantity * unit_cost) * 1.0 / NULLIF(SUM(quantity), 0), 0) AS cost
+          FROM stock_movements
+          WHERE item_id = ? AND warehouse_id = ? AND quantity > 0
+            AND movement_type IN ('PURCHASE','PRODUCTION')
+        `).get(m.item_id, m.warehouse_id) as { cost: number };
+        const unitCost = avg.cost > 0 ? avg.cost : ((db.prepare('SELECT standard_cost FROM items WHERE id = ?').get(m.item_id) as { standard_cost: number } | undefined)?.standard_cost || 0);
+
+        const nextNo = getNextSequenceNumber(db, 'BATCH_RECON_last_no');
+        db.prepare(`
+          INSERT INTO stock_batches (
+            batch_no, item_id, warehouse_id, source_type,
+            source_id, quantity_original, quantity_remaining,
+            unit_cost, received_date
+          ) VALUES (?, ?, ?, 'RECON', 0, ?, ?, ?, ?)
+        `).run(
+          `BATCH-${new Date().getFullYear() % 100}-RECON-${nextNo.toString().padStart(4, '0')}`,
+          m.item_id, m.warehouse_id, delta, delta, unitCost,
+          new Date().toISOString().split('T')[0]
+        );
+
+        const value = delta * unitCost;
+        if (value > 0.005 && db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='journal_entries'`).get()) {
+          const desc = `Coverage reconciliation: +${delta} units @ ${unitCost} (item ${m.item_id}, warehouse ${m.warehouse_id})`;
+          const je = db.prepare(`
+            INSERT INTO journal_entries (reference_type, reference_id, entry_date, description, debit_account, credit_account, amount, voided)
+            VALUES ('RECON', 0, ?, ?, '1200', '4999', ?, 0)
+          `).run(new Date().toISOString().split('T')[0], desc, value);
+          const jeId = je.lastInsertRowid as number;
+          const invAcc = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1200'`).get() as { id: number } | undefined;
+          const adjAcc = db.prepare(`SELECT id FROM chart_of_accounts WHERE code IN ('4999','4000') ORDER BY code DESC LIMIT 1`).get() as { id: number } | undefined;
+          if (invAcc && adjAcc) {
+            const lines = db.prepare(`
+              INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, line_date)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `);
+            const today = new Date().toISOString().split('T')[0];
+            lines.run(jeId, invAcc.id, value, 0, 'Inventory increase (coverage reconciliation)', today);
+            lines.run(jeId, adjAcc.id, 0, value, 'Coverage reconciliation adjustment', today);
+          }
+        }
+        logger.info(`  item ${m.item_id}/wh ${m.warehouse_id}: minted RECON layer of ${delta} @ ${unitCost}`);
+      }
+    }
+
+    // Post-condition: coverage must now match everywhere.
+    const remaining = db.prepare(`
+      SELECT COUNT(*) AS n FROM (
+        SELECT sb.id FROM stock_balances sb
+        WHERE ABS(sb.quantity - COALESCE((SELECT SUM(b.quantity_remaining) FROM stock_batches b
+                        WHERE b.item_id = sb.item_id AND b.warehouse_id = sb.warehouse_id), 0)) > 0.0005
+      )
+    `).get() as { n: number };
+    if (remaining.n > 0) {
+      throw new Error(`${remaining.n} coverage mismatch(es) remain after reconciliation`);
+    }
+  });
+  run();
+  logger.info('✅ Batch/balance coverage reconciled');
+}
+
+function runStockInvariantChecksRebuild(): void {
+  // INV-21: make negative stock and over-covered batches unrepresentable.
+  // Table rebuilds (FK off) adding CHECK constraints:
+  //   stock_balances:    quantity >= 0
+  //   stock_batches:     quantity_remaining >= 0 AND quantity_remaining <= quantity_original
+  // Runs AFTER runStockCoverageReconciliation so live data passes the checks.
+  const balSql = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_balances'`).get() as { sql: string } | undefined;
+  const batchSql = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_batches'`).get() as { sql: string } | undefined;
+  if (!balSql || !batchSql) return;
+
+  const balNeeds = !balSql.sql.includes('quantity >= 0');
+  const batchNeeds = !(batchSql.sql.includes('quantity_remaining <= quantity_original'));
+  if (!balNeeds && !batchNeeds) return;
+
+  logger.info('Applying stock invariant CHECK constraints...');
+
+  // Pre-flight: fail loudly if existing data would violate the checks.
+  const negBal = (db.prepare('SELECT COUNT(*) AS n FROM stock_balances WHERE quantity < 0').get() as { n: number }).n;
+  if (negBal > 0) throw new Error(`${negBal} stock_balances row(s) have negative quantity — reconcile before applying CHECK constraints`);
+  const badBatches = (db.prepare(`
+    SELECT COUNT(*) AS n FROM stock_batches
+    WHERE quantity_remaining < 0 OR quantity_remaining > quantity_original
+  `).get() as { n: number }).n;
+  if (badBatches > 0) throw new Error(`${badBatches} stock_batches row(s) violate coverage invariants — reconcile before applying CHECK constraints`);
+
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      if (balNeeds) {
+        db.exec(`
+          CREATE TABLE stock_balances_new (
+              item_id INTEGER NOT NULL REFERENCES items(id),
+              warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+              quantity DECIMAL(15,3) NOT NULL DEFAULT 0 CHECK(quantity >= 0),
+              last_updated DATETIME,
+              PRIMARY KEY (item_id, warehouse_id)
+          );
+          INSERT INTO stock_balances_new (item_id, warehouse_id, quantity, last_updated)
+            SELECT item_id, warehouse_id, quantity, last_updated FROM stock_balances;
+          DROP TABLE stock_balances;
+          ALTER TABLE stock_balances_new RENAME TO stock_balances;
+        `);
+      }
+      if (batchNeeds) {
+        const cols0 = (db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all() as Array<{ name: string }>).map(c => c.name);
+        const optionalDefs: string[] = [];
+        if (cols0.includes('created_at')) optionalDefs.push('created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+        if (cols0.includes('expiry_date')) optionalDefs.push('expiry_date DATE');
+        if (cols0.includes('halted')) optionalDefs.push('halted BOOLEAN DEFAULT 0');
+        db.exec(`
+          CREATE TABLE stock_batches_inv (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              batch_no VARCHAR(50) UNIQUE NOT NULL,
+              item_id INTEGER NOT NULL REFERENCES items(id),
+              warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+              source_type VARCHAR(20) NOT NULL CHECK(source_type IN ('PRODUCTION','PURCHASE','GOODS_RECEIPT','RETURN','ADJUSTMENT','OPENING','TRANSFER','RECON')),
+              source_id INTEGER NOT NULL,
+              quantity_original DECIMAL(15,3) NOT NULL DEFAULT 0,
+              quantity_remaining DECIMAL(15,3) NOT NULL DEFAULT 0
+                CHECK(quantity_remaining >= 0 AND quantity_remaining <= quantity_original),
+              unit_cost DECIMAL(15,4) NOT NULL DEFAULT 0,
+              received_date DATE NOT NULL${optionalDefs.length ? ',\n              ' + optionalDefs.join(',\n              ') : ''}
+              ' + optionalDefs.join(',
+              ') : ''}
+          );
+        `);
+        // Column-aware copy
+        const cols = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all().map((c: any) => c.name);
+        const base = ['id','batch_no','item_id','warehouse_id','source_type','source_id','quantity_original','quantity_remaining','unit_cost','received_date'];
+        const optional = ['created_at','expiry_date','halted'].filter(c => cols.includes(c));
+        const allCols = [...base, ...optional];
+        db.exec(`
+          INSERT INTO stock_batches_inv (${allCols.join(', ')})
+          SELECT ${allCols.join(', ')} FROM stock_batches;
+        `);
+        db.exec(`
+          DROP TABLE stock_batches;
+          ALTER TABLE stock_batches_inv RENAME TO stock_batches;
+          CREATE INDEX IF NOT EXISTS idx_stock_batches_item ON stock_batches(item_id, warehouse_id);
+          CREATE INDEX IF NOT EXISTS idx_stock_batches_source ON stock_batches(source_type, source_id);
+          CREATE INDEX IF NOT EXISTS idx_stock_batches_batch_no ON stock_batches(batch_no);
+        `);
+        if (optional.includes('expiry_date')) {
+          db.exec('CREATE INDEX IF NOT EXISTS idx_stock_batches_expiry ON stock_batches(expiry_date) WHERE expiry_date IS NOT NULL');
+        }
+      }
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  if ((db.pragma('foreign_keys', { simple: true }) as number) !== 1) {
+    throw new Error('FATAL: invariant rebuild failed to restore PRAGMA foreign_keys=ON');
+  }
+  logger.info('✅ Stock invariant CHECK constraints applied');
 }
 
 function runPaymentsPurchaseOrderIdMigration(): void {
@@ -1338,13 +1494,17 @@ runLedgered('fn.runLooseItemMigration', runLooseItemMigration);
 runLedgered('fn.runCashAccountsMigration', runCashAccountsMigration);
 runLedgered('fn.runOpeningBalancesMigration', runOpeningBalancesMigration);
 runLedgered('fn.runUserPreferencesMigration', runUserPreferencesMigration);
-runLedgered('fn.runUnbatchedStockReconciliation', runUnbatchedStockReconciliation);
-runLedgered('fn.runOrphanedBatchCleanup', runOrphanedBatchCleanup);
+// INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
+// INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
 runLedgered('fn.runGLVoidAttributionMigration', runGLVoidAttributionMigration);
 // FK-off table rebuild must NOT sit inside another transaction
 runLedgered('fn.runPaymentsCustomerNullableRebuild', runPaymentsCustomerNullableRebuild, { noTxn: true });
 // stock_batches source_type widening — FK-off table rebuild
 runLedgered('fn.runBatchSourceTypeRebuild', runBatchSourceTypeRebuild, { noTxn: true });
+// INV-21 prerequisite: reconcile live batch/balance drift before CHECK constraints land
+runLedgered('fn.runStockCoverageReconciliation', runStockCoverageReconciliation);
+// INV-21: database-level invariants — applied only after live data reconciled
+runLedgered('fn.runStockInvariantChecksRebuild', runStockInvariantChecksRebuild, { noTxn: true });
 
 // Rollback support: run if --rollback flag is passed
 if (process.argv.includes('--rollback')) {
@@ -2137,91 +2297,6 @@ function runLooseItemMigration(): void {
   }
 }
 
-function runUnbatchedStockReconciliation(): void {
-  // Reconcile stock that is on hand but has no covering stock_batches row.
-  // Before PO goods receipts created batches (see PurchaseOrderModel.
-  // addReceipt), received stock was written to stock_balances only, so
-  // batch-based valuation (dashboard stock value, stock valuation report,
-  // balance sheet) silently ignored it. This folds that legacy on-hand
-  // stock into a synthetic cost layer so it becomes visible.
-  try {
-    const rows = db.prepare(`
-      SELECT
-        sb.item_id,
-        sb.warehouse_id,
-        sb.quantity as on_hand,
-        COALESCE((
-          SELECT SUM(quantity_remaining)
-          FROM stock_batches
-          WHERE item_id = sb.item_id AND warehouse_id = sb.warehouse_id
-        ), 0) as covered,
-        i.standard_cost
-      FROM stock_balances sb
-      JOIN items i ON i.id = sb.item_id
-      WHERE sb.quantity > 0
-    `).all() as Array<{
-      item_id: number;
-      warehouse_id: number;
-      on_hand: number;
-      covered: number;
-      standard_cost: number;
-    }>;
-
-    let created = 0;
-    const insertBatch = db.prepare(`
-      INSERT INTO stock_batches (
-        batch_no, item_id, warehouse_id, source_type,
-        source_id, quantity_original, quantity_remaining,
-        unit_cost, received_date
-      ) VALUES (?, ?, ?, 'PURCHASE', 0, ?, ?, ?, ?)
-    `);
-
-    for (const row of rows) {
-      const uncovered = row.on_hand - row.covered;
-      if (uncovered <= 0.0005) continue;
-
-      // Prefer the weighted-average cost of inbound movements that have
-      // NO batch link — those are precisely the goods-receipt units this
-      // migration is reconciling (they record unit_price). Ignoring
-      // batch-linked movements avoids polluting the average with legacy
-      // seed movements. Fall back to the item's standard cost, then 0.
-      const avg = db.prepare(`
-        SELECT COALESCE(
-          SUM(quantity * unit_cost) * 1.0 / NULLIF(SUM(quantity), 0),
-          0
-        ) as cost
-        FROM stock_movements
-        WHERE item_id = ? AND quantity > 0 AND batch_id IS NULL
-      `).get(row.item_id) as { cost: number };
-      const unitCost = avg.cost > 0
-        ? avg.cost
-        : (row.standard_cost || 0);
-
-      // Distinct RECON prefix + own sequence so numbers never collide
-      // with real receipt batches (BATCH-26-PUR-xxxx).
-      const nextNo = getNextSequenceNumber(db, 'BATCH_RECON_last_no');
-      const batchNo = `BATCH-${new Date().getFullYear() % 100}-RECON-${nextNo.toString().padStart(4, '0')}`;
-
-      insertBatch.run(
-        batchNo,
-        row.item_id,
-        row.warehouse_id,
-        uncovered,
-        uncovered,
-        unitCost,
-        new Date().toISOString().split('T')[0]
-      );
-      created++;
-    }
-
-    if (created > 0) {
-      logger.info(`✅ Unbatched stock reconciliation: created ${created} batch row(s)`);
-    }
-  } catch (error: any) {
-    throw new Error('Unbatched stock reconciliation error:: ' + error.message, { cause: error });
-  }
-}
-
 function runUserPreferencesMigration(): void {
   // Per-user date-range picker preferences (week start, default range,
   // custom presets) — date-range-picker-spec.md §6.1.
@@ -2248,34 +2323,46 @@ function runUserPreferencesMigration(): void {
   }
 }
 
-function runOrphanedBatchCleanup(): void {
-  // Remove orphaned stock_batches that reference deleted purchases
-  // or have invalid data (zero cost/qty). Nullifies dangling batch_id
-  // references in stock_movements first. Idempotent — safe on every start.
-  try {
-    const orphanedCheck = db.prepare(`
-      SELECT COUNT(*) as count FROM stock_batches sb
-      WHERE (sb.source_type = 'PURCHASE' AND sb.source_id > 0
-             AND NOT EXISTS (SELECT 1 FROM purchases WHERE id = sb.source_id)
-             AND NOT EXISTS (SELECT 1 FROM goods_receipt_items WHERE id = sb.source_id))
-         OR sb.unit_cost <= 0
-         OR sb.quantity_original <= 0
-    `).get() as { count: number };
+export interface StockDiscrepancy {
+  item_id: number;
+  item_code: string;
+  warehouse_id: number;
+  warehouse_code: string;
+  balance_quantity: number | null;
+  movement_sum: number;
+}
 
-    if (orphanedCheck.count > 0) {
-      logger.info(`Running orphaned batch cleanup (${orphanedCheck.count} orphaned row(s))...`);
+/** Read-only comparison of stock_balances vs SUM(stock_movements). */
+export function getStockDiscrepancies(): StockDiscrepancy[] {
+  const rows = db.prepare(`
+    SELECT
+      sm.item_id,
+      i.item_code,
+      sm.warehouse_id,
+      w.warehouse_code,
+      sb.quantity AS balance_quantity,
+      COALESCE(SUM(sm.quantity), 0) AS movement_sum
+    FROM stock_movements sm
+    JOIN items i ON i.id = sm.item_id
+    JOIN warehouses w ON w.id = sm.warehouse_id
+    LEFT JOIN stock_balances sb
+      ON sb.item_id = sm.item_id AND sb.warehouse_id = sm.warehouse_id
+    GROUP BY sm.item_id, sm.warehouse_id
+    HAVING ABS(COALESCE(sb.quantity, 0) - COALESCE(SUM(sm.quantity), 0)) > 0.0005
+    ORDER BY sm.item_id, sm.warehouse_id
+  `).all() as StockDiscrepancy[];
+  return rows;
+}
 
-      const migrationSQL = fs.readFileSync(
-        path.join(MIGRATIONS_DIR, 'cleanup-orphaned-stock-batches.sql'),
-        'utf8'
-      );
-
-      db.exec(migrationSQL);
-
-      logger.info('✅ Orphaned batch cleanup completed!');
-    }
-  } catch (error: any) {
-    throw new Error('Orphaned batch cleanup error:: ' + error.message, { cause: error });
+function logStockDiscrepancies(): void {
+  const discrepancies = getStockDiscrepancies();
+  if (discrepancies.length === 0) {
+    logger.info('✅ Stock balances consistent with movements');
+    return;
+  }
+  logger.warn(`⚠ ${discrepancies.length} stock balance discrepanc(ies) detected (NOT auto-repaired — run the gated repair script to fix):`);
+  for (const d of discrepancies) {
+    logger.warn(`  item ${d.item_code} (${d.item_id}) in ${d.warehouse_code} (${d.warehouse_id}): balance=${d.balance_quantity ?? 'none'} movements=${d.movement_sum}`);
   }
 }
 

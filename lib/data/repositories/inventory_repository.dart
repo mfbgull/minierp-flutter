@@ -236,6 +236,18 @@ class InventoryRepository {
         StockMovement.fromJson(json as Map<String, dynamic>),
   );
 
+  /// INV-02: atomic server-side two-warehouse transfer. One call replaces
+  /// the old client-orchestrated OUT+IN movement pair; the server consumes
+  /// FIFO layers at the source, mirrors a TRANSFER batch at the destination
+  /// and writes both movements inside one transaction.
+  Future<ApiResult<Map<String, dynamic>>> createStockTransfer(
+    Map<String, dynamic> body,
+  ) => _api.postRaw(
+    ApiEndpoints.stockTransfers,
+    body: body,
+    parse: (Object? json) => (json ?? <String, dynamic>{}) as Map<String, dynamic>,
+  );
+
   Future<ApiResult<List<dynamic>>> stockSummary() => _api.getRawList(
     ApiEndpoints.stockSummary,
     parseItem: (Object? json) => json,
