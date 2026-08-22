@@ -51,15 +51,15 @@ CREATE INDEX IF NOT EXISTS idx_customer_ledger_type ON customer_ledger(transacti
 -- Purchase order indexes
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier_id ON purchase_orders(supplier_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status);
-CREATE INDEX IF NOT EXISTS idx_purchase_orders_date ON purchase_orders(order_date);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_po_date ON purchase_orders(po_date);
 
 -- Production indexes
-CREATE INDEX IF NOT EXISTS idx_productions_status ON productions(status);
+CREATE INDEX IF NOT EXISTS idx_productions_production_date ON productions(production_date);
 CREATE INDEX IF NOT EXISTS idx_productions_date ON productions(production_date);
 CREATE INDEX IF NOT EXISTS idx_productions_bom_id ON productions(bom_id);
 
 -- Expense indexes
-CREATE INDEX IF NOT EXISTS idx_expenses_category_id ON expenses(category_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_expense_category ON expenses(expense_category);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date);
 
 -- BOM indexes

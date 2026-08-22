@@ -92,18 +92,6 @@ CREATE TABLE IF NOT EXISTS accounting_periods (
 CREATE INDEX IF NOT EXISTS idx_periods_dates ON accounting_periods(start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_periods_status ON accounting_periods(status);
 
--- ============================================================================
--- 4. Auto-open the current month if no period is open
--- ============================================================================
--- Idempotent: if any open period exists, this does nothing. Otherwise
--- it opens the calendar month containing today. Users can close
--- periods manually or via the accounting service.
-INSERT INTO accounting_periods (period_name, start_date, end_date, status)
-SELECT
-    strftime('%Y-%m', 'now') AS period_name,
-    date('now', 'start of month') AS start_date,
-    date('now', 'start of month', '+1 month', '-1 day') AS end_date,
-    'open' AS status
-WHERE NOT EXISTS (
-    SELECT 1 FROM accounting_periods WHERE status = 'open'
-);
+-- Period creation happens at posting time (AccountingService.postEntry) —
+-- never at boot (audit-remediation task 3.6 / accounting-period-rollover spec).
+

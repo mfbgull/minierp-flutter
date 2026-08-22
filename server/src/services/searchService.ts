@@ -155,12 +155,14 @@ function getUserPermissions(userId: number): Set<string> {
   const role = db.prepare('SELECT role_id FROM users WHERE id = ?').get(userId) as { role_id: number } | undefined;
   if (!role?.role_id) return new Set();
 
+  // Task 8.6: bind the missing role_id parameter — without it every user
+  // received the full permission set.
   const perms = db.prepare(`
     SELECT p.module, p.action
     FROM role_permissions rp
     JOIN permissions p ON p.id = rp.permission_id
     WHERE rp.role_id = ?
-  `).all() as { module: string; action: string }[];
+  `).all(role.role_id) as { module: string; action: string }[];
 
   return new Set(perms.map((p) => `${p.module}:${p.action}`));
 }

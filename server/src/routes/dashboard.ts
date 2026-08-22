@@ -19,6 +19,7 @@ router.get('/expense-summary', requirePermission('dashboard', 'read'), dashboard
 router.get('/production-status', requirePermission('dashboard', 'read'), dashboardController.getProductionStatus);
 router.get('/stock-movement-summary', requirePermission('dashboard', 'read'), dashboardController.getStockMovementSummary);
 router.get('/kpi', requirePermission('dashboard', 'read'), dashboardController.getKPI);
+router.get('/kpi-batch', requirePermission('dashboard', 'read'), dashboardController.getKPIBatch);
 router.get('/ar-summary', requirePermission('dashboard', 'read'), dashboardController.getARSummary);
 router.get('/cash-position', requirePermission('dashboard', 'read'), dashboardController.getCashPosition);
 router.get('/cash-opening-balances', requirePermission('dashboard', 'read'), dashboardController.getCashOpeningBalances);

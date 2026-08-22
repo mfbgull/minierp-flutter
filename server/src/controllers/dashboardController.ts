@@ -131,6 +131,32 @@ function getKPI(req: AuthRequest, res: Response): void {
 }
 
 /**
+ * GET /api/dashboard/kpi-batch?metrics=a,b,c (task 8.4)
+ * Multiple KPIs in one round trip. Unknown metrics return null for their key.
+ */
+function getKPIBatch(req: AuthRequest, res: Response): void {
+  try {
+    const raw = String(req.query.metrics || '');
+    const metrics = raw.split(',').map(s => s.trim()).filter(Boolean).slice(0, 12);
+    const fromDate = String(getQueryParam(req.query.fromDate) || '') || undefined;
+    const toDate = String(getQueryParam(req.query.toDate) || '') || undefined;
+
+    const data: Record<string, unknown> = {};
+    for (const metric of metrics) {
+      try {
+        data[metric] = DashboardModel.getKPI(db, metric, fromDate, toDate);
+      } catch {
+        data[metric] = null;
+      }
+    }
+    res.json({ success: true, data });
+  } catch (error) {
+    logger.error('KPI batch error:', error);
+    res.status(500).json({ error: 'Failed to calculate KPIs' });
+  }
+}
+
+/**
  * GET /api/dashboard/ar-summary
  * Aggregated accounts receivable summary with aging buckets.
  */
@@ -224,5 +250,6 @@ export default {
   getProductionStatus,
   getStockMovementSummary,
   getKPI,
+  getKPIBatch,
   getARSummary,
 };

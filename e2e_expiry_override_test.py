@@ -16,12 +16,24 @@ Usage:
 """
 
 import json
+import os
 import sys
 import time
 import urllib.request
 import urllib.error
 
-API = "http://localhost:3011/api"
+# Task 9.1 (audit-remediation): this script writes real data to whatever API
+# it points at. Refuse to run against a target that wasn't explicitly opted in.
+if os.environ.get("E2E_TARGET") != "1":
+    sys.exit(
+        "REFUSING TO RUN: e2e tests mutate the target database.\n"
+        "Point it at an isolated server and set E2E_TARGET=1, e.g.:\n"
+        "  DATABASE_PATH=/tmp/e2e-db PORT=3099 node dist/server.js &\n"
+        "  E2E_TARGET=1 python3 e2e_expiry_override_test.py"
+    )
+
+API = os.environ.get("E2E_API", "http://localhost:3011/api")
+CREATED_IDS = {"customers": [], "items": [], "invoices": []}
 PASS = 0
 FAIL = 0
 
@@ -80,7 +92,21 @@ def main():
         "has_expiry": True, "near_expiry_threshold_days": 30,
     }, token)
     item_id = r["id"]
+    CREATED_IDS["items"].append(item_id)
     check("Item created with has_expiry=1", r.get("has_expiry") in (1, True, "1"))
+
+    # Task 9.1: scoped cleanup — only rows this run created, in FK-safe order.
+    import atexit
+    def _cleanup():
+        tok = None
+        try:
+            r = api("POST", "/auth/login", {"username": "admin", "password": os.environ.get("E2E_PASSWORD", "admin123")})
+            tok = r.get("token")
+        except Exception:
+            return
+        for inv in reversed(CREATED_IDS["invoices"]):
+            api("DELETE", f"/invoices/{inv}", token=tok)
+    atexit.register(_cleanup)
 
     r = api("POST", "/purchases", {
         "item_id": item_id, "warehouse_id": 1, "quantity": 50,

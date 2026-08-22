@@ -6,6 +6,7 @@ import errorHandlerMiddleware from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
 import logger from './utils/logger';
 import { requestLogger, errorLogger } from './middleware/requestLogger';
+import { activityLogBackstop } from './middleware/activityLog';
 import db from './config/database';
 
 // Import routes
@@ -109,6 +110,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Apply rate limiting to all API routes
 app.use('/api/', apiLimiter);
+// Audit-trail backstop: correlation id per request + one trail row per mutating 2xx (task 4.3)
+app.use(activityLogBackstop);
 
 // Request logging middleware
 app.use(requestLogger);

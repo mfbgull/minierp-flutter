@@ -41,6 +41,6 @@ router.get('/entity/:type/:id', requirePermission('activity_log', 'read'), activ
 router.get('/export', requirePermission('activity_log', 'read'), activityLogController.exportLogs);
 
 // Cleanup old logs (admin only)
-router.post('/cleanup', requirePermission('activity_log', 'read'), activityLogController.cleanupLogs);
+router.post('/cleanup', requirePermission('activity_log', 'purge'), activityLogController.cleanupLogs);
 
 export default router;

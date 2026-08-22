@@ -15,7 +15,9 @@
     "gl:backfill-ledger-dates": "node scripts/backfill-ledger-dates.js",
     "gl:recompute-item-amounts": "node scripts/recompute-item-amounts.js",
     "repair:unbatched-stock": "ts-node scripts/repair-stock.ts unbatched-stock",
-    "repair:orphaned-batches": "ts-node scripts/repair-stock.ts orphaned-batches"
+    "repair:orphaned-batches": "ts-node scripts/repair-stock.ts orphaned-batches",
+    "repair": "ts-node scripts/repair-stock.ts all",
+    "gl:check": "ts-node scripts/check-gl-integrity.ts"
   },
   "keywords": [
     "erp",
