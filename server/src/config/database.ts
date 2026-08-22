@@ -999,12 +999,13 @@ function runStockCoverageReconciliation(): void {
   //    weighted cost with a balancing journal entry.
   // Idempotent: no-op when coverage already matches everywhere.
   const mismatches = db.prepare(`
-    SELECT sb.item_id, sb.warehouse_id, sb.quantity AS balance_qty,
-           COALESCE((SELECT SUM(b.quantity_remaining) FROM stock_batches b
-                     WHERE b.item_id = sb.item_id AND b.warehouse_id = sb.warehouse_id), 0) AS covered
-    FROM stock_balances sb
-    HAVING ABS(sb.quantity - COALESCE((SELECT SUM(b.quantity_remaining) FROM stock_batches b
-                     WHERE b.item_id = sb.item_id AND b.warehouse_id = sb.warehouse_id), 0)) > 0.0005
+    SELECT * FROM (
+      SELECT sb.item_id, sb.warehouse_id, sb.quantity AS balance_qty,
+             COALESCE((SELECT SUM(b.quantity_remaining) FROM stock_batches b
+                       WHERE b.item_id = sb.item_id AND b.warehouse_id = sb.warehouse_id), 0) AS covered
+      FROM stock_balances sb
+    )
+    WHERE ABS(balance_qty - covered) > 0.0005
   `).all() as Array<{ item_id: number; warehouse_id: number; balance_qty: number; covered: number }>;
 
   if (mismatches.length === 0) return;
@@ -1076,7 +1077,7 @@ function runStockCoverageReconciliation(): void {
     // Post-condition: coverage must now match everywhere.
     const remaining = db.prepare(`
       SELECT COUNT(*) AS n FROM (
-        SELECT sb.id FROM stock_balances sb
+        SELECT 1 AS ok FROM stock_balances sb
         WHERE ABS(sb.quantity - COALESCE((SELECT SUM(b.quantity_remaining) FROM stock_batches b
                         WHERE b.item_id = sb.item_id AND b.warehouse_id = sb.warehouse_id), 0)) > 0.0005
       )
@@ -1151,8 +1152,6 @@ function runStockInvariantChecksRebuild(): void {
                 CHECK(quantity_remaining >= 0 AND quantity_remaining <= quantity_original),
               unit_cost DECIMAL(15,4) NOT NULL DEFAULT 0,
               received_date DATE NOT NULL${optionalDefs.length ? ',\n              ' + optionalDefs.join(',\n              ') : ''}
-              ' + optionalDefs.join(',
-              ') : ''}
           );
         `);
         // Column-aware copy
