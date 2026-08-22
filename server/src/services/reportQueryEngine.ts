@@ -10,6 +10,7 @@ import db from '../config/database';
 import { getEntity } from './entityRegistry';
 import type { EntityDefinition } from './entityRegistry';
 import logger from '../utils/logger';
+import { validateConfigExpressions, ExpressionValidationError } from './expressionValidator';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -148,6 +149,12 @@ export function executeReport(config: ReportConfig): QueryResult {
     throw new Error(`Entity "${config.entity}" not found in registry`);
   }
 
+  // REP-18 defense in depth: validate computed-column expressions against the
+  // safe grammar BEFORE any SQL is built. Even if a controller misses this,
+  // nothing unvalidated ever reaches query construction.
+  const entityFieldNames = new Set(entityDef.fields.map(f => f.name));
+  validateConfigExpressions(config, entityFieldNames);
+
   const ctx: BuildContext = {
     validFieldNames: new Set(entityDef.fields.map(f => f.name)),
     primaryTableAlias: 'e',
@@ -258,7 +265,7 @@ export function executeReport(config: ReportConfig): QueryResult {
     };
   } catch (error: any) {
     logger.error('Report query execution error:', { sql, error: error.message });
-    throw new Error(`Query execution failed: ${error.message}`);
+    throw new Error(`Query execution failed: ${error.message}`, { cause: error });
   }
 }
 

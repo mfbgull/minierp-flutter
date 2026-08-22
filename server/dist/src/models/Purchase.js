@@ -7,6 +7,8 @@ const sequence_1 = require("../utils/sequence");
 const sqlSanitizer_1 = require("../utils/sqlSanitizer");
 const StockMovement_1 = __importDefault(require("./StockMovement"));
 const SupplierLedger_1 = __importDefault(require("./SupplierLedger"));
+const accountingService_1 = __importDefault(require("../services/accountingService"));
+const ledgerUtils_1 = __importDefault(require("../utils/ledgerUtils"));
 // Whitelisted sort columns → qualified SQL column for the list query (the
 // item/warehouse/user joins make bare names ambiguous).
 const PURCHASE_SORT_COLUMN_MAP = {
@@ -140,6 +142,24 @@ class PurchaseModel {
                 }, db);
                 SupplierLedger_1.default.rebuildBalances(resolvedSupplierId, db);
             }
+            // GL posting (ACC-02): Dr 1200 Inventory Asset /
+            // Cr 2000 AP. Direct purchases are recorded on credit in this
+            // flow — immediate payment happens through the supplier-payment
+            // path, which posts its own cash-side entry.
+            accountingService_1.default.postPurchaseEntry(db, {
+                purchaseId,
+                purchaseNo,
+                totalCost,
+                purchaseDate: purchase_date,
+                paymentMethod: 'credit',
+                userId,
+            });
+            // Mark the movement financially posted so no backfill treats it
+            // as unposted (audit ACC-02 note).
+            db.prepare(`
+        UPDATE stock_movements SET financial_posted = 1
+        WHERE reference_docno = ? AND movement_type = 'PURCHASE'
+      `).run(purchaseNo);
             db.prepare(`
         INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
         VALUES (?, ?, ?, ?, ?)
@@ -309,11 +329,12 @@ class PurchaseModel {
             // Reverse the supplier AP entry posted at record time (keeps the
             // running balance chain consistent).
             if (purchase.supplier_id) {
-                db.prepare(`
-          DELETE FROM supplier_ledger
-          WHERE supplier_id = ? AND reference_no = ? AND transaction_type = 'PURCHASE'
-        `).run(purchase.supplier_id, purchase.purchase_no);
-                SupplierLedger_1.default.rebuildBalances(purchase.supplier_id, db);
+                // ACC-14: reverse the PURCHASE subledger row instead of deleting it.
+                const rows = db.prepare(`SELECT id FROM supplier_ledger
+           WHERE supplier_id = ? AND reference_no = ? AND transaction_type = 'PURCHASE' AND voided = 0`).all(purchase.supplier_id, purchase.purchase_no);
+                for (const row of rows) {
+                    ledgerUtils_1.default.reverseLedgerEntry('supplier_ledger', row.id, `purchase ${purchase.purchase_no} deleted`);
+                }
             }
             // Find the stock_batch created by this purchase
             const batch = db.prepare(`

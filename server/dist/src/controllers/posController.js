@@ -9,6 +9,8 @@ const sequence_1 = require("../utils/sequence");
 const Invoice_1 = __importDefault(require("../models/Invoice"));
 const StockMovement_1 = __importDefault(require("../models/StockMovement"));
 const Warehouse_1 = __importDefault(require("../models/Warehouse"));
+const accountingService_1 = __importDefault(require("../services/accountingService"));
+const currency_1 = require("../utils/currency");
 function generatePOSTransactionNo() {
     const year = new Date().getFullYear();
     const settingKey = `POS_last_no_${year}`;
@@ -53,6 +55,7 @@ function createPOSSale(req, res) {
             res.status(400).json({ error: 'Warehouse not found' });
             return;
         }
+        // ACC-18 interim: the server computes each line (rounded) and sums.
         let total = 0;
         for (const item of items) {
             if (!item.item_id || !item.quantity || item.quantity <= 0) {
@@ -63,7 +66,7 @@ function createPOSSale(req, res) {
                 res.status(400).json({ error: 'Each item must have a valid unit_price' });
                 return;
             }
-            total += item.quantity * item.unit_price;
+            total = (0, currency_1.addCurrency)(total, (0, currency_1.multiplyCurrency)(item.quantity, item.unit_price));
         }
         const cashAmount = parseFloat(cash_received) || total;
         if (cashAmount < total) {
@@ -149,10 +152,57 @@ function createPOSSale(req, res) {
                 const paymentId = Invoice_1.default.createPayment(database_1.default, paymentNo, walkinCustomerId, sale_date, cashAmount, 'Cash', null, `POS Transaction ${transactionNo}`);
                 Invoice_1.default.createPaymentAllocation(database_1.default, paymentId, invoiceId, cashAmount);
                 // Create ledger entry for payment
-                Invoice_1.default.createLedgerEntry(database_1.default, walkinCustomerId, 'PAYMENT', paymentNo, 0, cashAmount, `Payment ${paymentNo} for POS ${transactionNo}`);
+                Invoice_1.default.createLedgerEntry(database_1.default, walkinCustomerId, 'PAYMENT', paymentNo, sale_date, 0, cashAmount, `Payment ${paymentNo} for POS ${transactionNo}`);
             }
             // Create ledger entry for the sale
-            Invoice_1.default.createLedgerEntry(database_1.default, walkinCustomerId, 'INVOICE', transactionNo, total, 0, `POS Sale ${transactionNo}`);
+            Invoice_1.default.createLedgerEntry(database_1.default, walkinCustomerId, 'INVOICE', transactionNo, sale_date, total, 0, `POS Sale ${transactionNo}`);
+            // GL postings (ACC-05): POS sales previously posted nothing to the
+            // journal. Route them through the same sequence as the standard
+            // invoice path — revenue entry, COGS entry (actual FIFO cost), and
+            // the cash payment entry. Any failure rethrows and rolls back the
+            // whole sale (salary-payment reference pattern).
+            let posCogsTotal = 0;
+            for (const detail of itemDetails) {
+                const cogsRows = database_1.default.prepare(`
+          SELECT sm.quantity * sm.unit_cost AS line_cogs
+          FROM stock_movements sm
+          WHERE sm.reference_doctype = 'POS' AND sm.reference_docno = ?
+            AND sm.item_id = ? AND sm.movement_type = 'SALE'
+        `).all(transactionNo, detail.item_id);
+                posCogsTotal += cogsRows.reduce((s, r) => s + Math.abs(Number(r.line_cogs)), 0);
+            }
+            const computedPosTax = 0; // POS cart carries no tax_rate today (ACC-19 scope)
+            accountingService_1.default.postInvoiceEntry(database_1.default, {
+                invoiceId,
+                invoiceNo: transactionNo,
+                totalAmount: total,
+                invoiceDate: sale_date,
+                userId,
+                taxAmount: computedPosTax,
+            });
+            if (posCogsTotal > 0) {
+                accountingService_1.default.postCOGSEntry(database_1.default, {
+                    invoiceId,
+                    invoiceNo: transactionNo,
+                    cogsAmount: (0, currency_1.parseCurrency)(posCogsTotal),
+                    invoiceDate: sale_date,
+                    userId,
+                });
+            }
+            if (cashAmount > 0) {
+                const posPayment = database_1.default.prepare('SELECT id FROM payments WHERE notes = ? ORDER BY id DESC LIMIT 1').get(`POS Transaction ${transactionNo}`);
+                if (posPayment) {
+                    accountingService_1.default.postPaymentEntry(database_1.default, {
+                        paymentId: posPayment.id,
+                        paymentNo: `POS-${transactionNo}`,
+                        amount: cashAmount,
+                        paymentDate: sale_date,
+                        paymentMethod: 'cash',
+                        customerId: walkinCustomerId,
+                        userId,
+                    });
+                }
+            }
             // Activity log
             database_1.default.prepare('INSERT INTO activity_log (user_id, action, entity_type, entity_id, description) VALUES (?, ?, ?, ?, ?)').run(userId, 'CREATE', 'POS', invoiceId, `POS Transaction ${transactionNo}: ${items.length} items`);
             return {

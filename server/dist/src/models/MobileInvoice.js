@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const StockMovement_1 = __importDefault(require("./StockMovement"));
 const sequence_1 = require("../utils/sequence");
 const ledgerUtils_1 = __importDefault(require("../utils/ledgerUtils"));
+const accountingService_1 = __importDefault(require("../services/accountingService"));
+const currency_1 = require("../utils/currency");
 function getDraftById(db, id) {
     return db.prepare('SELECT * FROM invoice_drafts WHERE id = ?').get(id);
 }
@@ -113,12 +115,14 @@ function submitInvoice(db, data) {
             throw new Error('Invalid unit_price in invoice items');
     }
     return db.transaction(() => {
-        const subtotal = data.items.reduce((sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0), 0);
+        // ACC-18 interim: server-authoritative money — each line is
+        // round(qty × price − discount) with tax at the line boundary; the
+        // header total is the sum of those lines.
+        const totalAmount = (0, currency_1.computeInvoiceTotal)(data.items);
         const totalTax = data.items.reduce((sum, item) => {
-            const itemSubtotal = (item.quantity || 0) * (item.unit_price || 0);
-            return sum + itemSubtotal * ((item.tax_rate || 0) / 100);
+            const gross = (item.quantity || 0) * (item.unit_price || 0);
+            return sum + gross * ((item.tax_rate || 0) / 100);
         }, 0);
-        const totalAmount = subtotal + totalTax;
         const invoiceResult = db.prepare(`
       INSERT INTO invoices (
         invoice_no, customer_id, invoice_date, due_date, status,
@@ -128,7 +132,7 @@ function submitInvoice(db, data) {
         const invoiceId = invoiceResult.lastInsertRowid;
         const invoiceNo = data.invoice_no || (invoiceResult.lastInsertRowid ? `INV-${Date.now()}` : '');
         for (const item of data.items) {
-            const amount = (item.quantity || 0) * (item.unit_price || 0);
+            const amount = (0, currency_1.computeLineAmount)(item);
             db.prepare(`
         INSERT INTO invoice_items (
           invoice_id, item_id, quantity, unit_price, amount, tax_rate, discount_type, discount_value
@@ -164,12 +168,53 @@ function submitInvoice(db, data) {
         UPDATE invoices SET paid_amount = ?, balance_amount = ?, status = ? WHERE id = ?
       `).run(paymentAmount, totalAmount - paymentAmount, paymentAmount >= totalAmount ? 'Paid' : 'Partially Paid', invoiceId);
             // Create ledger entry for payment (credit to reduce AR)
-            ledgerUtils_1.default.createLedgerEntry(data.customer_id, 'PAYMENT', paymentNo, 0, paymentAmount, `Payment ${paymentNo} for Invoice ${invoiceId}`);
+            ledgerUtils_1.default.createLedgerEntry(data.customer_id, data.payment.payment_date || data.invoice_date, 'PAYMENT', paymentNo, 0, paymentAmount, `Payment ${paymentNo} for Invoice ${invoiceId}`);
         }
         // Create customer ledger entry for the invoice (debit to increase AR)
-        ledgerUtils_1.default.createLedgerEntry(data.customer_id, 'INVOICE', invoiceNo, totalAmount, 0, `Invoice ${invoiceNo}`);
+        ledgerUtils_1.default.createLedgerEntry(data.customer_id, data.invoice_date, 'INVOICE', invoiceNo, totalAmount, 0, `Invoice ${invoiceNo}`);
+        // GL postings (ACC-06): mobile invoices previously posted nothing.
+        // Same sequence as the standard invoice path — revenue entry with the
+        // computed tax split, COGS at recorded unit cost, and the payment
+        // entry when one was recorded inline.
+        accountingService_1.default.postInvoiceEntry(db, {
+            invoiceId,
+            invoiceNo,
+            totalAmount,
+            invoiceDate: data.invoice_date,
+            userId: data.userId,
+            taxAmount: totalTax,
+        });
+        const cogsRows = db.prepare(`
+      SELECT quantity * unit_cost AS line_cogs FROM stock_movements
+      WHERE reference_doctype = 'INVOICE' AND reference_docno = ?
+        AND movement_type = 'SALE'
+    `).all(String(invoiceId));
+        const cogsTotal = cogsRows.reduce((s, r) => s + Math.abs(Number(r.line_cogs)), 0);
+        if (cogsTotal > 0) {
+            accountingService_1.default.postCOGSEntry(db, {
+                invoiceId,
+                invoiceNo,
+                cogsAmount: (0, currency_1.parseCurrency)(cogsTotal),
+                invoiceDate: data.invoice_date,
+                userId: data.userId,
+            });
+        }
+        if (data.record_payment && data.payment && (data.payment.amount || 0) > 0) {
+            const payRow = db.prepare('SELECT id, payment_no, amount, payment_date, payment_method FROM payments WHERE invoice_id = ? ORDER BY id DESC LIMIT 1').get(invoiceId);
+            if (payRow) {
+                accountingService_1.default.postPaymentEntry(db, {
+                    paymentId: payRow.id,
+                    paymentNo: payRow.payment_no,
+                    amount: Number(payRow.amount),
+                    paymentDate: payRow.payment_date,
+                    paymentMethod: payRow.payment_method,
+                    customerId: data.customer_id,
+                    userId: data.userId,
+                });
+            }
+        }
         // Update customer balance
-        ledgerUtils_1.default.updateCustomerBalance(data.customer_id);
+        ledgerUtils_1.default.recalcCustomerBalanceFromLedger(data.customer_id);
         if (data.draft_id) {
             db.prepare('DELETE FROM invoice_drafts WHERE id = ?').run(data.draft_id);
         }

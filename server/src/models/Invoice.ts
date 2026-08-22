@@ -1,4 +1,5 @@
-import { multiplyCurrency, addCurrency, subtractCurrency, parseCurrency } from '../utils/currency';
+import { multiplyCurrency, addCurrency, subtractCurrency, parseCurrency, computeLineAmount } from '../utils/currency';
+import ledgerUtils from '../utils/ledgerUtils';
 import { getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, INVOICE_SORT_COLUMNS, INVOICE_RETURN_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import Database from 'better-sqlite3';
@@ -729,7 +730,10 @@ class InvoiceModel {
    * Create a new invoice item
    */
   static createInvoiceItem(db: Database.Database, invoiceId: number, item: CreateInvoiceItemDTO): void {
-    const amount = multiplyCurrency(item.quantity, item.unit_price);
+    // ACC-18 interim: the stored amount is always the server-computed
+    // line total — round(qty × price − discount) with tax applied at the
+    // line boundary. Client-supplied amounts are never trusted.
+    const amount = computeLineAmount(item);
     db.prepare(`
       INSERT INTO invoice_items (
         invoice_id, item_id, quantity, unit_price, amount,
@@ -782,13 +786,15 @@ class InvoiceModel {
 
   /**
    * Create a ledger entry
+   * ACC-12: transactionDate is the caller's document date; the running
+   * balance chains in (transaction_date, id) order over non-voided rows.
    */
-  static createLedgerEntry(db: Database.Database, customerId: number, type: string, referenceNo: string, debit: number, credit: number, description: string): void {
+  static createLedgerEntry(db: Database.Database, customerId: number, type: string, referenceNo: string, transactionDate: string, debit: number, credit: number, description: string): void {
     // Calculate running balance from last entry for this customer
     const lastBalanceResult = db.prepare(`
       SELECT balance FROM customer_ledger
-      WHERE customer_id = ?
-      ORDER BY id DESC
+      WHERE customer_id = ? AND voided = 0
+      ORDER BY transaction_date DESC, id DESC
       LIMIT 1
     `).get(customerId) as { balance: number } | undefined;
 
@@ -802,15 +808,8 @@ class InvoiceModel {
         customer_id, transaction_date, transaction_type, reference_no,
         debit, credit, balance, description
       )
-      VALUES (?, DATE('now'), ?, ?, ?, ?, ?, ?)
-    `).run(customerId, type, referenceNo, safeDebit, safeCredit, newBalance, description);
-  }
-
-  /**
-   * Update customer balance
-   */
-  static updateCustomerBalance(db: Database.Database, customerId: number): void {
-    // Balance is recalculated from ledger entries — no action needed here
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(customerId, transactionDate, type, referenceNo, safeDebit, safeCredit, newBalance, description);
   }
 
   /**
@@ -886,10 +885,21 @@ class InvoiceModel {
   }
 
   /**
-   * Delete customer ledger entry by reference
+   * Reverse customer ledger entries matching a document reference.
+   * ACC-20: scoped to the owning customer so a colliding reference_no
+   * cannot touch another party's rows.
    */
-  static deleteLedgerEntryByReference(db: Database.Database, referenceNo: string): void {
-    db.prepare(`DELETE FROM customer_ledger WHERE reference_no = ?`).run(referenceNo);
+  static deleteLedgerEntryByReference(db: Database.Database, referenceNo: string, customerId: number): void {
+    // ACC-14: ledgers are append-only. Reverse matching rows instead of
+    // deleting them so the audit trail survives. Scoped to INVOICE-type
+    // rows (invoice_no is UNIQUE, but the reference column also carries
+    // CANCELLATION/PAYMENT references for other customers).
+    const rows = db.prepare(
+      `SELECT id FROM customer_ledger WHERE reference_no = ? AND voided = 0 AND transaction_type = 'INVOICE' AND customer_id = ?`
+    ).all(referenceNo, customerId) as Array<{ id: number }>;
+    for (const row of rows) {
+      ledgerUtils.reverseLedgerEntry('customer_ledger', row.id, `document ${referenceNo} updated/deleted`);
+    }
   }
 
   /**

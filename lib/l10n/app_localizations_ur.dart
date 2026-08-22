@@ -5318,6 +5318,27 @@ class AppLocalizationsUr extends AppLocalizations {
   String get expiryReport => 'مونثی رپورٹ';
 
   @override
+  String expiryReportPagination(
+    Object currentPage,
+    Object totalPages,
+    Object totalRows,
+  ) {
+    return '$totalRows قطاریں • صفحہ $currentPage / $totalPages';
+  }
+
+  @override
+  String get expiryReportFirstPage => 'پہلا صفحہ';
+
+  @override
+  String get expiryReportPreviousPage => 'پچھلا صفحہ';
+
+  @override
+  String get expiryReportNextPage => 'اگلا صفحہ';
+
+  @override
+  String get expiryReportLastPage => 'آخری صفحہ';
+
+  @override
   String get expiryAlerts => 'مونثی الرٹس';
 
   @override

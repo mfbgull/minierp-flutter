@@ -1,10 +1,16 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import logger from '../utils/logger';
 import { getNextSequenceNumber } from '../utils/sequence';
 import { backfillPurchaseReturns } from '../utils/purchaseReturnBackfill';
+
+// Fail-closed: tests must never fall through to a shared dev DB by accident
+if (process.env.NODE_ENV === 'test' && !process.env.DATABASE_PATH) {
+  throw new Error('FATAL: NODE_ENV=test requires DATABASE_PATH to be set (use :memory: or a temp file). Refusing to open a default database.');
+}
 
 // Database file path - use DATABASE_PATH env var if set (Electron), otherwise default
 const dbDir = process.env.DATABASE_PATH || path.join(__dirname, '../../../database');
@@ -32,6 +38,77 @@ db.pragma('synchronous = NORMAL');
 // Wait up to 5s instead of failing immediately when locked
 db.pragma('busy_timeout = 5000');
 
+// Query cache 16MB; checkpoint WAL every ~400 pages so WAL stays bounded
+db.pragma('cache_size = -16000');
+db.pragma('wal_autocheckpoint = 400');
+
+// Guarded ALTER helper - replaces silent try/catch{} pattern
+function columnExists(table: string, column: string): boolean {
+  const cols = db.pragma(`table_info('${table}')`) as Array<{ name: string }>;
+  return cols.some((c) => c.name === column);
+}
+function addColumnIfMissing(table: string, columnDef: string): void {
+  const column = columnDef.trim().split(/\s+/)[0];
+  if (!columnExists(table, column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`);
+  }
+}
+
+// ── Migration ledger (schema_migrations) ──────────────────────────────
+// Single canonical migrations path; resolves under ts-node (src/config/..)
+// and dist (dist/src/config/..).
+const MIGRATIONS_DIR = path.resolve(__dirname, '../migrations');
+
+function ensureMigrationsTable(): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      filename TEXT PRIMARY KEY,
+      applied_at TEXT NOT NULL,
+      checksum TEXT NOT NULL
+    )
+  `);
+}
+
+function fileChecksum(filename: string): string {
+  try {
+    return crypto.createHash('sha256').update(fs.readFileSync(path.join(MIGRATIONS_DIR, filename))).digest('hex').slice(0, 16);
+  } catch {
+    return 'inline';
+  }
+}
+
+/**
+ * Ledger runner: skip if recorded; otherwise execute body inside a
+ * transaction, record with checksum on success. Any failure aborts the
+ * process non-zero BEFORE HTTP listen.
+ */
+function runLedgered(key: string, fn?: () => void, opts?: { noTxn?: boolean }): void {
+  ensureMigrationsTable();
+  if (db.prepare('SELECT 1 FROM schema_migrations WHERE filename = ?').get(key)) return;
+  const checksum = fileChecksum(key);
+  try {
+    if (fn) {
+      if (opts?.noTxn) {
+        // Body manages its own transaction/pragma scope (e.g. FK-off table rebuild)
+        fn();
+      } else {
+        db.transaction(fn)();
+      }
+    } else {
+      const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, key), 'utf8');
+      db.transaction(() => db.exec(sql))();
+    }
+    db.prepare('INSERT INTO schema_migrations (filename, applied_at, checksum) VALUES (?, ?, ?)')
+      .run(key, new Date().toISOString(), checksum);
+    const n = (db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get() as { n: number }).n;
+    db.pragma(`user_version = ${n}`);
+    logger.info(`✅ migration applied: ${key}`);
+  } catch (err: any) {
+    logger.error(`FATAL: migration '${key}' failed: ${err.message}`);
+    process.exit(1);
+  }
+}
+
 // Initialize database with schema if tables don't exist
 function initializeDatabase(): void {
   logger.info('Checking database initialization...');
@@ -46,7 +123,7 @@ function initializeDatabase(): void {
     logger.info('Database not initialized. Running migration...');
 
     const initSQL = fs.readFileSync(
-      path.join(__dirname, '../migrations/init.sql'),
+      path.join(MIGRATIONS_DIR, 'init.sql'),
       'utf8'
     );
 
@@ -56,7 +133,6 @@ function initializeDatabase(): void {
 
     createDefaultUser();
     createDefaultWarehouse();
-    seedDemoData();
 
     logger.info('✅ Database initialization complete!');
   } else {
@@ -108,54 +184,6 @@ function createDefaultWarehouse(): void {
   }
 }
 
-// Seed a minimal demo dataset on a freshly created database so a new
-// install has something to work with out of the box.
-function seedDemoData(): void {
-  try {
-    const admin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin') as
-      { id: number } | undefined;
-
-    // Walk-in customer (default cash/POS customer)
-    const existingCustomer = db.prepare('SELECT id FROM customers WHERE customer_code = ?').get('WALKIN');
-    if (!existingCustomer) {
-      db.prepare(`
-        INSERT INTO customers (customer_code, customer_name, is_active)
-        VALUES (?, ?, ?)
-      `).run('WALKIN', 'Walkin Customer', 1);
-      logger.info('✅ Demo customer created (Walkin Customer)');
-    }
-
-    // Demo supplier
-    const existingSupplier = db.prepare('SELECT id FROM suppliers WHERE supplier_code = ?').get('DEMO-SUP');
-    if (!existingSupplier) {
-      db.prepare(`
-        INSERT INTO suppliers (supplier_code, supplier_name, is_active)
-        VALUES (?, ?, ?)
-      `).run('DEMO-SUP', 'Demo supplier', 1);
-      logger.info('✅ Demo supplier created (Demo supplier)');
-    }
-
-    // Demonstration product
-    const existingItem = db.prepare('SELECT id FROM items WHERE item_code = ?').get('WIDGET-A');
-    if (!existingItem) {
-      db.prepare(`
-        INSERT INTO items (
-          item_code, item_name, category, unit_of_measure,
-          standard_cost, standard_selling_price,
-          is_purchased, is_finished_good, is_active, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        'WIDGET-A', 'Widget A', 'General', 'Nos',
-        0, 0,
-        1, 1, 1, admin?.id ?? null
-      );
-      logger.info('✅ Demo product created (Widget A)');
-    }
-  } catch (error: any) {
-    logger.error('Demo seed data error:', error.message);
-  }
-}
-
 function runInvoiceMigration(): void {
   try {
     const columnCheck = db.prepare(`
@@ -167,7 +195,7 @@ function runInvoiceMigration(): void {
       logger.info('Running invoice discount/tax migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-invoice-discount-tax-fields.sql'),
+        path.join(MIGRATIONS_DIR, 'add-invoice-discount-tax-fields.sql'),
         'utf8'
       );
 
@@ -176,12 +204,22 @@ function runInvoiceMigration(): void {
       logger.info('✅ Invoice discount/tax migration completed!');
     }
   } catch (error: any) {
-    logger.error('Invoice migration error:', error.message);
+    throw new Error('Invoice migration error:: ' + error.message, { cause: error });
   }
 }
 
 function runCustomerARMigrations(): void {
   try {
+    // Ensure return-tracking columns exist before the balance recalculation
+    // below references them (they are otherwise added later by
+    // runGLFoundationMigration — too late for first boot).
+    if (!columnExists('invoices', 'returned_amount')) {
+      db.exec("ALTER TABLE invoices ADD COLUMN returned_amount DECIMAL(15,2) NOT NULL DEFAULT 0");
+    }
+    if (!columnExists('invoices', 'return_fee')) {
+      db.exec('ALTER TABLE invoices ADD COLUMN return_fee DECIMAL(15,2) NOT NULL DEFAULT 0');
+    }
+
     const columnsToCheck = [
       {name: 'credit_limit', sql: 'ALTER TABLE customers ADD COLUMN credit_limit DECIMAL(15,2) DEFAULT 0'},
       {name: 'current_balance', sql: 'ALTER TABLE customers ADD COLUMN current_balance DECIMAL(15,2) DEFAULT 0'},
@@ -211,7 +249,7 @@ function runCustomerARMigrations(): void {
       logger.info('Running customer ledger migration...');
 
       const ledgerSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/create-customer-ledger.sql'),
+        path.join(MIGRATIONS_DIR, 'create-customer-ledger.sql'),
         'utf8'
       );
 
@@ -229,7 +267,7 @@ function runCustomerARMigrations(): void {
       logger.info('Running payment allocations migration...');
 
       const allocationsSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/create-payment-allocations.sql'),
+        path.join(MIGRATIONS_DIR, 'create-payment-allocations.sql'),
         'utf8'
       );
 
@@ -354,7 +392,7 @@ function runCustomerARMigrations(): void {
     }
     logger.info('✅ Payment ledger descriptions fixed!');
   } catch (error: any) {
-    logger.error('Customer AR migration error:', error.message);
+    throw new Error('Customer AR migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -369,7 +407,7 @@ function runExpensesMigration(): void {
       logger.info('Running expenses migration...');
 
       const expensesSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-expenses-table.sql'),
+        path.join(MIGRATIONS_DIR, 'add-expenses-table.sql'),
         'utf8'
       );
 
@@ -419,7 +457,7 @@ function runExpensesMigration(): void {
       logger.info('✅ Expense categories migration completed!');
     }
   } catch (error: any) {
-    logger.error('Expenses migration error:', error.message);
+    throw new Error('Expenses migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -434,7 +472,7 @@ function runPurchasesMigration(): void {
       logger.info('Running purchases migration...');
 
       const purchasesSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-purchases-table.sql'),
+        path.join(MIGRATIONS_DIR, 'add-purchases-table.sql'),
         'utf8'
       );
 
@@ -443,7 +481,7 @@ function runPurchasesMigration(): void {
       logger.info('✅ Purchases migration completed!');
     }
   } catch (error: any) {
-    logger.error('Purchases migration error:', error.message);
+    throw new Error('Purchases migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -458,7 +496,7 @@ function runPurchaseSupplierPaymentMigration(): void {
       logger.info('Running purchase supplier/payment migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-purchase-supplier-payment.sql'),
+        path.join(MIGRATIONS_DIR, 'add-purchase-supplier-payment.sql'),
         'utf8'
       );
 
@@ -494,7 +532,7 @@ function runPurchaseSupplierPaymentMigration(): void {
       logger.info('✅ purchase_allocations table added');
     }
   } catch (error: any) {
-    logger.error('Purchase supplier/payment migration error:', error.message);
+    throw new Error('Purchase supplier/payment migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -509,7 +547,7 @@ function runPurchaseReturnMigration(): void {
       logger.info('Running purchase return fields migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-purchase-return-fields.sql'),
+        path.join(MIGRATIONS_DIR, 'add-purchase-return-fields.sql'),
         'utf8'
       );
 
@@ -520,7 +558,7 @@ function runPurchaseReturnMigration(): void {
       logger.info('✅ Purchase return fields already applied.');
     }
   } catch (error: any) {
-    logger.error('Purchase return fields migration error:', error.message);
+    throw new Error('Purchase return fields migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -535,7 +573,7 @@ function runPurchaseReturnsTablesMigration(): void {
       logger.info('Running purchase returns tables migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-purchase-returns-tables.sql'),
+        path.join(MIGRATIONS_DIR, 'add-purchase-returns-tables.sql'),
         'utf8'
       );
 
@@ -556,7 +594,7 @@ function runPurchaseReturnsTablesMigration(): void {
       }
     }
   } catch (error: any) {
-    logger.error('Purchase returns tables migration error:', error.message);
+    throw new Error('Purchase returns tables migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -571,7 +609,7 @@ function runPurchaseReturnsBackfill(): void {
       logger.info(`✅ Backfilled ${count} purchase returns from legacy movements`);
     }
   } catch (error: any) {
-    logger.error('Purchase returns backfill error:', error.message);
+    throw new Error('Purchase returns backfill error:: ' + error.message, { cause: error });
   }
 }
 
@@ -586,7 +624,7 @@ function runProductionsMigration(): void {
       logger.info('Running productions migration...');
 
       const productionsSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-production-tables.sql'),
+        path.join(MIGRATIONS_DIR, 'add-production-tables.sql'),
         'utf8'
       );
 
@@ -595,7 +633,7 @@ function runProductionsMigration(): void {
       logger.info('✅ Productions migration completed!');
     }
   } catch (error: any) {
-    logger.error('Productions migration error:', error.message);
+    throw new Error('Productions migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -606,11 +644,27 @@ function runBOMMigration(): void {
       WHERE type='table' AND name='boms'
     `).get() as { name: string } | undefined;
 
+    // Legacy init.sql created bom_items with raw_material_id; the BOM model
+    // and this migration's indexes expect item_id. Rename BEFORE applying
+    // add-bom-tables.sql so its index on bom_items(item_id) doesn't fail
+    // (CREATE TABLE IF NOT EXISTS won't fix an existing legacy table).
+    const existingBomItems = db.prepare(`
+      SELECT name FROM sqlite_master WHERE type='table' AND name='bom_items'
+    `).get() as { name: string } | undefined;
+    if (existingBomItems) {
+      const hasItemId = (db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('bom_items') WHERE name='item_id'`).get() as { count: number }).count;
+      const hasRawMaterialId = (db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('bom_items') WHERE name='raw_material_id'`).get() as { count: number }).count;
+      if (!hasItemId && hasRawMaterialId) {
+        logger.info('Renaming bom_items.raw_material_id → item_id...');
+        db.exec('ALTER TABLE bom_items RENAME COLUMN raw_material_id TO item_id');
+      }
+    }
+
     if (!bomTableCheck) {
       logger.info('Running BOM migration...');
 
       const bomSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-bom-tables.sql'),
+        path.join(MIGRATIONS_DIR, 'add-bom-tables.sql'),
         'utf8'
       );
 
@@ -619,7 +673,7 @@ function runBOMMigration(): void {
       logger.info('✅ BOM migration completed!');
     }
   } catch (error: any) {
-    logger.error('BOM migration error:', error.message);
+    throw new Error('BOM migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -652,7 +706,7 @@ function runBOMItemsColumnMigration(): void {
     db.exec('ALTER TABLE bom_items RENAME COLUMN raw_material_id TO item_id');
     logger.info('✅ bom_items.raw_material_id renamed to item_id');
   } catch (error: any) {
-    logger.error('BOM items column migration error:', error.message);
+    throw new Error('BOM items column migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -710,20 +764,20 @@ function runSalesMigration(): void {
         `);
 
         // Add columns to existing tables if not exist
-        try { db.exec(`ALTER TABLE sales_orders ADD COLUMN source_type VARCHAR(20)`); } catch {}
-        try { db.exec(`ALTER TABLE sales_orders ADD COLUMN source_id INTEGER`); } catch {}
-        try { db.exec(`ALTER TABLE sales_orders ADD COLUMN customer_name VARCHAR(200)`); } catch {}
-        try { db.exec(`ALTER TABLE invoices ADD COLUMN source_type VARCHAR(20)`); } catch {}
-        try { db.exec(`ALTER TABLE invoices ADD COLUMN quotation_id INTEGER`); } catch {}
-        try { db.exec(`ALTER TABLE invoices ADD COLUMN customer_name VARCHAR(200)`); } catch {}
+        addColumnIfMissing('sales_orders', 'source_type VARCHAR(20)');
+        addColumnIfMissing('sales_orders', 'source_id INTEGER');
+        addColumnIfMissing('sales_orders', 'customer_name VARCHAR(200)');
+        addColumnIfMissing('invoices', 'source_type VARCHAR(20)');
+        addColumnIfMissing('invoices', 'quotation_id INTEGER');
+        addColumnIfMissing('invoices', 'customer_name VARCHAR(200)');
 
         logger.info('✅ Sales cycle migration completed!');
       } catch (migrationError: any) {
-        logger.error('Sales cycle migration error:', String(migrationError));
-      }
+        throw new Error('Sales cycle migration error:: ' + migrationError.message, { cause: migrationError });
+        }
     }
   } catch (error: any) {
-    logger.error('Sales migration error:', error.message);
+    throw new Error('Sales migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -738,7 +792,7 @@ function runSupplierLedgerMigration(): void {
       logger.info('Running supplier ledger migration...');
 
       const supplierLedgerSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/create-supplier-ledger.sql'),
+        path.join(MIGRATIONS_DIR, 'create-supplier-ledger.sql'),
         'utf8'
       );
 
@@ -747,7 +801,7 @@ function runSupplierLedgerMigration(): void {
       logger.info('✅ Supplier ledger migration completed!');
     }
   } catch (error: any) {
-    logger.error('Supplier ledger migration error:', error.message);
+    throw new Error('Supplier ledger migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -779,7 +833,7 @@ function runActivityLogMigration(): void {
       logger.info('✅ Activity log enhancement migration completed!');
     }
   } catch (error: any) {
-    logger.error('Activity log migration error:', error.message);
+    throw new Error('Activity log migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -794,7 +848,7 @@ function runSupplierPaymentMigration(): void {
       logger.info('Running supplier payment migration...');
 
       const supplierPaymentSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-supplier-payment-support.sql'),
+        path.join(MIGRATIONS_DIR, 'add-supplier-payment-support.sql'),
         'utf8'
       );
 
@@ -811,10 +865,27 @@ function runSupplierPaymentMigration(): void {
     `).get() as { count: number };
 
     if (notNullCheck.count > 0) {
-      logger.info('Making payments.customer_id nullable...');
+      logger.info('payments.customer_id nullable rebuild pending (runs as its own ledger step)...');
+    }
+  } catch (error: any) {
+    throw new Error('Supplier payment migration error:: ' + error.message, { cause: error });
+  }
+}
+
+// Table rebuild requiring FK off BEFORE the transaction starts; manages its
+// own transaction and always restores foreign_keys=ON.
+function runPaymentsCustomerNullableRebuild(): void {
+  const notNullCheck = db.prepare(`
+    SELECT COUNT(*) as count FROM pragma_table_info('payments')
+    WHERE name='customer_id' AND "notnull"=1
+  `).get() as { count: number };
+  if (notNullCheck.count === 0) return;
+
+  logger.info('Making payments.customer_id nullable...');
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
       db.exec(`
-        PRAGMA foreign_keys=OFF;
-        BEGIN TRANSACTION;
         CREATE TABLE payments_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             payment_no VARCHAR(50) UNIQUE NOT NULL,
@@ -833,20 +904,129 @@ function runSupplierPaymentMigration(): void {
             FOREIGN KEY (invoice_id) REFERENCES invoices(id),
             FOREIGN KEY (created_by) REFERENCES users(id)
         );
-        INSERT INTO payments_new (id, payment_no, customer_id, supplier_id, payment_date, amount, payment_method, reference_no, notes, created_by, created_at)
-          SELECT id, payment_no, customer_id, supplier_id, payment_date, amount, payment_method, reference_no, notes, created_by, created_at FROM payments;
+        INSERT INTO payments_new (id, payment_no, customer_id, supplier_id, invoice_id, payment_date, amount, payment_method, reference_no, notes, created_by, created_at)
+          SELECT id, payment_no, customer_id, supplier_id, invoice_id, payment_date, amount, payment_method, reference_no, notes, created_by, created_at FROM payments;
         DROP TABLE payments;
         ALTER TABLE payments_new RENAME TO payments;
         CREATE INDEX IF NOT EXISTS idx_payments_customer_id ON payments(customer_id);
         CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date);
-        COMMIT;
-        PRAGMA foreign_keys=ON;
       `);
-      logger.info('✅ payments.customer_id is now nullable');
-    }
-  } catch (error: any) {
-    logger.error('Supplier payment migration error:', error.message);
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON');
   }
+  if ((db.pragma('foreign_keys', { simple: true }) as number) !== 1) {
+    throw new Error('FATAL: payments rebuild failed to restore PRAGMA foreign_keys=ON');
+  }
+}
+
+const BATCH_SOURCE_TYPES = "('PRODUCTION','PURCHASE','GOODS_RECEIPT','RETURN','ADJUSTMENT','OPENING','TRANSFER','RECON')";
+
+function runBatchSourceTypeRebuild(): void {
+  // INV-10 / INV-22: widen stock_batches.source_type to a disjoint
+  // namespace per origin table and re-stamp existing rows.
+  const currentCheck = db.prepare(`
+    SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_batches'
+  `).get() as { sql: string } | undefined;
+  if (!currentCheck) return; // fresh DB — add-batch-costing.sql creates the widened schema
+
+  // Detect whether the live CHECK already carries the full namespace
+  // (covers both the legacy two-value CHECK and a CHECK-less table).
+  const needsWiden = !currentCheck.sql.includes("'GOODS_RECEIPT'")
+    || !currentCheck.sql.includes("'ADJUSTMENT'")
+    || !currentCheck.sql.includes("'TRANSFER'");
+  if (!needsWiden) return;
+
+  logger.info('Rebuilding stock_batches with widened source_type CHECK...');
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      // Re-stamp into disjoint namespaces (INV-10):
+      //  - synthetic reconciliation rows (source_id = 0) → RECON
+      //  - source_id resolves to goods_receipt_items     → GOODS_RECEIPT
+      //  - everything else stays PURCHASE / PRODUCTION as written
+      const batchCols = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all() as Array<{ name: string }>;
+      const hasExpiry = batchCols.some((c) => c.name === 'expiry_date');
+      const hasCreatedAt = batchCols.some((c) => c.name === 'created_at');
+      const copyCols = [
+        'id', 'batch_no', 'item_id', 'warehouse_id',
+        `CASE
+           WHEN source_type IN ('PURCHASE') AND source_id = 0 THEN 'RECON'
+           WHEN source_type = 'PURCHASE' AND source_id > 0
+                AND EXISTS (SELECT 1 FROM goods_receipt_items gri WHERE gri.id = stock_batches.source_id)
+             THEN 'GOODS_RECEIPT'
+           ELSE source_type
+         END AS source_type_stamped`,
+        'source_id', 'quantity_original', 'quantity_remaining', 'unit_cost', 'received_date',
+      ];
+      if (hasCreatedAt) copyCols.push(hasExpiry ? 'created_at' : "'' AS created_at");
+      if (hasExpiry) copyCols.push('expiry_date');
+      const insertCols = ['id', 'batch_no', 'item_id', 'warehouse_id', 'source_type', 'source_id', 'quantity_original', 'quantity_remaining', 'unit_cost', 'received_date'];
+      if (hasCreatedAt) insertCols.push('created_at');
+      if (hasExpiry) insertCols.push('expiry_date');
+      // Create the new table without optional columns when the source lacks them.
+      const optionalCols: string[] = [];
+      if (hasCreatedAt) optionalCols.push('created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+      if (hasExpiry) optionalCols.push('expiry_date DATE');
+      const newTableSQL = `
+        CREATE TABLE stock_batches_new (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_no        VARCHAR(50) UNIQUE NOT NULL,
+            item_id         INTEGER NOT NULL REFERENCES items(id),
+            warehouse_id    INTEGER NOT NULL REFERENCES warehouses(id),
+            source_type     VARCHAR(20) NOT NULL CHECK(source_type IN ${BATCH_SOURCE_TYPES}),
+            source_id       INTEGER NOT NULL,
+            quantity_original DECIMAL(15,3) NOT NULL DEFAULT 0,
+            quantity_remaining DECIMAL(15,3) NOT NULL DEFAULT 0,
+            unit_cost       DECIMAL(15,4) NOT NULL DEFAULT 0,
+            received_date   DATE NOT NULL${optionalCols.length ? ',\n            ' + optionalCols.join(',\n            ') : ''}
+        );
+      `;
+      db.exec(newTableSQL);
+      db.exec(`
+        INSERT INTO stock_batches_new (${insertCols.join(', ')})
+        SELECT ${copyCols.join(', ')}
+        FROM stock_batches;
+      `);
+
+
+      // Post-migration assertion: no row left in an unknown namespace.
+      const bad = db.prepare(`
+        SELECT COUNT(*) AS n FROM stock_batches_new
+        WHERE source_type NOT IN ${BATCH_SOURCE_TYPES.replace(/^\(/, '(')}
+           OR (source_type = 'PURCHASE' AND source_id > 0
+               AND EXISTS (SELECT 1 FROM goods_receipt_items gri WHERE gri.id = source_id))
+      `).get() as { n: number };
+      if (bad.n > 0) {
+        throw new Error(`${bad.n} stock_batches row(s) failed source_type re-stamping`);
+      }
+
+      const countsBefore = (db.prepare('SELECT COUNT(*) AS n FROM stock_batches').get() as { n: number }).n;
+      db.exec('DROP TABLE stock_batches');
+      db.exec('ALTER TABLE stock_batches_new RENAME TO stock_batches');
+
+      const countsAfter = (db.prepare('SELECT COUNT(*) AS n FROM stock_batches').get() as { n: number }).n;
+      if (countsAfter !== countsBefore) {
+        throw new Error(`stock_batches rebuild lost rows (${countsBefore} -> ${countsAfter})`);
+      }
+
+      // Restore indexes from add-batch-costing.sql (+ expiry index when present).
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_stock_batches_item ON stock_batches(item_id, warehouse_id);
+        CREATE INDEX IF NOT EXISTS idx_stock_batches_source ON stock_batches(source_type, source_id);
+        CREATE INDEX IF NOT EXISTS idx_stock_batches_batch_no ON stock_batches(batch_no);
+      `);
+      if (hasExpiry) {
+        db.exec('CREATE INDEX IF NOT EXISTS idx_stock_batches_expiry ON stock_batches(expiry_date) WHERE expiry_date IS NOT NULL');
+      }
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  if ((db.pragma('foreign_keys', { simple: true }) as number) !== 1) {
+    throw new Error('FATAL: stock_batches rebuild failed to restore PRAGMA foreign_keys=ON');
+  }
+  logger.info('✅ stock_batches source_type widened and re-stamped');
 }
 
 function runPaymentsPurchaseOrderIdMigration(): void {
@@ -859,14 +1039,14 @@ function runPaymentsPurchaseOrderIdMigration(): void {
     if (columnCheck.count === 0) {
       logger.info('Running payments purchase_order_id migration...');
       const sql = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-payments-purchase-order-id.sql'),
+        path.join(MIGRATIONS_DIR, 'add-payments-purchase-order-id.sql'),
         'utf8'
       );
       db.exec(sql);
       logger.info('✅ Payments purchase_order_id migration completed!');
     }
   } catch (error: any) {
-    logger.error('Payments purchase_order_id migration error:', error.message);
+    throw new Error('Payments purchase_order_id migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -895,7 +1075,7 @@ function runSupplierBalanceMigration(): void {
     `);
     logger.info('✅ Suppliers current_balance column ensured');
   } catch (error: any) {
-    logger.error('Supplier balance migration error:', error.message);
+    throw new Error('Supplier balance migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -910,7 +1090,7 @@ function runRawMaterialsWarehouseMigration(): void {
       logger.info('Running raw materials warehouse migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-raw-materials-warehouse.sql'),
+        path.join(MIGRATIONS_DIR, 'add-raw-materials-warehouse.sql'),
         'utf8'
       );
 
@@ -919,7 +1099,7 @@ function runRawMaterialsWarehouseMigration(): void {
       logger.info('✅ Raw materials warehouse migration completed!');
     }
   } catch (error: any) {
-    logger.error('Raw materials warehouse migration error:', error.message);
+    throw new Error('Raw materials warehouse migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -934,7 +1114,7 @@ function runProductionInputsWarehouseMigration(): void {
       logger.info('Running production inputs warehouse migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-warehouse-to-production-inputs.sql'),
+        path.join(MIGRATIONS_DIR, 'add-warehouse-to-production-inputs.sql'),
         'utf8'
       );
 
@@ -943,7 +1123,7 @@ function runProductionInputsWarehouseMigration(): void {
       logger.info('✅ Production inputs warehouse migration completed!');
     }
   } catch (error: any) {
-    logger.error('Production inputs warehouse migration error:', error.message);
+    throw new Error('Production inputs warehouse migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -958,7 +1138,7 @@ function runMobileInvoiceMigration(): void {
       logger.info('Running mobile invoice tables migration...');
 
       const mobileInvoiceSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-mobile-invoice-tables.sql'),
+        path.join(MIGRATIONS_DIR, 'add-mobile-invoice-tables.sql'),
         'utf8'
       );
 
@@ -967,7 +1147,7 @@ function runMobileInvoiceMigration(): void {
       logger.info('✅ Mobile invoice tables migration completed!');
     }
   } catch (error: any) {
-    logger.error('Mobile invoice migration error:', error.message);
+    throw new Error('Mobile invoice migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -982,7 +1162,7 @@ function runPerformanceIndexesMigration(): void {
       logger.info('Running performance indexes migration...');
 
       const indexSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-performance-indexes.sql'),
+        path.join(MIGRATIONS_DIR, 'add-performance-indexes.sql'),
         'utf8'
       );
 
@@ -991,7 +1171,7 @@ function runPerformanceIndexesMigration(): void {
       logger.info('✅ Performance indexes migration completed!');
     }
   } catch (error: any) {
-    logger.error('Performance indexes migration error:', error.message);
+    throw new Error('Performance indexes migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1006,7 +1186,7 @@ function runMissingIndexesMigration(): void {
       logger.info('Running missing indexes migration...');
 
       const indexSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-missing-indexes.sql'),
+        path.join(MIGRATIONS_DIR, 'add-missing-indexes.sql'),
         'utf8'
       );
 
@@ -1015,7 +1195,7 @@ function runMissingIndexesMigration(): void {
       logger.info('✅ Missing indexes migration completed!');
     }
   } catch (error: any) {
-    logger.error('Missing indexes migration error:', error.message);
+    throw new Error('Missing indexes migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1030,7 +1210,7 @@ function runMissingFKIndexesMigration(): void {
       logger.info('Running missing FK indexes migration...');
 
       const indexSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-missing-fk-indexes.sql'),
+        path.join(MIGRATIONS_DIR, 'add-missing-fk-indexes.sql'),
         'utf8'
       );
 
@@ -1039,7 +1219,7 @@ function runMissingFKIndexesMigration(): void {
       logger.info('✅ Missing FK indexes migration completed!');
     }
   } catch (error: any) {
-    logger.error('Missing FK indexes migration error:', error.message);
+    throw new Error('Missing FK indexes migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1055,7 +1235,7 @@ function runExpiryTrackingMigration(): void {
       logger.info('Running item expiry tracking migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-item-expiry-tracking.sql'),
+        path.join(MIGRATIONS_DIR, 'add-item-expiry-tracking.sql'),
         'utf8'
       );
 
@@ -1064,7 +1244,7 @@ function runExpiryTrackingMigration(): void {
       logger.info('✅ Item expiry tracking migration completed!');
     }
   } catch (error: any) {
-    logger.error('Expiry tracking migration error:', error.message);
+    throw new Error('Expiry tracking migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1077,62 +1257,94 @@ function runOverrideSaleMigration(): void {
     if (columnCheck.count === 0) {
       logger.info('Running override sale column migration...');
       const sql = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-override-sale-column.sql'),
+        path.join(MIGRATIONS_DIR, 'add-override-sale-column.sql'),
         'utf8'
       );
       db.exec(sql);
       logger.info('✅ Override sale column migration completed!');
     }
   } catch (error: any) {
-    logger.error('Override sale migration error:', error.message);
+    throw new Error('Override sale migration error:: ' + error.message, { cause: error });
   }
 }
 
-initializeDatabase();
-runExpensesMigration();
-runPurchasesMigration();
-runPurchaseSupplierPaymentMigration();
-runPurchaseReturnMigration();
-runPurchaseReturnsTablesMigration();
-runPurchaseReturnsBackfill();
-runProductionsMigration();
-runBOMMigration();
-runBOMItemsColumnMigration();
-runSalesMigration();
-runSupplierLedgerMigration();
-runActivityLogMigration();
-runSupplierPaymentMigration();
-runPaymentsPurchaseOrderIdMigration();
-runSupplierBalanceMigration();
-runRawMaterialsWarehouseMigration();
-runProductionInputsWarehouseMigration();
-runMobileInvoiceMigration();
-runPerformanceIndexesMigration();
-runMissingIndexesMigration();
-runMissingFKIndexesMigration();
-runProductionOverheadMigration();
-runProductionBOMIdMigration();
-runRolesPermissionsMigration();
-runStockAdjustmentFinancialMigration();
-runForecastsMigration();
-runMissingFKIndexesMigration();
-runBatchCostingMigration();
-runGLFoundationMigration();
-runSalaryPaymentsMigration();
-runCreditBalanceMigration();
-runEmployeesMigration();
-runPhysicalCountsMigration();
-runForecastEnhancementsMigration();
-runCustomReportsMigration();
-runExpiryTrackingMigration();
-runOverrideSaleMigration();
-runDashboardLayoutsMigration();
-runLooseItemMigration();
-runCashAccountsMigration();
-runOpeningBalancesMigration();
-runUserPreferencesMigration();
-runUnbatchedStockReconciliation();
-runOrphanedBatchCleanup();
+function runGLVoidAttributionMigration(): void {
+  // Adds journal_lines void attribution (voided_at/voided_by/void_reason)
+  // and subledger append-only columns (voided/reversed_by). Idempotent:
+  // guarded on the first new column; ALTER TABLE ADD COLUMN statements
+  // that would duplicate a column throw, so the whole block is skipped
+  // once applied.
+  try {
+    const hasVoidedAt = db.prepare(
+      `SELECT COUNT(*) as count FROM pragma_table_info('journal_lines') WHERE name='voided_at'`
+    ).get() as { count: number };
+
+    if (hasVoidedAt.count === 0) {
+      logger.info('Running GL void-attribution / append-only ledger migration...');
+      const sql = fs.readFileSync(
+        path.join(MIGRATIONS_DIR, 'add-gl-void-attribution.sql'),
+        'utf8'
+      );
+      db.exec(sql);
+      logger.info('✅ GL void-attribution migration completed!');
+    }
+  } catch (error: any) {
+    throw new Error('GL void-attribution migration error:: ' + error.message, { cause: error });
+  }
+}
+
+// Boot migration sequence - each entry recorded in schema_migrations.
+// Historical guards inside each runner make first-boot backfill safe:
+// already-applied work no-ops and gets registered without re-executing bodies.
+runLedgered('fn.initializeDatabase', initializeDatabase);
+runLedgered('fn.runExpensesMigration', runExpensesMigration);
+runLedgered('fn.runPurchasesMigration', runPurchasesMigration);
+runLedgered('fn.runPurchaseSupplierPaymentMigration', runPurchaseSupplierPaymentMigration);
+runLedgered('fn.runPurchaseReturnMigration', runPurchaseReturnMigration);
+runLedgered('fn.runPurchaseReturnsTablesMigration', runPurchaseReturnsTablesMigration);
+runLedgered('fn.runPurchaseReturnsBackfill', runPurchaseReturnsBackfill);
+runLedgered('fn.runProductionsMigration', runProductionsMigration);
+runLedgered('fn.runBOMMigration', runBOMMigration);
+runLedgered('fn.runBOMItemsColumnMigration', runBOMItemsColumnMigration);
+runLedgered('fn.runSalesMigration', runSalesMigration);
+runLedgered('fn.runSupplierLedgerMigration', runSupplierLedgerMigration);
+runLedgered('fn.runActivityLogMigration', runActivityLogMigration);
+runLedgered('fn.runSupplierPaymentMigration', runSupplierPaymentMigration);
+runLedgered('fn.runPaymentsPurchaseOrderIdMigration', runPaymentsPurchaseOrderIdMigration);
+runLedgered('fn.runSupplierBalanceMigration', runSupplierBalanceMigration);
+runLedgered('fn.runRawMaterialsWarehouseMigration', runRawMaterialsWarehouseMigration);
+runLedgered('fn.runProductionInputsWarehouseMigration', runProductionInputsWarehouseMigration);
+runLedgered('fn.runMobileInvoiceMigration', runMobileInvoiceMigration);
+runLedgered('fn.runPerformanceIndexesMigration', runPerformanceIndexesMigration);
+runLedgered('fn.runMissingIndexesMigration', runMissingIndexesMigration);
+runLedgered('fn.runMissingFKIndexesMigration', runMissingFKIndexesMigration);
+runLedgered('fn.runProductionOverheadMigration', runProductionOverheadMigration);
+runLedgered('fn.runProductionBOMIdMigration', runProductionBOMIdMigration);
+runLedgered('fn.runRolesPermissionsMigration', runRolesPermissionsMigration);
+runLedgered('fn.runStockAdjustmentFinancialMigration', runStockAdjustmentFinancialMigration);
+runLedgered('fn.runForecastsMigration', runForecastsMigration);
+runLedgered('fn.runBatchCostingMigration', runBatchCostingMigration);
+runLedgered('fn.runGLFoundationMigration', runGLFoundationMigration);
+runLedgered('fn.runSalaryPaymentsMigration', runSalaryPaymentsMigration);
+runLedgered('fn.runCreditBalanceMigration', runCreditBalanceMigration);
+runLedgered('fn.runEmployeesMigration', runEmployeesMigration);
+runLedgered('fn.runPhysicalCountsMigration', runPhysicalCountsMigration);
+runLedgered('fn.runForecastEnhancementsMigration', runForecastEnhancementsMigration);
+runLedgered('fn.runCustomReportsMigration', runCustomReportsMigration);
+runLedgered('fn.runExpiryTrackingMigration', runExpiryTrackingMigration);
+runLedgered('fn.runOverrideSaleMigration', runOverrideSaleMigration);
+runLedgered('fn.runDashboardLayoutsMigration', runDashboardLayoutsMigration);
+runLedgered('fn.runLooseItemMigration', runLooseItemMigration);
+runLedgered('fn.runCashAccountsMigration', runCashAccountsMigration);
+runLedgered('fn.runOpeningBalancesMigration', runOpeningBalancesMigration);
+runLedgered('fn.runUserPreferencesMigration', runUserPreferencesMigration);
+runLedgered('fn.runUnbatchedStockReconciliation', runUnbatchedStockReconciliation);
+runLedgered('fn.runOrphanedBatchCleanup', runOrphanedBatchCleanup);
+runLedgered('fn.runGLVoidAttributionMigration', runGLVoidAttributionMigration);
+// FK-off table rebuild must NOT sit inside another transaction
+runLedgered('fn.runPaymentsCustomerNullableRebuild', runPaymentsCustomerNullableRebuild, { noTxn: true });
+// stock_batches source_type widening — FK-off table rebuild
+runLedgered('fn.runBatchSourceTypeRebuild', runBatchSourceTypeRebuild, { noTxn: true });
 
 // Rollback support: run if --rollback flag is passed
 if (process.argv.includes('--rollback')) {
@@ -1158,7 +1370,7 @@ function runProductionBOMIdMigration(): void {
       logger.info('✅ Production bom_id migration completed!');
     }
   } catch (error: any) {
-    logger.error('Production bom_id migration error:', error.message);
+    throw new Error('Production bom_id migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1173,7 +1385,7 @@ function runProductionOverheadMigration(): void {
       logger.info('✅ Production overhead_cost migration completed!');
     }
   } catch (error: any) {
-    logger.error('Production overhead migration error:', error.message);
+    throw new Error('Production overhead migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1188,7 +1400,7 @@ function runRolesPermissionsMigration(): void {
       logger.info('Running roles and permissions migration...');
 
       const rolesPermissionsSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-roles-permissions.sql'),
+        path.join(MIGRATIONS_DIR, 'add-roles-permissions.sql'),
         'utf8'
       );
 
@@ -1200,7 +1412,7 @@ function runRolesPermissionsMigration(): void {
     // Always seed — backfills missing permissions for existing databases
     seedDefaultPermissions();
   } catch (error: any) {
-    logger.error('Roles and permissions migration error:', error.message);
+    throw new Error('Roles and permissions migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1379,7 +1591,7 @@ function seedDefaultPermissions(): void {
 
     logger.info('✅ Default permissions seeded successfully!');
   } catch (error: any) {
-    logger.error('Seed default permissions error:', error.message);
+    throw new Error('Seed default permissions error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1439,7 +1651,7 @@ function runStockAdjustmentFinancialMigration(): void {
       }
     }
   } catch (error: any) {
-    logger.error('Stock adjustment financial migration error:', error.message);
+    throw new Error('Stock adjustment financial migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1449,13 +1661,13 @@ function runGLFoundationMigration(): void {
   // schema and seed. The auto-open period is also handled in the SQL.
   try {
     const migrationSQL = fs.readFileSync(
-      path.join(__dirname, '../migrations/add-gl-foundation.sql'),
+      path.join(MIGRATIONS_DIR, 'add-gl-foundation.sql'),
       'utf8'
     );
     db.exec(migrationSQL);
     logger.info('✅ GL foundation migration applied (chart_of_accounts, journal_lines, accounting_periods)');
   } catch (error: any) {
-    logger.error('GL foundation migration error:', error.message);
+    throw new Error('GL foundation migration error:: ' + error.message, { cause: error });
   }
 
   // Add returned_amount column to invoices (idempotent – added in v3.1)
@@ -1468,7 +1680,7 @@ function runGLFoundationMigration(): void {
       logger.info('✅ returned_amount column added to invoices');
     }
   } catch (error: any) {
-    logger.error('returned_amount migration error:', error.message);
+    throw new Error('returned_amount migration error:: ' + error.message, { cause: error });
   }
 
   // Add return_fee column to invoices (idempotent — restocking fee tracking)
@@ -1481,7 +1693,7 @@ function runGLFoundationMigration(): void {
       logger.info('✅ return_fee column added to invoices');
     }
   } catch (error: any) {
-    logger.error('return_fee migration error:', error.message);
+    throw new Error('return_fee migration error:: ' + error.message, { cause: error });
   }
 
   // Add returned_qty column to invoice_items (per-item return tracking)
@@ -1494,7 +1706,7 @@ function runGLFoundationMigration(): void {
       logger.info('✅ returned_qty column added to invoice_items');
     }
   } catch (error: any) {
-    logger.error('returned_qty migration error:', error.message);
+    throw new Error('returned_qty migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1510,7 +1722,7 @@ function runBatchCostingMigration(): void {
       logger.info('Running batch costing migration...');
 
       const batchSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-batch-costing.sql'),
+        path.join(MIGRATIONS_DIR, 'add-batch-costing.sql'),
         'utf8'
       );
 
@@ -1556,7 +1768,7 @@ function runBatchCostingMigration(): void {
 
     logger.info('✅ Batch costing migration completed!');
   } catch (error: any) {
-    logger.error('Batch costing migration error:', error.message);
+    throw new Error('Batch costing migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1571,7 +1783,7 @@ function runCreditBalanceMigration(): void {
       logger.info('Running credit balance migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-credit-balance.sql'),
+        path.join(MIGRATIONS_DIR, 'add-credit-balance.sql'),
         'utf8'
       );
 
@@ -1580,7 +1792,7 @@ function runCreditBalanceMigration(): void {
       logger.info('✅ Credit balance column added to customers table!');
     }
   } catch (error: any) {
-    logger.error('Credit balance migration error:', error.message);
+    throw new Error('Credit balance migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1595,7 +1807,7 @@ function runForecastsMigration(): void {
       logger.info('Running demand forecasts migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-demand-forecasts.sql'),
+        path.join(MIGRATIONS_DIR, 'add-demand-forecasts.sql'),
         'utf8'
       );
 
@@ -1604,7 +1816,7 @@ function runForecastsMigration(): void {
       logger.info('✅ Demand forecasts migration completed!');
     }
   } catch (error: any) {
-    logger.error('Demand forecasts migration error:', error.message);
+    throw new Error('Demand forecasts migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1619,7 +1831,7 @@ function runEmployeesMigration(): void {
       logger.info('Running employees migration...');
 
       const employeesSQL = fs.readFileSync(
-        path.join(__dirname, '../../migrations/add-employees-table.sql'),
+        path.join(MIGRATIONS_DIR, 'add-employees-table.sql'),
         'utf8'
       );
 
@@ -1628,7 +1840,7 @@ function runEmployeesMigration(): void {
       logger.info('✅ Employees migration completed!');
     }
   } catch (error: any) {
-    logger.error('Employees migration error:', error.message);
+    throw new Error('Employees migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1643,7 +1855,7 @@ function runSalaryPaymentsMigration(): void {
       logger.info('Running salary payments migration...');
 
       const salarySQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-salary-payments.sql'),
+        path.join(MIGRATIONS_DIR, 'add-salary-payments.sql'),
         'utf8'
       );
 
@@ -1652,7 +1864,7 @@ function runSalaryPaymentsMigration(): void {
       logger.info('✅ Salary payments migration completed!');
     }
   } catch (error: any) {
-    logger.error('Salary payments migration error:', error.message);
+    throw new Error('Salary payments migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1667,7 +1879,7 @@ function runPhysicalCountsMigration(): void {
       logger.info('Running physical counts migration...');
 
       const physicalCountsSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-physical-counts.sql'),
+        path.join(MIGRATIONS_DIR, 'add-physical-counts.sql'),
         'utf8'
       );
 
@@ -1676,7 +1888,7 @@ function runPhysicalCountsMigration(): void {
       logger.info('✅ Physical counts migration completed!');
     }
   } catch (error: any) {
-    logger.error('Physical counts migration error:', error.message);
+    throw new Error('Physical counts migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1691,7 +1903,7 @@ function runCustomReportsMigration(): void {
       logger.info('Running custom reports migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-custom-reports.sql'),
+        path.join(MIGRATIONS_DIR, 'add-custom-reports.sql'),
         'utf8'
       );
 
@@ -1703,7 +1915,7 @@ function runCustomReportsMigration(): void {
       seedReportTemplates();
     }
   } catch (error: any) {
-    logger.error('Custom reports migration error:', error.message);
+    throw new Error('Custom reports migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1817,7 +2029,7 @@ function seedReportTemplates(): void {
 
     logger.info('✅ Report templates seeded!');
   } catch (error: any) {
-    logger.error('Seed report templates error:', error.message);
+    throw new Error('Seed report templates error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1833,7 +2045,7 @@ function runForecastEnhancementsMigration(): void {
       logger.info('Running forecast enhancements migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/enhance-forecasts.sql'),
+        path.join(MIGRATIONS_DIR, 'enhance-forecasts.sql'),
         'utf8'
       );
 
@@ -1842,7 +2054,7 @@ function runForecastEnhancementsMigration(): void {
       logger.info('✅ Forecast enhancements migration completed!');
     }
   } catch (error: any) {
-    logger.error('Forecast enhancements migration error:', error.message);
+    throw new Error('Forecast enhancements migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1857,7 +2069,7 @@ function runDashboardLayoutsMigration(): void {
       logger.info('Running dashboard layouts migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/dashboard-layouts.sql'),
+        path.join(MIGRATIONS_DIR, 'dashboard-layouts.sql'),
         'utf8'
       );
 
@@ -1866,7 +2078,7 @@ function runDashboardLayoutsMigration(): void {
       logger.info('✅ Dashboard layouts migration completed!');
     }
   } catch (error: any) {
-    logger.error('Dashboard layouts migration error:', error.message);
+    throw new Error('Dashboard layouts migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1876,13 +2088,13 @@ function runCashAccountsMigration(): void {
   // migration — no column/table pre-check needed.
   try {
     const migrationSQL = fs.readFileSync(
-      path.join(__dirname, '../migrations/add-cash-accounts.sql'),
+      path.join(MIGRATIONS_DIR, 'add-cash-accounts.sql'),
       'utf8'
     );
     db.exec(migrationSQL);
     logger.info('✅ Cash accounts migration applied (Easypaisa/JazzCash/UPaisa accounts + cash_reconciliations)');
   } catch (error: any) {
-    logger.error('Cash accounts migration error:', error.message);
+    throw new Error('Cash accounts migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1891,13 +2103,13 @@ function runOpeningBalancesMigration(): void {
   // server start so the seed rows exist before any cash computation.
   try {
     const migrationSQL = fs.readFileSync(
-      path.join(__dirname, '../migrations/add-opening-balances.sql'),
+      path.join(MIGRATIONS_DIR, 'add-opening-balances.sql'),
       'utf8'
     );
     db.exec(migrationSQL);
     logger.info('✅ Opening balances migration applied (per-account seed balances)');
   } catch (error: any) {
-    logger.error('Opening balances migration error:', error.message);
+    throw new Error('Opening balances migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -1912,7 +2124,7 @@ function runLooseItemMigration(): void {
       logger.info('Running loose item support migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-loose-item-support.sql'),
+        path.join(MIGRATIONS_DIR, 'add-loose-item-support.sql'),
         'utf8'
       );
 
@@ -1921,7 +2133,7 @@ function runLooseItemMigration(): void {
       logger.info('✅ Loose item support migration completed!');
     }
   } catch (error: any) {
-    logger.error('Loose item support migration error:', error.message);
+    throw new Error('Loose item support migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -2006,7 +2218,7 @@ function runUnbatchedStockReconciliation(): void {
       logger.info(`✅ Unbatched stock reconciliation: created ${created} batch row(s)`);
     }
   } catch (error: any) {
-    logger.error('Unbatched stock reconciliation error:', error.message);
+    throw new Error('Unbatched stock reconciliation error:: ' + error.message, { cause: error });
   }
 }
 
@@ -2023,7 +2235,7 @@ function runUserPreferencesMigration(): void {
       logger.info('Running user preferences migration...');
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/add-user-preferences.sql'),
+        path.join(MIGRATIONS_DIR, 'add-user-preferences.sql'),
         'utf8'
       );
 
@@ -2032,7 +2244,7 @@ function runUserPreferencesMigration(): void {
       logger.info('✅ User preferences migration completed!');
     }
   } catch (error: any) {
-    logger.error('User preferences migration error:', error.message);
+    throw new Error('User preferences migration error:: ' + error.message, { cause: error });
   }
 }
 
@@ -2054,7 +2266,7 @@ function runOrphanedBatchCleanup(): void {
       logger.info(`Running orphaned batch cleanup (${orphanedCheck.count} orphaned row(s))...`);
 
       const migrationSQL = fs.readFileSync(
-        path.join(__dirname, '../migrations/cleanup-orphaned-stock-batches.sql'),
+        path.join(MIGRATIONS_DIR, 'cleanup-orphaned-stock-batches.sql'),
         'utf8'
       );
 
@@ -2063,12 +2275,12 @@ function runOrphanedBatchCleanup(): void {
       logger.info('✅ Orphaned batch cleanup completed!');
     }
   } catch (error: any) {
-    logger.error('Orphaned batch cleanup error:', error.message);
+    throw new Error('Orphaned batch cleanup error:: ' + error.message, { cause: error });
   }
 }
 
 function runRollback(migrationName: string): void {
-  const rollbackFile = path.join(__dirname, '../migrations/rollbacks/rollback-' + migrationName + '.sql');
+  const rollbackFile = path.join(MIGRATIONS_DIR, 'rollbacks/rollback-' + migrationName + '.sql');
   if (!fs.existsSync(rollbackFile)) {
     logger.error(`Rollback file not found: ${rollbackFile}`);
     process.exit(1);
@@ -2085,7 +2297,7 @@ function runRollback(migrationName: string): void {
 }
 
 function runRollbackAll(): void {
-  const rollbacksDir = path.join(__dirname, '../migrations/rollbacks');
+  const rollbacksDir = path.join(MIGRATIONS_DIR, 'rollbacks');
   if (!fs.existsSync(rollbacksDir)) {
     logger.error('Rollbacks directory not found');
     process.exit(1);

@@ -77,7 +77,6 @@ function initializeDatabase() {
         logger_1.default.info('✅ Database schema created successfully!');
         createDefaultUser();
         createDefaultWarehouse();
-        seedDemoData();
         logger_1.default.info('✅ Database initialization complete!');
     }
     else {
@@ -116,46 +115,6 @@ function createDefaultWarehouse() {
     `);
         stmt.run('WH-001', 'Main Warehouse', 'Default Location', 1);
         logger_1.default.info('✅ Default warehouse created (WH-001)');
-    }
-}
-// Seed a minimal demo dataset on a freshly created database so a new
-// install has something to work with out of the box.
-function seedDemoData() {
-    try {
-        const admin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
-        // Walk-in customer (default cash/POS customer)
-        const existingCustomer = db.prepare('SELECT id FROM customers WHERE customer_code = ?').get('WALKIN');
-        if (!existingCustomer) {
-            db.prepare(`
-        INSERT INTO customers (customer_code, customer_name, is_active)
-        VALUES (?, ?, ?)
-      `).run('WALKIN', 'Walkin Customer', 1);
-            logger_1.default.info('✅ Demo customer created (Walkin Customer)');
-        }
-        // Demo supplier
-        const existingSupplier = db.prepare('SELECT id FROM suppliers WHERE supplier_code = ?').get('DEMO-SUP');
-        if (!existingSupplier) {
-            db.prepare(`
-        INSERT INTO suppliers (supplier_code, supplier_name, is_active)
-        VALUES (?, ?, ?)
-      `).run('DEMO-SUP', 'Demo supplier', 1);
-            logger_1.default.info('✅ Demo supplier created (Demo supplier)');
-        }
-        // Demonstration product
-        const existingItem = db.prepare('SELECT id FROM items WHERE item_code = ?').get('WIDGET-A');
-        if (!existingItem) {
-            db.prepare(`
-        INSERT INTO items (
-          item_code, item_name, category, unit_of_measure,
-          standard_cost, standard_selling_price,
-          is_purchased, is_finished_good, is_active, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run('WIDGET-A', 'Widget A', 'General', 'Nos', 0, 0, 1, 1, 1, admin?.id ?? null);
-            logger_1.default.info('✅ Demo product created (Widget A)');
-        }
-    }
-    catch (error) {
-        logger_1.default.error('Demo seed data error:', error.message);
     }
 }
 function runInvoiceMigration() {
@@ -753,6 +712,23 @@ function runSupplierPaymentMigration() {
         logger_1.default.error('Supplier payment migration error:', error.message);
     }
 }
+function runPaymentsPurchaseOrderIdMigration() {
+    try {
+        const columnCheck = db.prepare(`
+      SELECT COUNT(*) as count FROM pragma_table_info('payments')
+      WHERE name='purchase_order_id'
+    `).get();
+        if (columnCheck.count === 0) {
+            logger_1.default.info('Running payments purchase_order_id migration...');
+            const sql = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-payments-purchase-order-id.sql'), 'utf8');
+            db.exec(sql);
+            logger_1.default.info('✅ Payments purchase_order_id migration completed!');
+        }
+    }
+    catch (error) {
+        logger_1.default.error('Payments purchase_order_id migration error:', error.message);
+    }
+}
 function runSupplierBalanceMigration() {
     try {
         const columnCheck = db.prepare(`
@@ -900,6 +876,39 @@ function runExpiryTrackingMigration() {
         logger_1.default.error('Expiry tracking migration error:', error.message);
     }
 }
+function runOverrideSaleMigration() {
+    try {
+        const columnCheck = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('invoices') WHERE name='override_sale'`).get();
+        if (columnCheck.count === 0) {
+            logger_1.default.info('Running override sale column migration...');
+            const sql = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-override-sale-column.sql'), 'utf8');
+            db.exec(sql);
+            logger_1.default.info('✅ Override sale column migration completed!');
+        }
+    }
+    catch (error) {
+        logger_1.default.error('Override sale migration error:', error.message);
+    }
+}
+function runGLVoidAttributionMigration() {
+    // Adds journal_lines void attribution (voided_at/voided_by/void_reason)
+    // and subledger append-only columns (voided/reversed_by). Idempotent:
+    // guarded on the first new column; ALTER TABLE ADD COLUMN statements
+    // that would duplicate a column throw, so the whole block is skipped
+    // once applied.
+    try {
+        const hasVoidedAt = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('journal_lines') WHERE name='voided_at'`).get();
+        if (hasVoidedAt.count === 0) {
+            logger_1.default.info('Running GL void-attribution / append-only ledger migration...');
+            const sql = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-gl-void-attribution.sql'), 'utf8');
+            db.exec(sql);
+            logger_1.default.info('✅ GL void-attribution migration completed!');
+        }
+    }
+    catch (error) {
+        logger_1.default.error('GL void-attribution migration error:', error.message);
+    }
+}
 initializeDatabase();
 runExpensesMigration();
 runPurchasesMigration();
@@ -914,6 +923,7 @@ runSalesMigration();
 runSupplierLedgerMigration();
 runActivityLogMigration();
 runSupplierPaymentMigration();
+runPaymentsPurchaseOrderIdMigration();
 runSupplierBalanceMigration();
 runRawMaterialsWarehouseMigration();
 runProductionInputsWarehouseMigration();
@@ -936,6 +946,7 @@ runPhysicalCountsMigration();
 runForecastEnhancementsMigration();
 runCustomReportsMigration();
 runExpiryTrackingMigration();
+runOverrideSaleMigration();
 runDashboardLayoutsMigration();
 runLooseItemMigration();
 runCashAccountsMigration();
@@ -943,6 +954,7 @@ runOpeningBalancesMigration();
 runUserPreferencesMigration();
 runUnbatchedStockReconciliation();
 runOrphanedBatchCleanup();
+runGLVoidAttributionMigration();
 // Rollback support: run if --rollback flag is passed
 if (process.argv.includes('--rollback')) {
     const targetMigration = process.argv.find(arg => arg.startsWith('--rollback='));

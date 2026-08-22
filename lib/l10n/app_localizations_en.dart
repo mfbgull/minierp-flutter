@@ -5321,6 +5321,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get expiryReport => 'Expiry Report';
 
   @override
+  String expiryReportPagination(
+    Object currentPage,
+    Object totalPages,
+    Object totalRows,
+  ) {
+    return '$totalRows rows • Page $currentPage of $totalPages';
+  }
+
+  @override
+  String get expiryReportFirstPage => 'First page';
+
+  @override
+  String get expiryReportPreviousPage => 'Previous page';
+
+  @override
+  String get expiryReportNextPage => 'Next page';
+
+  @override
+  String get expiryReportLastPage => 'Last page';
+
+  @override
   String get expiryAlerts => 'Expiry Alerts';
 
   @override

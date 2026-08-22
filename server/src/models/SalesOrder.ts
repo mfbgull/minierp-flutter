@@ -3,6 +3,9 @@ import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, SALES_ORDER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { QuotationWithWarehouse, InvoiceWithUsername } from '../types';
 import InvoiceModel from './Invoice';
+import ledgerUtils from '../utils/ledgerUtils';
+import AccountingService from '../services/accountingService';
+import { parseCurrency } from '../utils/currency';
 
 export interface SalesOrder {
   id: number;
@@ -765,6 +768,36 @@ class SalesOrderModel {
         `).run(id, item.item_id);
       }
 
+      // ACC-07: the converted invoice previously appeared in NO subledger
+      // and NO journal. Add the customer_ledger row and the standard GL
+      // trio so statements, aging, and the trial balance all see it.
+      ledgerUtils.createLedgerEntry(salesOrder.customer_id, invoiceDate, 'INVOICE', invoiceNo, salesOrder.total_amount, 0, `Invoice ${invoiceNo} from SO ${salesOrder.so_no}`);
+
+      const cogsRows = db.prepare(`
+        SELECT quantity * unit_cost AS line_cogs FROM stock_movements
+        WHERE reference_doctype = 'Invoice' AND reference_docno = ?
+          AND movement_type = 'SALE'
+      `).all(invoiceNo) as Array<{ line_cogs: number }>;
+      const cogsTotal = cogsRows.reduce((s, r) => s + Math.abs(Number(r.line_cogs)), 0);
+
+      AccountingService.postInvoiceEntry(db, {
+        invoiceId,
+        invoiceNo,
+        totalAmount: salesOrder.total_amount,
+        invoiceDate,
+        userId,
+      });
+
+      if (cogsTotal > 0) {
+        AccountingService.postCOGSEntry(db, {
+          invoiceId,
+          invoiceNo,
+          cogsAmount: parseCurrency(cogsTotal),
+          invoiceDate,
+          userId,
+        });
+      }
+
       // Log activity
       db.prepare(`
         INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
@@ -776,7 +809,6 @@ class SalesOrderModel {
         invoiceId,
         `Created invoice ${invoiceNo} from sales order ${salesOrder.so_no}`
       );
-
       db.prepare(`
         INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
         VALUES (?, ?, ?, ?, ?)

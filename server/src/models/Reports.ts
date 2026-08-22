@@ -1206,6 +1206,107 @@ function getExpenseReport(startDate: string, endDate: string, category?: string,
   return { summary: { totalAmount, totalExpenses, averageAmount }, expenses, categoryBreakdown };
 }
 
+/**
+ * GL reconciliation report (ACC-10 short-term, design D8).
+ * Per account pairing: the GL balance from journal_lines alongside its
+ * operational derivation, plus the delta. Read-only; mutates nothing.
+ *
+ *   Inventory (1200)  ← stock_batches cost value (+ legacy item stock)
+ *   AR (1100)         ← Σ open-invoice balance_amount
+ *   AP (2000)         ← Σ latest supplier_ledger running balance
+ *   Cash family       ← payment sums per method + opening balances
+ */
+function getGLReconciliation(asOfDate: string, db: Database.Database) {
+  const acctId = (code: string): number | undefined =>
+    (db.prepare('SELECT id FROM chart_of_accounts WHERE code = ?').get(code) as { id: number } | undefined)?.id;
+
+  const glBalance = (code: string): number => {
+    const id = acctId(code);
+    return id ? AccountingService.getAccountBalance(db, id, asOfDate).balance : 0;
+  };
+
+  const round = (v: number): number => Number(Math.round(Number(v + 'e+2')) + 'e-2');
+
+  const rows: Array<{ pairing: string; account_code: string; gl_balance: number; operational_balance: number; delta: number }> = [];
+
+  // --- Inventory: GL 1200 vs stock_batches cost value ---------------------
+  const batchValue = db.prepare(`
+    SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) as v
+    FROM stock_batches WHERE quantity_remaining > 0
+  `).get() as { v: number };
+  const legacyValue = db.prepare(`
+    SELECT COALESCE(SUM(i.current_stock * i.standard_cost), 0) as v
+    FROM items i
+    WHERE i.is_active = 1 AND i.current_stock > 0
+      AND NOT EXISTS (SELECT 1 FROM stock_batches sb WHERE sb.item_id = i.id AND sb.quantity_remaining > 0)
+  `).get() as { v: number };
+  const inventoryOp = round(batchValue.v + legacyValue.v);
+  rows.push({
+    pairing: 'Inventory',
+    account_code: '1200',
+    gl_balance: round(glBalance('1200')),
+    operational_balance: inventoryOp,
+    delta: round(glBalance('1200') - inventoryOp),
+  });
+
+  // --- AR: GL 1100 vs open invoice balances --------------------------------
+  const arOpRow = db.prepare(`
+    SELECT COALESCE(SUM(balance_amount), 0) as total FROM invoices
+    WHERE status IN ('Unpaid', 'Partially Paid', 'Overdue', 'Sent')
+      AND balance_amount > 0
+      AND invoice_date <= ?
+  `).get(asOfDate) as { total: number };
+  const arOp = round(arOpRow.total);
+  rows.push({
+    pairing: 'Accounts Receivable',
+    account_code: '1100',
+    gl_balance: round(glBalance('1100')),
+    operational_balance: arOp,
+    delta: round(glBalance('1100') - arOp),
+  });
+
+  // --- AP: GL 2000 vs latest supplier_ledger positions ----------------------
+  const apOpRow = db.prepare(`
+    SELECT COALESCE(SUM(balance), 0) as total FROM (
+      SELECT sl1.supplier_id, sl1.balance
+      FROM supplier_ledger sl1
+      WHERE sl1.voided = 0
+        AND sl1.id = (
+          SELECT MAX(sl2.id) FROM supplier_ledger sl2
+          WHERE sl2.supplier_id = sl1.supplier_id AND sl2.voided = 0
+        )
+    ) WHERE balance > 0
+  `).get() as { total: number };
+  const apOp = round(apOpRow.total);
+  rows.push({
+    pairing: 'Accounts Payable',
+    account_code: '2000',
+    gl_balance: round(glBalance('2000')),
+    operational_balance: apOp,
+    delta: round(glBalance('2000') - apOp),
+  });
+
+  // --- Cash family: GL cash accounts vs opening balances + payment flows ---
+  for (const account of CASH_ACCOUNTS) {
+    // Operational derivation mirrors getCashAccountTotals:
+    // opening seed + cumulative inflows − cumulative outflows.
+    const totals = getCashAccountTotals(db, asOfDate).find(t => t.key === account.key);
+    const opBalance = totals ? round(totals.closing) : 0;
+    const glCode = ({ cash: '1000', bank: '1010', easypaisa: '1020', jazzcash: '1030', upaisa: '1040' } as Record<string, string>)[account.key] ?? null;
+    const gl = glCode ? round(glBalance(glCode)) : 0;
+    if (!glCode) continue;
+    rows.push({
+      pairing: `Cash (${account.name})`,
+      account_code: glCode,
+      gl_balance: gl,
+      operational_balance: opBalance,
+      delta: round(gl - opBalance),
+    });
+  }
+
+  return { as_of_date: asOfDate, pairings: rows };
+}
+
 export default {
   getARAgingReport, getAPAgingReport, getCustomerStatements, getTopDebtors, getDSOMetric,
   getReceivablesSummary, getSalesSummary, getSalesByCustomer, getSalesByItem,
@@ -1216,4 +1317,5 @@ export default {
   getPurchaseSummary, getProductionEfficiency, getBOMUsage, getBOMUsageReport, getCustomerOutstanding,
   getSupplierOutstanding, getExpenseReport,
   getCashReconciliation, saveCashReconciliation,
+  getGLReconciliation,
 };

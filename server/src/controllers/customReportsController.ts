@@ -9,6 +9,7 @@ import CustomReport from '../models/CustomReport';
 import { getAllEntities, getEntity } from '../services/entityRegistry';
 import { executeReport } from '../services/reportQueryEngine';
 import type { ReportConfig } from '../services/reportQueryEngine';
+import { validateConfigExpressions, ExpressionValidationError } from '../services/expressionValidator';
 import logger from '../utils/logger';
 
 // ── Config Validation ────────────────────────────────────────
@@ -83,6 +84,22 @@ function validateReportConfig(config: any): ValidationError[] {
       const f = config.filters[i];
       if (f.field && !validFields.has(f.field)) {
         errors.push({ field: `filters[${i}].field`, message: `Filter field "${f.field}" not found on entity "${config.entity}"` });
+      }
+    }
+  }
+  // REP-18: computed-column expressions must pass the safe-grammar
+  // validator before a config may be stored.
+  if (Array.isArray(config.computedColumns)) {
+    try {
+      validateConfigExpressions(config, validFields);
+    } catch (error) {
+      if (error instanceof ExpressionValidationError) {
+        errors.push({
+          field: 'computedColumns',
+          message: `Invalid expression: ${error.message}`,
+        });
+      } else {
+        throw error;
       }
     }
   }
@@ -309,9 +326,16 @@ function runReport(req: AuthRequest, res: Response): void {
       success: true,
       data: result,
     });
-  } catch (error: any) {
-    logger.error('Run report error:', error.message);
-    res.status(400).json({ error: error.message });
+  } catch (error: unknown) {
+    // REP-18: unsafe computed-column expressions surface as a 400 naming
+    // the offending token — identical for stored and inline configs.
+    if (error instanceof ExpressionValidationError) {
+      res.status(400).json({ error: `Invalid report config: ${error.message}` });
+      return;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('Run report error:', message);
+    res.status(400).json({ error: message });
   }
 }
 
@@ -371,6 +395,18 @@ function createTemplate(req: AuthRequest, res: Response): void {
       return;
     }
 
+    // REP-18: template configs are executed later — expressions must pass
+    // the safe-grammar validator before storage.
+    try {
+      validateConfigExpressions(config, entityFieldNames(config.entity));
+    } catch (error) {
+      if (error instanceof ExpressionValidationError) {
+        res.status(400).json({ error: `Invalid template config: ${error.message}` });
+        return;
+      }
+      throw error;
+    }
+
     const template = CustomReport.createTemplate({
       name: name.trim(),
       description: description || undefined,
@@ -379,10 +415,23 @@ function createTemplate(req: AuthRequest, res: Response): void {
 
     const parsed = { ...template, config: JSON.parse(template.config) };
     res.status(201).json({ success: true, data: parsed });
-  } catch (error: any) {
-    logger.error('Create template error:', error.message);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to create template';
+    logger.error('Create template error:', message);
     res.status(500).json({ error: 'Failed to create template' });
   }
+}
+
+/**
+ * Field-name scope for expression validation: every field of the config's
+ * entity. Computed-column names are added inside the validator.
+ */
+function entityFieldNames(entityKey: unknown): Set<string> {
+  const entity = typeof entityKey === 'string' ? getEntity(entityKey) : undefined;
+  if (!entity) {
+    return new Set();
+  }
+  return new Set(entity.fields.map((f: { name: string }) => f.name));
 }
 
 /**

@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const currency_1 = require("../utils/currency");
+const ledgerUtils_1 = __importDefault(require("../utils/ledgerUtils"));
 const sequence_1 = require("../utils/sequence");
 const sqlSanitizer_1 = require("../utils/sqlSanitizer");
 const logger_1 = __importDefault(require("../utils/logger"));
@@ -49,7 +50,7 @@ class InvoiceModel {
      * @param consumptions - Array of { itemId, consumption[] } per line item
      * @param db - Database connection
      */
-    static denormalizeExpiryInfo(invoiceId, consumptions, db) {
+    static denormalizeExpiryInfo(invoiceId, consumptions, db, expiryOverrides) {
         const today = new Date().toISOString().split('T')[0];
         const expiryNotes = [];
         for (const { itemId, consumption } of consumptions) {
@@ -62,14 +63,21 @@ class InvoiceModel {
             if (batchIds.length === 0)
                 continue;
             const batches = db.prepare(`SELECT id, expiry_date FROM stock_batches WHERE id IN (${batchIds.map(() => '?').join(',')})`).all(...batchIds);
-            // Find the earliest expiry date across consumed batches
-            const expiryDates = batches
-                .filter(b => b.expiry_date)
-                .map(b => b.expiry_date)
-                .sort();
-            if (expiryDates.length === 0)
+            // Merge DB expiry dates with frontend override dates.
+            // Overrides provide the *original* expiry_date that was temporarily
+            // cleared before posting to unblock FEFO consumption.
+            const effectiveDates = [];
+            for (const b of batches) {
+                const overrideDate = expiryOverrides?.[b.id];
+                const date = b.expiry_date ?? overrideDate ?? null;
+                if (date)
+                    effectiveDates.push(date);
+            }
+            if (effectiveDates.length === 0)
                 continue;
-            const earliestExpiry = expiryDates[0];
+            // Find the earliest expiry date across consumed batches
+            effectiveDates.sort();
+            const earliestExpiry = effectiveDates[0];
             const isExpired = earliestExpiry < today;
             // Get item name for the note
             const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId);
@@ -460,17 +468,20 @@ class InvoiceModel {
         invoice_no, customer_id, invoice_date, due_date, status,
         total_amount, paid_amount, balance_amount, notes,
         discount_scope, discount_type, discount_value, terms, created_by,
-        source_type
+        source_type, override_sale
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(data.invoice_no || null, data.customer_id, data.invoice_date, data.due_date || null, data.status || 'Unpaid', totalAmount, paidAmount, balanceAmount, data.notes || null, data.discount_scope || 'invoice', data.discount_type || 'percentage', data.discount_value || 0, data.terms || null, userId, data.source_type || null);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(data.invoice_no || null, data.customer_id, data.invoice_date, data.due_date || null, data.status || 'Unpaid', totalAmount, paidAmount, balanceAmount, data.notes || null, data.discount_scope || 'invoice', data.discount_type || 'percentage', data.discount_value || 0, data.terms || null, userId, data.source_type || null, data.override_sale || 0);
         return result.lastInsertRowid;
     }
     /**
      * Create a new invoice item
      */
     static createInvoiceItem(db, invoiceId, item) {
-        const amount = (0, currency_1.multiplyCurrency)(item.quantity, item.unit_price);
+        // ACC-18 interim: the stored amount is always the server-computed
+        // line total — round(qty × price − discount) with tax applied at the
+        // line boundary. Client-supplied amounts are never trusted.
+        const amount = (0, currency_1.computeLineAmount)(item);
         db.prepare(`
       INSERT INTO invoice_items (
         invoice_id, item_id, quantity, unit_price, amount,
@@ -503,13 +514,15 @@ class InvoiceModel {
     }
     /**
      * Create a ledger entry
+     * ACC-12: transactionDate is the caller's document date; the running
+     * balance chains in (transaction_date, id) order over non-voided rows.
      */
-    static createLedgerEntry(db, customerId, type, referenceNo, debit, credit, description) {
+    static createLedgerEntry(db, customerId, type, referenceNo, transactionDate, debit, credit, description) {
         // Calculate running balance from last entry for this customer
         const lastBalanceResult = db.prepare(`
       SELECT balance FROM customer_ledger
-      WHERE customer_id = ?
-      ORDER BY id DESC
+      WHERE customer_id = ? AND voided = 0
+      ORDER BY transaction_date DESC, id DESC
       LIMIT 1
     `).get(customerId);
         const lastBalance = (0, currency_1.parseCurrency)(lastBalanceResult?.balance);
@@ -521,14 +534,8 @@ class InvoiceModel {
         customer_id, transaction_date, transaction_type, reference_no,
         debit, credit, balance, description
       )
-      VALUES (?, DATE('now'), ?, ?, ?, ?, ?, ?)
-    `).run(customerId, type, referenceNo, safeDebit, safeCredit, newBalance, description);
-    }
-    /**
-     * Update customer balance
-     */
-    static updateCustomerBalance(db, customerId) {
-        // Balance is recalculated from ledger entries — no action needed here
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(customerId, transactionDate, type, referenceNo, safeDebit, safeCredit, newBalance, description);
     }
     /**
      * Get total paid for an invoice
@@ -574,10 +581,19 @@ class InvoiceModel {
         db.prepare(`DELETE FROM invoice_items WHERE invoice_id = ?`).run(invoiceId);
     }
     /**
-     * Delete customer ledger entry by reference
+     * Reverse customer ledger entries matching a document reference.
+     * ACC-20: scoped to the owning customer so a colliding reference_no
+     * cannot touch another party's rows.
      */
-    static deleteLedgerEntryByReference(db, referenceNo) {
-        db.prepare(`DELETE FROM customer_ledger WHERE reference_no = ?`).run(referenceNo);
+    static deleteLedgerEntryByReference(db, referenceNo, customerId) {
+        // ACC-14: ledgers are append-only. Reverse matching rows instead of
+        // deleting them so the audit trail survives. Scoped to INVOICE-type
+        // rows (invoice_no is UNIQUE, but the reference column also carries
+        // CANCELLATION/PAYMENT references for other customers).
+        const rows = db.prepare(`SELECT id FROM customer_ledger WHERE reference_no = ? AND voided = 0 AND transaction_type = 'INVOICE' AND customer_id = ?`).all(referenceNo, customerId);
+        for (const row of rows) {
+            ledgerUtils_1.default.reverseLedgerEntry('customer_ledger', row.id, `document ${referenceNo} updated/deleted`);
+        }
     }
     /**
      * Delete payment allocations by invoice ID
@@ -678,12 +694,11 @@ class InvoiceModel {
     `).get(id);
     }
     static getItems(invoiceId, db) {
-        return db.prepare(`
-      SELECT ii.id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount, ii.tax_rate,
-             ii.discount_type, ii.discount_value, item.item_name, item.item_code
+        return db.prepare(`SELECT ii.id, ii.item_id, ii.quantity, ii.returned_qty, ii.unit_price, ii.amount, ii.tax_rate,
+             ii.discount_type, ii.discount_value, ii.expiry_date, ii.is_expired_at_sale,
+             item.item_name, item.item_code
       FROM invoice_items ii LEFT JOIN items item ON ii.item_id = item.id
-      WHERE ii.invoice_id = ?
-    `).all(invoiceId);
+      WHERE ii.invoice_id = ?`).all(invoiceId);
     }
     static getPayments(invoiceId, db) {
         return db.prepare(`

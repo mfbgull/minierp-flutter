@@ -128,9 +128,13 @@ CalcItemLineResult calcItemLine(CalcItemLineInput input) {
     return (quantity: quantity, amount: _round2(quantity * rate), error: null);
   }
 
-  final step = (input.roundingStep != null && input.roundingStep! > 0)
+  var step = (input.roundingStep != null && input.roundingStep! > 0)
       ? input.roundingStep!
       : math.pow(10, -(input.qtyDecimalPrecision ?? 0)).toDouble();
+  // Loose items must support fractional quantities — when the
+  // configured precision is 0 (whole units only) fall back to 0.001
+  // so that amount→qty derivation produces meaningful results.
+  if (step >= 1) step = 0.001;
 
   // Which field is authoritative for this edit (flip model, spec §5.2)?
   // - Editing the amount → derive qty (amount ÷ rate).

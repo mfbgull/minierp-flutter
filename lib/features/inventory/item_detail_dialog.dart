@@ -18,6 +18,8 @@ import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
+import '../../widgets/app_toast.dart';
+import '../../widgets/confirm_dialog.dart';
 import 'inventory_providers.dart';
 import 'item_form_dialog.dart';
 import 'stock_ledger_dialog.dart';
@@ -60,13 +62,13 @@ class _ItemDetailDialog extends ConsumerWidget {
   }
 }
 
-class _DetailBody extends StatelessWidget {
+class _DetailBody extends ConsumerWidget {
   const _DetailBody({required this.detail});
 
   final ItemDetail detail;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final item = detail.item;
 
@@ -211,8 +213,16 @@ class _DetailBody extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              TextButton.icon(
+                onPressed: () => _deleteItem(context, ref, detail.item),
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: Text(l10n.commonDelete),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                ),
+              ),
+              const Spacer(),
               TextButton.icon(
                 onPressed: () => showStockLedgerDialog(
                   context,
@@ -261,6 +271,31 @@ class _DetailBody extends StatelessWidget {
       item.isFinishedGood ||
       item.isPurchased ||
       item.isManufactured;
+
+  static Future<void> _deleteItem(BuildContext context, WidgetRef ref, Item item) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonDelete,
+      message: '${l10n.inventoryConfirmdelete} ${item.itemName}?',
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !context.mounted) return;
+
+    final result = await ref
+        .read(inventoryRepositoryProvider)
+        .delete(item.id);
+    if (!context.mounted) return;
+    result.fold(
+      onSuccess: (_) {
+        Navigator.of(context).pop();
+        showAppToast(context, l10n.inventoryItemdeleted);
+      },
+      onFailure: (err) => showAppToast(context, err.message, isError: true),
+    );
+  }
 
   static Widget _flagChip(BuildContext context, String label) {
     final scheme = Theme.of(context).colorScheme;

@@ -334,13 +334,17 @@ class CustomerModel {
     return customers.map(c => c.id);
   }
 
+  /**
+   * ACC-13: current_balance is the ledger sum over non-voided rows,
+   * written only by the single authoritative writer.
+   */
   static recalculateBalance(id: number, db: Database.Database): void {
-    const balanceResult = db.prepare(`
-      SELECT COALESCE(SUM(balance_amount), 0) as total_balance
-      FROM invoices
-      WHERE customer_id = ? AND status IN ('Unpaid', 'Partially Paid', 'Overdue')
-    `).get(id) as { total_balance: number };
-    db.prepare('UPDATE customers SET current_balance = ? WHERE id = ?').run(balanceResult.total_balance, id);
+    const row = db.prepare(`
+      SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS net
+      FROM customer_ledger
+      WHERE customer_id = ? AND voided = 0
+    `).get(id) as { net: number };
+    db.prepare('UPDATE customers SET current_balance = ? WHERE id = ?').run(row.net || 0, id);
   }
 }
 

@@ -19,9 +19,20 @@ const Payment_1 = __importDefault(require("../models/Payment"));
 const accountingService_1 = __importDefault(require("../services/accountingService"));
 const ledgerUtils_1 = __importDefault(require("../utils/ledgerUtils"));
 const logger_1 = __importDefault(require("../utils/logger"));
+const activityLogger_1 = require("../services/activityLogger");
 const queryUtils_1 = require("../utils/queryUtils");
 const currency_1 = require("../utils/currency");
-const { createLedgerEntry, updateCustomerBalance, calculateInvoiceBalance, updateInvoiceStatus, } = ledgerUtils_1.default;
+/**
+ * ACC-18 interim: thrown when a client-supplied invoice total disagrees
+ * with the server-computed sum of line items beyond the 0.01 tolerance.
+ */
+class TotalMismatchError extends Error {
+    constructor(clientTotal, computedTotal) {
+        super(`total_amount disagrees with line items (client ${clientTotal.toFixed(2)} vs computed ${computedTotal.toFixed(2)})`);
+        this.name = 'TotalMismatchError';
+    }
+}
+const { createLedgerEntry, recalcCustomerBalanceFromLedger, calculateInvoiceBalance, updateInvoiceStatus, } = ledgerUtils_1.default;
 // ============ Controllers ============
 /**
  * GET /api/invoices
@@ -94,7 +105,7 @@ function getInvoice(req, res) {
  */
 function createInvoice(req, res) {
     try {
-        const { invoice_no, customer_id, invoice_date, due_date, status = 'Unpaid', discount_scope, discount_type, discount_value, items, notes, terms, total_amount, record_payment, payment, } = req.body;
+        const { invoice_no, customer_id, invoice_date, due_date, status = 'Unpaid', discount_scope, discount_type, discount_value, items, notes, terms, total_amount, record_payment, payment, expired_batch_overrides, } = req.body;
         if (!customer_id || !invoice_date || !items || items.length === 0) {
             return res.status(400).json({ error: 'Customer, date, and items are required' });
         }
@@ -102,7 +113,17 @@ function createInvoice(req, res) {
         const userId = req.user.id;
         // === ENTIRE operation inside one transaction ===
         const transaction = database_1.default.transaction(() => {
-            const totalAmountNum = (0, currency_1.parseCurrency)(total_amount);
+            // ACC-18 interim: the server is authoritative over invoice money.
+            // Header total = Σ of server-computed line amounts; a client-supplied
+            // total differing by more than 0.01 is rejected with nothing written.
+            const computedTotal = (0, currency_1.computeInvoiceTotal)(items);
+            const totalAmountNum = computedTotal;
+            if (total_amount !== undefined && total_amount !== null) {
+                const clientTotal = (0, currency_1.parseCurrency)(total_amount);
+                if (Math.abs(clientTotal - computedTotal) > 0.01) {
+                    throw new TotalMismatchError(clientTotal, computedTotal);
+                }
+            }
             const paymentAmountNum = record_payment && payment
                 ? (0, currency_1.parseCurrency)(payment.amount)
                 : 0;
@@ -140,7 +161,8 @@ function createInvoice(req, res) {
                 discount_type,
                 discount_value,
                 terms,
-                items
+                items,
+                override_sale: expired_batch_overrides && Object.keys(expired_batch_overrides).length > 0 ? 1 : 0,
             }, userId);
             // Insert invoice items and deduct stock via FIFO batch consumption
             let cogsTotal = 0;
@@ -177,10 +199,12 @@ function createInvoice(req, res) {
                 // Track consumption for expiry denormalization
                 consumptions.push({ itemId: item.item_id, consumption });
             }
-            // Denormalize expiry info onto invoice items and build expiry_notes
-            Invoice_1.default.denormalizeExpiryInfo(invoiceId, consumptions, database_1.default);
+            // Denormalize expiry info onto invoice items and build expiry_notes.
+            // expired_batch_overrides provides original expiry dates for batches
+            // whose dates were temporarily cleared to unblock FEFO consumption.
+            Invoice_1.default.denormalizeExpiryInfo(invoiceId, consumptions, database_1.default, expired_batch_overrides);
             // Create customer ledger entry (debit to increase AR)
-            createLedgerEntry(parsedCustomerId, 'INVOICE', invoice_no, totalAmountNum, // debit
+            createLedgerEntry(parsedCustomerId, invoice_date, 'INVOICE', invoice_no, totalAmountNum, // debit
             0, // credit
             `Invoice ${invoice_no}`);
             // Post the sales invoice to the GL (Dr AR / Cr Sales Revenue net / Cr Tax Payable).
@@ -219,7 +243,7 @@ function createInvoice(req, res) {
                 // Payment allocation
                 Invoice_1.default.createPaymentAllocation(database_1.default, paymentId, invoiceId, paymentAmountNum);
                 // Ledger entry for payment (credit to reduce AR)
-                Invoice_1.default.createLedgerEntry(database_1.default, parsedCustomerId, 'PAYMENT', newPaymentNo, 0, paymentAmountNum, `Payment ${newPaymentNo} for Invoice ${invoice_no}`);
+                Invoice_1.default.createLedgerEntry(database_1.default, parsedCustomerId, 'PAYMENT', newPaymentNo, payment.payment_date, 0, paymentAmountNum, `Payment ${newPaymentNo} for Invoice ${invoice_no}`);
                 // Post the payment to the GL (Dr Cash / Cr AR). Cash vs Bank
                 // is determined by payment_method.
                 accountingService_1.default.postPaymentEntry(database_1.default, {
@@ -233,7 +257,7 @@ function createInvoice(req, res) {
                 });
             }
             // --- FIX #6: Customer balance update inside transaction ---
-            ledgerUtils_1.default.updateCustomerBalance(parsedCustomerId);
+            ledgerUtils_1.default.recalcCustomerBalanceFromLedger(parsedCustomerId);
             return invoiceId;
         });
         const invoiceId = transaction();
@@ -241,6 +265,12 @@ function createInvoice(req, res) {
         res.status(201).json(createdInvoice);
     }
     catch (error) {
+        // ACC-18 interim: client total disagrees with line items → 400
+        if (error instanceof TotalMismatchError) {
+            logger_1.default.warn('Create invoice rejected:', { error: error.message });
+            res.status(400).json({ error: 'total_amount disagrees with line items' });
+            return;
+        }
         // FIX #7: Generic error message, log detail server-side
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         const errorCode = error.code;
@@ -274,14 +304,49 @@ function updateInvoice(req, res) {
             const originalInvoice = Invoice_1.default.getById(invoiceId, database_1.default);
             if (!originalInvoice)
                 throw new Error('Invoice not found');
+            // ACC-18 interim: server-authoritative totals on update too.
+            const computedTotal = (0, currency_1.computeInvoiceTotal)(items);
+            var totalAmountNum = computedTotal;
+            if (total_amount !== undefined && total_amount !== null) {
+                const clientTotal = (0, currency_1.parseCurrency)(total_amount);
+                if (Math.abs(clientTotal - computedTotal) > 0.01) {
+                    throw new TotalMismatchError(clientTotal, computedTotal);
+                }
+            }
             // Fallback to original invoice_no if not provided in request
             const resolvedInvoiceNo = invoice_no || originalInvoice.invoice_no;
-            // === Handle deleted payments ===
+            // === Handle deleted payments (PAY-01) ===
+            // Every deleted_payments id MUST be joined to THIS invoice via an
+            // existing payment_allocations row. Anything else is a crafted
+            // cross-invoice deletion → 400, delete nothing.
             if (deleted_payments && Array.isArray(deleted_payments) && deleted_payments.length > 0) {
+                for (const deletedPaymentId of deleted_payments) {
+                    const allocations = Payment_1.default.getAllocationsByPaymentId(database_1.default, deletedPaymentId);
+                    const ownsPayment = allocations.some(alloc => alloc.invoice_id === invoiceId);
+                    if (!ownsPayment) {
+                        throw new Error(`Payment ${deletedPaymentId} is not allocated to invoice ${invoiceId}; ` +
+                            `refusing to delete`);
+                    }
+                }
                 for (const deletedPaymentId of deleted_payments) {
                     const paymentInfo = Payment_1.default.getById(database_1.default, deletedPaymentId);
                     if (paymentInfo) {
-                        Invoice_1.default.deleteLedgerEntryByReference(database_1.default, paymentInfo.payment_no);
+                        Invoice_1.default.deleteLedgerEntryByReference(database_1.default, paymentInfo.payment_no, originalInvoice.customer_id);
+                        (0, activityLogger_1.log)({
+                            userId,
+                            action: activityLogger_1.ActionType.PAYMENT_DELETE,
+                            entityType: 'Payment',
+                            entityId: deletedPaymentId,
+                            description: `Payment ${paymentInfo.payment_no} (${Number(paymentInfo.amount).toFixed(2)}) removed from invoice ${invoiceId} during invoice update`,
+                            metadata: {
+                                payment_id: deletedPaymentId,
+                                payment_no: paymentInfo.payment_no,
+                                amount: Number(paymentInfo.amount),
+                                invoice_id: invoiceId,
+                                actor: userId,
+                            },
+                        });
+                        req.activityLogged = true;
                     }
                     const allocations = Payment_1.default.getAllocationsByPaymentId(database_1.default, deletedPaymentId);
                     Payment_1.default.deleteAllocationsByPaymentId(database_1.default, deletedPaymentId);
@@ -305,12 +370,23 @@ function updateInvoice(req, res) {
                 const newPaymentId = Invoice_1.default.createPayment(database_1.default, newPaymentNo, parsedCustomerId, payment.payment_date, newPaymentAmount, payment.payment_method, payment.reference_no, payment.notes);
                 Invoice_1.default.createPaymentAllocation(database_1.default, newPaymentId, invoiceId, newPaymentAmount);
                 // Ledger entry for payment (credit to reduce AR)
-                Invoice_1.default.createLedgerEntry(database_1.default, parsedCustomerId, 'PAYMENT', newPaymentNo, 0, newPaymentAmount, `Payment ${newPaymentNo} for Invoice ${resolvedInvoiceNo}`);
+                Invoice_1.default.createLedgerEntry(database_1.default, parsedCustomerId, 'PAYMENT', newPaymentNo, payment.payment_date, 0, newPaymentAmount, `Payment ${newPaymentNo} for Invoice ${resolvedInvoiceNo}`);
+                // GL posting (ACC-09 companion): the create-invoice path posts
+                // its recorded payments; the update path must too, else the
+                // payment's Dr Cash / Cr AR lines never exist.
+                accountingService_1.default.postPaymentEntry(database_1.default, {
+                    paymentId: newPaymentId,
+                    paymentNo: newPaymentNo,
+                    amount: newPaymentAmount,
+                    paymentDate: payment.payment_date,
+                    paymentMethod: payment.payment_method,
+                    customerId: parsedCustomerId,
+                    userId,
+                });
             }
             // === Recalculate paid/balance (accounting for returned_amount) ===
             const paidResult = Payment_1.default.getTotalPaidByInvoiceId(database_1.default, invoiceId);
             const totalPaid = (0, currency_1.parseCurrency)(paidResult);
-            const totalAmountNum = (0, currency_1.parseCurrency)(total_amount);
             const returnedAmt = (0, currency_1.parseCurrency)(originalInvoice?.returned_amount || 0);
             const newBalanceAmount = Math.max(0, (0, currency_1.subtractCurrency)((0, currency_1.subtractCurrency)(totalAmountNum, totalPaid), returnedAmt));
             // Determine status (considering returned amount)
@@ -349,6 +425,7 @@ function updateInvoice(req, res) {
             Invoice_1.default.reverseStockForItems(database_1.default, oldItems, originalInvoice.invoice_no, userId, 'INVOICE_UPDATE');
             Invoice_1.default.deleteInvoiceItems(database_1.default, invoiceId);
             // Insert new invoice items and create new stock movements
+            let updatedCogsTotal = 0;
             for (const item of items) {
                 Invoice_1.default.createInvoiceItem(database_1.default, invoiceId, {
                     item_id: item.item_id,
@@ -377,17 +454,42 @@ function updateInvoice(req, res) {
                         movement_date: invoice_date,
                         batch_id: entry.batchId ?? undefined,
                     }, userId, database_1.default);
+                    updatedCogsTotal += entry.consumed * entry.unitCost;
                 }
             }
-            // Update ledger entry for the invoice if total changed
-            // Delete old invoice ledger entry and recreate with new amount
-            Invoice_1.default.deleteLedgerEntryByReference(database_1.default, resolvedInvoiceNo);
-            Invoice_1.default.createLedgerEntry(database_1.default, parsedCustomerId, 'INVOICE', resolvedInvoiceNo, totalAmountNum, 0, `Invoice ${resolvedInvoiceNo} (updated)`);
+            // GL consistency (ACC-08): void the invoice's INVOICE + COGS lines
+            // (attributed) and re-post them at the new amounts. The old lines
+            // stay in the audit trail; only voided = 0 lines feed the reports.
+            accountingService_1.default.voidJournalLinesByReference(database_1.default, 'INVOICE', invoiceId, {
+                voidedBy: userId,
+                voidReason: `Invoice ${resolvedInvoiceNo} updated`,
+            });
+            const updatedTaxAmount = items.reduce((sum, item) => {
+                const lineAmount = item.quantity * item.unit_price;
+                return sum + lineAmount * ((item.tax_rate || 0) / 100);
+            }, 0);
+            accountingService_1.default.postInvoiceEntry(database_1.default, {
+                invoiceId,
+                invoiceNo: resolvedInvoiceNo,
+                totalAmount: totalAmountNum,
+                invoiceDate: invoice_date,
+                userId,
+                taxAmount: updatedTaxAmount,
+            });
+            if (updatedCogsTotal > 0) {
+                accountingService_1.default.postCOGSEntry(database_1.default, {
+                    invoiceId,
+                    invoiceNo: resolvedInvoiceNo,
+                    cogsAmount: (0, currency_1.parseCurrency)(updatedCogsTotal),
+                    invoiceDate: invoice_date,
+                    userId,
+                });
+            }
             // --- FIX #6: Customer balance update inside transaction ---
             if (originalInvoice.customer_id !== parsedCustomerId) {
-                ledgerUtils_1.default.updateCustomerBalance(originalInvoice.customer_id);
+                ledgerUtils_1.default.recalcCustomerBalanceFromLedger(originalInvoice.customer_id);
             }
-            ledgerUtils_1.default.updateCustomerBalance(parsedCustomerId);
+            ledgerUtils_1.default.recalcCustomerBalanceFromLedger(parsedCustomerId);
             // Update invoice status and balance
             updateInvoiceStatus(invoiceId);
         });
@@ -398,6 +500,18 @@ function updateInvoice(req, res) {
     catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorName = error instanceof Error ? error.name : 'Unknown';
+        // PAY-01: crafted cross-invoice payment deletion → client error, not 500
+        if (errorMessage.includes('refusing to delete')) {
+            logger_1.default.warn('Update invoice rejected payment deletion:', { error: errorMessage });
+            res.status(400).json({ error: 'One or more payments are not allocated to this invoice; nothing was deleted' });
+            return;
+        }
+        // ACC-18 interim: client total disagrees with line items → 400
+        if (error instanceof TotalMismatchError) {
+            logger_1.default.warn('Update invoice rejected:', { error: error.message });
+            res.status(400).json({ error: 'total_amount disagrees with line items' });
+            return;
+        }
         logger_1.default.error('Update invoice error:', { error: errorMessage, name: errorName, stack: error instanceof Error ? error.stack : undefined });
         res.status(500).json({ error: 'Failed to update invoice' });
     }
@@ -435,11 +549,16 @@ function deleteInvoice(req, res) {
             // Clean up payment allocations and orphaned payments
             const allocations = Payment_1.default.getAllocationsByInvoiceId(database_1.default, invoiceId);
             for (const alloc of allocations) {
-                const otherAllocations = Payment_1.default.getAllocationsByPaymentId(database_1.default, alloc.payment_id);
+                // ACC-21: getAllocationsByPaymentId returns ALL allocations for the
+                // payment — including this invoice's own row, which still exists.
+                // "Other" means other than the invoice being deleted; only a payment
+                // with none left is truly orphaned and must be removed.
+                const otherAllocations = Payment_1.default.getAllocationsByPaymentId(database_1.default, alloc.payment_id)
+                    .filter(a => a.invoice_id !== invoiceId);
                 if (otherAllocations.length === 0) {
                     const paymentInfo = Payment_1.default.getById(database_1.default, alloc.payment_id);
                     if (paymentInfo) {
-                        Invoice_1.default.deleteLedgerEntryByReference(database_1.default, paymentInfo.payment_no);
+                        Invoice_1.default.deleteLedgerEntryByReference(database_1.default, paymentInfo.payment_no, freshInvoice.customer_id);
                         // Void the payment's journal_lines entries (Dr Cash / Cr AR)
                         accountingService_1.default.voidJournalLinesByReference(database_1.default, 'PAYMENT', alloc.payment_id);
                     }
@@ -455,13 +574,13 @@ function deleteInvoice(req, res) {
             // Delete invoice items after stock reversal is complete
             Invoice_1.default.deleteInvoiceItems(database_1.default, invoiceId);
             // Delete related ledger entries
-            Invoice_1.default.deleteLedgerEntryByReference(database_1.default, freshInvoice.invoice_no);
+            Invoice_1.default.deleteLedgerEntryByReference(database_1.default, freshInvoice.invoice_no, freshInvoice.customer_id);
             // Rebuild running balances so remaining ledger rows are consistent
             ledgerUtils_1.default.rebuildLedgerBalances(freshInvoice.customer_id);
             // Delete invoice
             Invoice_1.default.deleteInvoice(database_1.default, invoiceId);
             // Recalculate customer's current_balance now that the invoice is gone
-            ledgerUtils_1.default.updateCustomerBalance(freshInvoice.customer_id);
+            ledgerUtils_1.default.recalcCustomerBalanceFromLedger(freshInvoice.customer_id);
         });
         transaction();
         res.status(200).json({ message: 'Invoice deleted successfully' });
@@ -501,10 +620,10 @@ function cancelInvoice(req, res) {
             accountingService_1.default.voidJournalLinesByReference(database_1.default, 'INVOICE', invoiceId);
             // Add a CANCELLED ledger entry (credit to offset the original debit)
             // This neutralizes the AR impact without deleting history
-            createLedgerEntry(invoice.customer_id, 'CANCELLATION', invoice.invoice_no, 0, invoice.total_amount, `Invoice ${invoice.invoice_no} cancelled`);
+            createLedgerEntry(invoice.customer_id, invoice.invoice_date.slice(0, 10), 'CANCELLATION', invoice.invoice_no, 0, invoice.total_amount, `Invoice ${invoice.invoice_no} cancelled`);
             // Recalculate customer balance
             ledgerUtils_1.default.rebuildLedgerBalances(invoice.customer_id);
-            ledgerUtils_1.default.updateCustomerBalance(invoice.customer_id);
+            ledgerUtils_1.default.recalcCustomerBalanceFromLedger(invoice.customer_id);
             // Log the cancellation
             database_1.default.prepare(`
         INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
@@ -715,7 +834,7 @@ function returnInvoiceItems(req, res) {
             // below already handle the AR reduction.
             if (resolvedDisposition === 'refund') {
                 // Create customer ledger entry for the return (credit to reduce AR) — net amount
-                createLedgerEntry(invoice.customer_id, 'RETURN', invoice.invoice_no, 0, netReturn, `Return on Invoice ${invoice.invoice_no}${deduction > 0 ? ` (fee: $${deduction.toFixed(2)})` : ''}`);
+                createLedgerEntry(invoice.customer_id, todayDate, 'RETURN', invoice.invoice_no, 0, netReturn, `Return on Invoice ${invoice.invoice_no}${deduction > 0 ? ` (fee: $${deduction.toFixed(2)})` : ''}`);
                 // ----------------------------------------------------------------
                 // REFUND: Create a refund payment (negative payment record),
                 // reverse/fraction the original payment allocation, post GL entry
@@ -727,7 +846,7 @@ function returnInvoiceItems(req, res) {
                 // Record a refund allocation (negative allocation = reduction of original payment)
                 Invoice_1.default.createPaymentAllocation(database_1.default, refundPaymentId, invoiceId, -netReturn);
                 // Ledger entry: Dr (debit) the refund payment no. to reflect cash out
-                createLedgerEntry(invoice.customer_id, 'REFUND', refundPaymentNo, netReturn, // debit = customer owes us more (contra)
+                createLedgerEntry(invoice.customer_id, todayDate, 'REFUND', refundPaymentNo, netReturn, // debit = customer owes us more (contra)
                 0, `Refund ${refundPaymentNo} for return on ${invoice.invoice_no}`);
                 // Post GL entry for refund: Dr Sales Returns (already done above in postInvoiceReturnEntry),
                 // but also need to reverse the cash side: Dr AR (credit the original overpayment) / Cr Cash
@@ -748,12 +867,9 @@ function returnInvoiceItems(req, res) {
                 // CREDIT: Add the net returned amount to customer's credit_balance
                 // ----------------------------------------------------------------
                 // Create customer ledger entry for the return (credit to reduce AR) — net amount
-                createLedgerEntry(invoice.customer_id, 'RETURN', invoice.invoice_no, 0, netReturn, `Return on Invoice ${invoice.invoice_no}${deduction > 0 ? ` (fee: $${deduction.toFixed(2)})` : ''}`);
-                const currentCreditBalance = database_1.default.prepare(`SELECT credit_balance FROM customers WHERE id = ?`).get(invoice.customer_id);
-                const newCreditBalance = (currentCreditBalance?.credit_balance || 0) + netReturn;
-                database_1.default.prepare(`UPDATE customers SET credit_balance = ? WHERE id = ?`).run(newCreditBalance, invoice.customer_id);
-                // Already created a RETURN ledger entry above with the credit
-                // No additional GL entry needed — the credit balance is tracked separately
+                createLedgerEntry(invoice.customer_id, todayDate, 'RETURN', invoice.invoice_no, 0, netReturn, `Return on Invoice ${invoice.invoice_no}${deduction > 0 ? ` (fee: $${deduction.toFixed(2)})` : ''}`);
+                // Credit memos remain visible as ledger credits; ACC-13 removes
+                // the parallel credit_balance column writer.
             }
             else if (resolvedDisposition === 'adjust') {
                 // ----------------------------------------------------------------
@@ -795,18 +911,14 @@ function returnInvoiceItems(req, res) {
                     Invoice_1.default.createPaymentAllocation(database_1.default, adjustPaymentId, targetInvoiceId, allocAmount);
                     // For ADJUST, we create PAYMENT ledger entries (credit reduces AR)
                     // but do NOT create a separate RETURN entry above to avoid double-counting.
-                    createLedgerEntry(invoice.customer_id, 'PAYMENT', adjustPaymentNo, 0, allocAmount, `Return credit from ${invoice.invoice_no} applied to ${targetInvoice.invoice_no}`);
+                    createLedgerEntry(invoice.customer_id, todayDate, 'PAYMENT', adjustPaymentNo, 0, allocAmount, `Return credit from ${invoice.invoice_no} applied to ${targetInvoice.invoice_no}`);
                     // Recalculate target invoice balance and status
                     calculateInvoiceBalance(targetInvoiceId);
                     updateInvoiceStatus(targetInvoiceId);
                     remainingCredit -= allocAmount;
                 }
-                if (remainingCredit > 0) {
-                    // If there's leftover credit, add it to customer's credit_balance
-                    const currentCreditBalance = database_1.default.prepare(`SELECT credit_balance FROM customers WHERE id = ?`).get(invoice.customer_id);
-                    const newCreditBalance = (currentCreditBalance?.credit_balance || 0) + remainingCredit;
-                    database_1.default.prepare(`UPDATE customers SET credit_balance = ? WHERE id = ?`).run(newCreditBalance, invoice.customer_id);
-                }
+                // Leftover credit stays visible as ledger credits only; ACC-13
+                // removed the parallel credit_balance column writer.
             }
             // ==================================================================
             // FINALIZE
@@ -815,7 +927,7 @@ function returnInvoiceItems(req, res) {
             calculateInvoiceBalance(invoiceId);
             updateInvoiceStatus(invoiceId);
             // Sync the customer's current_balance and credit_balance-aware total
-            updateCustomerBalance(invoice.customer_id);
+            recalcCustomerBalanceFromLedger(invoice.customer_id);
             // Log the return activity (include disposition info)
             const dispositionLabels = {
                 refund: 'Refund to customer',

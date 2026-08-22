@@ -6,6 +6,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const sequence_1 = require("../utils/sequence");
 const sqlSanitizer_1 = require("../utils/sqlSanitizer");
 const Invoice_1 = __importDefault(require("./Invoice"));
+const ledgerUtils_1 = __importDefault(require("../utils/ledgerUtils"));
+const accountingService_1 = __importDefault(require("../services/accountingService"));
+const currency_1 = require("../utils/currency");
 // Whitelisted sort columns → qualified SQL column for the list query (the
 // warehouse/user/quotation joins make bare names ambiguous).
 const SALES_ORDER_SORT_COLUMN_MAP = {
@@ -474,6 +477,32 @@ class SalesOrderModel {
           SET delivered_quantity = quantity
           WHERE so_id = ? AND item_id = ?
         `).run(id, item.item_id);
+            }
+            // ACC-07: the converted invoice previously appeared in NO subledger
+            // and NO journal. Add the customer_ledger row and the standard GL
+            // trio so statements, aging, and the trial balance all see it.
+            ledgerUtils_1.default.createLedgerEntry(salesOrder.customer_id, invoiceDate, 'INVOICE', invoiceNo, salesOrder.total_amount, 0, `Invoice ${invoiceNo} from SO ${salesOrder.so_no}`);
+            const cogsRows = db.prepare(`
+        SELECT quantity * unit_cost AS line_cogs FROM stock_movements
+        WHERE reference_doctype = 'Invoice' AND reference_docno = ?
+          AND movement_type = 'SALE'
+      `).all(invoiceNo);
+            const cogsTotal = cogsRows.reduce((s, r) => s + Math.abs(Number(r.line_cogs)), 0);
+            accountingService_1.default.postInvoiceEntry(db, {
+                invoiceId,
+                invoiceNo,
+                totalAmount: salesOrder.total_amount,
+                invoiceDate,
+                userId,
+            });
+            if (cogsTotal > 0) {
+                accountingService_1.default.postCOGSEntry(db, {
+                    invoiceId,
+                    invoiceNo,
+                    cogsAmount: (0, currency_1.parseCurrency)(cogsTotal),
+                    invoiceDate,
+                    userId,
+                });
             }
             // Log activity
             db.prepare(`

@@ -11,7 +11,7 @@
  *   4. Independently calculates the expected result
  *   5. Compares expected vs actual
  *
- * Run: npx ts-node src/audit-trace.ts
+ * Run: npx ts-node scripts/dev/audit-trace.ts (from server/)
  * Environment: DATABASE_PATH must be set, or uses default
  */
 
@@ -500,11 +500,12 @@ function testFullPayment(results: TestResult): void {
     VALUES (?, '2025-06-16', 'PAYMENT', ?, 0, ?, ?, ?)
   `).run(1, paymentNo, paymentAmount, ledgerBalance, `Payment ${paymentNo} for Invoice ${invoice.invoice_no}`);
   
-  // Update customer balance
-  const arTotal = db.prepare(`
-    SELECT COALESCE(SUM(balance_amount), 0) FROM invoices WHERE customer_id = ? AND status IN ('Unpaid', 'Partially Paid', 'Overdue')
-  `).get(1) as any;
-  db.prepare(`UPDATE customers SET current_balance = ? WHERE id = ?`).run(arTotal['COALESCE(SUM(balance_amount), 0)'], 1);
+  // Update customer balance from the ledger (ACC-13 single-writer basis)
+  const ledgerNet = db.prepare(`
+    SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS net
+    FROM customer_ledger WHERE customer_id = ? AND voided = 0
+  `).get(1) as { net: number };
+  db.prepare(`UPDATE customers SET current_balance = ? WHERE id = ?`).run(ledgerNet.net, 1);
   
   // ═══ VERIFY ═══
   
@@ -1338,4 +1339,6 @@ function main(): void {
   console.log('══════════════════════════════════════════════════════════════\n');
 }
 
-main();
+if (require.main === module) {
+  main();
+}

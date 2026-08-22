@@ -22,14 +22,12 @@ class SupplierLedgerModel {
     `).get(id);
     }
     static getBalance(supplier_id, db) {
-        // id order = insertion order = ledger chronology. created_at DESC is
-        // ambiguous when multiple entries share the same second, which made
-        // the running balance pick a stale row (e.g. PO-2026-0004 base 500
-        // instead of 800).
+        // ACC-12: chain order is (transaction_date, id); ACC-14: voided rows
+        // are excluded so reversals immediately restore the prior position.
         const result = db.prepare(`
       SELECT balance FROM supplier_ledger
-      WHERE supplier_id = ?
-      ORDER BY id DESC
+      WHERE supplier_id = ? AND voided = 0 AND reversed_by IS NULL
+      ORDER BY transaction_date DESC, id DESC
       LIMIT 1
     `).get(supplier_id);
         return result?.balance || 0;
@@ -43,8 +41,8 @@ class SupplierLedgerModel {
     static rebuildBalances(supplierId, db) {
         const rows = db.prepare(`
       SELECT id, debit, credit FROM supplier_ledger
-      WHERE supplier_id = ?
-      ORDER BY id ASC
+      WHERE supplier_id = ? AND voided = 0 AND reversed_by IS NULL
+      ORDER BY transaction_date ASC, id ASC
     `).all(supplierId);
         let running = 0;
         const update = db.prepare('UPDATE supplier_ledger SET balance = ? WHERE id = ?');
