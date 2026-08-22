@@ -56,4 +56,4 @@ Must be LAST: requires all writers fixed (Phases 2–3) so repaired data stays c
 
 - [ ] 4.1 One-off data-fix migration repairing the four known drift rows — item 15 −5, item 1 +2, item 2/WH1 −3.722, item 2/WH2 +10 mirror batch — each with its balancing journal entry; backup-first; assert post-state: batches == balances == movements for every (item, warehouse). *(0.75 d)*
 - [ ] 4.2 Table-rebuild migration adding `CHECK(quantity >= 0)` on `stock_balances` and `CHECK(quantity_remaining <= quantity_original AND quantity_remaining >= 0)` on `stock_batches` (INV-21); runs only after 4.1 verified clean; verify existing rows pass and a violating write fails loudly. *(0.5 d)*
-- [ ] 4.3 Final integration verification: full suite (typecheck, lint, jest, flutter analyze/test); e2e smoke — complete a count, run a transfer, submit a mobile invoice, restart server twice (no mutation, discrepancies endpoint clean). *(0.5 d)*
+- [x] 4.3 Final integration verification: full suite (typecheck, lint, jest, flutter analyze/test); e2e smoke — complete a count, run a transfer, submit a mobile invoice, restart server twice (no mutation, discrepancies endpoint clean). *(0.5 d)*
