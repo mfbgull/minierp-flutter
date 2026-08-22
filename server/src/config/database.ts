@@ -283,31 +283,10 @@ function runCustomerARMigrations(): void {
     `);
     logger.info('✅ Customer ID type fix completed!');
 
-    logger.info('Recalculating invoice balances from payment allocations...');
-    // Cap returned_amount at total_amount to prevent over-returns
-    db.exec(`UPDATE invoices SET returned_amount = total_amount WHERE returned_amount > total_amount AND total_amount > 0;`);
-    db.exec(`
-      UPDATE invoices SET
-        paid_amount = COALESCE((
-          SELECT SUM(pa.amount)
-          FROM payment_allocations pa
-          WHERE pa.invoice_id = invoices.id
-        ), 0),
-        balance_amount = MAX(0, total_amount - COALESCE((
-          SELECT SUM(pa.amount)
-          FROM payment_allocations pa
-          WHERE pa.invoice_id = invoices.id
-        ), 0) - COALESCE(returned_amount, 0) + COALESCE(return_fee, 0))
-        `);
+    // Task 3.3 (audit-remediation): invoice balance/status recalculation moved out of
+    // boot into the one-time `fn.recalcInvoiceBalances` data migration and the
+    // explicit `npm run repair` script. Boot no longer rewrites business rows.
 
-        db.exec(`
-      UPDATE invoices SET status = 'Returned' WHERE returned_amount >= total_amount AND total_amount > 0;
-      UPDATE invoices SET status = 'Partially Returned' WHERE returned_amount > 0 AND returned_amount < total_amount AND total_amount > 0;
-      UPDATE invoices SET status = 'Paid' WHERE balance_amount <= 0 AND total_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
-      UPDATE invoices SET status = 'Partially Paid' WHERE balance_amount > 0 AND balance_amount < total_amount AND paid_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
-      UPDATE invoices SET status = 'Unpaid' WHERE (paid_amount = 0 OR paid_amount IS NULL) AND (returned_amount IS NULL OR returned_amount = 0) AND total_amount > 0;
-    `);
-    logger.info('✅ Invoice balance recalculation completed!');
 
     // INV-09 (boot-task-gating): boot MUST NOT write to stock tables.
     // The former self-heal (rewrite of stock_balances / items.current_stock
@@ -318,37 +297,9 @@ function runCustomerARMigrations(): void {
     // only via the explicit gated repair scripts.
     logStockDiscrepancies();
 
-    logger.info('Fixing payment ledger descriptions...');
-    const paymentLedgerEntries = db.prepare(`
-      SELECT cl.id, cl.reference_no, cl.description
-      FROM customer_ledger cl
-      WHERE cl.transaction_type = 'PAYMENT'
-        AND cl.description LIKE 'Payment against %'
-    `).all() as { id: number; reference_no: string; description: string }[];
+    // Task 3.3: payment-ledger description rewrite also moved to the gated
+    // repair path (`npm run repair` / fn.paymentLedgerDescriptions backfill).
 
-    for (const entry of paymentLedgerEntries) {
-      const match = entry.description.match(/Payment against (.+)/);
-      if (match) {
-        const invoiceRefs = match[1].split(',').map((s: string) => s.trim());
-        const invoiceNumbers = invoiceRefs.map((ref: string) => {
-          if (/[a-zA-Z]/.test(ref)) {
-            return ref;
-          }
-          const invoiceId = parseInt(ref, 10);
-          if (!isNaN(invoiceId)) {
-            const invoice = db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(invoiceId) as { invoice_no: string } | undefined;
-            return invoice ? invoice.invoice_no : `Invoice #${invoiceId}`;
-          }
-          return ref;
-        });
-
-        const newDescription = `Payment against ${invoiceNumbers.join(', ')}`;
-        if (newDescription !== entry.description) {
-          db.prepare('UPDATE customer_ledger SET description = ? WHERE id = ?').run(newDescription, entry.id);
-        }
-      }
-    }
-    logger.info('✅ Payment ledger descriptions fixed!');
   } catch (error: any) {
     throw new Error('Customer AR migration error:: ' + error.message, { cause: error });
   }
@@ -1356,9 +1307,11 @@ function runMissingIndexesMigration(): void {
 
 function runMissingFKIndexesMigration(): void {
   try {
+    // Guard on an index this file actually creates (audit-remediation 3.7 —
+    // previously pointed at idx_invoices_so_id which nothing creates).
     const indexCheck = db.prepare(`
       SELECT COUNT(*) as count FROM sqlite_master
-      WHERE type='index' AND name='idx_invoices_so_id'
+      WHERE type='index' AND name='idx_invoices_customer_id'
     `).get() as { count: number };
 
     if (indexCheck.count === 0) {
@@ -1500,6 +1453,17 @@ runLedgered('fn.runGLVoidAttributionMigration', runGLVoidAttributionMigration);
 runLedgered('fn.runPaymentsCustomerNullableRebuild', runPaymentsCustomerNullableRebuild, { noTxn: true });
 // stock_batches source_type widening — FK-off table rebuild
 runLedgered('fn.runBatchSourceTypeRebuild', runBatchSourceTypeRebuild, { noTxn: true });
+runLedgered('add-search-indexes.sql');
+runLedgered('add-audit-trail-fields.sql');
+runLedgered('add-activity-log-purge-permission.sql');
+runLedgered('add-invoice-soft-delete.sql');
+runLedgered('add-hot-path-indexes.sql');
+// One-time data backfills (audit-remediation 3.2/3.3) — ledgered so they run
+// exactly once per database, never again on reboot.
+runLedgered('fn.recalcInvoiceBalances', recalcInvoiceBalancesBackfill);
+runLedgered('fn.paymentLedgerDescriptions', paymentLedgerDescriptionsBackfill);
+runLedgered('fn.recoverPaymentsInvoiceId', recoverPaymentsInvoiceId);
+runLedgered('fn.reconcileOrphanedJournalLines', reconcileOrphanedJournalLines);
 // INV-21 prerequisite: reconcile live batch/balance drift before CHECK constraints land
 runLedgered('fn.runStockCoverageReconciliation', runStockCoverageReconciliation);
 // INV-21: database-level invariants — applied only after live data reconciled
@@ -1723,29 +1687,40 @@ function seedDefaultPermissions(): void {
       `).run(perm.name, perm.module, perm.action, perm.description);
     }
 
-    // Assign all permissions to Admin role
-    const adminRole = db.prepare('SELECT id FROM roles WHERE role_name = ?').get('Admin') as { id: number };
-    const allPermissions = db.prepare('SELECT id FROM permissions').all() as { id: number }[];
-    
-    for (const perm of allPermissions) {
-      db.prepare(`
-        INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
-        VALUES (?, ?)
-      `).run(adminRole.id, perm.id);
+    // Task 3.5 (audit-remediation): seed grants ONLY for roles that have no
+    // role_permissions yet. Roles with existing grants (admin-configured) are
+    // never touched on reboot — the old always-grant behavior silently
+    // re-added revoked permissions after every restart.
+    const roleHasNoPerms = (roleId: number): boolean =>
+      ((db.prepare('SELECT COUNT(*) AS n FROM role_permissions WHERE role_id = ?').get(roleId) as { n: number }).n === 0);
+
+    // Assign all permissions to Admin role — only when it has none yet
+    const adminRole = db.prepare('SELECT id FROM roles WHERE role_name = ?').get('Admin') as { id: number } | undefined;
+    if (adminRole && roleHasNoPerms(adminRole.id)) {
+      const allPermissions = db.prepare('SELECT id FROM permissions').all() as { id: number }[];
+      for (const perm of allPermissions) {
+        db.prepare(`
+          INSERT INTO role_permissions (role_id, permission_id)
+          VALUES (?, ?)
+        `).run(adminRole.id, perm.id);
+      }
+      logger.info(`Seeded ${allPermissions.length} permission(s) to Admin role (was empty)`);
     }
 
-    // Assign read-only permissions to User role
-    const userRole = db.prepare('SELECT id FROM roles WHERE role_name = ?').get('User') as { id: number };
-    const readPermissions = db.prepare(`
-      SELECT id FROM permissions WHERE action = 'read'
-      AND module NOT IN ('roles', 'settings')
-    `).all() as { id: number }[];
-    
-    for (const perm of readPermissions) {
-      db.prepare(`
-        INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
-        VALUES (?, ?)
-      `).run(userRole.id, perm.id);
+    // Assign read-only permissions to User role — only when it has none yet
+    const userRole = db.prepare('SELECT id FROM roles WHERE role_name = ?').get('User') as { id: number } | undefined;
+    if (userRole && roleHasNoPerms(userRole.id)) {
+      const readPermissions = db.prepare(`
+        SELECT id FROM permissions WHERE action = 'read'
+        AND module NOT IN ('roles', 'settings')
+      `).all() as { id: number }[];
+      for (const perm of readPermissions) {
+        db.prepare(`
+          INSERT INTO role_permissions (role_id, permission_id)
+          VALUES (?, ?)
+        `).run(userRole.id, perm.id);
+      }
+      logger.info(`Seeded ${readPermissions.length} read permission(s) to User role (was empty)`);
     }
 
     logger.info('✅ Default permissions seeded successfully!');
@@ -2362,6 +2337,142 @@ function logStockDiscrepancies(): void {
   logger.warn(`⚠ ${discrepancies.length} stock balance discrepanc(ies) detected (NOT auto-repaired — run the gated repair script to fix):`);
   for (const d of discrepancies) {
     logger.warn(`  item ${d.item_code} (${d.item_id}) in ${d.warehouse_code} (${d.warehouse_id}): balance=${d.balance_quantity ?? 'none'} movements=${d.movement_sum}`);
+  }
+}
+
+function recalcInvoiceBalancesBackfill(): void {
+  // One-time backfill (audit-remediation 3.3): recompute invoice paid /
+  // balance / status from payment_allocations. Runs ONCE per database via
+  // the migration ledger; never on subsequent boots.
+  db.exec(`UPDATE invoices SET returned_amount = total_amount WHERE returned_amount > total_amount AND total_amount > 0;`);
+  db.exec(`
+    UPDATE invoices SET
+      paid_amount = COALESCE((
+        SELECT SUM(pa.amount)
+        FROM payment_allocations pa
+        WHERE pa.invoice_id = invoices.id
+      ), 0),
+      balance_amount = MAX(0, total_amount - COALESCE((
+        SELECT SUM(pa.amount)
+        FROM payment_allocations pa
+        WHERE pa.invoice_id = invoices.id
+      ), 0) - COALESCE(returned_amount, 0) + COALESCE(return_fee, 0))
+      `);
+  db.exec(`
+    UPDATE invoices SET status = 'Returned' WHERE returned_amount >= total_amount AND total_amount > 0;
+    UPDATE invoices SET status = 'Partially Returned' WHERE returned_amount > 0 AND returned_amount < total_amount AND total_amount > 0;
+    UPDATE invoices SET status = 'Paid' WHERE balance_amount <= 0 AND total_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
+    UPDATE invoices SET status = 'Partially Paid' WHERE balance_amount > 0 AND balance_amount < total_amount AND paid_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
+    UPDATE invoices SET status = 'Unpaid' WHERE (paid_amount = 0 OR paid_amount IS NULL) AND (returned_amount IS NULL OR returned_amount = 0) AND total_amount > 0;
+  `);
+  logger.info('✅ Invoice balances recalculated from allocations (one-time backfill)');
+}
+
+function paymentLedgerDescriptionsBackfill(): void {
+  // One-time backfill: rewrite 'Payment against <id>' descriptions to carry
+  // real invoice numbers.
+  const entries = db.prepare(`
+    SELECT cl.id, cl.reference_no, cl.description
+    FROM customer_ledger cl
+    WHERE cl.transaction_type = 'PAYMENT'
+      AND cl.description LIKE 'Payment against %'
+  `).all() as { id: number; reference_no: string; description: string }[];
+
+  for (const entry of entries) {
+    const match = entry.description.match(/Payment against (.+)/);
+    if (!match) continue;
+    const invoiceRefs = match[1].split(',').map((s: string) => s.trim());
+    const invoiceNumbers = invoiceRefs.map((ref: string) => {
+      if (/[a-zA-Z]/.test(ref)) return ref;
+      const invoiceId = parseInt(ref, 10);
+      if (!isNaN(invoiceId)) {
+        const invoice = db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(invoiceId) as { invoice_no: string } | undefined;
+        return invoice ? invoice.invoice_no : `Invoice #${invoiceId}`;
+      }
+      return ref;
+    });
+    const newDescription = `Payment against ${invoiceNumbers.join(', ')}`;
+    if (newDescription !== entry.description) {
+      db.prepare('UPDATE customer_ledger SET description = ? WHERE id = ?').run(newDescription, entry.id);
+    }
+  }
+  logger.info(`✅ Payment ledger descriptions fixed (${entries.length} scanned, one-time backfill)`);
+}
+
+function recoverPaymentsInvoiceId(): void {
+  // Task 3.2 (audit-remediation / MIG-02): the historical payments rebuild
+  // dropped payments.invoice_id. Recover it from payment_allocations where
+  // each allocation set maps to exactly one invoice.
+  const candidates = db.prepare(`
+    SELECT pa.payment_id, MIN(pa.invoice_id) AS first_invoice, MAX(pa.invoice_id) AS last_invoice,
+           COUNT(DISTINCT pa.invoice_id) AS n_invoices
+    FROM payment_allocations pa
+    JOIN payments p ON p.id = pa.payment_id
+    WHERE p.invoice_id IS NULL
+    GROUP BY pa.payment_id
+  `).all() as Array<{ payment_id: number; first_invoice: number; last_invoice: number; n_invoices: number }>;
+
+  let recovered = 0;
+  for (const c of candidates) {
+    if (c.n_invoices !== 1) continue; // ambiguous — leave NULL
+    db.prepare('UPDATE payments SET invoice_id = ? WHERE id = ? AND invoice_id IS NULL')
+      .run(c.first_invoice, c.payment_id);
+    recovered++;
+  }
+
+  if (recovered > 0) {
+    logger.info(`✅ Recovered invoice_id on ${recovered} payment(s) from payment_allocations`);
+    try {
+      db.prepare(`
+        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
+        VALUES (NULL, 'DATA_RECOVERY', 'payment', NULL, ?)
+      `).run(`Migration recovered payments.invoice_id for ${recovered} payment(s) from payment_allocations`);
+    } catch { /* activity_log schema may predate this migration — non-fatal */ }
+  }
+}
+
+function reconcileOrphanedJournalLines(): void {
+  // Task 5.4 (AUD-06): repair historical damage from hard-deleted invoices —
+  // void journal_lines whose reference document no longer exists, and NULL
+  // dangling journal_entry_id links on stock_movements. Post-condition:
+  // non-voided journal_lines must balance per entry; startup fails otherwise.
+  const orphans = db.prepare(`
+    SELECT jl.id FROM journal_lines jl
+    LEFT JOIN journal_entries je ON je.id = jl.journal_entry_id
+    WHERE jl.voided = 0
+      AND (je.id IS NULL OR (
+        je.reference_type = 'INVOICE' AND je.reference_id IS NOT NULL AND
+        NOT EXISTS (SELECT 1 FROM invoices i WHERE i.id = je.reference_id)
+      ))
+  `).all() as Array<{ id: number }>;
+
+  if (orphans.length > 0) {
+    logger.warn(`Voiding ${orphans.length} orphaned journal_line(s) from hard-deleted documents`);
+    const v = db.prepare('UPDATE journal_lines SET voided = 1, void_reason = ? WHERE id = ?');
+    for (const o of orphans) v.run('orphaned document reconciled', o.id);
+  }
+
+  const dangling = db.prepare(`
+    SELECT sm.id FROM stock_movements sm
+    LEFT JOIN journal_entries je ON je.id = sm.journal_entry_id
+    WHERE sm.journal_entry_id IS NOT NULL AND je.id IS NULL
+  `).all() as Array<{ id: number }>;
+  if (dangling.length > 0) {
+    logger.warn(`Clearing ${dangling.length} dangling stock_movements.journal_entry_id reference(s)`);
+    const u = db.prepare('UPDATE stock_movements SET journal_entry_id = NULL WHERE id = ?');
+    for (const d of dangling) u.run(d.id);
+  }
+
+  // Post-condition: every non-voided line set must balance per journal entry.
+  const imbalanced = db.prepare(`
+    SELECT je.id, SUM(jl.debit) AS dr, SUM(jl.credit) AS cr
+    FROM journal_entries je JOIN journal_lines jl ON jl.journal_entry_id = je.id
+    WHERE jl.voided = 0
+    GROUP BY je.id
+    HAVING ABS(SUM(jl.debit) - SUM(jl.credit)) > 0.005
+  `).all() as Array<{ id: number; dr: number; cr: number }>;
+  if (imbalanced.length > 0) {
+    throw new Error(`Trial balance integrity violated: ${imbalanced.length} unbalanced journal_entries after reconciliation`);
   }
 }
 

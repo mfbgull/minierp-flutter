@@ -229,6 +229,45 @@ function rebuildLedgerBalances(customerId: number): void {
 }
 
 /**
+ * Task 8.2 (PERF-02): incremental running-balance update. Recomputes the
+ * balance seed from everything BEFORE `fromEntryId`, then walks forward
+ * only over the affected tail (uses idx_customer_ledger_cust_date).
+ */
+function updateBalancesFrom(customerId: number, fromEntryId: number): void {
+  db.transaction(() => {
+    const anchorRow = db.prepare(
+      'SELECT transaction_date, id FROM customer_ledger WHERE id = ?'
+    ).get(fromEntryId) as { transaction_date: string; id: number } | undefined;
+    if (!anchorRow) {
+      rebuildLedgerBalances(customerId);
+      return;
+    }
+
+    // Seed: net of all active rows strictly before the changed row's position
+    const seedRow = db.prepare(`
+      SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS net
+      FROM customer_ledger
+      WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL
+        AND (transaction_date < ? OR (transaction_date = ? AND id < ?))
+    `).get(customerId, anchorRow.transaction_date, anchorRow.transaction_date, fromEntryId) as { net: number };
+
+    const tail = db.prepare(`
+      SELECT id, debit, credit FROM customer_ledger
+      WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL
+        AND (transaction_date > ? OR (transaction_date = ? AND id >= ?))
+      ORDER BY transaction_date ASC, id ASC
+    `).all(customerId, anchorRow.transaction_date, anchorRow.transaction_date, fromEntryId) as Array<{ id: number; debit: number; credit: number }>;
+
+    let running = parseCurrency(seedRow.net);
+    const updateStmt = db.prepare('UPDATE customer_ledger SET balance = ? WHERE id = ?');
+    for (const entry of tail) {
+      running = addCurrency(subtractCurrency(running, entry.credit), entry.debit);
+      updateStmt.run(running, entry.id);
+    }
+  })();
+}
+
+/**
  * Single authoritative customer-balance writer (ACC-13): the ledger sum
  * over non-voided rows, not an open-invoice status heuristic.
  */
@@ -252,5 +291,6 @@ export default {
   recalcCustomerBalanceFromLedger,
   calculateInvoiceBalance,
   updateInvoiceStatus,
-  rebuildLedgerBalances
+  rebuildLedgerBalances,
+  updateBalancesFrom
 };

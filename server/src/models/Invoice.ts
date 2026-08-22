@@ -263,7 +263,7 @@ class InvoiceModel {
       LEFT JOIN sales_orders so ON i.so_id = so.id
       LEFT JOIN quotations q ON i.quotation_id = q.id
       LEFT JOIN users u ON i.created_by = u.id
-      WHERE i.id = ?
+      WHERE i.id = ? AND i.deleted_at IS NULL
     `).get(id) as Invoice | undefined;
 
     if (!invoice) {
@@ -309,7 +309,7 @@ class InvoiceModel {
       LEFT JOIN sales_orders so ON i.so_id = so.id
       LEFT JOIN quotations q ON i.quotation_id = q.id
       LEFT JOIN users u ON i.created_by = u.id
-      WHERE 1=1
+      WHERE 1=1 AND i.deleted_at IS NULL
     `;
     const conditions: string[] = [];
     const params: any[] = [];

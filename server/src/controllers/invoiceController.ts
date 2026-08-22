@@ -7,7 +7,7 @@ import PaymentModel from '../models/Payment';
 import AccountingService from '../services/accountingService';
 import ledgerUtils from '../utils/ledgerUtils';
 import logger from '../utils/logger';
-import { log, ActionType } from '../services/activityLogger';
+import { log, logCRUD, ActionType, newCorrelationId } from '../services/activityLogger';
 import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import {
   parseCurrency,
@@ -380,6 +380,11 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
 
     const createdInvoice = InvoiceModel.getWithCustomer(invoiceId, db) as InvoiceRow;
 
+    const corrCreate = newCorrelationId();
+    logCRUD(ActionType.INVOICE_CREATE, 'Invoice', createdInvoice.id,
+      `Invoice ${createdInvoice.invoice_no} created (${createdInvoice.status})`, req.user!.id,
+      { total_amount: createdInvoice.total_amount, customer_id: createdInvoice.customer_id },
+      { newValue: createdInvoice, correlationId: corrCreate });
     res.status(201).json(createdInvoice);
   } catch (error: unknown) {
     // ACC-18 interim: client total disagrees with line items → 400
@@ -697,6 +702,10 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
 
     const updatedInvoice = InvoiceModel.getWithCustomer(invoiceId, db) as InvoiceRow;
 
+    logCRUD(ActionType.INVOICE_UPDATE, 'Invoice', updatedInvoice.id,
+      `Invoice ${updatedInvoice.invoice_no} updated`, req.user!.id,
+      { total_amount: updatedInvoice.total_amount, status: updatedInvoice.status },
+      { newValue: updatedInvoice, correlationId: newCorrelationId() });
     res.json(updatedInvoice);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -750,63 +759,53 @@ function deleteInvoice(req: AuthRequest, res: Response): Response | void {
     }
 
     const transaction = db.transaction(() => {
-      // Re-read invoice INSIDE transaction for fresh data
+      // AUD-06 (task 5.2): soft-delete. The invoice row is never removed, so
+      // journal lines and customer-ledger rows can never be orphaned.
       const freshInvoice = InvoiceModel.getById(invoiceId, db);
       if (!freshInvoice) throw new Error('Invoice not found');
 
       const invoiceItems = InvoiceModel.getItemsForStockReverse(invoiceId, db);
 
-      // Clean up payment allocations and orphaned payments
+      // Reverse stock movements
+      InvoiceModel.reverseStockForItems(db, invoiceItems, freshInvoice.invoice_no, userId, 'INVOICE_DELETE');
+
+      // Void ALL related journal lines (invoice + returns). Must affect rows.
+      const voided1 = AccountingService.voidJournalLinesByReference(db, 'INVOICE', invoiceId);
+      const voided2 = AccountingService.voidJournalLinesByReference(db, 'INVOICE_RETURN', invoiceId);
+      if ((voided1 ?? 0) + (voided2 ?? 0) === 0 && freshInvoice.total_amount > 0) {
+        throw new Error(`Refusing to soft-delete invoice ${freshInvoice.invoice_no}: no journal lines were voided — GL state unexpected`);
+      }
+
+      // Contra ledger entry neutralizing the original AR debit
+      InvoiceModel.deleteLedgerEntryByReference(db, freshInvoice.invoice_no, freshInvoice.customer_id);
+
+      // Void allocations; only remove a payment left with no other allocation
       const allocations = PaymentModel.getAllocationsByInvoiceId(db, invoiceId);
-
       for (const alloc of allocations) {
-        // ACC-21: getAllocationsByPaymentId returns ALL allocations for the
-        // payment — including this invoice's own row, which still exists.
-        // "Other" means other than the invoice being deleted; only a payment
-        // with none left is truly orphaned and must be removed.
-        const otherAllocations = PaymentModel.getAllocationsByPaymentId(db, alloc.payment_id)
+        db.prepare('UPDATE payment_allocations SET amount = 0 WHERE payment_id = ? AND invoice_id = ?').run(alloc.payment_id, invoiceId);
+        const other = PaymentModel.getAllocationsByPaymentId(db, alloc.payment_id)
           .filter(a => a.invoice_id !== invoiceId);
-
-        if (otherAllocations.length === 0) {
-          const paymentInfo = PaymentModel.getById(db, alloc.payment_id);
-
-          if (paymentInfo) {
-            InvoiceModel.deleteLedgerEntryByReference(db, paymentInfo.payment_no, freshInvoice.customer_id);
-            // Void the payment's journal_lines entries (Dr Cash / Cr AR)
-            AccountingService.voidJournalLinesByReference(db, 'PAYMENT', alloc.payment_id);
-          }
-
+        if (other.length === 0) {
+          AccountingService.voidJournalLinesByReference(db, 'PAYMENT', alloc.payment_id);
+          InvoiceModel.deleteLedgerEntryByReference(db,
+            (PaymentModel.getById(db, alloc.payment_id))?.payment_no || '', freshInvoice.customer_id);
           PaymentModel.delete(db, alloc.payment_id);
         }
       }
 
-      // Reverse stock movements (before deleting invoice items — reversal looks up SALE movements by invoice_no)
-      InvoiceModel.reverseStockForItems(db, invoiceItems, freshInvoice.invoice_no, userId, 'INVOICE_DELETE');
-
-      // Void the invoice's journal_lines entries (Dr AR / Cr Sales Revenue / Cr Tax Payable)
-      AccountingService.voidJournalLinesByReference(db, 'INVOICE', invoiceId);
-
-      // Also void any return-related journal_lines (Cr AR / Dr Sales Returns / Dr Tax Payable / Dr Inventory / Cr COGS)
-      AccountingService.voidJournalLinesByReference(db, 'INVOICE_RETURN', invoiceId);
-
-      // Delete invoice items after stock reversal is complete
-      InvoiceModel.deleteInvoiceItems(db, invoiceId);
-
-      // Delete related ledger entries
-      InvoiceModel.deleteLedgerEntryByReference(db, freshInvoice.invoice_no, freshInvoice.customer_id);
-
-      // Rebuild running balances so remaining ledger rows are consistent
+      // Soft-delete marker + rebuild balances
+      db.prepare('UPDATE invoices SET status = ?, deleted_at = ?, deleted_by = ? WHERE id = ?')
+        .run('Deleted', new Date().toISOString(), userId, invoiceId);
       ledgerUtils.rebuildLedgerBalances(freshInvoice.customer_id);
-
-      // Delete invoice
-      InvoiceModel.deleteInvoice(db, invoiceId);
-
-      // Recalculate customer's current_balance now that the invoice is gone
       ledgerUtils.recalcCustomerBalanceFromLedger(freshInvoice.customer_id);
     });
 
     transaction();
 
+    logCRUD(ActionType.INVOICE_DELETE, 'Invoice', invoiceId,
+      `Invoice ${invoice.invoice_no} deleted`, userId,
+      { total_amount: invoice.total_amount },
+      { oldValue: { invoice_no: invoice.invoice_no, status: invoice.status, total_amount: invoice.total_amount }, reason: 'Manual deletion via API', correlationId: newCorrelationId() });
     res.status(200).json({ message: 'Invoice deleted successfully' });
   } catch (error: unknown) {
     logger.error('Delete invoice error:', { error });
@@ -862,17 +861,16 @@ function cancelInvoice(req: AuthRequest, res: Response): Response | void {
       ledgerUtils.rebuildLedgerBalances(invoice.customer_id);
       ledgerUtils.recalcCustomerBalanceFromLedger(invoice.customer_id);
 
-      // Log the cancellation
-      db.prepare(`
-        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(
-        userId,
-        'CANCEL',
-        'Invoice',
-        invoiceId,
-        `Invoice ${invoice.invoice_no} cancelled`
-      );
+      const corrCancel = newCorrelationId();
+      logCRUD(ActionType.INVOICE_CANCEL, 'Invoice', invoiceId,
+        `Invoice ${invoice.invoice_no} cancelled`, userId,
+        { total_amount: invoice.total_amount, customer_id: invoice.customer_id },
+        {
+          oldValue: { status: invoice.status, total_amount: invoice.total_amount, balance_amount: invoice.balance_amount },
+          newValue: { status: 'Cancelled' },
+          reason: 'Manual cancellation via API',
+          correlationId: corrCancel
+        });
     });
 
     transaction();
@@ -1307,18 +1305,16 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
         adjust: 'Adjusted against unpaid invoice(s)',
       };
 
-      db.prepare(`
-        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(
-        userId,
-        'RETURN',
-        'Invoice',
-        invoiceId,
+      logCRUD('INVOICE_RETURN', 'Invoice', invoiceId,
         `Return processed for ${processedItems.length} item(s) on Invoice ${invoice.invoice_no}` +
         ` — Disposition: ${dispositionLabels[resolvedDisposition] || resolvedDisposition}` +
-        `${reason ? '. Reason: ' + reason : ''}`
-      );
+        `${reason ? '. Reason: ' + reason : ''}`,
+        userId,
+        { disposition: resolvedDisposition, processedItems: processedItems.length },
+        {
+          reason: reason || (dispositionLabels[resolvedDisposition] || resolvedDisposition),
+          correlationId: newCorrelationId()
+        });
 
       return {
         returnedItems: processedItems,

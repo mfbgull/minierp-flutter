@@ -55,6 +55,7 @@ export enum ActionType {
   INVOICE_POST = 'INVOICE_POST',
   INVOICE_CANCEL = 'INVOICE_CANCEL',
   INVOICE_DELETE = 'INVOICE_DELETE',
+  INVOICE_RETURN = 'INVOICE_RETURN',
 
   // Payments
   PAYMENT_CREATE = 'PAYMENT_CREATE',
@@ -126,6 +127,25 @@ export interface ActivityLogEntry {
   userAgent?: string;
   metadata?: Record<string, any>;
   durationMs?: number;
+  /** Prior row snapshot (task 4.2) — JSON, capped at 8KB */
+  oldValue?: unknown;
+  /** New row snapshot (task 4.2) — JSON, capped at 8KB */
+  newValue?: unknown;
+  /** Why the mutation happened (task 4.2) */
+  reason?: string;
+  /** Links all trail rows from one request / document flow (task 4.2) */
+  correlationId?: string;
+}
+
+/** Cap a JSON snapshot at 8KB (task 4.2). Oversized snapshots are truncated with a marker. */
+function capSnapshot(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  const MAX = 8 * 1024;
+  let json = typeof value === 'string' ? value : JSON.stringify(value);
+  if (json.length > MAX) {
+    json = json.slice(0, MAX - 32) + '...[truncated]';
+  }
+  return json;
 }
 
 // Activity logger service class
@@ -151,7 +171,15 @@ class ActivityLoggerService {
       return;
     }
 
-    // Add to queue for async processing
+    // Add to queue for async processing. Bound the retry queue at 1000 —
+    // drop-oldest with an error log so a DB outage can't grow memory forever (task 4.7).
+    if (this.logQueue.length >= 1000) {
+      const dropped = this.logQueue.shift();
+      logger.error('[ActivityLogger] Queue overflow — dropped oldest entry:', {
+        action: dropped?.action,
+        entityType: dropped?.entityType
+      });
+    }
     this.logQueue.push({
       ...entry,
       logLevel: entry.logLevel || LogLevel.INFO
@@ -187,12 +215,18 @@ class ActivityLoggerService {
    * Log CRUD activity
    */
   logCRUD(
-    action: ActionType,
+    action: ActionType | string,
     entityType: string,
     entityId: number | undefined,
     description: string,
     userId?: number,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
+    audit?: {
+      oldValue?: unknown;
+      newValue?: unknown;
+      reason?: string;
+      correlationId?: string;
+    }
   ): void {
     this.log({
       userId,
@@ -200,7 +234,11 @@ class ActivityLoggerService {
       entityType,
       entityId,
       description,
-      metadata
+      metadata,
+      oldValue: audit?.oldValue,
+      newValue: audit?.newValue,
+      reason: audit?.reason,
+      correlationId: audit?.correlationId
     });
   }
 
@@ -221,9 +259,9 @@ class ActivityLoggerService {
   /**
    * Flush the log queue to database
    */
-  flush(): void {
+  flush(): boolean {
     if (this.isProcessing || this.logQueue.length === 0) {
-      return;
+      return true;
     }
 
     this.isProcessing = true;
@@ -233,8 +271,9 @@ class ActivityLoggerService {
       const stmt = db.prepare(`
         INSERT INTO activity_log (
           user_id, action, entity_type, entity_id, description,
-          log_level, ip_address, user_agent, metadata, duration_ms
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          log_level, ip_address, user_agent, metadata, duration_ms,
+          old_value, new_value, reason, correlation_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (const entry of batch) {
@@ -248,11 +287,18 @@ class ActivityLoggerService {
           entry.ipAddress || null,
           entry.userAgent || null,
           entry.metadata ? JSON.stringify(entry.metadata) : null,
-          entry.durationMs || null
+          entry.durationMs || null,
+          capSnapshot(entry.oldValue),
+          capSnapshot(entry.newValue),
+          entry.reason || null,
+          entry.correlationId || null
         );
       }
     } catch (error: any) {
+      // Task 4.7: re-queue so nothing is silently lost; caller can detect failure.
+      this.logQueue.unshift(...batch);
       logger.error('[ActivityLogger] Failed to flush logs:', { error: error.message });
+      return false;
       // Re-add failed entries to queue
       this.logQueue.unshift(...batch);
     } finally {
@@ -398,5 +444,52 @@ export const getUserLogs = (...args: Parameters<typeof activityLogger.getByUser>
 export const getEntityLogs = (...args: Parameters<typeof activityLogger.getByEntity>) => activityLogger.getByEntity(...args);
 export const getActivityStats = (...args: Parameters<typeof activityLogger.getStats>) => activityLogger.getStats(...args);
 export const cleanupLogs = (...args: Parameters<typeof activityLogger.cleanup>) => activityLogger.cleanup(...args);
+/** Task 4.2: per-request correlation id shared by all trail rows of one flow. */
+export function newCorrelationId(): string {
+  return `corr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 export default activityLogger;
+
+/**
+ * Transactional activity-log write for model-layer code that runs INSIDE a
+ * database transaction (audit-remediation task 4.5). Unlike the queued
+ * service, this row commits/rolls back atomically with the business change.
+ */
+export function logActivityInTx(
+  db: import('better-sqlite3').Database,
+  entry: {
+    userId?: number;
+    action: string;
+    entityType: string;
+    entityId?: number | null;
+    description: string;
+    oldValue?: unknown;
+    newValue?: unknown;
+    reason?: string;
+    correlationId?: string;
+  }
+): void {
+  const MAX = 8 * 1024;
+  const cap = (v: unknown): string | null => {
+    if (v === undefined || v === null) return null;
+    const raw = typeof v === 'string' ? v : JSON.stringify(v);
+    return raw.length > MAX ? raw.slice(0, MAX - 32) + '...[truncated]' : raw;
+  };
+  db.prepare(`
+    INSERT INTO activity_log (
+      user_id, action, entity_type, entity_id, description, log_level,
+      old_value, new_value, reason, correlation_id
+    ) VALUES (?, ?, ?, ?, ?, 'INFO', ?, ?, ?, ?)
+  `).run(
+    entry.userId ?? null,
+    entry.action,
+    entry.entityType,
+    entry.entityId ?? null,
+    entry.description,
+    cap(entry.oldValue),
+    cap(entry.newValue),
+    entry.reason ?? null,
+    entry.correlationId ?? null
+  );
+}

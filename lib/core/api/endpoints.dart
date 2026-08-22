@@ -16,6 +16,7 @@ abstract final class ApiEndpoints {
   static const dashboardStockMovementSummary =
       '/dashboard/stock-movement-summary';
   static const dashboardKpi = '/dashboard/kpi';
+  static const dashboardKpiBatch = '/dashboard/kpi-batch';
   static const dashboardArSummary = '/dashboard/ar-summary';
   static const dashboardCashPosition = '/dashboard/cash-position';
   static const dashboardCashOpeningBalances = '/dashboard/cash-opening-balances';

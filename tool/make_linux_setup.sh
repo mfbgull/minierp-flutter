@@ -157,7 +157,20 @@ server_running() {
 start_server() {
   if server_running; then return 0; fi
   cd "$SERVER_DIR"
-  nohup "$NODE" dist/server.js >"$SERVER_DIR/logs/server.log" 2>&1 &
+  # DR-04 (audit-remediation 6.3): tracked process group + graceful trap so
+  # SIGTERM reaches the server and it can checkpoint WAL + flush audit logs.
+  cd "$SERVER_DIR"
+  setsid "$NODE" dist/server.js >"$SERVER_DIR/logs/server.log" 2>&1 &
+  SERVER_PID=$!
+  trap '
+    kill -TERM -- -'"$SERVER_PID"' 2>/dev/null
+    for i in 1 2 3 4 5 6; do
+      kill -0 '"$SERVER_PID"' 2>/dev/null || break
+      sleep 0.5
+    done
+    # Backstop after the 3s grace window
+    kill -9 -- -'"$SERVER_PID"' 2>/dev/null
+  ' EXIT INT TERM
   echo $! > "$PID_FILE"
   for _ in $(seq 1 60); do
     server_running && { echo "✓ API server ready on :$PORT"; return 0; }
@@ -218,11 +231,21 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -e "$DIR" ]; then
-  if [ "$FORCE" = 1 ]; then
-    rm -rf "$DIR";
-  else
+  if [ "$FORCE" != 1 ]; then
     echo "✗ $DIR already exists — re‑run with --force to overwrite." >&2; exit 1
   fi
+
+  # DR-07 (audit-remediation 7.5): upgrade path — back up existing database,
+  # uploads and .env before any removal, then restore them into the new install.
+  UPGRADE_TMP="$(mktemp -d)"
+  if [ -d "$DIR/server/database" ]; then
+    mkdir -p "$UPGRADE_TMP/database"
+    cp -a "$DIR/server/database/." "$UPGRADE_TMP/database/" 2>/dev/null || true
+  fi
+  [ -d "$DIR/server/uploads" ] && cp -a "$DIR/server/uploads" "$UPGRADE_TMP/uploads" 2>/dev/null
+  [ -f "$DIR/server/.env" ] && cp -a "$DIR/server/.env" "$UPGRADE_TMP/env" 2>/dev/null
+
+  rm -rf "$DIR";
 fi
 
 TMP="$(mktemp -d)"
@@ -234,7 +257,17 @@ tail -c +"$((MARKER_OFFSET + 20))" "$0" | tar -xzf - -C "$TMP"
 mkdir -p "$(dirname "$DIR")"
 mv "$TMP/minierp" "$DIR"
 chmod +x "$DIR/bundle/minierp_app" "$DIR/runtime/node" "$DIR/minierp" 2>/dev/null || true
-rm -f "$DIR/server/database/erp.db"
+# Restore upgraded data (7.5): user data survives the reinstall; only the
+# shipped placeholder DB is removed (including any -wal/-shm remnants).
+rm -f "$DIR/server/database/erp.db" "$DIR/server/database/erp.db-wal" "$DIR/server/database/erp.db-shm"
+if [ -n "$UPGRADE_TMP" ] && [ -d "$UPGRADE_TMP/database" ] && compgen -G "$UPGRADE_TMP/database/*" > /dev/null; then
+  mkdir -p "$DIR/server/database"
+  cp -a "$UPGRADE_TMP/database/." "$DIR/server/database/"
+  echo "↩ Restored existing database from previous install"
+fi
+[ -f "$UPGRADE_TMP/env" ] && cp -a "$UPGRADE_TMP/env" "$DIR/server/.env" && echo "↩ Restored server/.env"
+[ -d "$UPGRADE_TMP/uploads" ] && cp -a "$UPGRADE_TMP/uploads" "$DIR/server/" && echo "↩ Restored uploads"
+[ -n "$UPGRADE_TMP" ] && rm -rf "$UPGRADE_TMP"
 
 mkdir -p "$HOME/.local/bin"
 ln -sf "$DIR/minierp" "$HOME/.local/bin/minierp"

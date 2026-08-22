@@ -5,11 +5,14 @@ import app from './src/app';
 import db from './src/config/database';
 import settingsController from './src/controllers/settingsController';
 import logger from './src/utils/logger';
+import { flushLogs } from './src/services/activityLogger';
+import { startBackupScheduler } from './src/services/backupService';
 
 const PORT = parseInt(process.env.PORT || '3011', 10);
 const HOST = process.env.BIND_ADDRESS || process.env.HOST || '127.0.0.1';
 
 settingsController.initializeDefaults();
+startBackupScheduler();
 
 // Startup validation: check required env vars
 const requiredEnvVars = ['JWT_SECRET'];
@@ -20,6 +23,44 @@ const missingEnvVars = requiredEnvVars.filter(v => !process.env[v]);
 if (missingEnvVars.length > 0) {
   logger.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
   process.exit(1);
+}
+
+const SHUTDOWN_TIMEOUT_MS = 3000;
+
+/**
+ * Graceful shutdown (audit-remediation task 6.1 / DR-03):
+ *   stop accepting connections (bounded) → flush queued activity logs →
+ *   checkpoint WAL → close DB → exit.
+ */
+function gracefulExit(exitCode: number): void {
+  let timedOut = false;
+  const forceTimer = setTimeout(() => {
+    timedOut = true;
+    logger.warn('Graceful shutdown timeout — forcing exit');
+    db.close();
+    process.exit(exitCode || 1);
+  }, SHUTDOWN_TIMEOUT_MS);
+
+  server.close(() => {
+    if (timedOut) return;
+    clearTimeout(forceTimer);
+    try {
+      // Flush queued audit rows BEFORE closing the DB (task 4.7)
+      const ok = flushLogs();
+      if (!ok) logger.error('Activity-log flush failed during shutdown — rows remain queued and were lost');
+
+      // Checkpoint the WAL so the main DB file is complete on disk
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      // Task 8.8: refresh planner statistics before closing
+      db.pragma('optimize');
+      db.close();
+      logger.info('Graceful shutdown complete');
+      process.exit(exitCode);
+    } catch (err) {
+      logger.error('Error during graceful shutdown:', err);
+      process.exit(exitCode || 1);
+    }
+  });
 }
 
 const server: Server = app.listen(PORT, HOST, () => {
@@ -48,34 +89,25 @@ function getLocalIP(): string {
 
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Closing server...');
-  server.close(() => {
-    console.log('Server closed');
-    db.close();
-    process.exit(0);
-  });
+  gracefulExit(0);
 });
 
 process.on('SIGINT', () => {
   console.log('\nSIGINT received. Closing server...');
-  server.close(() => {
-    console.log('Server closed');
-    db.close();
-    process.exit(0);
-  });
+  gracefulExit(0);
+});
+
+process.on('SIGHUP', () => {
+  console.log('SIGHUP received. Closing server...');
+  gracefulExit(0);
 });
 
 process.on('unhandledRejection', (reason: unknown) => {
   logger.error('Unhandled Rejection:', reason);
-  server.close(() => {
-    db.close();
-    process.exit(1);
-  });
+  gracefulExit(1);
 });
 
 process.on('uncaughtException', (error: Error) => {
   logger.error('Uncaught Exception:', error);
-  server.close(() => {
-    db.close();
-    process.exit(1);
-  });
+  gracefulExit(1);
 });

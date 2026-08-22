@@ -7,6 +7,7 @@ import InvoiceModel from '../models/Invoice';
 import StockMovementModel from '../models/StockMovement';
 import WarehouseModel from '../models/Warehouse';
 import AccountingService from '../services/accountingService';
+import { ActionType, newCorrelationId, logActivityInTx } from '../services/activityLogger';
 import { parseCurrency, addCurrency, multiplyCurrency } from '../utils/currency';
 
 function generatePOSTransactionNo(): string {
@@ -258,10 +259,17 @@ function createPOSSale(req: AuthRequest, res: Response): void {
         }
       }
 
-      // Activity log
-      db.prepare('INSERT INTO activity_log (user_id, action, entity_type, entity_id, description) VALUES (?, ?, ?, ?, ?)').run(
-        userId, 'CREATE', 'POS', invoiceId, `POS Transaction ${transactionNo}: ${items.length} items`
-      );
+      // Activity log — task 4.5: attribute POS sales to the INVOICE entity,
+      // written transactionally via the shared helper.
+      logActivityInTx(db, {
+        userId,
+        action: ActionType.INVOICE_CREATE,
+        entityType: 'Invoice',
+        entityId: invoiceId,
+        description: `POS Transaction ${transactionNo}: ${items.length} items`,
+        newValue: { transaction_no: transactionNo, total, items: items.length },
+        correlationId: newCorrelationId()
+      });
 
       return {
         transaction_no: transactionNo,

@@ -107,6 +107,23 @@ class DashboardRepository {
         KpiResult.fromJson(json as Map<String, dynamic>),
   );
 
+  /// Task 8.5: `GET /dashboard/kpi-batch?metrics=a,b` — several KPIs in one
+  /// round trip. Values are returned as decoded JSON per metric key.
+  Future<ApiResult<Map<String, dynamic>>> kpiBatch({
+    required List<String> metrics,
+    String? fromDate,
+    String? toDate,
+  }) => _api.get(
+    ApiEndpoints.dashboardKpiBatch,
+    queryParameters: {
+      'metrics': metrics.join(','),
+      'fromDate': ?fromDate,
+      'toDate': ?toDate,
+    },
+    parse: (Object? json) =>
+        (json ?? <String, dynamic>{}) as Map<String, dynamic>,
+  );
+
   /// `GET /dashboard/ar-summary`.
   Future<ApiResult<ArSummaryResult>> arSummary() => _api.get(
     ApiEndpoints.dashboardArSummary,

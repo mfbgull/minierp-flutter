@@ -236,15 +236,104 @@ function repairOrphanedBatches(): void {
 
 // ── Entry point ──────────────────────────────────────────────────────
 
+function recalcInvoiceBalances(): void {
+  db.exec(`UPDATE invoices SET returned_amount = total_amount WHERE returned_amount > total_amount AND total_amount > 0;`);
+  db.exec(`
+    UPDATE invoices SET
+      paid_amount = COALESCE((SELECT SUM(pa.amount) FROM payment_allocations pa WHERE pa.invoice_id = invoices.id), 0),
+      balance_amount = MAX(0, total_amount - COALESCE((SELECT SUM(pa.amount) FROM payment_allocations pa WHERE pa.invoice_id = invoices.id), 0) - COALESCE(returned_amount, 0) + COALESCE(return_fee, 0))
+  `);
+  db.exec(`
+    UPDATE invoices SET status = 'Returned' WHERE returned_amount >= total_amount AND total_amount > 0;
+    UPDATE invoices SET status = 'Partially Returned' WHERE returned_amount > 0 AND returned_amount < total_amount AND total_amount > 0;
+    UPDATE invoices SET status = 'Paid' WHERE balance_amount <= 0 AND total_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
+    UPDATE invoices SET status = 'Partially Paid' WHERE balance_amount > 0 AND balance_amount < total_amount AND paid_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
+    UPDATE invoices SET status = 'Unpaid' WHERE (paid_amount = 0 OR paid_amount IS NULL) AND (returned_amount IS NULL OR returned_amount = 0) AND total_amount > 0;
+  `);
+  const n = (db.prepare('SELECT COUNT(*) AS n FROM invoices').get() as { n: number }).n;
+  console.log(`[INFO] Recalculated ${n} invoice(s) from payment_allocations`);
+}
+
+function fixPaymentLedgerDescriptions(): void {
+  const entries = db.prepare(`
+    SELECT cl.id, cl.reference_no, cl.description FROM customer_ledger cl
+    WHERE cl.transaction_type = 'PAYMENT' AND cl.description LIKE 'Payment against %'
+  `).all() as Array<{ id: number; reference_no: string; description: string }>;
+  let fixed = 0;
+  for (const entry of entries) {
+    const match = entry.description.match(/Payment against (.+)/);
+    if (!match) continue;
+    const invoiceRefs = match[1].split(',').map((s) => s.trim());
+    const nums = invoiceRefs.map((ref) => {
+      if (/[a-zA-Z]/.test(ref)) return ref;
+      const id = parseInt(ref, 10);
+      if (!isNaN(id)) {
+        const inv = db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(id) as { invoice_no: string } | undefined;
+        return inv ? inv.invoice_no : `Invoice #${id}`;
+      }
+      return ref;
+    });
+    const nd = `Payment against ${nums.join(', ')}`;
+    if (nd !== entry.description) {
+      db.prepare('UPDATE customer_ledger SET description = ? WHERE id = ?').run(nd, entry.id);
+      fixed++;
+    }
+  }
+  console.log(`[INFO] Fixed ${fixed} payment ledger description(s)`);
+}
+
+function recoverPaymentsInvoiceId(): void {
+  const candidates = db.prepare(`
+    SELECT pa.payment_id, MIN(pa.invoice_id) AS inv, COUNT(DISTINCT pa.invoice_id) AS n
+    FROM payment_allocations pa JOIN payments p ON p.id = pa.payment_id
+    WHERE p.invoice_id IS NULL GROUP BY pa.payment_id
+  `).all() as Array<{ payment_id: number; inv: number; n: number }>;
+  let recovered = 0;
+  for (const c of candidates) {
+    if (c.n !== 1) continue;
+    db.prepare('UPDATE payments SET invoice_id = ? WHERE id = ? AND invoice_id IS NULL').run(c.inv, c.payment_id);
+    recovered++;
+  }
+  console.log(`[INFO] Recovered invoice_id on ${recovered} payment(s)`);
+}
+
+/** VACUUM INTO backup before any mutation (task 3.4). */
+function takeBackup(): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const target = path.join(path.dirname(process.env.DATABASE_PATH || './database'), `pre-repair-${stamp}.db`);
+  db.exec(`VACUUM INTO '${target}'`);
+  console.log(`[INFO] Backup written to ${target}`);
+  return target;
+}
+
+const RUNNERS: Record<string, () => void> = {
+  'unbatched-stock': repairUnbatchedStock,
+  'orphaned-batches': repairOrphanedBatches,
+  'invoice-balances': recalcInvoiceBalances,
+  'payment-descriptions': fixPaymentLedgerDescriptions,
+  'recover-payments-invoice-id': recoverPaymentsInvoiceId,
+};
+
 switch (command) {
-  case 'unbatched-stock':
-    repairUnbatchedStock();
+  case 'all': {
+    takeBackup();
+    const run = db.transaction(() => {
+      for (const [name, fn] of Object.entries(RUNNERS)) {
+        console.log(`--- ${name} ---`);
+        fn();
+      }
+    });
+    run();
+    console.log('[INFO] ✅ Full repair complete');
     break;
-  case 'orphaned-batches':
-    repairOrphanedBatches();
-    break;
+  }
   default:
-    console.error('Usage: ts-node scripts/repair-stock.ts <unbatched-stock|orphaned-batches>');
+    if (RUNNERS[command]) {
+      takeBackup();
+      RUNNERS[command]();
+      break;
+    }
+    console.error(`Usage: ts-node scripts/repair-stock.ts <${Object.keys(RUNNERS).join('|')}|all>`);
     console.error('These are explicit opt-in repair scripts — they do NOT run at boot.');
     process.exit(1);
 }
