@@ -391,7 +391,11 @@ class GridNavController extends ChangeNotifier {
         break;
       case LineColumn.amount:
         if (data.isLoose) {
-          _applyDriver(row, LineField.amount, _parseNum(text));
+          final trimmed = text.trim();
+          if (trimmed.isNotEmpty) {
+            final parsed = _parseNum(trimmed);
+            _applyDriver(row, LineField.amount, parsed);
+          }
         }
         break;
     }

@@ -5,7 +5,6 @@ import bcrypt from 'bcrypt';
 import { log, logAuth, ActionType } from '../services/activityLogger';
 import logger from '../utils/logger';
 import UserModel from '../models/User';
-import RoleModel from '../models/Role';
 
 function getUsers(req: AuthRequest, res: Response): void {
   try {
@@ -81,12 +80,12 @@ function updateUser(req: AuthRequest, res: Response): void {
     const existingUser = UserModel.getPublicById(userId, db);
     if (!existingUser) { res.status(404).json({ error: 'User not found' }); return; }
 
-    if (req.user!.id === userId && role_id) {
-      const newRoleName = RoleModel.getById(db, role_id)?.role_name;
-      if (newRoleName !== 'Admin') {
-        res.status(400).json({ error: 'Cannot change your own role' });
-        return;
-      }
+    // SEC-04: own role is immutable through self-edit, full stop.
+    // Reject any self-edit containing role_id regardless of target role —
+    // the previous name comparison let a user promote themselves to Admin.
+    if (req.user!.id === userId && role_id !== undefined) {
+      res.status(400).json({ error: 'Cannot change your own role' });
+      return;
     }
 
     if (role_id && !UserModel.roleExists(db, role_id)) {

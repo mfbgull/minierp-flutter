@@ -9,7 +9,11 @@
     "build": "tsc && rm -rf dist/migrations && cp -r src/migrations dist/migrations && rm -rf dist/src/migrations && mkdir -p dist/src && cp -r src/migrations dist/src/migrations",
     "start:prod": "node dist/server.js",
     "test": "jest --forceExit",
-    "lint": "eslint src"
+    "typecheck": "tsc --noEmit",
+    "db:backup": "node scripts/backup-db.js",
+    "gl:dedupe-po": "node scripts/dedupe-po.js",
+    "gl:backfill-ledger-dates": "node scripts/backfill-ledger-dates.js",
+    "gl:recompute-item-amounts": "node scripts/recompute-item-amounts.js"
   },
   "keywords": [
     "erp",

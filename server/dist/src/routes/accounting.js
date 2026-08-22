@@ -35,6 +35,9 @@ router.get('/accounts', (0, requirePermission_1.requirePermission)('accounting',
 // GET /api/accounting/accounts/balances  (must come before /:code so it
 // doesn't get captured as a "code" param)
 router.get('/accounts/balances', (0, requirePermission_1.requirePermission)('accounting', 'read'), accountingController_1.default.listAccountBalances);
+// GET /api/accounting/reconciliation  (must come before /:code-style params;
+// GL vs operational balances per pairing)
+router.get('/reconciliation', (0, requirePermission_1.requirePermission)('accounting', 'read'), accountingController_1.default.getReconciliation);
 // GET /api/accounting/accounts/:code
 router.get('/accounts/:code', (0, requirePermission_1.requirePermission)('accounting', 'read'), accountingController_1.default.getAccount);
 // GET /api/accounting/accounts/:code/balance

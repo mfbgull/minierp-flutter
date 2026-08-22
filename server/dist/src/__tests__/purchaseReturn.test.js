@@ -26,6 +26,8 @@ function createFixture() {
         'create-supplier-ledger.sql',
         'add-gl-foundation.sql',
         'add-purchase-returns-tables.sql',
+        'create-customer-ledger.sql',
+        'add-gl-void-attribution.sql',
     ];
     for (const file of migrations) {
         const sql = fs_1.default.readFileSync(path_1.default.join(__dirname, '..', 'migrations', file), 'utf8');

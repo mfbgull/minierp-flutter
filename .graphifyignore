@@ -1,0 +1,21 @@
+# Agent / tooling dirs (not app code)
+.opencode/
+.kilo/
+.kilocode/
+.pi/
+graphify-out/
+
+# Generated Flutter desktop runners
+linux/
+windows/
+macos/
+
+# Tests (not app structure for the dependency graph)
+test/
+
+# Duplicate / reference-only trees
+references/
+reports/
+server-reference/
+calculations/
+tool/

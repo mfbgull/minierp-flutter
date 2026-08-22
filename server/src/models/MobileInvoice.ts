@@ -2,6 +2,8 @@ import Database from 'better-sqlite3';
 import StockMovementModel from './StockMovement';
 import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/sequence';
 import ledgerUtils from '../utils/ledgerUtils';
+import AccountingService from '../services/accountingService';
+import { parseCurrency, computeInvoiceTotal, computeLineAmount } from '../utils/currency';
 
 interface DraftRecord {
   id: number;
@@ -202,12 +204,14 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
   }
 
   return db.transaction(() => {
-    const subtotal = data.items.reduce((sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0), 0);
+    // ACC-18 interim: server-authoritative money — each line is
+    // round(qty × price − discount) with tax at the line boundary; the
+    // header total is the sum of those lines.
+    const totalAmount = computeInvoiceTotal(data.items);
     const totalTax = data.items.reduce((sum, item) => {
-      const itemSubtotal = (item.quantity || 0) * (item.unit_price || 0);
-      return sum + itemSubtotal * ((item.tax_rate || 0) / 100);
+      const gross = (item.quantity || 0) * (item.unit_price || 0);
+      return sum + gross * ((item.tax_rate || 0) / 100);
     }, 0);
-    const totalAmount = subtotal + totalTax;
 
     const invoiceResult = db.prepare(`
       INSERT INTO invoices (
@@ -232,7 +236,7 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
     const invoiceNo = data.invoice_no || (invoiceResult.lastInsertRowid ? `INV-${Date.now()}` : '');
 
     for (const item of data.items) {
-      const amount = (item.quantity || 0) * (item.unit_price || 0);
+      const amount = computeLineAmount(item);
       db.prepare(`
         INSERT INTO invoice_items (
           invoice_id, item_id, quantity, unit_price, amount, tax_rate, discount_type, discount_value
@@ -286,14 +290,60 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
       `).run(paymentAmount, totalAmount - paymentAmount, paymentAmount >= totalAmount ? 'Paid' : 'Partially Paid', invoiceId);
 
       // Create ledger entry for payment (credit to reduce AR)
-      ledgerUtils.createLedgerEntry(data.customer_id, 'PAYMENT', paymentNo, 0, paymentAmount, `Payment ${paymentNo} for Invoice ${invoiceId}`);
+      ledgerUtils.createLedgerEntry(data.customer_id, data.payment.payment_date || data.invoice_date, 'PAYMENT', paymentNo, 0, paymentAmount, `Payment ${paymentNo} for Invoice ${invoiceId}`);
     }
 
     // Create customer ledger entry for the invoice (debit to increase AR)
-    ledgerUtils.createLedgerEntry(data.customer_id, 'INVOICE', invoiceNo, totalAmount, 0, `Invoice ${invoiceNo}`);
+    ledgerUtils.createLedgerEntry(data.customer_id, data.invoice_date, 'INVOICE', invoiceNo, totalAmount, 0, `Invoice ${invoiceNo}`);
+
+    // GL postings (ACC-06): mobile invoices previously posted nothing.
+    // Same sequence as the standard invoice path — revenue entry with the
+    // computed tax split, COGS at recorded unit cost, and the payment
+    // entry when one was recorded inline.
+    AccountingService.postInvoiceEntry(db, {
+      invoiceId,
+      invoiceNo,
+      totalAmount,
+      invoiceDate: data.invoice_date,
+      userId: data.userId,
+      taxAmount: totalTax,
+    });
+
+    const cogsRows = db.prepare(`
+      SELECT quantity * unit_cost AS line_cogs FROM stock_movements
+      WHERE reference_doctype = 'INVOICE' AND reference_docno = ?
+        AND movement_type = 'SALE'
+    `).all(String(invoiceId)) as Array<{ line_cogs: number }>;
+    const cogsTotal = cogsRows.reduce((s, r) => s + Math.abs(Number(r.line_cogs)), 0);
+    if (cogsTotal > 0) {
+      AccountingService.postCOGSEntry(db, {
+        invoiceId,
+        invoiceNo,
+        cogsAmount: parseCurrency(cogsTotal),
+        invoiceDate: data.invoice_date,
+        userId: data.userId,
+      });
+    }
+
+    if (data.record_payment && data.payment && (data.payment.amount || 0) > 0) {
+      const payRow = db.prepare(
+        'SELECT id, payment_no, amount, payment_date, payment_method FROM payments WHERE invoice_id = ? ORDER BY id DESC LIMIT 1'
+      ).get(invoiceId) as { id: number; payment_no: string; amount: number; payment_date: string; payment_method: string } | undefined;
+      if (payRow) {
+        AccountingService.postPaymentEntry(db, {
+          paymentId: payRow.id,
+          paymentNo: payRow.payment_no,
+          amount: Number(payRow.amount),
+          paymentDate: payRow.payment_date,
+          paymentMethod: payRow.payment_method,
+          customerId: data.customer_id,
+          userId: data.userId,
+        });
+      }
+    }
 
     // Update customer balance
-    ledgerUtils.updateCustomerBalance(data.customer_id);
+    ledgerUtils.recalcCustomerBalanceFromLedger(data.customer_id);
 
     if (data.draft_id) {
       db.prepare('DELETE FROM invoice_drafts WHERE id = ?').run(data.draft_id);

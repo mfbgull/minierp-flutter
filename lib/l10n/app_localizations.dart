@@ -10448,6 +10448,40 @@ abstract class AppLocalizations {
   /// **'Expiry Report'**
   String get expiryReport;
 
+  /// No description provided for @expiryReportPagination.
+  ///
+  /// In en, this message translates to:
+  /// **'{totalRows} rows • Page {currentPage} of {totalPages}'**
+  String expiryReportPagination(
+    Object currentPage,
+    Object totalPages,
+    Object totalRows,
+  );
+
+  /// No description provided for @expiryReportFirstPage.
+  ///
+  /// In en, this message translates to:
+  /// **'First page'**
+  String get expiryReportFirstPage;
+
+  /// No description provided for @expiryReportPreviousPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous page'**
+  String get expiryReportPreviousPage;
+
+  /// No description provided for @expiryReportNextPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Next page'**
+  String get expiryReportNextPage;
+
+  /// No description provided for @expiryReportLastPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Last page'**
+  String get expiryReportLastPage;
+
   /// No description provided for @expiryAlerts.
   ///
   /// In en, this message translates to:

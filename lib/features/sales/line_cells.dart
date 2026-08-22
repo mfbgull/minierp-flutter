@@ -175,6 +175,13 @@ class _LineCellState extends State<LineCell> {
       _announcedEdit = true;
       _dismissed = false;
       _selectedAll = false;
+      // If the controller is empty (e.g. first edit after a fresh mount or
+      // after the row data was updated externally), seed it with the
+      // current cell value so the editor doesn't show blank/zero.
+      final controller = _editor;
+      if (controller != null && controller.text.isEmpty) {
+        controller.text = _displayText();
+      }
       // `autofocus` alone never focuses this editor inside the PlutoGrid
       // FocusScope — assert focus explicitly (spec §2.3/§5.2).
       _assertEditorFocus(_editFocus, this);

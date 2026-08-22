@@ -23,6 +23,8 @@ function createFixture(): Database.Database {
     'create-supplier-ledger.sql',
     'add-gl-foundation.sql',
     'add-purchase-returns-tables.sql',
+    'create-customer-ledger.sql',
+    'add-gl-void-attribution.sql',
   ];
 
   for (const file of migrations) {

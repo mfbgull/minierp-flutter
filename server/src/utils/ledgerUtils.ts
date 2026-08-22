@@ -1,21 +1,36 @@
 import db from '../config/database';
+import SupplierLedgerModel from '../models/SupplierLedger';
 import { parseCurrency, subtractCurrency, addCurrency } from './currency';
 
 /**
  * Create a ledger entry for a customer.
+ * ACC-12: carries the caller's real document date (invoice_date,
+ * payment_date, …) — never the server clock — so the running-balance
+ * chain follows (transaction_date, id) order over non-voided rows.
  * Wrapped in a transaction to prevent race conditions on running balance.
  * Uses currency utilities for safe arithmetic.
  */
-function createLedgerEntry(customerId: number, type: string, referenceNo: string, debit: number, credit: number, description: string): number {
+function createLedgerEntry(
+  customerId: number,
+  transactionDate: string,
+  type: string,
+  referenceNo: string,
+  debit: number,
+  credit: number,
+  description: string
+): number {
   const insertEntry = db.transaction(() => {
-    const lastBalanceResult = db.prepare(`
+    // ACC-12: the prior balance for a (possibly backdated) insert is the
+    // latest row at or BEFORE the new row's position in
+    // (transaction_date, id) order — never simply the newest row.
+    const priorResult = db.prepare(`
       SELECT balance FROM customer_ledger
-      WHERE customer_id = ?
-      ORDER BY id DESC
+      WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL AND transaction_date <= ?
+      ORDER BY transaction_date DESC, id DESC
       LIMIT 1
-    `).get(customerId) as { balance: number } | undefined;
+    `).get(customerId, transactionDate) as { balance: number } | undefined;
 
-    const lastBalance = parseCurrency(lastBalanceResult?.balance);
+    const lastBalance = parseCurrency(priorResult?.balance);
     const safeDebit = parseCurrency(debit);
     const safeCredit = parseCurrency(credit);
     const newBalance = subtractCurrency(addCurrency(lastBalance, safeDebit), safeCredit);
@@ -24,9 +39,10 @@ function createLedgerEntry(customerId: number, type: string, referenceNo: string
       INSERT INTO customer_ledger (
         customer_id, transaction_date, transaction_type, reference_no,
         debit, credit, balance, description
-      ) VALUES (?, date('now'), ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       customerId,
+      transactionDate,
       type,
       referenceNo,
       safeDebit,
@@ -34,28 +50,94 @@ function createLedgerEntry(customerId: number, type: string, referenceNo: string
       newBalance,
       description
     );
+    const newRowId = result.lastInsertRowid as number;
 
-    return result.lastInsertRowid as number;
+    // Rows positioned after the insert are stale; rebuild the whole chain
+    // in date order so every stored balance stays consistent.
+    rebuildLedgerBalances(customerId);
+
+    return newRowId;
   });
 
   return insertEntry();
 }
 
-function updateCustomerBalance(customerId: number): number {
+/**
+ * Append-only correction (ACC-14 / ACC-20): never delete a ledger row.
+ * Insert an equal-and-opposite REVERSAL row referencing the original via
+ * reversed_by, mark the original voided = 1, and rebuild the counterparty's
+ * stored chain. Works for both customer_ledger and supplier_ledger.
+ */
+function reverseLedgerEntry(
+  table: 'customer_ledger' | 'supplier_ledger',
+  rowId: number,
+  reason: string
+): number {
+  if (table !== 'customer_ledger' && table !== 'supplier_ledger') {
+    throw new Error(`Invalid ledger table: ${table}`);
+  }
+
   return db.transaction(() => {
-    const balanceResult = db.prepare(`
-      SELECT COALESCE(SUM(balance_amount), 0) as total_balance
-      FROM invoices
-      WHERE customer_id = ? AND status IN ('Unpaid', 'Partially Paid', 'Overdue')
-    `).get(customerId) as { total_balance: number };
+    const original = db.prepare(
+      `SELECT * FROM ${table} WHERE id = ?`
+    ).get(rowId) as Record<string, unknown> | undefined;
+    if (!original) throw new Error(`Ledger row ${rowId} not found in ${table}`);
+    if (Number(original.voided) === 1) {
+      throw new Error(`Ledger row ${rowId} is already voided`);
+    }
 
-    const newBalance = parseCurrency(balanceResult.total_balance);
+    const counterpartyKey = table === 'customer_ledger' ? 'customer_id' : 'supplier_id';
+    const counterpartyId = original[counterpartyKey] as number;
+    const debit = parseCurrency(original.debit as number);
+    const credit = parseCurrency(original.credit as number);
+    const originalType = String(original.transaction_type || '');
 
-    db.prepare('UPDATE customers SET current_balance = ? WHERE id = ?').run(newBalance, customerId);
+    // The reversal is positioned where the original sat in the chain —
+    // same transaction_date — so the rebuilt running balances treat the
+    // pair as a net-zero event at that point, not as an end-of-chain one.
+    const reversalDate = String(original.transaction_date || new Date().toISOString().slice(0, 10));
 
-    return newBalance;
+    // Latest non-voided balance for the counterparty.
+    const lastRow = db.prepare(
+      `SELECT balance FROM ${table}
+       WHERE ${counterpartyKey} = ? AND voided = 0
+       ORDER BY transaction_date DESC, id DESC LIMIT 1`
+    ).get(counterpartyId) as { balance: number } | undefined;
+    const lastBalance = parseCurrency(lastRow?.balance);
+    const reversalBalance = subtractCurrency(addCurrency(lastBalance, credit), debit);
+
+    const result = db.prepare(`
+      INSERT INTO ${table} (
+        ${counterpartyKey}, transaction_date, transaction_type, reference_no,
+        debit, credit, balance, description, reversed_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      counterpartyId,
+      reversalDate,
+      `REVERSAL:${originalType}`,
+      original.reference_no ?? null,
+      credit,   // swapped legs
+      debit,
+      reversalBalance,
+      `Reversal of ledger#${rowId}: ${reason}`,
+      rowId
+    );
+    const reversalId = result.lastInsertRowid as number;
+
+    db.prepare(`UPDATE ${table} SET voided = 1 WHERE id = ?`).run(rowId);
+
+    // Refresh stored balances for this counterparty in date order.
+    if (table === 'customer_ledger') {
+      rebuildLedgerBalances(counterpartyId);
+    } else {
+      SupplierLedgerModel.rebuildBalances(counterpartyId, db);
+    }
+
+    return reversalId;
   })();
 }
+
+
 
 function calculateInvoiceBalance(invoiceId: number): number {
   const invoice = db.prepare('SELECT total_amount, returned_amount, return_fee FROM invoices WHERE id = ?').get(invoiceId) as { total_amount: number; returned_amount?: number; return_fee?: number } | undefined;
@@ -127,10 +209,13 @@ function updateInvoiceStatus(invoiceId: number): string {
 
 function rebuildLedgerBalances(customerId: number): void {
   db.transaction(() => {
+    // ACC-14: voided rows are out; a REVERSAL row (reversed_by set) is
+    // also excluded — its voided original is already gone, so keeping the
+    // active half of the pair would double-count the correction.
     const entries = db.prepare(`
       SELECT id, debit, credit FROM customer_ledger
-      WHERE customer_id = ?
-      ORDER BY id ASC
+      WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL
+      ORDER BY transaction_date ASC, id ASC
     `).all(customerId) as Array<{ id: number; debit: number; credit: number }>;
 
     let runningBalance = 0;
@@ -143,9 +228,28 @@ function rebuildLedgerBalances(customerId: number): void {
   })();
 }
 
+/**
+ * Single authoritative customer-balance writer (ACC-13): the ledger sum
+ * over non-voided rows, not an open-invoice status heuristic.
+ */
+function recalcCustomerBalanceFromLedger(customerId: number): number {
+  return db.transaction(() => {
+    const row = db.prepare(`
+      SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS net
+      FROM customer_ledger
+      WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL
+    `).get(customerId) as { net: number };
+
+    const newBalance = parseCurrency(row.net);
+    db.prepare('UPDATE customers SET current_balance = ? WHERE id = ?').run(newBalance, customerId);
+    return newBalance;
+  })();
+}
+
 export default {
   createLedgerEntry,
-  updateCustomerBalance,
+  reverseLedgerEntry,
+  recalcCustomerBalanceFromLedger,
   calculateInvoiceBalance,
   updateInvoiceStatus,
   rebuildLedgerBalances

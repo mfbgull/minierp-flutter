@@ -10,6 +10,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const CustomReport_1 = __importDefault(require("../models/CustomReport"));
 const entityRegistry_1 = require("../services/entityRegistry");
 const reportQueryEngine_1 = require("../services/reportQueryEngine");
+const expressionValidator_1 = require("../services/expressionValidator");
 const logger_1 = __importDefault(require("../utils/logger"));
 /**
  * Validate a report config structure before saving.
@@ -73,6 +74,24 @@ function validateReportConfig(config) {
             const f = config.filters[i];
             if (f.field && !validFields.has(f.field)) {
                 errors.push({ field: `filters[${i}].field`, message: `Filter field "${f.field}" not found on entity "${config.entity}"` });
+            }
+        }
+    }
+    // REP-18: computed-column expressions must pass the safe-grammar
+    // validator before a config may be stored.
+    if (Array.isArray(config.computedColumns)) {
+        try {
+            (0, expressionValidator_1.validateConfigExpressions)(config, validFields);
+        }
+        catch (error) {
+            if (error instanceof expressionValidator_1.ExpressionValidationError) {
+                errors.push({
+                    field: 'computedColumns',
+                    message: `Invalid expression: ${error.message}`,
+                });
+            }
+            else {
+                throw error;
             }
         }
     }
@@ -276,8 +295,15 @@ function runReport(req, res) {
         });
     }
     catch (error) {
-        logger_1.default.error('Run report error:', error.message);
-        res.status(400).json({ error: error.message });
+        // REP-18: unsafe computed-column expressions surface as a 400 naming
+        // the offending token — identical for stored and inline configs.
+        if (error instanceof expressionValidator_1.ExpressionValidationError) {
+            res.status(400).json({ error: `Invalid report config: ${error.message}` });
+            return;
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        logger_1.default.error('Run report error:', message);
+        res.status(400).json({ error: message });
     }
 }
 // ── Entity & Template Discovery ──────────────────────────────
@@ -333,6 +359,18 @@ function createTemplate(req, res) {
             res.status(400).json({ error: 'Template config is required' });
             return;
         }
+        // REP-18: template configs are executed later — expressions must pass
+        // the safe-grammar validator before storage.
+        try {
+            (0, expressionValidator_1.validateConfigExpressions)(config, entityFieldNames(config.entity));
+        }
+        catch (error) {
+            if (error instanceof expressionValidator_1.ExpressionValidationError) {
+                res.status(400).json({ error: `Invalid template config: ${error.message}` });
+                return;
+            }
+            throw error;
+        }
         const template = CustomReport_1.default.createTemplate({
             name: name.trim(),
             description: description || undefined,
@@ -342,9 +380,21 @@ function createTemplate(req, res) {
         res.status(201).json({ success: true, data: parsed });
     }
     catch (error) {
-        logger_1.default.error('Create template error:', error.message);
+        const message = error instanceof Error ? error.message : 'Failed to create template';
+        logger_1.default.error('Create template error:', message);
         res.status(500).json({ error: 'Failed to create template' });
     }
+}
+/**
+ * Field-name scope for expression validation: every field of the config's
+ * entity. Computed-column names are added inside the validator.
+ */
+function entityFieldNames(entityKey) {
+    const entity = typeof entityKey === 'string' ? (0, entityRegistry_1.getEntity)(entityKey) : undefined;
+    if (!entity) {
+        return new Set();
+    }
+    return new Set(entity.fields.map((f) => f.name));
 }
 /**
  * GET /api/reports/custom/templates

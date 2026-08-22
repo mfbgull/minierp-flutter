@@ -253,7 +253,7 @@ export class PaymentModel {
         userId: data.userId,
       });
 
-      ledgerUtils.updateCustomerBalance(data.customer_id);
+      ledgerUtils.recalcCustomerBalanceFromLedger(data.customer_id);
 
       return paymentId;
     })();
@@ -390,6 +390,17 @@ export class PaymentModel {
 
       db.prepare('UPDATE suppliers SET current_balance = ? WHERE id = ?').run(newBalance, data.supplier_id);
 
+      // GL posting (ACC-03): Dr 2000 AP / Cr cash-per-method. Without this
+      // the cash the business paid out never leaves GL account 1000.
+      AccountingService.postSupplierPaymentEntry(db, {
+        paymentId,
+        paymentNo,
+        amount: parseCurrency(data.amount),
+        paymentDate: data.payment_date,
+        paymentMethod: data.payment_method,
+        userId: data.userId,
+      });
+
       return paymentId;
     })();
   }
@@ -411,9 +422,13 @@ export class PaymentModel {
           notes = COALESCE(?, notes) WHERE id = ?
       `).run(data.payment_date, data.amount, data.payment_method, data.reference_no, data.notes, id);
 
-      // If amount changed, recalculate allocations proportionally
+      // If amount changed, recalculate allocations proportionally and
+      // refresh the GL entry (ACC-09): void the posted Dr Cash / Cr AR
+      // lines, then re-post at the new amount below.
       if (amountChanged) {
         const newAmount = data.amount!;
+        AccountingService.voidJournalLinesByReference(db, 'PAYMENT', id);
+
         const allocations = db.prepare('SELECT id, invoice_id, amount FROM payment_allocations WHERE payment_id = ?').all(id) as { id: number; invoice_id: number; amount: number }[];
         const totalAllocated = allocations.reduce((sum, a) => sum + a.amount, 0);
 
@@ -443,7 +458,23 @@ export class PaymentModel {
         ledgerUtils.updateInvoiceStatus(alloc.invoice_id);
       }
 
-      ledgerUtils.updateCustomerBalance(existing.customer_id);
+      // Re-post the GL entry at the new amount/method (customer payments only;
+      // supplier payments post via their own flow).
+      if (existing.customer_id) {
+        const finalPayment = this.getById(db, id);
+        if (finalPayment) {
+          AccountingService.postPaymentEntry(db, {
+            paymentId: id,
+            paymentNo: finalPayment.payment_no,
+            amount: parseCurrency(finalPayment.amount),
+            paymentDate: finalPayment.payment_date,
+            paymentMethod: finalPayment.payment_method,
+            customerId: existing.customer_id,
+          });
+        }
+      }
+
+      ledgerUtils.recalcCustomerBalanceFromLedger(existing.customer_id);
     })();
   }
 
@@ -455,12 +486,30 @@ export class PaymentModel {
     if (!existing) throw new Error('Payment not found');
 
     db.transaction(() => {
+      // GL consistency (ACC-09): the payment's journal lines (Dr Cash /
+      // Cr AR, or supplier-side) must not survive as active orphans once
+      // the payment row is gone.
+      AccountingService.voidJournalLinesByReference(db, 'PAYMENT', id);
+
       const allocations = db.prepare('SELECT * FROM payment_allocations WHERE payment_id = ?').all(id) as Array<{ invoice_id: number }>;
       db.prepare('DELETE FROM payment_allocations WHERE payment_id = ?').run(id);
       db.prepare('DELETE FROM purchase_allocations WHERE payment_id = ?').run(id);
       db.prepare('DELETE FROM payments WHERE id = ?').run(id);
-      db.prepare('DELETE FROM customer_ledger WHERE reference_no = ?').run(existing.payment_no);
-      db.prepare('DELETE FROM supplier_ledger WHERE reference_no = ?').run(existing.payment_no);
+      // ACC-14: reverse the payment's subledger rows (append-only) instead
+      // of deleting them. Scoped by reference_no AND transaction_type so a
+      // colliding reference cannot touch another party's rows.
+      const custRows = db.prepare(
+        `SELECT id FROM customer_ledger WHERE reference_no = ? AND voided = 0 AND transaction_type = 'PAYMENT' AND customer_id = ?`
+      ).all(existing.payment_no, existing.customer_id) as Array<{ id: number }>;
+      for (const row of custRows) {
+        ledgerUtils.reverseLedgerEntry('customer_ledger', row.id, `payment ${existing.payment_no} deleted`);
+      }
+      const supRows = db.prepare(
+        `SELECT id FROM supplier_ledger WHERE reference_no = ? AND voided = 0 AND transaction_type = 'PAYMENT' AND supplier_id = ?`
+      ).all(existing.payment_no, existing.supplier_id) as Array<{ id: number }>;
+      for (const row of supRows) {
+        ledgerUtils.reverseLedgerEntry('supplier_ledger', row.id, `payment ${existing.payment_no} deleted`);
+      }
 
       if (existing.supplier_id) {
         // Deleting a payment may leave the running chain inconsistent
@@ -477,7 +526,7 @@ export class PaymentModel {
         }
       }
 
-      try { ledgerUtils.updateCustomerBalance(existing.customer_id); } catch (err) {
+      try { ledgerUtils.recalcCustomerBalanceFromLedger(existing.customer_id); } catch (err) {
         logger.warn('Payment.delete: failed to update customer balance', { customer_id: existing.customer_id, error: err instanceof Error ? err.message : err });
       }
 

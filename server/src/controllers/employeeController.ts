@@ -237,7 +237,7 @@ function paySalary(req: Request, res: Response): void {
         });
         if (result) journalEntryId = result.journal_entry_id;
       } catch (glError: any) {
-        throw new Error(`GL posting failed: ${glError.message}`);
+        throw new Error(`GL posting failed: ${glError.message}`, { cause: glError });
       }
 
       if (journalEntryId) {

@@ -23,6 +23,7 @@ import { AuthRequest } from '../types';
 import db from '../config/database';
 import AccountingService from '../services/accountingService';
 import PeriodModel from '../models/Period';
+import ReportsModel from '../models/Reports';
 import { logCRUD, ActionType } from '../services/activityLogger';
 import logger from '../utils/logger';
 import { getQueryParam, getRouteParam } from '../utils/queryUtils';
@@ -140,6 +141,27 @@ function getAccountBalance(req: AuthRequest, res: Response): void {
   } catch (error: unknown) {
     logger.error('Get account balance error:', error);
     sendInternalError(res, 'Failed to fetch account balance');
+  }
+}
+
+/**
+ * GET /api/accounting/reconciliation[?asOfDate=YYYY-MM-DD]
+ * GL vs operational balances per pairing (inventory, AR, AP, cash
+ * family). Read-only; makes every residual GL defect measurable.
+ */
+function getReconciliation(req: AuthRequest, res: Response): void {
+  try {
+    const asOfDate = getQueryParam(req.query.asOfDate) ?? new Date().toISOString().slice(0, 10);
+    if (!isValidIsoDate(asOfDate)) {
+      sendBadRequest(res, 'asOfDate must be a valid YYYY-MM-DD date');
+      return;
+    }
+
+    const report = ReportsModel.getGLReconciliation(asOfDate, db);
+    sendSuccess(res, report);
+  } catch (error: unknown) {
+    logger.error('GL reconciliation error:', error);
+    sendInternalError(res, 'Failed to build reconciliation report');
   }
 }
 
@@ -339,6 +361,8 @@ export default {
   getAccount,
   listAccountBalances,
   getAccountBalance,
+  // reconciliation
+  getReconciliation,
   // periods
   listPeriods,
   getCurrentPeriod,

@@ -14,6 +14,7 @@ exports.executeReport = executeReport;
 const database_1 = __importDefault(require("../config/database"));
 const entityRegistry_1 = require("./entityRegistry");
 const logger_1 = __importDefault(require("../utils/logger"));
+const expressionValidator_1 = require("./expressionValidator");
 // ── Relative Date Resolution ─────────────────────────────────
 const RELATIVE_DATE_TOKENS = {
     'today': "date('now')",
@@ -71,6 +72,11 @@ function executeReport(config) {
     if (!entityDef) {
         throw new Error(`Entity "${config.entity}" not found in registry`);
     }
+    // REP-18 defense in depth: validate computed-column expressions against the
+    // safe grammar BEFORE any SQL is built. Even if a controller misses this,
+    // nothing unvalidated ever reaches query construction.
+    const entityFieldNames = new Set(entityDef.fields.map(f => f.name));
+    (0, expressionValidator_1.validateConfigExpressions)(config, entityFieldNames);
     const ctx = {
         validFieldNames: new Set(entityDef.fields.map(f => f.name)),
         primaryTableAlias: 'e',

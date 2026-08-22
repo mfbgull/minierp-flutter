@@ -17,11 +17,39 @@ import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show warehousesProvider;
 import 'report_providers.dart';
 
-class ExpiryReportScreen extends ConsumerWidget {
+class ExpiryReportScreen extends ConsumerStatefulWidget {
   const ExpiryReportScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ExpiryReportScreen> createState() =>
+      _ExpiryReportScreenState();
+}
+
+class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
+  int _currentPage = 1;
+  int _pageSize = 50;
+
+  static const _pageSizeOptions = [25, 50, 100, 200];
+
+  @override
+  void initState() {
+    super.initState();
+    // Reset page when filters change
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listen(expiryReportWarehouseIdProvider, (_, __) {
+        if (mounted) setState(() => _currentPage = 1);
+      });
+      ref.listen(expiryReportStatusProvider, (_, __) {
+        if (mounted) setState(() => _currentPage = 1);
+      });
+      ref.listen(expiryReportThresholdProvider, (_, __) {
+        if (mounted) setState(() => _currentPage = 1);
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final report = ref.watch(expiryReportProvider);
 
@@ -37,7 +65,10 @@ class ExpiryReportScreen extends ConsumerWidget {
         ),
         ScreenToolbar(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          onRefresh: () => ref.invalidate(expiryReportProvider),
+          onRefresh: () {
+            setState(() => _currentPage = 1);
+            ref.invalidate(expiryReportProvider);
+          },
           actions: [
             TextButton.icon(
               onPressed: report.isLoading || report.valueOrNull == null
@@ -57,6 +88,7 @@ class ExpiryReportScreen extends ConsumerWidget {
         _Filters(),
         const SizedBox(height: 8),
         Expanded(child: _body(context, ref, report)),
+        _paginationBar(context, ref, report),
       ],
     );
   }
@@ -74,7 +106,10 @@ class ExpiryReportScreen extends ConsumerWidget {
     if (errorMessage != null) {
       return ScreenErrorPanel(
         message: errorMessage,
-        onRetry: () => ref.invalidate(expiryReportProvider),
+        onRetry: () {
+          setState(() => _currentPage = 1);
+          ref.invalidate(expiryReportProvider);
+        },
       );
     }
     if (report.isLoading) {
@@ -85,10 +120,18 @@ class ExpiryReportScreen extends ConsumerWidget {
       return Center(child: Text(l10n.reportsNodata));
     }
 
+    // Paginate
+    final totalPages = (data.length / _pageSize).ceil().clamp(1, 9999);
+    if (_currentPage > totalPages) _currentPage = totalPages;
+    final startIdx = (_currentPage - 1) * _pageSize;
+    final endIdx = (startIdx + _pageSize).clamp(0, data.length);
+    final pageData = data.sublist(startIdx, endIdx);
+
     return PlutoGrid(
+      key: ValueKey('$_currentPage-$_pageSize-${report.hashCode}'),
       configuration: const PlutoGridConfiguration(),
       columns: _columns(context, l10n),
-      rows: [for (final r in data) _toRow(r)],
+      rows: [for (final r in pageData) _toRow(r)],
       onLoaded: (e) =>
           e.stateManager.setSelectingMode(PlutoGridSelectingMode.none),
       rowColorCallback: (ctx) {
@@ -102,6 +145,104 @@ class ExpiryReportScreen extends ConsumerWidget {
           BatchStatus.normal => Colors.transparent,
         };
       },
+    );
+  }
+
+  Widget _paginationBar(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<List<ExpiryReportRow>> report,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final data = report.valueOrNull;
+    final totalRows = data?.length ?? 0;
+    final totalPages = (totalRows / _pageSize).ceil().clamp(1, 9999);
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    if (totalRows == 0) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        border: Border(
+          top: BorderSide(color: scheme.outlineVariant),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Row count
+          Text(
+            l10n.expiryReportPagination(totalRows, _currentPage, totalPages),
+            style: textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const Spacer(),
+          // Page size selector
+          Text(
+            'Per page: ',
+            style: textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          DropdownButton<int>(
+            value: _pageSize,
+            isDense: true,
+            underline: const SizedBox.shrink(),
+            items: [
+              for (final size in _pageSizeOptions)
+                DropdownMenuItem(value: size, child: Text('$size')),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() {
+                  _pageSize = value;
+                  _currentPage = 1;
+                });
+              }
+            },
+          ),
+          const SizedBox(width: 16),
+          // Navigation buttons
+          IconButton(
+            onPressed: _currentPage > 1
+                ? () => setState(() => _currentPage = 1)
+                : null,
+            icon: const Icon(Icons.first_page, size: 20),
+            tooltip: l10n.expiryReportFirstPage,
+          ),
+          IconButton(
+            onPressed: _currentPage > 1
+                ? () => setState(() => _currentPage--)
+                : null,
+            icon: const Icon(Icons.chevron_left, size: 20),
+            tooltip: l10n.expiryReportPreviousPage,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              '$_currentPage / $totalPages',
+              style: textTheme.bodyMedium,
+            ),
+          ),
+          IconButton(
+            onPressed: _currentPage < totalPages
+                ? () => setState(() => _currentPage++)
+                : null,
+            icon: const Icon(Icons.chevron_right, size: 20),
+            tooltip: l10n.expiryReportNextPage,
+          ),
+          IconButton(
+            onPressed: _currentPage < totalPages
+                ? () => setState(() => _currentPage = totalPages)
+                : null,
+            icon: const Icon(Icons.last_page, size: 20),
+            tooltip: l10n.expiryReportLastPage,
+          ),
+        ],
+      ),
     );
   }
 
@@ -178,8 +319,7 @@ class ExpiryReportScreen extends ConsumerWidget {
           BatchStatus.nearExpiry =>
             (const Color(0xffd97706), l10n.statusNearExpiry),
           BatchStatus.expired => (Colors.red, l10n.statusExpired),
-          BatchStatus.halted =>
-            (Colors.grey, l10n.statusHalted),
+          BatchStatus.halted => (Colors.grey, l10n.statusHalted),
         };
         return Container(
           alignment: Alignment.centerLeft,

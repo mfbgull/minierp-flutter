@@ -6,6 +6,8 @@ import { getNextSequenceNumber } from '../utils/sequence';
 import InvoiceModel from '../models/Invoice';
 import StockMovementModel from '../models/StockMovement';
 import WarehouseModel from '../models/Warehouse';
+import AccountingService from '../services/accountingService';
+import { parseCurrency, addCurrency, multiplyCurrency } from '../utils/currency';
 
 function generatePOSTransactionNo(): string {
   const year = new Date().getFullYear();
@@ -60,6 +62,7 @@ function createPOSSale(req: AuthRequest, res: Response): void {
       return;
     }
 
+    // ACC-18 interim: the server computes each line (rounded) and sums.
     let total = 0;
     for (const item of items) {
       if (!item.item_id || !item.quantity || item.quantity <= 0) {
@@ -70,7 +73,7 @@ function createPOSSale(req: AuthRequest, res: Response): void {
         res.status(400).json({ error: 'Each item must have a valid unit_price' });
         return;
       }
-      total += item.quantity * item.unit_price;
+      total = addCurrency(total, multiplyCurrency(item.quantity, item.unit_price));
     }
 
     const cashAmount = parseFloat(cash_received) || total;
@@ -196,11 +199,64 @@ function createPOSSale(req: AuthRequest, res: Response): void {
         const paymentId = InvoiceModel.createPayment(db, paymentNo, walkinCustomerId, sale_date, cashAmount, 'Cash', null, `POS Transaction ${transactionNo}`);
         InvoiceModel.createPaymentAllocation(db, paymentId, invoiceId, cashAmount);
         // Create ledger entry for payment
-        InvoiceModel.createLedgerEntry(db, walkinCustomerId, 'PAYMENT', paymentNo, 0, cashAmount, `Payment ${paymentNo} for POS ${transactionNo}`);
+        InvoiceModel.createLedgerEntry(db, walkinCustomerId, 'PAYMENT', paymentNo, sale_date, 0, cashAmount, `Payment ${paymentNo} for POS ${transactionNo}`);
       }
 
       // Create ledger entry for the sale
-      InvoiceModel.createLedgerEntry(db, walkinCustomerId, 'INVOICE', transactionNo, total, 0, `POS Sale ${transactionNo}`);
+      InvoiceModel.createLedgerEntry(db, walkinCustomerId, 'INVOICE', transactionNo, sale_date, total, 0, `POS Sale ${transactionNo}`);
+
+      // GL postings (ACC-05): POS sales previously posted nothing to the
+      // journal. Route them through the same sequence as the standard
+      // invoice path — revenue entry, COGS entry (actual FIFO cost), and
+      // the cash payment entry. Any failure rethrows and rolls back the
+      // whole sale (salary-payment reference pattern).
+      let posCogsTotal = 0;
+      for (const detail of itemDetails) {
+        const cogsRows = db.prepare(`
+          SELECT sm.quantity * sm.unit_cost AS line_cogs
+          FROM stock_movements sm
+          WHERE sm.reference_doctype = 'POS' AND sm.reference_docno = ?
+            AND sm.item_id = ? AND sm.movement_type = 'SALE'
+        `).all(transactionNo, detail.item_id) as Array<{ line_cogs: number }>;
+        posCogsTotal += cogsRows.reduce((s, r) => s + Math.abs(Number(r.line_cogs)), 0);
+      }
+
+      const computedPosTax = 0; // POS cart carries no tax_rate today (ACC-19 scope)
+      AccountingService.postInvoiceEntry(db, {
+        invoiceId,
+        invoiceNo: transactionNo,
+        totalAmount: total,
+        invoiceDate: sale_date,
+        userId,
+        taxAmount: computedPosTax,
+      });
+
+      if (posCogsTotal > 0) {
+        AccountingService.postCOGSEntry(db, {
+          invoiceId,
+          invoiceNo: transactionNo,
+          cogsAmount: parseCurrency(posCogsTotal),
+          invoiceDate: sale_date,
+          userId,
+        });
+      }
+
+      if (cashAmount > 0) {
+        const posPayment = db.prepare(
+          'SELECT id FROM payments WHERE notes = ? ORDER BY id DESC LIMIT 1'
+        ).get(`POS Transaction ${transactionNo}`) as { id: number } | undefined;
+        if (posPayment) {
+          AccountingService.postPaymentEntry(db, {
+            paymentId: posPayment.id,
+            paymentNo: `POS-${transactionNo}`,
+            amount: cashAmount,
+            paymentDate: sale_date,
+            paymentMethod: 'cash',
+            customerId: walkinCustomerId,
+            userId,
+          });
+        }
+      }
 
       // Activity log
       db.prepare('INSERT INTO activity_log (user_id, action, entity_type, entity_id, description) VALUES (?, ?, ?, ?, ?)').run(

@@ -21,12 +21,15 @@ import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/item.dart' show Item;
+import '../../data/repositories/inventory_repository.dart' show inventoryRepositoryProvider;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
+import '../../widgets/app_toast.dart';
+import '../../widgets/confirm_dialog.dart';
 import 'inventory_providers.dart';
 import 'item_detail_dialog.dart';
 import 'item_form_dialog.dart';
@@ -151,7 +154,37 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
         label: l10n.commonEdit,
         onTap: () => showItemFormDialog(context, item: item),
       ),
+      GridRowAction(
+        icon: Icons.delete_outline,
+        label: l10n.commonDelete,
+        onTap: () => _deleteItem(item),
+      ),
     ];
+  }
+
+  Future<void> _deleteItem(Item item) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonDelete,
+      message: '${l10n.inventoryConfirmdelete} ${item.itemName}?',
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final result = await ref
+        .read(inventoryRepositoryProvider)
+        .delete(item.id);
+    if (!mounted) return;
+    result.fold(
+      onSuccess: (_) {
+        ref.invalidate(itemsProvider);
+        showAppToast(context, l10n.inventoryItemdeleted);
+      },
+      onFailure: (err) => showAppToast(context, err.message, isError: true),
+    );
   }
 
   @override

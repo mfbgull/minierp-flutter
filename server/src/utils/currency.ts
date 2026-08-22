@@ -23,6 +23,52 @@ export function multiplyCurrency(a: number, b: number): number {
 }
 
 /**
+ * Server-authoritative line amount (ACC-18 interim): the stored
+ * invoice_items.amount is always round(qty × unit_price − discount) with
+ * tax applied at the line boundary. discount_type 'percentage' treats
+ * discount_value as a percent of the gross; 'flat' as an absolute amount.
+ */
+export function computeLineAmount(args: {
+  quantity: number;
+  unit_price: number;
+  tax_rate?: number;
+  discount_type?: string;
+  discount_value?: number;
+}): number {
+  const gross = multiplyCurrency(args.quantity, args.unit_price);
+  const discountValue = parseCurrency(args.discount_value || 0);
+  let net = gross;
+  if (discountValue > 0) {
+    const discountAmount = args.discount_type === 'flat'
+      ? roundCurrency(discountValue)
+      : roundCurrency(gross * (discountValue / 100));
+    net = subtractCurrency(gross, Math.min(discountAmount, gross));
+  }
+  const taxRate = parseCurrency(args.tax_rate || 0);
+  if (taxRate !== 0) {
+    net = addCurrency(net, roundCurrency(net * (taxRate / 100)));
+  }
+  return net;
+}
+
+/**
+ * Header total = Σ of server-computed line amounts.
+ */
+export function computeInvoiceTotal(items: Array<{
+  quantity: number;
+  unit_price: number;
+  tax_rate?: number;
+  discount_type?: string;
+  discount_value?: number;
+}>): number {
+  let total = 0;
+  for (const item of items) {
+    total = addCurrency(total, computeLineAmount(item));
+  }
+  return total;
+}
+
+/**
  * Safely parse a value to a currency number.
  * Returns 0 for null, undefined, NaN, or non-numeric strings.
  */

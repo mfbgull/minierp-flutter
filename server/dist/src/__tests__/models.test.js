@@ -659,6 +659,75 @@ describe('StockMovementModel', () => {
             expect(history[0].payment_method).toBe('Bank Transfer');
         });
     });
+    describe('supplier payment purchase_order_id linking', () => {
+        let supId;
+        let poId;
+        let poId2;
+        let purchaseId;
+        beforeAll(() => {
+            const r = database_1.default.prepare(`INSERT INTO suppliers (supplier_code, supplier_name, is_active) VALUES (?, ?, 1)`).run(`POID-SUP-${Date.now()}`, 'PO Id Link Test');
+            supId = Number(r.lastInsertRowid);
+            const po = PurchaseOrder_1.default.create({ supplier_id: supId, po_date: '2026-08-01', status: 'Draft', items: [{ item_id: 1, quantity: 5, unit_price: 20 }] }, 1, database_1.default);
+            poId = po.id;
+            const po2 = PurchaseOrder_1.default.create({ supplier_id: supId, po_date: '2026-08-01', status: 'Draft', items: [{ item_id: 1, quantity: 3, unit_price: 20 }] }, 1, database_1.default);
+            poId2 = po2.id;
+            const pr = database_1.default.prepare(`INSERT INTO purchases (purchase_no, item_id, warehouse_id, quantity, unit_cost, total_cost, supplier_id, created_by, purchase_date)
+         VALUES (?, ?, 1, 1, 10, 10, ?, ?, '2026-08-01')`).run(`POID-PUR-${Date.now()}`, 1, supId, 1);
+            purchaseId = Number(pr.lastInsertRowid);
+        });
+        afterAll(() => {
+            const pids = database_1.default.prepare('SELECT id FROM payments WHERE supplier_id = ?').all(supId);
+            for (const p of pids)
+                Payment_1.default.delete(database_1.default, p.id);
+            if (purchaseId)
+                database_1.default.prepare('DELETE FROM purchases WHERE id = ?').run(purchaseId);
+            PurchaseOrder_1.default.delete(poId, 1, database_1.default);
+            PurchaseOrder_1.default.delete(poId2, 1, database_1.default);
+            database_1.default.prepare('DELETE FROM supplier_ledger WHERE supplier_id = ?').run(supId);
+            database_1.default.prepare('DELETE FROM suppliers WHERE id = ?').run(supId);
+        });
+        it('sets purchase_order_id for a single-PO supplier payment', () => {
+            const paymentId = Payment_1.default.createSupplierPayment(database_1.default, {
+                supplier_id: supId,
+                payment_date: '2026-08-02',
+                amount: 50,
+                po_allocations: [{ po_id: String(poId), amount: 50 }],
+                purchase_allocations: [],
+                userId: 1,
+            });
+            const row = database_1.default.prepare('SELECT purchase_order_id FROM payments WHERE id = ?').get(paymentId);
+            expect(row.purchase_order_id).toBe(poId);
+            const alloc = database_1.default.prepare('SELECT po_id FROM po_allocations WHERE payment_id = ?').get(paymentId);
+            expect(alloc.po_id).toBe(poId);
+        });
+        it('leaves purchase_order_id NULL for a multi-PO supplier payment', () => {
+            const paymentId = Payment_1.default.createSupplierPayment(database_1.default, {
+                supplier_id: supId,
+                payment_date: '2026-08-03',
+                amount: 80,
+                po_allocations: [
+                    { po_id: String(poId), amount: 50 },
+                    { po_id: String(poId2), amount: 30 },
+                ],
+                purchase_allocations: [],
+                userId: 1,
+            });
+            const row = database_1.default.prepare('SELECT purchase_order_id FROM payments WHERE id = ?').get(paymentId);
+            expect(row.purchase_order_id).toBeNull();
+        });
+        it('leaves purchase_order_id NULL for a mixed PO + purchase supplier payment', () => {
+            const paymentId = Payment_1.default.createSupplierPayment(database_1.default, {
+                supplier_id: supId,
+                payment_date: '2026-08-04',
+                amount: 35,
+                po_allocations: [{ po_id: String(poId2), amount: 30 }],
+                purchase_allocations: [{ purchase_id: String(purchaseId), amount: 5 }],
+                userId: 1,
+            });
+            const row = database_1.default.prepare('SELECT purchase_order_id FROM payments WHERE id = ?').get(paymentId);
+            expect(row.purchase_order_id).toBeNull();
+        });
+    });
     describe('recordBatchMovement', () => {
         let testItemId2;
         let testWhId2;

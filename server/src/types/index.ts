@@ -536,7 +536,7 @@ export interface StockBatch {
   batch_no: string;
   item_id: number;
   warehouse_id: number;
-  source_type: 'PRODUCTION' | 'PURCHASE';
+  source_type: 'PRODUCTION' | 'PURCHASE' | 'GOODS_RECEIPT' | 'RETURN' | 'ADJUSTMENT' | 'OPENING' | 'TRANSFER' | 'RECON';
   source_id: number;
   quantity_original: number;
   quantity_remaining: number;

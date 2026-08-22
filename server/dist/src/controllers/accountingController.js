@@ -25,6 +25,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const database_1 = __importDefault(require("../config/database"));
 const accountingService_1 = __importDefault(require("../services/accountingService"));
 const Period_1 = __importDefault(require("../models/Period"));
+const Reports_1 = __importDefault(require("../models/Reports"));
 const activityLogger_1 = require("../services/activityLogger");
 const logger_1 = __importDefault(require("../utils/logger"));
 const queryUtils_1 = require("../utils/queryUtils");
@@ -134,6 +135,26 @@ function getAccountBalance(req, res) {
     catch (error) {
         logger_1.default.error('Get account balance error:', error);
         (0, apiResponse_1.sendInternalError)(res, 'Failed to fetch account balance');
+    }
+}
+/**
+ * GET /api/accounting/reconciliation[?asOfDate=YYYY-MM-DD]
+ * GL vs operational balances per pairing (inventory, AR, AP, cash
+ * family). Read-only; makes every residual GL defect measurable.
+ */
+function getReconciliation(req, res) {
+    try {
+        const asOfDate = (0, queryUtils_1.getQueryParam)(req.query.asOfDate) ?? new Date().toISOString().slice(0, 10);
+        if (!isValidIsoDate(asOfDate)) {
+            (0, apiResponse_1.sendBadRequest)(res, 'asOfDate must be a valid YYYY-MM-DD date');
+            return;
+        }
+        const report = Reports_1.default.getGLReconciliation(asOfDate, database_1.default);
+        (0, apiResponse_1.sendSuccess)(res, report);
+    }
+    catch (error) {
+        logger_1.default.error('GL reconciliation error:', error);
+        (0, apiResponse_1.sendInternalError)(res, 'Failed to build reconciliation report');
     }
 }
 // ============================================================================
@@ -302,6 +323,8 @@ exports.default = {
     getAccount,
     listAccountBalances,
     getAccountBalance,
+    // reconciliation
+    getReconciliation,
     // periods
     listPeriods,
     getCurrentPeriod,

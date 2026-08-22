@@ -22,8 +22,46 @@
  *     accessible via the non-journal sources used by the BS (AR from
  *     invoices, AP from supplier_ledger, inventory from stock_batches).
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AccountingService = void 0;
+const logger_1 = __importDefault(require("../utils/logger"));
+const activityLogger_1 = __importStar(require("./activityLogger"));
 class AccountingService {
     // ------------------------------------------------------------------
     // Account lookups
@@ -152,12 +190,42 @@ class AccountingService {
             throw new Error(`Unbalanced journal entry: total debit ${totalDebit.toFixed(2)} != ` +
                 `total credit ${totalCredit.toFixed(2)}`);
         }
-        // Period check
-        const openPeriod = db.prepare(`
+        // Period check — auto-create the calendar-month period when the
+        // entry date falls outside every existing period (ACC-11 rollover).
+        // INSERT ... ON CONFLICT DO NOTHING keeps concurrent postings
+        // idempotent; runs inside the caller's transaction so a failed
+        // posting rolls the period back with it.
+        let openPeriod = db.prepare(`
       SELECT id, period_name FROM accounting_periods
       WHERE status = 'open'
         AND start_date <= ? AND end_date >= ?
     `).get(input.entry_date, input.entry_date);
+        if (!openPeriod) {
+            const periodName = input.entry_date.slice(0, 7);
+            const startDate = `${periodName}-01`;
+            const endDate = AccountingService.monthEndDate(periodName);
+            db.prepare(`
+        INSERT INTO accounting_periods (period_name, start_date, end_date, status)
+        VALUES (?, ?, ?, 'open')
+        ON CONFLICT(period_name) DO NOTHING
+      `).run(periodName, startDate, endDate);
+            openPeriod = db.prepare(`
+        SELECT id, period_name FROM accounting_periods
+        WHERE status = 'open'
+          AND start_date <= ? AND end_date >= ?
+      `).get(input.entry_date, input.entry_date);
+            if (openPeriod) {
+                logger_1.default.warn(`Auto-created accounting period ${periodName} (${startDate}..${endDate}) ` +
+                    `for entry date ${input.entry_date}`);
+                activityLogger_1.default.log({
+                    action: activityLogger_1.ActionType.SETTING_UPDATE,
+                    entityType: 'AccountingPeriod',
+                    entityId: openPeriod.id,
+                    description: `Accounting period ${periodName} auto-created for posting dated ${input.entry_date}`,
+                    logLevel: activityLogger_1.LogLevel.WARNING,
+                });
+            }
+        }
         if (!openPeriod) {
             throw new Error(`No open accounting period covers ${input.entry_date}. ` +
                 `Open a period in accounting_periods before posting.`);
@@ -187,6 +255,13 @@ class AccountingService {
             total_debit: totalDebit,
             total_credit: totalCredit
         };
+    }
+    /**
+     * Last calendar day of a `YYYY-MM` period name.
+     */
+    static monthEndDate(periodName) {
+        const [year, month] = periodName.split('-').map(Number);
+        return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
     }
     // ------------------------------------------------------------------
     // Convenience helpers for transactional postings
@@ -295,6 +370,106 @@ class AccountingService {
                 { account_id: ap.id, credit: args.totalAmount, description: `AP created for ${args.poNo}` },
             ],
         });
+    }
+    /**
+     * Post a direct purchase (gl-posting-completeness / ACC-02).
+     * Dr 1200 Inventory Asset / Cr 2000 AP (credit) or Cr cash-per-method
+     * (paid immediately). Called inside the recordPurchase transaction.
+     */
+    static postPurchaseEntry(db, args) {
+        if (!args.totalCost || args.totalCost <= 0)
+            return null;
+        const inventory = AccountingService.getAccountByCode(db, '1200');
+        if (!inventory) {
+            throw new Error('Chart of accounts is missing required account: 1200 (Inventory Asset)');
+        }
+        const creditAccount = AccountingService.purchaseCreditAccount(db, args.paymentMethod);
+        return AccountingService.postEntry(db, {
+            entry_date: args.purchaseDate,
+            description: `Purchase ${args.purchaseNo} — total ${args.totalCost.toFixed(2)}`,
+            reference_type: 'PURCHASE',
+            reference_id: args.purchaseId,
+            created_by: args.userId,
+            lines: [
+                { account_id: inventory.id, debit: args.totalCost, description: `Inventory received via ${args.purchaseNo}` },
+                { account_id: creditAccount.id, credit: args.totalCost, description: `Obligation for ${args.purchaseNo}` },
+            ],
+        });
+    }
+    /**
+     * Post a supplier payment (ACC-03): Dr 2000 AP / Cr cash-per-method.
+     * Called inside the createSupplierPayment transaction.
+     */
+    static postSupplierPaymentEntry(db, args) {
+        if (!args.amount || args.amount <= 0)
+            return null;
+        const ap = AccountingService.getAccountByCode(db, '2000');
+        if (!ap) {
+            throw new Error('Chart of accounts is missing required account: 2000 (Accounts Payable)');
+        }
+        const cashCode = AccountingService._cashOrBankAccountCode(args.paymentMethod);
+        const cash = AccountingService.getAccountByCode(db, cashCode);
+        if (!cash) {
+            throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
+        }
+        return AccountingService.postEntry(db, {
+            entry_date: args.paymentDate,
+            description: `Supplier payment ${args.paymentNo} — ${args.amount.toFixed(2)} (${cashCode})`,
+            reference_type: 'PAYMENT',
+            reference_id: args.paymentId,
+            created_by: args.userId,
+            lines: [
+                { account_id: ap.id, debit: args.amount, description: `AP settled by ${args.paymentNo}` },
+                { account_id: cash.id, credit: args.amount, description: `Cash paid via ${args.paymentNo}` },
+            ],
+        });
+    }
+    /**
+     * Post an expense (ACC-04): Dr 6000 Operating Expenses /
+     * Cr cash-per-method. Called inside the expense-create transaction.
+     */
+    static postExpenseEntry(db, args) {
+        if (!args.amount || args.amount <= 0)
+            return null;
+        const opex = AccountingService.getAccountByCode(db, '6000');
+        if (!opex) {
+            throw new Error('Chart of accounts is missing required account: 6000 (Operating Expenses)');
+        }
+        const cashCode = AccountingService._cashOrBankAccountCode(args.paymentMethod);
+        const cash = AccountingService.getAccountByCode(db, cashCode);
+        if (!cash) {
+            throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
+        }
+        return AccountingService.postEntry(db, {
+            entry_date: args.expenseDate,
+            description: `Expense ${args.expenseNo} — ${args.amount.toFixed(2)} (${cashCode})`,
+            reference_type: 'EXPENSE',
+            reference_id: args.expenseId,
+            created_by: args.userId,
+            lines: [
+                { account_id: opex.id, debit: args.amount, description: `Expense incurred via ${args.expenseNo}` },
+                { account_id: cash.id, credit: args.amount, description: `Cash paid for ${args.expenseNo}` },
+            ],
+        });
+    }
+    /**
+     * Credit-side account for a purchase: AP when bought on credit,
+     * otherwise the cash/bank/wallet implied by the payment method.
+     */
+    static purchaseCreditAccount(db, paymentMethod) {
+        if (!paymentMethod || paymentMethod.toLowerCase() === 'credit') {
+            const ap = AccountingService.getAccountByCode(db, '2000');
+            if (!ap) {
+                throw new Error('Chart of accounts is missing required account: 2000 (Accounts Payable)');
+            }
+            return ap;
+        }
+        const code = AccountingService._cashOrBankAccountCode(paymentMethod);
+        const cash = AccountingService.getAccountByCode(db, code);
+        if (!cash) {
+            throw new Error(`Chart of accounts is missing required account: ${code}`);
+        }
+        return cash;
     }
     /**
      * Map a payment method string to a chart-of-accounts code.
@@ -571,14 +746,17 @@ class AccountingService {
      * Safe to call even if no matching lines exist (no-op). Returns the
      * number of lines voided.
      */
-    static voidJournalLinesByReference(db, referenceType, referenceId) {
+    static voidJournalLinesByReference(db, referenceType, referenceId, attribution) {
         const result = db.prepare(`
       UPDATE journal_lines
-      SET voided = 1
+      SET voided = 1,
+          voided_at = CURRENT_TIMESTAMP,
+          voided_by = ?,
+          void_reason = ?
       WHERE reference_type = ?
         AND reference_id = ?
         AND voided = 0
-    `).run(referenceType, referenceId);
+    `).run(attribution?.voidedBy ?? null, attribution?.voidReason ?? null, referenceType, referenceId);
         return result.changes;
     }
     // ------------------------------------------------------------------

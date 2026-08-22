@@ -8,7 +8,6 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const activityLogger_1 = require("../services/activityLogger");
 const logger_1 = __importDefault(require("../utils/logger"));
 const User_1 = __importDefault(require("../models/User"));
-const Role_1 = __importDefault(require("../models/Role"));
 function getUsers(req, res) {
     try {
         const { role, is_active, search } = req.query;
@@ -79,12 +78,12 @@ function updateUser(req, res) {
             res.status(404).json({ error: 'User not found' });
             return;
         }
-        if (req.user.id === userId && role_id) {
-            const newRoleName = Role_1.default.getById(database_1.default, role_id)?.role_name;
-            if (newRoleName !== 'Admin') {
-                res.status(400).json({ error: 'Cannot change your own role' });
-                return;
-            }
+        // SEC-04: own role is immutable through self-edit, full stop.
+        // Reject any self-edit containing role_id regardless of target role —
+        // the previous name comparison let a user promote themselves to Admin.
+        if (req.user.id === userId && role_id !== undefined) {
+            res.status(400).json({ error: 'Cannot change your own role' });
+            return;
         }
         if (role_id && !User_1.default.roleExists(database_1.default, role_id)) {
             res.status(400).json({ error: 'Invalid role' });

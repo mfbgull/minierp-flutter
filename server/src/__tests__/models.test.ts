@@ -241,7 +241,7 @@ describe('WarehouseModel', () => {
   describe('update', () => {
     it('updates warehouse fields', () => {
       WarehouseModel.update(db, createdWarehouseId, {
-        warehouse_code: (WarehouseModel.getById(db, createdWarehouseId)?.warehouse_code)!,
+        warehouse_code: WarehouseModel.getById(db, createdWarehouseId)!.warehouse_code,
         warehouse_name: 'Updated Warehouse',
         location: 'Updated Location',
       });
@@ -617,7 +617,7 @@ describe('StockMovementModel', () => {
 
   describe('Purchase supplier/payment flow', () => {
     let itemId: number;
-    let warehouseId = 1;
+    const warehouseId = 1;
     let supplierId: number;
     let purchaseId: number;
     let purchaseNo: string;

@@ -1,5 +1,9 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
+const accountingService_1 = __importDefault(require("../services/accountingService"));
 function generateExpenseNo(db, expenseDate) {
     const date = new Date(expenseDate);
     const year = date.getFullYear().toString().slice(-2);
@@ -14,13 +18,28 @@ function generateExpenseNo(db, expenseDate) {
     return `EXP-${year}${month}-0001`;
 }
 function create(db, data) {
-    const result = db.prepare(`
-    INSERT INTO expenses (
-      expense_no, expense_category, description, amount, expense_date,
-      payment_method, reference_no, vendor_name, project, status, created_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(data.expense_no, data.expense_category, data.description, data.amount, data.expense_date, data.payment_method || null, data.reference_no || null, data.vendor_name || null, data.project || null, data.status, data.created_by);
-    return result.lastInsertRowid;
+    const expenseId = db.transaction(() => {
+        const result = db.prepare(`
+      INSERT INTO expenses (
+        expense_no, expense_category, description, amount, expense_date,
+        payment_method, reference_no, vendor_name, project, status, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(data.expense_no, data.expense_category, data.description, data.amount, data.expense_date, data.payment_method || null, data.reference_no || null, data.vendor_name || null, data.project || null, data.status, data.created_by);
+        const newId = result.lastInsertRowid;
+        // GL posting (ACC-04): Dr 6000 Operating Expenses /
+        // Cr cash-per-method. Expenses default to Approved on entry, so
+        // posting at creation matches when the cash effect occurs.
+        accountingService_1.default.postExpenseEntry(db, {
+            expenseId: newId,
+            expenseNo: data.expense_no,
+            amount: data.amount,
+            expenseDate: data.expense_date,
+            paymentMethod: data.payment_method || 'cash',
+            userId: data.created_by,
+        });
+        return newId;
+    })();
+    return expenseId;
 }
 function getAll(db, filters = {}) {
     const pageNum = filters.page || 1;

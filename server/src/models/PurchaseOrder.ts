@@ -5,6 +5,7 @@ import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, PURCHASE_ORDER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { StockBalance } from '../types';
 import logger from '../utils/logger';
+import { addCurrency, multiplyCurrency, roundCurrency } from '../utils/currency';
 
 interface PurchaseOrder {
   id: number;
@@ -129,8 +130,12 @@ class PurchaseOrderModel {
       // Generate PO number
       const poNo = this.generatePONo(db);
 
-      // Calculate total amount
-      const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+      // ACC-18 interim: rounded money — each line is round(qty × price),
+      // the header total is the sum of rounded lines.
+      const totalAmount = items.reduce(
+        (sum, item) => addCurrency(sum, multiplyCurrency(item.quantity, item.unit_price)),
+        0
+      );
 
       // Insert PO header
       const poStmt = db.prepare(`
@@ -162,33 +167,14 @@ class PurchaseOrderModel {
       `);
 
       for (const item of items) {
-        const amount = item.quantity * item.unit_price;
-        itemStmt.run(poId, item.item_id, item.quantity, item.unit_price, amount, (item as any).expiry_date || null);
+        const amount = multiplyCurrency(item.quantity, item.unit_price);
+        itemStmt.run(poId, item.item_id, item.quantity, item.unit_price, amount, (item as { expiry_date?: string | null }).expiry_date || null);
       }
 
-      // Create AP ledger entry (if submitted)
-      if (status === 'Submitted') {
-        SupplierLedgerModel.createEntry({
-          supplier_id,
-          transaction_date: po_date,
-          transaction_type: 'PURCHASE_ORDER',
-          reference_no: poNo,
-          debit: totalAmount,
-          credit: 0,
-          description: `Purchase Order ${poNo}`
-        }, db);
-
-        // GL Phase-2 wiring: post the PO commitment to the journal.
-        // Dr Inventory Asset / Cr Accounts Payable. The supplier
-        // ledger above is the sub-ledger; this is the GL posting.
-        AccountingService.postPurchaseOrderEntry(db, {
-          purchaseOrderId: poId,
-          poNo,
-          totalAmount,
-          poDate: po_date,
-          userId,
-        });
-      }
+      // ACC-16: a PO is a commitment, not a liability. Posting Dr Inventory /
+      // Cr AP at submission overstated both accounts and double-counted
+      // against the PURCHASE posting at goods receipt. The sole inventory/AP
+      // entry now happens in Purchase.recordPurchase.
 
       // Log activity
       db.prepare(`
@@ -377,12 +363,13 @@ class PurchaseOrderModel {
     const { supplier_id, po_date, expected_delivery_date, notes, warehouse_id } = data;
 
     const transaction = db.transaction(() => {
-      // Recalculate total from existing items
-      const totalAmount = db.prepare(`
+      // Recalculate total from existing items (rounded once at the boundary)
+      const totalRow = db.prepare(`
         SELECT COALESCE(SUM(amount), 0) as total
         FROM purchase_order_items
         WHERE po_id = ?
       `).get(id) as { total: number };
+      const totalAmount = roundCurrency(totalRow.total);
 
       const stmt = db.prepare(`
         UPDATE purchase_orders
@@ -400,7 +387,7 @@ class PurchaseOrderModel {
         supplier_id || null,
         po_date || null,
         expected_delivery_date || null,
-        totalAmount.total,
+        totalAmount,
         notes || null,
         warehouse_id || null,
         id
@@ -435,7 +422,7 @@ class PurchaseOrderModel {
     }
 
     const transaction = db.transaction(() => {
-      const amount = itemData.quantity * itemData.unit_price;
+      const amount = multiplyCurrency(itemData.quantity, itemData.unit_price);
 
       const stmt = db.prepare(`
         INSERT INTO purchase_order_items (po_id, item_id, quantity, unit_price, amount)
@@ -455,7 +442,7 @@ class PurchaseOrderModel {
         UPDATE purchase_orders
         SET total_amount = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(totalAmount.total, poId);
+      `).run(roundCurrency(totalAmount.total), poId);
 
       return db.prepare(`
         SELECT poi.*, i.item_code, i.item_name, i.unit_of_measure
@@ -484,7 +471,7 @@ class PurchaseOrderModel {
       throw new Error('Cannot edit items in non-Draft Purchase Orders');
     }
 
-    const amount = itemData.quantity * itemData.unit_price;
+    const amount = multiplyCurrency(itemData.quantity, itemData.unit_price);
 
     const transaction = db.transaction(() => {
       db.prepare(`
@@ -504,7 +491,7 @@ class PurchaseOrderModel {
         UPDATE purchase_orders
         SET total_amount = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(totalAmount.total, item.po_id);
+      `).run(roundCurrency(totalAmount.total), item.po_id);
 
       return db.prepare(`
         SELECT poi.*, i.item_code, i.item_name, i.unit_of_measure
@@ -547,7 +534,7 @@ class PurchaseOrderModel {
         UPDATE purchase_orders
         SET total_amount = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(totalAmount.total, item.po_id);
+      `).run(roundCurrency(totalAmount.total), item.po_id);
 
       return true;
     });
@@ -773,7 +760,7 @@ class PurchaseOrderModel {
             batch_no, item_id, warehouse_id, source_type,
             source_id, quantity_original, quantity_remaining,
             unit_cost, received_date, expiry_date
-          ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, 'GOODS_RECEIPT', ?, ?, ?, ?, ?, ?)
         `).run(
           batchNo,
           poItem.item_id,

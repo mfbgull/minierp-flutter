@@ -131,6 +131,8 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
       'is_purchased': _isPurchased,
       'is_manufactured': _isManufactured,
       'sale_type': _saleType.value,
+      'qty_decimal_precision':
+          _saleType == SaleType.loose ? 3 : 0,
       'has_expiry': _hasExpiry,
       if (_hasExpiry && _thresholdController.text.isNotEmpty)
         'near_expiry_threshold_days': int.parse(_thresholdController.text),

@@ -425,11 +425,12 @@ function testFullPayment(results) {
     INSERT INTO customer_ledger (customer_id, transaction_date, transaction_type, reference_no, debit, credit, balance, description)
     VALUES (?, '2025-06-16', 'PAYMENT', ?, 0, ?, ?, ?)
   `).run(1, paymentNo, paymentAmount, ledgerBalance, `Payment ${paymentNo} for Invoice ${invoice.invoice_no}`);
-    // Update customer balance
-    const arTotal = db.prepare(`
-    SELECT COALESCE(SUM(balance_amount), 0) FROM invoices WHERE customer_id = ? AND status IN ('Unpaid', 'Partially Paid', 'Overdue')
+    // Update customer balance from the ledger (ACC-13 single-writer basis)
+    const ledgerNet = db.prepare(`
+    SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS net
+    FROM customer_ledger WHERE customer_id = ? AND voided = 0
   `).get(1);
-    db.prepare(`UPDATE customers SET current_balance = ? WHERE id = ?`).run(arTotal['COALESCE(SUM(balance_amount), 0)'], 1);
+    db.prepare(`UPDATE customers SET current_balance = ? WHERE id = ?`).run(ledgerNet.net, 1);
     // ═══ VERIFY ═══
     console.log('\n  -- Payment Record --');
     const payment = db.prepare('SELECT * FROM payments WHERE payment_no = ?').get(paymentNo);
