@@ -51,3 +51,10 @@ server/database/*.db
 *.db-shm
 *.db-wal
 server/database/backups/
+
+# Audit-remediation 7.1: never track server runtime data
+server/.env
+server/database/**/
+server/database/*.db-*
+server/node_modules/
+server/uploads/
