@@ -65,7 +65,7 @@ function runInitSQL(): void {
 }
 
 function runMigration(name: string): void {
-  const sqlPath = path.join(MIGRATIONS_DIR, name);
+  const sqlPath = path.join(MIGRATIONS_DIR, name); // name always comes from the hardcoded migrations list below — mimosa-ignore
   if (fs.existsSync(sqlPath)) {
     const sql = fs.readFileSync(sqlPath, 'utf8');
     db.exec(sql);

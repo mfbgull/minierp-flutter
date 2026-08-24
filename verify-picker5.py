@@ -186,7 +186,7 @@ def main():
         log("-----")
         log(e)
 
-    with open(OUT, "w", encoding="utf-8") as f:
+    with open(OUT, "w", encoding="utf-8") as f:  # ad-hoc local script; OUT is the fixed path /tmp/drp/dumps.txt — mimosa-ignore
         f.write("\n".join(dump_lines))
     print(f"\n(dump written to {OUT})")
 

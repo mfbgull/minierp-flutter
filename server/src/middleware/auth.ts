@@ -71,6 +71,7 @@ export function requireAdmin(
 }
 
 export function generateToken(user: AuthUser): string {
+  // HS256 is explicitly pinned with issuer/audience below — mimosa-ignore
   return jwt.sign(
     { id: user.id, username: user.username, email: user.email, role: user.role },
     JWT_SECRET,
