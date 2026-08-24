@@ -23,13 +23,13 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
 const langs = ['en', 'ur'];
 
 function loadHead(lang) {
-  const out = execSync(`git show HEAD:lib/l10n/${lang}.arb`, { cwd: root });
+  const { execFileSync } = require('child_process');
+  const out = execFileSync('git', ['show', `HEAD:lib/l10n/${lang}.arb`], { cwd: root });
   return JSON.parse(out.toString('utf8'));
 }
 

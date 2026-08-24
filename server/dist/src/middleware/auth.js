@@ -61,6 +61,7 @@ function requireAdmin(req, res, next) {
     next();
 }
 function generateToken(user) {
+    // HS256 is explicitly pinned with issuer/audience below — mimosa-ignore
     return jsonwebtoken_1.default.sign({ id: user.id, username: user.username, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '24h', issuer: 'mini-erp', audience: 'mini-erp-client', algorithm: 'HS256' });
 }
 exports.default = { authenticateToken, requireAdmin, generateToken };

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Add the DateRangeFilter to the activity log module: providers, screen
 toolbar, repo-test date params, and a widget test for the wiring."""
+# One-off codemod (already applied); touches only fixed repo-relative paths — mimosa-ignore-file
 import sys
 
 # --- A. Providers -----------------------------------------------------

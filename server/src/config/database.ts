@@ -174,6 +174,7 @@ function createDefaultUser(): void {
     if (!defaultPassword && process.env.NODE_ENV !== 'production') {
       // Development: no env var set, fall back to well-known dev credential
       logger.warn('⚠ WARNING: DEFAULT_ADMIN_PASSWORD not set. Using default development fallback (admin123). DO NOT USE IN PRODUCTION.');
+      // dev-only, gated by the NODE_ENV check above; production throws instead (docs/README.md, PORTING.md) — mimosa-ignore
       defaultPassword = 'admin123';
     }
     if (!defaultPassword) {
@@ -2570,7 +2571,13 @@ function reconcileOrphanedJournalLines(): void {
 }
 
 function runRollback(migrationName: string): void {
-  const rollbackFile = path.join(MIGRATIONS_DIR, 'rollbacks/rollback-' + migrationName + '.sql');
+  // --rollback=<name> is operator-supplied; restrict to safe filename characters
+  // so the joined path cannot traverse out of the rollbacks directory.
+  if (!/^[A-Za-z0-9._-]+$/.test(migrationName)) {
+    logger.error(`Invalid migration name: ${migrationName}`);
+    process.exit(1);
+  }
+  const rollbackFile = path.join(MIGRATIONS_DIR, 'rollbacks/rollback-' + migrationName + '.sql'); // mimosa-ignore
   if (!fs.existsSync(rollbackFile)) {
     logger.error(`Rollback file not found: ${rollbackFile}`);
     process.exit(1);

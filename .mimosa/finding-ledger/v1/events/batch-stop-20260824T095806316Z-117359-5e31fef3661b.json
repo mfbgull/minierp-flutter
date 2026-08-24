@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260824T095806316Z-117359-5e31fef3661b",
+  "runId": "20260824T095806316Z-117359-5e31fef3661b",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": []
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "e047bec4d2f2e95a5e4abba260f0283eea8a4502",
+  "diffHash": "d1c09390b55a50ac8c3b6e6147b5418e6877f131bfd52be7ebd38607a3c5e11a",
+  "rulesVersion": "unavailable",
+  "sessionHash": "2b3098532c8a73a92fc8ecb523dfe5da0db2d1bd12bc2e44c8f487cb6893f069",
+  "reportRef": ".mimosa/reports/task-review-sess_6db9507a-a6c2-430d-9cdf-c17764bc59cd-20260824T095806316Z-117359-5e31fef3661b.json",
+  "events": [],
+  "observedFindingIds": [],
+  "verifiedFiles": [
+    {
+      "file": "scripts/restore-l10n-labels.js",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-08-24T09:58:07.229Z"
+}
