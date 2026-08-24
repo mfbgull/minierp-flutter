@@ -131,7 +131,7 @@ class CustomerModel {
       ) VALUES (?, date('now'), ?, ?, ?, ?, ?, ?)
     `).run(customerId, 'OPENING_BALANCE', `OPEN-${customerCode}`, debit, credit, openingBalance, 'Opening Balance');
     }
-    static getLedger(id, sortBy, sortOrder, db) {
+    static getLedger(id, sortBy, sortOrder, db, page = 1, limit = 0) {
         const { sortBy: safeBy, sortOrder: safeOrder } = safeSortBy(sortBy, sortOrder);
         // `linked_invoice_no` is resolved with scalar subqueries instead of
         // LEFT JOINs so every ledger entry yields exactly ONE row: joining
@@ -143,7 +143,17 @@ class CustomerModel {
         // resolve through their refund/credit payment (matched by notes —
         // refunds carry a negative amount, not the legacy 0) and fall back
         // to the invoice reference the entry itself was written with.
-        return db.prepare(`
+        // Task 8.7: bounded pagination — limit 0 keeps the legacy unbounded
+        // shape for callers that haven't migrated (statement flows).
+        const countRow = db.prepare('SELECT COUNT(*) AS c FROM customer_ledger WHERE customer_id = ?').get(id);
+        const total = countRow.c;
+        let pageSql = '';
+        const params = [id];
+        if (limit > 0) {
+            pageSql = ' LIMIT ? OFFSET ?';
+            params.push(limit, (Math.max(1, page) - 1) * limit);
+        }
+        const rows = db.prepare(`
       SELECT cl.id, cl.transaction_date, cl.transaction_type, cl.reference_no,
         cl.debit, cl.credit, cl.balance, cl.description, cl.created_at,
         CASE
@@ -169,8 +179,9 @@ class CustomerModel {
         END as linked_invoice_no
       FROM customer_ledger cl
       WHERE cl.customer_id = ?
-      ORDER BY cl.${safeBy} ${safeOrder}
-    `).all(id);
+      ORDER BY cl.${safeBy} ${safeOrder}${pageSql}
+    `).all(...params);
+        return { rows, total };
     }
     static getStatement(id, fromDate, toDate, db) {
         let query = `
@@ -209,16 +220,19 @@ class CustomerModel {
             query += ' AND transaction_date <= ?';
             params.push(toDate);
         }
-        query += ' ORDER BY transaction_date ASC';
+        query += ' ORDER BY transaction_date ASC, id ASC';
         const transactions = db.prepare(query).all(...params);
         let openingBalanceQuery = 'SELECT balance FROM customer_ledger WHERE customer_id = ?';
         const openingBalanceParams = [id];
         if (fromDate) {
-            openingBalanceQuery += ' AND transaction_date < ? ORDER BY transaction_date DESC LIMIT 1';
+            // `, id DESC` tiebreaker (report-query-integrity): same-day rows must
+            // resolve deterministically to the last inserted one, matching the
+            // rebuild ordering (transaction_date ASC, id ASC).
+            openingBalanceQuery += ' AND transaction_date < ? ORDER BY transaction_date DESC, id DESC LIMIT 1';
             openingBalanceParams.push(fromDate);
         }
         else {
-            openingBalanceQuery += ' ORDER BY transaction_date DESC LIMIT 1';
+            openingBalanceQuery += ' ORDER BY transaction_date DESC, id DESC LIMIT 1';
         }
         const openingBalanceResult = db.prepare(openingBalanceQuery).get(...openingBalanceParams);
         return { transactions, openingBalance: openingBalanceResult ? openingBalanceResult.balance : 0 };

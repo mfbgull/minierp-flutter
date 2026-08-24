@@ -6,7 +6,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const StockMovement_1 = __importDefault(require("./StockMovement"));
 const SupplierLedger_1 = __importDefault(require("./SupplierLedger"));
 const accountingService_1 = __importDefault(require("../services/accountingService"));
-const logger_1 = __importDefault(require("../utils/logger"));
 const sequence_1 = require("../utils/sequence");
 const sqlSanitizer_1 = require("../utils/sqlSanitizer");
 // Whitelisted sort columns → qualified SQL column (the warehouse/user/credit
@@ -125,71 +124,105 @@ class PurchaseReturnModel {
             const lines = [];
             let totalQty = 0;
             let totalAmount = 0;
+            // PRET-01 (task 4.1): aggregate duplicate lines for the same source
+            // item BEFORE validating — each line previously validated against the
+            // same pre-request returned_quantity, so duplicates over-returned.
+            const aggregated = new Map();
             for (const line of data.items) {
                 if (!line.quantity || line.quantity <= 0) {
                     throw new Error('Return quantity must be positive');
                 }
                 if (!line.source_item_id)
                     throw new Error('source_item_id is required');
+                const key = Number(line.source_item_id);
+                const entry = aggregated.get(key);
+                if (entry) {
+                    // Duplicate lines for the same source item must price identically.
+                    if (Math.abs(Number(line.unit_cost ?? 0) - entry.unit_cost) > 0.001) {
+                        throw new Error(`Conflicting unit costs for source item ${key}: ${entry.unit_cost} vs ${line.unit_cost}`);
+                    }
+                    entry.quantity += line.quantity;
+                }
+                else {
+                    aggregated.set(key, { quantity: line.quantity, unit_cost: Number(line.unit_cost ?? 0) });
+                }
+            }
+            // Validate each AGGREGATE against its source document headroom.
+            for (const [sourceItemId, agg] of aggregated) {
                 if (data.source_type === 'PURCHASE') {
                     const purchase = db.prepare(`
             SELECT p.*, i.item_name
             FROM purchases p JOIN items i ON p.item_id = i.id
             WHERE p.id = ?
-          `).get(line.source_item_id);
+          `).get(sourceItemId);
                     if (!purchase)
-                        throw new Error(`Purchase line ${line.source_item_id} not found`);
+                        throw new Error(`Purchase line ${sourceItemId} not found`);
                     if (purchase.id !== data.source_id) {
-                        throw new Error(`Purchase ${line.source_item_id} does not belong to source ${data.source_id}`);
+                        throw new Error(`Purchase ${sourceItemId} does not belong to source ${data.source_id}`);
                     }
                     const returned = purchase.returned_quantity || 0;
                     const returnable = purchase.quantity - returned;
-                    if (line.quantity > returnable + 0.001) {
-                        throw new Error(`Return quantity (${line.quantity}) exceeds remaining available (${returnable}) ` +
+                    if (agg.quantity > returnable + 0.001) {
+                        throw new Error(`Return quantity (${agg.quantity}) exceeds remaining available (${returnable}) ` +
                             `for purchase ${purchase.id}`);
                     }
-                    const amount = line.quantity * purchase.unit_cost;
+                    const amount = agg.quantity * purchase.unit_cost;
                     lines.push({
                         source_item_id: purchase.id,
                         item_id: purchase.item_id,
                         item_name: purchase.item_name,
                         unit_cost: purchase.unit_cost,
-                        quantity: line.quantity,
+                        quantity: agg.quantity,
                         amount,
                     });
-                    totalQty += line.quantity;
+                    totalQty += agg.quantity;
                     totalAmount += amount;
                 }
                 else {
-                    // PURCHASE_ORDER — line.source_item_id is a purchase_order_items.id
+                    // PURCHASE_ORDER — source_item_id is a purchase_order_items.id
                     const poItem = db.prepare(`
             SELECT poi.*, i.item_name
             FROM purchase_order_items poi JOIN items i ON poi.item_id = i.id
             WHERE poi.id = ?
-          `).get(line.source_item_id);
+          `).get(sourceItemId);
                     if (!poItem)
-                        throw new Error(`PO line ${line.source_item_id} not found`);
+                        throw new Error(`PO line ${sourceItemId} not found`);
                     if (poItem.po_id !== data.source_id) {
-                        throw new Error(`PO line ${line.source_item_id} does not belong to PO ${data.source_id}`);
+                        throw new Error(`PO line ${sourceItemId} does not belong to PO ${data.source_id}`);
                     }
                     const returned = poItem.returned_quantity || 0;
                     const netReceived = (poItem.received_quantity || 0) - returned;
-                    if (line.quantity > netReceived + 0.001) {
-                        throw new Error(`Return quantity (${line.quantity}) exceeds net received quantity ` +
+                    if (agg.quantity > netReceived + 0.001) {
+                        throw new Error(`Return quantity (${agg.quantity}) exceeds net received quantity ` +
                             `(${netReceived}) for PO line ${poItem.id}`);
                     }
-                    const amount = line.quantity * poItem.unit_price;
+                    const amount = agg.quantity * poItem.unit_price;
                     lines.push({
                         source_item_id: poItem.id,
                         item_id: poItem.item_id,
                         item_name: poItem.item_name,
                         unit_cost: poItem.unit_price,
-                        quantity: line.quantity,
+                        quantity: agg.quantity,
                         amount,
                     });
-                    totalQty += line.quantity;
+                    totalQty += agg.quantity;
                     totalAmount += amount;
                 }
+            }
+            // PRET-06 (task 4.5): returning goods worth more than is still owed
+            // drives the supplier balance negative (a hidden receivable). Require
+            // an explicit disposition and stamp it on the credit note's status.
+            const unpaidBalance = this.sourceUnpaidBalance(data.source_type, data.source_id, db);
+            if (totalAmount > unpaidBalance + 0.01) {
+                const d = data.disposition;
+                if (d !== 'credit_on_account' && d !== 'refund_expected') {
+                    throw new Error(`Return value (${totalAmount.toFixed(2)}) exceeds the unpaid balance (${unpaidBalance.toFixed(2)}). ` +
+                        `Supply a disposition: 'credit_on_account' or 'refund_expected'.`);
+                }
+            }
+            else if (data.disposition &&
+                data.disposition !== 'credit_on_account' && data.disposition !== 'refund_expected') {
+                throw new Error(`Invalid disposition '${data.disposition}' — use 'credit_on_account' or 'refund_expected'`);
             }
             // Header
             const returnNo = this.generateReturnNo(db);
@@ -244,26 +277,33 @@ class PurchaseReturnModel {
                 // Track the movement on the movement row itself.
                 db.prepare('UPDATE stock_movements SET purchase_return_id = ? WHERE id = ?')
                     .run(returnId, movement.id);
-                // FIFO-reduce the cost layers so batch coverage stays in sync with
-                // on-hand stock (mirrors the PO return flow).
-                let toReturn = line.quantity;
-                const batches = db.prepare(`
-          SELECT id, quantity_remaining
-          FROM stock_batches
-          WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
-          ORDER BY received_date ASC, id ASC
-        `).all(line.item_id, data.warehouse_id);
-                for (const batch of batches) {
-                    if (toReturn <= 0.001)
-                        break;
-                    const consume = Math.min(toReturn, batch.quantity_remaining);
-                    db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?`)
-                        .run(consume, batch.id);
-                    toReturn -= consume;
+                // PRET-02 (task 4.2): consume the SOURCE DOCUMENT's own batch, not
+                // FIFO-oldest layers — returning goods must deplete the batch they
+                // came from at their own cost. Short coverage is an error: never
+                // silently under-consume while recording a full return.
+                const sourceBatch = db.prepare(`
+          SELECT id, quantity_remaining FROM stock_batches
+          WHERE source_type = ? AND source_id = ?
+            AND item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+          ORDER BY id LIMIT 1
+        `).get(data.source_type === 'PURCHASE' ? 'PURCHASE' : 'GOODS_RECEIPT', line.source_item_id, line.item_id, data.warehouse_id);
+                if (!sourceBatch || sourceBatch.quantity_remaining < line.quantity - 0.001) {
+                    throw new Error(`Insufficient stock in the source batch for ${line.item_name}: ` +
+                        `available ${sourceBatch?.quantity_remaining ?? 0}, required ${line.quantity}. ` +
+                        `Goods already sold cannot be returned to the supplier.`);
                 }
-                // If batches didn't fully cover the return (legacy unbatchable stock),
-                // the remainder is fine — the reconciliation migration folds it later.
+                db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')
+                    .run(line.quantity, sourceBatch.id);
                 insertLine.run(returnId, line.source_item_id, line.item_id, line.item_name, line.unit_cost, line.quantity, line.amount);
+                // Persist per-line batch consumption so void restores exactly
+                // these batches (PRET-05, task 4.4) — create-then-void is a
+                // value-identity operation.
+                db.prepare(`
+          INSERT INTO purchase_return_batches (return_line_id, batch_id, quantity)
+          SELECT id, ?, ? FROM purchase_return_items
+          WHERE purchase_return_id = ? AND source_item_id = ?
+          ORDER BY id DESC LIMIT 1
+        `).run(sourceBatch.id, line.quantity, returnId, line.source_item_id);
             }
             // GL reversal — Dr AP / Cr Inventory at actual return cost, keyed to
             // the return header so void can reverse it.
@@ -325,17 +365,32 @@ class PurchaseReturnModel {
                 // Track the reversal movement on the return header too.
                 db.prepare('UPDATE stock_movements SET purchase_return_id = ? WHERE id = ?')
                     .run(id, reversal.id);
-                // Restore batch coverage (add back to the newest cost layer so
-                // quantity_remaining tracks stock again).
-                const latest = db.prepare(`
-          SELECT id FROM stock_batches
-          WHERE item_id = ? AND warehouse_id = ?
-          ORDER BY received_date DESC, id DESC
-          LIMIT 1
-        `).get(line.item_id, header.warehouse_id);
-                if (latest) {
-                    db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?`)
-                        .run(line.quantity, latest.id);
+                // PRET-05 (task 4.4): restore EXACTLY the batches the return
+                // consumed (from purchase_return_batches) — not the newest layer.
+                // Falls back to the newest-layer restore only for legacy returns
+                // created before the consumption ledger existed.
+                const consumed = db.prepare(`
+          SELECT prb.batch_id, prb.quantity
+          FROM purchase_return_batches prb
+          WHERE prb.return_line_id = ?
+        `).all(line.id);
+                if (consumed.length > 0) {
+                    for (const c of consumed) {
+                        db.prepare(`UPDATE stock_batches SET quantity_remaining = MAX(0, quantity_remaining + ?) WHERE id = ?`)
+                            .run(c.quantity, c.batch_id);
+                    }
+                }
+                else {
+                    const latest = db.prepare(`
+            SELECT id FROM stock_batches
+            WHERE item_id = ? AND warehouse_id = ?
+            ORDER BY received_date DESC, id DESC
+            LIMIT 1
+          `).get(line.item_id, header.warehouse_id);
+                    if (latest) {
+                        db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?`)
+                            .run(line.quantity, latest.id);
+                    }
                 }
             }
             // Reverse the GL entry (journal_lines voided by reference).
@@ -359,6 +414,9 @@ class PurchaseReturnModel {
                             credit: 0,
                             description: `Void credit note ${note.credit_no} (return ${header.return_no})`,
                         }, db);
+                        // PRET-04 (task 4.3): rebuild the running balance chain after
+                        // the voiding debit, same as every other createEntry site.
+                        SupplierLedger_1.default.rebuildBalances(note.supplier_id, db);
                     }
                 }
             }
@@ -392,26 +450,29 @@ class PurchaseReturnModel {
     }
     /**
      * Create the supplier credit note + supplier ledger entry for a return.
-     * Direct purchases carry only a supplier_name (no FK), so the supplier is
-     * resolved by name; when no match exists the credit note is still posted
-     * (supplier_id NULL) but the ledger entry is skipped.
+     * PRET-03 (task 4.3): the supplier is resolved by FOREIGN KEY only
+     * (purchases.supplier_id / purchase_orders.supplier_id). The old
+     * name-based lookup silently picked an arbitrary match on duplicate
+     * names and skipped the ledger entry on a miss — a credit note without
+     * its supplier credit. Unresolvable → throw; the transaction rolls back.
      */
     static postCreditNote(db, returnId, returnNo, data, totalAmount, creditDate, userId) {
-        let supplierId = null;
+        let supplierId;
         if (data.source_type === 'PURCHASE_ORDER') {
             const po = db.prepare('SELECT supplier_id FROM purchase_orders WHERE id = ?')
                 .get(data.source_id);
-            supplierId = po?.supplier_id ?? null;
+            if (!po?.supplier_id) {
+                throw new Error(`Purchase order ${data.source_id} has no resolvable supplier — cannot post the credit note`);
+            }
+            supplierId = po.supplier_id;
         }
         else {
-            const purchase = db.prepare('SELECT supplier_name FROM purchases WHERE id = ?')
+            const purchase = db.prepare('SELECT supplier_id FROM purchases WHERE id = ?')
                 .get(data.source_id);
-            if (purchase?.supplier_name) {
-                const supplier = db.prepare(`
-          SELECT id FROM suppliers WHERE supplier_name = ? COLLATE NOCASE LIMIT 1
-        `).get(purchase.supplier_name);
-                supplierId = supplier?.id ?? null;
+            if (!purchase?.supplier_id) {
+                throw new Error(`Purchase ${data.source_id} has no linked supplier — cannot post the credit note`);
             }
+            supplierId = purchase.supplier_id;
         }
         const creditNo = this.generateCreditNo(db);
         const result = db.prepare(`
@@ -421,25 +482,44 @@ class PurchaseReturnModel {
       ) VALUES (?, ?, ?, 'PURCHASE_RETURN', ?, ?, 'POSTED', ?)
     `).run(creditNo, creditDate, supplierId, returnId, totalAmount, userId);
         const creditNoteId = result.lastInsertRowid;
-        if (supplierId) {
-            SupplierLedger_1.default.createEntry({
-                supplier_id: supplierId,
-                transaction_date: creditDate,
-                transaction_type: 'CREDIT_NOTE',
-                reference_no: creditNo,
-                debit: 0,
-                credit: totalAmount,
-                description: `Credit note ${creditNo} for return ${returnNo}`,
-            }, db);
-        }
-        else {
-            // No resolvable supplier — document still posted, ledger skipped.
-            const name = data.source_type === 'PURCHASE'
-                ? db.prepare('SELECT supplier_name FROM purchases WHERE id = ?').get(data.source_id).supplier_name
-                : `supplier ${db.prepare('SELECT supplier_id FROM purchase_orders WHERE id = ?').get(data.source_id).supplier_id}`;
-            logger_1.default.warn(`[PurchaseReturn] Credit note ${creditNo} posted without supplier ledger entry (unresolved supplier: ${name ?? 'none'})`);
-        }
+        SupplierLedger_1.default.createEntry({
+            supplier_id: supplierId,
+            transaction_date: creditDate,
+            transaction_type: 'CREDIT_NOTE',
+            reference_no: creditNo,
+            debit: 0,
+            credit: totalAmount,
+            description: `Credit note ${creditNo} for return ${returnNo}`,
+        }, db);
+        // PRET-04 (task 4.3): keep suppliers.current_balance in lockstep —
+        // createEntry alone never touches the header balance.
+        SupplierLedger_1.default.rebuildBalances(supplierId, db);
         return creditNoteId;
+    }
+    /**
+     * Unpaid balance of the return's source document (PRET-06, task 4.5):
+     * total minus what supplier payments have already settled, derived from
+     * the authoritative allocation tables.
+     */
+    static sourceUnpaidBalance(sourceType, sourceId, db) {
+        if (sourceType === 'PURCHASE') {
+            const row = db.prepare(`
+        SELECT p.total_cost,
+          COALESCE((SELECT SUM(amount) FROM purchase_allocations WHERE purchase_id = p.id), 0) AS paid
+        FROM purchases p WHERE p.id = ?
+      `).get(sourceId);
+            if (!row)
+                throw new Error('Purchase not found');
+            return Number(row.total_cost) - Number(row.paid);
+        }
+        const row = db.prepare(`
+      SELECT po.total_amount,
+        COALESCE((SELECT SUM(amount) FROM po_allocations WHERE po_id = po.id), 0) AS paid
+      FROM purchase_orders po WHERE po.id = ?
+    `).get(sourceId);
+        if (!row)
+            throw new Error('Purchase Order not found');
+        return Number(row.total_amount) - Number(row.paid);
     }
 }
 exports.default = PurchaseReturnModel;

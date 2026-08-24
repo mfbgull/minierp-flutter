@@ -12,6 +12,7 @@ const logger_1 = __importDefault(require("../utils/logger"));
 const currency_1 = require("../utils/currency");
 const Payment_1 = __importDefault(require("../models/Payment"));
 const Customer_1 = __importDefault(require("../models/Customer"));
+const ledgerUtils_1 = __importDefault(require("../utils/ledgerUtils"));
 const Invoice_1 = __importDefault(require("../models/Invoice"));
 const Supplier_1 = __importDefault(require("../models/Supplier"));
 function getPayments(req, res) {
@@ -65,8 +66,14 @@ function getPayment(req, res) {
 function createPayment(req, res) {
     try {
         const { customer_id, supplier_id, payment_date, amount, payment_method, reference_no, notes, invoice_allocations, po_allocations, purchase_allocations } = req.body;
-        if ((!customer_id && !supplier_id) || !payment_date || !amount || amount <= 0) {
-            res.status(400).json({ success: false, error: 'Customer ID or Supplier ID, payment date, and amount are required' });
+        // PAY-09 (task 2.2): XOR — exactly one counterparty. The old `||` guard
+        // admitted both ids and then silently discarded the supplier.
+        if (!!customer_id === !!supplier_id) {
+            res.status(400).json({ success: false, error: 'Exactly one of customer_id or supplier_id is required' });
+            return;
+        }
+        if (!payment_date || !amount || amount <= 0) {
+            res.status(400).json({ success: false, error: 'Payment date and a positive amount are required' });
             return;
         }
         const parsedAmount = (0, currency_1.parseCurrency)(amount);
@@ -155,7 +162,8 @@ function createPayment(req, res) {
     catch (error) {
         const message = error instanceof Error ? error.message : '';
         logger_1.default.error('Error creating payment:', error);
-        res.status(500).json({ success: false, error: message || 'Failed to create payment' });
+        const isClientError = message.includes('not allowed') || message.includes('required') || message.includes('Invalid');
+        res.status(isClientError ? 400 : 500).json({ success: false, error: message || 'Failed to create payment' });
     }
 }
 function updatePayment(req, res) {
@@ -176,6 +184,16 @@ function updatePayment(req, res) {
         const message = error instanceof Error ? error.message : 'Failed to update payment';
         if (message === 'Payment not found') {
             res.status(404).json({ success: false, error: message });
+            return;
+        }
+        // PAY-04 (task 2.1): amount edits are a client error — explain the policy.
+        if (message.includes('Cannot change the amount')) {
+            res.status(400).json({ success: false, error: message });
+            return;
+        }
+        // CASH-02 (task 1.4): bad method on edit is a client error too.
+        if (message.includes('Invalid payment_method')) {
+            res.status(400).json({ success: false, error: message });
             return;
         }
         logger_1.default.error('Error updating payment:', error);
@@ -235,7 +253,16 @@ function getPaymentReceipt(req, res) {
             entityPhone = customer.entity_phone || '';
             entityEmail = customer.entity_email || '';
             currentBalance = (0, currency_1.parseCurrency)(customer.current_balance);
-            previousBalance = (0, currency_1.parseCurrency)(currentBalance + (0, currency_1.parseCurrency)(payment.amount));
+            // PAY-11 (task 2.6): previous balance comes from the payment's own
+            // ledger row — today's balance is polluted by everything since.
+            const ownRow = database_1.default.prepare(`
+        SELECT debit, credit, balance FROM customer_ledger
+        WHERE reference_no = ? AND transaction_type = 'PAYMENT' AND customer_id = ? AND voided = 0
+        ORDER BY id DESC LIMIT 1
+      `).get(payment.payment_no, payment.customer_id);
+            previousBalance = ownRow
+                ? (0, currency_1.parseCurrency)((0, currency_1.parseCurrency)(ownRow.balance) + (0, currency_1.parseCurrency)(ownRow.credit) - (0, currency_1.parseCurrency)(ownRow.debit))
+                : (0, currency_1.parseCurrency)(currentBalance + (0, currency_1.parseCurrency)(payment.amount)); // legacy fallback
             allocations = database_1.default.prepare(`
         SELECT pa.invoice_id, i.invoice_no, pa.amount
         FROM payment_allocations pa
@@ -259,7 +286,16 @@ function getPaymentReceipt(req, res) {
             entityPhone = supplier.entity_phone || '';
             entityEmail = supplier.entity_email || '';
             currentBalance = (0, currency_1.parseCurrency)(supplier.current_balance);
-            previousBalance = (0, currency_1.parseCurrency)(currentBalance + (0, currency_1.parseCurrency)(payment.amount));
+            // PAY-11 (task 2.6): supplier sign convention — debit increases what
+            // we owe, credit (a payment) decreases it.
+            const supOwnRow = database_1.default.prepare(`
+        SELECT debit, credit, balance FROM supplier_ledger
+        WHERE reference_no = ? AND transaction_type = 'PAYMENT' AND supplier_id = ? AND voided = 0
+        ORDER BY id DESC LIMIT 1
+      `).get(payment.payment_no, payment.supplier_id);
+            previousBalance = supOwnRow
+                ? (0, currency_1.parseCurrency)((0, currency_1.parseCurrency)(supOwnRow.balance) + (0, currency_1.parseCurrency)(supOwnRow.debit) - (0, currency_1.parseCurrency)(supOwnRow.credit))
+                : (0, currency_1.parseCurrency)(currentBalance + (0, currency_1.parseCurrency)(payment.amount)); // legacy fallback
             const poRows = database_1.default.prepare(`
         SELECT pa.po_id as invoice_id, po.po_no as invoice_no, pa.amount
         FROM po_allocations pa
@@ -323,7 +359,88 @@ function getPaymentReceipt(req, res) {
     }
 }
 function allocatePaymentToInvoice(req, res) {
-    res.status(501).json({ success: false, error: 'Manual allocation endpoint not implemented - use createPayment with allocations instead' });
+    try {
+        const id = parseInt((0, queryUtils_2.getRouteParam)(req.params.id), 10);
+        if (isNaN(id)) {
+            res.status(400).json({ success: false, error: 'Invalid payment ID' });
+            return;
+        }
+        const { allocations } = req.body;
+        if (!allocations || !Array.isArray(allocations) || allocations.length === 0) {
+            res.status(400).json({ success: false, error: 'At least one allocation is required' });
+            return;
+        }
+        const payment = Payment_1.default.getById(database_1.default, id);
+        if (!payment) {
+            res.status(404).json({ success: false, error: 'Payment not found' });
+            return;
+        }
+        if (!payment.customer_id) {
+            res.status(400).json({ success: false, error: 'Manual invoice allocation applies to customer payments only' });
+            return;
+        }
+        const paymentAmount = (0, currency_1.parseCurrency)(payment.amount);
+        // Currently allocated total for THIS payment.
+        const currentRows = database_1.default.prepare('SELECT COALESCE(SUM(amount), 0) AS total FROM payment_allocations WHERE payment_id = ?').get(id);
+        const currentlyAllocated = (0, currency_1.parseCurrency)(currentRows.total);
+        const unallocated = paymentAmount - currentlyAllocated;
+        let newTotal = 0;
+        for (const alloc of allocations) {
+            const parsedInvoiceId = parseInt(alloc.invoice_id, 10);
+            if (isNaN(parsedInvoiceId)) {
+                res.status(400).json({ success: false, error: `Invalid invoice ID: ${alloc.invoice_id}` });
+                return;
+            }
+            const amount = (0, currency_1.parseCurrency)(alloc.amount);
+            if (amount <= 0) {
+                res.status(400).json({ success: false, error: `Allocation amount for invoice ${parsedInvoiceId} must be greater than 0` });
+                return;
+            }
+            const invoice = Invoice_1.default.getById(parsedInvoiceId, database_1.default);
+            if (!invoice) {
+                res.status(404).json({ success: false, error: `Invoice ${parsedInvoiceId} not found` });
+                return;
+            }
+            if (Number(invoice.customer_id) !== Number(payment.customer_id)) {
+                res.status(400).json({ success: false, error: `Invoice ${parsedInvoiceId} does not belong to this payment's customer` });
+                return;
+            }
+            if (amount > (0, currency_1.parseCurrency)(invoice.balance_amount) + 0.01) {
+                res.status(400).json({
+                    success: false,
+                    error: `Allocation (${amount.toFixed(2)}) exceeds invoice ${parsedInvoiceId} balance (${(0, currency_1.parseCurrency)(invoice.balance_amount).toFixed(2)})`,
+                });
+                return;
+            }
+            newTotal += amount;
+        }
+        if (Math.abs(newTotal - unallocated) > 0.01) {
+            res.status(400).json({
+                success: false,
+                error: `Allocations total (${newTotal.toFixed(2)}) must equal the unallocated remainder (${unallocated.toFixed(2)})`,
+            });
+            return;
+        }
+        database_1.default.transaction(() => {
+            const insert = database_1.default.prepare('INSERT INTO payment_allocations (payment_id, invoice_id, amount) VALUES (?, ?, ?)');
+            for (const alloc of allocations) {
+                insert.run(id, parseInt(alloc.invoice_id, 10), (0, currency_1.parseCurrency)(alloc.amount));
+            }
+            for (const alloc of allocations) {
+                const invoiceId = parseInt(alloc.invoice_id, 10);
+                ledgerUtils_1.default.calculateInvoiceBalance(invoiceId);
+                ledgerUtils_1.default.updateInvoiceStatus(invoiceId);
+            }
+        })();
+        (0, activityLogger_1.logCRUD)(activityLogger_1.ActionType.PAYMENT_UPDATE, 'Payment', id, `Allocated ${newTotal.toFixed(2)} of ${payment.payment_no} across ${allocations.length} invoice(s)`, req.user.id, { payment_no: payment.payment_no, allocated: newTotal });
+        req.activityLogged = true;
+        res.json({ success: true, message: 'Allocation recorded', data: Payment_1.default.getById(database_1.default, id) });
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to allocate payment';
+        logger_1.default.error('Error allocating payment:', error);
+        res.status(500).json({ success: false, error: message });
+    }
 }
 exports.default = {
     getPayments, getPayment, createPayment, updatePayment, deletePayment, getPaymentReceipt, allocatePaymentToInvoice,

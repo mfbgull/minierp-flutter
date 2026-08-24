@@ -1227,7 +1227,10 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       );
     }
     return PlutoGrid(
-      configuration: plutoGridConfigurationFor(context),
+      // Compact density, but no content auto-fit: this is the editable
+      // line-entry grid, and fitting to (mostly empty) entry rows would
+      // collapse the authored editor widths.
+      configuration: plutoGridConfigurationFor(context, compact: true),
       columns: columns,
       rows: _rows,
       onLoaded: (event) {

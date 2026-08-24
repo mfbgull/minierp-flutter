@@ -114,7 +114,7 @@ class InvoiceModel {
       LEFT JOIN sales_orders so ON i.so_id = so.id
       LEFT JOIN quotations q ON i.quotation_id = q.id
       LEFT JOIN users u ON i.created_by = u.id
-      WHERE i.id = ?
+      WHERE i.id = ? AND i.deleted_at IS NULL
     `).get(id);
         if (!invoice) {
             return undefined;
@@ -155,7 +155,7 @@ class InvoiceModel {
       LEFT JOIN sales_orders so ON i.so_id = so.id
       LEFT JOIN quotations q ON i.quotation_id = q.id
       LEFT JOIN users u ON i.created_by = u.id
-      WHERE 1=1
+      WHERE 1=1 AND i.deleted_at IS NULL
     `;
         const conditions = [];
         const params = [];
@@ -481,14 +481,15 @@ class InvoiceModel {
         // ACC-18 interim: the stored amount is always the server-computed
         // line total — round(qty × price − discount) with tax applied at the
         // line boundary. Client-supplied amounts are never trusted.
-        const amount = (0, currency_1.computeLineAmount)(item);
+        const { amount, netAmount, taxAmount } = (0, currency_1.decomposeLineAmount)(item);
         db.prepare(`
       INSERT INTO invoice_items (
         invoice_id, item_id, quantity, unit_price, amount,
-        tax_rate, discount_type, discount_value
+        tax_rate, discount_type, discount_value,
+        net_amount, tax_amount
       )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     `).run(invoiceId, item.item_id, item.quantity, item.unit_price, amount, item.tax_rate || 0, item.discount_type || 'percentage', item.discount_value || 0);
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     `).run(invoiceId, item.item_id, item.quantity, item.unit_price, amount, item.tax_rate || 0, item.discount_type || 'percentage', item.discount_value || 0, netAmount, taxAmount);
     }
     /**
      * Create a new payment

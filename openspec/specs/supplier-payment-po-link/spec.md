@@ -1,7 +1,11 @@
 # supplier-payment-po-link Specification
 
 ## Purpose
-TBD - created by archiving change set-payments-po-id. Update Purpose after archive.
+
+Supplier payments link to the purchase order they settle: new single-PO
+payments record the linkage at creation, historical rows are backfilled from
+allocations, and exactly one counterparty is enforced.
+
 ## Requirements
 ### Requirement: Single-PO supplier payment links to purchase_order_id
 The system SHALL set `payments.purchase_order_id` to the allocated purchase order id when a
@@ -28,3 +32,21 @@ or duplicate any allocation row.
 - **WHEN** a single-PO supplier payment is recorded and `purchase_order_id` is populated
 - **THEN** the corresponding `po_allocations` row (payment_id, po_id, amount) SHALL still exist unchanged
 
+
+### Requirement: Existing single-PO payments are backfilled
+A one-time migration SHALL set `payments.purchase_order_id` for existing rows where `po_allocations` contains exactly one distinct po_id and `purchase_allocations` is empty. The backfill SHALL be idempotent (NULL-only predicate) and SHALL log the affected count to activity_log.
+
+#### Scenario: Historical single-PO payment recovers its link
+- **WHEN** the migration runs against a database with a fully-PO-allocated payment whose purchase_order_id is NULL
+- **THEN** the column equals that PO's id, allocations are unchanged, and re-running changes nothing
+
+### Requirement: Exactly one counterparty per payment
+The payments table SHALL enforce `(customer_id IS NULL) <> (supplier_id IS NULL)` via CHECK constraint, and the create API SHALL reject requests supplying both or neither with 400 before any write.
+
+#### Scenario: Both counterparties rejected
+- **WHEN** a create request supplies customer_id and supplier_id together
+- **THEN** it fails 400 and no row is written (previously supplier_id was silently discarded)
+
+#### Scenario: Database enforces what the API misses
+- **WHEN** a write path bypasses the controller guard
+- **THEN** the CHECK constraint aborts the insert

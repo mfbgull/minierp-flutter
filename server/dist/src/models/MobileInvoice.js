@@ -132,14 +132,19 @@ function submitInvoice(db, data) {
         const invoiceId = invoiceResult.lastInsertRowid;
         const invoiceNo = data.invoice_no || (invoiceResult.lastInsertRowid ? `INV-${Date.now()}` : '');
         for (const item of data.items) {
-            const amount = (0, currency_1.computeLineAmount)(item);
+            const { amount, netAmount, taxAmount } = (0, currency_1.decomposeLineAmount)(item);
             db.prepare(`
         INSERT INTO invoice_items (
-          invoice_id, item_id, quantity, unit_price, amount, tax_rate, discount_type, discount_value
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(invoiceId, item.item_id, item.quantity, item.unit_price, amount, item.tax_rate || 0, item.discount_type || 'percentage', item.discount_value || 0);
+          invoice_id, item_id, quantity, unit_price, amount, tax_rate, discount_type, discount_value,
+          net_amount, tax_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(invoiceId, item.item_id, item.quantity, item.unit_price, amount, item.tax_rate || 0, item.discount_type || 'percentage', item.discount_value || 0, netAmount, taxAmount);
             const warehouseId = item.warehouse_id || findWarehouseForItem(db, item.item_id, item.quantity);
-            StockMovement_1.default.recordMovement({
+            // INV-03: mobile sales go through the SAME guarded, batch-consuming
+            // path as desktop invoices — availability is enforced inside the
+            // transaction and FIFO cost layers are consumed (no balance-only
+            // writes, no unbatched rows). GL posting happens below.
+            const movements = StockMovement_1.default.recordBatchMovement({
                 item_id: item.item_id,
                 warehouse_id: warehouseId,
                 movement_type: 'SALE',

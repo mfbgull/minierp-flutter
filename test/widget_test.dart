@@ -7710,7 +7710,7 @@ void main() {
     expect(find.widgetWithText(Dialog, 'New Expense'), findsNothing);
     expect(adapter.lastExpensePostBody?['expense_category'], 'Fuel');
     expect(adapter.lastExpensePostBody?['amount'], 750.25);
-    expect(adapter.lastExpensePostBody?['status'], 'Approved'); // default
+    expect(adapter.lastExpensePostBody?['status'], isNull); // omitted — server defaults to Draft (EXP-03)
     expect(adapter.lastExpensePostBody?['expense_date'], isNotEmpty);
     expect(adapter.lastExpensePostBody?['description'], isNull); // omitted
   });

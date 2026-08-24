@@ -10,6 +10,7 @@ const Invoice_1 = __importDefault(require("../models/Invoice"));
 const StockMovement_1 = __importDefault(require("../models/StockMovement"));
 const Warehouse_1 = __importDefault(require("../models/Warehouse"));
 const accountingService_1 = __importDefault(require("../services/accountingService"));
+const activityLogger_1 = require("../services/activityLogger");
 const currency_1 = require("../utils/currency");
 function generatePOSTransactionNo() {
     const year = new Date().getFullYear();
@@ -203,8 +204,17 @@ function createPOSSale(req, res) {
                     });
                 }
             }
-            // Activity log
-            database_1.default.prepare('INSERT INTO activity_log (user_id, action, entity_type, entity_id, description) VALUES (?, ?, ?, ?, ?)').run(userId, 'CREATE', 'POS', invoiceId, `POS Transaction ${transactionNo}: ${items.length} items`);
+            // Activity log — task 4.5: attribute POS sales to the INVOICE entity,
+            // written transactionally via the shared helper.
+            (0, activityLogger_1.logActivityInTx)(database_1.default, {
+                userId,
+                action: activityLogger_1.ActionType.INVOICE_CREATE,
+                entityType: 'Invoice',
+                entityId: invoiceId,
+                description: `POS Transaction ${transactionNo}: ${items.length} items`,
+                newValue: { transaction_no: transactionNo, total, items: items.length },
+                correlationId: (0, activityLogger_1.newCorrelationId)()
+            });
             return {
                 transaction_no: transactionNo,
                 sale_date,

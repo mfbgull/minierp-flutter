@@ -572,7 +572,7 @@ void main() {
     setUp(() => repo = ExpenseRepository(api));
 
     test(
-      'expenses parses rows and forwards filters as snake_case query params',
+      'expenses parses rows and forwards filters as PagedRequest extra',
       () async {
         Map<String, dynamic>? seenQuery;
         handler = (o) {
@@ -584,7 +584,7 @@ void main() {
                 'id': 1,
                 'expense_no': 'EXP-2605-0001',
                 'expense_category': 'Fuel',
-                'description': '',
+                'description': 'Fuel',
                 'amount': 1000,
                 'expense_date': '2026-05-22',
                 'payment_method': 'Cash',
@@ -597,26 +597,31 @@ void main() {
               },
             ],
             'pagination': {
-              'current_page': 1,
-              'total_pages': 1,
-              'total_expenses': 1,
-              'per_page': 1000,
+              'currentPage': 1,
+              'totalPages': 1,
+              'totalItems': 1,
+              'hasNext': false,
+              'hasPrev': false,
             },
           });
         };
         final result = await repo.expenses(
-          ExpenseFilters(
+          PagedRequest(
+            page: 1,
+            limit: 10,
             search: 'fuel',
-            category: 'Fuel',
-            status: 'Approved',
-            fromDate: DateTime(2026, 5, 1),
-            toDate: DateTime(2026, 5, 31),
+            extra: {
+              'category': 'Fuel',
+              'status': 'Approved',
+              'from_date': '2026-05-01',
+              'to_date': '2026-05-31',
+            },
           ),
         );
 
-        expect(result.requireData.single.expenseNo, 'EXP-2605-0001');
-        expect(result.requireData.single.amount, 1000);
-        expect(seenQuery!['limit'], 1000);
+        expect(result.requireData.items.single.expenseNo, 'EXP-2605-0001');
+        expect(result.requireData.items.single.amount, 1000);
+        expect(seenQuery!['limit'], 10);
         expect(seenQuery!['search'], 'fuel');
         expect(seenQuery!['category'], 'Fuel');
         expect(seenQuery!['status'], 'Approved');
@@ -633,16 +638,17 @@ void main() {
           'success': true,
           'data': [],
           'pagination': {
-            'current_page': 1,
-            'total_pages': 0,
-            'total_expenses': 0,
-            'per_page': 1000,
+            'currentPage': 1,
+            'totalPages': 0,
+            'totalItems': 0,
+            'hasNext': false,
+            'hasPrev': false,
           },
         });
       };
-      final result = await repo.expenses(const ExpenseFilters());
+      final result = await repo.expenses(const PagedRequest());
 
-      expect(result.requireData, isEmpty);
+      expect(result.requireData.items, isEmpty);
       expect(seenQuery!.containsKey('search'), isFalse);
       expect(seenQuery!.containsKey('category'), isFalse);
       expect(seenQuery!.containsKey('status'), isFalse);

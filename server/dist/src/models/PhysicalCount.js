@@ -1,6 +1,22 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const sqlSanitizer_1 = require("../utils/sqlSanitizer");
+const StockMovement_1 = __importDefault(require("./StockMovement"));
+/** Next sequence number for ADJUSTMENT-sourced batch numbers. */
+function getNextBatchSequence(db) {
+    db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('BATCH_ADJ_last_no', '1', CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET
+      value = CAST(CAST(settings.value AS INTEGER) + 1 AS TEXT),
+      updated_at = CURRENT_TIMESTAMP
+  `).run();
+    const row = db.prepare(`SELECT value FROM settings WHERE key = 'BATCH_ADJ_last_no'`).get();
+    return parseInt(row.value, 10);
+}
 // Whitelisted sort columns → qualified SQL column for the list query
 // (the users join makes bare `created_at` ambiguous).
 const COUNT_SORT_COLUMN_MAP = {
@@ -132,7 +148,14 @@ class PhysicalCountModel {
         if (count.status === 'Completed' || count.status === 'Cancelled') {
             throw new Error(`Cannot record count for ${count.status} session`);
         }
-        const variance = countedQuantity - db.prepare('SELECT system_quantity FROM physical_count_items WHERE count_id = ? AND item_id = ?').get(countId, itemId)?.system_quantity || 0;
+        // INV-24: explicit null-safe read — a missing snapshot row is an error
+        // (abort), never silently treated as zero system quantity.
+        const snapshot = db.prepare('SELECT system_quantity FROM physical_count_items WHERE count_id = ? AND item_id = ?').get(countId, itemId);
+        if (!snapshot) {
+            throw new Error(`No snapshot row in physical_count_items for item ${itemId} in count ${countId} — ` +
+                `the count session must be (re)started so a snapshot exists before recording counts`);
+        }
+        const variance = countedQuantity - snapshot.system_quantity;
         db.prepare(`
       UPDATE physical_count_items
       SET counted_quantity = ?,
@@ -156,15 +179,41 @@ class PhysicalCountModel {
             const items = this.getItems(countId, db);
             const adjustmentItems = items.filter(i => i.counted_quantity !== null && i.variance !== 0);
             for (const item of adjustmentItems) {
-                // Create stock movement for the adjustment
+                // INV-01: count completion reconciles ALL THREE tables — movements,
+                // balances AND cost layers — inside this one transaction.
+                let consumedCost = item.unit_cost;
+                let consumption = [];
+                if (item.variance < 0) {
+                    // Shortage: consume FIFO-oldest layers at their actual costs.
+                    consumption = StockMovement_1.default.consumeFromOldestBatches(item.item_id, count.warehouse_id, Math.abs(item.variance), db);
+                    const totalConsumed = consumption.reduce((s, c) => s + c.consumed, 0);
+                    consumedCost = totalConsumed > 0
+                        ? consumption.reduce((s, c) => s + c.consumed * c.unitCost, 0) / totalConsumed
+                        : item.unit_cost;
+                }
+                // ADJUSTMENT movement via the shared sequential generator
+                // (INV-23 — no epoch-suffixed ad-hoc numbers).
+                const movementNo = StockMovement_1.default.generateMovementNo(db);
+                const primaryBatchId = consumption.length > 0 ? consumption[0].batchId : null;
                 const movementResult = db.prepare(`
           INSERT INTO stock_movements (
             movement_no, item_id, warehouse_id, movement_type,
             quantity, unit_cost, reference_doctype, reference_docno,
-            remarks, movement_date, created_by
-          ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, ?, 'PhysicalCount', ?, ?, ?, ?)
-        `).run(`STK-${new Date().getFullYear()}-${Date.now()}`, item.item_id, count.warehouse_id, item.variance, item.unit_cost, count.count_no, `Physical count adjustment: ${item.variance > 0 ? '+' : ''}${item.variance} (system: ${item.system_quantity}, counted: ${item.counted_quantity})`, count.count_date, userId);
+            remarks, movement_date, created_by, batch_id
+          ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, ?, 'PhysicalCount', ?, ?, ?, ?, ?)
+        `).run(movementNo, item.item_id, count.warehouse_id, item.variance, consumedCost, count.count_no, `Physical count adjustment: ${item.variance > 0 ? '+' : ''}${item.variance} (system: ${item.system_quantity}, counted: ${item.counted_quantity})`, count.count_date, userId, primaryBatchId);
                 const movementId = movementResult.lastInsertRowid;
+                // Surplus: insert an ADJUSTMENT-sourced cost layer at item.unit_cost.
+                if (item.variance > 0) {
+                    const nextBatchNo = getNextBatchSequence(db);
+                    db.prepare(`
+            INSERT INTO stock_batches (
+              batch_no, item_id, warehouse_id, source_type,
+              source_id, quantity_original, quantity_remaining,
+              unit_cost, received_date
+            ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, ?, ?, ?, ?)
+          `).run(`BATCH-${new Date().getFullYear() % 100}-ADJ-${nextBatchNo.toString().padStart(4, '0')}`, item.item_id, count.warehouse_id, countId, item.variance, item.variance, item.unit_cost, count.count_date);
+                }
                 // Update stock_balances
                 const existingBalance = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?').get(item.item_id, count.warehouse_id);
                 if (existingBalance) {
@@ -198,9 +247,10 @@ class PhysicalCountModel {
               adjustment_movement_id = ?
           WHERE count_id = ? AND item_id = ?
         `).run(movementId, countId, item.item_id);
-                // Post financial entry for adjustment
-                if (item.unit_cost && item.variance !== 0) {
-                    const value = Math.abs(item.variance) * item.unit_cost;
+                // Post financial entry for adjustment — valued at the ACTUAL
+                // consumed layer costs on shortages (not the snapshot unit_cost).
+                if (consumedCost && item.variance !== 0) {
+                    const value = Math.abs(item.variance) * consumedCost;
                     const isRemoval = item.variance < 0;
                     const accounts = isRemoval
                         ? { debit: 'inventory_shrinkage', credit: 'inventory_asset' }
@@ -210,7 +260,7 @@ class PhysicalCountModel {
               (reference_type, reference_id, entry_date, description,
                debit_account, credit_account, amount, created_by)
             VALUES ('stock_adjustment', ?, ?, ?, ?, ?, ?, ?)
-          `).run(movementId, count.count_date, `Physical count: ${item.item_code} ${isRemoval ? 'shrinkage' : 'correction'} ${Math.abs(item.variance)} units @ ${item.unit_cost}`, accounts.debit, accounts.credit, value, userId);
+          `).run(movementId, count.count_date, `Physical count: ${item.item_code} ${isRemoval ? 'shrinkage' : 'correction'} ${Math.abs(item.variance)} units @ ${consumedCost}`, accounts.debit, accounts.credit, value, userId);
                     db.prepare(`
             UPDATE stock_movements
             SET financial_value = ?, financial_posted = TRUE, journal_entry_id = ?

@@ -1,12 +1,10 @@
 // Expenses repository — typed against docs/API.md §Expenses and the
 // server expenseController shapes (PORTING.md §2).
 //
-// Endpoint shapes (verified against the live server):
+// Endpoint shape (verified against the live server):
 // - `GET /expenses?page&limit&search&category&status&vendor&from_date&to_date`
-//   → `{success, data: [Expense], pagination: {current_page, total_pages,
-//   total_expenses, per_page}}` (snake_case here vs camelCase on
-//   /customers — the client treats the list as a full dataset, limit 1000,
-//   and sorts/filters the grid client-side like the items screen).
+//   → `{success, data: [Expense], pagination: {currentPage, totalPages,
+//   totalItems, hasNext, hasPrev}}` (the PagedResponse convention).
 // - `GET /expenses/categories` → `{success, data: [ExpenseCategory]}`
 // - `GET /expenses/status-options`, `/payment-method-options` →
 //   `{success, data: [{value, label}]}`
@@ -21,6 +19,7 @@ import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../models/expense.dart' show Expense, ExpenseCategory, ExpenseOption;
 import 'api_result.dart';
+import 'paged_request.dart' show PagedRequest, PagedResponse;
 import 'repository_client.dart';
 
 /// Expenses list filters — mirrors the `getExpenses` controller params.
@@ -46,10 +45,8 @@ class ExpenseFilters {
   final DateTime? toDate;
 
   Map<String, dynamic> toQuery() => {
-    // The expenses controller defaults to 10 rows/page; the client
-    // wants the full dataset for client-side grid sort (items-screen
-    // convention), so cap at the server's practical list ceiling.
-    'limit': 1000,
+    'page': null,
+    'limit': null,
     if (search != null && search!.isNotEmpty) 'search': search,
     if (category != null && category!.isNotEmpty) 'category': category,
     if (status != null && status!.isNotEmpty) 'status': status,
@@ -63,10 +60,10 @@ class ExpenseRepository {
 
   final RepositoryClient _client;
 
-  Future<ApiResult<List<Expense>>> expenses(ExpenseFilters filters) =>
-      _client.getList(
+  Future<ApiResult<PagedResponse<Expense>>> expenses(PagedRequest request) =>
+      _client.getPaged(
         ApiEndpoints.expenses,
-        queryParameters: filters.toQuery(),
+        queryParameters: request.toQuery(),
         parseItem: (Object? json) =>
             Expense.fromJson(json! as Map<String, dynamic>),
       );
@@ -78,8 +75,6 @@ class ExpenseRepository {
   );
 
   /// `POST /expenses/categories` — the quick-add from the expense form.
-  /// The server returns `{success, message, data: {id, category_name,
-  /// description, is_active}}` (no timestamps on create).
   Future<ApiResult<ExpenseCategory>> createCategory({
     required String categoryName,
     String? description,
@@ -87,7 +82,7 @@ class ExpenseRepository {
     ApiEndpoints.expensesCategories,
     body: {
       'category_name': categoryName,
-      if (description != null && description.isNotEmpty)
+      if (description != null && description!.isNotEmpty)
         'description': description,
     },
     parse: (Object? json) =>
@@ -123,8 +118,7 @@ class ExpenseRepository {
       _client.put(
         '${ApiEndpoints.expenses}/$id',
         body: body,
-        parse: (Object? json) =>
-            Expense.fromJson(json! as Map<String, dynamic>),
+        parse: (Object? json) => Expense.fromJson(json! as Map<String, dynamic>),
       );
 
   Future<ApiResult<void>> delete(int id) =>

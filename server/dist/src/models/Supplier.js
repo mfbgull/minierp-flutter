@@ -88,15 +88,25 @@ class SupplierModel {
     static countPurchaseOrders(supplierId, db) {
         return db.prepare('SELECT COUNT(*) as count FROM purchase_orders WHERE supplier_id = ?').get(supplierId);
     }
-    static getLedger(id, sortBy, sortOrder, db) {
+    static getLedger(id, sortBy, sortOrder, db, page = 1, limit = 0) {
         const { sortBy: safeBy, sortOrder: safeOrder } = safeSortBy(sortBy, sortOrder);
-        return db.prepare(`
+        // Task 8.7: bounded pagination; limit 0 keeps the legacy unbounded shape.
+        const countRow = db.prepare('SELECT COUNT(*) AS c FROM supplier_ledger WHERE supplier_id = ?').get(id);
+        const total = countRow.c;
+        let pageSql = '';
+        const params = [id];
+        if (limit > 0) {
+            pageSql = ' LIMIT ? OFFSET ?';
+            params.push(limit, (Math.max(1, page) - 1) * limit);
+        }
+        const rows = db.prepare(`
       SELECT id, supplier_id, transaction_date, transaction_type, reference_no,
         debit, credit, balance, description, created_at
       FROM supplier_ledger
       WHERE supplier_id = ?
-      ORDER BY ${safeBy} ${safeOrder}
-    `).all(id);
+      ORDER BY ${safeBy} ${safeOrder}${pageSql}
+    `).all(...params);
+        return { rows, total };
     }
     static getStatement(id, fromDate, toDate, db) {
         let query = `

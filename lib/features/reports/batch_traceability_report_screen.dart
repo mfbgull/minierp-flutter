@@ -10,6 +10,8 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../data/models/item.dart' show Item;
 import '../../features/inventory/inventory_providers.dart' show allItemsProvider;
+import '../../widgets/pluto_grid_screen.dart'
+    show autoFitPlutoColumns, plutoGridConfigurationFor;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../../widgets/searchable_select.dart';
@@ -179,7 +181,10 @@ class _BatchTraceabilityContent extends StatelessWidget {
           child: report.batches.isEmpty
               ? Center(child: Text(l10n.reportsNodata))
               : PlutoGrid(
-                  configuration: const PlutoGridConfiguration(),
+                  configuration: plutoGridConfigurationFor(
+                    context,
+                    compact: true,
+                  ),
                   columns: [
                     PlutoColumn(title: 'Batch No', field: 'batchNo', type: PlutoColumnType.text(), width: 120),
                     PlutoColumn(title: l10n.fieldsWarehouse, field: 'warehouse', type: PlutoColumnType.text(), width: 130),
@@ -254,7 +259,11 @@ class _BatchTraceabilityContent extends StatelessWidget {
                         'status': PlutoCell(value: b.status ?? 'normal'),
                       }),
                   ],
-                  onLoaded: (e) => e.stateManager.setSelectingMode(PlutoGridSelectingMode.none),
+                  onLoaded: (e) {
+                    e.stateManager
+                        .setSelectingMode(PlutoGridSelectingMode.none);
+                    autoFitPlutoColumns(e.stateManager);
+                  },
                 ),
         ),
       ],

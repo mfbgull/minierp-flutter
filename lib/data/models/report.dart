@@ -856,6 +856,8 @@ class GeneralLedgerRow {
   const GeneralLedgerRow({
     required this.id,
     this.customerId,
+    this.accountCode,
+    this.accountName,
     required this.transactionType,
     required this.referenceNo,
     required this.debit,
@@ -868,6 +870,8 @@ class GeneralLedgerRow {
   factory GeneralLedgerRow.fromJson(Map<String, dynamic> json) => GeneralLedgerRow(
     id: asInt(json['id']) ?? 0,
     customerId: asInt(json['customer_id']),
+    accountCode: asString(json['account_code']),
+    accountName: asString(json['account_name']),
     transactionType: asString(json['transaction_type']) ?? '',
     referenceNo: asString(json['reference_no']) ?? '',
     debit: asNum(json['debit']) ?? 0,
@@ -879,6 +883,8 @@ class GeneralLedgerRow {
 
   final int id;
   final int? customerId;
+  final String? accountCode;
+  final String? accountName;
   final String transactionType;
   final String referenceNo;
   final num debit;

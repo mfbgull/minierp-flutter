@@ -165,7 +165,7 @@ function executeReport(config) {
     }
     catch (error) {
         logger_1.default.error('Report query execution error:', { sql, error: error.message });
-        throw new Error(`Query execution failed: ${error.message}`);
+        throw new Error(`Query execution failed: ${error.message}`, { cause: error });
     }
 }
 // ── SELECT Builder ───────────────────────────────────────────

@@ -15,7 +15,11 @@ import 'package:pluto_grid/pluto_grid.dart';
 
 import '../l10n/app_localizations.dart';
 import 'pluto_grid_screen.dart'
-    show plutoGridConfigurationFor, serialGridColumn, withSerialCell;
+    show
+        autoFitPlutoColumns,
+        plutoGridConfigurationFor,
+        serialGridColumn,
+        withSerialCell;
 
 /// A read-only PlutoGrid over [data] for the detail tabs.
 class DetailTabGrid<T> extends StatefulWidget {
@@ -74,7 +78,7 @@ class _DetailTabGridState<T> extends State<DetailTabGrid<T>> {
     // didUpdateWidget).
     final brightness = Theme.of(context).brightness;
     if (_configurationBrightness != brightness) {
-      _configuration = plutoGridConfigurationFor(context);
+      _configuration = plutoGridConfigurationFor(context, compact: true);
       _configurationBrightness = brightness;
     }
   }
@@ -95,6 +99,12 @@ class _DetailTabGridState<T> extends State<DetailTabGrid<T>> {
       for (final (index, row) in widget.data.indexed)
         withSerialCell(widget.gridRowFor(row), index),
     ]);
+    // Column widths re-fit to the fresh content. Post-frame: resizeColumn
+    // notifies listeners and didUpdateWidget runs during build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(_manager, manager)) return;
+      autoFitPlutoColumns(manager);
+    });
   }
 
   @override

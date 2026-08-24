@@ -8,6 +8,8 @@ import '../../data/models/report.dart' show TrialBalanceReport;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter, DateRangeMode;
+import '../../widgets/pluto_grid_screen.dart'
+    show autoFitPlutoColumns, plutoGridConfigurationFor;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
@@ -165,7 +167,7 @@ class _TrialBalanceGridState extends State<_TrialBalanceGrid> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return PlutoGrid(
-      configuration: const PlutoGridConfiguration(),
+      configuration: plutoGridConfigurationFor(context, compact: true),
       columns: [
         PlutoColumn(title: l10n.reportsAccountcode, field: 'code', type: PlutoColumnType.text(), width: 100),
         PlutoColumn(title: l10n.reportsAccountname, field: 'name', type: PlutoColumnType.text(), width: 200),
@@ -209,6 +211,7 @@ class _TrialBalanceGridState extends State<_TrialBalanceGrid> {
       onLoaded: (e) {
         stateManager = e.stateManager;
         stateManager.setSelectingMode(PlutoGridSelectingMode.none);
+        autoFitPlutoColumns(stateManager);
       },
     );
   }

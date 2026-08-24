@@ -17,6 +17,8 @@ import '../../data/repositories/inventory_repository.dart'
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/date_picker.dart' show pickDate;
+import '../../widgets/pluto_grid_screen.dart'
+    show autoFitPlutoColumns, plutoGridConfigurationFor;
 import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show allItemsProvider;
 
@@ -275,14 +277,17 @@ class _BatchManagementScreenState
 
     return PlutoGrid(
       key: ValueKey(_selectedItemId),
-      configuration: const PlutoGridConfiguration(),
+      configuration: plutoGridConfigurationFor(context, compact: true),
       columns: _columns(l10n),
       rows: [
         for (final b in _batches) _toRow(b),
       ],
-      onLoaded: (e) => e.stateManager.setSelectingMode(
-        PlutoGridSelectingMode.none,
-      ),
+      onLoaded: (e) {
+        e.stateManager.setSelectingMode(
+          PlutoGridSelectingMode.none,
+        );
+        autoFitPlutoColumns(e.stateManager);
+      },
     );
   }
 

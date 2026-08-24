@@ -166,6 +166,19 @@ class PurchaseRepository {
     parse: (Object? json) =>
         PurchaseReturn.fromJson(json as Map<String, dynamic>),
   );
+
+  /// Void a direct purchase (PUR-03) — enveloped `{success, message}` with
+  /// no data. The server rejects (400) when stock was already sold/returned
+  /// or payments are recorded against the purchase.
+  Future<ApiResult<void>> voidPurchase(
+    int id, {
+    required String reason,
+  }) =>
+      _api.postEnvelope<void>(
+        '${ApiEndpoints.purchases}/$id/void',
+        body: {'reason': reason.trim()},
+        parse: (_) {},
+      );
 }
 
 final purchaseRepositoryProvider = Provider<PurchaseRepository>(

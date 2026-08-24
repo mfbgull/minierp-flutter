@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-08-24T06:48:13.107Z",
+  "sessionId": "sess_fdb51f4a-3911-4830-ad38-33a7407e406d",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "lib/features/sales/sales_invoice_form_page.dart",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 6,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

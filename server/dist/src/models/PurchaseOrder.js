@@ -501,7 +501,7 @@ class PurchaseOrderModel {
             batch_no, item_id, warehouse_id, source_type,
             source_id, quantity_original, quantity_remaining,
             unit_cost, received_date, expiry_date
-          ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, 'GOODS_RECEIPT', ?, ?, ?, ?, ?, ?)
         `).run(batchNo, poItem.item_id, warehouse_id, receiptItemId, receiptItem.received_quantity, receiptItem.received_quantity, poItem.unit_price, receipt_date, poItem.expiry_date || null);
                 const batchId = batchResult.lastInsertRowid;
                 // Create stock movement using atomic movement number generation

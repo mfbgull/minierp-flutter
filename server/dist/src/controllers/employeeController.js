@@ -208,7 +208,7 @@ function paySalary(req, res) {
                     journalEntryId = result.journal_entry_id;
             }
             catch (glError) {
-                throw new Error(`GL posting failed: ${glError.message}`);
+                throw new Error(`GL posting failed: ${glError.message}`, { cause: glError });
             }
             if (journalEntryId) {
                 database_1.default.prepare(`UPDATE salary_payments SET journal_entry_id = ? WHERE id = ?`)

@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS stock_batches (
     batch_no        VARCHAR(50) UNIQUE NOT NULL,
     item_id         INTEGER NOT NULL REFERENCES items(id),
     warehouse_id    INTEGER NOT NULL REFERENCES warehouses(id),
-    source_type     VARCHAR(20) NOT NULL CHECK(source_type IN ('PRODUCTION','PURCHASE')),
+    source_type     VARCHAR(20) NOT NULL CHECK(source_type IN ('PRODUCTION','PURCHASE','GOODS_RECEIPT','RETURN','ADJUSTMENT','OPENING','TRANSFER','RECON')),
     source_id       INTEGER NOT NULL,
     quantity_original DECIMAL(15,3) NOT NULL DEFAULT 0,
     quantity_remaining DECIMAL(15,3) NOT NULL DEFAULT 0,

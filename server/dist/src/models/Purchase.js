@@ -73,19 +73,18 @@ class PurchaseModel {
             const totalCost = quantity * unit_cost;
             const result = purchaseStmt.run(purchaseNo, item_id, warehouse_id, quantity, unit_cost, totalCost, resolvedSupplierId || null, resolvedSupplierName || null, purchase_date, invoice_no || null, remarks || null, userId);
             const purchaseId = result.lastInsertRowid;
-            // Create a stock_batch record for the purchased item
-            db.prepare(`
+            // Create a stock_batch record for the purchased item. Identity comes
+            // from the INSERT result (task 3.4 / PUR-02 residue) — re-querying
+            // (source_type, source_id) could return another writer's batch when
+            // id spaces ever collide.
+            const batchResult = db.prepare(`
         INSERT INTO stock_batches (
           batch_no, item_id, warehouse_id, source_type,
           source_id, quantity_original, quantity_remaining,
           unit_cost, received_date, expiry_date
         ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?)
       `).run(batchNo, item_id, warehouse_id, purchaseId, quantity, quantity, unit_cost, purchase_date, expiry_date || null);
-            const batchRecord = db.prepare(`
-        SELECT id FROM stock_batches
-        WHERE source_type = 'PURCHASE' AND source_id = ?
-      `).get(purchaseId);
-            const outputBatchId = batchRecord?.id;
+            const outputBatchId = Number(batchResult.lastInsertRowid);
             // Record stock movement linked to the new batch
             const movementNo = this.generateMovementNo(db);
             db.prepare(`
@@ -313,57 +312,100 @@ class PurchaseModel {
       LIMIT ?
     `).all(limit);
     }
-    static delete(id, userId, db) {
+    /**
+     * Void a purchase (PUR-03, task 3.2) — replaces hard delete.
+     * Guards: open purchase returns, returned stock, sold stock, allocations.
+     * Reverses subledger (append-only), voids the GL entry, removes only the
+     * genuinely remaining stock, stamps void attribution.
+     */
+    static void(id, userId, reason, db) {
+        if (!reason || !reason.trim()) {
+            throw new Error('A void reason is required');
+        }
         const purchase = this.getById(id, db);
         if (!purchase) {
             throw new Error('Purchase not found');
         }
+        const existing = db.prepare('SELECT voided_at FROM purchases WHERE id = ?').get(id);
+        if (existing?.voided_at) {
+            throw new Error(`Purchase ${purchase.purchase_no} is already voided`);
+        }
         const transaction = db.transaction(() => {
-            // A purchase with recorded payments cannot be deleted outright —
-            // the allocations/ledger would be orphaned. Deleting must go
-            // through the payment reversals first.
+            // Guard: a purchase with recorded payments cannot be voided —
+            // the allocations/ledger would be orphaned. Reverse payments first.
             const paymentAlloc = db.prepare('SELECT id FROM purchase_allocations WHERE purchase_id = ? LIMIT 1').get(id);
             if (paymentAlloc) {
-                throw new Error('Cannot delete purchase with recorded payments — delete the payments first');
+                throw new Error('Cannot void purchase with recorded payments — delete the payments first');
+            }
+            // Guard: open (non-voided) purchase returns against this purchase.
+            const openReturn = db.prepare(`
+        SELECT id FROM purchase_returns
+        WHERE source_type = 'PURCHASE' AND source_id = ? AND status != 'VOIDED'
+        LIMIT 1
+      `).get(id);
+            if (openReturn) {
+                throw new Error(`Cannot void purchase ${purchase.purchase_no} — void its purchase returns first`);
+            }
+            // Guard: any returned quantity makes the return history unreversable.
+            const returned = Number(purchase.returned_quantity) || 0;
+            if (returned > 0.001) {
+                throw new Error(`Cannot void purchase ${purchase.purchase_no} — ${returned} unit(s) already returned`);
+            }
+            // Find the stock_batch created by this purchase
+            const batch = db.prepare(`
+        SELECT id, batch_no, quantity_original, quantity_remaining, unit_cost
+        FROM stock_batches
+        WHERE source_type = 'PURCHASE' AND source_id = ?
+      `).get(id);
+            // Guard: stock already sold — remaining < original means consumption
+            // happened that cannot be attributed back once the purchase is voided.
+            if (batch) {
+                const original = Number(batch.quantity_original);
+                const remaining = Number(batch.quantity_remaining);
+                if (remaining < original - 0.01) {
+                    throw new Error(`Cannot void purchase ${purchase.purchase_no} — ${(original - remaining).toFixed(3)} unit(s) of its stock already sold/consumed`);
+                }
             }
             // Reverse the supplier AP entry posted at record time (keeps the
             // running balance chain consistent).
             if (purchase.supplier_id) {
-                // ACC-14: reverse the PURCHASE subledger row instead of deleting it.
                 const rows = db.prepare(`SELECT id FROM supplier_ledger
            WHERE supplier_id = ? AND reference_no = ? AND transaction_type = 'PURCHASE' AND voided = 0`).all(purchase.supplier_id, purchase.purchase_no);
                 for (const row of rows) {
-                    ledgerUtils_1.default.reverseLedgerEntry('supplier_ledger', row.id, `purchase ${purchase.purchase_no} deleted`);
+                    ledgerUtils_1.default.reverseLedgerEntry('supplier_ledger', row.id, `purchase ${purchase.purchase_no} voided`);
                 }
             }
-            // Find the stock_batch created by this purchase
-            const batch = db.prepare(`
-        SELECT id, batch_no, quantity_remaining, unit_cost
-        FROM stock_batches
-        WHERE source_type = 'PURCHASE' AND source_id = ?
-      `).get(id);
+            // Void the GL journal entry posted at record time (Dr Inventory / Cr AP).
+            accountingService_1.default.voidJournalLinesByReference(db, 'PURCHASE', id, {
+                voidedBy: userId,
+                voidReason: reason.trim(),
+            });
             if (batch && batch.quantity_remaining > 0) {
-                // Create ADJUSTMENT movement to remove remaining stock
+                // ADJUSTMENT movement to remove only the genuinely remaining stock
                 StockMovement_1.default.recordMovement({
                     item_id: purchase.item_id,
                     warehouse_id: purchase.warehouse_id,
                     movement_type: 'ADJUSTMENT',
                     quantity: -batch.quantity_remaining,
                     unit_cost: batch.unit_cost,
-                    reference_doctype: 'PURCHASE_DELETE',
+                    reference_doctype: 'PURCHASE_VOID',
                     reference_docno: purchase.purchase_no,
-                    remarks: `Stock reversed - Purchase ${purchase.purchase_no} deleted (batch ${batch.batch_no})`,
+                    remarks: `Stock reversed - Purchase ${purchase.purchase_no} voided (batch ${batch.batch_no}): ${reason.trim()}`,
                     movement_date: new Date().toISOString().split('T')[0],
                 }, userId, db);
                 // Zero out the batch record (keep for FK integrity with stock_movements)
                 db.prepare('UPDATE stock_batches SET quantity_remaining = 0 WHERE id = ?').run(batch.id);
             }
-            // Delete the purchase record
-            db.prepare('DELETE FROM purchases WHERE id = ?').run(id);
+            // Stamp void attribution instead of deleting
+            db.prepare(`
+        UPDATE purchases
+        SET voided_at = datetime('now'), voided_by = ?, void_reason = ?
+        WHERE id = ?
+      `).run(userId, reason.trim(), id);
             db.prepare(`
         INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
         VALUES (?, ?, ?, ?, ?)
-      `).run(userId, 'DELETE', 'Purchase', id, `Deleted purchase ${purchase.purchase_no}`);
+      `).run(userId, 'VOID', 'Purchase', id, `Voided purchase ${purchase.purchase_no}: ${reason.trim()}`);
         });
         transaction();
         return true;

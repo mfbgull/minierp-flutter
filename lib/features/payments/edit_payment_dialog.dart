@@ -152,7 +152,12 @@ class _PaymentEditDialogState extends ConsumerState<PaymentEditDialog> {
                     child: TextFormField(
                       initialValue: Formatters.currency(widget.payment.amount),
                       readOnly: true,
-                      decoration: formInputDecoration(),
+                      // PAY-04 (task 2.7): amount edits are rejected by the
+                      // server — explain the void-and-reissue policy inline.
+                      decoration: formInputDecoration().copyWith(
+                        helperText: 'Amount is fixed — void this payment and '
+                            'record a new one to change it',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),

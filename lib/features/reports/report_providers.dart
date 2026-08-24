@@ -403,6 +403,11 @@ final List<(StateProvider<DateTime?>, StateProvider<DateTime?>)>
       (reportProfitLossFromDateProvider, reportProfitLossToDateProvider),
       (reportStatementsFromDateProvider, reportStatementsToDateProvider),
       (activityLogFromDateProvider, activityLogToDateProvider),
+      // REP-16: these three previously ignored the global dashboard range,
+      // so the income statement could disagree with its delegating P&L.
+      (reportGeneralLedgerFromDateProvider, reportGeneralLedgerToDateProvider),
+      (reportIncomeStatementFromDateProvider, reportIncomeStatementToDateProvider),
+      (reportTaxSummaryFromDateProvider, reportTaxSummaryToDateProvider),
     ];
 
 /// Applies [from]..[to] to every report page's range providers.

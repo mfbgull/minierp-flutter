@@ -16,6 +16,8 @@
 // `Object?`), so the only type cast lives in [gridRowsFrom], against
 // each screen's own known provider type.
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
@@ -76,9 +78,15 @@ class GridRowAction {
 /// Theme-aware PlutoGrid configuration: maps M3 [ColorScheme] tokens
 /// into PlutoGrid's [PlutoGridStyleConfig] so the grid visually matches
 /// the rest of the app.
+///
+/// `compact: true` renders the denser report-grid variant — 34px rows
+/// instead of PlutoGrid's 45px default, a slimmer header, tighter cell
+/// padding and 13px cell text. Read-only financial reports fit far more
+/// rows per screen; CRUD list screens keep the roomier default.
 PlutoGridConfiguration plutoGridConfigurationFor(
   BuildContext context, {
   PlutoGridShortcut? shortcut,
+  bool compact = false,
 }) {
   final sc = shortcut ?? const PlutoGridShortcut();
   final scheme = Theme.of(context).colorScheme;
@@ -103,6 +111,16 @@ PlutoGridConfiguration plutoGridConfigurationFor(
       inactivatedBorderColor: scheme.outlineVariant,
       iconColor: scheme.onSurfaceVariant,
       disabledIconColor: scheme.onSurface.withValues(alpha: 0.12),
+      iconSize: compact ? 16 : 18,
+      rowHeight:
+          compact ? kCompactGridRowHeight : PlutoGridSettings.rowHeight,
+      columnHeight:
+          compact ? kCompactGridHeaderHeight : PlutoGridSettings.rowHeight,
+      columnFilterHeight:
+          compact ? kCompactGridHeaderHeight : PlutoGridSettings.rowHeight,
+      defaultCellPadding: compact
+          ? const EdgeInsets.symmetric(horizontal: 8)
+          : PlutoGridSettings.cellPadding,
       columnTextStyle: textTheme.titleSmall?.copyWith(
         color: scheme.onSurface,
         decoration: TextDecoration.none,
@@ -110,11 +128,69 @@ PlutoGridConfiguration plutoGridConfigurationFor(
       ) ?? const TextStyle(),
       cellTextStyle: textTheme.bodyMedium?.copyWith(
         color: scheme.onSurface,
+        fontSize: compact ? 13 : null,
       ) ?? const TextStyle(),
       gridBorderRadius: AppBorderRadius.smRadius,
       gridPopupBorderRadius: AppBorderRadius.smRadius,
     ),
   );
+}
+
+/// Row/header heights for the compact (`compact: true`) grid style —
+/// denser than [PlutoGridSettings.rowHeight] (45px).
+const double kCompactGridRowHeight = 34;
+const double kCompactGridHeaderHeight = 40;
+
+/// Upper bound for content auto-fitting: a very long free-text cell
+/// (remarks, narration) must not swallow the whole grid width — it
+/// ellipsizes past this and can be widened by dragging.
+const double kAutoFitMaxColumnWidth = 480;
+
+/// Resizes every visible, default-rendered column of [stateManager] to
+/// fit its content: the widest of the header title and the current rows'
+/// formatted cell values (number/date formats applied), plus padding and
+/// a small gutter. PlutoGrid's built-in [PlutoAutoSizeMode] only shares
+/// the viewport between columns (equal/scale) — it never measures
+/// content, which is what read-only report grids need.
+///
+/// Safe to call from `onLoaded` (PlutoGrid fires it post-frame) or after
+/// appending a new dataset. Skips hidden columns and custom-rendered
+/// ones (the `#` / ⋮ renderer columns don't measure reliably), clamps to
+/// [kAutoFitMaxColumnWidth], and no-ops per column within 1px so calling
+/// it repeatedly is cheap.
+void autoFitPlutoColumns(PlutoGridStateManager stateManager) {
+  final style = stateManager.configuration.style;
+
+  double measuredWidth(String text, TextStyle textStyle) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: textStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    return width;
+  }
+
+  for (final column in stateManager.columns) {
+    if (column.hide || column.renderer != null) continue;
+    var widest = measuredWidth(column.title, style.columnTextStyle);
+    for (final row in stateManager.refRows) {
+      final value = row.cells[column.field]?.value;
+      if (value == null) continue;
+      widest = math.max(
+        widest,
+        measuredWidth(
+          column.formattedValueForDisplay(value),
+          style.cellTextStyle,
+        ),
+      );
+    }
+    final padding = column.cellPadding ?? style.defaultCellPadding;
+    final target = (widest + padding.horizontal + 12)
+        .clamp(column.minWidth, kAutoFitMaxColumnWidth);
+    if ((target - column.width).abs() < 1) continue;
+    stateManager.resizeColumn(column, target - column.width);
+  }
 }
 
 /// Mixin over any [ConsumerState] providing the read-only grid skeleton.
@@ -289,6 +365,7 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
     if (_configurationBrightness != brightness) {
       _gridConfiguration = plutoGridConfigurationFor(
         context,
+        compact: true,
         shortcut: PlutoGridShortcut(
           actions: rowDetailShortcutActions(openRowDetail),
         ),
@@ -315,7 +392,18 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
         for (final (index, row) in gridRowsFrom(value.value).indexed)
           withSerialCell(gridRowFor(row), index),
       ]);
+      scheduleColumnAutoFit(manager);
     }
+  }
+
+  /// Re-fit column widths after fresh rows land (post-frame:
+  /// resizeColumn notifies listeners and provider callbacks can fire
+  /// during build).
+  void scheduleColumnAutoFit(PlutoGridStateManager manager) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(gridStateManager, manager)) return;
+      autoFitPlutoColumns(manager);
+    });
   }
 
   /// The standard body: a full-pane error panel on failure (dropping the

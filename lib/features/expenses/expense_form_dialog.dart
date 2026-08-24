@@ -85,7 +85,7 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
     _projectController = TextEditingController(text: expense?.project ?? '');
     _category = expense?.expenseCategory;
     _paymentMethod = expense?.paymentMethod;
-    _status = expense?.status ?? 'Approved';
+    _status = expense?.status ?? 'Draft';
     _expenseDate =
         DateTime.tryParse(expense?.expenseDate ?? '') ?? DateTime.now();
   }
@@ -154,7 +154,9 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
       if (referenceNo.isNotEmpty) 'reference_no': referenceNo,
       if (vendor.isNotEmpty) 'vendor_name': vendor,
       if (project.isNotEmpty) 'project': project,
-      'status': _status!,
+      // EXP-03 (task 5.5): create omits status (server defaults Draft);
+      // edits carry the chosen transition target.
+      if (_isEdit) 'status': _status!,
     };
   }
 
@@ -370,19 +372,24 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: FormFieldShell(
-                              label: l10n.fieldsStatus,
-                              required: true,
-                              child: SearchableSelect<String>(
-                                items: statusItems,
-                                selected: _status,
-                                labelBuilder: (v) => v,
-                                onChanged: (v) => setState(() => _status = v),
+                          // EXP-03 (task 5.5): the server defaults new
+                          // expenses to Draft and ignores client status —
+                          // only show transitions when editing.
+                          if (_isEdit) ...[
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FormFieldShell(
+                                label: l10n.fieldsStatus,
+                                required: true,
+                                child: SearchableSelect<String>(
+                                  items: statusItems,
+                                  selected: _status,
+                                  labelBuilder: (v) => v,
+                                  onChanged: (v) => setState(() => _status = v),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 10),

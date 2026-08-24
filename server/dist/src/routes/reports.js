@@ -21,12 +21,13 @@ router.get('/ar-summary', (0, requirePermission_1.requirePermission)('reports', 
 router.get('/profit-loss', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.getProfitLossReport);
 router.get('/cash-flow', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.getCashFlowReport);
 router.get('/cash-reconciliation', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.getCashReconciliation);
-router.post('/cash-reconciliation', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.saveCashReconciliation);
+router.post('/cash-reconciliation', (0, requirePermission_1.requirePermission)('reports', 'create'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.saveCashReconciliation);
 router.get('/balance-sheet', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.getBalanceSheetReport);
 router.get('/trial-balance', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.getTrialBalanceReport);
 router.get('/general-ledger', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.getGeneralLedgerReport);
 router.get('/income-statement', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.getIncomeStatementReport);
 router.get('/tax-summary', (0, requirePermission_1.requirePermission)('reports', 'read'), rateLimiter_1.sensitiveOperationLimiter, reportsController_1.default.getTaxSummaryReport);
 router.get('/batch-traceability/:itemId', (0, requirePermission_1.requirePermission)('reports', 'read'), reportsController_1.default.getBatchTraceabilityReport);
+router.get('/expiry', (0, requirePermission_1.requirePermission)('reports', 'read'), reportsController_1.default.getExpiryReport);
 exports.default = router;
 //# sourceMappingURL=reports.js.map
