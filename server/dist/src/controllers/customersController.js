@@ -10,6 +10,7 @@ const Customer_1 = __importDefault(require("../models/Customer"));
 const queryUtils_2 = require("../utils/queryUtils");
 const sqlSanitizer_1 = require("../utils/sqlSanitizer");
 const logger_1 = __importDefault(require("../utils/logger"));
+const paginate_1 = require("../utils/paginate");
 const sequence_1 = require("../utils/sequence");
 function getCustomers(req, res) {
     try {
@@ -149,8 +150,10 @@ function getCustomerLedger(req, res) {
             res.status(404).json({ success: false, error: 'Customer not found' });
             return;
         }
-        const ledgerEntries = Customer_1.default.getLedger(id, sortParams.column, sortParams.order, database_1.default);
-        res.json({ success: true, data: ledgerEntries });
+        // Task 8.7: bounded ledger listing with a pagination envelope.
+        const pageParams = (0, paginate_1.parsePageParams)(req);
+        const { rows, total } = Customer_1.default.getLedger(id, sortParams.column, sortParams.order, database_1.default, pageParams.page, pageParams.limit);
+        res.json({ success: true, data: rows, pagination: (0, paginate_1.envelope)(total, pageParams) });
     }
     catch (error) {
         logger_1.default.error('Error fetching customer ledger:', error);

@@ -8,7 +8,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cleanupLogs = exports.getActivityStats = exports.getEntityLogs = exports.getUserLogs = exports.getRecentLogs = exports.flushLogs = exports.logWithRequest = exports.logCRUD = exports.logAuth = exports.log = exports.LogLevel = exports.ActionType = void 0;
+exports.cleanupLogs = exports.getEntityLogs = exports.getUserLogs = exports.getRecentLogs = exports.disposeLogger = exports.flushLogs = exports.logWithRequest = exports.logCRUD = exports.logAuth = exports.log = exports.LogLevel = exports.ActionType = void 0;
+exports.newCorrelationId = newCorrelationId;
+exports.logActivityInTx = logActivityInTx;
 const database_1 = __importDefault(require("../config/database"));
 const logger_1 = __importDefault(require("../utils/logger"));
 // Activity types enumeration
@@ -54,6 +56,7 @@ var ActionType;
     ActionType["INVOICE_POST"] = "INVOICE_POST";
     ActionType["INVOICE_CANCEL"] = "INVOICE_CANCEL";
     ActionType["INVOICE_DELETE"] = "INVOICE_DELETE";
+    ActionType["INVOICE_RETURN"] = "INVOICE_RETURN";
     // Payments
     ActionType["PAYMENT_CREATE"] = "PAYMENT_CREATE";
     ActionType["PAYMENT_UPDATE"] = "PAYMENT_UPDATE";
@@ -104,6 +107,17 @@ var LogLevel;
     LogLevel["WARNING"] = "WARNING";
     LogLevel["ERROR"] = "ERROR";
 })(LogLevel || (exports.LogLevel = LogLevel = {}));
+/** Cap a JSON snapshot at 8KB (task 4.2). Oversized snapshots are truncated with a marker. */
+function capSnapshot(value) {
+    if (value === undefined || value === null)
+        return null;
+    const MAX = 8 * 1024;
+    let json = typeof value === 'string' ? value : JSON.stringify(value);
+    if (json.length > MAX) {
+        json = json.slice(0, MAX - 32) + '...[truncated]';
+    }
+    return json;
+}
 // Activity logger service class
 class ActivityLoggerService {
     constructor() {
@@ -111,8 +125,16 @@ class ActivityLoggerService {
         this.isProcessing = false;
         this.BATCH_SIZE = 10;
         this.FLUSH_INTERVAL = 1000; // 1 second
-        // Start periodic flush
-        setInterval(() => this.flush(), this.FLUSH_INTERVAL);
+        // Start periodic flush. unref() lets the process exit naturally when
+        // nothing else is pending (task 4.7 / 9.5: leaked-handle fix) — the
+        // graceful-shutdown path still calls flushLogs() explicitly.
+        this.flushTimer = setInterval(() => this.flush(), this.FLUSH_INTERVAL);
+        this.flushTimer.unref();
+    }
+    /** Stop the periodic flush and drain the queue (graceful shutdown). */
+    dispose() {
+        clearInterval(this.flushTimer);
+        this.flush();
     }
     /**
      * Log an activity entry
@@ -124,7 +146,15 @@ class ActivityLoggerService {
             // Validation failure - log skipped silently
             return;
         }
-        // Add to queue for async processing
+        // Add to queue for async processing. Bound the retry queue at 1000 —
+        // drop-oldest with an error log so a DB outage can't grow memory forever (task 4.7).
+        if (this.logQueue.length >= 1000) {
+            const dropped = this.logQueue.shift();
+            logger_1.default.error('[ActivityLogger] Queue overflow — dropped oldest entry:', {
+                action: dropped?.action,
+                entityType: dropped?.entityType
+            });
+        }
         this.logQueue.push({
             ...entry,
             logLevel: entry.logLevel || LogLevel.INFO
@@ -150,14 +180,18 @@ class ActivityLoggerService {
     /**
      * Log CRUD activity
      */
-    logCRUD(action, entityType, entityId, description, userId, metadata) {
+    logCRUD(action, entityType, entityId, description, userId, metadata, audit) {
         this.log({
             userId,
             action,
             entityType,
             entityId,
             description,
-            metadata
+            metadata,
+            oldValue: audit?.oldValue,
+            newValue: audit?.newValue,
+            reason: audit?.reason,
+            correlationId: audit?.correlationId
         });
     }
     /**
@@ -175,7 +209,7 @@ class ActivityLoggerService {
      */
     flush() {
         if (this.isProcessing || this.logQueue.length === 0) {
-            return;
+            return true;
         }
         this.isProcessing = true;
         const batch = this.logQueue.splice(0, this.BATCH_SIZE);
@@ -183,15 +217,19 @@ class ActivityLoggerService {
             const stmt = database_1.default.prepare(`
         INSERT INTO activity_log (
           user_id, action, entity_type, entity_id, description,
-          log_level, ip_address, user_agent, metadata, duration_ms
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          log_level, ip_address, user_agent, metadata, duration_ms,
+          old_value, new_value, reason, correlation_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
             for (const entry of batch) {
-                stmt.run(entry.userId || null, entry.action, entry.entityType, entry.entityId || null, entry.description, entry.logLevel || LogLevel.INFO, entry.ipAddress || null, entry.userAgent || null, entry.metadata ? JSON.stringify(entry.metadata) : null, entry.durationMs || null);
+                stmt.run(entry.userId || null, entry.action, entry.entityType, entry.entityId || null, entry.description, entry.logLevel || LogLevel.INFO, entry.ipAddress || null, entry.userAgent || null, entry.metadata ? JSON.stringify(entry.metadata) : null, entry.durationMs || null, capSnapshot(entry.oldValue), capSnapshot(entry.newValue), entry.reason || null, entry.correlationId || null);
             }
         }
         catch (error) {
+            // Task 4.7: re-queue so nothing is silently lost; caller can detect failure.
+            this.logQueue.unshift(...batch);
             logger_1.default.error('[ActivityLogger] Failed to flush logs:', { error: error.message });
+            return false;
             // Re-add failed entries to queue
             this.logQueue.unshift(...batch);
         }
@@ -256,47 +294,12 @@ class ActivityLoggerService {
         }
     }
     /**
-     * Get activity statistics
+     * getStats removed (report-query-integrity): it filtered the DATETIME
+     * created_at with `BETWEEN start AND end`, dropping the entire last day.
+     * The wired stats endpoint uses ActivityLog.getStats, which filters
+     * created_at with a localDateToUtcBound half-open interval. Nothing may
+     * reintroduce a BETWEEN filter on this column.
      */
-    getStats(startDate, endDate) {
-        try {
-            let dateFilter = '';
-            const params = [];
-            if (startDate && endDate) {
-                dateFilter = ' WHERE created_at BETWEEN ? AND ?';
-                params.push(startDate, endDate);
-            }
-            const actions = database_1.default.prepare(`
-        SELECT action, COUNT(*) as count
-        FROM activity_log
-        ${dateFilter}
-        GROUP BY action
-        ORDER BY count DESC
-      `).all(...params);
-            const users = database_1.default.prepare(`
-        SELECT u.username, COUNT(*) as count
-        FROM activity_log al
-        LEFT JOIN users u ON al.user_id = u.id
-        ${dateFilter.replace('WHERE', 'WHERE al.user_id IS NOT NULL AND')}
-        GROUP BY al.user_id
-        ORDER BY count DESC
-        LIMIT 10
-      `).all(...params);
-            const dailyActivity = database_1.default.prepare(`
-        SELECT DATE(created_at) as date, COUNT(*) as count
-        FROM activity_log
-        ${dateFilter}
-        GROUP BY DATE(created_at)
-        ORDER BY date DESC
-        LIMIT 30
-      `).all(...params);
-            return { actions, users, dailyActivity };
-        }
-        catch (error) {
-            logger_1.default.error('[ActivityLogger] Failed to get stats:', { error: error.message });
-            return { actions: [], users: [], dailyActivity: [] };
-        }
-    }
     /**
      * Cleanup old logs (retention policy)
      */
@@ -330,15 +333,39 @@ const logWithRequest = (...args) => activityLogger.logWithRequest(...args);
 exports.logWithRequest = logWithRequest;
 const flushLogs = () => activityLogger.flush();
 exports.flushLogs = flushLogs;
+const disposeLogger = () => activityLogger.dispose();
+exports.disposeLogger = disposeLogger;
 const getRecentLogs = (...args) => activityLogger.getRecent(...args);
 exports.getRecentLogs = getRecentLogs;
 const getUserLogs = (...args) => activityLogger.getByUser(...args);
 exports.getUserLogs = getUserLogs;
 const getEntityLogs = (...args) => activityLogger.getByEntity(...args);
 exports.getEntityLogs = getEntityLogs;
-const getActivityStats = (...args) => activityLogger.getStats(...args);
-exports.getActivityStats = getActivityStats;
 const cleanupLogs = (...args) => activityLogger.cleanup(...args);
 exports.cleanupLogs = cleanupLogs;
+/** Task 4.2: per-request correlation id shared by all trail rows of one flow. */
+function newCorrelationId() {
+    return `corr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 exports.default = activityLogger;
+/**
+ * Transactional activity-log write for model-layer code that runs INSIDE a
+ * database transaction (audit-remediation task 4.5). Unlike the queued
+ * service, this row commits/rolls back atomically with the business change.
+ */
+function logActivityInTx(db, entry) {
+    const MAX = 8 * 1024;
+    const cap = (v) => {
+        if (v === undefined || v === null)
+            return null;
+        const raw = typeof v === 'string' ? v : JSON.stringify(v);
+        return raw.length > MAX ? raw.slice(0, MAX - 32) + '...[truncated]' : raw;
+    };
+    db.prepare(`
+    INSERT INTO activity_log (
+      user_id, action, entity_type, entity_id, description, log_level,
+      old_value, new_value, reason, correlation_id
+    ) VALUES (?, ?, ?, ?, ?, 'INFO', ?, ?, ?, ?)
+  `).run(entry.userId ?? null, entry.action, entry.entityType, entry.entityId ?? null, entry.description, cap(entry.oldValue), cap(entry.newValue), entry.reason ?? null, entry.correlationId ?? null);
+}
 //# sourceMappingURL=activityLogger.js.map

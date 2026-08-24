@@ -421,13 +421,15 @@ class SalesOrderModel {
             }
             const result = invoiceStmt.run(invoiceNo, salesOrder.customer_id, salesOrder.customer_name, id, 'SALES_ORDER', quotationId, invoiceDate, invoiceData?.due_date || null, 'Unpaid', salesOrder.total_amount, 0, salesOrder.total_amount, invoiceData?.notes || salesOrder.notes || null, userId);
             const invoiceId = result.lastInsertRowid;
-            // Create invoice items
+            // Create invoice items. SO lines carry a precomputed amount with no
+            // discount/tax breakdown, so net = amount and tax = 0 (consistent
+            // with the line's default tax_rate of 0).
             const invoiceItemStmt = db.prepare(`
-         INSERT INTO invoice_items (invoice_id, item_id, quantity, unit_price, amount)
-         VALUES (?, ?, ?, ?, ?)
+         INSERT INTO invoice_items (invoice_id, item_id, quantity, unit_price, amount, net_amount, tax_amount)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
        `);
             for (const item of salesOrder.items || []) {
-                invoiceItemStmt.run(invoiceId, item.item_id, item.quantity, item.unit_price, item.amount);
+                invoiceItemStmt.run(invoiceId, item.item_id, item.quantity, item.unit_price, item.amount, item.amount, 0);
             }
             // Deduct inventory using FIFO batch consumption
             const movementDate = invoiceDate;

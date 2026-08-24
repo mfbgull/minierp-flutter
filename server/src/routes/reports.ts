@@ -18,12 +18,13 @@ router.get('/ar-summary', requirePermission('reports', 'read'), reportsControlle
 router.get('/profit-loss', requirePermission('reports', 'read'), sensitiveOperationLimiter, reportsController.getProfitLossReport);
 router.get('/cash-flow', requirePermission('reports', 'read'), sensitiveOperationLimiter, reportsController.getCashFlowReport);
 router.get('/cash-reconciliation', requirePermission('reports', 'read'), sensitiveOperationLimiter, reportsController.getCashReconciliation);
-router.post('/cash-reconciliation', requirePermission('reports', 'read'), sensitiveOperationLimiter, reportsController.saveCashReconciliation);
+router.post('/cash-reconciliation', requirePermission('reports', 'create'), sensitiveOperationLimiter, reportsController.saveCashReconciliation);
 router.get('/balance-sheet', requirePermission('reports', 'read'), sensitiveOperationLimiter, reportsController.getBalanceSheetReport);
 router.get('/trial-balance', requirePermission('reports', 'read'), sensitiveOperationLimiter, reportsController.getTrialBalanceReport);
 router.get('/general-ledger', requirePermission('reports', 'read'), sensitiveOperationLimiter, reportsController.getGeneralLedgerReport);
 router.get('/income-statement', requirePermission('reports', 'read'), sensitiveOperationLimiter, reportsController.getIncomeStatementReport);
 router.get('/tax-summary', requirePermission('reports', 'read'), sensitiveOperationLimiter, reportsController.getTaxSummaryReport);
 router.get('/batch-traceability/:itemId', requirePermission('reports', 'read'), reportsController.getBatchTraceabilityReport);
+router.get('/expiry', requirePermission('reports', 'read'), reportsController.getExpiryReport);
 
 export default router;

@@ -163,14 +163,25 @@ function getTopSuppliers(req: Request, res: Response): void {
   }
 }
 
-function deletePurchase(req: AuthRequest, res: Response): void {
+function voidPurchase(req: AuthRequest, res: Response): void {
   try {
-    Purchase.delete(Number(req.params.id), req.user!.id, db);
+    const id = Number(req.params.id);
+    const { reason } = req.body as { reason?: string };
 
-    res.json({ success: true, message: 'Purchase deleted successfully' });
+    if (!reason || !reason.trim()) {
+      res.status(400).json({ success: false, error: 'A void reason is required' });
+      return;
+    }
+
+    Purchase.void(id, req.user!.id, reason, db);
+
+    res.json({ success: true, message: 'Purchase voided successfully' });
   } catch (error: any) {
-    logger.error('Delete purchase error:', error);
-    res.status(500).json({ error: error.message || 'Failed to delete purchase' });
+    const message = error?.message || 'Failed to void purchase';
+    // Guard rejections are client errors — surface the reason.
+    const isClientError = /Cannot void|already voided|not found|reason is required/i.test(message);
+    logger.error('Void purchase error:', error);
+    res.status(isClientError ? 400 : 500).json({ success: false, error: message });
   }
 }
 
@@ -182,5 +193,5 @@ export default {
   getPurchaseSummaryByItem,
   getPurchaseSummaryByDateRange,
   getTopSuppliers,
-  deletePurchase,
+  voidPurchase,
 };

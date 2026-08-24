@@ -1,6 +1,7 @@
 import db from '../config/database';
 import SupplierLedgerModel from '../models/SupplierLedger';
 import { parseCurrency, subtractCurrency, addCurrency } from './currency';
+import { todayLocal } from './reportSql';
 
 /**
  * Create a ledger entry for a customer.
@@ -95,7 +96,7 @@ function reverseLedgerEntry(
     // The reversal is positioned where the original sat in the chain —
     // same transaction_date — so the rebuilt running balances treat the
     // pair as a net-zero event at that point, not as an end-of-chain one.
-    const reversalDate = String(original.transaction_date || new Date().toISOString().slice(0, 10));
+    const reversalDate = String(original.transaction_date || todayLocal());
 
     // Latest non-voided balance for the counterparty.
     const lastRow = db.prepare(

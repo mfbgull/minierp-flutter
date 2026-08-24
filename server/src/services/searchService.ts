@@ -140,23 +140,29 @@ export const PAGE_ACTIONS: PageAction[] = [
 // ============================================================
 
 /**
- * Get all allowed module:action strings for a user.
- * Admin role (role_name = 'Admin') bypasses all checks.
+ * Resolved permission state for one request. Hoisted ONCE per search
+ * (search-permission-filtering): the previous code re-queried the user's
+ * role and permission set per result row (~650 rows x 3 queries per
+ * keystroke at full width).
  */
-function getUserPermissions(userId: number): Set<string> {
+export interface PermissionContext {
+  allowed: Set<string>;
+  isAdmin: boolean;
+}
+
+/** Admin role bypasses all checks; otherwise the role's permission set. */
+function resolvePermissionContext(userId: number): PermissionContext {
   const user = db.prepare('SELECT role FROM users WHERE id = ?').get(userId) as { role: string } | undefined;
 
   if (user?.role === 'admin') {
-    // Admin has all permissions
     const all = db.prepare('SELECT module, action FROM permissions').all() as { module: string; action: string }[];
-    return new Set(all.map((p) => `${p.module}:${p.action}`));
+    return { allowed: new Set(all.map((p) => `${p.module}:${p.action}`)), isAdmin: true };
   }
 
   const role = db.prepare('SELECT role_id FROM users WHERE id = ?').get(userId) as { role_id: number } | undefined;
-  if (!role?.role_id) return new Set();
+  if (!role?.role_id) return { allowed: new Set(), isAdmin: false };
 
-  // Task 8.6: bind the missing role_id parameter — without it every user
-  // received the full permission set.
+  // Task 8.6: bind the missing role_id parameter.
   const perms = db.prepare(`
     SELECT p.module, p.action
     FROM role_permissions rp
@@ -164,7 +170,7 @@ function getUserPermissions(userId: number): Set<string> {
     WHERE rp.role_id = ?
   `).all(role.role_id) as { module: string; action: string }[];
 
-  return new Set(perms.map((p) => `${p.module}:${p.action}`));
+  return { allowed: new Set(perms.map((p) => `${p.module}:${p.action}`)), isAdmin: false };
 }
 
 /**
@@ -173,22 +179,18 @@ function getUserPermissions(userId: number): Set<string> {
  */
 export function filterActions(
   actions: ActionDef[],
-  userId: number,
+  ctx: PermissionContext,
   entityRow: Record<string, unknown>
 ): SearchAction[] {
-  const allowed = getUserPermissions(userId);
-  const user = db.prepare('SELECT role FROM users WHERE id = ?').get(userId) as { role: string } | undefined;
-  const isAdmin = user?.role === 'admin';
-
   return actions
     .filter((action) => {
       // Admin bypasses permission checks
-      if (isAdmin) return true;
+      if (ctx.isAdmin) return true;
       // If no permission required, action is always shown
       if (!action.permission) return true;
       // Check user has the required permission
       const [module, act] = action.permission.split(':');
-      return allowed.has(`${module}:${act}`);
+      return ctx.allowed.has(`${module}:${act}`);
     })
     .filter((action) => {
       // Evaluate status-based condition
@@ -204,26 +206,7 @@ export function filterActions(
 // Per-entity search functions
 // ============================================================
 
-function rankClause(field: string, alias = 'name'): string {
-  return `
-    CASE
-      WHEN ${field} LIKE ? THEN 1
-      WHEN ${field} LIKE ? THEN 2
-      WHEN ${field} LIKE ? THEN 3
-      ELSE 4
-    END
-  `;
-}
-
-function rankParams(prefix: string): unknown[] {
-  return [
-    `${prefix}%`,   // starts-with = 1
-    `%${prefix}%`,  // contains = 2
-    `${prefix}%`,   // code starts-with = 3
-  ];
-}
-
-export function searchCustomers(query: string, limit: number, userId: number): SearchResult[] {
+export function searchCustomers(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const qs = `${query}%`;
   const rows = db
@@ -265,12 +248,12 @@ export function searchCustomers(query: string, limit: number, userId: number): S
         phone: r.phone ?? null,
         email: r.email ?? null,
       },
-      actions: filterActions(ENTITY_ACTIONS.customer, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.customer, ctx, r),
     };
   });
 }
 
-export function searchSuppliers(query: string, limit: number, userId: number): SearchResult[] {
+export function searchSuppliers(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const qs = `${query}%`;
   const rows = db
@@ -312,12 +295,12 @@ export function searchSuppliers(query: string, limit: number, userId: number): S
         phone: r.phone ?? null,
         email: r.email ?? null,
       },
-      actions: filterActions(ENTITY_ACTIONS.supplier, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.supplier, ctx, r),
     };
   });
 }
 
-export function searchProducts(query: string, limit: number, userId: number): SearchResult[] {
+export function searchProducts(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const qs = `${query}%`;
   const rows = db
@@ -364,12 +347,12 @@ export function searchProducts(query: string, limit: number, userId: number): Se
         category: r.category ?? null,
         unit: r.unit_of_measure,
       },
-      actions: filterActions(ENTITY_ACTIONS.product, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.product, ctx, r),
     };
   });
 }
 
-export function searchInvoices(query: string, limit: number, userId: number): SearchResult[] {
+export function searchInvoices(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const qs = `${query}%`;
   const rows = db
@@ -379,6 +362,7 @@ export function searchInvoices(query: string, limit: number, userId: number): Se
        FROM invoices i
        JOIN customers c ON c.id = i.customer_id
        WHERE (i.invoice_no LIKE ? OR c.customer_name LIKE ?)
+         AND i.status != 'Cancelled'
        ORDER BY
          CASE
            WHEN i.invoice_no LIKE ? THEN 1
@@ -414,12 +398,12 @@ export function searchInvoices(query: string, limit: number, userId: number): Se
         customer_name: r.customer_name,
         invoice_date: r.invoice_date,
       },
-      actions: filterActions(ENTITY_ACTIONS.invoice, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.invoice, ctx, r),
     };
   });
 }
 
-export function searchPurchaseOrders(query: string, limit: number, userId: number): SearchResult[] {
+export function searchPurchaseOrders(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const qs = `${query}%`;
   const rows = db
@@ -454,12 +438,12 @@ export function searchPurchaseOrders(query: string, limit: number, userId: numbe
         supplier_name: r.supplier_name,
         po_date: r.po_date,
       },
-      actions: filterActions(ENTITY_ACTIONS.purchase_order, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.purchase_order, ctx, r),
     };
   });
 }
 
-export function searchQuotations(query: string, limit: number, userId: number): SearchResult[] {
+export function searchQuotations(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const rows = db
     .prepare(
@@ -493,12 +477,12 @@ export function searchQuotations(query: string, limit: number, userId: number): 
         customer_name: r.customer_name,
         quotation_date: r.quotation_date,
       },
-      actions: filterActions(ENTITY_ACTIONS.quotation, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.quotation, ctx, r),
     };
   });
 }
 
-export function searchSalesOrders(query: string, limit: number, userId: number): SearchResult[] {
+export function searchSalesOrders(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const rows = db
     .prepare(
@@ -532,12 +516,12 @@ export function searchSalesOrders(query: string, limit: number, userId: number):
         customer_name: r.customer_name,
         so_date: r.so_date,
       },
-      actions: filterActions(ENTITY_ACTIONS.sales_order, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.sales_order, ctx, r),
     };
   });
 }
 
-export function searchPayments(query: string, limit: number, userId: number): SearchResult[] {
+export function searchPayments(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const rows = db
     .prepare(
@@ -578,12 +562,12 @@ export function searchPayments(query: string, limit: number, userId: number): Se
         customer_name: r.customer_name ?? null,
         payment_date: r.payment_date,
       },
-      actions: filterActions(ENTITY_ACTIONS.payment, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.payment, ctx, r),
     };
   });
 }
 
-export function searchExpenses(query: string, limit: number, userId: number): SearchResult[] {
+export function searchExpenses(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const rows = db
     .prepare(
@@ -614,19 +598,20 @@ export function searchExpenses(query: string, limit: number, userId: number): Se
         category: r.expense_category,
         expense_date: r.expense_date,
       },
-      actions: filterActions(ENTITY_ACTIONS.expense, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.expense, ctx, r),
     };
   });
 }
 
-export function searchWarehouses(query: string, limit: number, userId: number): SearchResult[] {
+export function searchWarehouses(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const qs = `${query}%`;
   const rows = db
     .prepare(
       `SELECT id, warehouse_name, warehouse_code, location, is_active
        FROM warehouses
-       WHERE warehouse_name LIKE ? OR warehouse_code LIKE ?
+       WHERE (warehouse_name LIKE ? OR warehouse_code LIKE ?)
+         AND is_active = 1
        ORDER BY warehouse_name ASC
        LIMIT ?`
     )
@@ -649,19 +634,20 @@ export function searchWarehouses(query: string, limit: number, userId: number): 
         code: r.warehouse_code,
         location: r.location ?? null,
       },
-      actions: filterActions(ENTITY_ACTIONS.warehouse, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.warehouse, ctx, r),
     };
   });
 }
 
-export function searchEmployees(query: string, limit: number, userId: number): SearchResult[] {
+export function searchEmployees(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const qs = `${query}%`;
   const rows = db
     .prepare(
       `SELECT id, first_name, last_name, employee_code, department, phone, is_active
        FROM employees
-       WHERE first_name LIKE ? OR last_name LIKE ? OR employee_code LIKE ?
+       WHERE (first_name LIKE ? OR last_name LIKE ? OR employee_code LIKE ?)
+         AND is_active = 1
        ORDER BY
          CASE
            WHEN first_name LIKE ? THEN 1
@@ -694,12 +680,12 @@ export function searchEmployees(query: string, limit: number, userId: number): S
         department: r.department ?? null,
         phone: r.phone ?? null,
       },
-      actions: filterActions(ENTITY_ACTIONS.employee, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.employee, ctx, r),
     };
   });
 }
 
-export function searchProductions(query: string, limit: number, userId: number): SearchResult[] {
+export function searchProductions(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const rows = db
     .prepare(
@@ -733,12 +719,12 @@ export function searchProductions(query: string, limit: number, userId: number):
         item_name: r.item_name,
         start_date: r.production_date,
       },
-      actions: filterActions(ENTITY_ACTIONS.production, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.production, ctx, r),
     };
   });
 }
 
-export function searchBOMs(query: string, limit: number, userId: number): SearchResult[] {
+export function searchBOMs(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
   const q = `%${query}%`;
   const rows = db
     .prepare(
@@ -773,7 +759,7 @@ export function searchBOMs(query: string, limit: number, userId: number): Search
         item_name: r.item_name,
         component_count: r.component_count,
       },
-      actions: filterActions(ENTITY_ACTIONS.bom, userId, r),
+      actions: filterActions(ENTITY_ACTIONS.bom, ctx, r),
     };
   });
 }
@@ -782,18 +768,14 @@ export function searchBOMs(query: string, limit: number, userId: number): Search
 // Page/action search
 // ============================================================
 
-export function searchPages(query: string, userId: number): SearchResult[] {
+export function searchPages(query: string, ctx: PermissionContext): SearchResult[] {
   const q = query.toLowerCase();
-  const user = db.prepare('SELECT role FROM users WHERE id = ?').get(userId) as { role: string } | undefined;
-  const isAdmin = user?.role === 'admin';
-
-  const allowed = isAdmin ? null : getUserPermissions(userId);
 
   return PAGE_ACTIONS.filter((page) => {
     // Permission filter
-    if (!isAdmin && page.permission) {
+    if (!ctx.isAdmin && page.permission) {
       const [module, action] = page.permission.split(':');
-      if (!allowed?.has(`${module}:${action}`)) return false;
+      if (!ctx.allowed.has(`${module}:${action}`)) return false;
     }
 
     // Keyword match: title + keywords
@@ -825,21 +807,28 @@ export function search(query: string, limit: number, userId: number): SearchResp
     return { query: trimmed, results: [], total: 0 };
   }
 
+  // search-permission-filtering: the caller's permission state resolves
+  // exactly once per request; an entity is searched only when the caller
+  // holds its module read permission. Rows were previously returned to
+  // ANY authenticated user regardless of permissions.
+  const ctx = resolvePermissionContext(userId);
+  const gate = (perm: string): boolean => ctx.isAdmin || ctx.allowed.has(perm);
+
   const results: SearchResult[] = [
-    ...searchCustomers(trimmed, limit, userId),
-    ...searchSuppliers(trimmed, limit, userId),
-    ...searchProducts(trimmed, limit, userId),
-    ...searchInvoices(trimmed, limit, userId),
-    ...searchPurchaseOrders(trimmed, limit, userId),
-    ...searchQuotations(trimmed, limit, userId),
-    ...searchSalesOrders(trimmed, limit, userId),
-    ...searchPayments(trimmed, limit, userId),
-    ...searchExpenses(trimmed, limit, userId),
-    ...searchWarehouses(trimmed, limit, userId),
-    ...searchEmployees(trimmed, limit, userId),
-    ...searchProductions(trimmed, limit, userId),
-    ...searchBOMs(trimmed, limit, userId),
-    ...searchPages(trimmed, userId),
+    ...(gate('customers:read') ? searchCustomers(trimmed, limit, ctx) : []),
+    ...(gate('suppliers:read') ? searchSuppliers(trimmed, limit, ctx) : []),
+    ...(gate('inventory:read') ? searchProducts(trimmed, limit, ctx) : []),
+    ...(gate('invoices:read') ? searchInvoices(trimmed, limit, ctx) : []),
+    ...(gate('purchase_orders:read') ? searchPurchaseOrders(trimmed, limit, ctx) : []),
+    ...(gate('quotations:read') ? searchQuotations(trimmed, limit, ctx) : []),
+    ...(gate('sales_orders:read') ? searchSalesOrders(trimmed, limit, ctx) : []),
+    ...(gate('payments:read') ? searchPayments(trimmed, limit, ctx) : []),
+    ...(gate('expenses:read') ? searchExpenses(trimmed, limit, ctx) : []),
+    ...(gate('inventory:read') ? searchWarehouses(trimmed, limit, ctx) : []),
+    ...(gate('employees:read') ? searchEmployees(trimmed, limit, ctx) : []),
+    ...(gate('production:read') ? searchProductions(trimmed, limit, ctx) : []),
+    ...(gate('bom:read') ? searchBOMs(trimmed, limit, ctx) : []),
+    ...searchPages(trimmed, ctx),
   ];
 
   return {

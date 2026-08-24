@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
+import { getNextSequenceNumber } from '../utils/sequence';
 
 interface ExpenseFilters {
   category?: string;
@@ -10,6 +11,8 @@ interface ExpenseFilters {
   search?: string;
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
 }
 
 interface CreateExpenseDTO {
@@ -49,15 +52,13 @@ function generateExpenseNo(db: Database.Database, expenseDate: string): string {
   const year = date.getFullYear().toString().slice(-2);
   const month = String(date.getMonth() + 1).padStart(2, '0');
 
-  const lastExpense = db.prepare(`
-    SELECT expense_no FROM expenses WHERE expense_no LIKE ? ORDER BY expense_no DESC LIMIT 1
-  `).get(`EXP-${year}${month}-%`) as { expense_no: string } | undefined;
-
-  if (lastExpense) {
-    const lastNum = parseInt(lastExpense.expense_no.split('-')[2]);
-    return `EXP-${year}${month}-${String(lastNum + 1).padStart(4, '0')}`;
-  }
-  return `EXP-${year}${month}-0001`;
+  // EXP-05 (task 5.4): the shared atomic counter replaces the old
+  // read-modify-write over MAX(expense_no), which ran outside any
+  // transaction and reused numbers after deletion. Callers wrap this in
+  // the same transaction as the INSERT. Counters are seeded from existing
+  // maxima by migrations/seed-expense-sequence.sql.
+  const nextNo = getNextSequenceNumber(db, `EXP_last_no_${year}${month}`);
+  return `EXP-${year}${month}-${String(nextNo).padStart(4, '0')}`;
 }
 
 function create(db: Database.Database, data: CreateExpenseDTO): number {
@@ -115,7 +116,12 @@ function getAll(db: Database.Database, filters: ExpenseFilters = {}) {
     params.push(term, term, term);
   }
 
-  query += ' ORDER BY e.expense_date DESC, e.created_at DESC LIMIT ? OFFSET ?';
+  // Sort — whitelisted via sqlSanitizer (default matches pre-paging
+  // behavior: newest expense first).
+  const sortBy = filters.sortBy || 'e.expense_date';
+  const sortOrder = filters.sortOrder || 'DESC';
+
+  query += ` ORDER BY ${sortBy} ${sortOrder} LIMIT ? OFFSET ?`;
   params.push(limitNum, offset);
 
   return db.prepare(query).all(...params);

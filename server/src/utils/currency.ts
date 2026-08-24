@@ -35,6 +35,24 @@ export function computeLineAmount(args: {
   discount_type?: string;
   discount_value?: number;
 }): number {
+  return decomposeLineAmount(args).amount;
+}
+
+/**
+ * Decompose a line into stored amount / pre-tax net / tax
+ * (report-query-integrity). The stored amount is
+ * round(qty × unit_price − discount) plus tax at the line boundary;
+ * net_amount + tax_amount always equals amount, which lets the tax
+ * summary report tax on a tax-exclusive base instead of re-deriving
+ * tax from the tax-inclusive stored amount.
+ */
+export function decomposeLineAmount(args: {
+  quantity: number;
+  unit_price: number;
+  tax_rate?: number;
+  discount_type?: string;
+  discount_value?: number;
+}): { amount: number; netAmount: number; taxAmount: number } {
   const gross = multiplyCurrency(args.quantity, args.unit_price);
   const discountValue = parseCurrency(args.discount_value || 0);
   let net = gross;
@@ -45,10 +63,8 @@ export function computeLineAmount(args: {
     net = subtractCurrency(gross, Math.min(discountAmount, gross));
   }
   const taxRate = parseCurrency(args.tax_rate || 0);
-  if (taxRate !== 0) {
-    net = addCurrency(net, roundCurrency(net * (taxRate / 100)));
-  }
-  return net;
+  const taxAmount = taxRate !== 0 ? roundCurrency(net * (taxRate / 100)) : 0;
+  return { amount: addCurrency(net, taxAmount), netAmount: net, taxAmount };
 }
 
 /**

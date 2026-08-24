@@ -56,26 +56,15 @@ abstract final class ApiEndpoints {
   static const purchaseReturns = '/purchase-returns';
 
   // Reports (§11) — first batch; add each endpoint as its report screen
-  // is ported.
+  // is ported. Declared-but-unrouted report endpoints were removed
+  // (report-query-integrity): a client constant must resolve server-side.
   static const reportsBase = '/reports';
   static const reportArAging = '/reports/ar-aging';
-  static const reportSalesSummary = '/reports/sales-summary';
-  static const reportLowStock = '/reports/low-stock';
-  static const reportStockLevel = '/reports/stock-level';
-  static const reportStockValuation = '/reports/stock-valuation';
-  static const reportSalesByCustomer = '/reports/sales-by-customer';
   static const reportDso = '/reports/dso';
   static const reportCashFlow = '/reports/cash-flow';
   static const reportProfitLoss = '/reports/profit-loss';
-  static const reportInventoryMovement = '/reports/inventory-movement';
-  static const reportPurchaseSummary = '/reports/purchase-summary';
   static const reportTopDebtors = '/reports/top-debtors';
-  static const reportExpenses = '/reports/expenses';
   static const reportCustomerStatements = '/reports/customer-statements';
-  static const reportSalesByItem = '/reports/sales-by-item';
-  static const reportSupplierAnalysis = '/reports/supplier-analysis';
-  static const reportProductionSummary = '/reports/production-summary';
-  static const reportBomUsage = '/reports/bom-usage';
   static const reportArSummary = '/reports/ar-summary';
   static const reportCashReconciliation = '/reports/cash-reconciliation';
   static const reportApAging = '/reports/ap-aging';

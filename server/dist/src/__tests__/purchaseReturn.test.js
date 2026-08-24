@@ -25,13 +25,23 @@ function createFixture() {
         'add-stock-adjustment-financial.sql',
         'create-supplier-ledger.sql',
         'add-gl-foundation.sql',
+        'create-payment-allocations.sql',
+        'add-supplier-payment-support.sql',
+        'add-purchase-supplier-payment.sql',
         'add-purchase-returns-tables.sql',
+        'add-purchase-return-batches.sql',
         'create-customer-ledger.sql',
         'add-gl-void-attribution.sql',
     ];
     for (const file of migrations) {
         const sql = fs_1.default.readFileSync(path_1.default.join(__dirname, '..', 'migrations', file), 'utf8');
         db.exec(sql);
+    }
+    // suppliers.current_balance is added programmatically at boot
+    // (config/database.ts) — replicate for rebuildBalances.
+    const supCols = db.prepare(`SELECT name FROM pragma_table_info('suppliers')`).all();
+    if (!supCols.some((c) => c.name === 'current_balance')) {
+        db.exec('ALTER TABLE suppliers ADD COLUMN current_balance DECIMAL(15,2) DEFAULT 0');
     }
     // Replicate the programmatic ALTERs from runBatchCostingMigration (the
     // SQL file only creates stock_batches; the column adds are applied in
@@ -86,9 +96,9 @@ function seedPurchase(db, overrides = {}) {
     const result = db.prepare(`
     INSERT INTO purchases (
       purchase_no, item_id, warehouse_id, quantity, unit_cost, total_cost,
-      supplier_name, purchase_date, created_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-  `).run(overrides.purchase_no ?? `PURCH-${Date.now()}-${seedCounter}`, itemId, warehouseId, qty, overrides.unit_cost ?? 10, qty * (overrides.unit_cost ?? 10), overrides.supplier_name ?? 'Acme Supplies', overrides.purchase_date ?? '2026-07-01');
+      supplier_id, supplier_name, purchase_date, created_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+  `).run(overrides.purchase_no ?? `PURCH-${Date.now()}-${seedCounter}`, itemId, warehouseId, qty, overrides.unit_cost ?? 10, qty * (overrides.unit_cost ?? 10), overrides.supplier_id ?? 1, overrides.supplier_name ?? 'Acme Supplies', overrides.purchase_date ?? '2026-07-01');
     const purchaseId = result.lastInsertRowid;
     db.prepare(`
     INSERT INTO stock_batches (
@@ -131,7 +141,7 @@ function seedPO(db, overrides = {}) {
     INSERT INTO stock_batches (
       batch_no, item_id, warehouse_id, source_type, source_id,
       quantity_original, quantity_remaining, unit_cost, received_date
-    ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, 'GOODS_RECEIPT', ?, ?, ?, ?, ?)
   `).run(`BATCH-PO-${poItemId}`, itemId, warehouseId, poItemId, received, received, overrides.unit_price ?? 10, overrides.po_date ?? '2026-07-01');
     db.prepare(`
     INSERT INTO stock_balances (item_id, warehouse_id, quantity)
@@ -387,6 +397,134 @@ describe('PurchaseReturnModel', () => {
             expect((0, purchaseReturnBackfill_1.backfillPurchaseReturns)(db)).toBe(0); // no-op on re-run
             const headers = db.prepare('SELECT COUNT(*) as c FROM purchase_returns').get();
             expect(headers.c).toBe(1);
+        });
+    });
+    describe('financial-audit-p0-remediation (tasks 4.1-4.5)', () => {
+        it('PRET-01: duplicate lines for the same source item validate as an aggregate', () => {
+            const db = createFixture();
+            const purchaseId = seedPurchase(db, { quantity: 50 });
+            // Two 50-unit lines against a 50-unit purchase → aggregate 100 > 50.
+            expect(() => PurchaseReturn_1.default.create({
+                return_date: '2026-08-01',
+                source_type: 'PURCHASE',
+                source_id: purchaseId,
+                warehouse_id: 1,
+                items: [
+                    { source_item_id: purchaseId, quantity: 50 },
+                    { source_item_id: purchaseId, quantity: 50 },
+                ],
+            }, 1, db)).toThrow(/exceeds remaining available/);
+            // Nothing was written on the failed attempt.
+            expect(db.prepare('SELECT COUNT(*) c FROM purchase_returns').get().c).toBe(0);
+            expect(db.prepare('SELECT returned_quantity q FROM purchases WHERE id = ?').get(purchaseId).q ?? 0).toBeLessThanOrEqual(50);
+            db.close();
+        });
+        it('PRET-01: aggregate within headroom posts once with summed quantities', () => {
+            const db = createFixture();
+            const purchaseId = seedPurchase(db, { quantity: 100 });
+            const result = PurchaseReturn_1.default.create({
+                return_date: '2026-08-01',
+                source_type: 'PURCHASE',
+                source_id: purchaseId,
+                warehouse_id: 1,
+                items: [
+                    { source_item_id: purchaseId, quantity: 30 },
+                    { source_item_id: purchaseId, quantity: 40 },
+                ],
+            }, 1, db);
+            expect(result.total_qty).toBe(70);
+            const p = db.prepare('SELECT returned_quantity q FROM purchases WHERE id = ?').get(purchaseId);
+            expect(Number(p.q)).toBe(70);
+            db.close();
+        });
+        it('PRET-02: a full return after most stock was sold fails loudly (no silent short-consume)', () => {
+            const db = createFixture();
+            const purchaseId = seedPurchase(db, { quantity: 10 });
+            const itemRow = db.prepare('SELECT item_id FROM purchases WHERE id = ?').get(purchaseId);
+            // Simulate 8 of the 10 units already sold out of the batch.
+            db.prepare('UPDATE stock_batches SET quantity_remaining = 2 WHERE source_type = ? AND source_id = ?')
+                .run('PURCHASE', purchaseId);
+            expect(() => PurchaseReturn_1.default.create({
+                return_date: '2026-08-01',
+                source_type: 'PURCHASE',
+                source_id: purchaseId,
+                warehouse_id: 1,
+                items: [{ source_item_id: purchaseId, quantity: 10 }],
+            }, 1, db)).toThrow(/Insufficient stock in the source batch/);
+        });
+        it('PRET-05: void restores exactly the consumed batches (value identity)', () => {
+            const db = createFixture();
+            const purchaseId = seedPurchase(db, { quantity: 10 });
+            const batchBefore = db.prepare('SELECT quantity_remaining FROM stock_batches WHERE source_type = ? AND source_id = ?').get('PURCHASE', purchaseId);
+            const created = PurchaseReturn_1.default.create({
+                return_date: '2026-08-01',
+                source_type: 'PURCHASE',
+                source_id: purchaseId,
+                warehouse_id: 1,
+                items: [{ source_item_id: purchaseId, quantity: 4 }],
+            }, 1, db);
+            PurchaseReturn_1.default.voidReturn(created.id, 1, 'wrong stock', db);
+            const batchAfter = db.prepare('SELECT quantity_remaining FROM stock_batches WHERE source_type = ? AND source_id = ?').get('PURCHASE', purchaseId);
+            expect(Number(batchAfter.quantity_remaining)).toBe(Number(batchBefore.quantity_remaining));
+            // Consumption ledger recorded the line→batch link during create.
+            const links = db.prepare(`
+        SELECT COUNT(*) c FROM purchase_return_batches prb
+        JOIN purchase_return_items pri ON pri.id = prb.return_line_id
+        WHERE pri.purchase_return_id = ?
+      `).get(created.id);
+            expect(links.c).toBe(1);
+            db.close();
+        });
+        it('PRET-06: overpaid returns require an explicit disposition', () => {
+            const db = createFixture();
+            const purchaseId = seedPurchase(db, { quantity: 10 });
+            // Fully settled by an allocation.
+            // payment_allocations/payment rows need a parent; use a real payment.
+            // The base init.sql payments table requires customer_id NOT NULL;
+            // relax it for this supplier-payment fixture row.
+            // legacy_alter_table so the rename does not retarget purchase_allocations' FK.
+            db.pragma('legacy_alter_table = ON');
+            db.exec('ALTER TABLE payments RENAME TO payments_old');
+            db.exec(`CREATE TABLE payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        payment_no VARCHAR(50) UNIQUE NOT NULL,
+        customer_id INTEGER,
+        supplier_id INTEGER REFERENCES suppliers(id),
+        invoice_id INTEGER,
+        payment_date DATE NOT NULL,
+        amount DECIMAL(15,2) NOT NULL,
+        payment_method VARCHAR(50)
+      )`);
+            db.exec(`INSERT INTO payments (id, payment_no, customer_id, invoice_id, payment_date, amount)
+        SELECT id, payment_no, customer_id, invoice_id, payment_date, amount FROM payments_old`);
+            db.exec('DROP TABLE payments_old');
+            db.pragma('legacy_alter_table = OFF');
+            db.prepare(`
+        INSERT INTO payments (payment_no, supplier_id, payment_date, amount, payment_method)
+        VALUES ('PAYD1', 1, '2026-07-15', 100, 'Cash')
+      `).run();
+            const payId = db.prepare(`SELECT id FROM payments WHERE payment_no='PAYD1'`).get().id;
+            // The RENAME retargeted purchase_allocations' payment FK to
+            // payments_old; repoint it at the rebuilt payments table.
+            db.exec('DROP TABLE purchase_allocations');
+            db.exec(`CREATE TABLE purchase_allocations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        payment_id INTEGER NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+        purchase_id INTEGER NOT NULL REFERENCES purchases(id),
+        amount DECIMAL(15,2) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+            db.prepare(`
+        INSERT INTO purchase_allocations (payment_id, purchase_id, amount) VALUES (?, ?, ?)
+      `).run(payId, purchaseId, 100);
+            expect(() => PurchaseReturn_1.default.create({
+                return_date: '2026-08-01',
+                source_type: 'PURCHASE',
+                source_id: purchaseId,
+                warehouse_id: 1,
+                items: [{ source_item_id: purchaseId, quantity: 10 }],
+            }, 1, db)).toThrow(/Supply a disposition/);
+            db.close();
         });
     });
 });

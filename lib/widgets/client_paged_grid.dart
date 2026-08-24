@@ -24,7 +24,7 @@ import 'package:pluto_grid/pluto_grid.dart';
 import '../l10n/app_localizations.dart';
 import 'pagination_bar.dart' show ServerPaginationBar;
 import 'pluto_grid_screen.dart'
-    show plutoGridConfigurationFor, withSerialCell;
+    show autoFitPlutoColumns, plutoGridConfigurationFor, withSerialCell;
 
 /// A read-only, client-paginated PlutoGrid over [data].
 class ClientPagedGrid<T> extends StatefulWidget {
@@ -40,6 +40,8 @@ class ClientPagedGrid<T> extends StatefulWidget {
     this.isLoading,
     this.noRowsWidget,
     this.padding = const EdgeInsets.fromLTRB(16, 8, 16, 0),
+    this.compact = true,
+    this.autoFitColumns = true,
   });
 
   /// The full row set. Identity-compared in [State.didUpdateWidget] so
@@ -75,6 +77,15 @@ class ClientPagedGrid<T> extends StatefulWidget {
 
   /// Padding around the grid itself (the bar sits below it, flush).
   final EdgeInsets padding;
+
+  /// Denser grid variant (34px rows, 13px cell text) — see
+  /// [plutoGridConfigurationFor].
+  final bool compact;
+
+  /// Size every column to its content when a new dataset lands (first
+  /// load and provider refetches; paging alone keeps widths stable).
+  /// Pass `compact: false` to restore PlutoGrid's roomier defaults.
+  final bool autoFitColumns;
 
   @override
   State<ClientPagedGrid<T>> createState() => _ClientPagedGridState<T>();
@@ -120,6 +131,13 @@ class _ClientPagedGridState<T> extends State<ClientPagedGrid<T>> {
       // doesn't leave the user stranded past the last page.
       if (_page > _totalPages) _page = _totalPages < 1 ? 1 : _totalPages;
       _sync();
+      // Resize runs post-frame: didUpdateWidget is inside build, and
+      // resizeColumn notifies listeners.
+      if (widget.autoFitColumns && _manager != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _manager != null) autoFitPlutoColumns(_manager!);
+        });
+      }
     }
     if (widget.isLoading != oldWidget.isLoading) {
       _manager?.setShowLoading(widget.isLoading ?? false);
@@ -139,7 +157,10 @@ class _ClientPagedGridState<T> extends State<ClientPagedGrid<T>> {
             padding: widget.padding,
             child: PlutoGrid(
               columns: widget.columns,
-              configuration: plutoGridConfigurationFor(context),
+              configuration: plutoGridConfigurationFor(
+                context,
+                compact: widget.compact,
+              ),
               // NOTE: must be a *growable* list — PlutoGrid's FilteredList
               // wraps the passed rows and appends to it.
               rows: <PlutoRow>[],
@@ -156,6 +177,7 @@ class _ClientPagedGridState<T> extends State<ClientPagedGrid<T>> {
                 }
                 _manager?.setShowLoading(widget.isLoading ?? false);
                 _sync();
+                if (widget.autoFitColumns) autoFitPlutoColumns(_manager!);
               },
               onRowDoubleTap: widget.onRowDoubleTap == null
                   ? null

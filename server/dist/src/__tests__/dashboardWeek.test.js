@@ -39,9 +39,12 @@ beforeEach(() => {
 afterEach(() => {
     db.close();
 });
-/** SQLite's `date('now')` — the same anchor the model uses. */
+/** SQLite's notion of today — the same anchor the model uses
+ * (`date('now', 'localtime')`; see Dashboard.todayISO). Must match, or
+ * seeds land around the wrong day whenever the local date differs from
+ * the UTC date (e.g. UTC+5 after midnight). */
 function todayISO() {
-    return db.prepare(`SELECT date('now') as d`).get().d;
+    return db.prepare(`SELECT date('now', 'localtime') as d`).get().d;
 }
 function addDaysISO(iso, n) {
     const [y, m, d] = iso.split('-').map(Number);

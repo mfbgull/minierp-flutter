@@ -285,6 +285,16 @@ class _CashReconciliationScreenState
             width: 140,
             bold: true,
             leading: _accountIcon(a.key),
+            trailing: a.key == 'unclassified'
+                ? Tooltip(
+                    // CASH-02 (task 1.3): unrecognized payment methods land
+                    // here instead of silently counting as bank.
+                    message: 'Payments with an unrecognized method — fix the '
+                        'payment method so it reaches the right account.',
+                    child: Icon(Icons.warning_amber_rounded,
+                        size: 15, color: scheme.error),
+                  )
+                : null,
           ),
           _cell(Formatters.currency(a.openingBalance), width: 120, alignRight: true),
           _cell(
@@ -389,6 +399,7 @@ class _CashReconciliationScreenState
     Color? color,
     FontWeight? weight,
     Widget? leading,
+    Widget? trailing,
   }) =>
       SizedBox(
         width: width,
@@ -406,6 +417,7 @@ class _CashReconciliationScreenState
                 ),
               ),
             ),
+            if (trailing != null) ...[const SizedBox(width: 6), trailing],
           ],
         ),
       );

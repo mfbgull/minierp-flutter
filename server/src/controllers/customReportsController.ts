@@ -380,6 +380,15 @@ function getEntityDetail(req: Request, res: Response): void {
  */
 function createTemplate(req: AuthRequest, res: Response): void {
   try {
+    // authz-hardening (reporting-search-remediation / REP-19): every
+    // template created here is a SYSTEM template (user_id 0) visible to
+    // all users — planting one must not be within reach of an ordinary
+    // reports:create holder.
+    if (req.user?.role !== 'admin') {
+      res.status(403).json({ error: 'Only administrators can create system report templates' });
+      return;
+    }
+
     const { name, description, config } = req.body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {

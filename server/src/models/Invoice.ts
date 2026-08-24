@@ -1,4 +1,4 @@
-import { multiplyCurrency, addCurrency, subtractCurrency, parseCurrency, computeLineAmount } from '../utils/currency';
+import { multiplyCurrency, addCurrency, subtractCurrency, parseCurrency, decomposeLineAmount } from '../utils/currency';
 import ledgerUtils from '../utils/ledgerUtils';
 import { getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, INVOICE_SORT_COLUMNS, INVOICE_RETURN_SORT_COLUMNS } from '../utils/sqlSanitizer';
@@ -733,13 +733,14 @@ class InvoiceModel {
     // ACC-18 interim: the stored amount is always the server-computed
     // line total — round(qty × price − discount) with tax applied at the
     // line boundary. Client-supplied amounts are never trusted.
-    const amount = computeLineAmount(item);
+    const { amount, netAmount, taxAmount } = decomposeLineAmount(item);
     db.prepare(`
       INSERT INTO invoice_items (
         invoice_id, item_id, quantity, unit_price, amount,
-        tax_rate, discount_type, discount_value
+        tax_rate, discount_type, discount_value,
+        net_amount, tax_amount
       )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      `).run(
       invoiceId,
       item.item_id,
@@ -748,7 +749,9 @@ class InvoiceModel {
       amount,
       item.tax_rate || 0,
       item.discount_type || 'percentage',
-      item.discount_value || 0
+      item.discount_value || 0,
+      netAmount,
+      taxAmount
     );
   }
 

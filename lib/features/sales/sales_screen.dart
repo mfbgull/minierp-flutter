@@ -35,7 +35,7 @@ import '../../widgets/confirm_dialog.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart'
-    show plutoGridConfigurationFor, serialGridColumn, withSerialCell;
+    show autoFitPlutoColumns, plutoGridConfigurationFor, serialGridColumn, withSerialCell;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
@@ -153,6 +153,12 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         ),
     ]);
     manager.setShowLoading(value.isLoading);
+    // Column widths re-fit to the fresh rows (post-frame: resizeColumn
+    // notifies listeners and provider callbacks can fire during build).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(_stateManager, manager)) return;
+      autoFitPlutoColumns(manager);
+    });
   }
 
   Future<void> _refresh() => ref.refresh(invoicesProvider.future);
@@ -416,7 +422,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       child: PlutoGrid(
-        configuration: plutoGridConfigurationFor(context),
+        configuration: plutoGridConfigurationFor(context, compact: true),
         columns: _columns,
         // Must be a modifiable list — FilteredList appends into it (a
         // const list throws "Cannot add to an unmodifiable list").

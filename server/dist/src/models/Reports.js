@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const accountingService_1 = __importDefault(require("../services/accountingService"));
 const cashService_1 = require("../services/cashService");
+const reportSql_1 = require("../utils/reportSql");
 function getARAgingReport(asOfDate, db) {
     const agingData = db.prepare(`
     SELECT c.customer_name, c.customer_code, SUM(i.balance_amount) as total_outstanding,
@@ -30,50 +31,54 @@ function getARAgingReport(asOfDate, db) {
 }
 // Moved from reportsController
 function getCustomerStatements(db, customerId, startDate, endDate) {
-    let query;
-    let params;
-    if (customerId) {
-        query = `
-      SELECT c.id as customer_id, c.customer_name, c.customer_code,
-        COALESCE(c.opening_balance, 0) as opening_balance,
-        COALESCE(SUM(i.total_amount), 0) as total_debits,
-        COALESCE(SUM(i.paid_amount), 0) as total_credits,
-        COALESCE(SUM(i.balance_amount), 0) as closing_balance,
-        COUNT(i.id) as invoice_count,
-        COALESCE(SUM(i.total_amount), 0) as total_amount,
-        COALESCE(SUM(i.paid_amount), 0) as paid_amount,
-        COALESCE(SUM(i.balance_amount), 0) as balance,
-        MAX(i.invoice_date) as last_invoice_date
-      FROM customers c
-      LEFT JOIN invoices i ON i.customer_id = c.id
-      WHERE c.id = ?
-    `;
-        params = [customerId];
-    }
-    else {
-        query = `
-      SELECT c.id as customer_id, c.customer_name, c.customer_code,
-        COALESCE(c.opening_balance, 0) as opening_balance,
-        COALESCE(SUM(i.total_amount), 0) as total_debits,
-        COALESCE(SUM(i.paid_amount), 0) as total_credits,
-        COALESCE(SUM(i.balance_amount), 0) as closing_balance,
-        COUNT(i.id) as invoice_count,
-        COALESCE(SUM(i.total_amount), 0) as total_amount,
-        COALESCE(SUM(i.paid_amount), 0) as paid_amount,
-        COALESCE(SUM(i.balance_amount), 0) as balance,
-        MAX(i.invoice_date) as last_invoice_date
-      FROM customers c
-      LEFT JOIN invoices i ON i.customer_id = c.id
-    `;
-        params = [];
-    }
-    if (startDate && endDate) {
-        query += customerId ? ` AND i.invoice_date BETWEEN ? AND ?` : ` AND (i.invoice_date BETWEEN ? AND ? OR i.id IS NULL)`;
-        params.push(startDate, endDate);
-    }
-    query += ` GROUP BY c.id ORDER BY c.customer_name`;
-    const rows = db.prepare(query).all(...params);
-    return { statements: rows };
+    // reporting-search-remediation (report-query-integrity): rebuilt from
+    // customer_ledger so statements actually foot. The old version summed
+    // invoice header columns with two different join semantics — a date
+    // filter on a selected customer landed in WHERE and annihilated the
+    // LEFT JOIN (customers with no in-range invoices vanished), and
+    // opening_balance was never folded into closing_balance.
+    //
+    // Now: opening = Σ(debit − credit) before the period; debits/credits =
+    // ledger movement inside the period; closing = opening + debits − credits.
+    // Date predicates live inside conditional aggregates, so childless
+    // customers always survive the LEFT JOIN.
+    const from = startDate && endDate ? startDate : '0001-01-01';
+    const to = startDate && endDate ? endDate : '9999-12-31';
+    const rows = db.prepare(`
+    SELECT c.id as customer_id, c.customer_name, c.customer_code,
+      COALESCE(SUM(CASE WHEN cl.transaction_date < :from THEN cl.debit - cl.credit ELSE 0 END), 0) as opening_balance,
+      COALESCE(SUM(CASE WHEN cl.transaction_date BETWEEN :from AND :to THEN cl.debit ELSE 0 END), 0) as total_debits,
+      COALESCE(SUM(CASE WHEN cl.transaction_date BETWEEN :from AND :to THEN cl.credit ELSE 0 END), 0) as total_credits,
+      COUNT(CASE WHEN cl.transaction_type = 'INVOICE' AND cl.transaction_date BETWEEN :from AND :to THEN 1 END) as invoice_count,
+      MAX(CASE WHEN cl.transaction_type = 'INVOICE' AND cl.transaction_date BETWEEN :from AND :to THEN cl.transaction_date END) as last_invoice_date
+    FROM customers c
+    LEFT JOIN customer_ledger cl ON cl.customer_id = c.id
+    ${customerId ? 'WHERE c.id = :customerId' : ''}
+    GROUP BY c.id ORDER BY c.customer_name
+  `).all({
+        from,
+        to,
+        ...(customerId ? { customerId } : {}),
+    });
+    const r2 = (v) => Math.round(v * 100) / 100;
+    const statements = rows.map((row) => {
+        const closing = r2(row.opening_balance + row.total_debits - row.total_credits);
+        return {
+            customer_id: row.customer_id,
+            customer_name: row.customer_name,
+            customer_code: row.customer_code,
+            opening_balance: r2(row.opening_balance),
+            total_debits: r2(row.total_debits),
+            total_credits: r2(row.total_credits),
+            closing_balance: closing,
+            invoice_count: row.invoice_count,
+            total_amount: r2(row.total_debits),
+            paid_amount: r2(row.total_credits),
+            balance: closing,
+            last_invoice_date: row.last_invoice_date,
+        };
+    });
+    return { statements };
 }
 // Moved from reportsController
 function getTopDebtors(db, limit = 10, asOfDate) {
@@ -98,7 +103,7 @@ function getDSOMetric(db, startDateStr, endDateStr) {
     const avgReceivables = db.prepare(`
     SELECT AVG(balance_amount) as avg_balance FROM invoices WHERE status IN ('Unpaid', 'Partially Paid', 'Overdue') AND invoice_date BETWEEN ? AND ?
   `).get(startDateStr, endDateStr);
-    const totalCreditSales = db.prepare(`SELECT SUM(total_amount) as total FROM invoices WHERE invoice_date BETWEEN ? AND ?`).get(startDateStr, endDateStr);
+    const totalCreditSales = db.prepare(`SELECT ${(0, reportSql_1.netRevenueSum)()} as total FROM invoices WHERE invoice_date BETWEEN ? AND ? AND ${(0, reportSql_1.NET_REVENUE_STATUS)()}`).get(startDateStr, endDateStr);
     const dso = totalCreditSales.total > 0 ? (avgReceivables.avg_balance / totalCreditSales.total) * days : 0;
     const totalSales = totalCreditSales.total;
     const totalAR = avgReceivables.avg_balance;
@@ -200,188 +205,6 @@ function getReceivablesSummary(db, asOfDate = new Date().toISOString().split('T'
         },
     };
 }
-function getSalesSummary(db, startDate, endDate) {
-    const detail = db.prepare(`
-    SELECT i.invoice_date, i.invoice_no, c.customer_name,
-           i.total_amount, i.paid_amount, i.balance_amount, i.status,
-           COALESCE(SUM(ii.quantity), 0) as total_items
-    FROM invoices i
-    JOIN customers c ON i.customer_id = c.id
-    LEFT JOIN invoice_items ii ON ii.invoice_id = i.id
-    WHERE i.invoice_date BETWEEN ? AND ?
-    GROUP BY i.id
-    ORDER BY i.invoice_date DESC
-  `).all(startDate, endDate);
-    const sales = detail.map((row) => ({
-        invoice_date: row.invoice_date,
-        invoice_no: row.invoice_no,
-        customer_name: row.customer_name,
-        total_sales: row.total_amount,
-        total_items: row.total_items,
-        paid_amount: row.paid_amount,
-        balance_amount: row.balance_amount,
-        status: row.status
-    }));
-    const totalInvoices = sales.length;
-    const totalSales = sales.reduce((s, r) => s + (r.total_sales || 0), 0);
-    const totalItemsSold = sales.reduce((s, r) => s + (r.total_items || 0), 0);
-    const totalPaid = sales.reduce((s, r) => s + (r.paid_amount || 0), 0);
-    const totalBalance = sales.reduce((s, r) => s + (r.balance_amount || 0), 0);
-    const averageInvoiceValue = totalInvoices > 0 ? totalSales / totalInvoices : 0;
-    const summary = { totalInvoices, totalSales, totalItemsSold, averageInvoiceValue, totalPaid, totalBalance };
-    return { period: { startDate, endDate }, summary, sales };
-}
-// Moved from reportsController
-function getSalesByCustomer(db, startDate, endDate) {
-    return db.prepare(`
-    SELECT c.customer_name, c.customer_code, c.email, c.phone,
-      COUNT(DISTINCT i.id) as total_invoices,
-      SUM(i.total_amount) as total_sales,
-      AVG(i.total_amount) as average_order_value,
-      COALESCE(SUM(ii.quantity), 0) as total_items,
-      MAX(i.invoice_date) as last_purchase_date
-    FROM invoices i
-    JOIN customers c ON i.customer_id = c.id
-    LEFT JOIN invoice_items ii ON ii.invoice_id = i.id
-    WHERE i.invoice_date BETWEEN ? AND ?
-    GROUP BY i.customer_id ORDER BY total_sales DESC
-  `).all(startDate, endDate);
-}
-// Moved from reportsController
-function getSalesByItem(db, startDate, endDate) {
-    return db.prepare(`
-    SELECT it.item_code, it.item_name, it.category as item_category,
-      SUM(ii.quantity) as total_quantity_sold,
-      SUM(ii.amount) as total_sales,
-      AVG(ii.unit_price) as avg_selling_price
-    FROM invoice_items ii JOIN items it ON ii.item_id = it.id JOIN invoices i ON ii.invoice_id = i.id
-    WHERE i.invoice_date BETWEEN ? AND ? GROUP BY ii.item_id ORDER BY total_sales DESC
-  `).all(startDate, endDate);
-}
-// Moved from reportsController
-function getStockValuationReport(db) {
-    // MAJOR-9 fix: previously the report computed stock_value as
-    //   current_stock * standard_cost
-    // for every item, ignoring stock_batches entirely. With batch
-    // costing enabled, the real value of stock is the SUM of
-    // (quantity_remaining * unit_cost) across batches, which can
-    // differ materially from standard_cost when:
-    //   - items have a mix of old (cheap) and new (expensive) batches
-    //   - standard costs haven't been updated
-    //   - production costs differ from standard_cost
-    // The report also double-counted stock by LEFT JOINing
-    // stock_balances (which has one row per item-warehouse pair), so
-    // an item in 3 warehouses reported 3x the actual stock.
-    //
-    // New behavior: for each item, value = SUM(quantity_remaining *
-    // unit_cost) across stock_batches, with quantity_remaining > 0.
-    // Items with no batch rows fall back to standard_cost * current_stock
-    // (the legacy case). Quantity comes from stock_batches
-    // (not stock_balances, which is per-warehouse and would multiply).
-    const valuation = db.prepare(`
-    SELECT
-      i.id, i.item_code, i.item_name, i.category, i.unit_of_measure, i.standard_cost,
-      COALESCE(sb_summary.batch_qty, 0) as total_stock,
-      COALESCE(sb_summary.batch_value, 0) as batch_tracked_value,
-      CASE
-        WHEN COALESCE(sb_summary.batch_qty, 0) > 0
-          THEN COALESCE(sb_summary.batch_value, 0)
-        ELSE i.current_stock * i.standard_cost
-      END as total_value,
-      CASE
-        WHEN COALESCE(sb_summary.batch_qty, 0) > 0 THEN 'batch'
-        ELSE 'standard_cost_fallback'
-      END as valuation_method
-    FROM items i
-    LEFT JOIN (
-      SELECT item_id,
-             SUM(quantity_remaining) as batch_qty,
-             SUM(quantity_remaining * unit_cost) as batch_value
-      FROM stock_batches
-      WHERE quantity_remaining > 0
-      GROUP BY item_id
-    ) sb_summary ON i.id = sb_summary.item_id
-    WHERE i.is_active = 1
-    ORDER BY total_value DESC
-  `).all();
-    // Total at report level: also use the same CASE formula so the
-    // summary agrees with the per-item rows. Computed in JS to keep
-    // the SQL simple (it would need a CTE for the same effect).
-    const totalValue = valuation.reduce((sum, r) => sum + (r.total_value || 0), 0);
-    // Count how many items still rely on standard_cost (legacy).
-    const legacyItems = valuation.filter((r) => r.valuation_method === 'standard_cost_fallback').length;
-    return {
-        stockValuation: valuation,
-        summary: {
-            totalValue,
-            totalItems: valuation.length,
-            batchTrackedItems: valuation.length - legacyItems,
-            legacyItems
-        }
-    };
-}
-// Moved from reportsController
-function getInventoryMovementReport(db, startDate, endDate, itemId) {
-    let query = `
-    SELECT sm.movement_no, sm.movement_type, sm.quantity, sm.unit_cost, sm.movement_date,
-      sm.reference_doctype, sm.reference_docno, sm.remarks,
-      i.item_code, i.item_name, w.warehouse_name
-    FROM stock_movements sm JOIN items i ON sm.item_id = i.id JOIN warehouses w ON sm.warehouse_id = w.id WHERE 1=1
-  `;
-    const params = [];
-    if (startDate) {
-        query += ' AND sm.movement_date >= ?';
-        params.push(startDate);
-    }
-    if (endDate) {
-        query += ' AND sm.movement_date <= ?';
-        params.push(endDate);
-    }
-    if (itemId !== undefined && itemId !== null) {
-        query += ' AND sm.item_id = ?';
-        params.push(itemId);
-    }
-    query += ' ORDER BY sm.movement_date DESC LIMIT 500';
-    const rows = db.prepare(query).all(...params);
-    // Classify by quantity direction, not movement_type literal strings.
-    // The system stores real types (PURCHASE, SALE, ADJUSTMENT, TRANSFER,
-    // ...) — a PURCHASE is inbound, a SALE is outbound, and ADJUSTMENT /
-    // TRANSFER directions are determined by the sign of the quantity.
-    // Comparing against 'in'/'out' always yielded 0. Quantity is positive
-    // for inbound, negative for outbound.
-    const totalInbound = rows.filter((r) => (r.quantity ?? 0) > 0).length;
-    const totalOutbound = rows.filter((r) => (r.quantity ?? 0) < 0).length;
-    return {
-        movements: rows,
-        summary: {
-            totalInbound,
-            totalOutbound,
-            netMovement: totalInbound - totalOutbound
-        }
-    };
-}
-// Moved from reportsController
-function getSupplierAnalysis(db, startDate, endDate) {
-    const rows = db.prepare(`
-    SELECT s.supplier_name, s.supplier_code, s.email, s.phone,
-      COUNT(po.id) as total_orders, SUM(po.total_amount) as total_purchase_value,
-      AVG(po.total_amount) as average_order_value,
-      MAX(po.po_date) as last_purchase_date,
-      COUNT(poi.id) as total_items
-    FROM purchase_orders po 
-    JOIN suppliers s ON po.supplier_id = s.id 
-    LEFT JOIN purchase_order_items poi ON poi.po_id = po.id
-    WHERE po.po_date BETWEEN ? AND ?
-    GROUP BY po.supplier_id ORDER BY total_purchase_value DESC
-  `).all(startDate, endDate);
-    return rows.map((r) => ({
-        ...r,
-        total_purchase_value: r.total_purchase_value || 0,
-        average_order_value: r.average_order_value || 0,
-        on_time_delivery_rate: 100,
-        total_items: r.total_items || 0
-    }));
-}
 // Moved from reportsController
 function getBatchTraceability(db, itemId) {
     const item = db.prepare('SELECT id, item_code, item_name, unit_of_measure FROM items WHERE id = ?').get(itemId);
@@ -424,46 +247,74 @@ function getBatchTraceability(db, itemId) {
         }
     };
 }
-function getAPAgingReport(asOfDate, db) {
-    // AP Aging mirrors AR Aging but queries purchase orders instead of
-    // invoices. Each supplier's outstanding amount is split into aging
-    // buckets based on the due_date of their purchase orders.
-    const agingData = db.prepare(`
-    SELECT s.supplier_name, s.supplier_code,
-      SUM(po.balance_amount) as total_outstanding,
-      SUM(CASE WHEN julianday(?) - julianday(po.due_date) <= 0 THEN po.balance_amount ELSE 0 END) as current_amount,
-      SUM(CASE WHEN julianday(?) - julianday(po.due_date) > 0 AND julianday(?) - julianday(po.due_date) <= 30 THEN po.balance_amount ELSE 0 END) as days_1_30,
-      SUM(CASE WHEN julianday(?) - julianday(po.due_date) > 30 AND julianday(?) - julianday(po.due_date) <= 60 THEN po.balance_amount ELSE 0 END) as days_31_60,
-      SUM(CASE WHEN julianday(?) - julianday(po.due_date) > 60 AND julianday(?) - julianday(po.due_date) <= 90 THEN po.balance_amount ELSE 0 END) as days_61_90,
-      SUM(CASE WHEN julianday(?) - julianday(po.due_date) > 90 THEN po.balance_amount ELSE 0 END) as days_over_90
-    FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.id
-    WHERE po.status IN ('Approved', 'Received', 'Partial') AND po.balance_amount > 0
-    GROUP BY po.supplier_id, s.supplier_name, s.supplier_code ORDER BY total_outstanding DESC
-  `).all(asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate);
-    const summary = db.prepare(`
-    SELECT SUM(balance_amount) as "totalPayables",
-      SUM(CASE WHEN julianday(?) - julianday(due_date) <= 0 THEN balance_amount ELSE 0 END) as current_amount,
-      SUM(CASE WHEN julianday(?) - julianday(due_date) > 0 AND julianday(?) - julianday(due_date) <= 30 THEN balance_amount ELSE 0 END) as total_1_30,
-      SUM(CASE WHEN julianday(?) - julianday(due_date) > 30 AND julianday(?) - julianday(due_date) <= 60 THEN balance_amount ELSE 0 END) as total_31_60,
-      SUM(CASE WHEN julianday(?) - julianday(due_date) > 60 AND julianday(?) - julianday(due_date) <= 90 THEN balance_amount ELSE 0 END) as total_61_90,
-      SUM(CASE WHEN julianday(?) - julianday(due_date) > 90 THEN balance_amount ELSE 0 END) as total_over_90
-    FROM purchase_orders WHERE status IN ('Approved', 'Received', 'Partial') AND balance_amount > 0
-  `).get(asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate);
-    return { asOfDate, agingBuckets: agingData, summary };
-}
-function getAPSummary(asOfDate, db) {
-    const summary = db.prepare(`
-    SELECT s.supplier_name, SUM(po.total_cost - COALESCE(p.paid_amount, 0)) as outstanding
-    FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.id
-    LEFT JOIN (SELECT purchase_order_id, SUM(amount) as paid_amount FROM payments GROUP BY purchase_order_id) p ON po.id = p.purchase_order_id
-    WHERE po.status IN ('Approved', 'Received') GROUP BY s.supplier_name ORDER BY outstanding DESC
+function computeAPAging(asOfDate, db) {
+    const debitRows = db.prepare(`
+    SELECT sl.supplier_id, sl.transaction_date, sl.debit,
+      COALESCE(s.supplier_name, '') AS supplier_name,
+      s.supplier_code
+    FROM supplier_ledger sl
+    JOIN suppliers s ON s.id = sl.supplier_id
+    WHERE sl.voided = 0 AND sl.debit > 0
+    ORDER BY sl.supplier_id, sl.transaction_date ASC, sl.id ASC
   `).all();
-    const totalOutstanding = db.prepare(`
-    SELECT SUM(total_cost - COALESCE(p.paid_amount, 0)) as total
-    FROM purchase_orders LEFT JOIN (SELECT purchase_order_id, SUM(amount) as paid_amount FROM payments GROUP BY purchase_order_id) p ON id = p.purchase_order_id
-    WHERE status IN ('Approved', 'Received')
-  `).get();
-    return { asOfDate, supplierSummary: summary, totalOutstanding: totalOutstanding?.total || 0 };
+    const creditTotals = new Map();
+    const creditRows = db.prepare(`
+    SELECT supplier_id, SUM(credit) AS credit FROM supplier_ledger
+    WHERE voided = 0 AND credit > 0 GROUP BY supplier_id
+  `).all();
+    for (const r of creditRows)
+        creditTotals.set(r.supplier_id, Number(r.credit));
+    const buckets = new Map();
+    for (const row of debitRows) {
+        let b = buckets.get(row.supplier_id);
+        if (!b) {
+            b = {
+                supplier_id: row.supplier_id,
+                supplier_name: row.supplier_name,
+                supplier_code: row.supplier_code,
+                total_outstanding: 0, current_amount: 0, days_1_30: 0,
+                days_31_60: 0, days_61_90: 0, days_over_90: 0,
+            };
+            buckets.set(row.supplier_id, b);
+        }
+        let outstanding = Number(row.debit);
+        // Net credits FIFO against the oldest debits first.
+        const credit = creditTotals.get(row.supplier_id) ?? 0;
+        if (credit > 0) {
+            const applied = Math.min(credit, outstanding);
+            outstanding -= applied;
+            creditTotals.set(row.supplier_id, credit - applied);
+        }
+        if (outstanding <= 0.005)
+            continue; // fully offset — not outstanding
+        const ageDays = Math.floor((new Date(asOfDate).getTime() - new Date(row.transaction_date).getTime()) / 86400000);
+        b.total_outstanding += outstanding;
+        if (ageDays <= 0)
+            b.current_amount += outstanding;
+        else if (ageDays <= 30)
+            b.days_1_30 += outstanding;
+        else if (ageDays <= 60)
+            b.days_31_60 += outstanding;
+        else if (ageDays <= 90)
+            b.days_61_90 += outstanding;
+        else
+            b.days_over_90 += outstanding;
+    }
+    return [...buckets.values()]
+        .filter((b) => b.total_outstanding > 0.005)
+        .sort((a, b) => b.total_outstanding - a.total_outstanding);
+}
+function getAPAgingReport(asOfDate, db) {
+    const agingBuckets = computeAPAging(asOfDate, db);
+    const summary = {
+        totalPayables: agingBuckets.reduce((sum, b) => sum + b.total_outstanding, 0),
+        current_amount: agingBuckets.reduce((sum, b) => sum + b.current_amount, 0),
+        total_1_30: agingBuckets.reduce((sum, b) => sum + b.days_1_30, 0),
+        total_31_60: agingBuckets.reduce((sum, b) => sum + b.days_31_60, 0),
+        total_61_90: agingBuckets.reduce((sum, b) => sum + b.days_61_90, 0),
+        total_over_90: agingBuckets.reduce((sum, b) => sum + b.days_over_90, 0),
+    };
+    return { asOfDate, basis: 'supplier_ledger', agingBuckets, summary };
 }
 function getProfitLossReport(startDate, endDate, db) {
     // MAJOR-3 audit note: the original P&L formula here is correct
@@ -475,22 +326,14 @@ function getProfitLossReport(startDate, endDate, db) {
     // in the audit), so COGS will be slightly off until that flow is
     // also fixed; the SQL itself is correct.
     const revenue = db.prepare(`
-    SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total FROM invoices
+    SELECT ${(0, reportSql_1.netRevenueSum)()} as total FROM invoices
     WHERE invoice_date BETWEEN ? AND ?
-      AND status != 'Cancelled'
+      AND ${(0, reportSql_1.NET_REVENUE_STATUS)()}
   `).get(startDate, endDate);
-    // COGS nets SALE movements against their stock reversals (returns /
-    // deletes / updates post an ADJUSTMENT at the same cost) so returned
-    // sales stop counting as cost of goods sold.
-    const cogs = db.prepare(`
-    SELECT COALESCE(ABS(SUM(sm.quantity * sm.unit_cost)), 0) as total FROM stock_movements sm
-    WHERE sm.movement_date BETWEEN ? AND ?
-      AND (
-        sm.movement_type = 'SALE'
-        OR (sm.movement_type = 'ADJUSTMENT'
-            AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE'))
-      )
-  `).get(startDate, endDate);
+    // COGS via the shared helper (report-query-integrity): nets SALE
+    // movements against their stock reversals so returned sales stop
+    // counting as cost of goods sold.
+    const cogs = { total: (0, reportSql_1.cogsForPeriod)(db, startDate, endDate) };
     const expenses = db.prepare(`SELECT expense_category, SUM(amount) as total FROM expenses WHERE expense_date BETWEEN ? AND ? GROUP BY expense_category ORDER BY total DESC`).all(startDate, endDate);
     const totalExpenses = expenses.reduce((sum, e) => sum + e.total, 0);
     const grossProfit = revenue.total - cogs.total;
@@ -500,146 +343,76 @@ function getProfitLossReport(startDate, endDate, db) {
     return { startDate, endDate, totalRevenue: revenue.total, totalCogs: cogs.total, grossProfit, expenses, totalExpenses, netProfit, grossProfitMargin, netProfitMargin };
 }
 function getBalanceSheet(asOfDate, db) {
-    // CRITICAL-3 fix: the previous implementation had four independent
-    // bugs in one report.
-    //
-    //  (a) AP = SUM(po.total_amount WHERE status='Completed')
-    //      This counted FULL PO value, not outstanding AP. Paid and
-    //      partially-paid POs were both included. Real AP is the
-    //      supplier_ledger's running balance (PO amount owed - payments
-    //      allocated against it), not the gross PO total.
-    //
-    //  (b) "Cash" was SUM(credit - debit) FROM customer_ledger WHERE
-    //      transaction_type = 'PAYMENT'. That is a per-customer running
-    //      AR balance, not cash. Two different concepts conflated.
-    //      New: derive cash from journal_entries where the account is
-    //      'cash' or 'bank'. If no journal entries reference those
-    //      accounts, returns 0 (honest "no cash tracked yet" answer
-    //      rather than a fake number). A TODO notes that proper cash
-    //      tracking needs a dedicated cash_accounts table.
-    //
-    //  (c) Equity was hard-coded to 0 (no opening retained earnings
-    //      tracked, net income silently dropped).
-    //      New: equity = opening_retained_earnings (from settings) +
-    //                    net_income_to_date (revenue - cogs - expenses
-    //                    up to asOfDate).
-    //
-    //  (d) asOfDate was accepted but never used as a filter.
-    //      New: AR, AP, and equity are all filtered by asOfDate.
-    //
-    // Inventory: switched from current_stock * standard_cost (per item)
-    // to SUM(quantity_remaining * unit_cost) across stock_batches, to
-    // match the production-fix (CRITICAL-4) and the valuation report
-    // (MAJOR-9).
+    // reporting-search-remediation: the sheet is now fully GL-derived.
+    // Every section reads AccountingService.getAllAccountBalances — the
+    // same journal_lines ∪ legacy journal_entries source the trial
+    // balance uses — so the two statements report identical account
+    // balances by construction. With complete document posting
+    // (migrations/backfillGlPreposting.ts) every flow hits both an
+    // asset/liability and a revenue/expense/equity account, so
+    // assets − liabilities == equity holds through the double-entry
+    // identity rather than by coincidence between unrelated tables.
+    const round2 = (v) => Math.round(v * 100) / 100;
+    const balances = accountingService_1.default.getAllAccountBalances(db, asOfDate);
+    const byCode = new Map(balances.map(b => [b.account_code, b]));
+    const bal = (code) => byCode.get(code)?.balance ?? 0;
+    const CASH_CODES = ['1000', '1010', '1020', '1030', '1040'];
+    const sumType = (type) => round2(balances.filter(b => b.type === type).reduce((s, b) => s + b.balance, 0));
     // --- ASSETS ---
-    const inventoryRow = db.prepare(`
-    SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) as batch_value
-    FROM stock_batches WHERE quantity_remaining > 0
-  `).get();
-    // Plus legacy items (stock on hand but no batch rows) valued at
-    // standard_cost. Computed as (sum of items.current_stock * standard_cost
-    // for items with no batches) so we don't double-count batch-tracked
-    // items.
-    const legacyInventoryRow = db.prepare(`
-    SELECT COALESCE(SUM(i.current_stock * i.standard_cost), 0) as legacy_value
-    FROM items i
-    WHERE i.is_active = 1
-      AND i.current_stock > 0
-      AND NOT EXISTS (SELECT 1 FROM stock_batches sb WHERE sb.item_id = i.id AND sb.quantity_remaining > 0)
-  `).get();
-    const inventoryValue = inventoryRow.batch_value + legacyInventoryRow.legacy_value;
-    const ar = db.prepare(`
-    SELECT COALESCE(SUM(balance_amount), 0) as total FROM invoices
-    WHERE status IN ('Unpaid', 'Partially Paid', 'Overdue', 'Sent')
-      AND balance_amount > 0
-      AND invoice_date <= ?
-  `).get(asOfDate);
-    // Cash: read from the cash account via AccountingService so it pulls
-    // from both journal_lines (new) and journal_entries (legacy, matched
-    // by text_code) and returns a properly signed balance.
-    const cashAccount = accountingService_1.default.getAccountByTextCode(db, 'cash');
-    const cashBalance = cashAccount
-        ? accountingService_1.default.getAccountBalance(db, cashAccount.id, asOfDate).balance
-        : 0;
+    const inventoryValue = bal('1200');
+    const arTotal = bal('1100');
+    const cashBalance = round2(CASH_CODES.reduce((s, c) => s + bal(c), 0));
+    // Asset accounts outside the three display lines (custom accounts).
+    const knownAssetCodes = new Set([...CASH_CODES, '1100', '1200']);
+    const otherAssets = round2(balances.filter(b => b.type === 'asset' && !knownAssetCodes.has(b.account_code))
+        .reduce((s, b) => s + b.balance, 0));
+    const totalAssets = sumType('asset');
     // --- LIABILITIES ---
-    // AP from supplier_ledger: sum the latest running balance per
-    // supplier. This is the amount currently owed, not the gross PO
-    // total. Per supplier, we take the most recent balance as of
-    // asOfDate (any transactions after asOfDate are ignored).
-    const ap = db.prepare(`
-    SELECT COALESCE(SUM(balance), 0) as total FROM (
-      SELECT sl1.supplier_id, sl1.balance
-      FROM supplier_ledger sl1
-      WHERE sl1.balance > 0
-        AND sl1.transaction_date <= ?
-        AND sl1.id = (
-          SELECT MAX(sl2.id) FROM supplier_ledger sl2
-          WHERE sl2.supplier_id = sl1.supplier_id
-            AND sl2.transaction_date <= ?
-        )
-    )
-  `).get(asOfDate, asOfDate);
+    const apTotal = bal('2000');
+    const taxPayable = bal('2100');
+    const otherLiabilities = round2(balances.filter(b => b.type === 'liability' && !['2000', '2100'].includes(b.account_code))
+        .reduce((s, b) => s + b.balance, 0));
+    const totalLiabilities = sumType('liability');
     // --- EQUITY ---
-    // Opening retained earnings from settings table. The key is
-    // 'opening_retained_earnings' and the value is a decimal string.
-    // Default to 0 if not set.
-    const openingRE = db.prepare(`
-    SELECT value FROM settings WHERE key = 'opening_retained_earnings'
-  `).get();
-    const openingRetainedEarnings = openingRE ? parseFloat(openingRE.value) || 0 : 0;
-    // Net income to date: revenue - cogs - expenses up to asOfDate.
-    // Note: this is the same calc as the P&L, just run for [earliest,
-    // asOfDate] instead of [startDate, endDate].
-    const revenueYTD = db.prepare(`
-    SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total FROM invoices
-    WHERE invoice_date <= ? AND status != 'Cancelled'
-  `).get(asOfDate);
-    const cogsYTD = db.prepare(`
-    SELECT COALESCE(ABS(SUM(quantity * unit_cost)), 0) as total
-    FROM stock_movements
-    WHERE movement_date <= ?
-      AND (
-        movement_type IN ('SALE','OUT')
-        OR (movement_type = 'ADJUSTMENT'
-            AND reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE'))
-      )
-  `).get(asOfDate);
-    const expensesYTD = db.prepare(`
-    SELECT COALESCE(SUM(amount), 0) as total FROM expenses
-    WHERE expense_date <= ?
-  `).get(asOfDate);
-    const netIncomeYTD = revenueYTD.total - cogsYTD.total - expensesYTD.total;
-    const equity = openingRetainedEarnings + netIncomeYTD;
+    // Revenue accounts are credit-normal except the contra-revenue Sales
+    // Returns (4100, debit-normal), which reduces revenue.
+    const revenueYtd = round2(balances.filter(b => b.type === 'revenue')
+        .reduce((s, b) => s + (b.normal_balance === 'credit' ? b.balance : -b.balance), 0));
+    const cogsYtd = bal('5000');
+    const expensesYtd = round2(sumType('expense') - cogsYtd);
+    const openingRetainedEarnings = sumType('equity'); // contributed capital + posted retained earnings
+    const netIncomeYtd = round2(revenueYtd - cogsYtd - expensesYtd);
+    const equity = round2(openingRetainedEarnings + netIncomeYtd);
     // --- ASSEMBLE ---
-    const totalAssets = inventoryValue + ar.total + cashBalance;
-    const totalLiabilities = ap.total;
-    const totalEquity = equity;
-    const totalLiabAndEquity = totalLiabilities + totalEquity;
+    const totalLiabAndEquity = round2(totalLiabilities + equity);
     const balanced = Math.abs(totalAssets - totalLiabAndEquity) < 0.01;
     return {
         asOfDate,
         assets: {
-            inventory: inventoryValue,
-            accounts_receivable: ar.total,
+            inventory: round2(inventoryValue),
+            accounts_receivable: round2(arTotal),
             cash: cashBalance,
+            other: otherAssets,
             total: totalAssets
         },
         liabilities: {
-            accounts_payable: ap.total,
+            accounts_payable: round2(apTotal),
+            tax_payable: round2(taxPayable),
+            other: otherLiabilities,
             total: totalLiabilities
         },
         equity: {
             opening_retained_earnings: openingRetainedEarnings,
-            net_income_ytd: netIncomeYTD,
-            revenue_ytd: revenueYTD.total,
-            cogs_ytd: cogsYTD.total,
-            expenses_ytd: expensesYTD.total,
-            total: totalEquity
+            net_income_ytd: netIncomeYtd,
+            revenue_ytd: revenueYtd,
+            cogs_ytd: round2(cogsYtd),
+            expenses_ytd: expensesYtd,
+            total: equity
         },
         totals: {
             total_assets: totalAssets,
             total_liabilities: totalLiabilities,
-            total_equity: totalEquity,
+            total_equity: equity,
             total_liab_and_equity: totalLiabAndEquity,
             balanced
         }
@@ -699,9 +472,88 @@ function getTrialBalance(asOfDate, db) {
     };
 }
 function getGeneralLedger(startDate, endDate, db) {
+    // report-query-integrity: the general ledger reports the GL itself —
+    // journal_lines joined to chart_of_accounts, voided lines excluded —
+    // with a per-account running balance. The previous implementation
+    // returned the customer subledger and survives renamed below.
+    return db.prepare(`
+    SELECT jl.id,
+      jl.line_date as transaction_date,
+      coa.code as account_code,
+      coa.name as account_name,
+      COALESCE(jl.reference_type, '') as transaction_type,
+      -- Reference No is the source-document pointer (#id), not the
+      -- description — aliasing description here made it duplicate the
+      -- remarks column.
+      COALESCE('#' || jl.reference_id, '') as reference_no,
+      jl.reference_id,
+      jl.debit,
+      jl.credit,
+      SUM(jl.debit - jl.credit) OVER (
+        PARTITION BY coa.id ORDER BY jl.line_date, jl.id
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+      ) as balance,
+      jl.description as remarks
+    FROM journal_lines jl
+    JOIN chart_of_accounts coa ON coa.id = jl.account_id
+    WHERE jl.voided = 0 AND jl.line_date BETWEEN ? AND ?
+    ORDER BY jl.line_date, jl.id
+  `).all(startDate, endDate);
+}
+/** Former body of getGeneralLedger — kept under its true name. */
+function getCustomerLedgerReport(startDate, endDate, db) {
     return db.prepare(`
     SELECT * FROM customer_ledger WHERE transaction_date BETWEEN ? AND ? ORDER BY transaction_date, id
   `).all(startDate, endDate);
+}
+/** Batches carrying an expiry_date with stock remaining, classified as
+ * expired / expiring (within `thresholdDays`) / normal. Backs
+ * GET /reports/expiry. */
+function getExpiryReport(db, opts = {}) {
+    const threshold = opts.thresholdDays ?? 30;
+    const rows = db.prepare(`
+    SELECT sb.id, i.id as item_id, i.item_code, i.item_name, sb.batch_no,
+      w.id as warehouse_id, w.warehouse_name,
+      sb.quantity_remaining, sb.unit_cost, sb.received_date,
+      date(sb.expiry_date) as expiry_date,
+      CAST(julianday(sb.expiry_date) - julianday(date('now', 'localtime')) AS INTEGER) as days_remaining,
+      ${columnExistsSafe(db, 'stock_batches', 'halted') ? 'sb.halted' : '0'} as halted
+    FROM stock_batches sb
+    JOIN items i ON sb.item_id = i.id
+    JOIN warehouses w ON sb.warehouse_id = w.id
+    WHERE sb.quantity_remaining > 0 AND sb.expiry_date IS NOT NULL
+      ${opts.warehouseId ? 'AND sb.warehouse_id = @warehouseId' : ''}
+    ORDER BY sb.expiry_date ASC
+  `).all(opts.warehouseId ? { warehouseId: opts.warehouseId } : {});
+    const classified = rows.map((r) => ({
+        ...r,
+        status: (r.days_remaining < 0 ? 'expired' : r.days_remaining <= threshold ? 'expiring' : 'normal'),
+    }));
+    if (opts.status && ['expired', 'expiring', 'normal'].includes(opts.status)) {
+        return classified.filter((r) => r.status === opts.status);
+    }
+    return classified;
+}
+/** Batches expiring within `days` (expired ones first), for the dashboard
+ * alert feed. Backs GET /dashboard/expiry-alerts. */
+function getExpiryAlerts(db, days) {
+    return db.prepare(`
+    SELECT i.id as item_id, i.item_name, sb.batch_no,
+      w.warehouse_name,
+      date(sb.expiry_date) as expiry_date,
+      CAST(julianday(sb.expiry_date) - julianday(date('now', 'localtime')) AS INTEGER) as days_remaining
+    FROM stock_batches sb
+    JOIN items i ON sb.item_id = i.id
+    JOIN warehouses w ON sb.warehouse_id = w.id
+    WHERE sb.quantity_remaining > 0 AND sb.expiry_date IS NOT NULL
+      AND sb.expiry_date <= date('now', 'localtime', '+' || @days || ' days')
+    ORDER BY sb.expiry_date ASC
+    LIMIT 10
+  `).all({ days });
+}
+/** Guarded column probe for optional schema additions (halted). */
+function columnExistsSafe(db, table, column) {
+    return db.pragma(`table_info('${table}')`).some(c => c.name === column);
 }
 function getCashFlow(startDate, endDate, db) {
     // Same money-movement tables as the dashboard cash position
@@ -730,204 +582,33 @@ function getCashFlow(startDate, endDate, db) {
     return { startDate, endDate, totalInflow, totalOutflow, netCashFlow: totalInflow - totalOutflow };
 }
 function getTaxSummary(startDate, endDate, db) {
+    // report-query-integrity: sum the stored per-line tax_amount instead of
+    // re-deriving tax from `amount`, which is tax-INCLUSIVE on
+    // quotation-sourced lines (re-deriving taxed the tax).
     return db.prepare(`
-    SELECT SUM(amount * tax_rate / 100) as total_tax FROM invoice_items ii JOIN invoices i ON ii.invoice_id = i.id WHERE i.invoice_date BETWEEN ? AND ?
+    SELECT COALESCE(SUM(ii.tax_amount), 0) as total_tax
+    FROM invoice_items ii JOIN invoices i ON ii.invoice_id = i.id
+    WHERE i.invoice_date BETWEEN ? AND ? AND ${(0, reportSql_1.NET_REVENUE_STATUS)('i')}
   `).get(startDate, endDate);
 }
 function getDailySales(startDate, endDate, db) {
     return db.prepare(`
-    SELECT invoice_date, COUNT(*) as count, SUM(total_amount) as total FROM invoices WHERE invoice_date BETWEEN ? AND ? GROUP BY invoice_date ORDER BY invoice_date
+    SELECT invoice_date, COUNT(*) as count, ${(0, reportSql_1.netRevenueSum)()} as total
+    FROM invoices WHERE invoice_date BETWEEN ? AND ? AND ${(0, reportSql_1.NET_REVENUE_STATUS)()}
+    GROUP BY invoice_date ORDER BY invoice_date
   `).all(startDate, endDate);
 }
 function getMonthlySales(year, db) {
     return db.prepare(`
-    SELECT strftime('%m', invoice_date) as month, COUNT(*) as count, SUM(total_amount) as total FROM invoices WHERE strftime('%Y', invoice_date) = ? GROUP BY month ORDER BY month
+    SELECT strftime('%m', invoice_date) as month, COUNT(*) as count, ${(0, reportSql_1.netRevenueSum)()} as total
+    FROM invoices WHERE strftime('%Y', invoice_date) = ? AND ${(0, reportSql_1.NET_REVENUE_STATUS)()}
+    GROUP BY month ORDER BY month
   `).all(year);
 }
 function getGrossProfit(startDate, endDate, db) {
-    const revenue = db.prepare(`SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total FROM invoices WHERE invoice_date BETWEEN ? AND ? AND status != 'Cancelled'`).get(startDate, endDate);
-    const cogs = db.prepare(`SELECT COALESCE(ABS(SUM(sm.quantity * sm.unit_cost)), 0) as total FROM stock_movements sm WHERE sm.movement_date BETWEEN ? AND ? AND (sm.movement_type = 'SALE' OR (sm.movement_type = 'ADJUSTMENT' AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE')))`).get(startDate, endDate);
-    return { startDate, endDate, revenue: revenue.total, cogs: cogs.total, grossProfit: revenue.total - cogs.total, margin: revenue.total > 0 ? ((revenue.total - cogs.total) / revenue.total * 100) : 0 };
-}
-function getStockLevelReport(db) {
-    const rows = db.prepare(`
-    SELECT i.id, i.item_code, i.item_name, i.category, i.unit_of_measure,
-           COALESCE(SUM(sb.quantity), 0) as total_stock, i.reorder_level, i.standard_cost
-    FROM items i LEFT JOIN stock_balances sb ON i.id = sb.item_id WHERE i.is_active = 1
-    GROUP BY i.id ORDER BY i.item_name
-  `).all();
-    const stockLevels = rows.map(row => {
-        const currentStock = Math.max(0, row.total_stock);
-        return {
-            id: row.id,
-            item_code: row.item_code,
-            item_name: row.item_name,
-            item_category: row.category || '',
-            unit_of_measure: row.unit_of_measure,
-            current_stock: currentStock,
-            minimum_stock: row.reorder_level || 0,
-            reorder_level: row.reorder_level || 0,
-            standard_selling_price: row.standard_cost || 0,
-            stock_status: currentStock === 0
-                ? 'Out of Stock'
-                : currentStock < (row.reorder_level || 0)
-                    ? 'Low Stock'
-                    : 'In Stock'
-        };
-    });
-    const totalItems = stockLevels.length;
-    const inStock = stockLevels.filter(s => s.stock_status === 'In Stock').length;
-    const lowStock = stockLevels.filter(s => s.stock_status === 'Low Stock').length;
-    const outOfStock = stockLevels.filter(s => s.stock_status === 'Out of Stock').length;
-    return { stockLevels, summary: { totalItems, inStock, lowStock, outOfStock } };
-}
-function getLowStockReport(db) {
-    const rows = db.prepare(`
-    SELECT i.id, i.item_code, i.item_name, i.category, i.unit_of_measure,
-           COALESCE(SUM(sb.quantity), 0) as current_stock, i.reorder_level,
-           i.standard_selling_price
-    FROM items i LEFT JOIN stock_balances sb ON i.id = sb.item_id
-    WHERE i.reorder_level > 0
-    GROUP BY i.id
-    HAVING COALESCE(SUM(sb.quantity), 0) <= i.reorder_level
-    ORDER BY (COALESCE(SUM(sb.quantity), 0) * 1.0 / i.reorder_level) ASC
-  `).all();
-    return rows.map(row => ({
-        id: row.id,
-        item_code: row.item_code,
-        item_name: row.item_name,
-        item_category: row.category || '',
-        unit_of_measure: row.unit_of_measure,
-        current_stock: row.current_stock,
-        minimum_stock: row.reorder_level,
-        shortage: Math.max(row.reorder_level - row.current_stock, 0),
-        reorder_level: row.reorder_level,
-        standard_selling_price: row.standard_selling_price || 0,
-        stock_status: row.current_stock === 0
-            ? 'Out of Stock'
-            : row.current_stock < row.reorder_level
-                ? 'Low Stock'
-                : 'In Stock'
-    }));
-}
-function getPurchaseSummary(startDate, endDate, db) {
-    const rows = db.prepare(`
-    SELECT po.id as po_id, po.po_no as purchase_order_number, po.po_date as purchase_date,
-      s.supplier_name, po.total_amount as total_cost, po.status,
-      (SELECT COUNT(*) FROM purchase_order_items WHERE po_id = po.id) as total_items,
-      (SELECT COALESCE(SUM(received_quantity * unit_price), 0) FROM purchase_order_items WHERE po_id = po.id) as received_amount,
-      (po.total_amount - (SELECT COALESCE(SUM(received_quantity * unit_price), 0) FROM purchase_order_items WHERE po_id = po.id)) as balance_amount
-    FROM purchase_orders po
-    JOIN suppliers s ON po.supplier_id = s.id
-    WHERE po.po_date BETWEEN ? AND ?
-    ORDER BY po.po_date DESC
-  `).all(startDate, endDate);
-    // Compute return metrics from stock movements
-    const returnData = db.prepare(`
-    SELECT
-      COUNT(*) as return_count,
-      COALESCE(SUM(ABS(quantity)), 0) as return_quantity,
-      COALESCE(SUM(ABS(quantity) * unit_cost), 0) as return_value
-    FROM stock_movements
-    WHERE reference_doctype IN ('PURCHASE_RETURN', 'PO_RETURN')
-      AND quantity < 0
-      AND movement_date BETWEEN ? AND ?
-  `).get(startDate, endDate);
-    const totalOrders = rows.length;
-    const totalCost = rows.reduce((s, r) => s + (r.total_cost || 0), 0);
-    const totalPurchasedItems = rows.reduce((s, r) => s + (r.total_items || 0), 0);
-    const averageOrderValue = totalOrders > 0 ? totalCost / totalOrders : 0;
-    return {
-        purchases: rows,
-        summary: {
-            totalOrders,
-            totalCost,
-            totalItems: totalPurchasedItems,
-            averageOrderValue,
-            returnCount: returnData?.return_count || 0,
-            returnQuantity: returnData?.return_quantity || 0,
-            returnValue: returnData?.return_value || 0
-        }
-    };
-}
-function getProductionEfficiency(startDate, endDate, db) {
-    const rows = db.prepare(`
-    SELECT p.id, p.production_no, p.output_item_id, i.item_name as output_item_name,
-      p.output_quantity, p.production_date, p.bom_id
-    FROM productions p JOIN items i ON p.output_item_id = i.id
-    WHERE p.production_date BETWEEN ? AND ? ORDER BY p.production_date DESC
-  `).all(startDate, endDate);
-    const production = rows.map(r => ({
-        production_date: r.production_date,
-        production_order_number: r.production_no,
-        output_item_name: r.output_item_name,
-        output_quantity: r.output_quantity || 0,
-        completed_quantity: r.output_quantity || 0,
-        scrapped_quantity: 0,
-        status: 'Completed',
-        item_name: r.output_item_name,
-        planned_quantity: r.output_quantity || 0,
-        work_order_number: r.production_no
-    }));
-    const totalProductionOrders = production.length;
-    const totalOutput = production.reduce((s, r) => s + (r.output_quantity || 0), 0);
-    const totalCompleted = totalOutput;
-    const totalScrapped = 0;
-    return {
-        production,
-        summary: { totalProductionOrders, totalOutput, totalCompleted, totalScrapped }
-    };
-}
-function getBOMUsage(bomId, db) {
-    return db.prepare(`
-    SELECT bi.*, i.item_name, i.item_code, i.unit_of_measure
-    FROM bom_items bi JOIN items i ON bi.item_id = i.id WHERE bi.bom_id = ? ORDER BY bi.item_id
-  `).all(bomId);
-}
-function getBOMUsageReport(startDate, endDate, itemId, db) {
-    let query = `
-    SELECT b.id as bom_id, b.bom_name, i.item_name as parent_item_name,
-      (SELECT COUNT(*) FROM productions WHERE bom_id = b.id AND production_date BETWEEN ? AND ?) as usage_count,
-      (SELECT MAX(production_date) FROM productions WHERE bom_id = b.id AND production_date BETWEEN ? AND ?) as last_used_date,
-      (SELECT COUNT(*) FROM bom_items WHERE bom_id = b.id) as total_components,
-      CASE WHEN b.is_active THEN 'Active' ELSE 'Inactive' END as status
-    FROM boms b
-    JOIN items i ON b.finished_item_id = i.id
-    WHERE 1=1
-  `;
-    const params = [startDate, endDate, startDate, endDate];
-    if (itemId) {
-        query += ' AND b.finished_item_id = ?';
-        params.push(itemId);
-    }
-    query += ' ORDER BY usage_count DESC, b.bom_name';
-    const rows = db.prepare(query).all(...params);
-    return {
-        usage: rows.map(r => ({
-            bom_name: r.bom_name,
-            parent_item_name: r.parent_item_name,
-            usage_count: r.usage_count || 0,
-            last_used_date: r.last_used_date,
-            total_components: r.total_components || 0,
-            status: r.status,
-            bom_id: r.bom_id
-        }))
-    };
-}
-function getCustomerOutstanding(asOfDate, db) {
-    return db.prepare(`
-    SELECT c.customer_name, c.customer_code, SUM(i.balance_amount) as outstanding
-    FROM invoices i JOIN customers c ON i.customer_id = c.id
-    WHERE i.status IN ('Unpaid', 'Partially Paid', 'Overdue') AND i.balance_amount > 0
-    GROUP BY c.id ORDER BY outstanding DESC
-  `).all();
-}
-function getSupplierOutstanding(asOfDate, db) {
-    return db.prepare(`
-    SELECT s.supplier_name, s.supplier_code, SUM(po.total_amount) as outstanding
-    FROM purchase_orders po JOIN suppliers s ON po.supplier_id = s.id
-    WHERE po.status IN ('Approved', 'Received') GROUP BY s.id ORDER BY outstanding DESC
-  `).all();
+    const revenue = db.prepare(`SELECT ${(0, reportSql_1.netRevenueSum)()} as total FROM invoices WHERE invoice_date BETWEEN ? AND ? AND ${(0, reportSql_1.NET_REVENUE_STATUS)()}`).get(startDate, endDate);
+    const cogs = (0, reportSql_1.cogsForPeriod)(db, startDate, endDate);
+    return { startDate, endDate, revenue: revenue.total, cogs, grossProfit: revenue.total - cogs, margin: revenue.total > 0 ? ((revenue.total - cogs) / revenue.total * 100) : 0 };
 }
 /**
  * End-of-day cash reconciliation for `date`: for every tracked account
@@ -1011,27 +692,6 @@ function saveCashReconciliation(db, date, entries, userId) {
         }
     })();
     return getCashReconciliation(db, date);
-}
-function getExpenseReport(startDate, endDate, category, db) {
-    const conditions = ['expense_date BETWEEN ? AND ?'];
-    const params = [startDate, endDate];
-    if (category) {
-        conditions.push('expense_category = ?');
-        params.push(category);
-    }
-    const whereClause = conditions.join(' AND ');
-    // Individual expense rows for the grid
-    const expenses = db.prepare(`SELECT id, expense_no, expense_category, description, amount, expense_date,
-            payment_method, reference_no, vendor_name, project, status
-      FROM expenses WHERE ${whereClause} ORDER BY expense_date DESC`).all(...params);
-    // Category breakdown
-    const categoryBreakdown = db.prepare(`SELECT expense_category, COUNT(*) as count, SUM(amount) as total_amount
-     FROM expenses WHERE ${whereClause} GROUP BY expense_category ORDER BY total_amount DESC`).all(...params);
-    // Summary from the same result set
-    const totalAmount = expenses.reduce((s, r) => s + (r.amount || 0), 0);
-    const totalExpenses = expenses.length;
-    const averageAmount = totalExpenses > 0 ? totalAmount / totalExpenses : 0;
-    return { summary: { totalAmount, totalExpenses, averageAmount }, expenses, categoryBreakdown };
 }
 /**
  * GL reconciliation report (ACC-10 short-term, design D8).
@@ -1127,14 +787,11 @@ function getGLReconciliation(asOfDate, db) {
 }
 exports.default = {
     getARAgingReport, getAPAgingReport, getCustomerStatements, getTopDebtors, getDSOMetric,
-    getReceivablesSummary, getSalesSummary, getSalesByCustomer, getSalesByItem,
-    getStockValuationReport, getInventoryMovementReport, getSupplierAnalysis,
-    getAPSummary, getProfitLossReport, getBalanceSheet, getIncomeStatement,
-    getTrialBalance, getGeneralLedger, getCashFlow, getTaxSummary, getDailySales, getMonthlySales,
-    getGrossProfit, getStockLevelReport, getLowStockReport, getBatchTraceability,
-    getPurchaseSummary, getProductionEfficiency, getBOMUsage, getBOMUsageReport, getCustomerOutstanding,
-    getSupplierOutstanding, getExpenseReport,
+    getReceivablesSummary, getProfitLossReport, getBalanceSheet, getIncomeStatement,
+    getTrialBalance, getGeneralLedger, getCustomerLedgerReport, getCashFlow, getTaxSummary, getDailySales, getMonthlySales,
+    getGrossProfit, getBatchTraceability,
     getCashReconciliation, saveCashReconciliation,
     getGLReconciliation,
+    getExpiryReport, getExpiryAlerts,
 };
 //# sourceMappingURL=Reports.js.map

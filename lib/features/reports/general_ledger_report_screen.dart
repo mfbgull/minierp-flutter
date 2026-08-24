@@ -8,6 +8,8 @@ import '../../data/models/report.dart' show GeneralLedgerRow;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
+import '../../widgets/pluto_grid_screen.dart'
+    show autoFitPlutoColumns, plutoGridConfigurationFor;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
@@ -85,9 +87,10 @@ class GeneralLedgerReportScreen extends ConsumerWidget {
     }
 
     return PlutoGrid(
-      configuration: const PlutoGridConfiguration(),
+      configuration: plutoGridConfigurationFor(context, compact: true),
       columns: [
         PlutoColumn(title: l10n.reportsDate, field: 'date', type: PlutoColumnType.text(), width: 110),
+        PlutoColumn(title: 'Account', field: 'account', type: PlutoColumnType.text(), width: 170),
         PlutoColumn(title: l10n.reportsTransactiontype, field: 'type', type: PlutoColumnType.text(), width: 120),
         PlutoColumn(title: l10n.reportsReferenceno, field: 'ref', type: PlutoColumnType.text(), width: 120),
         PlutoColumn(title: l10n.reportsDebit, field: 'debit', type: PlutoColumnType.number(format: '#,###.00'), width: 120, textAlign: PlutoColumnTextAlign.end, titleTextAlign: PlutoColumnTextAlign.end),
@@ -99,6 +102,7 @@ class GeneralLedgerReportScreen extends ConsumerWidget {
         for (final r in rows)
           PlutoRow(cells: {
             'date': PlutoCell(value: Formatters.date(r.transactionDate)),
+            'account': PlutoCell(value: r.accountCode == null ? '' : '${r.accountCode} — ${r.accountName ?? ''}'),
             'type': PlutoCell(value: r.transactionType),
             'ref': PlutoCell(value: r.referenceNo),
             'debit': PlutoCell(value: r.debit),
@@ -107,7 +111,10 @@ class GeneralLedgerReportScreen extends ConsumerWidget {
             'remarks': PlutoCell(value: r.remarks ?? ''),
           }),
       ],
-      onLoaded: (e) => e.stateManager.setSelectingMode(PlutoGridSelectingMode.none),
+      onLoaded: (e) {
+        e.stateManager.setSelectingMode(PlutoGridSelectingMode.none);
+        autoFitPlutoColumns(e.stateManager);
+      },
     );
   }
 }

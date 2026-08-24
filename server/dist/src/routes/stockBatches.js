@@ -8,6 +8,7 @@ const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const requirePermission_1 = require("../middleware/requirePermission");
 const logger_1 = __importDefault(require("../utils/logger"));
+const paginate_1 = require("../utils/paginate");
 const router = (0, express_1.Router)();
 router.use(auth_1.authenticateToken);
 // Will be injected via initStockBatchesRoutes
@@ -23,6 +24,14 @@ function initStockBatchesRoutes(database) {
 router.get('/stock-batches', (0, requirePermission_1.requirePermission)('inventory', 'read'), (req, res) => {
     try {
         const { item_id, warehouse_id, halted } = req.query;
+        // Task 8.7: bounded listing. Legacy callers (no page/limit params) keep
+        // the bare-array response; passing `page` opts into the envelope shape.
+        const wantsPagination = req.query.page !== undefined || req.query.limit !== undefined;
+        const countSql = `
+      SELECT COUNT(*) AS c
+      FROM stock_batches sb
+      WHERE sb.quantity_remaining > 0
+    `;
         let sql = `
       SELECT sb.*,
         i.item_code, i.item_name,
@@ -33,21 +42,38 @@ router.get('/stock-batches', (0, requirePermission_1.requirePermission)('invento
       WHERE sb.quantity_remaining > 0
     `;
         const params = [];
-        if (item_id) {
-            sql += ' AND sb.item_id = ?';
-            params.push(Number(item_id));
-        }
-        if (warehouse_id) {
-            sql += ' AND sb.warehouse_id = ?';
-            params.push(Number(warehouse_id));
-        }
-        if (halted !== undefined) {
-            sql += ' AND sb.halted = ?';
-            params.push(halted === 'true' ? 1 : 0);
-        }
+        const countParams = [];
+        const applyFilters = (target, into) => {
+            let out = target;
+            if (item_id) {
+                out += ' AND sb.item_id = ?';
+                into.push(Number(item_id));
+            }
+            if (warehouse_id) {
+                out += ' AND sb.warehouse_id = ?';
+                into.push(Number(warehouse_id));
+            }
+            if (halted !== undefined) {
+                out += ' AND sb.halted = ?';
+                into.push(halted === 'true' ? 1 : 0);
+            }
+            return out;
+        };
+        const filteredCountSql = applyFilters(countSql, countParams);
+        sql = applyFilters(sql, params);
         sql += ' ORDER BY sb.received_date ASC, sb.id ASC';
-        const batches = db.prepare(sql).all(...params);
-        res.json(batches);
+        if (wantsPagination) {
+            const { c: total } = db.prepare(filteredCountSql).get(...countParams);
+            const p = (0, paginate_1.parsePageParams)(req);
+            sql += ' LIMIT ? OFFSET ?';
+            params.push(p.limit, p.offset);
+            const batches = db.prepare(sql).all(...params);
+            res.json({ success: true, data: batches, pagination: (0, paginate_1.envelope)(total, p) });
+        }
+        else {
+            const batches = db.prepare(sql).all(...params);
+            res.json(batches);
+        }
     }
     catch (error) {
         logger_1.default.error('Get stock batches error:', error);

@@ -27,9 +27,11 @@ function check(name: string, rows: unknown[]): void {
 // 1. Journal lines referencing a missing entry
 check('journal_lines with missing journal_entry',
   db.prepare(`
+    -- Task 10.4: only ACTIVE (voided=0) lines matter — historical voided
+    -- rows whose entries were purged are inert audit residue.
     SELECT jl.id, jl.journal_entry_id FROM journal_lines jl
     LEFT JOIN journal_entries je ON je.id = jl.journal_entry_id
-    WHERE jl.journal_entry_id IS NOT NULL AND je.id IS NULL
+    WHERE jl.voided = 0 AND jl.journal_entry_id IS NOT NULL AND je.id IS NULL
   `).all());
 
 // 2. Unbalanced (non-voided) entries

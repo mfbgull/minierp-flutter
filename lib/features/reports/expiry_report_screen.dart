@@ -11,6 +11,8 @@ import '../../data/models/report.dart' show ExpiryReportRow;
 import '../../data/models/stock_batch.dart' show BatchStatus;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/pluto_grid_screen.dart'
+    show autoFitPlutoColumns, plutoGridConfigurationFor;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../../widgets/searchable_select.dart';
@@ -129,11 +131,13 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
 
     return PlutoGrid(
       key: ValueKey('$_currentPage-$_pageSize-${report.hashCode}'),
-      configuration: const PlutoGridConfiguration(),
+      configuration: plutoGridConfigurationFor(context, compact: true),
       columns: _columns(context, l10n),
       rows: [for (final r in pageData) _toRow(r)],
-      onLoaded: (e) =>
-          e.stateManager.setSelectingMode(PlutoGridSelectingMode.none),
+      onLoaded: (e) {
+        e.stateManager.setSelectingMode(PlutoGridSelectingMode.none);
+        autoFitPlutoColumns(e.stateManager);
+      },
       rowColorCallback: (ctx) {
         final status = BatchStatus.fromString(
           ctx.row.cells['status']!.value as String?,

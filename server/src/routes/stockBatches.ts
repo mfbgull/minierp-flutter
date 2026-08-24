@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
 import logger from '../utils/logger';
+import { parsePageParams, envelope } from '../utils/paginate';
 
 const router = Router();
 router.use(authenticateToken);
@@ -23,6 +24,15 @@ router.get('/stock-batches', requirePermission('inventory', 'read'), (req, res) 
   try {
     const { item_id, warehouse_id, halted } = req.query;
 
+    // Task 8.7: bounded listing. Legacy callers (no page/limit params) keep
+    // the bare-array response; passing `page` opts into the envelope shape.
+    const wantsPagination = req.query.page !== undefined || req.query.limit !== undefined;
+
+    const countSql = `
+      SELECT COUNT(*) AS c
+      FROM stock_batches sb
+      WHERE sb.quantity_remaining > 0
+    `;
     let sql = `
       SELECT sb.*,
         i.item_code, i.item_name,
@@ -33,24 +43,40 @@ router.get('/stock-batches', requirePermission('inventory', 'read'), (req, res) 
       WHERE sb.quantity_remaining > 0
     `;
     const params: any[] = [];
+    const countParams: any[] = [];
 
-    if (item_id) {
-      sql += ' AND sb.item_id = ?';
-      params.push(Number(item_id));
-    }
-    if (warehouse_id) {
-      sql += ' AND sb.warehouse_id = ?';
-      params.push(Number(warehouse_id));
-    }
-    if (halted !== undefined) {
-      sql += ' AND sb.halted = ?';
-      params.push(halted === 'true' ? 1 : 0);
-    }
+    const applyFilters = (target: string, into: any[]): string => {
+      let out = target;
+      if (item_id) {
+        out += ' AND sb.item_id = ?';
+        into.push(Number(item_id));
+      }
+      if (warehouse_id) {
+        out += ' AND sb.warehouse_id = ?';
+        into.push(Number(warehouse_id));
+      }
+      if (halted !== undefined) {
+        out += ' AND sb.halted = ?';
+        into.push(halted === 'true' ? 1 : 0);
+      }
+      return out;
+    };
+    const filteredCountSql = applyFilters(countSql, countParams);
+    sql = applyFilters(sql, params);
 
     sql += ' ORDER BY sb.received_date ASC, sb.id ASC';
 
-    const batches = db.prepare(sql).all(...params);
-    res.json(batches);
+    if (wantsPagination) {
+      const { c: total } = db.prepare(filteredCountSql).get(...countParams) as { c: number };
+      const p = parsePageParams(req);
+      sql += ' LIMIT ? OFFSET ?';
+      params.push(p.limit, p.offset);
+      const batches = db.prepare(sql).all(...params);
+      res.json({ success: true, data: batches, pagination: envelope(total, p) });
+    } else {
+      const batches = db.prepare(sql).all(...params);
+      res.json(batches);
+    }
   } catch (error: any) {
     logger.error('Get stock batches error:', error);
     res.status(500).json({ error: 'Failed to fetch stock batches' });

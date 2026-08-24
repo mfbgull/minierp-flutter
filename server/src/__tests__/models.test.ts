@@ -642,7 +642,21 @@ describe('StockMovementModel', () => {
     afterAll(() => {
       db.prepare(`DELETE FROM stock_movements WHERE item_id = ?`).run(itemId);
       db.prepare(`DELETE FROM stock_balances WHERE item_id = ?`).run(itemId);
+      // task 4.4 added purchase_return_batches → FK to stock_batches, and
+      // stock_movements/purchases carry batch_id FKs too — clear children
+      // and their batch references before the batches themselves.
+      db.prepare(`DELETE FROM purchase_return_batches`).run();
+      db.prepare(`UPDATE purchases SET batch_id = NULL WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(itemId);
+      db.prepare(`UPDATE productions SET batch_id = NULL WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(itemId);
       db.prepare(`DELETE FROM stock_batches WHERE item_id = ?`).run(itemId);
+      // payments.supplier_id FK — clear supplier-linked payments before the supplier.
+      db.prepare(`DELETE FROM purchase_allocations WHERE payment_id IN (SELECT id FROM payments WHERE supplier_id = ?)`).run(supplierId);
+      db.prepare(`DELETE FROM po_allocations WHERE payment_id IN (SELECT id FROM payments WHERE supplier_id = ?)`).run(supplierId);
+      db.prepare(`UPDATE payments SET supplier_id = NULL WHERE supplier_id = ?`).run(supplierId);
+      // credit_notes / purchases also carry supplier FKs.
+      db.prepare(`DELETE FROM credit_notes WHERE supplier_id = ?`).run(supplierId);
+      db.prepare(`DELETE FROM purchase_returns WHERE source_type = 'PURCHASE' AND source_id IN (SELECT id FROM purchases WHERE supplier_id = ?)`).run(supplierId);
+      db.prepare(`DELETE FROM purchases WHERE supplier_id = ?`).run(supplierId);
       db.prepare(`DELETE FROM supplier_ledger WHERE supplier_id = ?`).run(supplierId);
       db.prepare(`DELETE FROM suppliers WHERE id = ?`).run(supplierId);
       ItemModel.delete(itemId, db);
@@ -737,13 +751,13 @@ describe('StockMovementModel', () => {
       expect(listed?.balance_amount).toBe(150);
     });
 
-    it('blocks deleting a purchase that has recorded payments', () => {
-      expect(() => PurchaseModel.delete(purchaseId, 1, db)).toThrow(
-        /Cannot delete purchase with recorded payments/
+    it('blocks voiding a purchase that has recorded payments', () => {
+      expect(() => PurchaseModel.void(purchaseId, 1, 'test', db)).toThrow(
+        /Cannot void purchase with recorded payments/
       );
     });
 
-    it('deleting the payment restores the balance and allows purchase deletion', () => {
+    it('deleting the payment restores the balance and allows purchase void', () => {
       const paymentId = (db.prepare(
         'SELECT payment_id FROM purchase_allocations WHERE purchase_id = ?'
       ).get(purchaseId) as { payment_id: number }).payment_id;
@@ -752,8 +766,15 @@ describe('StockMovementModel', () => {
       // Payment removed → only the purchase entry remains.
       expect(SupplierLedgerModel.getBalance(supplierId, db)).toBe(250);
 
-      PurchaseModel.delete(purchaseId, 1, db);
+      PurchaseModel.void(purchaseId, 1, 'duplicate entry', db);
       expect(SupplierLedgerModel.getBalance(supplierId, db)).toBe(0);
+
+      // Void attribution stamped; the row remains queryable.
+      const row = db.prepare(
+        'SELECT voided_at, void_reason FROM purchases WHERE id = ?'
+      ).get(purchaseId) as { voided_at: string | null; void_reason: string | null };
+      expect(row.voided_at).not.toBeNull();
+      expect(row.void_reason).toBe('duplicate entry');
     });
   });
 
@@ -851,6 +872,7 @@ describe('StockMovementModel', () => {
         supplier_id: supId,
         payment_date: '2026-08-02',
         amount: 50,
+        payment_method: 'Cash',
         po_allocations: [{ po_id: String(poId), amount: 50 }],
         purchase_allocations: [],
         userId: 1,
@@ -870,6 +892,7 @@ describe('StockMovementModel', () => {
         supplier_id: supId,
         payment_date: '2026-08-03',
         amount: 80,
+        payment_method: 'Cash',
         po_allocations: [
           { po_id: String(poId), amount: 50 },
           { po_id: String(poId2), amount: 30 },
@@ -888,6 +911,7 @@ describe('StockMovementModel', () => {
         supplier_id: supId,
         payment_date: '2026-08-04',
         amount: 35,
+        payment_method: 'Cash',
         po_allocations: [{ po_id: String(poId2), amount: 30 }],
         purchase_allocations: [{ purchase_id: String(purchaseId), amount: 5 }],
         userId: 1,

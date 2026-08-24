@@ -11,12 +11,13 @@ const errorHandler_1 = __importDefault(require("./middleware/errorHandler"));
 const rateLimiter_1 = require("./middleware/rateLimiter");
 const logger_1 = __importDefault(require("./utils/logger"));
 const requestLogger_1 = require("./middleware/requestLogger");
+const activityLog_1 = require("./middleware/activityLog");
 const database_1 = __importDefault(require("./config/database"));
 // Import routes
 const auth_1 = __importDefault(require("./routes/auth"));
 const users_1 = __importDefault(require("./routes/users"));
 const roles_1 = __importDefault(require("./routes/roles"));
-const activityLog_1 = __importDefault(require("./routes/activityLog"));
+const activityLog_2 = __importDefault(require("./routes/activityLog"));
 const inventory_1 = __importDefault(require("./routes/inventory"));
 const purchases_1 = __importDefault(require("./routes/purchases"));
 const purchaseOrders_1 = __importDefault(require("./routes/purchaseOrders"));
@@ -38,6 +39,7 @@ const integrations_1 = __importDefault(require("./routes/integrations"));
 const dashboard_1 = __importDefault(require("./routes/dashboard"));
 const forecasts_1 = __importDefault(require("./routes/forecasts"));
 const accounting_1 = __importDefault(require("./routes/accounting"));
+const adminHealth_1 = __importDefault(require("./routes/adminHealth"));
 const customReports_1 = __importDefault(require("./routes/customReports"));
 const preferences_1 = __importDefault(require("./routes/preferences"));
 const search_1 = __importDefault(require("./routes/search"));
@@ -101,6 +103,8 @@ app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
 // Apply rate limiting to all API routes
 app.use('/api/', rateLimiter_1.apiLimiter);
+// Audit-trail backstop: correlation id per request + one trail row per mutating 2xx (task 4.3)
+app.use(activityLog_1.activityLogBackstop);
 // Request logging middleware
 app.use(requestLogger_1.requestLogger);
 /**
@@ -189,7 +193,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', auth_1.default);
 app.use('/api/users', users_1.default);
 app.use('/api/roles', roles_1.default);
-app.use('/api/activity-logs', activityLog_1.default);
+app.use('/api/activity-logs', activityLog_2.default);
 app.use('/api/inventory', inventory_1.default);
 app.use('/api/expenses', expenses_1.default);
 app.use('/api/boms', bom_1.default);
@@ -211,6 +215,7 @@ app.use('/api/integrations', integrations_1.default);
 app.use('/api/dashboard', dashboard_1.default);
 app.use('/api/forecasts', forecasts_1.default);
 app.use('/api/accounting', accounting_1.default);
+app.use('/api/admin', adminHealth_1.default);
 app.use('/api/reports/custom', customReports_1.default);
 app.use('/api/preferences', preferences_1.default);
 app.use('/api/search', search_1.default);

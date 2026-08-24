@@ -182,7 +182,7 @@ describe('GL lifecycle: update/delete voiding', () => {
     expect(afterVoid.c).toBe(0);
   });
 
-  it('payment amount change voids the old entry and re-posts the new one', async () => {
+  it('payment amount change is rejected with the void-and-reissue guidance', async () => {
     const { invoiceId } = await createInvoice(200);
 
     const put = await request(app).put(`/api/invoices/${invoiceId}`)
@@ -197,23 +197,20 @@ describe('GL lifecycle: update/delete voiding', () => {
       'SELECT payment_id FROM payment_allocations WHERE invoice_id = ?'
     ).get(invoiceId) as { payment_id: number };
 
-    // Edit the payment amount to 80.
+    // PAY-04 (task 2.1): amount edits are forbidden — the original entry
+    // stays intact and untouched.
     const upd = await request(app).put(`/api/payments/${alloc.payment_id}`)
       .set('Cookie', authCookie)
       .send({ amount: 80 });
-    expect(upd.status).toBe(200);
+    expect(upd.status).toBe(400);
+    expect(upd.body.error).toMatch(/Cannot change the amount/);
 
-    // Exactly one active debit leg remains, at the new amount.
+    // The original GL entry survives un-voided at its original amount.
     const active = db.prepare(
       `SELECT debit FROM journal_lines
        WHERE reference_type='PAYMENT' AND reference_id=? AND voided=0 AND debit > 0`
     ).all(alloc.payment_id) as Array<{ debit: number }>;
     const activeDebit = active.reduce((s, l) => s + Number(l.debit), 0);
-    expect(activeDebit).toBeCloseTo(80, 2);
-
-    // The 50-entry is gone into voided state.
-    const attr = voidedAttribution('PAYMENT', alloc.payment_id);
-    expect(attr).toBeDefined();
-    expect(attr!.voided_at).toBeTruthy();
+    expect(activeDebit).toBeCloseTo(50, 2);
   });
 });

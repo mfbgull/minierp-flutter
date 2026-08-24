@@ -7,6 +7,7 @@ const database_1 = __importDefault(require("../config/database"));
 const logger_1 = __importDefault(require("../utils/logger"));
 const queryUtils_1 = require("../utils/queryUtils");
 const Dashboard_1 = __importDefault(require("../models/Dashboard"));
+const Reports_1 = __importDefault(require("../models/Reports"));
 const cashService_1 = require("../services/cashService");
 // ═══════════════════════════════════════════════════════════════
 //  EXISTING
@@ -122,6 +123,32 @@ function getKPI(req, res) {
     }
 }
 /**
+ * GET /api/dashboard/kpi-batch?metrics=a,b,c (task 8.4)
+ * Multiple KPIs in one round trip. Unknown metrics return null for their key.
+ */
+function getKPIBatch(req, res) {
+    try {
+        const raw = String(req.query.metrics || '');
+        const metrics = raw.split(',').map(s => s.trim()).filter(Boolean).slice(0, 12);
+        const fromDate = String((0, queryUtils_1.getQueryParam)(req.query.fromDate) || '') || undefined;
+        const toDate = String((0, queryUtils_1.getQueryParam)(req.query.toDate) || '') || undefined;
+        const data = {};
+        for (const metric of metrics) {
+            try {
+                data[metric] = Dashboard_1.default.getKPI(database_1.default, metric, fromDate, toDate);
+            }
+            catch {
+                data[metric] = null;
+            }
+        }
+        res.json({ success: true, data });
+    }
+    catch (error) {
+        logger_1.default.error('KPI batch error:', error);
+        res.status(500).json({ error: 'Failed to calculate KPIs' });
+    }
+}
+/**
  * GET /api/dashboard/ar-summary
  * Aggregated accounts receivable summary with aging buckets.
  */
@@ -148,6 +175,21 @@ function getCashPosition(req, res) {
     catch (error) {
         logger_1.default.error('Cash position error:', error);
         res.status(500).json({ error: 'Failed to fetch cash position' });
+    }
+}
+/**
+ * GET /api/dashboard/expiry-alerts?days=30
+ * Batches with stock remaining whose expiry_date falls within `days`
+ * (already-expired batches sort first). Backs the dashboard expiry feed.
+ */
+function getExpiryAlerts(req, res) {
+    try {
+        const days = Math.max(0, parseInt(String(req.query.days ?? '30'), 10) || 30);
+        res.json({ success: true, data: Reports_1.default.getExpiryAlerts(database_1.default, days) });
+    }
+    catch (error) {
+        logger_1.default.error('Expiry alerts error:', error);
+        res.status(500).json({ error: 'Failed to fetch expiry alerts' });
     }
 }
 /**
@@ -205,6 +247,7 @@ function saveCashOpeningBalances(req, res) {
 exports.default = {
     getSummary,
     getCashPosition,
+    getExpiryAlerts,
     getCashOpeningBalances,
     saveCashOpeningBalances,
     getTopCustomers,
@@ -213,6 +256,7 @@ exports.default = {
     getProductionStatus,
     getStockMovementSummary,
     getKPI,
+    getKPIBatch,
     getARSummary,
 };
 //# sourceMappingURL=dashboardController.js.map

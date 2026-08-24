@@ -22,6 +22,7 @@ router.get('/kpi', requirePermission('dashboard', 'read'), dashboardController.g
 router.get('/kpi-batch', requirePermission('dashboard', 'read'), dashboardController.getKPIBatch);
 router.get('/ar-summary', requirePermission('dashboard', 'read'), dashboardController.getARSummary);
 router.get('/cash-position', requirePermission('dashboard', 'read'), dashboardController.getCashPosition);
+router.get('/expiry-alerts', requirePermission('dashboard', 'read'), dashboardController.getExpiryAlerts);
 router.get('/cash-opening-balances', requirePermission('dashboard', 'read'), dashboardController.getCashOpeningBalances);
 router.put('/cash-opening-balances', requirePermission('dashboard', 'update'), dashboardController.saveCashOpeningBalances);
 

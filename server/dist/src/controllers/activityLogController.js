@@ -218,10 +218,13 @@ function exportLogs(req, res) {
  */
 function cleanupLogs(req, res) {
     try {
-        const { days = '90' } = req.body;
+        const { days = '365' } = req.body;
         const retentionDays = parseInt(days, 10);
-        if (isNaN(retentionDays) || retentionDays < 1) {
-            res.status(400).json({ error: 'Invalid retention days' });
+        // Task 4.8: minimum retention is 365 days — the audit trail must not be
+        // purgeable sooner than that, regardless of who asks.
+        const MIN_RETENTION_DAYS = 365;
+        if (isNaN(retentionDays) || retentionDays < MIN_RETENTION_DAYS) {
+            res.status(400).json({ error: `Invalid retention days — minimum is ${MIN_RETENTION_DAYS}` });
             return;
         }
         const deletedCount = ActivityLog_1.default.deleteOlderThan(retentionDays);

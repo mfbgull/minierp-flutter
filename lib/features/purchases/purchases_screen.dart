@@ -20,6 +20,8 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
+import '../../widgets/app_toast.dart' show showAppToast;
+import 'void_purchase_dialog.dart' show showVoidPurchaseDialog;
 import 'purchase_detail_dialog.dart';
 import 'purchase_form_dialog.dart';
 import 'purchase_providers.dart';
@@ -137,7 +139,23 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
               warehouseId: purchase.warehouseId,
             ),
           ),
+      ),
+      GridRowAction(
+        // PUR-03 (task 3.5): void with reason — never hard delete.
+        icon: Icons.block_outlined,
+        label: l10n.purchasesVoid,
+        color: Theme.of(context).colorScheme.error,
+        onTap: () => showVoidPurchaseDialog(
+          context,
+            id: id,
+            purchaseNo: purchase?.purchaseNo ?? '#$id',
+            onVoided: () {
+              if (!mounted) return;
+              showAppToast(context, l10n.purchasesVoid);
+              ref.invalidate(purchasesProvider);
+            },
         ),
+      ),
     ];
   }
 

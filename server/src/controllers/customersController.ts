@@ -7,6 +7,7 @@ import CustomerModel from '../models/Customer';
 import { getRouteParam } from '../utils/queryUtils';
 import { sanitizeSortParams, CUSTOMER_SORT_COLUMNS, LEDGER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import logger from '../utils/logger';
+import { parsePageParams, envelope } from '../utils/paginate';
 import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/sequence';
 
 function getCustomers(req: Request, res: Response): void {
@@ -173,8 +174,10 @@ function getCustomerLedger(req: Request, res: Response): void {
       return;
     }
 
-    const ledgerEntries = CustomerModel.getLedger(id, sortParams.column, sortParams.order, db);
-    res.json({ success: true, data: ledgerEntries });
+    // Task 8.7: bounded ledger listing with a pagination envelope.
+    const pageParams = parsePageParams(req);
+    const { rows, total } = CustomerModel.getLedger(id, sortParams.column, sortParams.order, db, pageParams.page, pageParams.limit);
+    res.json({ success: true, data: rows, pagination: envelope(total, pageParams) });
   } catch (error) {
     logger.error('Error fetching customer ledger:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch customer ledger' });

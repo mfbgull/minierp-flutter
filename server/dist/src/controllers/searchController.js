@@ -4,7 +4,7 @@ const searchService_1 = require("../services/searchService");
 function getSearch(req, res) {
     try {
         const q = req.query.q?.trim() ?? '';
-        const limit = Math.min(Number(req.query.limit ?? 10), 50);
+        const limit = Math.min(Number(req.query.limit ?? 10), 10); // spec: max 10 per entity
         if (!q || q.length < 2) {
             res.status(400).json({
                 success: false,

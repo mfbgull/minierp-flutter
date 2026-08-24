@@ -1,15 +1,9 @@
 // Expenses list screen — PORTING.md §5/§6: read-only PlutoGrid over
-// `GET /expenses` with server-side search + category/status/date filters
-// (full dataset, client-side grid sort — the items-screen convention).
-//
-// Grid state: same pattern as ItemsScreen — rows are fed through the
-// PlutoGridStateManager (clear + append) on provider changes; the
-// provider is the single source of truth. Double-tapping a row opens the
-// edit form; New Expense opens the create form.
-//
-// Summary strip: total amount + count computed from the *loaded* rows, so
-// it always matches the active filters (the server's `/expenses/summary`
-// endpoint only supports a date range, not the other filters).
+// `GET /expenses` with server-side paging + search + category/status/date
+// filters (`PagedResponse<Expense>` + `ServerPaginationBar`, like
+// suppliers/customers). The grid renders one page; the summary strip and
+// CSV export run over the full filtered list (10k fetch — same pattern as
+// the sales screen).
 
 import 'dart:async';
 
@@ -22,10 +16,12 @@ import '../../core/utils/expense_status.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/expense.dart' show Expense;
 import '../../data/repositories/api_result.dart' show ApiError;
+import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart'
-    show plutoGridConfigurationFor, serialGridColumn, withSerialCell;
+    show autoFitPlutoColumns, plutoGridConfigurationFor, serialGridColumn, withSerialCell;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
@@ -86,7 +82,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
 
   /// Pushes the provider state into the grid manager (clear + append,
   /// with the loading overlay toggled). No-op until `onLoaded`.
-  void _applyExpenses(AsyncValue<List<Expense>> value) {
+  void _applyExpenses(AsyncValue<PagedResponse<Expense>> value) {
     final manager = _stateManager;
     if (manager == null) return;
     manager.setShowLoading(value.isLoading);
@@ -94,14 +90,19 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       manager.removeAllRows();
       manager.appendRows([
         for (final (index, expense)
-            in (value.value ?? const <Expense>[]).indexed)
+            in (value.value!.items).indexed)
           _rowFor(expense, index),
       ]);
+      // Column widths re-fit to the fresh rows (post-frame: resizeColumn
+      // notifies listeners and provider callbacks can fire during build).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !identical(_stateManager, manager)) return;
+        autoFitPlutoColumns(manager);
+      });
     }
   }
 
-  /// Opens the row-actions menu (Edit) anchored at [cellContext] — the
-  /// same Listener + [showMenu] pattern as the sales/customers grids.
+  /// Opens the row-actions menu (Edit) anchored at [cellContext].
   Future<void> _openRowMenu(
     BuildContext cellContext,
     Expense? expense,
@@ -141,7 +142,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   PlutoRow _rowFor(Expense expense, int index) => withSerialCell(
     PlutoRow(
       cells: {
-        // Hidden cell carrying the full Expense for the ⋮ menu.
         'data': PlutoCell(value: expense),
         'id': PlutoCell(value: expense.id),
         'expense_no': PlutoCell(value: expense.expenseNo),
@@ -163,6 +163,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   @override
   Widget build(BuildContext context) {
     final expenses = ref.watch(expensesProvider);
+    final page = expenses.valueOrNull;
     final l10n = AppLocalizations.of(context)!;
 
     ref.listen(expensesProvider, (previous, next) => _applyExpenses(next));
@@ -176,14 +177,32 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: _summaryStrip(l10n, expenses),
+          child: _summaryStrip(l10n),
         ),
         Expanded(child: _buildBody(expenses)),
+        if (page != null)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(expensesLimitProvider),
+            itemLabel: l10n.expensesExpenses,
+            onPageChanged: (p) =>
+                ref.read(expensesPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(expensesLimitProvider.notifier).state = limit;
+              if (ref.read(expensesPageProvider) != 1) {
+                ref.read(expensesPageProvider.notifier).state = 1;
+              }
+            },
+          ),
       ],
     );
   }
 
-  Widget _toolbar(AppLocalizations l10n, AsyncValue<List<Expense>> expenses) {
+  Widget _toolbar(AppLocalizations l10n, AsyncValue<PagedResponse<Expense>> expenses) {
     return ScreenToolbar(
       searchController: _searchController,
       searchHint: l10n.commonSearch,
@@ -205,8 +224,12 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
           ],
           labelBuilder: (v) => v ?? l10n.expensesAllcategories,
           width: 170,
-          onChanged: (v) =>
-              ref.read(expensesCategoryProvider.notifier).state = v,
+          onChanged: (v) {
+            ref.read(expensesCategoryProvider.notifier).state = v;
+            if (ref.read(expensesPageProvider) != 1) {
+              ref.read(expensesPageProvider.notifier).state = 1;
+            }
+          },
         ),
         ScreenToolbarDropdown<String?>(
           key: const ValueKey('expense-status-filter'),
@@ -223,7 +246,60 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
               ? l10n.expensesAllstatuses
               : expenseStatusLabel(l10n, v),
           width: 150,
-          onChanged: (v) => ref.read(expensesStatusProvider.notifier).state = v,
+          onChanged: (v) {
+            ref.read(expensesStatusProvider.notifier).state = v;
+            if (ref.read(expensesPageProvider) != 1) {
+              ref.read(expensesPageProvider.notifier).state = 1;
+            }
+          },
+        ),
+        ScreenToolbarDropdown<String?>(
+          key: const ValueKey('expense-sort-filter'),
+          value: ref.watch(expensesSortProvider)?.column,
+          hint: 'Sort',
+          items: const [
+            null,
+            'e.expense_date',
+            'e.amount',
+            'e.expense_category',
+            'e.status',
+            'e.vendor_name',
+            'e.created_at',
+          ],
+          labelBuilder: (v) {
+            switch (v) {
+              case 'e.expense_date':
+                return 'Date';
+              case 'e.amount':
+                return 'Amount';
+              case 'e.expense_category':
+                return 'Category';
+              case 'e.status':
+                return 'Status';
+              case 'e.vendor_name':
+                return 'Vendor';
+              case 'e.created_at':
+                return 'Created';
+              default:
+                return 'Sort';
+            }
+          },
+          width: 130,
+          onChanged: (v) {
+            final current = ref.read(expensesSortProvider);
+            final next = v == null
+                ? null
+                : ExpenseSort(
+                    v,
+                    current == null || current.column != v
+                        ? 'DESC'
+                        : (current.order == 'ASC' ? 'DESC' : 'ASC'),
+                  );
+            ref.read(expensesSortProvider.notifier).state = next;
+            if (ref.read(expensesPageProvider) != 1) {
+              ref.read(expensesPageProvider.notifier).state = 1;
+            }
+          },
         ),
         DateRangeFilter(
           height: 40,
@@ -236,15 +312,18 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       onRefresh: () => ref.invalidate(expensesProvider),
       actions: [
         TextButton.icon(
-          onPressed: expenses.isLoading || _hasNoRows
-              ? null
-              : () => saveCsv(
-                  context,
-                  suggestedName: csvSuggestedName('expenses'),
-                  csv: buildExpensesCsv(l10n, _filteredRows),
-                  successMessage: l10n.expensesExported,
-                  errorMessage: l10n.expensesExportfailed,
-                ),
+          onPressed: () {
+            final all = ref.read(allExpensesProvider);
+            final rows = all.valueOrNull;
+            if (rows == null || rows.isEmpty) return;
+            saveCsv(
+              context,
+              suggestedName: csvSuggestedName('expenses'),
+              csv: buildExpensesCsv(l10n, rows),
+              successMessage: l10n.expensesExported,
+              errorMessage: l10n.expensesExportfailed,
+            );
+          },
           icon: const Icon(Icons.file_download_outlined, size: 18),
           label: Text(l10n.expensesExportcsv),
         ),
@@ -259,20 +338,16 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     );
   }
 
-  /// Rows currently visible in the grid — the provider's loaded value
-  /// (empty while loading or on error). The export mirrors exactly what
-  /// the grid shows under the active filters.
+  /// The full filtered list (10k fetch) — feeds the summary strip and
+  /// CSV export. Mirrors the sales screen's [filteredInvoicesProvider].
   List<Expense> get _filteredRows =>
-      ref.read(expensesProvider).valueOrNull ?? const <Expense>[];
+      ref.read(allExpensesProvider).valueOrNull ?? const <Expense>[];
 
   bool get _hasNoRows => _filteredRows.isEmpty;
 
-  Widget _summaryStrip(
-    AppLocalizations l10n,
-    AsyncValue<List<Expense>> expenses,
-  ) {
+  Widget _summaryStrip(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
-    final rows = expenses.valueOrNull ?? const <Expense>[];
+    final rows = _filteredRows;
     final total = rows.fold<num>(0, (sum, e) => sum + e.amount);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -306,7 +381,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     );
   }
 
-  Widget _buildBody(AsyncValue<List<Expense>> expenses) {
+  Widget _buildBody(AsyncValue<PagedResponse<Expense>> expenses) {
     final errorMessage = switch (expenses) {
       AsyncError(:final error) => error is ApiError ? error.message : null,
       _ => null,
@@ -328,7 +403,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       child: PlutoGrid(
-        configuration: plutoGridConfigurationFor(context),
+        configuration: plutoGridConfigurationFor(context, compact: true),
         columns: _columns,
         rows: <PlutoRow>[],
         onLoaded: (event) {
@@ -343,14 +418,21 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         onRowDoubleTap: (event) {
           final id = event.row.cells['id']?.value as int?;
           if (id == null || id <= 0) return;
-          // The grid row only exists when the provider has data, so the
-          // lookup always succeeds (defensive no-op otherwise).
           final expenses =
-              ref.read(expensesProvider).valueOrNull ?? const <Expense>[];
-          final matches = expenses.where((e) => e.id == id);
+              ref.read(expensesProvider).valueOrNull ??
+              const PagedResponse<Expense>(
+                items: [],
+                totalItems: 0,
+                currentPage: 1,
+                totalPages: 1,
+                hasNext: false,
+                hasPrev: false,
+              );
+          final matches = expenses.items.where((e) => e.id == id);
           if (matches.isEmpty) return;
           showExpenseFormDialog(context, expense: matches.first);
         },
+        onSorted: _onGridSorted,
         noRowsWidget: Center(
           child: Text(
             l10n.commonNoresults,
@@ -361,10 +443,47 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     );
   }
 
+  String? _sortColumnFor(String field) {
+    switch (field) {
+      case 'expense_no':
+        return 'e.expense_no';
+      case 'expense_date':
+        return 'e.expense_date';
+      case 'category':
+        return 'e.expense_category';
+      case 'amount':
+        return 'e.amount';
+      case 'status':
+        return 'e.status';
+      case 'vendor':
+        return 'e.vendor_name';
+      case 'payment_method':
+        return 'e.payment_method';
+      case 'project':
+        return 'e.project';
+      case 'created_by':
+        return 'e.created_at';
+      default:
+        return null;
+    }
+  }
+
+  /// Server-side sort — maps the grid header click to the whitelist and
+  /// resets to page 1.
+  void _onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    if (sort == null) return;
+    final order = sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC';
+    ref.read(expensesSortProvider.notifier).state = ExpenseSort(sortBy, order);
+    if (ref.read(expensesPageProvider) != 1) {
+      ref.read(expensesPageProvider.notifier).state = 1;
+    }
+  }
+
   /// Column set — dense data-screen conventions (PORTING.md §6), read-only
-  /// with the id column hidden (it carries the row's expense id to the
-  /// double-tap handler). Instance (not static) because the actions
-  /// column's renderer opens the per-row menu on `this` State.
+  /// with the id column hidden.
   List<PlutoColumn> _buildColumns(AppLocalizations l10n) {
     PlutoColumn textColumn(String field, String title, double width) =>
         PlutoColumn(
@@ -448,12 +567,9 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         ),
       ),
       textColumn('created_by', l10n.expensesCreatedby, 130),
-      // Per-row actions menu — the ⋮ dropdown (Edit), same Listener +
-      // showMenu pattern as the sales grid.
       PlutoColumn(
         title: l10n.commonActions,
         field: 'actions',
-        // Pinned to the right edge — stays reachable when the grid scrolls.
         frozen: PlutoColumnFrozen.end,
         type: PlutoColumnType.text(),
         width: 64,
@@ -485,5 +601,3 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
 
 /// The per-row ⋮ menu actions for an expense row.
 enum _ExpenseRowAction { edit }
-
-/// Full-pane error state with a retry — same pattern as the items screen.

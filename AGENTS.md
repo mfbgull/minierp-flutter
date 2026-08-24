@@ -30,9 +30,8 @@ rule ARCHITECTURE_GUARD:
 
   frontend_stack:
     - Flutter
-    - TanStack Query
-    - Pluto-Grid (desktop)
-    - Compact Card System (mobile)
+    - Riverpod (state) + Dio (HTTP) + go_router (routing)
+    - Pluto-Grid (desktop lists)
 
   backend_stack:
     - Node.js
@@ -235,15 +234,6 @@ rule UI_SYSTEM:
     desktop:
       - Pluto_Grid_for_lists
 
-    mobile:
-      breakpoint: 768px
-      layout: Compact_Card_System
-      required_features:
-        - search
-        - action_menu
-        - detail_modal
-        - mobile_action_bar
-
   constraint:
     - no_duplicate_ui_systems
 
@@ -286,7 +276,6 @@ rule SELF_AUDIT:
     - lint_errors == 0
     - unused_imports == 0
     - duplicated_logic == false
-    - mobile_layout_valid == true
     - desktop_layout_valid == true
     - api_contract_consistent == true
     - error_handling_complete == true

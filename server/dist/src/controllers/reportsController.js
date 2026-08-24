@@ -7,9 +7,10 @@ const queryUtils_1 = require("../utils/queryUtils");
 const database_1 = __importDefault(require("../config/database"));
 const logger_1 = __importDefault(require("../utils/logger"));
 const Reports_1 = __importDefault(require("../models/Reports"));
+const reportSql_1 = require("../utils/reportSql");
 function getARAgingReport(req, res) {
     try {
-        const asOfDate = ((0, queryUtils_1.getQueryParam)(req.query.asOfDate)) || new Date().toISOString().split('T')[0];
+        const asOfDate = ((0, queryUtils_1.getQueryParam)(req.query.asOfDate)) || (0, reportSql_1.todayLocal)();
         res.json({ success: true, data: Reports_1.default.getARAgingReport(asOfDate, database_1.default) });
     }
     catch (error) {
@@ -19,7 +20,7 @@ function getARAgingReport(req, res) {
 }
 function getAPAgingReport(req, res) {
     try {
-        const asOfDate = ((0, queryUtils_1.getQueryParam)(req.query.asOfDate)) || new Date().toISOString().split('T')[0];
+        const asOfDate = ((0, queryUtils_1.getQueryParam)(req.query.asOfDate)) || (0, reportSql_1.todayLocal)();
         res.json({ success: true, data: Reports_1.default.getAPAgingReport(asOfDate, database_1.default) });
     }
     catch (error) {
@@ -62,8 +63,8 @@ function getDSOMetric(req, res) {
             const defaultEnd = new Date();
             const defaultStart = new Date();
             defaultStart.setDate(defaultStart.getDate() - 30);
-            const defaultFrom = defaultStart.toISOString().split('T')[0];
-            const defaultTo = defaultEnd.toISOString().split('T')[0];
+            const defaultFrom = (0, reportSql_1.toLocalDateString)(defaultStart);
+            const defaultTo = (0, reportSql_1.toLocalDateString)(defaultEnd);
             const dsoData = Reports_1.default.getDSOMetric(database_1.default, defaultFrom, defaultTo);
             res.json({ success: true, data: dsoData });
             return;
@@ -78,111 +79,13 @@ function getDSOMetric(req, res) {
 }
 function getReceivablesSummary(req, res) {
     try {
-        const asOfDate = req.query.asOfDate || new Date().toISOString().split('T')[0];
+        const asOfDate = req.query.asOfDate || (0, reportSql_1.todayLocal)();
         const summary = Reports_1.default.getReceivablesSummary(database_1.default, asOfDate);
         res.json({ success: true, data: { asOfDate, ...summary } });
     }
     catch (error) {
         logger_1.default.error('Error fetching receivables summary:', error);
         res.status(500).json({ success: false, error: 'Failed to fetch receivables summary' });
-    }
-}
-function getSalesSummary(req, res) {
-    try {
-        const _defaultEnd = new Date();
-        const _defaultStart = new Date();
-        _defaultStart.setMonth(_defaultStart.getMonth() - 1);
-        const startDefault = _defaultStart.toISOString().split('T')[0];
-        const endDefault = _defaultEnd.toISOString().split('T')[0];
-        const startDate = String(((0, queryUtils_1.getQueryParam)(req.query.startDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.fromDate)) || startDefault);
-        const endDate = String(((0, queryUtils_1.getQueryParam)(req.query.endDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.toDate)) || endDefault);
-        const salesData = Reports_1.default.getSalesSummary(database_1.default, startDate, endDate);
-        res.json({ success: true, data: salesData });
-    }
-    catch (error) {
-        logger_1.default.error('Error fetching sales summary:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch sales summary' });
-    }
-}
-function getSalesByCustomer(req, res) {
-    try {
-        const startDate = String(((0, queryUtils_1.getQueryParam)(req.query.startDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.fromDate)) || '');
-        const endDate = String(((0, queryUtils_1.getQueryParam)(req.query.endDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.toDate)) || '');
-        if (!startDate || !endDate) {
-            res.status(400).json({ success: false, error: 'startDate and endDate are required' });
-            return;
-        }
-        const sales = Reports_1.default.getSalesByCustomer(database_1.default, startDate, endDate);
-        res.json({ success: true, data: sales });
-    }
-    catch (error) {
-        logger_1.default.error('Error fetching sales by customer:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch sales by customer' });
-    }
-}
-function getSalesByItem(req, res) {
-    try {
-        const startDate = String(((0, queryUtils_1.getQueryParam)(req.query.startDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.fromDate)) || '');
-        const endDate = String(((0, queryUtils_1.getQueryParam)(req.query.endDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.toDate)) || '');
-        if (!startDate || !endDate) {
-            res.status(400).json({ success: false, error: 'startDate and endDate are required' });
-            return;
-        }
-        const sales = Reports_1.default.getSalesByItem(database_1.default, startDate, endDate);
-        res.json({ success: true, data: sales });
-    }
-    catch (error) {
-        logger_1.default.error('Error fetching sales by item:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch sales by item' });
-    }
-}
-function getStockLevelReport(req, res) {
-    try {
-        res.json({ success: true, data: Reports_1.default.getStockLevelReport(database_1.default) });
-    }
-    catch (error) {
-        logger_1.default.error('Error fetching stock level report:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch stock level report' });
-    }
-}
-function getLowStockReport(req, res) {
-    try {
-        res.json({ success: true, data: Reports_1.default.getLowStockReport(database_1.default) });
-    }
-    catch (error) {
-        logger_1.default.error('Error fetching low stock report:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch low stock report' });
-    }
-}
-function getStockValuationReport(req, res) {
-    try {
-        const reportData = Reports_1.default.getStockValuationReport(database_1.default);
-        res.json({ success: true, data: reportData });
-    }
-    catch (error) {
-        logger_1.default.error('Error fetching stock valuation report:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch stock valuation report' });
-    }
-}
-function getInventoryMovementReport(req, res) {
-    try {
-        const startDate = String(((0, queryUtils_1.getQueryParam)(req.query.startDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.fromDate)) || '');
-        const endDate = String(((0, queryUtils_1.getQueryParam)(req.query.endDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.toDate)) || '');
-        const { itemId } = req.query;
-        const reportData = Reports_1.default.getInventoryMovementReport(database_1.default, startDate, endDate, itemId ? parseInt(itemId, 10) : undefined);
-        res.json({ success: true, data: reportData });
-    }
-    catch (error) {
-        logger_1.default.error('Error fetching inventory movement report:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch inventory movement report' });
     }
 }
 function getProfitLossReport(req, res) {
@@ -215,91 +118,9 @@ function getCashFlowReport(req, res) {
         res.status(500).json({ success: false, error: 'Failed to fetch cash flow report' });
     }
 }
-function getPurchaseSummary(req, res) {
-    try {
-        const startDate = String(((0, queryUtils_1.getQueryParam)(req.query.startDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.fromDate)) || '');
-        const endDate = String(((0, queryUtils_1.getQueryParam)(req.query.endDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.toDate)) || '');
-        if (!startDate || !endDate) {
-            res.status(400).json({ success: false, error: 'startDate and endDate are required' });
-            return;
-        }
-        res.json({ success: true, data: Reports_1.default.getPurchaseSummary(startDate, endDate, database_1.default) });
-    }
-    catch (error) {
-        logger_1.default.error('Error fetching purchase summary:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch purchase summary' });
-    }
-}
-function getSupplierAnalysis(req, res) {
-    try {
-        const startDate = String(((0, queryUtils_1.getQueryParam)(req.query.startDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.fromDate)) || '');
-        const endDate = String(((0, queryUtils_1.getQueryParam)(req.query.endDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.toDate)) || '');
-        if (!startDate || !endDate) {
-            res.status(400).json({ success: false, error: 'startDate and endDate are required' });
-            return;
-        }
-        const analysis = Reports_1.default.getSupplierAnalysis(database_1.default, startDate, endDate);
-        res.json({ success: true, data: analysis });
-    }
-    catch (error) {
-        logger_1.default.error('Error fetching supplier analysis:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch supplier analysis' });
-    }
-}
-function getProductionSummary(req, res) {
-    try {
-        const startDate = String(((0, queryUtils_1.getQueryParam)(req.query.startDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.fromDate)) || '');
-        const endDate = String(((0, queryUtils_1.getQueryParam)(req.query.endDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.toDate)) || '');
-        if (!startDate || !endDate) {
-            res.status(400).json({ success: false, error: 'startDate and endDate are required' });
-            return;
-        }
-        res.json({ success: true, data: Reports_1.default.getProductionEfficiency(startDate, endDate, database_1.default) });
-    }
-    catch (error) {
-        logger_1.default.error('Error fetching production summary:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch production summary' });
-    }
-}
-function getBOMUsageReport(req, res) {
-    try {
-        const startDate = String(((0, queryUtils_1.getQueryParam)(req.query.startDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.fromDate)) || '');
-        const endDate = String(((0, queryUtils_1.getQueryParam)(req.query.endDate)) ||
-            ((0, queryUtils_1.getQueryParam)(req.query.toDate)) || '');
-        const itemId = req.query.itemId ? parseInt(req.query.itemId, 10) : null;
-        res.json({ success: true, data: Reports_1.default.getBOMUsageReport(startDate || '2000-01-01', endDate || '2099-12-31', itemId, database_1.default) });
-    }
-    catch (error) {
-        logger_1.default.error('Error fetching BOM usage report:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch BOM usage report' });
-    }
-}
-function getExpensesReport(req, res) {
-    try {
-        const fromDate = String(((0, queryUtils_1.getQueryParam)(req.query.fromDate)) || req.query.from_date || '');
-        const toDate = String(((0, queryUtils_1.getQueryParam)(req.query.toDate)) || req.query.to_date || '');
-        const category = String(((0, queryUtils_1.getQueryParam)(req.query.category)) || '');
-        if (!fromDate || !toDate) {
-            res.status(400).json({ success: false, error: 'fromDate and toDate are required' });
-            return;
-        }
-        res.json({ success: true, data: Reports_1.default.getExpenseReport(fromDate, toDate, category, database_1.default) });
-    }
-    catch (error) {
-        logger_1.default.error('Error fetching expenses report:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch expenses report' });
-    }
-}
 function getTrialBalanceReport(req, res) {
     try {
-        const { asOfDate = new Date().toISOString().split('T')[0] } = req.query;
+        const { asOfDate = (0, reportSql_1.todayLocal)() } = req.query;
         res.json({ success: true, data: Reports_1.default.getTrialBalance(asOfDate, database_1.default) });
     }
     catch (error) {
@@ -323,7 +144,7 @@ function getGeneralLedgerReport(req, res) {
 }
 function getBalanceSheetReport(req, res) {
     try {
-        const { asOfDate = new Date().toISOString().split('T')[0] } = req.query;
+        const { asOfDate = (0, reportSql_1.todayLocal)() } = req.query;
         res.json({ success: true, data: Reports_1.default.getBalanceSheet(asOfDate, database_1.default) });
     }
     catch (error) {
@@ -361,7 +182,7 @@ function getTaxSummaryReport(req, res) {
 }
 function getCashReconciliation(req, res) {
     try {
-        const date = String((0, queryUtils_1.getQueryParam)(req.query.date)) || new Date().toISOString().split('T')[0];
+        const date = String((0, queryUtils_1.getQueryParam)(req.query.date)) || (0, reportSql_1.todayLocal)();
         res.json({ success: true, data: Reports_1.default.getCashReconciliation(database_1.default, date) });
     }
     catch (error) {
@@ -372,7 +193,7 @@ function getCashReconciliation(req, res) {
 function saveCashReconciliation(req, res) {
     try {
         const { date, accounts } = req.body;
-        const dateStr = date || new Date().toISOString().split('T')[0];
+        const dateStr = date || (0, reportSql_1.todayLocal)();
         if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
             res.status(400).json({ success: false, error: 'accounts array is required' });
             return;
@@ -401,13 +222,23 @@ function getBatchTraceabilityReport(req, res) {
         res.status(500).json({ success: false, error: 'Failed to fetch batch traceability report' });
     }
 }
+function getExpiryReport(req, res) {
+    try {
+        const warehouseId = req.query.warehouse_id ? parseInt(String(req.query.warehouse_id), 10) : undefined;
+        const thresholdDays = req.query.threshold_days ? parseInt(String(req.query.threshold_days), 10) : undefined;
+        const status = req.query.status ? String(req.query.status) : undefined;
+        res.json({ success: true, data: Reports_1.default.getExpiryReport(database_1.default, { warehouseId, thresholdDays, status }) });
+    }
+    catch (error) {
+        logger_1.default.error('Error fetching expiry report:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch expiry report' });
+    }
+}
 exports.default = {
     getARAgingReport, getAPAgingReport, getCustomerStatements, getTopDebtors, getDSOMetric, getReceivablesSummary,
-    getSalesSummary, getSalesByCustomer, getSalesByItem, getStockLevelReport, getLowStockReport,
-    getStockValuationReport, getInventoryMovementReport, getProfitLossReport, getCashFlowReport,
-    getPurchaseSummary, getSupplierAnalysis, getProductionSummary, getBOMUsageReport,
-    getExpensesReport, getTrialBalanceReport, getGeneralLedgerReport, getBalanceSheetReport,
+    getProfitLossReport, getCashFlowReport,
+    getTrialBalanceReport, getGeneralLedgerReport, getBalanceSheetReport,
     getIncomeStatementReport, getTaxSummaryReport, getCashReconciliation, saveCashReconciliation,
-    getBatchTraceabilityReport,
+    getBatchTraceabilityReport, getExpiryReport,
 };
 //# sourceMappingURL=reportsController.js.map

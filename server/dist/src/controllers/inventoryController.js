@@ -388,6 +388,47 @@ function createStockMovement(req, res) {
         res.status(500).json({ error: 'Failed to create stock movement' });
     }
 }
+/**
+ * POST /api/inventory/stock-transfers (INV-02)
+ * Atomic two-warehouse transfer: FIFO consumption at source, mirrored
+ * TRANSFER cost layer at destination, both movements written server-side
+ * inside one transaction. Replaces the client's two-call orchestration.
+ */
+function createStockTransfer(req, res) {
+    try {
+        const { item_id, from_warehouse_id, to_warehouse_id, quantity, remarks } = req.body;
+        if (!item_id || !from_warehouse_id || !to_warehouse_id) {
+            res.status(400).json({ error: 'Item, source warehouse, and destination warehouse are required' });
+            return;
+        }
+        const qty = Number(quantity);
+        if (!Number.isFinite(qty) || qty <= 0) {
+            res.status(400).json({ error: 'Quantity must be a positive number' });
+            return;
+        }
+        if (from_warehouse_id === to_warehouse_id) {
+            res.status(400).json({ error: 'Source and destination warehouses must differ' });
+            return;
+        }
+        const result = StockMovement_1.default.recordTransfer({ item_id, from_warehouse_id, to_warehouse_id, quantity: qty, remarks: remarks || null }, req.user.id, database_1.default);
+        res.status(201).json({
+            success: true,
+            data: result,
+            error: null
+        });
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to record transfer';
+        const isClientError = /Insufficient stock|must differ|must be positive/i.test(message);
+        if (isClientError) {
+            res.status(400).json({ error: message });
+        }
+        else {
+            logger_1.default.error('Stock transfer failed:', message);
+            res.status(500).json({ error: 'Failed to record transfer' });
+        }
+    }
+}
 function getStockSummary(req, res) {
     try {
         const summary = StockMovement_1.default.getStockSummary(database_1.default);
@@ -594,6 +635,7 @@ exports.default = {
     getStockMovements,
     getStockMovement,
     createStockMovement,
+    createStockTransfer,
     getStockSummary,
     getItemLedger,
     getStockBalances,

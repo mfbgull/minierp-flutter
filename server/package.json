@@ -6,9 +6,9 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "node dist/server.js",
-    "build": "tsc && rm -rf dist/migrations && cp -r src/migrations dist/migrations && rm -rf dist/src/migrations && mkdir -p dist/src && cp -r src/migrations dist/src/migrations",
+    "build": "tsc && rm -rf dist/migrations && cp -r src/migrations dist/migrations && cp -r src/migrations/*.sql dist/src/migrations/",
     "start:prod": "node dist/server.js",
-    "test": "jest --forceExit",
+    "test": "jest",
     "typecheck": "tsc --noEmit",
     "db:backup": "node scripts/backup-db.js",
     "gl:dedupe-po": "node scripts/dedupe-po.js",

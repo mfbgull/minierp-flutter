@@ -10,6 +10,7 @@ const accountingService_1 = __importDefault(require("../services/accountingServi
 const currency_1 = require("../utils/currency");
 const logger_1 = __importDefault(require("../utils/logger"));
 const SupplierLedger_1 = __importDefault(require("./SupplierLedger"));
+const cashService_1 = require("../services/cashService");
 // Static class for Payment model operations
 class PaymentModel {
     /**
@@ -149,6 +150,10 @@ class PaymentModel {
             if (!data.payment_date) {
                 throw new Error('Payment date is required');
             }
+            // CASH-02 (task 1.4): reject unrecognized payment methods outright
+            if (!(0, cashService_1.isValidPaymentMethod)(data.payment_method)) {
+                throw new Error(`Invalid payment_method "${data.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
+            }
             if (!data.invoice_allocations || data.invoice_allocations.length === 0) {
                 throw new Error('At least one invoice allocation is required');
             }
@@ -221,6 +226,10 @@ class PaymentModel {
             }
             if (!data.payment_date) {
                 throw new Error('Payment date is required');
+            }
+            // CASH-02 (task 1.4): same method whitelist as the customer path.
+            if (!(0, cashService_1.isValidPaymentMethod)(data.payment_method)) {
+                throw new Error(`Invalid payment_method "${data.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
             }
             const poAllocs = data.po_allocations || [];
             const purchaseAllocs = data.purchase_allocations || [];
@@ -334,50 +343,30 @@ class PaymentModel {
         const existing = this.getById(db, id);
         if (!existing)
             throw new Error('Payment not found');
-        const amountChanged = data.amount !== undefined && data.amount !== existing.amount;
+        // PAY-04 (financial-audit-p0-remediation 2.1): amount edits on an
+        // allocated payment silently rescaled allocations past invoice balances
+        // and desynced allocations/ledger/GL. Policy: void-and-reissue.
+        const amountChanged = data.amount !== undefined && (0, currency_1.parseCurrency)(data.amount) !== (0, currency_1.parseCurrency)(existing.amount);
+        if (amountChanged) {
+            throw new Error(`Cannot change the amount of payment ${existing.payment_no} — it has recorded allocations. ` +
+                `Void this payment and record a new one with the correct amount.`);
+        }
+        // CASH-02 (task 1.4): method edits must pass the same whitelist.
+        if (data.payment_method !== undefined && !(0, cashService_1.isValidPaymentMethod)(data.payment_method)) {
+            throw new Error(`Invalid payment_method "${data.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
+        }
+        const methodChanged = data.payment_method !== undefined &&
+            data.payment_method.toLowerCase() !== String(existing.payment_method).toLowerCase();
         db.transaction(() => {
             db.prepare(`
         UPDATE payments SET
-          payment_date = COALESCE(?, payment_date), amount = COALESCE(?, amount),
+          payment_date = COALESCE(?, payment_date),
           payment_method = COALESCE(?, payment_method), reference_no = COALESCE(?, reference_no),
           notes = COALESCE(?, notes) WHERE id = ?
-      `).run(data.payment_date, data.amount, data.payment_method, data.reference_no, data.notes, id);
-            // If amount changed, recalculate allocations proportionally and
-            // refresh the GL entry (ACC-09): void the posted Dr Cash / Cr AR
-            // lines, then re-post at the new amount below.
-            if (amountChanged) {
-                const newAmount = data.amount;
+      `).run(data.payment_date, data.payment_method, data.reference_no, data.notes, id);
+            // Method change moves money between accounts → GL void + repost only.
+            if (methodChanged && existing.customer_id) {
                 accountingService_1.default.voidJournalLinesByReference(db, 'PAYMENT', id);
-                const allocations = db.prepare('SELECT id, invoice_id, amount FROM payment_allocations WHERE payment_id = ?').all(id);
-                const totalAllocated = allocations.reduce((sum, a) => sum + a.amount, 0);
-                if (totalAllocated > 0 && allocations.length > 0) {
-                    const ratio = newAmount / totalAllocated;
-                    let distributed = 0;
-                    for (let i = 0; i < allocations.length; i++) {
-                        const alloc = allocations[i];
-                        if (i === allocations.length - 1) {
-                            // Last allocation gets the remainder to avoid rounding issues
-                            db.prepare('UPDATE payment_allocations SET amount = ? WHERE id = ?')
-                                .run(newAmount - distributed, alloc.id);
-                        }
-                        else {
-                            const newAllocAmount = Math.round(alloc.amount * ratio * 100) / 100;
-                            distributed += newAllocAmount;
-                            db.prepare('UPDATE payment_allocations SET amount = ? WHERE id = ?')
-                                .run(newAllocAmount, alloc.id);
-                        }
-                    }
-                }
-            }
-            // Recalculate affected invoice balances
-            const allocations = db.prepare('SELECT invoice_id FROM payment_allocations WHERE payment_id = ?').all(id);
-            for (const alloc of allocations) {
-                ledgerUtils_1.default.calculateInvoiceBalance(alloc.invoice_id);
-                ledgerUtils_1.default.updateInvoiceStatus(alloc.invoice_id);
-            }
-            // Re-post the GL entry at the new amount/method (customer payments only;
-            // supplier payments post via their own flow).
-            if (existing.customer_id) {
                 const finalPayment = this.getById(db, id);
                 if (finalPayment) {
                     accountingService_1.default.postPaymentEntry(db, {
@@ -390,7 +379,6 @@ class PaymentModel {
                     });
                 }
             }
-            ledgerUtils_1.default.recalcCustomerBalanceFromLedger(existing.customer_id);
         })();
     }
     /**

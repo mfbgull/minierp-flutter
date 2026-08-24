@@ -424,6 +424,18 @@ describe('Inventory Endpoints', () => {
     expect(res.body.pagination?.totalItems).toBeGreaterThanOrEqual(0);
   });
 
+  it('GET /api/expenses - returns paged expenses with auth', async () => {
+    const res = await request(app)
+      .get('/api/expenses')
+      .set('Cookie', `token=${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.pagination?.currentPage).toBe(1);
+    expect(res.body.pagination?.totalPages).toBeGreaterThanOrEqual(0);
+    expect(res.body.pagination?.totalItems).toBeGreaterThanOrEqual(0);
+  });
+
   it('GET /api/forecasts/demand - returns paged demand forecasts with auth', async () => {
     const res = await request(app)
       .get('/api/forecasts/demand')
@@ -468,6 +480,45 @@ describe('Security Tests', () => {
       .set('Cookie', authCookie);
     expect(check.status).toBe(200);
   });
+
+  // task 8.3 — batch: every new sortable endpoint must reject SQL injection
+  // in sortBy/sortOrder; the whitelist falls back to the default column
+  // and the table is never dropped.
+  const batchSortEndpoints = [
+    '/api/inventory/items',
+    '/api/invoices',
+    '/api/invoices/returns',
+    '/api/sales-orders',
+    '/api/quotations',
+    '/api/purchase-orders',
+    '/api/purchases',
+    '/api/productions',
+    '/api/boms',
+    '/api/forecasts/demand',
+  ];
+
+  for (const ep of batchSortEndpoints) {
+    it(`SQL injection via sortBy blocked on ${ep}`, async () => {
+      const res = await request(app)
+        .get(`${ep}?sortBy=id;DROP TABLE x;--`)
+        .set('Cookie', authCookie);
+      expect([200, 400]).toContain(res.status);
+
+      // Verify data endpoint is still alive (no drop).
+      const ok = await request(app).get(ep).set('Cookie', authCookie);
+      expect(ok.status).toBe(200);
+    });
+
+    it(`SQL injection via sortOrder blocked on ${ep}`, async () => {
+      const res = await request(app)
+        .get(`${ep}?sortOrder=DESC;DROP TABLE x;--`)
+        .set('Cookie', authCookie);
+      expect([200, 400]).toContain(res.status);
+
+      const ok = await request(app).get(ep).set('Cookie', authCookie);
+      expect(ok.status).toBe(200);
+    });
+  }
 
   it('SQL injection via period parameter is blocked', async () => {
     const res = await request(app)
@@ -523,6 +574,9 @@ describe('Purchase Returns Endpoints (full flow)', () => {
         quantity: 10,
         unit_cost: 10,
         purchase_date: '2026-08-01',
+        // PRET-03 (task 4.3): returns resolve the supplier by FK — the
+        // purchase must carry supplier_id (the Flutter form sends it too).
+        supplier_id: supplierId,
         supplier_name: 'Return Test Supplier',
       });
     expect(purchase.status).toBe(201);

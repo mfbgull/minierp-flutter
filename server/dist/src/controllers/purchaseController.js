@@ -142,14 +142,23 @@ function getTopSuppliers(req, res) {
         res.status(500).json({ error: 'Failed to get top suppliers' });
     }
 }
-function deletePurchase(req, res) {
+function voidPurchase(req, res) {
     try {
-        Purchase_1.default.delete(Number(req.params.id), req.user.id, database_1.default);
-        res.json({ success: true, message: 'Purchase deleted successfully' });
+        const id = Number(req.params.id);
+        const { reason } = req.body;
+        if (!reason || !reason.trim()) {
+            res.status(400).json({ success: false, error: 'A void reason is required' });
+            return;
+        }
+        Purchase_1.default.void(id, req.user.id, reason, database_1.default);
+        res.json({ success: true, message: 'Purchase voided successfully' });
     }
     catch (error) {
-        logger_1.default.error('Delete purchase error:', error);
-        res.status(500).json({ error: error.message || 'Failed to delete purchase' });
+        const message = error?.message || 'Failed to void purchase';
+        // Guard rejections are client errors — surface the reason.
+        const isClientError = /Cannot void|already voided|not found|reason is required/i.test(message);
+        logger_1.default.error('Void purchase error:', error);
+        res.status(isClientError ? 400 : 500).json({ success: false, error: message });
     }
 }
 exports.default = {
@@ -160,6 +169,6 @@ exports.default = {
     getPurchaseSummaryByItem,
     getPurchaseSummaryByDateRange,
     getTopSuppliers,
-    deletePurchase,
+    voidPurchase,
 };
 //# sourceMappingURL=purchaseController.js.map

@@ -146,7 +146,7 @@ describe('GL lifecycle: update/delete voiding', () => {
         const afterVoid = database_1.default.prepare(`SELECT COUNT(*) AS c FROM journal_lines WHERE reference_type='PAYMENT' AND reference_id=? AND voided=0`).get(alloc.payment_id);
         expect(afterVoid.c).toBe(0);
     });
-    it('payment amount change voids the old entry and re-posts the new one', async () => {
+    it('payment amount change is rejected with the void-and-reissue guidance', async () => {
         const { invoiceId } = await createInvoice(200);
         const put = await (0, supertest_1.default)(app_1.default).put(`/api/invoices/${invoiceId}`)
             .set('Cookie', authCookie)
@@ -156,20 +156,18 @@ describe('GL lifecycle: update/delete voiding', () => {
         }));
         expect(put.status).toBe(200);
         const alloc = database_1.default.prepare('SELECT payment_id FROM payment_allocations WHERE invoice_id = ?').get(invoiceId);
-        // Edit the payment amount to 80.
+        // PAY-04 (task 2.1): amount edits are forbidden — the original entry
+        // stays intact and untouched.
         const upd = await (0, supertest_1.default)(app_1.default).put(`/api/payments/${alloc.payment_id}`)
             .set('Cookie', authCookie)
             .send({ amount: 80 });
-        expect(upd.status).toBe(200);
-        // Exactly one active debit leg remains, at the new amount.
+        expect(upd.status).toBe(400);
+        expect(upd.body.error).toMatch(/Cannot change the amount/);
+        // The original GL entry survives un-voided at its original amount.
         const active = database_1.default.prepare(`SELECT debit FROM journal_lines
        WHERE reference_type='PAYMENT' AND reference_id=? AND voided=0 AND debit > 0`).all(alloc.payment_id);
         const activeDebit = active.reduce((s, l) => s + Number(l.debit), 0);
-        expect(activeDebit).toBeCloseTo(80, 2);
-        // The 50-entry is gone into voided state.
-        const attr = voidedAttribution('PAYMENT', alloc.payment_id);
-        expect(attr).toBeDefined();
-        expect(attr.voided_at).toBeTruthy();
+        expect(activeDebit).toBeCloseTo(50, 2);
     });
 });
 //# sourceMappingURL=glLifecycle.test.js.map

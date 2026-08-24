@@ -174,15 +174,29 @@ class SupplierModel {
     return db.prepare('SELECT COUNT(*) as count FROM purchase_orders WHERE supplier_id = ?').get(supplierId) as { count: number };
   }
 
-  static getLedger(id: number, sortBy: string, sortOrder: string, db: Database.Database): LedgerEntry[] {
+  static getLedger(id: number, sortBy: string, sortOrder: string, db: Database.Database, page = 1, limit = 0): { rows: LedgerEntry[]; total: number } {
     const { sortBy: safeBy, sortOrder: safeOrder } = safeSortBy(sortBy, sortOrder);
-    return db.prepare(`
+    // Task 8.7: bounded pagination; limit 0 keeps the legacy unbounded shape.
+    const countRow = db.prepare(
+      'SELECT COUNT(*) AS c FROM supplier_ledger WHERE supplier_id = ?'
+    ).get(id) as { c: number };
+    const total = countRow.c;
+
+    let pageSql = '';
+    const params: number[] = [id];
+    if (limit > 0) {
+      pageSql = ' LIMIT ? OFFSET ?';
+      params.push(limit, (Math.max(1, page) - 1) * limit);
+    }
+
+    const rows = db.prepare(`
       SELECT id, supplier_id, transaction_date, transaction_type, reference_no,
         debit, credit, balance, description, created_at
       FROM supplier_ledger
       WHERE supplier_id = ?
-      ORDER BY ${safeBy} ${safeOrder}
-    `).all(id) as LedgerEntry[];
+      ORDER BY ${safeBy} ${safeOrder}${pageSql}
+    `).all(...params) as LedgerEntry[];
+    return { rows, total };
   }
 
   static getStatement(id: number, fromDate: string | undefined, toDate: string | undefined, db: Database.Database): { transactions: LedgerEntry[]; openingBalance: number } {

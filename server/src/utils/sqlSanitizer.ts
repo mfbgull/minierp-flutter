@@ -234,6 +234,21 @@ export const PRODUCTION_SORT_COLUMNS = [
   'created_at'
 ] as const;
 
+// Whitelisted sort columns for expenses (`ExpenseModel.getAll`; mapped
+// to qualified SQL columns — the users join makes bare names ambiguous)
+export const EXPENSE_SORT_COLUMNS = [
+  'e.expense_no',
+  'e.expense_date',
+  'e.expense_category',
+  'e.description',
+  'e.amount',
+  'e.status',
+  'e.vendor_name',
+  'e.payment_method',
+  'e.project',
+  'e.created_at'
+] as const;
+
 // Whitelisted sort columns for BOMs (`BOMModel.getAll`; mapped to
 // qualified SQL columns — the finished-item join)
 export const BOM_SORT_COLUMNS = [

@@ -9,6 +9,7 @@ const database_1 = __importDefault(require("../config/database"));
 const Supplier_1 = __importDefault(require("../models/Supplier"));
 const sqlSanitizer_1 = require("../utils/sqlSanitizer");
 const logger_1 = __importDefault(require("../utils/logger"));
+const paginate_1 = require("../utils/paginate");
 const sequence_1 = require("../utils/sequence");
 function getSuppliers(req, res) {
     try {
@@ -227,8 +228,10 @@ function getSupplierLedger(req, res) {
             res.status(404).json({ success: false, error: 'Supplier not found' });
             return;
         }
-        const ledgerEntries = Supplier_1.default.getLedger(supplierId, sortParams.column, sortParams.order, database_1.default);
-        res.json({ success: true, data: ledgerEntries });
+        // Task 8.7: bounded ledger listing with a pagination envelope.
+        const pageParams = (0, paginate_1.parsePageParams)(req);
+        const { rows, total } = Supplier_1.default.getLedger(supplierId, sortParams.column, sortParams.order, database_1.default, pageParams.page, pageParams.limit);
+        res.json({ success: true, data: rows, pagination: (0, paginate_1.envelope)(total, pageParams) });
     }
     catch (error) {
         logger_1.default.error('Error fetching supplier ledger:', error);

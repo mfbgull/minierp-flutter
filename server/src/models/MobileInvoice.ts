@@ -3,7 +3,7 @@ import StockMovementModel from './StockMovement';
 import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/sequence';
 import ledgerUtils from '../utils/ledgerUtils';
 import AccountingService from '../services/accountingService';
-import { parseCurrency, computeInvoiceTotal, computeLineAmount } from '../utils/currency';
+import { parseCurrency, computeInvoiceTotal, decomposeLineAmount } from '../utils/currency';
 
 interface DraftRecord {
   id: number;
@@ -236,12 +236,13 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
     const invoiceNo = data.invoice_no || (invoiceResult.lastInsertRowid ? `INV-${Date.now()}` : '');
 
     for (const item of data.items) {
-      const amount = computeLineAmount(item);
+      const { amount, netAmount, taxAmount } = decomposeLineAmount(item);
       db.prepare(`
         INSERT INTO invoice_items (
-          invoice_id, item_id, quantity, unit_price, amount, tax_rate, discount_type, discount_value
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(invoiceId, item.item_id, item.quantity, item.unit_price, amount, item.tax_rate || 0, item.discount_type || 'percentage', item.discount_value || 0);
+          invoice_id, item_id, quantity, unit_price, amount, tax_rate, discount_type, discount_value,
+          net_amount, tax_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(invoiceId, item.item_id, item.quantity, item.unit_price, amount, item.tax_rate || 0, item.discount_type || 'percentage', item.discount_value || 0, netAmount, taxAmount);
 
       const warehouseId = item.warehouse_id || findWarehouseForItem(db, item.item_id, item.quantity);
 

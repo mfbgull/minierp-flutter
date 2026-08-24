@@ -6,7 +6,7 @@
 
 import db from '../config/database';
 import logger from '../utils/logger';
-import { ActivityLogDbEntry, ActivityStat } from '../types';
+import { ActivityLogDbEntry } from '../types';
 
 // Activity types enumeration
 export enum ActionType {
@@ -155,9 +155,20 @@ class ActivityLoggerService {
   private readonly BATCH_SIZE = 10;
   private readonly FLUSH_INTERVAL = 1000; // 1 second
 
+  private flushTimer?: NodeJS.Timeout;
+
   constructor() {
-    // Start periodic flush
-    setInterval(() => this.flush(), this.FLUSH_INTERVAL);
+    // Start periodic flush. unref() lets the process exit naturally when
+    // nothing else is pending (task 4.7 / 9.5: leaked-handle fix) — the
+    // graceful-shutdown path still calls flushLogs() explicitly.
+    this.flushTimer = setInterval(() => this.flush(), this.FLUSH_INTERVAL);
+    this.flushTimer.unref();
+  }
+
+  /** Stop the periodic flush and drain the queue (graceful shutdown). */
+  dispose(): void {
+    clearInterval(this.flushTimer);
+    this.flush();
   }
 
   /**
@@ -363,51 +374,12 @@ class ActivityLoggerService {
   }
 
   /**
-   * Get activity statistics
+   * getStats removed (report-query-integrity): it filtered the DATETIME
+   * created_at with `BETWEEN start AND end`, dropping the entire last day.
+   * The wired stats endpoint uses ActivityLog.getStats, which filters
+   * created_at with a localDateToUtcBound half-open interval. Nothing may
+   * reintroduce a BETWEEN filter on this column.
    */
-  getStats(startDate?: string, endDate?: string): any {
-    try {
-      let dateFilter = '';
-      const params: any[] = [];
-
-      if (startDate && endDate) {
-        dateFilter = ' WHERE created_at BETWEEN ? AND ?';
-        params.push(startDate, endDate);
-      }
-
-      const actions = db.prepare(`
-        SELECT action, COUNT(*) as count
-        FROM activity_log
-        ${dateFilter}
-        GROUP BY action
-        ORDER BY count DESC
-      `).all(...params) as ActivityStat[];
-
-      const users = db.prepare(`
-        SELECT u.username, COUNT(*) as count
-        FROM activity_log al
-        LEFT JOIN users u ON al.user_id = u.id
-        ${dateFilter.replace('WHERE', 'WHERE al.user_id IS NOT NULL AND')}
-        GROUP BY al.user_id
-        ORDER BY count DESC
-        LIMIT 10
-      `).all(...params) as ActivityStat[];
-
-      const dailyActivity = db.prepare(`
-        SELECT DATE(created_at) as date, COUNT(*) as count
-        FROM activity_log
-        ${dateFilter}
-        GROUP BY DATE(created_at)
-        ORDER BY date DESC
-        LIMIT 30
-      `).all(...params) as ActivityStat[];
-
-      return { actions, users, dailyActivity };
-    } catch (error: any) {
-      logger.error('[ActivityLogger] Failed to get stats:', { error: error.message });
-      return { actions: [], users: [], dailyActivity: [] };
-    }
-  }
 
   /**
    * Cleanup old logs (retention policy)
@@ -439,10 +411,10 @@ export const logAuth = (...args: Parameters<typeof activityLogger.logAuth>) => a
 export const logCRUD = (...args: Parameters<typeof activityLogger.logCRUD>) => activityLogger.logCRUD(...args);
 export const logWithRequest = (...args: Parameters<typeof activityLogger.logWithRequest>) => activityLogger.logWithRequest(...args);
 export const flushLogs = () => activityLogger.flush();
+export const disposeLogger = () => activityLogger.dispose();
 export const getRecentLogs = (...args: Parameters<typeof activityLogger.getRecent>) => activityLogger.getRecent(...args);
 export const getUserLogs = (...args: Parameters<typeof activityLogger.getByUser>) => activityLogger.getByUser(...args);
 export const getEntityLogs = (...args: Parameters<typeof activityLogger.getByEntity>) => activityLogger.getByEntity(...args);
-export const getActivityStats = (...args: Parameters<typeof activityLogger.getStats>) => activityLogger.getStats(...args);
 export const cleanupLogs = (...args: Parameters<typeof activityLogger.cleanup>) => activityLogger.cleanup(...args);
 /** Task 4.2: per-request correlation id shared by all trail rows of one flow. */
 export function newCorrelationId(): string {

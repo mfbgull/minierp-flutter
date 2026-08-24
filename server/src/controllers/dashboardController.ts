@@ -4,6 +4,7 @@ import db from '../config/database';
 import logger from '../utils/logger';
 import { getQueryParam } from '../utils/queryUtils';
 import DashboardModel from '../models/Dashboard';
+import ReportsModel from '../models/Reports';
 import {
   CASH_ACCOUNTS,
   getOpeningBalances,
@@ -186,6 +187,21 @@ function getCashPosition(req: AuthRequest, res: Response): void {
 }
 
 /**
+ * GET /api/dashboard/expiry-alerts?days=30
+ * Batches with stock remaining whose expiry_date falls within `days`
+ * (already-expired batches sort first). Backs the dashboard expiry feed.
+ */
+function getExpiryAlerts(req: AuthRequest, res: Response): void {
+  try {
+    const days = Math.max(0, parseInt(String((req.query.days as string) ?? '30'), 10) || 30);
+    res.json({ success: true, data: ReportsModel.getExpiryAlerts(db, days) });
+  } catch (error) {
+    logger.error('Expiry alerts error:', error);
+    res.status(500).json({ error: 'Failed to fetch expiry alerts' });
+  }
+}
+
+/**
  * GET /api/dashboard/cash-opening-balances
  * The per-account opening (seed) balances a new business starts with.
  */
@@ -242,6 +258,7 @@ function saveCashOpeningBalances(req: AuthRequest, res: Response): void {
 export default {
   getSummary,
   getCashPosition,
+  getExpiryAlerts,
   getCashOpeningBalances,
   saveCashOpeningBalances,
   getTopCustomers,

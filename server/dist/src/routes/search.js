@@ -11,7 +11,7 @@ const validation_1 = require("../middleware/validation");
 const zod_1 = require("zod");
 const searchQuerySchema = zod_1.z.object({
     q: zod_1.z.string().min(2).max(100),
-    limit: zod_1.z.coerce.number().int().min(1).max(50).optional().default(10),
+    limit: zod_1.z.coerce.number().int().min(1).max(10).optional().default(10),
 });
 router.use(auth_1.authenticateToken);
 router.get('/', (0, validation_1.validateZodQuery)(searchQuerySchema), searchController_1.default.getSearch);

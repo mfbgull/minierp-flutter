@@ -5,7 +5,7 @@ import app from './src/app';
 import db from './src/config/database';
 import settingsController from './src/controllers/settingsController';
 import logger from './src/utils/logger';
-import { flushLogs } from './src/services/activityLogger';
+import { disposeLogger } from './src/services/activityLogger';
 import { startBackupScheduler } from './src/services/backupService';
 
 const PORT = parseInt(process.env.PORT || '3011', 10);
@@ -45,9 +45,9 @@ function gracefulExit(exitCode: number): void {
     if (timedOut) return;
     clearTimeout(forceTimer);
     try {
-      // Flush queued audit rows BEFORE closing the DB (task 4.7)
-      const ok = flushLogs();
-      if (!ok) logger.error('Activity-log flush failed during shutdown — rows remain queued and were lost');
+      // Flush queued audit rows BEFORE closing the DB (task 4.7).
+      // disposeLogger also stops the flush timer (task 9.5).
+      disposeLogger();
 
       // Checkpoint the WAL so the main DB file is complete on disk
       db.pragma('wal_checkpoint(TRUNCATE)');

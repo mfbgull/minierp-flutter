@@ -18,7 +18,6 @@ router.get('/date-range', requirePermission('expenses', 'read'), expenseControll
 router.get('/category/:category', requirePermission('expenses', 'read'), expenseController.getExpensesByCategory);
 router.get('/:id', requirePermission('expenses', 'read'), expenseController.getExpenseById);
 router.put('/:id', requirePermission('expenses', 'update'), sensitiveOperationLimiter, expenseController.updateExpense);
-router.delete('/:id', requirePermission('expenses', 'delete'), sensitiveOperationLimiter, expenseController.deleteExpense);
 router.post('/categories', requirePermission('expenses', 'create'), sensitiveOperationLimiter, expenseController.createExpenseCategory);
 router.put('/categories/:id', requirePermission('expenses', 'update'), sensitiveOperationLimiter, expenseController.updateExpenseCategory);
 router.delete('/categories/:id', requirePermission('expenses', 'delete'), sensitiveOperationLimiter, expenseController.deleteExpenseCategory);

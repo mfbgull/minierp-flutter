@@ -36,13 +36,21 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getStockDiscrepancies = getStockDiscrepancies;
 const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
+const crypto_1 = __importDefault(require("crypto"));
 const bcrypt = __importStar(require("bcrypt"));
 const logger_1 = __importDefault(require("../utils/logger"));
 const sequence_1 = require("../utils/sequence");
 const purchaseReturnBackfill_1 = require("../utils/purchaseReturnBackfill");
+const backfillGlPreposting_1 = require("../migrations/backfillGlPreposting");
+const backfillInvoiceItemTax_1 = require("../migrations/backfillInvoiceItemTax");
+// Fail-closed: tests must never fall through to a shared dev DB by accident
+if (process.env.NODE_ENV === 'test' && !process.env.DATABASE_PATH) {
+    throw new Error('FATAL: NODE_ENV=test requires DATABASE_PATH to be set (use :memory: or a temp file). Refusing to open a default database.');
+}
 // Database file path - use DATABASE_PATH env var if set (Electron), otherwise default
 const dbDir = process.env.DATABASE_PATH || path_1.default.join(__dirname, '../../../database');
 const dbPath = path_1.default.join(dbDir, 'erp.db');
@@ -62,6 +70,98 @@ db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
 // Wait up to 5s instead of failing immediately when locked
 db.pragma('busy_timeout = 5000');
+// Query cache 16MB; checkpoint WAL every ~400 pages so WAL stays bounded
+db.pragma('cache_size = -16000');
+db.pragma('wal_autocheckpoint = 400');
+// Guarded ALTER helper - replaces silent try/catch{} pattern
+function columnExists(table, column) {
+    const cols = db.pragma(`table_info('${table}')`);
+    return cols.some((c) => c.name === column);
+}
+function addColumnIfMissing(table, columnDef) {
+    const column = columnDef.trim().split(/\s+/)[0];
+    if (!columnExists(table, column)) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`);
+    }
+}
+// ── Migration ledger (schema_migrations) ──────────────────────────────
+// Single canonical migrations path; resolves under ts-node (src/config/..)
+// and dist (dist/src/config/..).
+const MIGRATIONS_DIR = path_1.default.resolve(__dirname, '../migrations');
+function ensureMigrationsTable() {
+    db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      filename TEXT PRIMARY KEY,
+      applied_at TEXT NOT NULL,
+      checksum TEXT NOT NULL
+    )
+  `);
+}
+function fileChecksum(filename) {
+    try {
+        return crypto_1.default.createHash('sha256').update(fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, filename))).digest('hex').slice(0, 16);
+    }
+    catch {
+        return 'inline';
+    }
+}
+/**
+ * Ledger runner: skip if recorded; otherwise execute body inside a
+ * transaction, record with checksum on success. Any failure aborts the
+ * process non-zero BEFORE HTTP listen.
+ */
+function runLedgered(key, fn, opts) {
+    ensureMigrationsTable();
+    if (db.prepare('SELECT 1 FROM schema_migrations WHERE filename = ?').get(key))
+        return;
+    const checksum = fileChecksum(key);
+    try {
+        if (fn) {
+            if (opts?.noTxn) {
+                // Body manages its own transaction/pragma scope (e.g. FK-off table rebuild)
+                fn();
+            }
+            else {
+                db.transaction(fn)();
+            }
+        }
+        else {
+            const sql = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, key), 'utf8');
+            if (opts?.noTxn) {
+                // Table-rebuild migrations need foreign_keys OFF during their DROP
+                // (with it ON, dropping `payments` cascades the allocation tables —
+                // the PAY-06 data-loss class). PRAGMA is a no-op inside a txn, so
+                // these run outside one; the file manages its own transaction.
+                db.pragma('foreign_keys = OFF');
+                try {
+                    db.exec(sql);
+                    db.exec("INSERT INTO schema_migrations (filename, applied_at, checksum) VALUES ('" +
+                        key.replace(/'/g, "''") + "', '" + new Date().toISOString() + "', '" + checksum + "')");
+                }
+                finally {
+                    db.pragma('foreign_keys = ON');
+                }
+                if (db.pragma('foreign_keys', { simple: true }) !== 1) {
+                    throw new Error(`FATAL: migration '${key}' failed to restore foreign_keys=ON`);
+                }
+                const n = db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n;
+                db.pragma(`user_version = ${n}`);
+                logger_1.default.info(`✅ migration applied: ${key} (noTxn)`);
+                return;
+            }
+            db.transaction(() => db.exec(sql))();
+        }
+        db.prepare('INSERT INTO schema_migrations (filename, applied_at, checksum) VALUES (?, ?, ?)')
+            .run(key, new Date().toISOString(), checksum);
+        const n = db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n;
+        db.pragma(`user_version = ${n}`);
+        logger_1.default.info(`✅ migration applied: ${key}`);
+    }
+    catch (err) {
+        logger_1.default.error(`FATAL: migration '${key}' failed: ${err.message}`);
+        process.exit(1);
+    }
+}
 // Initialize database with schema if tables don't exist
 function initializeDatabase() {
     logger_1.default.info('Checking database initialization...');
@@ -72,7 +172,7 @@ function initializeDatabase() {
   `).get();
     if (!tableCheck) {
         logger_1.default.info('Database not initialized. Running migration...');
-        const initSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/init.sql'), 'utf8');
+        const initSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'init.sql'), 'utf8');
         db.exec(initSQL);
         logger_1.default.info('✅ Database schema created successfully!');
         createDefaultUser();
@@ -125,17 +225,26 @@ function runInvoiceMigration() {
     `).get();
         if (columnCheck.count === 0) {
             logger_1.default.info('Running invoice discount/tax migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-invoice-discount-tax-fields.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-invoice-discount-tax-fields.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Invoice discount/tax migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Invoice migration error:', error.message);
+        throw new Error('Invoice migration error:: ' + error.message, { cause: error });
     }
 }
 function runCustomerARMigrations() {
     try {
+        // Ensure return-tracking columns exist before the balance recalculation
+        // below references them (they are otherwise added later by
+        // runGLFoundationMigration — too late for first boot).
+        if (!columnExists('invoices', 'returned_amount')) {
+            db.exec("ALTER TABLE invoices ADD COLUMN returned_amount DECIMAL(15,2) NOT NULL DEFAULT 0");
+        }
+        if (!columnExists('invoices', 'return_fee')) {
+            db.exec('ALTER TABLE invoices ADD COLUMN return_fee DECIMAL(15,2) NOT NULL DEFAULT 0');
+        }
         const columnsToCheck = [
             { name: 'credit_limit', sql: 'ALTER TABLE customers ADD COLUMN credit_limit DECIMAL(15,2) DEFAULT 0' },
             { name: 'current_balance', sql: 'ALTER TABLE customers ADD COLUMN current_balance DECIMAL(15,2) DEFAULT 0' },
@@ -159,7 +268,7 @@ function runCustomerARMigrations() {
     `).get();
         if (!ledgerTableCheck) {
             logger_1.default.info('Running customer ledger migration...');
-            const ledgerSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/create-customer-ledger.sql'), 'utf8');
+            const ledgerSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'create-customer-ledger.sql'), 'utf8');
             db.exec(ledgerSQL);
             logger_1.default.info('✅ Customer ledger migration completed!');
         }
@@ -169,7 +278,7 @@ function runCustomerARMigrations() {
     `).get();
         if (!allocationsTableCheck) {
             logger_1.default.info('Running payment allocations migration...');
-            const allocationsSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/create-payment-allocations.sql'), 'utf8');
+            const allocationsSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'create-payment-allocations.sql'), 'utf8');
             db.exec(allocationsSQL);
             logger_1.default.info('✅ Payment allocations migration completed!');
         }
@@ -179,106 +288,22 @@ function runCustomerARMigrations() {
       UPDATE payments SET customer_id = CAST(customer_id AS INTEGER) WHERE typeof(customer_id) = 'text';
     `);
         logger_1.default.info('✅ Customer ID type fix completed!');
-        logger_1.default.info('Recalculating invoice balances from payment allocations...');
-        // Cap returned_amount at total_amount to prevent over-returns
-        db.exec(`UPDATE invoices SET returned_amount = total_amount WHERE returned_amount > total_amount AND total_amount > 0;`);
-        db.exec(`
-      UPDATE invoices SET
-        paid_amount = COALESCE((
-          SELECT SUM(pa.amount)
-          FROM payment_allocations pa
-          WHERE pa.invoice_id = invoices.id
-        ), 0),
-        balance_amount = MAX(0, total_amount - COALESCE((
-          SELECT SUM(pa.amount)
-          FROM payment_allocations pa
-          WHERE pa.invoice_id = invoices.id
-        ), 0) - COALESCE(returned_amount, 0) + COALESCE(return_fee, 0))
-        `);
-        db.exec(`
-      UPDATE invoices SET status = 'Returned' WHERE returned_amount >= total_amount AND total_amount > 0;
-      UPDATE invoices SET status = 'Partially Returned' WHERE returned_amount > 0 AND returned_amount < total_amount AND total_amount > 0;
-      UPDATE invoices SET status = 'Paid' WHERE balance_amount <= 0 AND total_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
-      UPDATE invoices SET status = 'Partially Paid' WHERE balance_amount > 0 AND balance_amount < total_amount AND paid_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
-      UPDATE invoices SET status = 'Unpaid' WHERE (paid_amount = 0 OR paid_amount IS NULL) AND (returned_amount IS NULL OR returned_amount = 0) AND total_amount > 0;
-    `);
-        logger_1.default.info('✅ Invoice balance recalculation completed!');
-        logger_1.default.info('Recalculating stock balances from movements...');
-        const movementSums = db.prepare(`
-      SELECT item_id, warehouse_id, SUM(quantity) as total_qty
-      FROM stock_movements
-      GROUP BY item_id, warehouse_id
-    `).all();
-        for (const sum of movementSums) {
-            const existing = db.prepare('SELECT id, quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?').get(sum.item_id, sum.warehouse_id);
-            if (existing) {
-                if (existing.quantity !== sum.total_qty) {
-                    const item = db.prepare('SELECT item_code FROM items WHERE id = ?').get(sum.item_id);
-                    const wh = db.prepare('SELECT warehouse_code FROM warehouses WHERE id = ?').get(sum.warehouse_id);
-                    logger_1.default.info(`Fixing ${item?.item_code} in ${wh?.warehouse_code}: ${existing.quantity} -> ${sum.total_qty}`);
-                    db.prepare('UPDATE stock_balances SET quantity = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?').run(sum.total_qty, existing.id);
-                }
-            }
-            else {
-                db.prepare('INSERT INTO stock_balances (item_id, warehouse_id, quantity) VALUES (?, ?, ?)').run(sum.item_id, sum.warehouse_id, sum.total_qty);
-            }
-        }
-        const orphanedBalances = db.prepare(`
-      SELECT sb.id, i.item_code, w.warehouse_code
-      FROM stock_balances sb
-      JOIN items i ON sb.item_id = i.id
-      JOIN warehouses w ON sb.warehouse_id = w.id
-      WHERE NOT EXISTS (
-        SELECT 1 FROM stock_movements sm
-        WHERE sm.item_id = sb.item_id AND sm.warehouse_id = sb.warehouse_id
-      )
-    `).all();
-        for (const orphan of orphanedBalances) {
-            logger_1.default.info(`Removing orphaned balance: ${orphan.item_code} in ${orphan.warehouse_code}`);
-            db.prepare('DELETE FROM stock_balances WHERE id = ?').run(orphan.id);
-        }
-        logger_1.default.info('✅ Stock balances recalculated from movements!');
-        logger_1.default.info('Syncing item current_stock from stock_balances...');
-        db.exec(`
-      UPDATE items SET current_stock = (
-        SELECT COALESCE(SUM(quantity), 0)
-        FROM stock_balances
-        WHERE stock_balances.item_id = items.id
-      )
-    `);
-        logger_1.default.info('✅ Item stock synced from warehouse balances!');
-        logger_1.default.info('Fixing payment ledger descriptions...');
-        const paymentLedgerEntries = db.prepare(`
-      SELECT cl.id, cl.reference_no, cl.description
-      FROM customer_ledger cl
-      WHERE cl.transaction_type = 'PAYMENT'
-        AND cl.description LIKE 'Payment against %'
-    `).all();
-        for (const entry of paymentLedgerEntries) {
-            const match = entry.description.match(/Payment against (.+)/);
-            if (match) {
-                const invoiceRefs = match[1].split(',').map((s) => s.trim());
-                const invoiceNumbers = invoiceRefs.map((ref) => {
-                    if (/[a-zA-Z]/.test(ref)) {
-                        return ref;
-                    }
-                    const invoiceId = parseInt(ref, 10);
-                    if (!isNaN(invoiceId)) {
-                        const invoice = db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(invoiceId);
-                        return invoice ? invoice.invoice_no : `Invoice #${invoiceId}`;
-                    }
-                    return ref;
-                });
-                const newDescription = `Payment against ${invoiceNumbers.join(', ')}`;
-                if (newDescription !== entry.description) {
-                    db.prepare('UPDATE customer_ledger SET description = ? WHERE id = ?').run(newDescription, entry.id);
-                }
-            }
-        }
-        logger_1.default.info('✅ Payment ledger descriptions fixed!');
+        // Task 3.3 (audit-remediation): invoice balance/status recalculation moved out of
+        // boot into the one-time `fn.recalcInvoiceBalances` data migration and the
+        // explicit `npm run repair` script. Boot no longer rewrites business rows.
+        // INV-09 (boot-task-gating): boot MUST NOT write to stock tables.
+        // The former self-heal (rewrite of stock_balances / items.current_stock
+        // and deletion of "orphaned" balances) masked every balance-side bug by
+        // overwriting them from SUM(stock_movements) on each start. It is now a
+        // read-only comparison; discrepancies are logged at startup and exposed
+        // read-only on GET /api/admin/health/stock-discrepancies. Repairs happen
+        // only via the explicit gated repair scripts.
+        logStockDiscrepancies();
+        // Task 3.3: payment-ledger description rewrite also moved to the gated
+        // repair path (`npm run repair` / fn.paymentLedgerDescriptions backfill).
     }
     catch (error) {
-        logger_1.default.error('Customer AR migration error:', error.message);
+        throw new Error('Customer AR migration error:: ' + error.message, { cause: error });
     }
 }
 function runExpensesMigration() {
@@ -289,7 +314,7 @@ function runExpensesMigration() {
     `).get();
         if (!expensesTableCheck) {
             logger_1.default.info('Running expenses migration...');
-            const expensesSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-expenses-table.sql'), 'utf8');
+            const expensesSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-expenses-table.sql'), 'utf8');
             db.exec(expensesSQL);
             logger_1.default.info('✅ Expenses migration completed!');
         }
@@ -331,7 +356,7 @@ function runExpensesMigration() {
         }
     }
     catch (error) {
-        logger_1.default.error('Expenses migration error:', error.message);
+        throw new Error('Expenses migration error:: ' + error.message, { cause: error });
     }
 }
 function runPurchasesMigration() {
@@ -342,13 +367,13 @@ function runPurchasesMigration() {
     `).get();
         if (!purchasesTableCheck) {
             logger_1.default.info('Running purchases migration...');
-            const purchasesSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-purchases-table.sql'), 'utf8');
+            const purchasesSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-purchases-table.sql'), 'utf8');
             db.exec(purchasesSQL);
             logger_1.default.info('✅ Purchases migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Purchases migration error:', error.message);
+        throw new Error('Purchases migration error:: ' + error.message, { cause: error });
     }
 }
 function runPurchaseSupplierPaymentMigration() {
@@ -359,7 +384,7 @@ function runPurchaseSupplierPaymentMigration() {
     `).get();
         if (columnCheck.count === 0) {
             logger_1.default.info('Running purchase supplier/payment migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-purchase-supplier-payment.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-purchase-supplier-payment.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Purchase supplier/payment migration completed!');
         }
@@ -391,7 +416,7 @@ function runPurchaseSupplierPaymentMigration() {
         }
     }
     catch (error) {
-        logger_1.default.error('Purchase supplier/payment migration error:', error.message);
+        throw new Error('Purchase supplier/payment migration error:: ' + error.message, { cause: error });
     }
 }
 function runPurchaseReturnMigration() {
@@ -402,7 +427,7 @@ function runPurchaseReturnMigration() {
     `).get();
         if (hasReturnedQty.count === 0) {
             logger_1.default.info('Running purchase return fields migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-purchase-return-fields.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-purchase-return-fields.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Purchase return fields migration completed!');
         }
@@ -411,7 +436,7 @@ function runPurchaseReturnMigration() {
         }
     }
     catch (error) {
-        logger_1.default.error('Purchase return fields migration error:', error.message);
+        throw new Error('Purchase return fields migration error:: ' + error.message, { cause: error });
     }
 }
 function runPurchaseReturnsTablesMigration() {
@@ -422,7 +447,7 @@ function runPurchaseReturnsTablesMigration() {
     `).get();
         if (!tableCheck) {
             logger_1.default.info('Running purchase returns tables migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-purchase-returns-tables.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-purchase-returns-tables.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Purchase returns tables migration completed!');
         }
@@ -441,7 +466,7 @@ function runPurchaseReturnsTablesMigration() {
         }
     }
     catch (error) {
-        logger_1.default.error('Purchase returns tables migration error:', error.message);
+        throw new Error('Purchase returns tables migration error:: ' + error.message, { cause: error });
     }
 }
 // Backfill purchase_returns / purchase_return_items from the legacy
@@ -456,7 +481,7 @@ function runPurchaseReturnsBackfill() {
         }
     }
     catch (error) {
-        logger_1.default.error('Purchase returns backfill error:', error.message);
+        throw new Error('Purchase returns backfill error:: ' + error.message, { cause: error });
     }
 }
 function runProductionsMigration() {
@@ -467,13 +492,13 @@ function runProductionsMigration() {
     `).get();
         if (!productionsTableCheck) {
             logger_1.default.info('Running productions migration...');
-            const productionsSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-production-tables.sql'), 'utf8');
+            const productionsSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-production-tables.sql'), 'utf8');
             db.exec(productionsSQL);
             logger_1.default.info('✅ Productions migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Productions migration error:', error.message);
+        throw new Error('Productions migration error:: ' + error.message, { cause: error });
     }
 }
 function runBOMMigration() {
@@ -482,15 +507,30 @@ function runBOMMigration() {
       SELECT name FROM sqlite_master
       WHERE type='table' AND name='boms'
     `).get();
+        // Legacy init.sql created bom_items with raw_material_id; the BOM model
+        // and this migration's indexes expect item_id. Rename BEFORE applying
+        // add-bom-tables.sql so its index on bom_items(item_id) doesn't fail
+        // (CREATE TABLE IF NOT EXISTS won't fix an existing legacy table).
+        const existingBomItems = db.prepare(`
+      SELECT name FROM sqlite_master WHERE type='table' AND name='bom_items'
+    `).get();
+        if (existingBomItems) {
+            const hasItemId = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('bom_items') WHERE name='item_id'`).get().count;
+            const hasRawMaterialId = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('bom_items') WHERE name='raw_material_id'`).get().count;
+            if (!hasItemId && hasRawMaterialId) {
+                logger_1.default.info('Renaming bom_items.raw_material_id → item_id...');
+                db.exec('ALTER TABLE bom_items RENAME COLUMN raw_material_id TO item_id');
+            }
+        }
         if (!bomTableCheck) {
             logger_1.default.info('Running BOM migration...');
-            const bomSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-bom-tables.sql'), 'utf8');
+            const bomSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-bom-tables.sql'), 'utf8');
             db.exec(bomSQL);
             logger_1.default.info('✅ BOM migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('BOM migration error:', error.message);
+        throw new Error('BOM migration error:: ' + error.message, { cause: error });
     }
 }
 function runBOMItemsColumnMigration() {
@@ -523,7 +563,7 @@ function runBOMItemsColumnMigration() {
         logger_1.default.info('✅ bom_items.raw_material_id renamed to item_id');
     }
     catch (error) {
-        logger_1.default.error('BOM items column migration error:', error.message);
+        throw new Error('BOM items column migration error:: ' + error.message, { cause: error });
     }
 }
 function runSalesMigration() {
@@ -575,39 +615,21 @@ function runSalesMigration() {
           )
         `);
                 // Add columns to existing tables if not exist
-                try {
-                    db.exec(`ALTER TABLE sales_orders ADD COLUMN source_type VARCHAR(20)`);
-                }
-                catch { }
-                try {
-                    db.exec(`ALTER TABLE sales_orders ADD COLUMN source_id INTEGER`);
-                }
-                catch { }
-                try {
-                    db.exec(`ALTER TABLE sales_orders ADD COLUMN customer_name VARCHAR(200)`);
-                }
-                catch { }
-                try {
-                    db.exec(`ALTER TABLE invoices ADD COLUMN source_type VARCHAR(20)`);
-                }
-                catch { }
-                try {
-                    db.exec(`ALTER TABLE invoices ADD COLUMN quotation_id INTEGER`);
-                }
-                catch { }
-                try {
-                    db.exec(`ALTER TABLE invoices ADD COLUMN customer_name VARCHAR(200)`);
-                }
-                catch { }
+                addColumnIfMissing('sales_orders', 'source_type VARCHAR(20)');
+                addColumnIfMissing('sales_orders', 'source_id INTEGER');
+                addColumnIfMissing('sales_orders', 'customer_name VARCHAR(200)');
+                addColumnIfMissing('invoices', 'source_type VARCHAR(20)');
+                addColumnIfMissing('invoices', 'quotation_id INTEGER');
+                addColumnIfMissing('invoices', 'customer_name VARCHAR(200)');
                 logger_1.default.info('✅ Sales cycle migration completed!');
             }
             catch (migrationError) {
-                logger_1.default.error('Sales cycle migration error:', String(migrationError));
+                throw new Error('Sales cycle migration error:: ' + migrationError.message, { cause: migrationError });
             }
         }
     }
     catch (error) {
-        logger_1.default.error('Sales migration error:', error.message);
+        throw new Error('Sales migration error:: ' + error.message, { cause: error });
     }
 }
 function runSupplierLedgerMigration() {
@@ -618,13 +640,13 @@ function runSupplierLedgerMigration() {
     `).get();
         if (!supplierLedgerTableCheck) {
             logger_1.default.info('Running supplier ledger migration...');
-            const supplierLedgerSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/create-supplier-ledger.sql'), 'utf8');
+            const supplierLedgerSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'create-supplier-ledger.sql'), 'utf8');
             db.exec(supplierLedgerSQL);
             logger_1.default.info('✅ Supplier ledger migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Supplier ledger migration error:', error.message);
+        throw new Error('Supplier ledger migration error:: ' + error.message, { cause: error });
     }
 }
 function runActivityLogMigration() {
@@ -652,7 +674,7 @@ function runActivityLogMigration() {
         }
     }
     catch (error) {
-        logger_1.default.error('Activity log migration error:', error.message);
+        throw new Error('Activity log migration error:: ' + error.message, { cause: error });
     }
 }
 function runSupplierPaymentMigration() {
@@ -663,7 +685,7 @@ function runSupplierPaymentMigration() {
     `).get();
         if (columnCheck.count === 0) {
             logger_1.default.info('Running supplier payment migration...');
-            const supplierPaymentSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-supplier-payment-support.sql'), 'utf8');
+            const supplierPaymentSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-supplier-payment-support.sql'), 'utf8');
             db.exec(supplierPaymentSQL);
             logger_1.default.info('✅ Supplier payment migration completed!');
         }
@@ -674,10 +696,27 @@ function runSupplierPaymentMigration() {
       WHERE name='customer_id' AND "notnull"=1
     `).get();
         if (notNullCheck.count > 0) {
-            logger_1.default.info('Making payments.customer_id nullable...');
+            logger_1.default.info('payments.customer_id nullable rebuild pending (runs as its own ledger step)...');
+        }
+    }
+    catch (error) {
+        throw new Error('Supplier payment migration error:: ' + error.message, { cause: error });
+    }
+}
+// Table rebuild requiring FK off BEFORE the transaction starts; manages its
+// own transaction and always restores foreign_keys=ON.
+function runPaymentsCustomerNullableRebuild() {
+    const notNullCheck = db.prepare(`
+    SELECT COUNT(*) as count FROM pragma_table_info('payments')
+    WHERE name='customer_id' AND "notnull"=1
+  `).get();
+    if (notNullCheck.count === 0)
+        return;
+    logger_1.default.info('Making payments.customer_id nullable...');
+    db.pragma('foreign_keys = OFF');
+    try {
+        db.transaction(() => {
             db.exec(`
-        PRAGMA foreign_keys=OFF;
-        BEGIN TRANSACTION;
         CREATE TABLE payments_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             payment_no VARCHAR(50) UNIQUE NOT NULL,
@@ -689,28 +728,330 @@ function runSupplierPaymentMigration() {
             payment_method VARCHAR(50),
             reference_no VARCHAR(100),
             notes TEXT,
+            purchase_order_id INTEGER REFERENCES purchase_orders(id),
             created_by INTEGER,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (customer_id) REFERENCES customers(id),
             FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
             FOREIGN KEY (invoice_id) REFERENCES invoices(id),
+            FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
             FOREIGN KEY (created_by) REFERENCES users(id)
         );
-        INSERT INTO payments_new (id, payment_no, customer_id, supplier_id, payment_date, amount, payment_method, reference_no, notes, created_by, created_at)
-          SELECT id, payment_no, customer_id, supplier_id, payment_date, amount, payment_method, reference_no, notes, created_by, created_at FROM payments;
+        INSERT INTO payments_new (id, payment_no, customer_id, supplier_id, invoice_id, payment_date, amount, payment_method, reference_no, notes, purchase_order_id, created_by, created_at)
+          SELECT id, payment_no, customer_id, supplier_id, invoice_id, payment_date, amount, payment_method, reference_no, notes, purchase_order_id, created_by, created_at FROM payments;
+        CREATE INDEX IF NOT EXISTS idx_payments_purchase_order_id ON payments_new(purchase_order_id);
         DROP TABLE payments;
         ALTER TABLE payments_new RENAME TO payments;
         CREATE INDEX IF NOT EXISTS idx_payments_customer_id ON payments(customer_id);
         CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date);
-        COMMIT;
-        PRAGMA foreign_keys=ON;
       `);
-            logger_1.default.info('✅ payments.customer_id is now nullable');
+        })();
+    }
+    finally {
+        db.pragma('foreign_keys = ON');
+    }
+    if (db.pragma('foreign_keys', { simple: true }) !== 1) {
+        throw new Error('FATAL: payments rebuild failed to restore PRAGMA foreign_keys=ON');
+    }
+}
+const BATCH_SOURCE_TYPES = "('PRODUCTION','PURCHASE','GOODS_RECEIPT','RETURN','ADJUSTMENT','OPENING','TRANSFER','RECON')";
+function runBatchSourceTypeRebuild() {
+    // INV-10 / INV-22: widen stock_batches.source_type to a disjoint
+    // namespace per origin table and re-stamp existing rows.
+    const currentCheck = db.prepare(`
+    SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_batches'
+  `).get();
+    if (!currentCheck)
+        return; // fresh DB — add-batch-costing.sql creates the widened schema
+    // Detect whether the live CHECK already carries the full namespace
+    // (covers both the legacy two-value CHECK and a CHECK-less table).
+    const needsWiden = !currentCheck.sql.includes("'GOODS_RECEIPT'")
+        || !currentCheck.sql.includes("'ADJUSTMENT'")
+        || !currentCheck.sql.includes("'TRANSFER'");
+    if (!needsWiden)
+        return;
+    logger_1.default.info('Rebuilding stock_batches with widened source_type CHECK...');
+    db.pragma('foreign_keys = OFF');
+    try {
+        db.transaction(() => {
+            // Re-stamp into disjoint namespaces (INV-10):
+            //  - synthetic reconciliation rows (source_id = 0) → RECON
+            //  - source_id resolves to goods_receipt_items     → GOODS_RECEIPT
+            //  - everything else stays PURCHASE / PRODUCTION as written
+            const batchCols = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all();
+            const hasExpiry = batchCols.some((c) => c.name === 'expiry_date');
+            const hasCreatedAt = batchCols.some((c) => c.name === 'created_at');
+            const copyCols = [
+                'id', 'batch_no', 'item_id', 'warehouse_id',
+                `CASE
+           WHEN source_type IN ('PURCHASE') AND source_id = 0 THEN 'RECON'
+           WHEN source_type = 'PURCHASE' AND source_id > 0
+                AND EXISTS (SELECT 1 FROM goods_receipt_items gri WHERE gri.id = stock_batches.source_id)
+             THEN 'GOODS_RECEIPT'
+           ELSE source_type
+         END AS source_type_stamped`,
+                'source_id', 'quantity_original', 'quantity_remaining', 'unit_cost', 'received_date',
+            ];
+            if (hasCreatedAt)
+                copyCols.push(hasExpiry ? 'created_at' : "'' AS created_at");
+            if (hasExpiry)
+                copyCols.push('expiry_date');
+            const insertCols = ['id', 'batch_no', 'item_id', 'warehouse_id', 'source_type', 'source_id', 'quantity_original', 'quantity_remaining', 'unit_cost', 'received_date'];
+            if (hasCreatedAt)
+                insertCols.push('created_at');
+            if (hasExpiry)
+                insertCols.push('expiry_date');
+            // Create the new table without optional columns when the source lacks them.
+            const optionalCols = [];
+            if (hasCreatedAt)
+                optionalCols.push('created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+            if (hasExpiry)
+                optionalCols.push('expiry_date DATE');
+            const newTableSQL = `
+        CREATE TABLE stock_batches_new (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_no        VARCHAR(50) UNIQUE NOT NULL,
+            item_id         INTEGER NOT NULL REFERENCES items(id),
+            warehouse_id    INTEGER NOT NULL REFERENCES warehouses(id),
+            source_type     VARCHAR(20) NOT NULL CHECK(source_type IN ${BATCH_SOURCE_TYPES}),
+            source_id       INTEGER NOT NULL,
+            quantity_original DECIMAL(15,3) NOT NULL DEFAULT 0,
+            quantity_remaining DECIMAL(15,3) NOT NULL DEFAULT 0,
+            unit_cost       DECIMAL(15,4) NOT NULL DEFAULT 0,
+            received_date   DATE NOT NULL${optionalCols.length ? ',\n            ' + optionalCols.join(',\n            ') : ''}
+        );
+      `;
+            db.exec(newTableSQL);
+            db.exec(`
+        INSERT INTO stock_batches_new (${insertCols.join(', ')})
+        SELECT ${copyCols.join(', ')}
+        FROM stock_batches;
+      `);
+            // Post-migration assertion: no row left in an unknown namespace.
+            const bad = db.prepare(`
+        SELECT COUNT(*) AS n FROM stock_batches_new
+        WHERE source_type NOT IN ${BATCH_SOURCE_TYPES.replace(/^\(/, '(')}
+           OR (source_type = 'PURCHASE' AND source_id > 0
+               AND EXISTS (SELECT 1 FROM goods_receipt_items gri WHERE gri.id = source_id))
+      `).get();
+            if (bad.n > 0) {
+                throw new Error(`${bad.n} stock_batches row(s) failed source_type re-stamping`);
+            }
+            const countsBefore = db.prepare('SELECT COUNT(*) AS n FROM stock_batches').get().n;
+            db.exec('DROP TABLE stock_batches');
+            db.exec('ALTER TABLE stock_batches_new RENAME TO stock_batches');
+            const countsAfter = db.prepare('SELECT COUNT(*) AS n FROM stock_batches').get().n;
+            if (countsAfter !== countsBefore) {
+                throw new Error(`stock_batches rebuild lost rows (${countsBefore} -> ${countsAfter})`);
+            }
+            // Restore indexes from add-batch-costing.sql (+ expiry index when present).
+            db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_stock_batches_item ON stock_batches(item_id, warehouse_id);
+        CREATE INDEX IF NOT EXISTS idx_stock_batches_source ON stock_batches(source_type, source_id);
+        CREATE INDEX IF NOT EXISTS idx_stock_batches_batch_no ON stock_batches(batch_no);
+      `);
+            if (hasExpiry) {
+                db.exec('CREATE INDEX IF NOT EXISTS idx_stock_batches_expiry ON stock_batches(expiry_date) WHERE expiry_date IS NOT NULL');
+            }
+        })();
+    }
+    finally {
+        db.pragma('foreign_keys = ON');
+    }
+    if (db.pragma('foreign_keys', { simple: true }) !== 1) {
+        throw new Error('FATAL: stock_batches rebuild failed to restore PRAGMA foreign_keys=ON');
+    }
+    logger_1.default.info('✅ stock_batches source_type widened and re-stamped');
+}
+function runStockCoverageReconciliation() {
+    // One-off reconciliation of known live drift (inventory-integrity Phase 4):
+    // stock_batches coverage must equal stock_balances.quantity per
+    // (item, warehouse) before the INV-21 CHECK constraints can be applied.
+    //  - Over-coverage: trimmed FIFO-newest-first.
+    //  - Under-coverage: a RECON layer is minted at the warehouse's inbound
+    //    weighted cost with a balancing journal entry.
+    // Idempotent: no-op when coverage already matches everywhere.
+    const mismatches = db.prepare(`
+    SELECT * FROM (
+      SELECT sb.item_id, sb.warehouse_id, sb.quantity AS balance_qty,
+             COALESCE((SELECT SUM(b.quantity_remaining) FROM stock_batches b
+                       WHERE b.item_id = sb.item_id AND b.warehouse_id = sb.warehouse_id), 0) AS covered
+      FROM stock_balances sb
+    )
+    WHERE ABS(balance_qty - covered) > 0.0005
+  `).all();
+    if (mismatches.length === 0)
+        return;
+    logger_1.default.info(`Reconciling ${mismatches.length} batch/balance coverage mismatch(es)...`);
+    const run = db.transaction(() => {
+        for (const m of mismatches) {
+            const delta = m.balance_qty - m.covered; // >0 under-covered, <0 over-covered
+            if (delta < 0) {
+                let toTrim = -delta;
+                const layers = db.prepare(`
+          SELECT id, quantity_remaining FROM stock_batches
+          WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+          ORDER BY received_date DESC, id DESC
+        `).all(m.item_id, m.warehouse_id);
+                for (const layer of layers) {
+                    if (toTrim <= 0.0005)
+                        break;
+                    const trim = Math.min(layer.quantity_remaining, toTrim);
+                    db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?').run(trim, layer.id);
+                    toTrim -= trim;
+                }
+                logger_1.default.info(`  item ${m.item_id}/wh ${m.warehouse_id}: trimmed over-coverage by ${(-delta).toFixed(3)}`);
+            }
+            else {
+                const avg = db.prepare(`
+          SELECT COALESCE(SUM(quantity * unit_cost) * 1.0 / NULLIF(SUM(quantity), 0), 0) AS cost
+          FROM stock_movements
+          WHERE item_id = ? AND warehouse_id = ? AND quantity > 0
+            AND movement_type IN ('PURCHASE','PRODUCTION')
+        `).get(m.item_id, m.warehouse_id);
+                const unitCost = avg.cost > 0 ? avg.cost : (db.prepare('SELECT standard_cost FROM items WHERE id = ?').get(m.item_id)?.standard_cost || 0);
+                const nextNo = (0, sequence_1.getNextSequenceNumber)(db, 'BATCH_RECON_last_no');
+                db.prepare(`
+          INSERT INTO stock_batches (
+            batch_no, item_id, warehouse_id, source_type,
+            source_id, quantity_original, quantity_remaining,
+            unit_cost, received_date
+          ) VALUES (?, ?, ?, 'RECON', 0, ?, ?, ?, ?)
+        `).run(`BATCH-${new Date().getFullYear() % 100}-RECON-${nextNo.toString().padStart(4, '0')}`, m.item_id, m.warehouse_id, delta, delta, unitCost, new Date().toISOString().split('T')[0]);
+                const value = delta * unitCost;
+                if (value > 0.005 && db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='journal_entries'`).get()) {
+                    const desc = `Coverage reconciliation: +${delta} units @ ${unitCost} (item ${m.item_id}, warehouse ${m.warehouse_id})`;
+                    const je = db.prepare(`
+            INSERT INTO journal_entries (reference_type, reference_id, entry_date, description, debit_account, credit_account, amount, voided)
+            VALUES ('RECON', 0, ?, ?, '1200', '4999', ?, 0)
+          `).run(new Date().toISOString().split('T')[0], desc, value);
+                    const jeId = je.lastInsertRowid;
+                    const invAcc = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1200'`).get();
+                    const adjAcc = db.prepare(`SELECT id FROM chart_of_accounts WHERE code IN ('4999','4000') ORDER BY code DESC LIMIT 1`).get();
+                    if (invAcc && adjAcc) {
+                        const lines = db.prepare(`
+              INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, line_date)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `);
+                        const today = new Date().toISOString().split('T')[0];
+                        lines.run(jeId, invAcc.id, value, 0, 'Inventory increase (coverage reconciliation)', today);
+                        lines.run(jeId, adjAcc.id, 0, value, 'Coverage reconciliation adjustment', today);
+                    }
+                }
+                logger_1.default.info(`  item ${m.item_id}/wh ${m.warehouse_id}: minted RECON layer of ${delta} @ ${unitCost}`);
+            }
         }
+        // Post-condition: coverage must now match everywhere.
+        const remaining = db.prepare(`
+      SELECT COUNT(*) AS n FROM (
+        SELECT 1 AS ok FROM stock_balances sb
+        WHERE ABS(sb.quantity - COALESCE((SELECT SUM(b.quantity_remaining) FROM stock_batches b
+                        WHERE b.item_id = sb.item_id AND b.warehouse_id = sb.warehouse_id), 0)) > 0.0005
+      )
+    `).get();
+        if (remaining.n > 0) {
+            throw new Error(`${remaining.n} coverage mismatch(es) remain after reconciliation`);
+        }
+    });
+    run();
+    logger_1.default.info('✅ Batch/balance coverage reconciled');
+}
+function runStockInvariantChecksRebuild() {
+    // INV-21: make negative stock and over-covered batches unrepresentable.
+    // Table rebuilds (FK off) adding CHECK constraints:
+    //   stock_balances:    quantity >= 0
+    //   stock_batches:     quantity_remaining >= 0 AND quantity_remaining <= quantity_original
+    // Runs AFTER runStockCoverageReconciliation so live data passes the checks.
+    const balSql = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_balances'`).get();
+    const batchSql = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='stock_batches'`).get();
+    if (!balSql || !batchSql)
+        return;
+    const balNeeds = !balSql.sql.includes('quantity >= 0');
+    const batchNeeds = !(batchSql.sql.includes('quantity_remaining <= quantity_original'));
+    if (!balNeeds && !batchNeeds)
+        return;
+    logger_1.default.info('Applying stock invariant CHECK constraints...');
+    // Pre-flight: fail loudly if existing data would violate the checks.
+    const negBal = db.prepare('SELECT COUNT(*) AS n FROM stock_balances WHERE quantity < 0').get().n;
+    if (negBal > 0)
+        throw new Error(`${negBal} stock_balances row(s) have negative quantity — reconcile before applying CHECK constraints`);
+    const badBatches = db.prepare(`
+    SELECT COUNT(*) AS n FROM stock_batches
+    WHERE quantity_remaining < 0 OR quantity_remaining > quantity_original
+  `).get().n;
+    if (badBatches > 0)
+        throw new Error(`${badBatches} stock_batches row(s) violate coverage invariants — reconcile before applying CHECK constraints`);
+    db.pragma('foreign_keys = OFF');
+    try {
+        db.transaction(() => {
+            if (balNeeds) {
+                db.exec(`
+          CREATE TABLE stock_balances_new (
+              item_id INTEGER NOT NULL REFERENCES items(id),
+              warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+              quantity DECIMAL(15,3) NOT NULL DEFAULT 0 CHECK(quantity >= 0),
+              last_updated DATETIME,
+              PRIMARY KEY (item_id, warehouse_id)
+          );
+          INSERT INTO stock_balances_new (item_id, warehouse_id, quantity, last_updated)
+            SELECT item_id, warehouse_id, quantity, last_updated FROM stock_balances;
+          DROP TABLE stock_balances;
+          ALTER TABLE stock_balances_new RENAME TO stock_balances;
+        `);
+            }
+            if (batchNeeds) {
+                const cols0 = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all().map(c => c.name);
+                const optionalDefs = [];
+                if (cols0.includes('created_at'))
+                    optionalDefs.push('created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+                if (cols0.includes('expiry_date'))
+                    optionalDefs.push('expiry_date DATE');
+                if (cols0.includes('halted'))
+                    optionalDefs.push('halted BOOLEAN DEFAULT 0');
+                db.exec(`
+          CREATE TABLE stock_batches_inv (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              batch_no VARCHAR(50) UNIQUE NOT NULL,
+              item_id INTEGER NOT NULL REFERENCES items(id),
+              warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+              source_type VARCHAR(20) NOT NULL CHECK(source_type IN ('PRODUCTION','PURCHASE','GOODS_RECEIPT','RETURN','ADJUSTMENT','OPENING','TRANSFER','RECON')),
+              source_id INTEGER NOT NULL,
+              quantity_original DECIMAL(15,3) NOT NULL DEFAULT 0,
+              quantity_remaining DECIMAL(15,3) NOT NULL DEFAULT 0
+                CHECK(quantity_remaining >= 0 AND quantity_remaining <= quantity_original),
+              unit_cost DECIMAL(15,4) NOT NULL DEFAULT 0,
+              received_date DATE NOT NULL${optionalDefs.length ? ',\n              ' + optionalDefs.join(',\n              ') : ''}
+          );
+        `);
+                // Column-aware copy
+                const cols = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all().map((c) => c.name);
+                const base = ['id', 'batch_no', 'item_id', 'warehouse_id', 'source_type', 'source_id', 'quantity_original', 'quantity_remaining', 'unit_cost', 'received_date'];
+                const optional = ['created_at', 'expiry_date', 'halted'].filter(c => cols.includes(c));
+                const allCols = [...base, ...optional];
+                db.exec(`
+          INSERT INTO stock_batches_inv (${allCols.join(', ')})
+          SELECT ${allCols.join(', ')} FROM stock_batches;
+        `);
+                db.exec(`
+          DROP TABLE stock_batches;
+          ALTER TABLE stock_batches_inv RENAME TO stock_batches;
+          CREATE INDEX IF NOT EXISTS idx_stock_batches_item ON stock_batches(item_id, warehouse_id);
+          CREATE INDEX IF NOT EXISTS idx_stock_batches_source ON stock_batches(source_type, source_id);
+          CREATE INDEX IF NOT EXISTS idx_stock_batches_batch_no ON stock_batches(batch_no);
+        `);
+                if (optional.includes('expiry_date')) {
+                    db.exec('CREATE INDEX IF NOT EXISTS idx_stock_batches_expiry ON stock_batches(expiry_date) WHERE expiry_date IS NOT NULL');
+                }
+            }
+        })();
     }
-    catch (error) {
-        logger_1.default.error('Supplier payment migration error:', error.message);
+    finally {
+        db.pragma('foreign_keys = ON');
     }
+    if (db.pragma('foreign_keys', { simple: true }) !== 1) {
+        throw new Error('FATAL: invariant rebuild failed to restore PRAGMA foreign_keys=ON');
+    }
+    logger_1.default.info('✅ Stock invariant CHECK constraints applied');
 }
 function runPaymentsPurchaseOrderIdMigration() {
     try {
@@ -720,13 +1061,13 @@ function runPaymentsPurchaseOrderIdMigration() {
     `).get();
         if (columnCheck.count === 0) {
             logger_1.default.info('Running payments purchase_order_id migration...');
-            const sql = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-payments-purchase-order-id.sql'), 'utf8');
+            const sql = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-payments-purchase-order-id.sql'), 'utf8');
             db.exec(sql);
             logger_1.default.info('✅ Payments purchase_order_id migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Payments purchase_order_id migration error:', error.message);
+        throw new Error('Payments purchase_order_id migration error:: ' + error.message, { cause: error });
     }
 }
 function runSupplierBalanceMigration() {
@@ -753,7 +1094,7 @@ function runSupplierBalanceMigration() {
         logger_1.default.info('✅ Suppliers current_balance column ensured');
     }
     catch (error) {
-        logger_1.default.error('Supplier balance migration error:', error.message);
+        throw new Error('Supplier balance migration error:: ' + error.message, { cause: error });
     }
 }
 function runRawMaterialsWarehouseMigration() {
@@ -764,13 +1105,13 @@ function runRawMaterialsWarehouseMigration() {
     `).get();
         if (columnCheck.count === 0) {
             logger_1.default.info('Running raw materials warehouse migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-raw-materials-warehouse.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-raw-materials-warehouse.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Raw materials warehouse migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Raw materials warehouse migration error:', error.message);
+        throw new Error('Raw materials warehouse migration error:: ' + error.message, { cause: error });
     }
 }
 function runProductionInputsWarehouseMigration() {
@@ -781,13 +1122,13 @@ function runProductionInputsWarehouseMigration() {
     `).get();
         if (columnCheck.count === 0) {
             logger_1.default.info('Running production inputs warehouse migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-warehouse-to-production-inputs.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-warehouse-to-production-inputs.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Production inputs warehouse migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Production inputs warehouse migration error:', error.message);
+        throw new Error('Production inputs warehouse migration error:: ' + error.message, { cause: error });
     }
 }
 function runMobileInvoiceMigration() {
@@ -798,13 +1139,13 @@ function runMobileInvoiceMigration() {
     `).get();
         if (!taxRatesTableCheck) {
             logger_1.default.info('Running mobile invoice tables migration...');
-            const mobileInvoiceSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-mobile-invoice-tables.sql'), 'utf8');
+            const mobileInvoiceSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-mobile-invoice-tables.sql'), 'utf8');
             db.exec(mobileInvoiceSQL);
             logger_1.default.info('✅ Mobile invoice tables migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Mobile invoice migration error:', error.message);
+        throw new Error('Mobile invoice migration error:: ' + error.message, { cause: error });
     }
 }
 function runPerformanceIndexesMigration() {
@@ -815,13 +1156,13 @@ function runPerformanceIndexesMigration() {
     `).get();
         if (indexCheck.count === 0) {
             logger_1.default.info('Running performance indexes migration...');
-            const indexSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-performance-indexes.sql'), 'utf8');
+            const indexSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-performance-indexes.sql'), 'utf8');
             db.exec(indexSQL);
             logger_1.default.info('✅ Performance indexes migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Performance indexes migration error:', error.message);
+        throw new Error('Performance indexes migration error:: ' + error.message, { cause: error });
     }
 }
 function runMissingIndexesMigration() {
@@ -832,30 +1173,32 @@ function runMissingIndexesMigration() {
     `).get();
         if (indexCheck.count === 0) {
             logger_1.default.info('Running missing indexes migration...');
-            const indexSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-missing-indexes.sql'), 'utf8');
+            const indexSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-missing-indexes.sql'), 'utf8');
             db.exec(indexSQL);
             logger_1.default.info('✅ Missing indexes migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Missing indexes migration error:', error.message);
+        throw new Error('Missing indexes migration error:: ' + error.message, { cause: error });
     }
 }
 function runMissingFKIndexesMigration() {
     try {
+        // Guard on an index this file actually creates (audit-remediation 3.7 —
+        // previously pointed at idx_invoices_so_id which nothing creates).
         const indexCheck = db.prepare(`
       SELECT COUNT(*) as count FROM sqlite_master
-      WHERE type='index' AND name='idx_invoices_so_id'
+      WHERE type='index' AND name='idx_invoices_customer_id'
     `).get();
         if (indexCheck.count === 0) {
             logger_1.default.info('Running missing FK indexes migration...');
-            const indexSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-missing-fk-indexes.sql'), 'utf8');
+            const indexSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-missing-fk-indexes.sql'), 'utf8');
             db.exec(indexSQL);
             logger_1.default.info('✅ Missing FK indexes migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Missing FK indexes migration error:', error.message);
+        throw new Error('Missing FK indexes migration error:: ' + error.message, { cause: error });
     }
 }
 function runExpiryTrackingMigration() {
@@ -867,13 +1210,13 @@ function runExpiryTrackingMigration() {
     `).get();
         if (columnCheck.count === 0) {
             logger_1.default.info('Running item expiry tracking migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-item-expiry-tracking.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-item-expiry-tracking.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Item expiry tracking migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Expiry tracking migration error:', error.message);
+        throw new Error('Expiry tracking migration error:: ' + error.message, { cause: error });
     }
 }
 function runOverrideSaleMigration() {
@@ -881,13 +1224,13 @@ function runOverrideSaleMigration() {
         const columnCheck = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('invoices') WHERE name='override_sale'`).get();
         if (columnCheck.count === 0) {
             logger_1.default.info('Running override sale column migration...');
-            const sql = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-override-sale-column.sql'), 'utf8');
+            const sql = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-override-sale-column.sql'), 'utf8');
             db.exec(sql);
             logger_1.default.info('✅ Override sale column migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Override sale migration error:', error.message);
+        throw new Error('Override sale migration error:: ' + error.message, { cause: error });
     }
 }
 function runGLVoidAttributionMigration() {
@@ -900,61 +1243,101 @@ function runGLVoidAttributionMigration() {
         const hasVoidedAt = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('journal_lines') WHERE name='voided_at'`).get();
         if (hasVoidedAt.count === 0) {
             logger_1.default.info('Running GL void-attribution / append-only ledger migration...');
-            const sql = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-gl-void-attribution.sql'), 'utf8');
+            const sql = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-gl-void-attribution.sql'), 'utf8');
             db.exec(sql);
             logger_1.default.info('✅ GL void-attribution migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('GL void-attribution migration error:', error.message);
+        throw new Error('GL void-attribution migration error:: ' + error.message, { cause: error });
     }
 }
-initializeDatabase();
-runExpensesMigration();
-runPurchasesMigration();
-runPurchaseSupplierPaymentMigration();
-runPurchaseReturnMigration();
-runPurchaseReturnsTablesMigration();
-runPurchaseReturnsBackfill();
-runProductionsMigration();
-runBOMMigration();
-runBOMItemsColumnMigration();
-runSalesMigration();
-runSupplierLedgerMigration();
-runActivityLogMigration();
-runSupplierPaymentMigration();
-runPaymentsPurchaseOrderIdMigration();
-runSupplierBalanceMigration();
-runRawMaterialsWarehouseMigration();
-runProductionInputsWarehouseMigration();
-runMobileInvoiceMigration();
-runPerformanceIndexesMigration();
-runMissingIndexesMigration();
-runMissingFKIndexesMigration();
-runProductionOverheadMigration();
-runProductionBOMIdMigration();
-runRolesPermissionsMigration();
-runStockAdjustmentFinancialMigration();
-runForecastsMigration();
-runMissingFKIndexesMigration();
-runBatchCostingMigration();
-runGLFoundationMigration();
-runSalaryPaymentsMigration();
-runCreditBalanceMigration();
-runEmployeesMigration();
-runPhysicalCountsMigration();
-runForecastEnhancementsMigration();
-runCustomReportsMigration();
-runExpiryTrackingMigration();
-runOverrideSaleMigration();
-runDashboardLayoutsMigration();
-runLooseItemMigration();
-runCashAccountsMigration();
-runOpeningBalancesMigration();
-runUserPreferencesMigration();
-runUnbatchedStockReconciliation();
-runOrphanedBatchCleanup();
-runGLVoidAttributionMigration();
+// Boot migration sequence - each entry recorded in schema_migrations.
+// Historical guards inside each runner make first-boot backfill safe:
+// already-applied work no-ops and gets registered without re-executing bodies.
+runLedgered('fn.initializeDatabase', initializeDatabase);
+runLedgered('fn.runExpensesMigration', runExpensesMigration);
+runLedgered('fn.runPurchasesMigration', runPurchasesMigration);
+runLedgered('fn.runPurchaseSupplierPaymentMigration', runPurchaseSupplierPaymentMigration);
+runLedgered('fn.runPurchaseReturnMigration', runPurchaseReturnMigration);
+runLedgered('fn.runPurchaseReturnsTablesMigration', runPurchaseReturnsTablesMigration);
+runLedgered('fn.runPurchaseReturnsBackfill', runPurchaseReturnsBackfill);
+runLedgered('fn.runProductionsMigration', runProductionsMigration);
+runLedgered('fn.runBOMMigration', runBOMMigration);
+runLedgered('fn.runBOMItemsColumnMigration', runBOMItemsColumnMigration);
+runLedgered('fn.runSalesMigration', runSalesMigration);
+runLedgered('fn.runSupplierLedgerMigration', runSupplierLedgerMigration);
+runLedgered('fn.runActivityLogMigration', runActivityLogMigration);
+runLedgered('fn.runSupplierPaymentMigration', runSupplierPaymentMigration);
+runLedgered('fn.runPaymentsPurchaseOrderIdMigration', runPaymentsPurchaseOrderIdMigration);
+runLedgered('fn.runSupplierBalanceMigration', runSupplierBalanceMigration);
+runLedgered('fn.runRawMaterialsWarehouseMigration', runRawMaterialsWarehouseMigration);
+runLedgered('fn.runProductionInputsWarehouseMigration', runProductionInputsWarehouseMigration);
+runLedgered('fn.runMobileInvoiceMigration', runMobileInvoiceMigration);
+runLedgered('fn.runPerformanceIndexesMigration', runPerformanceIndexesMigration);
+runLedgered('fn.runMissingIndexesMigration', runMissingIndexesMigration);
+runLedgered('fn.runMissingFKIndexesMigration', runMissingFKIndexesMigration);
+runLedgered('fn.runProductionOverheadMigration', runProductionOverheadMigration);
+runLedgered('fn.runProductionBOMIdMigration', runProductionBOMIdMigration);
+runLedgered('fn.runRolesPermissionsMigration', runRolesPermissionsMigration);
+runLedgered('fn.runStockAdjustmentFinancialMigration', runStockAdjustmentFinancialMigration);
+runLedgered('fn.runForecastsMigration', runForecastsMigration);
+runLedgered('fn.runBatchCostingMigration', runBatchCostingMigration);
+runLedgered('fn.runGLFoundationMigration', runGLFoundationMigration);
+runLedgered('fn.runSalaryPaymentsMigration', runSalaryPaymentsMigration);
+runLedgered('fn.runCreditBalanceMigration', runCreditBalanceMigration);
+runLedgered('fn.runEmployeesMigration', runEmployeesMigration);
+runLedgered('fn.runPhysicalCountsMigration', runPhysicalCountsMigration);
+runLedgered('fn.runForecastEnhancementsMigration', runForecastEnhancementsMigration);
+runLedgered('fn.runCustomReportsMigration', runCustomReportsMigration);
+runLedgered('fn.runExpiryTrackingMigration', runExpiryTrackingMigration);
+runLedgered('fn.runOverrideSaleMigration', runOverrideSaleMigration);
+runLedgered('fn.runDashboardLayoutsMigration', runDashboardLayoutsMigration);
+runLedgered('fn.runLooseItemMigration', runLooseItemMigration);
+runLedgered('fn.runCashAccountsMigration', runCashAccountsMigration);
+runLedgered('fn.runOpeningBalancesMigration', runOpeningBalancesMigration);
+runLedgered('fn.runUserPreferencesMigration', runUserPreferencesMigration);
+// INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
+// INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
+runLedgered('fn.runGLVoidAttributionMigration', runGLVoidAttributionMigration);
+// FK-off table rebuild must NOT sit inside another transaction
+runLedgered('fn.runPaymentsCustomerNullableRebuild', runPaymentsCustomerNullableRebuild, { noTxn: true });
+// stock_batches source_type widening — FK-off table rebuild
+runLedgered('fn.runBatchSourceTypeRebuild', runBatchSourceTypeRebuild, { noTxn: true });
+runLedgered('add-search-indexes.sql');
+// reporting-search-remediation: those indexes can never serve '%term%' LIKE — drop them.
+runLedgered('drop-search-indexes.sql');
+runLedgered('add-audit-trail-fields.sql');
+runLedgered('add-activity-log-purge-permission.sql');
+runLedgered('add-invoice-soft-delete.sql');
+runLedgered('add-hot-path-indexes.sql');
+runLedgered('normalize-payment-methods.sql', undefined, { noTxn: true }); // rebuilds payments — FK off required
+runLedgered('add-payments-counterparty-check.sql', undefined, { noTxn: true });
+// financial-audit-p0-remediation task 2.4: recover purchase_order_id for
+// historical single-PO payments (PAY-06 residue — the rebuild nulled it).
+runLedgered('fn.backfillPaymentsPurchaseOrderId', backfillPaymentsPurchaseOrderId);
+// financial-audit-p0-remediation task 3.1: purchases get a void lifecycle
+// (PUR-03) — voided_at/by/reason, no more hard deletes.
+runLedgered('add-purchase-void-columns.sql');
+runLedgered('add-purchase-return-batches.sql');
+runLedgered('seed-expense-sequence.sql');
+// One-time data backfills (audit-remediation 3.2/3.3) — ledgered so they run
+// exactly once per database, never again on reboot.
+runLedgered('fn.recalcInvoiceBalances', recalcInvoiceBalancesBackfill);
+runLedgered('fn.paymentLedgerDescriptions', paymentLedgerDescriptionsBackfill);
+runLedgered('fn.recoverPaymentsInvoiceId', recoverPaymentsInvoiceId);
+runLedgered('fn.reconcileOrphanedJournalLines', reconcileOrphanedJournalLines);
+// GL backfill for documents created before live posting (reporting-search-remediation):
+// posts purchases/payments/expenses/salaries + opening capital; skips docs already posted.
+runLedgered('fn.backfillGlPreposting', () => (0, backfillGlPreposting_1.runBackfillGlPreposting)(db));
+// Per-line tax decomposition (report-query-integrity): columns first, then the
+// one-time decomposition of stored amounts into net_amount + tax_amount.
+runLedgered('add-invoice-item-tax-columns.sql');
+runLedgered('fn.backfillInvoiceItemTax', () => (0, backfillInvoiceItemTax_1.runBackfillInvoiceItemTax)(db));
+// INV-21 prerequisite: reconcile live batch/balance drift before CHECK constraints land
+runLedgered('fn.runStockCoverageReconciliation', runStockCoverageReconciliation);
+// INV-21: database-level invariants — applied only after live data reconciled
+runLedgered('fn.runStockInvariantChecksRebuild', runStockInvariantChecksRebuild, { noTxn: true });
 // Rollback support: run if --rollback flag is passed
 if (process.argv.includes('--rollback')) {
     const targetMigration = process.argv.find(arg => arg.startsWith('--rollback='));
@@ -977,7 +1360,7 @@ function runProductionBOMIdMigration() {
         }
     }
     catch (error) {
-        logger_1.default.error('Production bom_id migration error:', error.message);
+        throw new Error('Production bom_id migration error:: ' + error.message, { cause: error });
     }
 }
 function runProductionOverheadMigration() {
@@ -990,7 +1373,7 @@ function runProductionOverheadMigration() {
         }
     }
     catch (error) {
-        logger_1.default.error('Production overhead migration error:', error.message);
+        throw new Error('Production overhead migration error:: ' + error.message, { cause: error });
     }
 }
 function runRolesPermissionsMigration() {
@@ -1001,7 +1384,7 @@ function runRolesPermissionsMigration() {
     `).get();
         if (!rolesTableCheck) {
             logger_1.default.info('Running roles and permissions migration...');
-            const rolesPermissionsSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-roles-permissions.sql'), 'utf8');
+            const rolesPermissionsSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-roles-permissions.sql'), 'utf8');
             db.exec(rolesPermissionsSQL);
             logger_1.default.info('✅ Roles and permissions migration completed!');
         }
@@ -1009,7 +1392,7 @@ function runRolesPermissionsMigration() {
         seedDefaultPermissions();
     }
     catch (error) {
-        logger_1.default.error('Roles and permissions migration error:', error.message);
+        throw new Error('Roles and permissions migration error:: ' + error.message, { cause: error });
     }
 }
 function seedDefaultPermissions() {
@@ -1086,7 +1469,7 @@ function seedDefaultPermissions() {
             { name: 'expenses:read', module: 'expenses', action: 'read', description: 'View expenses' },
             { name: 'expenses:create', module: 'expenses', action: 'create', description: 'Create expenses' },
             { name: 'expenses:update', module: 'expenses', action: 'update', description: 'Update expenses' },
-            { name: 'expenses:delete', module: 'expenses', action: 'delete', description: 'Delete expenses' },
+            { name: 'expenses:approve', module: 'expenses', action: 'approve', description: 'Approve and pay expenses' },
             // Production
             { name: 'production:read', module: 'production', action: 'read', description: 'View production' },
             { name: 'production:create', module: 'production', action: 'create', description: 'Create production' },
@@ -1126,6 +1509,11 @@ function seedDefaultPermissions() {
             // Accounting
             { name: 'accounting:read', module: 'accounting', action: 'read', description: 'View accounting data' },
         ];
+        // Task 1.5: reports:create must exist for the reconciliation-save gate.
+        db.prepare(`
+      INSERT OR IGNORE INTO permissions (permission_name, module, action, description)
+      VALUES ('reports:create', 'reports', 'create', 'Create/save reports and reconciliations')
+    `).run();
         // Insert permissions
         for (const perm of permissions) {
             db.prepare(`
@@ -1133,31 +1521,52 @@ function seedDefaultPermissions() {
         VALUES (?, ?, ?, ?)
       `).run(perm.name, perm.module, perm.action, perm.description);
         }
-        // Assign all permissions to Admin role
+        // Task 3.5 (audit-remediation): seed grants ONLY for roles that have no
+        // role_permissions yet. Roles with existing grants (admin-configured) are
+        // never touched on reboot — the old always-grant behavior silently
+        // re-added revoked permissions after every restart.
+        const roleHasNoPerms = (roleId) => (db.prepare('SELECT COUNT(*) AS n FROM role_permissions WHERE role_id = ?').get(roleId).n === 0);
+        // Assign all permissions to Admin role — only when it has none yet
         const adminRole = db.prepare('SELECT id FROM roles WHERE role_name = ?').get('Admin');
-        const allPermissions = db.prepare('SELECT id FROM permissions').all();
-        for (const perm of allPermissions) {
-            db.prepare(`
-        INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
-        VALUES (?, ?)
-      `).run(adminRole.id, perm.id);
+        if (adminRole && roleHasNoPerms(adminRole.id)) {
+            const allPermissions = db.prepare('SELECT id FROM permissions').all();
+            for (const perm of allPermissions) {
+                db.prepare(`
+          INSERT INTO role_permissions (role_id, permission_id)
+          VALUES (?, ?)
+        `).run(adminRole.id, perm.id);
+            }
+            logger_1.default.info(`Seeded ${allPermissions.length} permission(s) to Admin role (was empty)`);
         }
-        // Assign read-only permissions to User role
+        // Assign read-only permissions to User role — only when it has none yet
         const userRole = db.prepare('SELECT id FROM roles WHERE role_name = ?').get('User');
-        const readPermissions = db.prepare(`
-      SELECT id FROM permissions WHERE action = 'read'
-      AND module NOT IN ('roles', 'settings')
-    `).all();
-        for (const perm of readPermissions) {
-            db.prepare(`
-        INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
-        VALUES (?, ?)
-      `).run(userRole.id, perm.id);
+        if (userRole && roleHasNoPerms(userRole.id)) {
+            const readPermissions = db.prepare(`
+        SELECT id FROM permissions WHERE action = 'read'
+        AND module NOT IN ('roles', 'settings')
+      `).all();
+            for (const perm of readPermissions) {
+                db.prepare(`
+          INSERT INTO role_permissions (role_id, permission_id)
+          VALUES (?, ?)
+        `).run(userRole.id, perm.id);
+            }
+            logger_1.default.info(`Seeded ${readPermissions.length} read permission(s) to User role (was empty)`);
+        }
+        // Grant reports:create to Admin and Manager even on pre-seeded roles.
+        const rcPerm = db.prepare(`SELECT id FROM permissions WHERE permission_name = 'reports:create'`).get();
+        if (rcPerm) {
+            for (const roleName of ['Admin', 'Manager']) {
+                const role = db.prepare('SELECT id FROM roles WHERE role_name = ?').get(roleName);
+                if (role) {
+                    db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)`).run(role.id, rcPerm.id);
+                }
+            }
         }
         logger_1.default.info('✅ Default permissions seeded successfully!');
     }
     catch (error) {
-        logger_1.default.error('Seed default permissions error:', error.message);
+        throw new Error('Seed default permissions error:: ' + error.message, { cause: error });
     }
 }
 function runStockAdjustmentFinancialMigration() {
@@ -1208,7 +1617,7 @@ function runStockAdjustmentFinancialMigration() {
         }
     }
     catch (error) {
-        logger_1.default.error('Stock adjustment financial migration error:', error.message);
+        throw new Error('Stock adjustment financial migration error:: ' + error.message, { cause: error });
     }
 }
 function runGLFoundationMigration() {
@@ -1216,12 +1625,12 @@ function runGLFoundationMigration() {
     // and accounting_periods. See migrations/add-gl-foundation.sql for
     // schema and seed. The auto-open period is also handled in the SQL.
     try {
-        const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-gl-foundation.sql'), 'utf8');
+        const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-gl-foundation.sql'), 'utf8');
         db.exec(migrationSQL);
         logger_1.default.info('✅ GL foundation migration applied (chart_of_accounts, journal_lines, accounting_periods)');
     }
     catch (error) {
-        logger_1.default.error('GL foundation migration error:', error.message);
+        throw new Error('GL foundation migration error:: ' + error.message, { cause: error });
     }
     // Add returned_amount column to invoices (idempotent – added in v3.1)
     try {
@@ -1232,7 +1641,7 @@ function runGLFoundationMigration() {
         }
     }
     catch (error) {
-        logger_1.default.error('returned_amount migration error:', error.message);
+        throw new Error('returned_amount migration error:: ' + error.message, { cause: error });
     }
     // Add return_fee column to invoices (idempotent — restocking fee tracking)
     try {
@@ -1243,7 +1652,7 @@ function runGLFoundationMigration() {
         }
     }
     catch (error) {
-        logger_1.default.error('return_fee migration error:', error.message);
+        throw new Error('return_fee migration error:: ' + error.message, { cause: error });
     }
     // Add returned_qty column to invoice_items (per-item return tracking)
     try {
@@ -1254,7 +1663,7 @@ function runGLFoundationMigration() {
         }
     }
     catch (error) {
-        logger_1.default.error('returned_qty migration error:', error.message);
+        throw new Error('returned_qty migration error:: ' + error.message, { cause: error });
     }
 }
 function runBatchCostingMigration() {
@@ -1266,7 +1675,7 @@ function runBatchCostingMigration() {
     `).get();
         if (!stockBatchesTableCheck) {
             logger_1.default.info('Running batch costing migration...');
-            const batchSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-batch-costing.sql'), 'utf8');
+            const batchSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-batch-costing.sql'), 'utf8');
             db.exec(batchSQL);
             logger_1.default.info('✅ stock_batches table created!');
         }
@@ -1299,7 +1708,7 @@ function runBatchCostingMigration() {
         logger_1.default.info('✅ Batch costing migration completed!');
     }
     catch (error) {
-        logger_1.default.error('Batch costing migration error:', error.message);
+        throw new Error('Batch costing migration error:: ' + error.message, { cause: error });
     }
 }
 function runCreditBalanceMigration() {
@@ -1310,13 +1719,13 @@ function runCreditBalanceMigration() {
     `).get();
         if (hasCreditBalance.count === 0) {
             logger_1.default.info('Running credit balance migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-credit-balance.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-credit-balance.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Credit balance column added to customers table!');
         }
     }
     catch (error) {
-        logger_1.default.error('Credit balance migration error:', error.message);
+        throw new Error('Credit balance migration error:: ' + error.message, { cause: error });
     }
 }
 function runForecastsMigration() {
@@ -1327,13 +1736,13 @@ function runForecastsMigration() {
     `).get();
         if (!tableCheck) {
             logger_1.default.info('Running demand forecasts migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-demand-forecasts.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-demand-forecasts.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Demand forecasts migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Demand forecasts migration error:', error.message);
+        throw new Error('Demand forecasts migration error:: ' + error.message, { cause: error });
     }
 }
 function runEmployeesMigration() {
@@ -1344,13 +1753,13 @@ function runEmployeesMigration() {
     `).get();
         if (!employeesTableCheck) {
             logger_1.default.info('Running employees migration...');
-            const employeesSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../../migrations/add-employees-table.sql'), 'utf8');
+            const employeesSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-employees-table.sql'), 'utf8');
             db.exec(employeesSQL);
             logger_1.default.info('✅ Employees migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Employees migration error:', error.message);
+        throw new Error('Employees migration error:: ' + error.message, { cause: error });
     }
 }
 function runSalaryPaymentsMigration() {
@@ -1361,13 +1770,13 @@ function runSalaryPaymentsMigration() {
     `).get();
         if (!salaryTableCheck) {
             logger_1.default.info('Running salary payments migration...');
-            const salarySQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-salary-payments.sql'), 'utf8');
+            const salarySQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-salary-payments.sql'), 'utf8');
             db.exec(salarySQL);
             logger_1.default.info('✅ Salary payments migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Salary payments migration error:', error.message);
+        throw new Error('Salary payments migration error:: ' + error.message, { cause: error });
     }
 }
 function runPhysicalCountsMigration() {
@@ -1378,13 +1787,13 @@ function runPhysicalCountsMigration() {
     `).get();
         if (!physicalCountsTableCheck) {
             logger_1.default.info('Running physical counts migration...');
-            const physicalCountsSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-physical-counts.sql'), 'utf8');
+            const physicalCountsSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-physical-counts.sql'), 'utf8');
             db.exec(physicalCountsSQL);
             logger_1.default.info('✅ Physical counts migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Physical counts migration error:', error.message);
+        throw new Error('Physical counts migration error:: ' + error.message, { cause: error });
     }
 }
 function runCustomReportsMigration() {
@@ -1395,7 +1804,7 @@ function runCustomReportsMigration() {
     `).get();
         if (!tableCheck) {
             logger_1.default.info('Running custom reports migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-custom-reports.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-custom-reports.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Custom reports migration completed!');
             // Seed 5 report templates
@@ -1403,7 +1812,7 @@ function runCustomReportsMigration() {
         }
     }
     catch (error) {
-        logger_1.default.error('Custom reports migration error:', error.message);
+        throw new Error('Custom reports migration error:: ' + error.message, { cause: error });
     }
 }
 function seedReportTemplates() {
@@ -1513,7 +1922,7 @@ function seedReportTemplates() {
         logger_1.default.info('✅ Report templates seeded!');
     }
     catch (error) {
-        logger_1.default.error('Seed report templates error:', error.message);
+        throw new Error('Seed report templates error:: ' + error.message, { cause: error });
     }
 }
 function runForecastEnhancementsMigration() {
@@ -1525,13 +1934,13 @@ function runForecastEnhancementsMigration() {
     `).get();
         if (!tableCheck) {
             logger_1.default.info('Running forecast enhancements migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/enhance-forecasts.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'enhance-forecasts.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Forecast enhancements migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Forecast enhancements migration error:', error.message);
+        throw new Error('Forecast enhancements migration error:: ' + error.message, { cause: error });
     }
 }
 function runDashboardLayoutsMigration() {
@@ -1542,13 +1951,13 @@ function runDashboardLayoutsMigration() {
     `).get();
         if (!tableCheck) {
             logger_1.default.info('Running dashboard layouts migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/dashboard-layouts.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'dashboard-layouts.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Dashboard layouts migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Dashboard layouts migration error:', error.message);
+        throw new Error('Dashboard layouts migration error:: ' + error.message, { cause: error });
     }
 }
 function runCashAccountsMigration() {
@@ -1556,24 +1965,24 @@ function runCashAccountsMigration() {
     // in the SQL), so it runs on every server start like the GL foundation
     // migration — no column/table pre-check needed.
     try {
-        const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-cash-accounts.sql'), 'utf8');
+        const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-cash-accounts.sql'), 'utf8');
         db.exec(migrationSQL);
         logger_1.default.info('✅ Cash accounts migration applied (Easypaisa/JazzCash/UPaisa accounts + cash_reconciliations)');
     }
     catch (error) {
-        logger_1.default.error('Cash accounts migration error:', error.message);
+        throw new Error('Cash accounts migration error:: ' + error.message, { cause: error });
     }
 }
 function runOpeningBalancesMigration() {
     // Idempotent (CREATE IF NOT EXISTS + INSERT OR IGNORE) — runs on every
     // server start so the seed rows exist before any cash computation.
     try {
-        const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-opening-balances.sql'), 'utf8');
+        const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-opening-balances.sql'), 'utf8');
         db.exec(migrationSQL);
         logger_1.default.info('✅ Opening balances migration applied (per-account seed balances)');
     }
     catch (error) {
-        logger_1.default.error('Opening balances migration error:', error.message);
+        throw new Error('Opening balances migration error:: ' + error.message, { cause: error });
     }
 }
 function runLooseItemMigration() {
@@ -1584,79 +1993,13 @@ function runLooseItemMigration() {
     `).get();
         if (columnCheck.count === 0) {
             logger_1.default.info('Running loose item support migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-loose-item-support.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-loose-item-support.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ Loose item support migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('Loose item support migration error:', error.message);
-    }
-}
-function runUnbatchedStockReconciliation() {
-    // Reconcile stock that is on hand but has no covering stock_batches row.
-    // Before PO goods receipts created batches (see PurchaseOrderModel.
-    // addReceipt), received stock was written to stock_balances only, so
-    // batch-based valuation (dashboard stock value, stock valuation report,
-    // balance sheet) silently ignored it. This folds that legacy on-hand
-    // stock into a synthetic cost layer so it becomes visible.
-    try {
-        const rows = db.prepare(`
-      SELECT
-        sb.item_id,
-        sb.warehouse_id,
-        sb.quantity as on_hand,
-        COALESCE((
-          SELECT SUM(quantity_remaining)
-          FROM stock_batches
-          WHERE item_id = sb.item_id AND warehouse_id = sb.warehouse_id
-        ), 0) as covered,
-        i.standard_cost
-      FROM stock_balances sb
-      JOIN items i ON i.id = sb.item_id
-      WHERE sb.quantity > 0
-    `).all();
-        let created = 0;
-        const insertBatch = db.prepare(`
-      INSERT INTO stock_batches (
-        batch_no, item_id, warehouse_id, source_type,
-        source_id, quantity_original, quantity_remaining,
-        unit_cost, received_date
-      ) VALUES (?, ?, ?, 'PURCHASE', 0, ?, ?, ?, ?)
-    `);
-        for (const row of rows) {
-            const uncovered = row.on_hand - row.covered;
-            if (uncovered <= 0.0005)
-                continue;
-            // Prefer the weighted-average cost of inbound movements that have
-            // NO batch link — those are precisely the goods-receipt units this
-            // migration is reconciling (they record unit_price). Ignoring
-            // batch-linked movements avoids polluting the average with legacy
-            // seed movements. Fall back to the item's standard cost, then 0.
-            const avg = db.prepare(`
-        SELECT COALESCE(
-          SUM(quantity * unit_cost) * 1.0 / NULLIF(SUM(quantity), 0),
-          0
-        ) as cost
-        FROM stock_movements
-        WHERE item_id = ? AND quantity > 0 AND batch_id IS NULL
-      `).get(row.item_id);
-            const unitCost = avg.cost > 0
-                ? avg.cost
-                : (row.standard_cost || 0);
-            // Distinct RECON prefix + own sequence so numbers never collide
-            // with real receipt batches (BATCH-26-PUR-xxxx).
-            const nextNo = (0, sequence_1.getNextSequenceNumber)(db, 'BATCH_RECON_last_no');
-            const batchNo = `BATCH-${new Date().getFullYear() % 100}-RECON-${nextNo.toString().padStart(4, '0')}`;
-            insertBatch.run(batchNo, row.item_id, row.warehouse_id, uncovered, uncovered, unitCost, new Date().toISOString().split('T')[0]);
-            created++;
-        }
-        if (created > 0) {
-            logger_1.default.info(`✅ Unbatched stock reconciliation: created ${created} batch row(s)`);
-        }
-    }
-    catch (error) {
-        logger_1.default.error('Unbatched stock reconciliation error:', error.message);
+        throw new Error('Loose item support migration error:: ' + error.message, { cause: error });
     }
 }
 function runUserPreferencesMigration() {
@@ -1669,41 +2012,215 @@ function runUserPreferencesMigration() {
     `).get();
         if (!tableCheck) {
             logger_1.default.info('Running user preferences migration...');
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/add-user-preferences.sql'), 'utf8');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-user-preferences.sql'), 'utf8');
             db.exec(migrationSQL);
             logger_1.default.info('✅ User preferences migration completed!');
         }
     }
     catch (error) {
-        logger_1.default.error('User preferences migration error:', error.message);
+        throw new Error('User preferences migration error:: ' + error.message, { cause: error });
     }
 }
-function runOrphanedBatchCleanup() {
-    // Remove orphaned stock_batches that reference deleted purchases
-    // or have invalid data (zero cost/qty). Nullifies dangling batch_id
-    // references in stock_movements first. Idempotent — safe on every start.
-    try {
-        const orphanedCheck = db.prepare(`
-      SELECT COUNT(*) as count FROM stock_batches sb
-      WHERE (sb.source_type = 'PURCHASE' AND sb.source_id > 0
-             AND NOT EXISTS (SELECT 1 FROM purchases WHERE id = sb.source_id)
-             AND NOT EXISTS (SELECT 1 FROM goods_receipt_items WHERE id = sb.source_id))
-         OR sb.unit_cost <= 0
-         OR sb.quantity_original <= 0
-    `).get();
-        if (orphanedCheck.count > 0) {
-            logger_1.default.info(`Running orphaned batch cleanup (${orphanedCheck.count} orphaned row(s))...`);
-            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(__dirname, '../migrations/cleanup-orphaned-stock-batches.sql'), 'utf8');
-            db.exec(migrationSQL);
-            logger_1.default.info('✅ Orphaned batch cleanup completed!');
+/** Read-only comparison of stock_balances vs SUM(stock_movements). */
+function getStockDiscrepancies() {
+    const rows = db.prepare(`
+    SELECT
+      sm.item_id,
+      i.item_code,
+      sm.warehouse_id,
+      w.warehouse_code,
+      sb.quantity AS balance_quantity,
+      COALESCE(SUM(sm.quantity), 0) AS movement_sum
+    FROM stock_movements sm
+    JOIN items i ON i.id = sm.item_id
+    JOIN warehouses w ON w.id = sm.warehouse_id
+    LEFT JOIN stock_balances sb
+      ON sb.item_id = sm.item_id AND sb.warehouse_id = sm.warehouse_id
+    GROUP BY sm.item_id, sm.warehouse_id
+    HAVING ABS(COALESCE(sb.quantity, 0) - COALESCE(SUM(sm.quantity), 0)) > 0.0005
+    ORDER BY sm.item_id, sm.warehouse_id
+  `).all();
+    return rows;
+}
+function logStockDiscrepancies() {
+    const discrepancies = getStockDiscrepancies();
+    if (discrepancies.length === 0) {
+        logger_1.default.info('✅ Stock balances consistent with movements');
+        return;
+    }
+    logger_1.default.warn(`⚠ ${discrepancies.length} stock balance discrepanc(ies) detected (NOT auto-repaired — run the gated repair script to fix):`);
+    for (const d of discrepancies) {
+        logger_1.default.warn(`  item ${d.item_code} (${d.item_id}) in ${d.warehouse_code} (${d.warehouse_id}): balance=${d.balance_quantity ?? 'none'} movements=${d.movement_sum}`);
+    }
+}
+function recalcInvoiceBalancesBackfill() {
+    // One-time backfill (audit-remediation 3.3): recompute invoice paid /
+    // balance / status from payment_allocations. Runs ONCE per database via
+    // the migration ledger; never on subsequent boots.
+    db.exec(`UPDATE invoices SET returned_amount = total_amount WHERE returned_amount > total_amount AND total_amount > 0;`);
+    db.exec(`
+    UPDATE invoices SET
+      paid_amount = COALESCE((
+        SELECT SUM(pa.amount)
+        FROM payment_allocations pa
+        WHERE pa.invoice_id = invoices.id
+      ), 0),
+      balance_amount = MAX(0, total_amount - COALESCE((
+        SELECT SUM(pa.amount)
+        FROM payment_allocations pa
+        WHERE pa.invoice_id = invoices.id
+      ), 0) - COALESCE(returned_amount, 0) + COALESCE(return_fee, 0))
+      `);
+    db.exec(`
+    UPDATE invoices SET status = 'Returned' WHERE returned_amount >= total_amount AND total_amount > 0;
+    UPDATE invoices SET status = 'Partially Returned' WHERE returned_amount > 0 AND returned_amount < total_amount AND total_amount > 0;
+    UPDATE invoices SET status = 'Paid' WHERE balance_amount <= 0 AND total_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
+    UPDATE invoices SET status = 'Partially Paid' WHERE balance_amount > 0 AND balance_amount < total_amount AND paid_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
+    UPDATE invoices SET status = 'Unpaid' WHERE (paid_amount = 0 OR paid_amount IS NULL) AND (returned_amount IS NULL OR returned_amount = 0) AND total_amount > 0;
+  `);
+    logger_1.default.info('✅ Invoice balances recalculated from allocations (one-time backfill)');
+}
+function paymentLedgerDescriptionsBackfill() {
+    // One-time backfill: rewrite 'Payment against <id>' descriptions to carry
+    // real invoice numbers.
+    const entries = db.prepare(`
+    SELECT cl.id, cl.reference_no, cl.description
+    FROM customer_ledger cl
+    WHERE cl.transaction_type = 'PAYMENT'
+      AND cl.description LIKE 'Payment against %'
+  `).all();
+    for (const entry of entries) {
+        const match = entry.description.match(/Payment against (.+)/);
+        if (!match)
+            continue;
+        const invoiceRefs = match[1].split(',').map((s) => s.trim());
+        const invoiceNumbers = invoiceRefs.map((ref) => {
+            if (/[a-zA-Z]/.test(ref))
+                return ref;
+            const invoiceId = parseInt(ref, 10);
+            if (!isNaN(invoiceId)) {
+                const invoice = db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(invoiceId);
+                return invoice ? invoice.invoice_no : `Invoice #${invoiceId}`;
+            }
+            return ref;
+        });
+        const newDescription = `Payment against ${invoiceNumbers.join(', ')}`;
+        if (newDescription !== entry.description) {
+            db.prepare('UPDATE customer_ledger SET description = ? WHERE id = ?').run(newDescription, entry.id);
         }
     }
-    catch (error) {
-        logger_1.default.error('Orphaned batch cleanup error:', error.message);
+    logger_1.default.info(`✅ Payment ledger descriptions fixed (${entries.length} scanned, one-time backfill)`);
+}
+function recoverPaymentsInvoiceId() {
+    // Task 3.2 (audit-remediation / MIG-02): the historical payments rebuild
+    // dropped payments.invoice_id. Recover it from payment_allocations where
+    // each allocation set maps to exactly one invoice.
+    const candidates = db.prepare(`
+    SELECT pa.payment_id, MIN(pa.invoice_id) AS first_invoice, MAX(pa.invoice_id) AS last_invoice,
+           COUNT(DISTINCT pa.invoice_id) AS n_invoices
+    FROM payment_allocations pa
+    JOIN payments p ON p.id = pa.payment_id
+    WHERE p.invoice_id IS NULL
+    GROUP BY pa.payment_id
+  `).all();
+    let recovered = 0;
+    for (const c of candidates) {
+        if (c.n_invoices !== 1)
+            continue; // ambiguous — leave NULL
+        db.prepare('UPDATE payments SET invoice_id = ? WHERE id = ? AND invoice_id IS NULL')
+            .run(c.first_invoice, c.payment_id);
+        recovered++;
+    }
+    if (recovered > 0) {
+        logger_1.default.info(`✅ Recovered invoice_id on ${recovered} payment(s) from payment_allocations`);
+        try {
+            db.prepare(`
+        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
+        VALUES (NULL, 'DATA_RECOVERY', 'payment', NULL, ?)
+      `).run(`Migration recovered payments.invoice_id for ${recovered} payment(s) from payment_allocations`);
+        }
+        catch { /* activity_log schema may predate this migration — non-fatal */ }
+    }
+}
+function backfillPaymentsPurchaseOrderId() {
+    // Task 2.4 (financial-audit-p0-remediation / PAY-06 residue): the
+    // historical payments rebuild nulled purchase_order_id. Recover it for
+    // single-PO payments — exactly one distinct po_allocations.po_id and no
+    // purchase allocations (mirrors supplier-payment-po-link spec).
+    const candidates = db.prepare(`
+    SELECT p.id AS payment_id, MIN(pa.po_id) AS first_po, MAX(pa.po_id) AS last_po,
+           COUNT(DISTINCT pa.po_id) AS n_pos
+    FROM payments p
+    JOIN po_allocations pa ON pa.payment_id = p.id
+    WHERE p.supplier_id IS NOT NULL
+      AND p.purchase_order_id IS NULL
+      AND NOT EXISTS (SELECT 1 FROM purchase_allocations pca WHERE pca.payment_id = p.id)
+    GROUP BY p.id
+  `).all();
+    let recovered = 0;
+    for (const c of candidates) {
+        if (c.n_pos !== 1)
+            continue; // multi-PO / ambiguous — stays NULL per spec
+        db.prepare('UPDATE payments SET purchase_order_id = ? WHERE id = ? AND purchase_order_id IS NULL')
+            .run(c.first_po, c.payment_id);
+        recovered++;
+    }
+    if (recovered > 0) {
+        logger_1.default.info(`✅ Backfilled payments.purchase_order_id on ${recovered} single-PO payment(s) from po_allocations`);
+        try {
+            db.prepare(`
+        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
+        VALUES (NULL, 'DATA_RECOVERY', 'payment', NULL, ?)
+      `).run(`Migration backfilled payments.purchase_order_id for ${recovered} payment(s) from po_allocations`);
+        }
+        catch { /* activity_log schema may predate this migration — non-fatal */ }
+    }
+}
+function reconcileOrphanedJournalLines() {
+    // Task 5.4 (AUD-06): repair historical damage from hard-deleted invoices —
+    // void journal_lines whose reference document no longer exists, and NULL
+    // dangling journal_entry_id links on stock_movements. Post-condition:
+    // non-voided journal_lines must balance per entry; startup fails otherwise.
+    const orphans = db.prepare(`
+    SELECT jl.id FROM journal_lines jl
+    LEFT JOIN journal_entries je ON je.id = jl.journal_entry_id
+    WHERE jl.voided = 0
+      AND (je.id IS NULL OR (
+        je.reference_type = 'INVOICE' AND je.reference_id IS NOT NULL AND
+        NOT EXISTS (SELECT 1 FROM invoices i WHERE i.id = je.reference_id)
+      ))
+  `).all();
+    if (orphans.length > 0) {
+        logger_1.default.warn(`Voiding ${orphans.length} orphaned journal_line(s) from hard-deleted documents`);
+        const v = db.prepare('UPDATE journal_lines SET voided = 1, void_reason = ? WHERE id = ?');
+        for (const o of orphans)
+            v.run('orphaned document reconciled', o.id);
+    }
+    const dangling = db.prepare(`
+    SELECT sm.id FROM stock_movements sm
+    LEFT JOIN journal_entries je ON je.id = sm.journal_entry_id
+    WHERE sm.journal_entry_id IS NOT NULL AND je.id IS NULL
+  `).all();
+    if (dangling.length > 0) {
+        logger_1.default.warn(`Clearing ${dangling.length} dangling stock_movements.journal_entry_id reference(s)`);
+        const u = db.prepare('UPDATE stock_movements SET journal_entry_id = NULL WHERE id = ?');
+        for (const d of dangling)
+            u.run(d.id);
+    }
+    // Post-condition: every non-voided line set must balance per journal entry.
+    const imbalanced = db.prepare(`
+    SELECT je.id, SUM(jl.debit) AS dr, SUM(jl.credit) AS cr
+    FROM journal_entries je JOIN journal_lines jl ON jl.journal_entry_id = je.id
+    WHERE jl.voided = 0
+    GROUP BY je.id
+    HAVING ABS(SUM(jl.debit) - SUM(jl.credit)) > 0.005
+  `).all();
+    if (imbalanced.length > 0) {
+        throw new Error(`Trial balance integrity violated: ${imbalanced.length} unbalanced journal_entries after reconciliation`);
     }
 }
 function runRollback(migrationName) {
-    const rollbackFile = path_1.default.join(__dirname, '../migrations/rollbacks/rollback-' + migrationName + '.sql');
+    const rollbackFile = path_1.default.join(MIGRATIONS_DIR, 'rollbacks/rollback-' + migrationName + '.sql');
     if (!fs_1.default.existsSync(rollbackFile)) {
         logger_1.default.error(`Rollback file not found: ${rollbackFile}`);
         process.exit(1);
@@ -1720,7 +2237,7 @@ function runRollback(migrationName) {
     }
 }
 function runRollbackAll() {
-    const rollbacksDir = path_1.default.join(__dirname, '../migrations/rollbacks');
+    const rollbacksDir = path_1.default.join(MIGRATIONS_DIR, 'rollbacks');
     if (!fs_1.default.existsSync(rollbacksDir)) {
         logger_1.default.error('Rollbacks directory not found');
         process.exit(1);

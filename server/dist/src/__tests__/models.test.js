@@ -215,7 +215,7 @@ describe('WarehouseModel', () => {
     describe('update', () => {
         it('updates warehouse fields', () => {
             Warehouse_1.default.update(database_1.default, createdWarehouseId, {
-                warehouse_code: (Warehouse_1.default.getById(database_1.default, createdWarehouseId)?.warehouse_code),
+                warehouse_code: Warehouse_1.default.getById(database_1.default, createdWarehouseId).warehouse_code,
                 warehouse_name: 'Updated Warehouse',
                 location: 'Updated Location',
             });
@@ -510,7 +510,7 @@ describe('StockMovementModel', () => {
     });
     describe('Purchase supplier/payment flow', () => {
         let itemId;
-        let warehouseId = 1;
+        const warehouseId = 1;
         let supplierId;
         let purchaseId;
         let purchaseNo;
@@ -532,7 +532,21 @@ describe('StockMovementModel', () => {
         afterAll(() => {
             database_1.default.prepare(`DELETE FROM stock_movements WHERE item_id = ?`).run(itemId);
             database_1.default.prepare(`DELETE FROM stock_balances WHERE item_id = ?`).run(itemId);
+            // task 4.4 added purchase_return_batches → FK to stock_batches, and
+            // stock_movements/purchases carry batch_id FKs too — clear children
+            // and their batch references before the batches themselves.
+            database_1.default.prepare(`DELETE FROM purchase_return_batches`).run();
+            database_1.default.prepare(`UPDATE purchases SET batch_id = NULL WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(itemId);
+            database_1.default.prepare(`UPDATE productions SET batch_id = NULL WHERE batch_id IN (SELECT id FROM stock_batches WHERE item_id = ?)`).run(itemId);
             database_1.default.prepare(`DELETE FROM stock_batches WHERE item_id = ?`).run(itemId);
+            // payments.supplier_id FK — clear supplier-linked payments before the supplier.
+            database_1.default.prepare(`DELETE FROM purchase_allocations WHERE payment_id IN (SELECT id FROM payments WHERE supplier_id = ?)`).run(supplierId);
+            database_1.default.prepare(`DELETE FROM po_allocations WHERE payment_id IN (SELECT id FROM payments WHERE supplier_id = ?)`).run(supplierId);
+            database_1.default.prepare(`UPDATE payments SET supplier_id = NULL WHERE supplier_id = ?`).run(supplierId);
+            // credit_notes / purchases also carry supplier FKs.
+            database_1.default.prepare(`DELETE FROM credit_notes WHERE supplier_id = ?`).run(supplierId);
+            database_1.default.prepare(`DELETE FROM purchase_returns WHERE source_type = 'PURCHASE' AND source_id IN (SELECT id FROM purchases WHERE supplier_id = ?)`).run(supplierId);
+            database_1.default.prepare(`DELETE FROM purchases WHERE supplier_id = ?`).run(supplierId);
             database_1.default.prepare(`DELETE FROM supplier_ledger WHERE supplier_id = ?`).run(supplierId);
             database_1.default.prepare(`DELETE FROM suppliers WHERE id = ?`).run(supplierId);
             Item_1.default.delete(itemId, database_1.default);
@@ -608,16 +622,20 @@ describe('StockMovementModel', () => {
             expect(listed?.paid_amount).toBe(100);
             expect(listed?.balance_amount).toBe(150);
         });
-        it('blocks deleting a purchase that has recorded payments', () => {
-            expect(() => Purchase_1.default.delete(purchaseId, 1, database_1.default)).toThrow(/Cannot delete purchase with recorded payments/);
+        it('blocks voiding a purchase that has recorded payments', () => {
+            expect(() => Purchase_1.default.void(purchaseId, 1, 'test', database_1.default)).toThrow(/Cannot void purchase with recorded payments/);
         });
-        it('deleting the payment restores the balance and allows purchase deletion', () => {
+        it('deleting the payment restores the balance and allows purchase void', () => {
             const paymentId = database_1.default.prepare('SELECT payment_id FROM purchase_allocations WHERE purchase_id = ?').get(purchaseId).payment_id;
             Payment_1.default.delete(database_1.default, paymentId);
             // Payment removed → only the purchase entry remains.
             expect(SupplierLedger_1.default.getBalance(supplierId, database_1.default)).toBe(250);
-            Purchase_1.default.delete(purchaseId, 1, database_1.default);
+            Purchase_1.default.void(purchaseId, 1, 'duplicate entry', database_1.default);
             expect(SupplierLedger_1.default.getBalance(supplierId, database_1.default)).toBe(0);
+            // Void attribution stamped; the row remains queryable.
+            const row = database_1.default.prepare('SELECT voided_at, void_reason FROM purchases WHERE id = ?').get(purchaseId);
+            expect(row.voided_at).not.toBeNull();
+            expect(row.void_reason).toBe('duplicate entry');
         });
     });
     describe('PO payment history', () => {
@@ -691,6 +709,7 @@ describe('StockMovementModel', () => {
                 supplier_id: supId,
                 payment_date: '2026-08-02',
                 amount: 50,
+                payment_method: 'Cash',
                 po_allocations: [{ po_id: String(poId), amount: 50 }],
                 purchase_allocations: [],
                 userId: 1,
@@ -705,6 +724,7 @@ describe('StockMovementModel', () => {
                 supplier_id: supId,
                 payment_date: '2026-08-03',
                 amount: 80,
+                payment_method: 'Cash',
                 po_allocations: [
                     { po_id: String(poId), amount: 50 },
                     { po_id: String(poId2), amount: 30 },
@@ -720,6 +740,7 @@ describe('StockMovementModel', () => {
                 supplier_id: supId,
                 payment_date: '2026-08-04',
                 amount: 35,
+                payment_method: 'Cash',
                 po_allocations: [{ po_id: String(poId2), amount: 30 }],
                 purchase_allocations: [{ purchase_id: String(purchaseId), amount: 5 }],
                 userId: 1,

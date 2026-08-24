@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const database_1 = __importDefault(require("../config/database"));
 const SupplierLedger_1 = __importDefault(require("../models/SupplierLedger"));
 const currency_1 = require("./currency");
+const reportSql_1 = require("./reportSql");
 /**
  * Create a ledger entry for a customer.
  * ACC-12: carries the caller's real document date (invoice_date,
@@ -68,7 +69,7 @@ function reverseLedgerEntry(table, rowId, reason) {
         // The reversal is positioned where the original sat in the chain —
         // same transaction_date — so the rebuilt running balances treat the
         // pair as a net-zero event at that point, not as an end-of-chain one.
-        const reversalDate = String(original.transaction_date || new Date().toISOString().slice(0, 10));
+        const reversalDate = String(original.transaction_date || (0, reportSql_1.todayLocal)());
         // Latest non-voided balance for the counterparty.
         const lastRow = database_1.default.prepare(`SELECT balance FROM ${table}
        WHERE ${counterpartyKey} = ? AND voided = 0
@@ -172,6 +173,39 @@ function rebuildLedgerBalances(customerId) {
     })();
 }
 /**
+ * Task 8.2 (PERF-02): incremental running-balance update. Recomputes the
+ * balance seed from everything BEFORE `fromEntryId`, then walks forward
+ * only over the affected tail (uses idx_customer_ledger_cust_date).
+ */
+function updateBalancesFrom(customerId, fromEntryId) {
+    database_1.default.transaction(() => {
+        const anchorRow = database_1.default.prepare('SELECT transaction_date, id FROM customer_ledger WHERE id = ?').get(fromEntryId);
+        if (!anchorRow) {
+            rebuildLedgerBalances(customerId);
+            return;
+        }
+        // Seed: net of all active rows strictly before the changed row's position
+        const seedRow = database_1.default.prepare(`
+      SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS net
+      FROM customer_ledger
+      WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL
+        AND (transaction_date < ? OR (transaction_date = ? AND id < ?))
+    `).get(customerId, anchorRow.transaction_date, anchorRow.transaction_date, fromEntryId);
+        const tail = database_1.default.prepare(`
+      SELECT id, debit, credit FROM customer_ledger
+      WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL
+        AND (transaction_date > ? OR (transaction_date = ? AND id >= ?))
+      ORDER BY transaction_date ASC, id ASC
+    `).all(customerId, anchorRow.transaction_date, anchorRow.transaction_date, fromEntryId);
+        let running = (0, currency_1.parseCurrency)(seedRow.net);
+        const updateStmt = database_1.default.prepare('UPDATE customer_ledger SET balance = ? WHERE id = ?');
+        for (const entry of tail) {
+            running = (0, currency_1.addCurrency)((0, currency_1.subtractCurrency)(running, entry.credit), entry.debit);
+            updateStmt.run(running, entry.id);
+        }
+    })();
+}
+/**
  * Single authoritative customer-balance writer (ACC-13): the ledger sum
  * over non-voided rows, not an open-invoice status heuristic.
  */
@@ -193,6 +227,7 @@ exports.default = {
     recalcCustomerBalanceFromLedger,
     calculateInvoiceBalance,
     updateInvoiceStatus,
-    rebuildLedgerBalances
+    rebuildLedgerBalances,
+    updateBalancesFrom
 };
 //# sourceMappingURL=ledgerUtils.js.map

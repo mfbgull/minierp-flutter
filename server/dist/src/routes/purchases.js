@@ -14,7 +14,7 @@ router.post('/purchases', (0, requirePermission_1.requirePermission)('purchases'
 router.get('/purchases', (0, requirePermission_1.requirePermission)('purchases', 'read'), purchaseController_1.default.getPurchases);
 router.get('/purchases/:id', (0, requirePermission_1.requirePermission)('purchases', 'read'), purchaseController_1.default.getPurchase);
 router.get('/purchases/:id/payments', (0, requirePermission_1.requirePermission)('purchases', 'read'), purchaseController_1.default.getPurchasePayments);
-router.delete('/purchases/:id', (0, requirePermission_1.requirePermission)('purchases', 'delete'), rateLimiter_1.sensitiveOperationLimiter, purchaseController_1.default.deletePurchase);
+router.post('/purchases/:id/void', (0, requirePermission_1.requirePermission)('purchases', 'delete'), rateLimiter_1.sensitiveOperationLimiter, purchaseController_1.default.voidPurchase);
 router.get('/purchases/summary/item/:item_id', (0, requirePermission_1.requirePermission)('purchases', 'read'), purchaseController_1.default.getPurchaseSummaryByItem);
 router.get('/purchases/summary/daterange', (0, requirePermission_1.requirePermission)('purchases', 'read'), purchaseController_1.default.getPurchaseSummaryByDateRange);
 router.get('/purchases/top-suppliers', (0, requirePermission_1.requirePermission)('purchases', 'read'), purchaseController_1.default.getTopSuppliers);

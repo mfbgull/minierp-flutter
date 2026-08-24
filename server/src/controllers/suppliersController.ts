@@ -7,6 +7,7 @@ import SupplierModel from '../models/Supplier';
 import { getRouteParam } from '../utils/queryUtils';
 import { sanitizeSortParams, SUPPLIER_SORT_COLUMNS, LEDGER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import logger from '../utils/logger';
+import { parsePageParams, envelope } from '../utils/paginate';
 import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/sequence';
 
 function getSuppliers(req: Request, res: Response): void {
@@ -265,8 +266,10 @@ function getSupplierLedger(req: Request, res: Response): void {
       return;
     }
 
-    const ledgerEntries = SupplierModel.getLedger(supplierId, sortParams.column, sortParams.order, db);
-    res.json({ success: true, data: ledgerEntries });
+    // Task 8.7: bounded ledger listing with a pagination envelope.
+    const pageParams = parsePageParams(req);
+    const { rows, total } = SupplierModel.getLedger(supplierId, sortParams.column, sortParams.order, db, pageParams.page, pageParams.limit);
+    res.json({ success: true, data: rows, pagination: envelope(total, pageParams) });
   } catch (error) {
     logger.error('Error fetching supplier ledger:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch supplier ledger' });

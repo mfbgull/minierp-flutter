@@ -6,6 +6,8 @@ import * as bcrypt from 'bcrypt';
 import logger from '../utils/logger';
 import { getNextSequenceNumber } from '../utils/sequence';
 import { backfillPurchaseReturns } from '../utils/purchaseReturnBackfill';
+import { runBackfillGlPreposting } from '../migrations/backfillGlPreposting';
+import { runBackfillInvoiceItemTax } from '../migrations/backfillInvoiceItemTax';
 
 // Fail-closed: tests must never fall through to a shared dev DB by accident
 if (process.env.NODE_ENV === 'test' && !process.env.DATABASE_PATH) {
@@ -96,6 +98,27 @@ function runLedgered(key: string, fn?: () => void, opts?: { noTxn?: boolean }): 
       }
     } else {
       const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, key), 'utf8');
+      if (opts?.noTxn) {
+        // Table-rebuild migrations need foreign_keys OFF during their DROP
+        // (with it ON, dropping `payments` cascades the allocation tables —
+        // the PAY-06 data-loss class). PRAGMA is a no-op inside a txn, so
+        // these run outside one; the file manages its own transaction.
+        db.pragma('foreign_keys = OFF');
+        try {
+          db.exec(sql);
+          db.exec("INSERT INTO schema_migrations (filename, applied_at, checksum) VALUES ('" +
+            key.replace(/'/g, "''") + "', '" + new Date().toISOString() + "', '" + checksum + "')");
+        } finally {
+          db.pragma('foreign_keys = ON');
+        }
+        if ((db.pragma('foreign_keys', { simple: true }) as number) !== 1) {
+          throw new Error(`FATAL: migration '${key}' failed to restore foreign_keys=ON`);
+        }
+        const n = (db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get() as { n: number }).n;
+        db.pragma(`user_version = ${n}`);
+        logger.info(`✅ migration applied: ${key} (noTxn)`);
+        return;
+      }
       db.transaction(() => db.exec(sql))();
     }
     db.prepare('INSERT INTO schema_migrations (filename, applied_at, checksum) VALUES (?, ?, ?)')
@@ -1454,16 +1477,35 @@ runLedgered('fn.runPaymentsCustomerNullableRebuild', runPaymentsCustomerNullable
 // stock_batches source_type widening — FK-off table rebuild
 runLedgered('fn.runBatchSourceTypeRebuild', runBatchSourceTypeRebuild, { noTxn: true });
 runLedgered('add-search-indexes.sql');
+// reporting-search-remediation: those indexes can never serve '%term%' LIKE — drop them.
+runLedgered('drop-search-indexes.sql');
 runLedgered('add-audit-trail-fields.sql');
 runLedgered('add-activity-log-purge-permission.sql');
 runLedgered('add-invoice-soft-delete.sql');
 runLedgered('add-hot-path-indexes.sql');
+runLedgered('normalize-payment-methods.sql', undefined, { noTxn: true }); // rebuilds payments — FK off required
+runLedgered('add-payments-counterparty-check.sql', undefined, { noTxn: true });
+// financial-audit-p0-remediation task 2.4: recover purchase_order_id for
+// historical single-PO payments (PAY-06 residue — the rebuild nulled it).
+runLedgered('fn.backfillPaymentsPurchaseOrderId', backfillPaymentsPurchaseOrderId);
+// financial-audit-p0-remediation task 3.1: purchases get a void lifecycle
+// (PUR-03) — voided_at/by/reason, no more hard deletes.
+runLedgered('add-purchase-void-columns.sql');
+runLedgered('add-purchase-return-batches.sql');
+runLedgered('seed-expense-sequence.sql');
 // One-time data backfills (audit-remediation 3.2/3.3) — ledgered so they run
 // exactly once per database, never again on reboot.
 runLedgered('fn.recalcInvoiceBalances', recalcInvoiceBalancesBackfill);
 runLedgered('fn.paymentLedgerDescriptions', paymentLedgerDescriptionsBackfill);
 runLedgered('fn.recoverPaymentsInvoiceId', recoverPaymentsInvoiceId);
 runLedgered('fn.reconcileOrphanedJournalLines', reconcileOrphanedJournalLines);
+// GL backfill for documents created before live posting (reporting-search-remediation):
+// posts purchases/payments/expenses/salaries + opening capital; skips docs already posted.
+runLedgered('fn.backfillGlPreposting', () => runBackfillGlPreposting(db));
+// Per-line tax decomposition (report-query-integrity): columns first, then the
+// one-time decomposition of stored amounts into net_amount + tax_amount.
+runLedgered('add-invoice-item-tax-columns.sql');
+runLedgered('fn.backfillInvoiceItemTax', () => runBackfillInvoiceItemTax(db));
 // INV-21 prerequisite: reconcile live batch/balance drift before CHECK constraints land
 runLedgered('fn.runStockCoverageReconciliation', runStockCoverageReconciliation);
 // INV-21: database-level invariants — applied only after live data reconciled
@@ -1627,7 +1669,7 @@ function seedDefaultPermissions(): void {
       { name: 'expenses:read', module: 'expenses', action: 'read', description: 'View expenses' },
       { name: 'expenses:create', module: 'expenses', action: 'create', description: 'Create expenses' },
       { name: 'expenses:update', module: 'expenses', action: 'update', description: 'Update expenses' },
-      { name: 'expenses:delete', module: 'expenses', action: 'delete', description: 'Delete expenses' },
+      { name: 'expenses:approve', module: 'expenses', action: 'approve', description: 'Approve and pay expenses' },
 
       // Production
       { name: 'production:read', module: 'production', action: 'read', description: 'View production' },
@@ -1679,6 +1721,12 @@ function seedDefaultPermissions(): void {
       { name: 'accounting:read', module: 'accounting', action: 'read', description: 'View accounting data' },
     ];
 
+    // Task 1.5: reports:create must exist for the reconciliation-save gate.
+    db.prepare(`
+      INSERT OR IGNORE INTO permissions (permission_name, module, action, description)
+      VALUES ('reports:create', 'reports', 'create', 'Create/save reports and reconciliations')
+    `).run();
+
     // Insert permissions
     for (const perm of permissions) {
       db.prepare(`
@@ -1723,6 +1771,16 @@ function seedDefaultPermissions(): void {
       logger.info(`Seeded ${readPermissions.length} read permission(s) to User role (was empty)`);
     }
 
+    // Grant reports:create to Admin and Manager even on pre-seeded roles.
+    const rcPerm = db.prepare(`SELECT id FROM permissions WHERE permission_name = 'reports:create'`).get() as { id: number } | undefined;
+    if (rcPerm) {
+      for (const roleName of ['Admin', 'Manager']) {
+        const role = db.prepare('SELECT id FROM roles WHERE role_name = ?').get(roleName) as { id: number } | undefined;
+        if (role) {
+          db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)`).run(role.id, rcPerm.id);
+        }
+      }
+    }
     logger.info('✅ Default permissions seeded successfully!');
   } catch (error: any) {
     throw new Error('Seed default permissions error:: ' + error.message, { cause: error });
@@ -2427,6 +2485,41 @@ function recoverPaymentsInvoiceId(): void {
         INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
         VALUES (NULL, 'DATA_RECOVERY', 'payment', NULL, ?)
       `).run(`Migration recovered payments.invoice_id for ${recovered} payment(s) from payment_allocations`);
+    } catch { /* activity_log schema may predate this migration — non-fatal */ }
+  }
+}
+
+function backfillPaymentsPurchaseOrderId(): void {
+  // Task 2.4 (financial-audit-p0-remediation / PAY-06 residue): the
+  // historical payments rebuild nulled purchase_order_id. Recover it for
+  // single-PO payments — exactly one distinct po_allocations.po_id and no
+  // purchase allocations (mirrors supplier-payment-po-link spec).
+  const candidates = db.prepare(`
+    SELECT p.id AS payment_id, MIN(pa.po_id) AS first_po, MAX(pa.po_id) AS last_po,
+           COUNT(DISTINCT pa.po_id) AS n_pos
+    FROM payments p
+    JOIN po_allocations pa ON pa.payment_id = p.id
+    WHERE p.supplier_id IS NOT NULL
+      AND p.purchase_order_id IS NULL
+      AND NOT EXISTS (SELECT 1 FROM purchase_allocations pca WHERE pca.payment_id = p.id)
+    GROUP BY p.id
+  `).all() as Array<{ payment_id: number; first_po: number; last_po: number; n_pos: number }>;
+
+  let recovered = 0;
+  for (const c of candidates) {
+    if (c.n_pos !== 1) continue; // multi-PO / ambiguous — stays NULL per spec
+    db.prepare('UPDATE payments SET purchase_order_id = ? WHERE id = ? AND purchase_order_id IS NULL')
+      .run(c.first_po, c.payment_id);
+    recovered++;
+  }
+
+  if (recovered > 0) {
+    logger.info(`✅ Backfilled payments.purchase_order_id on ${recovered} single-PO payment(s) from po_allocations`);
+    try {
+      db.prepare(`
+        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
+        VALUES (NULL, 'DATA_RECOVERY', 'payment', NULL, ?)
+      `).run(`Migration backfilled payments.purchase_order_id for ${recovered} payment(s) from po_allocations`);
     } catch { /* activity_log schema may predate this migration — non-fatal */ }
   }
 }
