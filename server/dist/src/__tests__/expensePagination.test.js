@@ -64,4 +64,3 @@ describe('ExpenseModel pagination + sort', () => {
         expect(sqlSanitizer_1.EXPENSE_SORT_COLUMNS).toContain(column);
     });
 });
-//# sourceMappingURL=expensePagination.test.js.map

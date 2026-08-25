@@ -166,4 +166,3 @@ router.patch('/stock-batches/:id/unhalt', (0, requirePermission_1.requirePermiss
     }
 });
 exports.default = router;
-//# sourceMappingURL=stockBatches.js.map

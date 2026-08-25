@@ -38,4 +38,3 @@ router.post('/physical-counts/:id/complete', (0, requirePermission_1.requirePerm
 router.post('/physical-counts/:id/cancel', (0, requirePermission_1.requirePermission)('inventory', 'update'), rateLimiter_1.sensitiveOperationLimiter, inventoryController_1.default.cancelPhysicalCount);
 router.delete('/physical-counts/:id', (0, requirePermission_1.requirePermission)('inventory', 'delete'), rateLimiter_1.sensitiveOperationLimiter, inventoryController_1.default.deletePhysicalCount);
 exports.default = router;
-//# sourceMappingURL=inventory.js.map

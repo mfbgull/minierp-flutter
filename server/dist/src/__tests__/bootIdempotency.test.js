@@ -37,4 +37,3 @@ describe('boot idempotency (task 3.9)', () => {
         expect(diffs).toEqual([]);
     });
 });
-//# sourceMappingURL=bootIdempotency.test.js.map

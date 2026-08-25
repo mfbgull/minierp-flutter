@@ -272,4 +272,3 @@ exports.default = {
     getStatusOptions,
     getPaymentMethodOptions,
 };
-//# sourceMappingURL=Expense.js.map

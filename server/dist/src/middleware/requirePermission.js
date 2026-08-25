@@ -62,4 +62,3 @@ function requirePermission(module, action) {
         }
     };
 }
-//# sourceMappingURL=requirePermission.js.map

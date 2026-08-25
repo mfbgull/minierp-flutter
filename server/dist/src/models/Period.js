@@ -101,4 +101,3 @@ exports.default = {
     openPeriod,
     closePeriod,
 };
-//# sourceMappingURL=Period.js.map

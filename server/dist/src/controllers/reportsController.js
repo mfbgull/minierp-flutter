@@ -241,4 +241,3 @@ exports.default = {
     getIncomeStatementReport, getTaxSummaryReport, getCashReconciliation, saveCashReconciliation,
     getBatchTraceabilityReport, getExpiryReport,
 };
-//# sourceMappingURL=reportsController.js.map

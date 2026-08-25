@@ -33,4 +33,3 @@ router.get('/purchase-orders/summary/supplier/:supplierId', (0, requirePermissio
 router.get('/suppliers/:supplierId/balance', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getSupplierBalance);
 router.get('/suppliers/:supplierId/transactions', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getSupplierTransactions);
 exports.default = router;
-//# sourceMappingURL=purchaseOrders.js.map

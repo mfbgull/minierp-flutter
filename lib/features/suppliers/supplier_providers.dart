@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/ledger_entry.dart' show LedgerEntry;
 import '../../data/models/payment.dart' show Payment;
+import '../../data/models/purchase.dart' show Purchase;
 import '../../data/models/purchase_order.dart' show PurchaseOrder;
 import '../../data/models/supplier.dart' show Supplier;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -11,6 +12,8 @@ import '../../data/repositories/paged_request.dart'
     show PagedRequest, PagedResponse;
 import '../../data/repositories/purchase_order_repository.dart'
     show POSummary, purchaseOrderRepositoryProvider;
+import '../../data/repositories/purchase_repository.dart'
+    show purchaseRepositoryProvider;
 import '../../data/repositories/supplier_repository.dart'
     show SupplierBalance, SupplierStatement, supplierRepositoryProvider;
 
@@ -160,24 +163,70 @@ final supplierTabsVersionProvider = StateProvider<int>((ref) => 0);
 /// [ServerPaginationBar].
 final supplierPurchaseOrdersPagedProvider = FutureProvider.autoDispose
     .family<PagedResponse<PurchaseOrder>, SupplierPurchaseOrdersArgs>((
-  ref,
-  args,
-) async {
-  ref.watch(supplierTabsVersionProvider);
-  final result = await ref
-      .watch(purchaseOrderRepositoryProvider)
-      .listPaged(
-        PagedRequest(
-          page: args.page,
-          limit: args.limit,
-          extra: {'supplier_id': args.supplierId},
-        ),
-      );
-  return switch (result) {
-    ApiSuccess(:final data) => data,
-    ApiFailure(:final error) => throw error,
-  };
-});
+      ref,
+      args,
+    ) async {
+      ref.watch(supplierTabsVersionProvider);
+      final result = await ref
+          .watch(purchaseOrderRepositoryProvider)
+          .listPaged(
+            PagedRequest(
+              page: args.page,
+              limit: args.limit,
+              extra: {'supplier_id': args.supplierId},
+            ),
+          );
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+/// Paged fetch args for [supplierPurchasesPagedProvider].
+class SupplierPurchasesArgs {
+  const SupplierPurchasesArgs({
+    required this.supplierId,
+    required this.page,
+    required this.limit,
+  });
+
+  final int supplierId;
+  final int page;
+  final int limit;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SupplierPurchasesArgs &&
+      other.supplierId == supplierId &&
+      other.page == page &&
+      other.limit == limit;
+
+  @override
+  int get hashCode => Object.hash(supplierId, page, limit);
+}
+
+/// One page of the supplier's direct purchases (`GET /purchases` +
+/// `supplier_id=<id>` + `page`/`limit` — server-paginated like the
+/// purchases module; default sort `purchase_date DESC` matches the
+/// module). The Purchases tab renders this with a [ServerPaginationBar].
+final supplierPurchasesPagedProvider = FutureProvider.autoDispose
+    .family<PagedResponse<Purchase>, SupplierPurchasesArgs>((ref, args) async {
+      ref.watch(supplierTabsVersionProvider);
+      final result = await ref
+          .watch(purchaseRepositoryProvider)
+          .listPaged(
+            PagedRequest(
+              page: args.page,
+              limit: args.limit,
+              sortOrder: 'DESC',
+              extra: {'supplier_id': args.supplierId},
+            ),
+          );
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
 
 /// PO summary for the supplier (`GET /purchase-orders/summary/supplier/<id>`,
 /// bare `POSummary`) — the Overview tab's PO-status counts. autoDispose:
@@ -235,14 +284,16 @@ class SupplierPaymentsArgs {
 final supplierPaymentsPagedProvider = FutureProvider.autoDispose
     .family<PagedResponse<Payment>, SupplierPaymentsArgs>((ref, args) async {
       ref.watch(supplierTabsVersionProvider);
-      final result = await ref.watch(invoiceRepositoryProvider).payments(
-        PagedRequest(
-          page: args.page,
-          limit: args.limit,
-          sortOrder: 'DESC',
-          extra: {'supplierId': args.supplierId},
-        ),
-      );
+      final result = await ref
+          .watch(invoiceRepositoryProvider)
+          .payments(
+            PagedRequest(
+              page: args.page,
+              limit: args.limit,
+              sortOrder: 'DESC',
+              extra: {'supplierId': args.supplierId},
+            ),
+          );
       return switch (result) {
         ApiSuccess(:final data) => data,
         ApiFailure(:final error) => throw error,
@@ -282,11 +333,13 @@ final supplierStatementVersionProvider = StateProvider<int>((ref) => 0);
 final supplierStatementProvider = FutureProvider.autoDispose
     .family<SupplierStatement, SupplierStatementArgs>((ref, args) async {
       ref.watch(supplierStatementVersionProvider);
-      final result = await ref.watch(supplierRepositoryProvider).statement(
-        args.supplierId,
-        fromDate: args.fromDate,
-        toDate: args.toDate,
-      );
+      final result = await ref
+          .watch(supplierRepositoryProvider)
+          .statement(
+            args.supplierId,
+            fromDate: args.fromDate,
+            toDate: args.toDate,
+          );
       return switch (result) {
         ApiSuccess(:final data) => data,
         ApiFailure(:final error) => throw error,

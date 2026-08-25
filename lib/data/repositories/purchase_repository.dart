@@ -100,9 +100,48 @@ class PurchaseRepository {
         'invoice_no': invoiceNo.trim(),
       if (remarks != null && remarks.trim().isNotEmpty)
         'remarks': remarks.trim(),
-      if (expiryDate != null) 'expiry_date': expiryDate,
+      'expiry_date': ?expiryDate,
     },
     parse: (Object? json) => Purchase.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// Record ONE purchase containing MULTIPLE items (`POST /purchases`
+  /// with an `items` array). The server creates one `purchases` row per
+  /// line — each with its own doc no, batch, movement, ledger and GL
+  /// entries — atomically in one transaction, and returns the created
+  /// rows as a **bare array** (order matches [items]). Header fields
+  /// apply to every line.
+  Future<ApiResult<List<Purchase>>> createMulti({
+    required int warehouseId,
+    required String purchaseDate,
+    int? supplierId,
+    String? invoiceNo,
+    String? remarks,
+    required List<({int itemId, num quantity, num unitCost, String? expiryDate})> items,
+  }) => _api.postRaw<List<Purchase>>(
+    ApiEndpoints.purchases,
+    body: {
+      'warehouse_id': warehouseId,
+      'purchase_date': purchaseDate,
+      'supplier_id': ?supplierId,
+      if (invoiceNo != null && invoiceNo.trim().isNotEmpty)
+        'invoice_no': invoiceNo.trim(),
+      if (remarks != null && remarks.trim().isNotEmpty)
+        'remarks': remarks.trim(),
+      'items': [
+        for (final line in items)
+          {
+            'item_id': line.itemId,
+            'quantity': line.quantity,
+            'unit_cost': line.unitCost,
+            'expiry_date': ?line.expiryDate,
+          },
+      ],
+    },
+    parse: (Object? json) => [
+      for (final row in json! as List<dynamic>)
+        Purchase.fromJson(row as Map<String, dynamic>),
+    ],
   );
 
   /// One page of purchase-return headers (`GET /purchase-returns`) —

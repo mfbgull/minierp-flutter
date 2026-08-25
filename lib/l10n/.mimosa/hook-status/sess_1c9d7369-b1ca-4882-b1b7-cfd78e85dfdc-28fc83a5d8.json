@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-08-24T16:23:41.113Z",
+  "sessionId": "sess_1c9d7369-b1ca-4882-b1b7-cfd78e85dfdc",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "en.arb",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 21,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

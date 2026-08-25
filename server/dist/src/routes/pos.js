@@ -12,4 +12,3 @@ router.use(auth_1.authenticateToken);
 router.post('/sale', (0, requirePermission_1.requirePermission)('pos', 'create'), posController_1.default.createPOSSale);
 router.get('/transactions', (0, requirePermission_1.requirePermission)('pos', 'read'), posController_1.default.getPOSTransactions);
 exports.default = router;
-//# sourceMappingURL=pos.js.map

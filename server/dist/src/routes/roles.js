@@ -18,4 +18,3 @@ router.put('/:id', (0, requirePermission_1.requirePermission)('roles', 'update')
 router.put('/:id/permissions', (0, requirePermission_1.requirePermission)('roles', 'update'), rolesController_1.default.updateRolePermissions);
 router.delete('/:id', (0, requirePermission_1.requirePermission)('roles', 'delete'), rolesController_1.default.deleteRole);
 exports.default = router;
-//# sourceMappingURL=roles.js.map

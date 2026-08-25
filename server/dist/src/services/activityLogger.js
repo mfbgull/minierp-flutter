@@ -89,6 +89,7 @@ var ActionType;
     // Settings & System
     ActionType["SETTING_UPDATE"] = "SETTING_UPDATE";
     ActionType["BACKUP_CREATE"] = "BACKUP_CREATE";
+    ActionType["BACKUP_DELETE"] = "BACKUP_DELETE";
     ActionType["DATA_IMPORT"] = "DATA_IMPORT";
     ActionType["DATA_EXPORT"] = "DATA_EXPORT";
     ActionType["SYSTEM_CLEANUP"] = "SYSTEM_CLEANUP";
@@ -368,4 +369,3 @@ function logActivityInTx(db, entry) {
     ) VALUES (?, ?, ?, ?, ?, 'INFO', ?, ?, ?, ?)
   `).run(entry.userId ?? null, entry.action, entry.entityType, entry.entityId ?? null, entry.description, cap(entry.oldValue), cap(entry.newValue), entry.reason ?? null, entry.correlationId ?? null);
 }
-//# sourceMappingURL=activityLogger.js.map

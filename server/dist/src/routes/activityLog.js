@@ -35,4 +35,3 @@ router.get('/export', (0, requirePermission_1.requirePermission)('activity_log',
 // Cleanup old logs (admin only)
 router.post('/cleanup', (0, requirePermission_1.requirePermission)('activity_log', 'purge'), activityLogController_1.default.cleanupLogs);
 exports.default = router;
-//# sourceMappingURL=activityLog.js.map

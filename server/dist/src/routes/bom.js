@@ -18,4 +18,3 @@ router.put('/:id', (0, requirePermission_1.requirePermission)('bom', 'update'), 
 router.patch('/:id/toggle-active', (0, requirePermission_1.requirePermission)('bom', 'update'), bomController_1.toggleBOMActive);
 router.delete('/:id', (0, requirePermission_1.requirePermission)('bom', 'delete'), bomController_1.deleteBOM);
 exports.default = router;
-//# sourceMappingURL=bom.js.map

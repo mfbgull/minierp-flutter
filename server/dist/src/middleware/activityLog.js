@@ -96,4 +96,3 @@ function activityLogBackstop(req, res, next) {
     });
     next();
 }
-//# sourceMappingURL=activityLog.js.map

@@ -523,4 +523,3 @@ class PurchaseReturnModel {
     }
 }
 exports.default = PurchaseReturnModel;
-//# sourceMappingURL=PurchaseReturn.js.map

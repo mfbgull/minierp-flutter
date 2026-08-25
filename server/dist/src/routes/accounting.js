@@ -54,4 +54,3 @@ router.post('/periods', (0, requirePermission_1.requirePermission)('accounting',
 // POST /api/accounting/periods/:id/close  (sensitive operation)
 router.post('/periods/:id/close', (0, requirePermission_1.requirePermission)('accounting', 'update'), rateLimiter_1.sensitiveOperationLimiter, accountingController_1.default.closePeriod);
 exports.default = router;
-//# sourceMappingURL=accounting.js.map

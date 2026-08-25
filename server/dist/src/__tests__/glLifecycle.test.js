@@ -170,4 +170,3 @@ describe('GL lifecycle: update/delete voiding', () => {
         expect(activeDebit).toBeCloseTo(50, 2);
     });
 });
-//# sourceMappingURL=glLifecycle.test.js.map

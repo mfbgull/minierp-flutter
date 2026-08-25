@@ -81,6 +81,12 @@ class CustomerOverviewTab extends ConsumerWidget {
                 valueColor: metrics.totalOutstanding > 0
                     ? scheme.error
                     : null,
+                // A negative ledger net is money we owe the customer
+                // (return credits / advances) — surface it next to the
+                // outstanding figure so the two never look contradictory.
+                footer: metrics.currentBalance < 0
+                    ? '${l10n.customersCredit}: ${Formatters.currency(-metrics.currentBalance)}'
+                    : null,
               ),
               const SizedBox(width: 12),
               _SummaryCard(
@@ -259,12 +265,16 @@ class _SummaryCard extends StatelessWidget {
     required this.value,
     required this.icon,
     this.valueColor,
+    this.footer,
   });
 
   final String label;
   final String value;
   final IconData icon;
   final Color? valueColor;
+
+  /// Optional small note under the label (e.g. available credit).
+  final String? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -301,6 +311,17 @@ class _SummaryCard extends StatelessWidget {
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
+              if (footer != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  footer!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ],
           ),
         ),

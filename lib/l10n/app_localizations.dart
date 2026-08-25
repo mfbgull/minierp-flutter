@@ -2930,6 +2930,12 @@ abstract class AppLocalizations {
   /// **'Enter reason for voiding...'**
   String get purchasesVoidreasonplaceholder;
 
+  /// No description provided for @purchasesShowvoided.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Voided'**
+  String get purchasesShowvoided;
+
   /// No description provided for @purchasesReturnvoided.
   ///
   /// In en, this message translates to:
@@ -4555,6 +4561,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Status'**
   String get fieldsStatus;
+
+  /// No description provided for @fieldsType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get fieldsType;
 
   /// No description provided for @fieldsDescription.
   ///
@@ -6302,6 +6314,12 @@ abstract class AppLocalizations {
   /// **'No purchase orders found'**
   String get suppliersNopos;
 
+  /// No description provided for @suppliersNopurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'No purchases found'**
+  String get suppliersNopurchases;
+
   /// No description provided for @suppliersNotes.
   ///
   /// In en, this message translates to:
@@ -6385,6 +6403,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Print Receipt (A4)'**
   String get suppliersPrintreceipta4;
+
+  /// No description provided for @suppliersPurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchases'**
+  String get suppliersPurchases;
 
   /// No description provided for @suppliersRecordpayment.
   ///
@@ -7039,6 +7063,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Contact Person'**
   String get customersContactperson;
+
+  /// No description provided for @customersCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit'**
+  String get customersCredit;
+
+  /// No description provided for @customersCreditAbbrev.
+  ///
+  /// In en, this message translates to:
+  /// **'CR'**
+  String get customersCreditAbbrev;
 
   /// No description provided for @customersCreditlimit.
   ///
@@ -8228,6 +8264,24 @@ abstract class AppLocalizations {
   /// **'Payment No'**
   String get paymentsPaymentno;
 
+  /// No description provided for @paymentsTypein.
+  ///
+  /// In en, this message translates to:
+  /// **'In'**
+  String get paymentsTypein;
+
+  /// No description provided for @paymentsTypeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Out'**
+  String get paymentsTypeout;
+
+  /// No description provided for @paymentsParty.
+  ///
+  /// In en, this message translates to:
+  /// **'Party'**
+  String get paymentsParty;
+
   /// No description provided for @paymentsRecordedsuccess.
   ///
   /// In en, this message translates to:
@@ -9374,6 +9428,84 @@ abstract class AppLocalizations {
   /// **'Select an invoice'**
   String get salesreturnsSelectinvoice;
 
+  /// No description provided for @settingsBackupDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete backup'**
+  String get settingsBackupDeleteFailed;
+
+  /// No description provided for @settingsBackupDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently deletes the backup file from the server. This action cannot be undone.'**
+  String get settingsBackupDeleteMessage;
+
+  /// No description provided for @settingsBackupDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete backup?'**
+  String get settingsBackupDeleteTitle;
+
+  /// No description provided for @settingsBackupDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup deleted'**
+  String get settingsBackupDeleted;
+
+  /// No description provided for @settingsBackupDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to download backup'**
+  String get settingsBackupDownloadFailed;
+
+  /// No description provided for @settingsBackupDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup saved'**
+  String get settingsBackupDownloaded;
+
+  /// No description provided for @settingsBackupEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No backups yet'**
+  String get settingsBackupEmpty;
+
+  /// No description provided for @settingsBackupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup failed'**
+  String get settingsBackupFailed;
+
+  /// No description provided for @settingsBackupFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup files'**
+  String get settingsBackupFiles;
+
+  /// No description provided for @settingsBackupLast.
+  ///
+  /// In en, this message translates to:
+  /// **'Last backup'**
+  String get settingsBackupLast;
+
+  /// No description provided for @settingsBackupNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get settingsBackupNever;
+
+  /// No description provided for @settingsBackupNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Back Up Now'**
+  String get settingsBackupNow;
+
+  /// No description provided for @settingsBackupSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup created'**
+  String get settingsBackupSuccess;
+
   /// No description provided for @settingsEmpty.
   ///
   /// In en, this message translates to:
@@ -9469,6 +9601,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Settings saved'**
   String get settingsSaved;
+
+  /// No description provided for @settingsSectionBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Database Backup'**
+  String get settingsSectionBackup;
 
   /// No description provided for @settingsSectionCompany.
   ///

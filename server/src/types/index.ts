@@ -76,6 +76,9 @@ export interface InvoiceItemDTO {
   discount_type?: 'flat' | 'percentage';
   discount_value?: number;
   warehouse_id?: number;
+  /** Loose amount-driven lines: the entered bill amount is the line's
+   * gross base (sales form flip model §5.2); otherwise qty × unit_price. */
+  amount?: number;
 }
 
 export interface PaymentDTO {

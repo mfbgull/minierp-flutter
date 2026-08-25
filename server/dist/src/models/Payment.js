@@ -476,4 +476,3 @@ class PaymentModel {
 }
 exports.PaymentModel = PaymentModel;
 exports.default = PaymentModel;
-//# sourceMappingURL=Payment.js.map

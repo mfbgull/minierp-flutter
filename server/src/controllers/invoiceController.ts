@@ -12,7 +12,7 @@ import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import {
   parseCurrency,
   subtractCurrency,
-  computeInvoiceTotal,
+  computeInvoiceGrandTotal,
 } from '../utils/currency';
 
 /**
@@ -190,9 +190,15 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
     // === ENTIRE operation inside one transaction ===
     const transaction = db.transaction(() => {
       // ACC-18 interim: the server is authoritative over invoice money.
-      // Header total = Σ of server-computed line amounts; a client-supplied
-      // total differing by more than 0.01 is rejected with nothing written.
-      const computedTotal = computeInvoiceTotal(items);
+      // Header total = Σ of server-computed line amounts minus an
+      // invoice-scope header discount — the same grand total the form
+      // displays. A client-supplied total differing by more than 0.01
+      // is rejected with nothing written.
+      const computedTotal = computeInvoiceGrandTotal(items, {
+        discount_scope,
+        discount_type,
+        discount_value,
+      });
       const totalAmountNum = computedTotal;
       if (total_amount !== undefined && total_amount !== null) {
         const clientTotal = parseCurrency(total_amount);
@@ -261,7 +267,8 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
         unit_price: item.unit_price,
         tax_rate: item.tax_rate,
         discount_type: item.discount_type,
-        discount_value: item.discount_value
+        discount_value: item.discount_value,
+        amount: item.amount
       });
 
       // FIFO consumption from oldest batches
@@ -465,7 +472,11 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         if (!originalInvoice) throw new Error('Invoice not found');
 
         // ACC-18 interim: server-authoritative totals on update too.
-        const computedTotal = computeInvoiceTotal(items);
+        const computedTotal = computeInvoiceGrandTotal(items, {
+          discount_scope,
+          discount_type,
+          discount_value,
+        });
         const totalAmountNum = computedTotal;
         if (total_amount !== undefined && total_amount !== null) {
             const clientTotal = parseCurrency(total_amount);
@@ -614,7 +625,8 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
                 unit_price: item.unit_price,
                 tax_rate: item.tax_rate,
                 discount_type: item.discount_type,
-                discount_value: item.discount_value
+                discount_value: item.discount_value,
+                amount: item.amount
             });
 
             // FIX #3: Stock validation with warning

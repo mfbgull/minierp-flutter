@@ -39,4 +39,3 @@ describe('migration replay (task 2.6)', () => {
         fs_1.default.rmSync(dir, { recursive: true, force: true });
     });
 });
-//# sourceMappingURL=migrationReplay.test.js.map

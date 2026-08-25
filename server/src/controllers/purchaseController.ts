@@ -7,6 +7,41 @@ import logger from '../utils/logger';
 
 function recordPurchase(req: AuthRequest, res: Response): void {
   try {
+    // Multi-item payload (Record Purchase form's line items): one
+    // transaction creates one purchases row per item. The flat
+    // single-item body remains the legacy path.
+    const items = req.body?.items;
+    if (Array.isArray(items)) {
+      if (items.length === 0) {
+        res.status(400).json({ error: 'At least one purchase item is required' });
+        return;
+      }
+      if (!req.body.warehouse_id || !req.body.purchase_date) {
+        res.status(400).json({ error: 'Warehouse and purchase date are required' });
+        return;
+      }
+      for (const line of items) {
+        if (!line?.item_id || !line.quantity || line.unit_cost === undefined) {
+          res.status(400).json({
+            error: 'Each purchase item needs item_id, quantity, and unit cost'
+          });
+          return;
+        }
+        if (Number(line.quantity) <= 0) {
+          res.status(400).json({ error: 'Quantity must be positive' });
+          return;
+        }
+        if (Number(line.unit_cost) < 0) {
+          res.status(400).json({ error: 'Unit cost cannot be negative' });
+          return;
+        }
+      }
+
+      const created = Purchase.recordPurchaseMulti(req.body, req.user!.id, db);
+      res.status(201).json(created);
+      return;
+    }
+
     const {
       item_id,
       warehouse_id,
@@ -49,18 +84,22 @@ function getPurchases(req: Request, res: Response): void {
     const endDateParam = getQueryParam(req.query.end_date);
     const itemIdParam = getQueryParam(req.query.item_id);
     const warehouseIdParam = getQueryParam(req.query.warehouse_id);
+    const supplierIdParam = getQueryParam(req.query.supplier_id);
     const supplierNameParam = getQueryParam(req.query.supplier_name);
     const search = getQueryParam(req.query.search);
     const sortBy = getQueryParam(req.query.sortBy);
     const sortOrder = getQueryParam(req.query.sortOrder);
+    const includeVoidedParam = getQueryParam(req.query.include_voided);
 
     const filters = {
       start_date: startDateParam as string | undefined,
       end_date: endDateParam as string | undefined,
       item_id: itemIdParam ? Number(itemIdParam) : undefined,
       warehouse_id: warehouseIdParam ? Number(warehouseIdParam) : undefined,
+      supplier_id: supplierIdParam ? Number(supplierIdParam) : undefined,
       supplier_name: supplierNameParam as string | undefined,
       search: search || undefined,
+      include_voided: includeVoidedParam === '1' || includeVoidedParam === 'true',
       sortBy: sortBy || undefined,
       sortOrder: sortOrder || undefined,
       page,

@@ -56,6 +56,11 @@ function createFixture() {
     if (!smCols.some((c) => c.name === 'journal_entry_id')) {
         db.exec('ALTER TABLE stock_movements ADD COLUMN journal_entry_id INTEGER REFERENCES journal_entries(id)');
     }
+    // recordPurchase writes expiry at boot-added columns only.
+    const sbCols = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all();
+    if (!sbCols.some((c) => c.name === 'expiry_date')) {
+        db.exec('ALTER TABLE stock_batches ADD COLUMN expiry_date DATE');
+    }
     db.pragma('foreign_keys = ON');
     db.prepare(`INSERT INTO users (username,email,password_hash,full_name,role,is_active)
               VALUES ('u','e@x.c','h','U','admin',1)`).run();
@@ -160,4 +165,116 @@ describe('task 3.6: purchase void lifecycle', () => {
         db.close();
     });
 });
-//# sourceMappingURL=purchaseVoid.test.js.map
+describe('purchases grid: voided filter + multi-item recording', () => {
+    function seedItem(db, itemId, name) {
+        db.prepare(`INSERT INTO items (id, item_code, item_name, unit_of_measure, standard_cost, is_purchased, is_active)
+                VALUES (?, ?, ?, 'Nos', 10, 1, 1)`).run(itemId, `IT-${itemId}`, name);
+    }
+    function ensureWarehouse(db) {
+        if (!db.prepare('SELECT id FROM warehouses WHERE id = 1').get()) {
+            db.prepare(`INSERT INTO warehouses (id, warehouse_code, warehouse_name, is_active)
+                  VALUES (1, 'W-GRID', 'Grid WH', 1)`).run();
+        }
+    }
+    it('excludes voided purchases from getAll unless include_voided is set', () => {
+        const db = createFixture();
+        const activeId = seedPurchase(db, { quantity: 5 });
+        const voidedId = seedPurchase(db, { quantity: 7 });
+        // Stamp void directly — the full void() reversal flow is covered by
+        // models.test.ts / api.integration.test.ts; here only the list filter
+        // matters.
+        db.prepare(`UPDATE purchases SET voided_at = datetime('now'), void_reason = 'grid test' WHERE id = ?`)
+            .run(voidedId);
+        const def = Purchase_1.default.getAll({}, db);
+        expect(def.rows.map((r) => r.id)).toEqual([activeId]);
+        expect(def.total).toBe(1);
+        const incl = Purchase_1.default.getAll({ include_voided: true }, db);
+        expect(incl.total).toBe(2);
+        expect(incl.rows.map((r) => r.id).sort()).toEqual([activeId, voidedId].sort());
+        db.close();
+    });
+    it('records a multi-item purchase atomically — one row per item with side effects', () => {
+        const db = createFixture();
+        ensureWarehouse(db);
+        const itemA = 8101;
+        const itemB = 8102;
+        seedItem(db, itemA, 'Multi A');
+        seedItem(db, itemB, 'Multi B');
+        const created = Purchase_1.default.recordPurchaseMulti({
+            warehouse_id: 1,
+            purchase_date: '2026-08-20',
+            invoice_no: 'INV-MULTI-1',
+            remarks: 'one delivery',
+            items: [
+                { item_id: itemA, quantity: 4, unit_cost: 12 },
+                { item_id: itemB, quantity: 2, unit_cost: 30 },
+            ],
+        }, 1, db);
+        expect(created).toHaveLength(2);
+        expect(created[0].purchase_no).not.toBe(created[1].purchase_no);
+        for (const row of created) {
+            expect(row.invoice_no).toBe('INV-MULTI-1');
+            expect(row.remarks).toBe('one delivery');
+        }
+        expect(created[0].total_cost).toBe(48);
+        expect(created[1].total_cost).toBe(60);
+        const ids = created.map((c) => c.id);
+        const placeholders = ids.map(() => '?').join(',');
+        const batches = db.prepare(`SELECT COUNT(*) n FROM stock_batches WHERE source_type='PURCHASE' AND source_id IN (${placeholders})`).get(...ids);
+        expect(batches.n).toBe(2);
+        const movements = db.prepare(`SELECT COUNT(*) n, COALESCE(SUM(financial_posted),0) posted FROM stock_movements
+       WHERE movement_type='PURCHASE' AND batch_id IS NOT NULL AND reference_doctype='Purchase'
+         AND reference_docno IN (${created.map(() => '?').join(',')})`).get(...created.map((c) => c.purchase_no));
+        expect(movements.n).toBe(2);
+        expect(movements.posted).toBe(2);
+        // One balanced Dr Inventory / Cr AP entry per purchase row.
+        for (const row of created) {
+            const lines = db.prepare(`SELECT debit, credit FROM journal_lines WHERE reference_type='PURCHASE' AND reference_id=? AND voided=0`).all(row.id);
+            expect(lines.length).toBeGreaterThanOrEqual(2);
+            const debits = lines.reduce((s, l) => s + Number(l.debit), 0);
+            const credits = lines.reduce((s, l) => s + Number(l.credit), 0);
+            expect(debits).toBeCloseTo(row.total_cost, 2);
+            expect(debits).toBeCloseTo(credits, 2);
+        }
+        // current_stock refreshed per line's item.
+        const stockA = db.prepare('SELECT current_stock FROM items WHERE id = ?').get(itemA);
+        const stockB = db.prepare('SELECT current_stock FROM items WHERE id = ?').get(itemB);
+        expect(Number(stockA.current_stock)).toBe(4);
+        expect(Number(stockB.current_stock)).toBe(2);
+        db.close();
+    });
+    it('rolls back ALL lines when one line fails mid-transaction', () => {
+        const db = createFixture();
+        ensureWarehouse(db);
+        const goodItem = 8201;
+        seedItem(db, goodItem, 'Rollback Good');
+        const before = db.prepare('SELECT COUNT(*) n FROM purchases').get();
+        expect(() => Purchase_1.default.recordPurchaseMulti({
+            warehouse_id: 1,
+            purchase_date: '2026-08-20',
+            items: [
+                { item_id: goodItem, quantity: 1, unit_cost: 5 },
+                { item_id: 999999, quantity: 1, unit_cost: 5 }, // FK violation mid-batch
+            ],
+        }, 1, db)).toThrow();
+        const after = db.prepare('SELECT COUNT(*) n FROM purchases').get();
+        expect(after.n).toBe(before.n);
+        db.close();
+    });
+    it('legacy single-item payload still records exactly one purchase', () => {
+        const db = createFixture();
+        ensureWarehouse(db);
+        const item = 8301;
+        seedItem(db, item, 'Legacy Single');
+        const purchase = Purchase_1.default.recordPurchase({
+            item_id: item,
+            warehouse_id: 1,
+            quantity: 3,
+            unit_cost: 9,
+            purchase_date: '2026-08-21',
+        }, 1, db);
+        expect(purchase.total_cost).toBe(27);
+        expect(Purchase_1.default.getAll({}, db).total).toBe(1);
+        db.close();
+    });
+});

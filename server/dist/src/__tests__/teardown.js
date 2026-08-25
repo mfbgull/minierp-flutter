@@ -13,4 +13,3 @@ async function globalTeardown() {
     // Close all Winston transports to release file handles
     logger_1.default.close();
 }
-//# sourceMappingURL=teardown.js.map

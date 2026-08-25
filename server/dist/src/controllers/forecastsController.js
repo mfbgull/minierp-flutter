@@ -297,4 +297,3 @@ exports.default = {
     getExport,
     getRuns
 };
-//# sourceMappingURL=forecastsController.js.map

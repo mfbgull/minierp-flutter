@@ -274,6 +274,59 @@ describe('ledger integrity and reconciliation', () => {
         const header = database_1.default.prepare('SELECT total_amount FROM invoices WHERE id = ?').get(res.body.id);
         expect(Number(header.total_amount)).toBeCloseTo(189, 2);
     });
+    it('invoice-scope header discount nets into the accepted/stored total', async () => {
+        counter += 1;
+        // Form contract: gross 200, invoice-scope flat discount 50 → grand
+        // total 150. Before computeInvoiceGrandTotal this was rejected as a
+        // mismatch because the header discount was ignored.
+        const res = await (0, supertest_1.default)(app_1.default).post('/api/invoices')
+            .set('Cookie', authCookie)
+            .send({
+            invoice_no: `INV-LGR-INVDC-${counter}`,
+            customer_id: customerId,
+            invoice_date: '2026-07-13',
+            due_date: '2026-07-13',
+            status: 'Unpaid',
+            discount_scope: 'invoice',
+            discount_type: 'flat',
+            discount_value: 50,
+            total_amount: 150,
+            items: [{
+                    item_id: itemId,
+                    quantity: 2,
+                    unit_price: 100,
+                    warehouse_id: warehouseId,
+                }],
+        });
+        expect(res.status).toBe(201);
+        const header = database_1.default.prepare('SELECT total_amount FROM invoices WHERE id = ?').get(res.body.id);
+        expect(Number(header.total_amount)).toBeCloseTo(150, 2);
+    });
+    it('loose amount-driven line bills the entered amount, not qty × price', async () => {
+        counter += 1;
+        // Flip-model loose line (§5.2): the user billed a flat 60 for
+        // 1.75 units — qty × price would disagree by design.
+        const res = await (0, supertest_1.default)(app_1.default).post('/api/invoices')
+            .set('Cookie', authCookie)
+            .send({
+            invoice_no: `INV-LGR-LOOSE-${counter}`,
+            customer_id: customerId,
+            invoice_date: '2026-07-14',
+            due_date: '2026-07-14',
+            status: 'Unpaid',
+            total_amount: 60,
+            items: [{
+                    item_id: itemId,
+                    quantity: 1.75,
+                    unit_price: 33.333,
+                    amount: 60,
+                    warehouse_id: warehouseId,
+                }],
+        });
+        expect(res.status).toBe(201);
+        const line = database_1.default.prepare('SELECT amount FROM invoice_items WHERE invoice_id = ?').get(res.body.id);
+        expect(Number(line.amount)).toBeCloseTo(60, 2);
+    });
     // ------------------------------------------------------------------
     // 8.2 Reconciliation report
     // ------------------------------------------------------------------
@@ -293,4 +346,3 @@ describe('ledger integrity and reconciliation', () => {
         expect(Math.abs(inventory.delta)).toBeLessThanOrEqual(0.01);
     });
 });
-//# sourceMappingURL=ledgerIntegrity.test.js.map

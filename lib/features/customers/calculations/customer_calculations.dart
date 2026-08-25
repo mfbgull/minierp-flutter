@@ -106,9 +106,16 @@ num calculateCurrentBalance(num totalDebit, num totalCredit) {
   return totalDebit - totalCredit;
 }
 
-/// Total invoiced amount from invoices.
+/// Total invoiced amount from invoices, net of returns.
+/// A fully returned invoice contributes nothing; a partially returned one
+/// contributes `total - returned + return_fee` (the return fee remains
+/// chargeable, mirroring the server's invoice-balance formula).
 num calculateTotalInvoiced(List<Invoice> invoices) {
-  return invoices.fold<num>(0, (sum, inv) => sum + inv.totalAmount);
+  return invoices.fold<num>(0, (sum, inv) {
+    final net =
+        inv.totalAmount - inv.returnedAmount + (inv.returnFee ?? 0);
+    return sum + (net > 0 ? net : 0);
+  });
 }
 
 /// Total paid amount from invoices.

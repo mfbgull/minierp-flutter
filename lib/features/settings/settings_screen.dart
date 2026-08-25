@@ -6,21 +6,34 @@
 // `*_api_key` belong to the Integrations module and are hidden here);
 // unknown keys fall through to an "Other" card so nothing is ever lost.
 //
-// Each card saves its changed fields atomically through the bulk endpoint
-// and marks itself with an "unsaved" chip while any field differs from the
-// loaded server values. Document-numbering counters are editable but
-// flagged as server-managed.
+// Every section is a collapsible card (ExpansionTile) that starts
+// collapsed. Each key-section saves its changed fields atomically
+// through the bulk endpoint and marks itself with an "unsaved" chip
+// while any field differs from the loaded server values.
+// Document-numbering counters are editable but flagged as server-managed.
+// The Database Backup card talks to `GET/POST/DELETE /admin/backup`
+// (server/src/routes/adminBackup.ts): status, on-demand backup,
+// per-file download / delete.
 
+import 'dart:io' show File;
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/utils/date_range_math.dart' show WeekStart;
+import '../../data/models/backup.dart' show BackupFile, BackupStatus;
 import '../../data/models/setting.dart' show AppSetting;
-import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
+import '../../data/repositories/api_result.dart'
+    show ApiError, ApiFailure, ApiResult, ApiSuccess;
+import '../../data/repositories/backup_repository.dart'
+    show backupRepositoryProvider;
 import '../../data/repositories/settings_repository.dart'
     show settingsRepositoryProvider;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/confirm_dialog.dart' show showConfirmDialog;
 import '../../widgets/screen_error_panel.dart';
 import '../preferences/preference_providers.dart'
     show saveDefaultRange, saveWeekStart, weekStartProvider;
@@ -102,6 +115,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Map<String, TextEditingController> _controllers = {};
   Map<String, String> _serverTruth = {};
   final Set<String> _savingSections = {};
+
+  // Database Backup card state. `null` means "never loaded" — the list
+  // is fetched lazily on first expansion of the card.
+  ApiResult<BackupStatus>? _backups;
+  bool _backupsLoading = false;
+  bool _creatingBackup = false;
+  final Set<String> _downloadingFiles = {};
+  final Set<String> _deletingFiles = {};
+
+  BackupStatus? get _backupData => switch (_backups) {
+    ApiSuccess<BackupStatus>(:final data) => data,
+    _ => null,
+  };
 
   @override
   void dispose() {
@@ -327,6 +353,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         _dateRangeSection(l10n),
                         const SizedBox(height: 16),
+                        _backupSection(l10n),
+                        const SizedBox(height: 16),
                         LayoutBuilder(
                           builder: (context, constraints) {
                             final w = constraints.maxWidth;
@@ -358,6 +386,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  /// Collapsible key-section card — starts collapsed; the unsaved chip
+  /// stays visible in the header while collapsed, fields + Save button
+  /// live in the expanded children.
   Widget _sectionCard(AppLocalizations l10n, _Section section) {
     final scheme = Theme.of(context).colorScheme;
     final dirty = _sectionDirty(section);
@@ -365,64 +396,68 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Card(
       elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppBorderRadius.mdRadius,
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        leading: Icon(section.icon, size: 20, color: scheme.primary),
+        initiallyExpanded: false,
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Row(
           children: [
-            Row(
-              children: [
-                Icon(section.icon, size: 20, color: scheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _sectionTitle(l10n, section),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                if (dirty && !saving)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: scheme.tertiaryContainer,
-                      borderRadius: AppBorderRadius.badge,
-                    ),
-                    child: Text(
-                      l10n.settingsUnsaved,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onTertiaryContainer,
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 8),
-                FilledButton.tonalIcon(
-                  onPressed: saving || !dirty ? null : () => _saveSection(section),
-                  icon: saving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save_outlined, size: 18),
-                  label: Text(l10n.commonSave),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            for (final key in section.keys) ...[
-              _field(
-                key: key,
-                helper: _isNumberingKey(key)
-                    ? l10n.settingsNumberingHelper
-                    : null,
+            Expanded(
+              child: Text(
+                _sectionTitle(l10n, section),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: 12),
-            ],
+            ),
+            if (dirty && !saving)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: scheme.tertiaryContainer,
+                  borderRadius: AppBorderRadius.badge,
+                ),
+                child: Text(
+                  l10n.settingsUnsaved,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onTertiaryContainer,
+                  ),
+                ),
+              ),
           ],
         ),
+        children: [
+          for (final key in section.keys) ...[
+            _field(
+              key: key,
+              helper: _isNumberingKey(key)
+                  ? l10n.settingsNumberingHelper
+                  : null,
+            ),
+            const SizedBox(height: 12),
+          ],
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.tonalIcon(
+              onPressed:
+                  saving || !dirty ? null : () => _saveSection(section),
+              icon: saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined, size: 18),
+              label: Text(l10n.commonSave),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -457,102 +492,392 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Card(
       elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.date_range_outlined, size: 20, color: scheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    l10n.settingsSectionDate,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Week starts on
-            Text(
+      shape: RoundedRectangleBorder(
+        borderRadius: AppBorderRadius.mdRadius,
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        leading: Icon(Icons.date_range_outlined, size: 20, color: scheme.primary),
+        initiallyExpanded: false,
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Text(
+          l10n.settingsSectionDate,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        children: [
+          // Week starts on
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
               l10n.drpWeekStartsOn,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const SizedBox(height: 8),
-            SegmentedButton<WeekStart>(
-              segments: [
-                ButtonSegment(
-                  value: WeekStart.monday,
-                  label: Text(l10n.drpWeekdayMonday),
+          ),
+          const SizedBox(height: 8),
+          SegmentedButton<WeekStart>(
+            segments: [
+              ButtonSegment(
+                value: WeekStart.monday,
+                label: Text(l10n.drpWeekdayMonday),
+              ),
+              ButtonSegment(
+                value: WeekStart.saturday,
+                label: Text(l10n.drpWeekdaySaturday),
+              ),
+              ButtonSegment(
+                value: WeekStart.sunday,
+                label: Text(l10n.drpWeekdaySunday),
+              ),
+            ],
+            selected: {currentWeekStart},
+            onSelectionChanged: (selection) {
+              final value = selection.first;
+              ref.read(weekStartProvider.notifier).state = value;
+              saveWeekStart(ref, value).then((error) {
+                if (!mounted || error == null) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(l10n.drpWeekStartFailed)),
+                );
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+          // Set current range as default — captures the active range
+          // from the dashboard / reports and persists it as the default
+          // for next app open (spec §6.2).
+          Row(
+            children: [
+              Icon(
+                Icons.bookmark_outline,
+                size: 20,
+                color: scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l10n.drpSetDefault,
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
-                ButtonSegment(
-                  value: WeekStart.saturday,
-                  label: Text(l10n.drpWeekdaySaturday),
-                ),
-                ButtonSegment(
-                  value: WeekStart.sunday,
-                  label: Text(l10n.drpWeekdaySunday),
-                ),
-              ],
-              selected: {currentWeekStart},
-              onSelectionChanged: (selection) {
-                final value = selection.first;
-                ref.read(weekStartProvider.notifier).state = value;
-                saveWeekStart(ref, value).then((error) {
-                  if (!mounted || error == null) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.drpWeekStartFailed)),
-                  );
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            // Set current range as default — captures the active range
-            // from the dashboard / reports and persists it as the default
-            // for next app open (spec §6.2).
-            Row(
-              children: [
-                Icon(
-                  Icons.bookmark_outline,
-                  size: 20,
-                  color: scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    l10n.drpSetDefault,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-                FilledButton.tonalIcon(
-                  onPressed: !hasActiveRange
-                      ? null
-                      : () async {
-                          final error = await saveDefaultRange(
-                            ref,
-                            (from: fromDate, to: toDate),
-                          );
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                error == null
-                                    ? l10n.drpDefaultSet
-                                    : l10n.drpDefaultFailed,
-                              ),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: !hasActiveRange
+                    ? null
+                    : () async {
+                        final error = await saveDefaultRange(
+                          ref,
+                          (from: fromDate, to: toDate),
+                        );
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              error == null
+                                  ? l10n.drpDefaultSet
+                                  : l10n.drpDefaultFailed,
                             ),
-                          );
-                        },
-                  icon: const Icon(Icons.bookmark_add_outlined, size: 18),
-                  label: Text(l10n.drpSetDefault),
-                ),
-              ],
-            ),
-          ],
-        ),
+                          ),
+                        );
+                      },
+                icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                label: Text(l10n.drpSetDefault),
+              ),
+            ],
+          ),
+        ],
       ),
     );
+  }
+
+  // ── Database Backup section (/admin/backup) ──────────────────────────
+  Widget _backupSection(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppBorderRadius.mdRadius,
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        leading: Icon(Icons.backup_outlined, size: 20, color: scheme.primary),
+        initiallyExpanded: false,
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Text(
+          l10n.settingsSectionBackup,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        onExpansionChanged: (expanded) {
+          if (expanded && _backups == null) _loadBackups();
+        },
+        children: [
+          _backupStatusRow(l10n),
+          const SizedBox(height: 12),
+          _createBackupRow(l10n),
+          const SizedBox(height: 12),
+          _backupFilesList(l10n),
+        ],
+      ),
+    );
+  }
+
+  Widget _backupStatusRow(AppLocalizations l10n) {
+    final status = _backupData;
+    final lastAt = status?.lastBackupAt;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            '${l10n.settingsBackupLast}: ${lastAt == null ? l10n.settingsBackupNever : _formatDateTime(lastAt)}',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
+        IconButton(
+          tooltip: l10n.commonRefresh,
+          icon: _backupsLoading && status != null
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh, size: 20),
+          onPressed: _backupsLoading ? null : _loadBackups,
+        ),
+      ],
+    );
+  }
+
+  Widget _createBackupRow(AppLocalizations l10n) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: FilledButton.tonalIcon(
+        onPressed: _creatingBackup ? null : _createBackup,
+        icon: _creatingBackup
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.backup_outlined, size: 18),
+        label: Text(l10n.settingsBackupNow),
+      ),
+    );
+  }
+
+  Widget _backupFilesList(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    final status = _backupData;
+
+    if (_backupsLoading && status == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final error = switch (_backups) {
+      ApiFailure(:final error) => error,
+      _ => null,
+    };
+    if (status == null && error != null) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              error.message.isEmpty ? l10n.settingsBackupFailed : error.message,
+              style: TextStyle(color: scheme.error),
+            ),
+          ),
+          TextButton(
+            onPressed: _backupsLoading ? null : _loadBackups,
+            child: Text(l10n.commonRefresh),
+          ),
+        ],
+      );
+    }
+    final files = status?.backups ?? const <BackupFile>[];
+    if (files.isEmpty) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          l10n.settingsBackupEmpty,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            l10n.settingsBackupFiles,
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+        ),
+        const SizedBox(height: 4),
+        for (final file in files) _backupFileRow(l10n, file),
+      ],
+    );
+  }
+
+  /// One backup file row — auxiliary list inside a card, not a primary
+  /// data grid, so no PlutoGrid here.
+  Widget _backupFileRow(AppLocalizations l10n, BackupFile file) {
+    final scheme = Theme.of(context).colorScheme;
+    final downloading = _downloadingFiles.contains(file.name);
+    final deleting = _deletingFiles.contains(file.name);
+    final busy = downloading || deleting;
+
+    Widget actionIcon(IconData icon, bool spinning) => spinning
+        ? const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : Icon(icon, size: 20);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(Icons.description_outlined,
+              size: 18, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  file.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                Text(
+                  '${_formatBytes(file.sizeBytes)} · ${_formatDateTime(file.createdAt)}',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: l10n.commonDownload,
+            onPressed: busy ? null : () => _downloadBackup(file),
+            icon: actionIcon(Icons.download_outlined, downloading),
+          ),
+          IconButton(
+            tooltip: l10n.commonDelete,
+            onPressed: busy ? null : () => _deleteBackup(file),
+            icon: actionIcon(Icons.delete_outline, deleting),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _loadBackups() async {
+    if (_backupsLoading) return;
+    setState(() => _backupsLoading = true);
+    final result = await ref.read(backupRepositoryProvider).status();
+    if (!mounted) return;
+    setState(() {
+      _backups = result;
+      _backupsLoading = false;
+    });
+  }
+
+  Future<void> _createBackup() async {
+    if (_creatingBackup) return;
+    final l10n = AppLocalizations.of(context)!;
+    setState(() => _creatingBackup = true);
+    final result = await ref.read(backupRepositoryProvider).create();
+    if (!mounted) return;
+    setState(() => _creatingBackup = false);
+    _showSnack(switch (result) {
+      ApiSuccess() => l10n.settingsBackupSuccess,
+      ApiFailure(:final error) => error.message.isEmpty
+          ? l10n.settingsBackupFailed
+          : error.message,
+    });
+    if (result is ApiSuccess<String>) _loadBackups();
+  }
+
+  Future<void> _downloadBackup(BackupFile file) async {
+    if (_downloadingFiles.contains(file.name)) return;
+    final l10n = AppLocalizations.of(context)!;
+    setState(() => _downloadingFiles.add(file.name));
+    try {
+      final result =
+          await ref.read(backupRepositoryProvider).downloadBytes(file.name);
+      if (!mounted) return;
+      await result.fold<Future<void>>(onSuccess: (bytes) async {
+        try {
+          final path = await FilePicker.saveFile(
+            dialogTitle: file.name,
+            fileName: file.name,
+            bytes: bytes,
+          );
+          if (path == null || !mounted) return; // dialog cancelled
+          await File(path).writeAsBytes(bytes, flush: true);
+          if (!mounted) return;
+          _showSnack(l10n.settingsBackupDownloaded);
+        } catch (_) {
+          if (mounted) _showSnack(l10n.settingsBackupDownloadFailed);
+        }
+      }, onFailure: (error) async {
+        _showSnack(error.message.isEmpty
+            ? l10n.settingsBackupDownloadFailed
+            : error.message);
+      });
+    } finally {
+      if (mounted) setState(() => _downloadingFiles.remove(file.name));
+    }
+  }
+
+  Future<void> _deleteBackup(BackupFile file) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.settingsBackupDeleteTitle,
+      message: l10n.settingsBackupDeleteMessage,
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    if (_deletingFiles.contains(file.name)) return;
+    setState(() => _deletingFiles.add(file.name));
+    final result = await ref.read(backupRepositoryProvider).delete(file.name);
+    if (!mounted) return;
+    setState(() => _deletingFiles.remove(file.name));
+    _showSnack(switch (result) {
+      ApiSuccess() => l10n.settingsBackupDeleted,
+      ApiFailure(:final error) => error.message.isEmpty
+          ? l10n.settingsBackupDeleteFailed
+          : error.message,
+    });
+    if (result is ApiSuccess<void>) _loadBackups();
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  static String _formatDateTime(String iso) {
+    final parsed = DateTime.tryParse(iso);
+    if (parsed == null) return iso;
+    return DateFormat('yyyy-MM-dd HH:mm').format(parsed);
+  }
+
+  static String _formatBytes(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    if (bytes >= 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '$bytes B';
   }
 }

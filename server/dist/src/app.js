@@ -40,6 +40,7 @@ const dashboard_1 = __importDefault(require("./routes/dashboard"));
 const forecasts_1 = __importDefault(require("./routes/forecasts"));
 const accounting_1 = __importDefault(require("./routes/accounting"));
 const adminHealth_1 = __importDefault(require("./routes/adminHealth"));
+const adminBackup_1 = __importDefault(require("./routes/adminBackup"));
 const customReports_1 = __importDefault(require("./routes/customReports"));
 const preferences_1 = __importDefault(require("./routes/preferences"));
 const search_1 = __importDefault(require("./routes/search"));
@@ -216,6 +217,7 @@ app.use('/api/dashboard', dashboard_1.default);
 app.use('/api/forecasts', forecasts_1.default);
 app.use('/api/accounting', accounting_1.default);
 app.use('/api/admin', adminHealth_1.default);
+app.use('/api/admin', adminBackup_1.default);
 app.use('/api/reports/custom', customReports_1.default);
 app.use('/api/preferences', preferences_1.default);
 app.use('/api/search', search_1.default);
@@ -301,4 +303,3 @@ app.use(requestLogger_1.errorLogger);
 // Global error handler
 app.use(errorHandler_1.default.errorHandler);
 exports.default = app;
-//# sourceMappingURL=app.js.map

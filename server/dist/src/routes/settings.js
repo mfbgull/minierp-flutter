@@ -14,4 +14,3 @@ router.get('/:key', (0, requirePermission_1.requirePermission)('settings', 'read
 router.put('/:key', (0, requirePermission_1.requirePermission)('settings', 'update'), settingsController_1.default.updateSetting);
 router.post('/bulk', (0, requirePermission_1.requirePermission)('settings', 'update'), settingsController_1.default.updateSettings);
 exports.default = router;
-//# sourceMappingURL=settings.js.map

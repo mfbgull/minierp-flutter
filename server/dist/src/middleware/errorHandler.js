@@ -41,4 +41,3 @@ function notFoundHandler(req, res) {
     });
 }
 exports.default = { errorHandler, notFoundHandler };
-//# sourceMappingURL=errorHandler.js.map

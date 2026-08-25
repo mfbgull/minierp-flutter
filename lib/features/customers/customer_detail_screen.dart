@@ -93,6 +93,10 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
     final utilizationDanger = utilization > 90;
     final utilizationWarn = !utilizationDanger && utilization > 75;
 
+    // A negative ledger balance is a customer credit (return credits or
+    // advance payments), not a debt — display it as such (ACC-13).
+    final balanceIsCredit = metrics.currentBalance < 0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -182,9 +186,13 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                   _QuickStat(
                     icon: Icons.account_balance_wallet_outlined,
                     label: l10n.customersBalance,
-                    value: Formatters.currency(metrics.currentBalance),
+                    value: balanceIsCredit
+                        ? '${Formatters.currency(-metrics.currentBalance)} ${l10n.customersCreditAbbrev}'
+                        : Formatters.currency(metrics.currentBalance),
                     color: metrics.currentBalance > 0
                         ? scheme.error
+                        : balanceIsCredit
+                        ? scheme.primary
                         : null,
                   ),
                   _statDivider(scheme),

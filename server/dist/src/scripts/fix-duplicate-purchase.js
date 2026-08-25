@@ -107,4 +107,3 @@ console.log(`Cash outflow total : Rs ${supplierPaid.t + direct.t}`);
 console.log('\nRestart the server — on startup the reconciliation migration folds the');
 console.log('14 real units into a batch so valuation shows them at cost (14 × 500 = 7,000).');
 db.close();
-//# sourceMappingURL=fix-duplicate-purchase.js.map

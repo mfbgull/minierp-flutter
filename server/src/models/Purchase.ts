@@ -22,6 +22,9 @@ interface Purchase {
   batch_no?: string;
   batch_id?: number;
   returned_quantity?: number;
+  voided_at?: string;
+  voided_by?: number;
+  void_reason?: string;
   paid_amount?: number;
   balance_amount?: number;
   created_by: number;
@@ -39,8 +42,11 @@ interface PurchaseFilters {
   end_date?: string;
   item_id?: number;
   warehouse_id?: number;
+  supplier_id?: number;
   supplier_name?: string;
   search?: string;
+  /** Opt-in for the grid's "Show Voided" toggle — default excludes voided. */
+  include_voided?: boolean;
   limit?: number;
   sortBy?: string;
   sortOrder?: string;
@@ -84,6 +90,24 @@ interface CreatePurchaseDTO {
   expiry_date?: string;
 }
 
+// One line of a multi-item direct purchase — the header-level fields
+// (warehouse/date/supplier/invoice/remarks) are shared by all lines.
+interface CreatePurchaseLineDTO {
+  item_id: number;
+  quantity: number;
+  unit_cost: number;
+  expiry_date?: string;
+}
+
+interface CreatePurchaseBatchDTO {
+  warehouse_id: number;
+  purchase_date: string;
+  supplier_id?: number;
+  invoice_no?: string;
+  remarks?: string;
+  items: CreatePurchaseLineDTO[];
+}
+
 class PurchaseModel {
   static generatePurchaseNo(db: Database.Database): string {
     return generateDocNo(db, 'PURCH');
@@ -100,188 +124,254 @@ class PurchaseModel {
     return generateDocNo(db, 'STK');
   }
 
-  static recordPurchase(data: CreatePurchaseDTO, userId: number, db: Database.Database): Purchase {
+  private static validateCreateDTO(data: CreatePurchaseDTO): void {
     if (!data.item_id || data.item_id <= 0) throw new Error('Invalid item_id');
     if (!data.warehouse_id || data.warehouse_id <= 0) throw new Error('Invalid warehouse_id');
     if (!data.quantity || data.quantity <= 0) throw new Error('Quantity must be positive');
     if (data.unit_cost === undefined || data.unit_cost < 0) throw new Error('unit_cost must be non-negative');
     if (!data.purchase_date) throw new Error('purchase_date is required');
+  }
 
-    const { item_id, warehouse_id, quantity, unit_cost, supplier_id, supplier_name, purchase_date, invoice_no, remarks, expiry_date } = data;
+  /**
+   * A linked supplier wins over any free-text name: resolve the display
+   * name from the suppliers table so purchases always show the
+   * supplier's current name.
+   */
+  private static resolveSupplier(
+    supplierId: number | undefined,
+    fallbackName: string | undefined,
+    db: Database.Database
+  ): { id?: number; name?: string } {
+    if (!supplierId) return { name: fallbackName };
+    const supplier = db.prepare(
+      'SELECT id, supplier_name FROM suppliers WHERE id = ?'
+    ).get(supplierId) as { id: number; supplier_name: string } | undefined;
+    if (!supplier) throw new Error(`Supplier ${supplierId} not found`);
+    return { id: supplier.id, name: supplier.supplier_name };
+  }
 
-    // A linked supplier wins over any free-text name: resolve the
-    // display name from the suppliers table so the purchase always
-    // shows the supplier's current name.
-    const resolvedSupplierId: number | undefined = supplier_id;
-    let resolvedSupplierName: string | undefined = supplier_name;
-    if (resolvedSupplierId) {
-      const supplier = db.prepare(
-        'SELECT id, supplier_name FROM suppliers WHERE id = ?'
-      ).get(resolvedSupplierId) as { id: number; supplier_name: string } | undefined;
-      if (!supplier) throw new Error(`Supplier ${resolvedSupplierId} not found`);
-      resolvedSupplierName = supplier.supplier_name;
+  /**
+   * Insert ONE purchase row plus its full side-effect chain — stock
+   * batch, stock movement, stock balances/current_stock refresh,
+   * supplier AP entry, GL posting (ACC-02), activity log. Runs inside
+   * the caller's transaction; both [recordPurchase] and
+   * [recordPurchaseMulti] funnel through here.
+   */
+  private static writePurchaseRow(
+    data: CreatePurchaseDTO,
+    resolvedSupplierId: number | undefined,
+    resolvedSupplierName: string | undefined,
+    userId: number,
+    db: Database.Database
+  ): Purchase {
+    const { item_id, warehouse_id, quantity, unit_cost, purchase_date, invoice_no, remarks, expiry_date } = data;
+
+    const purchaseNo = this.generatePurchaseNo(db);
+    const batchNo = this.generateBatchNo(db);
+
+    const purchaseStmt = db.prepare(`
+      INSERT INTO purchases (
+        purchase_no, item_id, warehouse_id, quantity, unit_cost, total_cost,
+        supplier_id, supplier_name, purchase_date, invoice_no, remarks, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const totalCost = quantity * unit_cost;
+
+    const result = purchaseStmt.run(
+      purchaseNo,
+      item_id,
+      warehouse_id,
+      quantity,
+      unit_cost,
+      totalCost,
+      resolvedSupplierId || null,
+      resolvedSupplierName || null,
+      purchase_date,
+      invoice_no || null,
+      remarks || null,
+      userId
+    );
+
+    const purchaseId = result.lastInsertRowid as number;
+
+    // Create a stock_batch record for the purchased item. Identity comes
+    // from the INSERT result (task 3.4 / PUR-02 residue) — re-querying
+    // (source_type, source_id) could return another writer's batch when
+    // id spaces ever collide.
+    const batchResult = db.prepare(`
+      INSERT INTO stock_batches (
+        batch_no, item_id, warehouse_id, source_type,
+        source_id, quantity_original, quantity_remaining,
+        unit_cost, received_date, expiry_date
+      ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?)
+    `).run(
+      batchNo,
+      item_id,
+      warehouse_id,
+      purchaseId,
+      quantity,
+      quantity,
+      unit_cost,
+      purchase_date,
+      expiry_date || null
+    );
+    const outputBatchId = Number(batchResult.lastInsertRowid);
+
+    // Record stock movement linked to the new batch
+    const movementNo = this.generateMovementNo(db);
+    db.prepare(`
+      INSERT INTO stock_movements (
+        movement_no, item_id, warehouse_id, movement_type,
+        quantity, unit_cost, reference_doctype, reference_docno,
+        remarks, movement_date, created_by, batch_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      movementNo,
+      item_id,
+      warehouse_id,
+      'PURCHASE',
+      quantity,
+      unit_cost,
+      'Purchase',
+      purchaseNo,
+      `Purchase: ${purchaseNo}${resolvedSupplierName ? ' from ' + resolvedSupplierName : ''} (batch ${outputBatchId})`,
+      purchase_date,
+      userId,
+      outputBatchId
+    );
+
+    // Update purchase record with batch info
+    db.prepare(`
+      UPDATE purchases SET batch_no = ?, batch_id = ? WHERE id = ?
+    `).run(batchNo, outputBatchId, purchaseId);
+
+    // Update stock_balances
+    const existingBalance = db.prepare(`
+      SELECT * FROM stock_balances
+      WHERE item_id = ? AND warehouse_id = ?
+    `).get(item_id, warehouse_id) as Record<string, unknown> | undefined;
+
+    if (existingBalance) {
+      db.prepare(`
+        UPDATE stock_balances
+        SET quantity = quantity + ?,
+            last_updated = CURRENT_TIMESTAMP
+        WHERE item_id = ? AND warehouse_id = ?
+      `).run(quantity, item_id, warehouse_id);
+    } else {
+      db.prepare(`
+        INSERT INTO stock_balances (item_id, warehouse_id, quantity)
+        VALUES (?, ?, ?)
+      `).run(item_id, warehouse_id, quantity);
     }
 
-    const transaction = db.transaction(() => {
-      const purchaseNo = this.generatePurchaseNo(db);
-      const batchNo = this.generateBatchNo(db);
+    db.prepare(`
+      UPDATE items
+      SET current_stock = (
+        SELECT COALESCE(SUM(quantity), 0)
+        FROM stock_balances
+        WHERE item_id = ?
+      )
+      WHERE id = ?
+    `).run(item_id, item_id);
 
-      const purchaseStmt = db.prepare(`
-        INSERT INTO purchases (
-          purchase_no, item_id, warehouse_id, quantity, unit_cost, total_cost,
-          supplier_id, supplier_name, purchase_date, invoice_no, remarks, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+    // Supplier AP entry: a linked purchase increases the supplier's
+    // payable balance (mirrors the PO submit flow's PURCHASE_ORDER
+    // entry; the payment flow then credits it down).
+    if (resolvedSupplierId) {
+      SupplierLedgerModel.createEntry({
+        supplier_id: resolvedSupplierId,
+        transaction_date: purchase_date,
+        transaction_type: 'PURCHASE',
+        reference_no: purchaseNo,
+        debit: totalCost,
+        credit: 0,
+        description: `Purchase ${purchaseNo}`,
+      }, db);
+      SupplierLedgerModel.rebuildBalances(resolvedSupplierId, db);
+    }
 
-      const totalCost = quantity * unit_cost;
-
-      const result = purchaseStmt.run(
-        purchaseNo,
-        item_id,
-        warehouse_id,
-        quantity,
-        unit_cost,
-        totalCost,
-        resolvedSupplierId || null,
-        resolvedSupplierName || null,
-        purchase_date,
-        invoice_no || null,
-        remarks || null,
-        userId
-      );
-
-      const purchaseId = result.lastInsertRowid as number;
-
-      // Create a stock_batch record for the purchased item. Identity comes
-      // from the INSERT result (task 3.4 / PUR-02 residue) — re-querying
-      // (source_type, source_id) could return another writer's batch when
-      // id spaces ever collide.
-      const batchResult = db.prepare(`
-        INSERT INTO stock_batches (
-          batch_no, item_id, warehouse_id, source_type,
-          source_id, quantity_original, quantity_remaining,
-          unit_cost, received_date, expiry_date
-        ) VALUES (?, ?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?)
-      `).run(
-        batchNo,
-        item_id,
-        warehouse_id,
-        purchaseId,
-        quantity,
-        quantity,
-        unit_cost,
-        purchase_date,
-        expiry_date || null
-      );
-      const outputBatchId = Number(batchResult.lastInsertRowid);
-
-      // Record stock movement linked to the new batch
-      const movementNo = this.generateMovementNo(db);
-      db.prepare(`
-        INSERT INTO stock_movements (
-          movement_no, item_id, warehouse_id, movement_type,
-          quantity, unit_cost, reference_doctype, reference_docno,
-          remarks, movement_date, created_by, batch_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        movementNo,
-        item_id,
-        warehouse_id,
-        'PURCHASE',
-        quantity,
-        unit_cost,
-        'Purchase',
-        purchaseNo,
-        `Purchase: ${purchaseNo}${supplier_name ? ' from ' + supplier_name : ''} (batch ${outputBatchId})`,
-        purchase_date,
-        userId,
-        outputBatchId
-      );
-
-      // Update purchase record with batch info
-      db.prepare(`
-        UPDATE purchases SET batch_no = ?, batch_id = ? WHERE id = ?
-      `).run(batchNo, outputBatchId, purchaseId);
-
-      // Update stock_balances
-      const existingBalance = db.prepare(`
-        SELECT * FROM stock_balances
-        WHERE item_id = ? AND warehouse_id = ?
-      `).get(item_id, warehouse_id) as Record<string, unknown> | undefined;
-
-      if (existingBalance) {
-        db.prepare(`
-          UPDATE stock_balances
-          SET quantity = quantity + ?,
-              last_updated = CURRENT_TIMESTAMP
-          WHERE item_id = ? AND warehouse_id = ?
-        `).run(quantity, item_id, warehouse_id);
-      } else {
-        db.prepare(`
-          INSERT INTO stock_balances (item_id, warehouse_id, quantity)
-          VALUES (?, ?, ?)
-        `).run(item_id, warehouse_id, quantity);
-      }
-
-      db.prepare(`
-        UPDATE items
-        SET current_stock = (
-          SELECT COALESCE(SUM(quantity), 0)
-          FROM stock_balances
-          WHERE item_id = ?
-        )
-        WHERE id = ?
-      `).run(item_id, item_id);
-
-      // Supplier AP entry: a linked purchase increases the supplier's
-      // payable balance (mirrors the PO submit flow's PURCHASE_ORDER
-      // entry; the payment flow then credits it down).
-      if (resolvedSupplierId) {
-        SupplierLedgerModel.createEntry({
-          supplier_id: resolvedSupplierId,
-          transaction_date: purchase_date,
-          transaction_type: 'PURCHASE',
-          reference_no: purchaseNo,
-          debit: totalCost,
-          credit: 0,
-          description: `Purchase ${purchaseNo}`,
-        }, db);
-        SupplierLedgerModel.rebuildBalances(resolvedSupplierId, db);
-      }
-
-      // GL posting (ACC-02): Dr 1200 Inventory Asset /
-      // Cr 2000 AP. Direct purchases are recorded on credit in this
-      // flow — immediate payment happens through the supplier-payment
-      // path, which posts its own cash-side entry.
-      AccountingService.postPurchaseEntry(db, {
-        purchaseId,
-        purchaseNo,
-        totalCost,
-        purchaseDate: purchase_date,
-        paymentMethod: 'credit',
-        userId,
-      });
-
-      // Mark the movement financially posted so no backfill treats it
-      // as unposted (audit ACC-02 note).
-      db.prepare(`
-        UPDATE stock_movements SET financial_posted = 1
-        WHERE reference_docno = ? AND movement_type = 'PURCHASE'
-      `).run(purchaseNo);
-
-      db.prepare(`
-        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(
-        userId,
-        'CREATE',
-        'Purchase',
-        purchaseId,
-        `Recorded purchase ${purchaseNo}: ${quantity} units (Batch: ${batchNo}, Cost: ${unit_cost}/unit)`
-      );
-
-      return this.getById(purchaseId, db) as Purchase;
+    // GL posting (ACC-02): Dr 1200 Inventory Asset /
+    // Cr 2000 AP. Direct purchases are recorded on credit in this
+    // flow — immediate payment happens through the supplier-payment
+    // path, which posts its own cash-side entry.
+    AccountingService.postPurchaseEntry(db, {
+      purchaseId,
+      purchaseNo,
+      totalCost,
+      purchaseDate: purchase_date,
+      paymentMethod: 'credit',
+      userId,
     });
+
+    // Mark the movement financially posted so no backfill treats it
+    // as unposted (audit ACC-02 note).
+    db.prepare(`
+      UPDATE stock_movements SET financial_posted = 1
+      WHERE reference_docno = ? AND movement_type = 'PURCHASE'
+    `).run(purchaseNo);
+
+    db.prepare(`
+      INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      userId,
+      'CREATE',
+      'Purchase',
+      purchaseId,
+      `Recorded purchase ${purchaseNo}: ${quantity} units (Batch: ${batchNo}, Cost: ${unit_cost}/unit)`
+    );
+
+    return this.getById(purchaseId, db) as Purchase;
+  }
+
+  static recordPurchase(data: CreatePurchaseDTO, userId: number, db: Database.Database): Purchase {
+    this.validateCreateDTO(data);
+    const { id, name } = this.resolveSupplier(data.supplier_id, data.supplier_name, db);
+    const transaction = db.transaction(() => this.writePurchaseRow(data, id, name, userId, db));
+    return transaction();
+  }
+
+  /**
+   * Record one direct purchase containing MULTIPLE items: every line
+   * becomes its own `purchases` row (own doc no, batch, movement, ledger
+   * and GL entries) but ALL lines commit or roll back together in a
+   * single better-sqlite3 transaction.
+   */
+  static recordPurchaseMulti(data: CreatePurchaseBatchDTO, userId: number, db: Database.Database): Purchase[] {
+    if (!data.warehouse_id || data.warehouse_id <= 0) throw new Error('Invalid warehouse_id');
+    if (!data.purchase_date) throw new Error('purchase_date is required');
+    if (!Array.isArray(data.items) || data.items.length === 0) throw new Error('At least one purchase item is required');
+    for (const line of data.items) {
+      this.validateCreateDTO({
+        ...line,
+        warehouse_id: data.warehouse_id,
+        purchase_date: data.purchase_date,
+      });
+    }
+
+    const { id, name } = this.resolveSupplier(data.supplier_id, undefined, db);
+
+    const transaction = db.transaction(() =>
+      data.items.map((line) => this.writePurchaseRow(
+        {
+          item_id: line.item_id,
+          warehouse_id: data.warehouse_id,
+          quantity: line.quantity,
+          unit_cost: line.unit_cost,
+          purchase_date: data.purchase_date,
+          expiry_date: line.expiry_date,
+          supplier_id: data.supplier_id,
+          invoice_no: data.invoice_no,
+          remarks: data.remarks,
+        },
+        id,
+        name,
+        userId,
+        db
+      ))
+    );
 
     return transaction();
   }
@@ -314,6 +404,14 @@ class PurchaseModel {
     const conditions: string[] = [];
     const params: any[] = [];
 
+    // Voided purchases stay off the grid unless explicitly requested
+    // (the client's "Show Voided" toggle sends include_voided=1). The
+    // shared where-clause keeps the COUNT query consistent with the
+    // page rows.
+    if (!filters.include_voided) {
+      conditions.push('p.voided_at IS NULL');
+    }
+
     if (filters.start_date) {
       conditions.push('p.purchase_date >= ?');
       params.push(filters.start_date);
@@ -332,6 +430,11 @@ class PurchaseModel {
     if (filters.warehouse_id) {
       conditions.push('p.warehouse_id = ?');
       params.push(filters.warehouse_id);
+    }
+
+    if (filters.supplier_id) {
+      conditions.push('p.supplier_id = ?');
+      params.push(filters.supplier_id);
     }
 
     if (filters.supplier_name) {

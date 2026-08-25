@@ -65,4 +65,3 @@ function generateToken(user) {
     return jsonwebtoken_1.default.sign({ id: user.id, username: user.username, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '24h', issuer: 'mini-erp', audience: 'mini-erp-client', algorithm: 'HS256' });
 }
 exports.default = { authenticateToken, requireAdmin, generateToken };
-//# sourceMappingURL=auth.js.map

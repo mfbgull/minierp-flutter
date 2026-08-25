@@ -18,4 +18,3 @@ router.delete('/:id', (0, requirePermission_1.requirePermission)('users', 'delet
 router.put('/:id/reset-password', (0, requirePermission_1.requirePermission)('users', 'update'), userController_1.default.resetPassword);
 router.put('/:id/toggle-status', (0, requirePermission_1.requirePermission)('users', 'update'), userController_1.default.toggleUserStatus);
 exports.default = router;
-//# sourceMappingURL=users.js.map

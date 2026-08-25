@@ -12,4 +12,3 @@ router.use(auth_1.authenticateToken);
 router.get('/', (0, requirePermission_1.requirePermission)('settings', 'read'), preferencesController_1.default.getPreferences);
 router.put('/', (0, requirePermission_1.requirePermission)('settings', 'update'), preferencesController_1.default.updatePreferences);
 exports.default = router;
-//# sourceMappingURL=preferences.js.map

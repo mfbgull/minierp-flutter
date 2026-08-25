@@ -296,4 +296,3 @@ exports.default = {
     createPOSSale,
     getPOSTransactions
 };
-//# sourceMappingURL=posController.js.map

@@ -19,4 +19,3 @@ router.get('/purchases/summary/item/:item_id', (0, requirePermission_1.requirePe
 router.get('/purchases/summary/daterange', (0, requirePermission_1.requirePermission)('purchases', 'read'), purchaseController_1.default.getPurchaseSummaryByDateRange);
 router.get('/purchases/top-suppliers', (0, requirePermission_1.requirePermission)('purchases', 'read'), purchaseController_1.default.getTopSuppliers);
 exports.default = router;
-//# sourceMappingURL=purchases.js.map

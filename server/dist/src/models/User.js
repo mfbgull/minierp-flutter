@@ -112,4 +112,3 @@ class UserModel {
     }
 }
 exports.default = UserModel;
-//# sourceMappingURL=User.js.map

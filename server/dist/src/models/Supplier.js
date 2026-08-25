@@ -158,4 +158,3 @@ class SupplierModel {
     }
 }
 exports.default = SupplierModel;
-//# sourceMappingURL=Supplier.js.map

@@ -20,4 +20,3 @@ function envelope(total, p) {
         total_pages: Math.max(1, Math.ceil(total / p.limit)),
     };
 }
-//# sourceMappingURL=paginate.js.map

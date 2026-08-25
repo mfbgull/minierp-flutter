@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/theme/status_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/payment.dart' show Payment;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
@@ -24,6 +25,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
+import '../../widgets/status_badge.dart';
 import 'payment_detail_dialog.dart';
 import 'payments_providers.dart';
 import 'record_payment_dialog.dart';
@@ -75,12 +77,15 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
     cells: {
       'id': PlutoCell(value: payment.id),
       'paymentNo': PlutoCell(value: payment.paymentNo),
+      // Direction: money in from a customer vs out to a supplier. The
+      // server XOR-guarantees exactly one counterparty is set.
+      'type': PlutoCell(value: payment.supplierId != null ? 'out' : 'in'),
       'date': PlutoCell(value: payment.paymentDate),
       'amount': PlutoCell(value: payment.amount),
       'method': PlutoCell(value: payment.paymentMethod),
       'reference': PlutoCell(value: payment.referenceNo ?? ''),
       'notes': PlutoCell(value: payment.notes ?? ''),
-      'customer': PlutoCell(value: payment.customerName ?? ''),
+      'party': PlutoCell(value: payment.customerName ?? payment.supplierName ?? ''),
     },
   );
 
@@ -221,6 +226,26 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
       ),
       textColumn('paymentNo', l10n.paymentsPaymentno, 130),
       PlutoColumn(
+        title: l10n.fieldsType,
+        field: 'type',
+        type: PlutoColumnType.text(),
+        width: 90,
+        readOnly: true,
+        enableContextMenu: false,
+        renderer: (ctx) {
+          final isIn = ctx.cell.value?.toString() != 'out';
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: StatusBadge(
+              status: isIn ? l10n.paymentsTypein : l10n.paymentsTypeout,
+              color: isIn
+                  ? StatusColors.of(context).success
+                  : StatusColors.of(context).error,
+            ),
+          );
+        },
+      ),
+      PlutoColumn(
         title: l10n.fieldsDate,
         field: 'date',
         type: PlutoColumnType.text(),
@@ -254,7 +279,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
       textColumn('method', l10n.expensesPaymentmethod, 130),
       textColumn('reference', l10n.fieldsReference, 130),
       textColumn('notes', l10n.fieldsNotes, 180),
-      textColumn('customer', l10n.fieldsCustomer, 180),
+      textColumn('party', l10n.paymentsParty, 180),
     ];
   }
 }

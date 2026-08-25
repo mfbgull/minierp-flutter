@@ -148,4 +148,3 @@ const toggleBOMActive = (req, res, next) => {
     }
 };
 exports.toggleBOMActive = toggleBOMActive;
-//# sourceMappingURL=bomController.js.map

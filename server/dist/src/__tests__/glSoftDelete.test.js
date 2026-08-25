@@ -70,4 +70,3 @@ describe('invoice soft-delete GL integrity', () => {
         expect(data.includes(`"id":${invoiceId},`)).toBe(false);
     });
 });
-//# sourceMappingURL=glSoftDelete.test.js.map

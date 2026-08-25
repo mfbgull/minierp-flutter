@@ -181,4 +181,3 @@ exports.default = {
     setActiveLayout,
     duplicateLayout,
 };
-//# sourceMappingURL=DashboardLayout.js.map

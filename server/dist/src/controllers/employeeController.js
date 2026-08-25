@@ -336,4 +336,3 @@ exports.default = {
     addEmployeeDocument,
     removeEmployeeDocument
 };
-//# sourceMappingURL=employeeController.js.map

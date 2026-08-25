@@ -667,4 +667,3 @@ function search(query, limit, userId) {
         total: results.length,
     };
 }
-//# sourceMappingURL=searchService.js.map

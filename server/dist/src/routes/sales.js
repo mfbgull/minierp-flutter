@@ -54,4 +54,3 @@ router.get('/dashboard', (0, requirePermission_1.requirePermission)('sales', 're
 // GET /api/sales/summary/daterange - Sales summary by date range (uses InvoiceModel)
 router.get('/sales/summary/daterange', (0, requirePermission_1.requirePermission)('sales', 'read'), salesController_1.default.getSalesSummaryByDateRange);
 exports.default = router;
-//# sourceMappingURL=sales.js.map

@@ -30,4 +30,3 @@ router.get('/tax-summary', (0, requirePermission_1.requirePermission)('reports',
 router.get('/batch-traceability/:itemId', (0, requirePermission_1.requirePermission)('reports', 'read'), reportsController_1.default.getBatchTraceabilityReport);
 router.get('/expiry', (0, requirePermission_1.requirePermission)('reports', 'read'), reportsController_1.default.getExpiryReport);
 exports.default = router;
-//# sourceMappingURL=reports.js.map

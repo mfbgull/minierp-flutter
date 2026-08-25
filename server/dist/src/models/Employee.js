@@ -116,4 +116,3 @@ class EmployeeModel {
     }
 }
 exports.default = EmployeeModel;
-//# sourceMappingURL=Employee.js.map

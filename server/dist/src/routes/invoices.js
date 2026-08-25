@@ -19,4 +19,3 @@ router.delete('/:id', (0, requirePermission_1.requirePermission)('invoices', 'de
 router.put('/:id/cancel', (0, requirePermission_1.requirePermission)('invoices', 'update'), invoiceController_1.default.cancelInvoice);
 router.post('/:id/return', (0, requirePermission_1.requirePermission)('invoices', 'update'), invoiceController_1.default.returnInvoiceItems);
 exports.default = router;
-//# sourceMappingURL=invoices.js.map

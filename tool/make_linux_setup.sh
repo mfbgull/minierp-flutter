@@ -17,6 +17,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# Guard against concurrent runs: a second invocation would `rm -rf` the
+# staging dir mid-flight and corrupt the first run's output.
+LOCK_FILE="$ROOT/build/.make_linux_setup.lock"
+mkdir -p "$ROOT/build"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "ERROR: another make_linux_setup.sh run is already in progress." >&2
+  exit 1
+fi
+
 # ----- options ---------------------------------------------------------------
 VERSION="$(grep -m1 '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
 FLUTTER="${FLUTTER:-flutter}"
@@ -68,8 +78,9 @@ mkdir -p "$STAGE/minierp/server" "$STAGE/minierp/runtime" "$STAGE/.cache"
 # copy UI bundle -> minierp/bundle (no nesting)
 cp -a "$BUNDLE" "$STAGE/minierp/bundle"
 
-# copy built server
+# copy built server (defense-in-depth: never ship source maps or TS sources)
 cp -a server/dist "$STAGE/minierp/server/dist"
+find "$STAGE/minierp/server/dist" \( -name '*.map' -o -name '*.ts' \) -delete
 cp server/package.json server/package-lock.json "$STAGE/minierp/server/"
 cp -a server/uploads "$STAGE/minierp/server/uploads"
 mkdir -p "$STAGE/minierp/server/logs"
@@ -80,6 +91,9 @@ cp -a server/node_modules "$STAGE/minierp/server/node_modules"
 (cd "$STAGE/minierp/server" && npm prune --omit=dev --no-audit --no-fund >/dev/null)
 # Drop unused sqlite3 native module (not used by any server code)
 rm -rf "$STAGE/minierp/server/node_modules/sqlite3"
+# Runtime never reads type declarations or source maps — drop them
+rm -rf "$STAGE/minierp/server/node_modules/@types"
+find "$STAGE/minierp/server/node_modules" \( -name '*.map' -o -name '*.d.ts' \) -delete
 
 # -------------------------------------------------
 #   3.1 Database (optional, with WAL checkpoint)
@@ -118,6 +132,7 @@ EOF
 # -------------------------------------------------
 echo "[5/5] Bundling bundled Node $($NODE --version)"
 CACHE="$ROOT/build/.cache/node-$NODE_VERSION-linux-x64.tar.xz"
+mkdir -p "$(dirname "$CACHE")"
 [ -f "$CACHE" ] || curl -fL --retry 3 -o "$CACHE" "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz"
 mkdir -p "$STAGE/minierp/runtime"
 tar -xJf "$CACHE" -C "$STAGE/minierp/runtime" "node-v$NODE_VERSION-linux-x64/bin/node"
@@ -229,6 +244,9 @@ while [ $# -gt 0 ]; do
     *) echo "Unknown option: $1"; exit 1;;
   esac
 done
+
+# Empty on fresh installs; set to a backup dir on the upgrade path below.
+UPGRADE_TMP=""
 
 if [ -e "$DIR" ]; then
   if [ "$FORCE" != 1 ]; then

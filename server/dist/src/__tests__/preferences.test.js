@@ -191,4 +191,3 @@ describe('Preferences Controller (HTTP)', () => {
         expect(res.status).toBe(401);
     });
 });
-//# sourceMappingURL=preferences.test.js.map

@@ -136,4 +136,3 @@ exports.default = {
     deleteRole,
     getPermissions,
 };
-//# sourceMappingURL=rolesController.js.map

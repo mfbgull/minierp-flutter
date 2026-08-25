@@ -89,6 +89,8 @@ export interface CreateInvoiceItemDTO {
   tax_rate?: number;
   discount_type?: 'none' | 'percentage' | 'flat';
   discount_value?: number;
+  /** Loose amount-driven lines: entered bill amount as the gross base. */
+  amount?: number;
 }
 
 export interface UpdateInvoiceDTO {
@@ -731,8 +733,9 @@ class InvoiceModel {
    */
   static createInvoiceItem(db: Database.Database, invoiceId: number, item: CreateInvoiceItemDTO): void {
     // ACC-18 interim: the stored amount is always the server-computed
-    // line total — round(qty × price − discount) with tax applied at the
-    // line boundary. Client-supplied amounts are never trusted.
+    // line total — round(base − discount) with tax applied at the line
+    // boundary. The base is qty × price, or the entered `amount` for
+    // loose amount-driven lines (the same base the validation summed).
     const { amount, netAmount, taxAmount } = decomposeLineAmount(item);
     db.prepare(`
       INSERT INTO invoice_items (

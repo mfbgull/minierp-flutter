@@ -109,4 +109,3 @@ describe('EXP-05: atomic numbering from settings counter', () => {
         db.close();
     });
 });
-//# sourceMappingURL=apReporting.test.js.map

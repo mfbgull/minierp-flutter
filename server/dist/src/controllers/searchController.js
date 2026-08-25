@@ -33,4 +33,3 @@ function getSearch(req, res) {
 exports.default = {
     getSearch,
 };
-//# sourceMappingURL=searchController.js.map

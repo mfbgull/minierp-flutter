@@ -84,4 +84,3 @@ function initializeDefaults() {
     Settings_1.default.initializeDefaults(database_1.default);
 }
 exports.default = { getSettings, getSetting, updateSetting, updateSettings, getIntegrationSettings, updateIntegrationSettings, initializeDefaults };
-//# sourceMappingURL=settingsController.js.map

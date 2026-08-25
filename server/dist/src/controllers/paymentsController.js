@@ -445,4 +445,3 @@ function allocatePaymentToInvoice(req, res) {
 exports.default = {
     getPayments, getPayment, createPayment, updatePayment, deletePayment, getPaymentReceipt, allocatePaymentToInvoice,
 };
-//# sourceMappingURL=paymentsController.js.map

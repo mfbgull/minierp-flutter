@@ -48,4 +48,3 @@ function weekBounds(todayISO, weekStart = 'monday') {
     const to = addDaysUTC(from, 6);
     return { from: toISO(from), to: toISO(to) };
 }
-//# sourceMappingURL=weekMath.js.map

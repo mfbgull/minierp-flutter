@@ -121,4 +121,3 @@ exports.default = {
     updatePermissions,
     getAllPermissions,
 };
-//# sourceMappingURL=Role.js.map

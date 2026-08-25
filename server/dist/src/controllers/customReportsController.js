@@ -435,4 +435,3 @@ exports.default = {
     createTemplate,
     runReport,
 };
-//# sourceMappingURL=customReportsController.js.map

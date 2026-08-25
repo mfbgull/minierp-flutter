@@ -425,7 +425,9 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen>
                 Text(
                   '${ctx.cell.value}',
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13),
+                  // height keeps the two-line cell inside the 34px row
+                  // (default line height overflows the grid cell by 1px).
+                  style: const TextStyle(fontSize: 13, height: 1.1),
                 ),
                 if (supplier?.email?.isNotEmpty ?? false)
                   Text(
@@ -433,6 +435,7 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen>
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11,
+                      height: 1.1,
                       color: Theme.of(cellContext).colorScheme.onSurfaceVariant,
                     ),
                   ),

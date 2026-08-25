@@ -65,4 +65,3 @@ function getQueryInteger(param, defaultValue = NaN) {
     const numValue = parseInt(strValue, 10);
     return isNaN(numValue) ? defaultValue : numValue;
 }
-//# sourceMappingURL=queryUtils.js.map

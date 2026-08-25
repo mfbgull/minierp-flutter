@@ -579,7 +579,89 @@ function getCashFlow(startDate, endDate, db) {
         totalInflow += now.inflow - earlier.inflow;
         totalOutflow += now.outflow - earlier.outflow;
     }
-    return { startDate, endDate, totalInflow, totalOutflow, netCashFlow: totalInflow - totalOutflow };
+    return {
+        startDate, endDate, totalInflow, totalOutflow,
+        netCashFlow: totalInflow - totalOutflow,
+        // Additive: per-movement drill-down for the report's grid. Same
+        // sources/filters as the totals above, so they always agree.
+        movements: getCashMovements(startDate, endDate, db),
+    };
+}
+/** The individual movements behind getCashFlow's inflow/outflow — same
+ * source tables and date range, filtered to the same tracked accounts so
+ * the movement grid sums to the summary cards by construction. Methods
+ * that normalizeCashMethod maps outside CASH_ACCOUNTS are excluded for
+ * exactly the reason the cards exclude them: 'credit' rows are AR
+ * adjustments (no money moved) and 'unclassified' methods never reach
+ * the card totals. Newest first. */
+function getCashMovements(startDate, endDate, db) {
+    const tracked = new Set(cashService_1.CASH_ACCOUNTS.map((a) => a.key));
+    const out = [];
+    const push = (row) => {
+        const key = (0, cashService_1.normalizeCashMethod)(row.method);
+        if (!key || !tracked.has(key))
+            return;
+        out.push({
+            date: row.date,
+            type: row.type,
+            reference: row.reference || '',
+            party: row.party || '',
+            method: row.method || '',
+            description: row.description || '',
+            amount: Math.round(row.amount * 100) / 100,
+        });
+    };
+    // Customer payments: positive = money in, negative = refund paid out.
+    const customerRows = db.prepare(`
+    SELECT p.payment_date as date, p.payment_no as reference,
+           c.customer_name as party, p.payment_method as method, p.notes as description, p.amount
+    FROM payments p LEFT JOIN customers c ON c.id = p.customer_id
+    WHERE p.customer_id IS NOT NULL AND p.payment_date BETWEEN ? AND ?
+    ORDER BY p.payment_date DESC
+  `).all(startDate, endDate);
+    for (const r of customerRows) {
+        if (r.amount > 0)
+            push({ ...r, type: 'payment_received', amount: r.amount });
+        else if (r.amount < 0)
+            push({ ...r, type: 'refund', amount: r.amount });
+    }
+    // Supplier payments: money out.
+    const supplierRows = db.prepare(`
+    SELECT p.payment_date as date, p.payment_no as reference,
+           s.supplier_name as party, p.payment_method as method, p.notes as description, p.amount
+    FROM payments p LEFT JOIN suppliers s ON s.id = p.supplier_id
+    WHERE p.supplier_id IS NOT NULL AND p.amount > 0 AND p.payment_date BETWEEN ? AND ?
+    ORDER BY p.payment_date DESC
+  `).all(startDate, endDate);
+    for (const r of supplierRows) {
+        push({ ...r, type: 'supplier_payment', amount: -r.amount });
+    }
+    // Expenses: money out once approved/submitted (draft/cancelled are not).
+    const expenseRows = db.prepare(`
+    SELECT e.expense_date as date, e.expense_no as reference,
+           COALESCE(NULLIF(e.vendor_name, ''), e.expense_category) as party,
+           e.payment_method as method, e.description as description, e.amount
+    FROM expenses e
+    WHERE e.status NOT IN ('Cancelled', 'Draft') AND e.expense_date BETWEEN ? AND ?
+    ORDER BY e.expense_date DESC
+  `).all(startDate, endDate);
+    for (const r of expenseRows) {
+        push({ ...r, type: 'expense', amount: -r.amount });
+    }
+    // Salary payments: money out.
+    const salaryRows = db.prepare(`
+    SELECT sp.payment_date as date, COALESCE(NULLIF(sp.reference_no, ''), sp.id) as reference,
+           TRIM(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')) as party,
+           sp.payment_method as method, sp.notes as description, sp.amount
+    FROM salary_payments sp LEFT JOIN employees e ON e.id = sp.employee_id
+    WHERE sp.status != 'cancelled' AND sp.payment_date BETWEEN ? AND ?
+    ORDER BY sp.payment_date DESC
+  `).all(startDate, endDate);
+    for (const r of salaryRows) {
+        push({ ...r, type: 'salary', amount: -r.amount });
+    }
+    out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    return out;
 }
 function getTaxSummary(startDate, endDate, db) {
     // report-query-integrity: sum the stored per-line tax_amount instead of
@@ -794,4 +876,3 @@ exports.default = {
     getGLReconciliation,
     getExpiryReport, getExpiryAlerts,
 };
-//# sourceMappingURL=Reports.js.map
