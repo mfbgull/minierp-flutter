@@ -43,4 +43,3 @@ router.get('/health/stock-discrepancies', (0, requirePermission_1.requirePermiss
     }
 });
 exports.default = router;
-//# sourceMappingURL=adminHealth.js.map

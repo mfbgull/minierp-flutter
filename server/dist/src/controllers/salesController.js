@@ -473,4 +473,3 @@ exports.default = {
     getSalesDashboard,
     getSalesSummaryByDateRange
 };
-//# sourceMappingURL=salesController.js.map

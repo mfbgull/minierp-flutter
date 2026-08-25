@@ -647,4 +647,3 @@ exports.default = {
     cancelPhysicalCount,
     deletePhysicalCount
 };
-//# sourceMappingURL=inventoryController.js.map

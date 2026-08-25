@@ -3,7 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.resolveBackupFilePath = resolveBackupFilePath;
 exports.runBackup = runBackup;
+exports.listBackups = listBackups;
+exports.lastBackupAt = lastBackupAt;
+exports.deleteBackupFile = deleteBackupFile;
 exports.startBackupScheduler = startBackupScheduler;
 /**
  * Scheduled database backup service (audit-remediation task 7.3 / DR-01, DR-02).
@@ -18,7 +22,10 @@ const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const database_1 = __importDefault(require("../config/database"));
 const logger_1 = __importDefault(require("../utils/logger"));
 const activityLogger_1 = require("./activityLogger");
-const BACKUP_DIR = path_1.default.join(path_1.default.dirname(process.env.DATABASE_PATH || path_1.default.join(__dirname, '../../database')), 'backups');
+// DATABASE_PATH is the database *directory* (see config/database.ts);
+// backups live alongside erp.db inside <db-dir>/backups.
+const DB_DIR = process.env.DATABASE_PATH || path_1.default.join(__dirname, '../../database');
+const BACKUP_DIR = path_1.default.join(DB_DIR, 'backups');
 const DAILY_KEEP = 7;
 const WEEKLY_KEEP = 4;
 const INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -30,6 +37,24 @@ function lastBackupAgeMs() {
     if (!fs_1.default.existsSync(marker))
         return Infinity;
     return Date.now() - fs_1.default.statSync(marker).mtimeMs;
+}
+// Only filenames the service itself generates are addressable over HTTP —
+// anything else (../, arbitrary paths) is rejected before touching the fs.
+const BACKUP_NAME_RE = /^erp-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.db$/;
+/**
+ * Absolute path of an existing backup file, or null when the name is not
+ * a generated backup filename (traversal guard) or the file is missing.
+ */
+function resolveBackupFilePath(name) {
+    if (!BACKUP_NAME_RE.test(name))
+        return null;
+    const backupRoot = path_1.default.resolve(BACKUP_DIR);
+    const target = path_1.default.resolve(backupRoot, name);
+    if (!target.startsWith(backupRoot + path_1.default.sep))
+        return null;
+    if (!fs_1.default.existsSync(target))
+        return null;
+    return target;
 }
 function pruneRetention() {
     const files = fs_1.default.readdirSync(BACKUP_DIR)
@@ -56,7 +81,8 @@ function pruneRetention() {
         }
     }
 }
-function runBackup() {
+function runBackup(opts) {
+    const triggerLabel = opts?.trigger === 'manual' ? 'Manual' : 'Nightly';
     try {
         ensureBackupDir();
         // Task 8.8: nightly planner statistics maintenance
@@ -76,19 +102,62 @@ function runBackup() {
             return null;
         }
         fs_1.default.utimesSync(target, new Date(), new Date());
+        // Staleness marker for startBackupScheduler — previously never written,
+        // which made the >24h check true on every boot.
+        fs_1.default.writeFileSync(path_1.default.join(BACKUP_DIR, '.last_backup'), new Date().toISOString());
         pruneRetention();
         try {
-            database_1.default.prepare(`INSERT INTO activity_log (action, entity_type, description) VALUES (?, ?, ?)`)
-                .run(activityLogger_1.ActionType.BACKUP_CREATE, 'Database', `Nightly backup ${path_1.default.basename(target)} (integrity ok)`);
+            const description = `${triggerLabel} backup ${path_1.default.basename(target)} (integrity ok)`;
+            if (opts?.userId) {
+                database_1.default.prepare(`INSERT INTO activity_log (user_id, action, entity_type, description) VALUES (?, ?, ?, ?)`)
+                    .run(opts.userId, activityLogger_1.ActionType.BACKUP_CREATE, 'Database', description);
+            }
+            else {
+                database_1.default.prepare(`INSERT INTO activity_log (action, entity_type, description) VALUES (?, ?, ?)`)
+                    .run(activityLogger_1.ActionType.BACKUP_CREATE, 'Database', description);
+            }
         }
         catch { /* non-fatal */ }
-        logger_1.default.info(`[Backup] created ${path_1.default.basename(target)}`);
+        logger_1.default.info(`[Backup] created ${path_1.default.basename(target)} (${triggerLabel.toLowerCase()})`);
         return target;
     }
     catch (err) {
         logger_1.default.error('[Backup] failed:', err);
         return null;
     }
+}
+/** Existing backups, newest first. */
+function listBackups() {
+    if (!fs_1.default.existsSync(BACKUP_DIR))
+        return [];
+    return fs_1.default.readdirSync(BACKUP_DIR)
+        .filter(f => f.startsWith('erp-') && f.endsWith('.db'))
+        .map(f => {
+        const st = fs_1.default.statSync(path_1.default.join(BACKUP_DIR, f));
+        return { name: f, sizeBytes: st.size, createdAt: new Date(st.mtimeMs).toISOString() };
+    })
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+/** ISO timestamp of the most recent backup (newest file; falls back to the
+ *  scheduler's staleness marker), or null when none exists. */
+function lastBackupAt() {
+    const backups = listBackups();
+    if (backups.length > 0)
+        return backups[0].createdAt;
+    const marker = path_1.default.join(BACKUP_DIR, '.last_backup');
+    if (!fs_1.default.existsSync(marker))
+        return null;
+    return new Date(fs_1.default.statSync(marker).mtimeMs).toISOString();
+}
+/** Removes one backup file by validated name. False when the name fails
+ *  the traversal guard or the file does not exist. */
+function deleteBackupFile(name) {
+    const target = resolveBackupFilePath(name);
+    if (!target)
+        return false;
+    fs_1.default.rmSync(target);
+    logger_1.default.info(`[Backup] deleted ${name}`);
+    return true;
 }
 let started = false;
 /** Fire-on-boot-if-stale + nightly interval (task 7.3). Call once at server start. */
@@ -103,4 +172,3 @@ function startBackupScheduler() {
     }
     setInterval(() => runBackup(), INTERVAL_MS).unref();
 }
-//# sourceMappingURL=backupService.js.map

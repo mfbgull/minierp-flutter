@@ -115,4 +115,3 @@ describe('week-aware period=week dashboard summaries', () => {
         expect(result).toEqual({ period_total: 0, count: 0 });
     });
 });
-//# sourceMappingURL=dashboardWeek.test.js.map

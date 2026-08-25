@@ -365,4 +365,3 @@ exports.default = {
     getSupplierBalance,
     getSupplierTransactions
 };
-//# sourceMappingURL=purchaseOrderController.js.map

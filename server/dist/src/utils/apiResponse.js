@@ -44,4 +44,3 @@ function sendConflict(res, message = 'Resource already exists') {
 function sendInternalError(res, message = 'Internal server error') {
     sendError(res, 500, 'INTERNAL_SERVER_ERROR', message);
 }
-//# sourceMappingURL=apiResponse.js.map

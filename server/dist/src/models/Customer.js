@@ -145,7 +145,10 @@ class CustomerModel {
         // to the invoice reference the entry itself was written with.
         // Task 8.7: bounded pagination — limit 0 keeps the legacy unbounded
         // shape for callers that haven't migrated (statement flows).
-        const countRow = db.prepare('SELECT COUNT(*) AS c FROM customer_ledger WHERE customer_id = ?').get(id);
+        // ACC-14: voided rows and their reversal counterparts are audit-only;
+        // listings and totals count active rows exclusively (same active set as
+        // rebuildLedgerBalances / recalcCustomerBalanceFromLedger).
+        const countRow = db.prepare('SELECT COUNT(*) AS c FROM customer_ledger WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL').get(id);
         const total = countRow.c;
         let pageSql = '';
         const params = [id];
@@ -178,7 +181,7 @@ class CustomerModel {
           )
         END as linked_invoice_no
       FROM customer_ledger cl
-      WHERE cl.customer_id = ?
+      WHERE cl.customer_id = ? AND cl.voided = 0 AND cl.reversed_by IS NULL
       ORDER BY cl.${safeBy} ${safeOrder}${pageSql}
     `).all(...params);
         return { rows, total };
@@ -209,7 +212,7 @@ class CustomerModel {
           )
         END as linked_invoice_no
       FROM customer_ledger cl
-      WHERE cl.customer_id = ?
+      WHERE cl.customer_id = ? AND cl.voided = 0 AND cl.reversed_by IS NULL
     `;
         const params = [id];
         if (fromDate) {
@@ -222,7 +225,9 @@ class CustomerModel {
         }
         query += ' ORDER BY transaction_date ASC, id ASC';
         const transactions = db.prepare(query).all(...params);
-        let openingBalanceQuery = 'SELECT balance FROM customer_ledger WHERE customer_id = ?';
+        // Active rows only (ACC-14): the stored running balance of a voided or
+        // reversal row is stale by definition and must never seed a statement.
+        let openingBalanceQuery = 'SELECT balance FROM customer_ledger WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL';
         const openingBalanceParams = [id];
         if (fromDate) {
             // `, id DESC` tiebreaker (report-query-integrity): same-day rows must
@@ -249,13 +254,16 @@ class CustomerModel {
      * written only by the single authoritative writer.
      */
     static recalculateBalance(id, db) {
+        // Must match the authoritative writer (ledgerUtils
+        // .recalcCustomerBalanceFromLedger): exclude voided rows AND their
+        // reversal counterparts, otherwise a correction's active half is
+        // counted without its voided original and the balance drifts.
         const row = db.prepare(`
       SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS net
       FROM customer_ledger
-      WHERE customer_id = ? AND voided = 0
+      WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL
     `).get(id);
         db.prepare('UPDATE customers SET current_balance = ? WHERE id = ?').run(row.net || 0, id);
     }
 }
 exports.default = CustomerModel;
-//# sourceMappingURL=Customer.js.map

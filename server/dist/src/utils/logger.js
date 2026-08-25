@@ -42,4 +42,3 @@ const logger = winston_1.default.createLogger({
     exitOnError: false
 });
 exports.default = logger;
-//# sourceMappingURL=logger.js.map

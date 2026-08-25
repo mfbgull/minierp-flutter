@@ -37,6 +37,8 @@ class Purchase {
     this.invoiceNo,
     this.remarks,
     this.returnedQuantity = 0,
+    this.voidedAt,
+    this.voidReason,
     this.createdByUsername,
   });
 
@@ -60,6 +62,8 @@ class Purchase {
     invoiceNo: asString(json['invoice_no']),
     remarks: asString(json['remarks']),
     returnedQuantity: asNum(json['returned_quantity']) ?? 0,
+    voidedAt: asString(json['voided_at']),
+    voidReason: asString(json['void_reason']),
     createdByUsername: asString(json['created_by_username']),
   );
 
@@ -82,7 +86,14 @@ class Purchase {
   final String? invoiceNo;
   final String? remarks;
   final num returnedQuantity;
+
+  /// Void attribution (PUR-03) — non-null `voidedAt` marks a voided
+  /// purchase; the grid hides these unless "Show Voided" is toggled on.
+  final String? voidedAt;
+  final String? voidReason;
   final String? createdByUsername;
+
+  bool get isVoided => voidedAt != null;
 
   /// How much of this purchase can still be returned.
   num get returnableQty {

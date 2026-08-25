@@ -121,4 +121,3 @@ exports.default = {
     getTemplates,
     createTemplate,
 };
-//# sourceMappingURL=CustomReport.js.map

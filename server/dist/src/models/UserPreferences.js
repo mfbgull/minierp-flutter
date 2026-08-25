@@ -78,4 +78,3 @@ function updateForUser(db, userId, partial) {
   `).run(userId, next.weekStart, next.defaultRange ? JSON.stringify(next.defaultRange) : null, JSON.stringify(next.presets));
     return next;
 }
-//# sourceMappingURL=UserPreferences.js.map

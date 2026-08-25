@@ -269,4 +269,3 @@ exports.default = {
     cleanupLogs,
     getUsers
 };
-//# sourceMappingURL=activityLogController.js.map

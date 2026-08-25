@@ -23,4 +23,3 @@ describe('weekMath', () => {
         expect((0, weekMath_1.weekBounds)('2027-01-01', 'monday')).toEqual({ from: '2026-12-28', to: '2027-01-03' });
     });
 });
-//# sourceMappingURL=weekMath.test.js.map

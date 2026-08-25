@@ -823,4 +823,3 @@ describe('StockMovementModel', () => {
         });
     });
 });
-//# sourceMappingURL=models.test.js.map

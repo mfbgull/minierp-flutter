@@ -35,4 +35,3 @@ router.get('/layouts', (0, requirePermission_1.requirePermission)('dashboard', '
 router.put('/layout/:id/activate', (0, requirePermission_1.requirePermission)('dashboard', 'update'), dashboardLayoutController_1.default.setActiveLayout);
 router.post('/layout/duplicate', (0, requirePermission_1.requirePermission)('dashboard', 'create'), dashboardLayoutController_1.default.duplicateLayout);
 exports.default = router;
-//# sourceMappingURL=dashboard.js.map

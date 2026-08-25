@@ -332,4 +332,3 @@ exports.default = {
     openPeriod,
     closePeriod,
 };
-//# sourceMappingURL=accountingController.js.map

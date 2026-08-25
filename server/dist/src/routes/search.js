@@ -16,4 +16,3 @@ const searchQuerySchema = zod_1.z.object({
 router.use(auth_1.authenticateToken);
 router.get('/', (0, validation_1.validateZodQuery)(searchQuerySchema), searchController_1.default.getSearch);
 exports.default = router;
-//# sourceMappingURL=search.js.map

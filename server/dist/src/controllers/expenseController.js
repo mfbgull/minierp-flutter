@@ -346,4 +346,3 @@ exports.default = {
     getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
     getExpenseStatusOptions, getExpensePaymentMethodOptions,
 };
-//# sourceMappingURL=expenseController.js.map

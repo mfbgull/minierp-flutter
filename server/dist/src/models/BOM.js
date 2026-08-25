@@ -227,4 +227,3 @@ class BOMModel {
     }
 }
 exports.default = BOMModel;
-//# sourceMappingURL=BOM.js.map

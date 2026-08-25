@@ -115,6 +115,11 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
   @override
   bool get hasRowActions => true;
 
+  /// The `isVoided` flag rides in every row so the purchase-no renderer
+  /// can strike voided rows through; never shown as a grid column.
+  @override
+  List<String> get hiddenGridColumnFields => const ['id', 'isVoided'];
+
   @override
   List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
     final id = row.cells['id']?.value as int?;
@@ -127,7 +132,11 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
         label: l10n.commonView,
         onTap: () => showPurchaseDetailDialog(context, purchaseId: id),
       ),
-      if (purchase != null && purchase.returnableQty > 0)
+      // Voided purchases (visible via the "Show Voided" toggle) are
+      // read-only: no returns, and re-voiding is rejected server-side.
+      if (purchase != null &&
+          !purchase.isVoided &&
+          purchase.returnableQty > 0)
         GridRowAction(
           icon: Icons.assignment_return_outlined,
           label: l10n.purchasesReturn,
@@ -140,7 +149,8 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
             ),
           ),
       ),
-      GridRowAction(
+      if (purchase?.isVoided != true)
+        GridRowAction(
         // PUR-03 (task 3.5): void with reason — never hard delete.
         icon: Icons.block_outlined,
         label: l10n.purchasesVoid,
@@ -165,6 +175,7 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
     return PlutoRow(
     cells: {
       'id': PlutoCell(value: purchase.id),
+      'isVoided': PlutoCell(value: purchase.isVoided),
       'purchaseNo': PlutoCell(value: purchase.purchaseNo),
       'date': PlutoCell(value: purchase.purchaseDate),
       'item': PlutoCell(value: purchase.itemName),
@@ -183,6 +194,7 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
   @override
   Widget build(BuildContext context) {
     final purchases = ref.watch(purchasesProvider);
+    final includeVoided = ref.watch(purchasesIncludeVoidedProvider);
     final l10n = AppLocalizations.of(context)!;
 
     // Keep the grid in sync with provider transitions (loading → data).
@@ -193,12 +205,26 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Toolbar: search + refresh.
+        // Toolbar: search + show-voided filter + refresh.
         ScreenToolbar(
           searchController: _searchController,
           searchHint: l10n.commonSearch,
           onSearchChanged: _onSearchChanged,
           onRefresh: () => ref.invalidate(purchasesProvider),
+          filters: [
+            FilterChip(
+              label: Text(l10n.purchasesShowvoided),
+              selected: includeVoided,
+              onSelected: (selected) {
+                ref.read(purchasesIncludeVoidedProvider.notifier).state =
+                    selected;
+                // A different voided view starts back at page 1.
+                if (ref.read(purchasesPageProvider) != 1) {
+                  ref.read(purchasesPageProvider.notifier).state = 1;
+                }
+              },
+            ),
+          ],
           primaryActions: [
             FilledButton.icon(
               onPressed: () => showPurchaseFormDialog(context),
@@ -281,7 +307,49 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
         enableHideColumnMenuItem: false,
         enableSetColumnsMenuItem: false,
       ),
-      textColumn('purchaseNo', l10n.purchasesPurchaseno, 120),
+      // Hidden void flag (see hiddenGridColumnFields) — read by the
+      // purchaseNo renderer to strike voided rows through.
+      PlutoColumn(
+        title: '',
+        field: 'isVoided',
+        type: PlutoColumnType.text(),
+        width: 60,
+        readOnly: true,
+        renderer: (ctx) => const SizedBox.shrink(),
+        enableContextMenu: false,
+        enableFilterMenuItem: false,
+        enableHideColumnMenuItem: false,
+        enableSetColumnsMenuItem: false,
+      ),
+      // Voided purchases (visible via "Show Voided") render struck
+      // through in the error tone so they can't be mistaken for active
+      // ones; `isVoided` rides hidden in every row.
+      PlutoColumn(
+        title: l10n.purchasesPurchaseno,
+        field: 'purchaseNo',
+        type: PlutoColumnType.text(),
+        width: 120,
+        readOnly: true,
+        enableContextMenu: false,
+        renderer: (ctx) {
+          final voided = ctx.row.cells['isVoided']?.value == true;
+          return Builder(
+            builder: (cellContext) => Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                ctx.cell.value as String? ?? '',
+                style: Theme.of(cellContext).textTheme.bodyMedium?.copyWith(
+                  color: voided
+                      ? Theme.of(cellContext).colorScheme.error
+                      : null,
+                  decoration:
+                      voided ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
       PlutoColumn(
         title: l10n.purchasesDatecol,
         field: 'date',

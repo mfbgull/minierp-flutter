@@ -139,4 +139,3 @@ class ItemModel {
     }
 }
 exports.default = ItemModel;
-//# sourceMappingURL=Item.js.map

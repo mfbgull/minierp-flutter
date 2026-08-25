@@ -236,4 +236,3 @@ exports.default = {
     getCustomers, getCustomer, createCustomer, updateCustomer, deleteCustomer,
     getCustomerLedger, getCustomerStatement, getCustomerBalance, recalculateAllBalances
 };
-//# sourceMappingURL=customersController.js.map

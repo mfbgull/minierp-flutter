@@ -114,4 +114,3 @@ exports.default = {
     buildIntegrationStatus,
     updateIntegrationSetting,
 };
-//# sourceMappingURL=Settings.js.map

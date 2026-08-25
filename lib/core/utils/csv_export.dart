@@ -66,6 +66,7 @@ import '../../data/models/stock_movement.dart' show StockMovement;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import 'formatters.dart';
+import 'cash_movement_labels.dart';
 import 'expense_status.dart';
 import 'invoice_status.dart';
 import 'movement_type_label.dart';
@@ -486,7 +487,7 @@ String buildDsoCsv(AppLocalizations l10n, DSOMetric metric) {
 /// Builds the CSV text for the cash flow report — a Metric | Value
 /// table (total inflow, total outflow, net cash flow).
 String buildCashFlowCsv(AppLocalizations l10n, CashFlowReport report) {
-  return _buildGridCsv(
+  final summary = _buildGridCsv(
     [l10n.fieldsMetric, l10n.fieldsValue],
     [
       (l10n.reportsTotalinflow, Formatters.currency(report.totalInflow)),
@@ -495,6 +496,30 @@ String buildCashFlowCsv(AppLocalizations l10n, CashFlowReport report) {
     ],
     (row) => [sanitizeCsvCell(row.$1), row.$2],
   );
+  if (report.movements.isEmpty) return summary;
+  final movements = _buildGridCsv(
+    [
+      l10n.commonDate,
+      l10n.fieldsType,
+      l10n.fieldsReference,
+      l10n.paymentsParty,
+      l10n.expensesPaymentmethod,
+      l10n.fieldsNotes,
+      l10n.fieldsAmount,
+    ],
+    report.movements,
+    (m) => [
+      sanitizeCsvCell(m.date),
+      sanitizeCsvCell(cashMovementLabel(l10n, m.type)),
+      sanitizeCsvCell(m.reference),
+      sanitizeCsvCell(m.party),
+      sanitizeCsvCell(m.method),
+      sanitizeCsvCell(m.description),
+      // Signed numeric cell — keep the sign; not injection-safe concern.
+      m.amount,
+    ],
+  );
+  return '$summary\n$movements';
 }
 
 /// Builds the CSV text for the cash reconciliation — Account | Opening

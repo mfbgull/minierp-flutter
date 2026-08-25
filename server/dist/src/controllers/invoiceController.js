@@ -114,9 +114,15 @@ function createInvoice(req, res) {
         // === ENTIRE operation inside one transaction ===
         const transaction = database_1.default.transaction(() => {
             // ACC-18 interim: the server is authoritative over invoice money.
-            // Header total = Σ of server-computed line amounts; a client-supplied
-            // total differing by more than 0.01 is rejected with nothing written.
-            const computedTotal = (0, currency_1.computeInvoiceTotal)(items);
+            // Header total = Σ of server-computed line amounts minus an
+            // invoice-scope header discount — the same grand total the form
+            // displays. A client-supplied total differing by more than 0.01
+            // is rejected with nothing written.
+            const computedTotal = (0, currency_1.computeInvoiceGrandTotal)(items, {
+                discount_scope,
+                discount_type,
+                discount_value,
+            });
             const totalAmountNum = computedTotal;
             if (total_amount !== undefined && total_amount !== null) {
                 const clientTotal = (0, currency_1.parseCurrency)(total_amount);
@@ -175,7 +181,8 @@ function createInvoice(req, res) {
                     unit_price: item.unit_price,
                     tax_rate: item.tax_rate,
                     discount_type: item.discount_type,
-                    discount_value: item.discount_value
+                    discount_value: item.discount_value,
+                    amount: item.amount
                 });
                 // FIFO consumption from oldest batches
                 const consumption = Invoice_1.default.consumeFromOldestBatches(item.item_id, warehouseId, item.quantity, database_1.default);
@@ -307,7 +314,11 @@ function updateInvoice(req, res) {
             if (!originalInvoice)
                 throw new Error('Invoice not found');
             // ACC-18 interim: server-authoritative totals on update too.
-            const computedTotal = (0, currency_1.computeInvoiceTotal)(items);
+            const computedTotal = (0, currency_1.computeInvoiceGrandTotal)(items, {
+                discount_scope,
+                discount_type,
+                discount_value,
+            });
             const totalAmountNum = computedTotal;
             if (total_amount !== undefined && total_amount !== null) {
                 const clientTotal = (0, currency_1.parseCurrency)(total_amount);
@@ -435,7 +446,8 @@ function updateInvoice(req, res) {
                     unit_price: item.unit_price,
                     tax_rate: item.tax_rate,
                     discount_type: item.discount_type,
-                    discount_value: item.discount_value
+                    discount_value: item.discount_value,
+                    amount: item.amount
                 });
                 // FIX #3: Stock validation with warning
                 const warehouseId = Invoice_1.default.findWarehouseForItem(database_1.default, item.item_id, item.quantity, item.warehouse_id);
@@ -1014,4 +1026,3 @@ exports.default = {
     returnInvoiceItems,
     getInvoiceReturnHistory,
 };
-//# sourceMappingURL=invoiceController.js.map

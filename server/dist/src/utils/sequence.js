@@ -59,4 +59,3 @@ function initializeSequenceFromMax(db, settingKey, tableName, columnName, prefix
         db.prepare('INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(settingKey, maxNo.toString());
     }
 }
-//# sourceMappingURL=sequence.js.map

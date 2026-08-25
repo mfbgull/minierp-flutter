@@ -782,6 +782,8 @@ function runBatchSourceTypeRebuild() {
             const batchCols = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all();
             const hasExpiry = batchCols.some((c) => c.name === 'expiry_date');
             const hasCreatedAt = batchCols.some((c) => c.name === 'created_at');
+            const hasHalted = batchCols.some((c) => c.name === 'halted');
+            const hasHaltedReason = batchCols.some((c) => c.name === 'halted_reason');
             const copyCols = [
                 'id', 'batch_no', 'item_id', 'warehouse_id',
                 `CASE
@@ -797,17 +799,31 @@ function runBatchSourceTypeRebuild() {
                 copyCols.push(hasExpiry ? 'created_at' : "'' AS created_at");
             if (hasExpiry)
                 copyCols.push('expiry_date');
+            if (hasHalted)
+                copyCols.push('halted');
+            if (hasHaltedReason)
+                copyCols.push('halted_reason');
             const insertCols = ['id', 'batch_no', 'item_id', 'warehouse_id', 'source_type', 'source_id', 'quantity_original', 'quantity_remaining', 'unit_cost', 'received_date'];
             if (hasCreatedAt)
                 insertCols.push('created_at');
             if (hasExpiry)
                 insertCols.push('expiry_date');
+            if (hasHalted)
+                insertCols.push('halted');
+            if (hasHaltedReason)
+                insertCols.push('halted_reason');
             // Create the new table without optional columns when the source lacks them.
             const optionalCols = [];
             if (hasCreatedAt)
                 optionalCols.push('created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
             if (hasExpiry)
                 optionalCols.push('expiry_date DATE');
+            // FEFO halt columns (add-item-expiry-tracking.sql) — dropping these
+            // silently breaks invoice creation's batch consumption.
+            if (hasHalted)
+                optionalCols.push('halted BOOLEAN DEFAULT 0');
+            if (hasHaltedReason)
+                optionalCols.push('halted_reason TEXT');
             const newTableSQL = `
         CREATE TABLE stock_batches_new (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1009,6 +1025,8 @@ function runStockInvariantChecksRebuild() {
                     optionalDefs.push('expiry_date DATE');
                 if (cols0.includes('halted'))
                     optionalDefs.push('halted BOOLEAN DEFAULT 0');
+                if (cols0.includes('halted_reason'))
+                    optionalDefs.push('halted_reason TEXT');
                 db.exec(`
           CREATE TABLE stock_batches_inv (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1027,7 +1045,7 @@ function runStockInvariantChecksRebuild() {
                 // Column-aware copy
                 const cols = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all().map((c) => c.name);
                 const base = ['id', 'batch_no', 'item_id', 'warehouse_id', 'source_type', 'source_id', 'quantity_original', 'quantity_remaining', 'unit_cost', 'received_date'];
-                const optional = ['created_at', 'expiry_date', 'halted'].filter(c => cols.includes(c));
+                const optional = ['created_at', 'expiry_date', 'halted', 'halted_reason'].filter(c => cols.includes(c));
                 const allCols = [...base, ...optional];
                 db.exec(`
           INSERT INTO stock_batches_inv (${allCols.join(', ')})
@@ -1234,6 +1252,31 @@ function runOverrideSaleMigration() {
         throw new Error('Override sale migration error:: ' + error.message, { cause: error });
     }
 }
+/**
+ * Repair: the INV-10 stock_batches re-stamp rebuild originally preserved
+ * created_at/expiry_date but NOT the FEFO halt columns — databases that
+ * rebuilt after add-item-expiry-tracking.sql silently lost them, and the
+ * ledger marks that migration applied so it never re-ran. Invoice
+ * creation's batch consumption (`halted = 0 OR halted IS NULL`) then
+ * failed with "no such column: halted". Both rebuilds now preserve the
+ * columns; this re-adds them on already-affected databases.
+ */
+function runBatchHaltColumnsRepairMigration() {
+    try {
+        const cols = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all().map(c => c.name);
+        if (!cols.includes('halted')) {
+            logger_1.default.info('Repairing missing stock_batches.halted column...');
+            db.exec('ALTER TABLE stock_batches ADD COLUMN halted BOOLEAN DEFAULT 0');
+            logger_1.default.info('✅ stock_batches.halted restored');
+        }
+        if (!cols.includes('halted_reason')) {
+            db.exec('ALTER TABLE stock_batches ADD COLUMN halted_reason TEXT');
+        }
+    }
+    catch (error) {
+        throw new Error('Batch halt columns repair error:: ' + error.message, { cause: error });
+    }
+}
 function runGLVoidAttributionMigration() {
     // Adds journal_lines void attribution (voided_at/voided_by/void_reason)
     // and subledger append-only columns (voided/reversed_by). Idempotent:
@@ -1339,6 +1382,9 @@ runLedgered('fn.backfillInvoiceItemTax', () => (0, backfillInvoiceItemTax_1.runB
 runLedgered('fn.runStockCoverageReconciliation', runStockCoverageReconciliation);
 // INV-21: database-level invariants — applied only after live data reconciled
 runLedgered('fn.runStockInvariantChecksRebuild', runStockInvariantChecksRebuild, { noTxn: true });
+// Repair: re-add stock_batches halted/halted_reason when an older rebuild
+// dropped them (FEFO consumption hard-fails without the column).
+runLedgered('fn.runBatchHaltColumnsRepairMigration', runBatchHaltColumnsRepairMigration);
 // Rollback support: run if --rollback flag is passed
 if (process.argv.includes('--rollback')) {
     const targetMigration = process.argv.find(arg => arg.startsWith('--rollback='));
@@ -2265,4 +2311,3 @@ function runRollbackAll() {
     }
     logger_1.default.info('✅ All rollbacks completed');
 }
-//# sourceMappingURL=database.js.map

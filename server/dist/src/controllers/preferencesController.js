@@ -124,4 +124,3 @@ function updatePreferences(req, res) {
     }
 }
 exports.default = { getPreferences, updatePreferences };
-//# sourceMappingURL=preferencesController.js.map

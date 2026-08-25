@@ -211,4 +211,3 @@ exports.default = {
     resetPassword,
     toggleUserStatus,
 };
-//# sourceMappingURL=userController.js.map

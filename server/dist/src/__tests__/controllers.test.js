@@ -288,4 +288,3 @@ describe('Sales Controller', () => {
         expect(res.status).toBe(200);
     });
 });
-//# sourceMappingURL=controllers.test.js.map

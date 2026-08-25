@@ -159,6 +159,42 @@ class DSOMetric {
   final String endDate;
 }
 
+/// One row of the cash flow report's movement grid — mirrors the
+/// server's `movements` array (same sources/filters as the summary
+/// totals, so the grid reconciles with the cards). Signed amount:
+/// positive = money in, negative = money out.
+class CashFlowMovement {
+  const CashFlowMovement({
+    required this.date,
+    required this.type,
+    required this.reference,
+    required this.party,
+    required this.method,
+    required this.description,
+    required this.amount,
+  });
+
+  factory CashFlowMovement.fromJson(Map<String, dynamic> json) =>
+      CashFlowMovement(
+        date: asString(json['date']) ?? '',
+        type: asString(json['type']) ?? '',
+        reference: asString(json['reference']) ?? '',
+        party: asString(json['party']) ?? '',
+        method: asString(json['method']) ?? '',
+        description: asString(json['description']) ?? '',
+        amount: asNum(json['amount']) ?? 0,
+      );
+
+  final String date;
+  /// 'payment_received' | 'refund' | 'supplier_payment' | 'expense' | 'salary'
+  final String type;
+  final String reference;
+  final String party;
+  final String method;
+  final String description;
+  final num amount;
+}
+
 // ── Cash flow (GET /reports/cash-flow) ──────────────────────────────
 
 /// Cash flow summary — `getCashFlow` in `server-reference/Reports.ts`:
@@ -171,6 +207,7 @@ class CashFlowReport {
     required this.totalInflow,
     required this.totalOutflow,
     required this.netCashFlow,
+    this.movements = const [],
   });
 
   factory CashFlowReport.fromJson(Map<String, dynamic> json) => CashFlowReport(
@@ -179,6 +216,10 @@ class CashFlowReport {
     totalInflow: asNum(json['totalInflow']) ?? 0,
     totalOutflow: asNum(json['totalOutflow']) ?? 0,
     netCashFlow: asNum(json['netCashFlow']) ?? 0,
+    movements: [
+      for (final m in json['movements'] as List? ?? const [])
+        CashFlowMovement.fromJson(m as Map<String, dynamic>),
+    ],
   );
 
   final String startDate;
@@ -186,6 +227,7 @@ class CashFlowReport {
   final num totalInflow;
   final num totalOutflow;
   final num netCashFlow;
+  final List<CashFlowMovement> movements;
 }
 
 // ── Profit & loss (GET /reports/profit-loss) ────────────────────────

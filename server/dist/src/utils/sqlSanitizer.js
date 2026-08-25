@@ -237,4 +237,3 @@ exports.BOM_SORT_COLUMNS = [
     'total_material_cost',
     'created_at'
 ];
-//# sourceMappingURL=sqlSanitizer.js.map

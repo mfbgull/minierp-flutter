@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-08-25T06:25:06.227Z",
+  "sessionId": "sess_13547121-7451-4f1f-bc0e-987914c5d3e8",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "lib/features/reports/cash_flow_report_screen.dart",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 8,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

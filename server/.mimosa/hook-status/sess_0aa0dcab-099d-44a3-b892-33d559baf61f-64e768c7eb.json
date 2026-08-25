@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-08-25T07:18:06.546Z",
+  "sessionId": "sess_0aa0dcab-099d-44a3-b892-33d559baf61f",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/lib/l10n/ur.arb",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 50,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

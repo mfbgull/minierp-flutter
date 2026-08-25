@@ -37,4 +37,3 @@ describe('backup WAL durability (task 7.6)', () => {
         fs_1.default.rmSync(dir, { recursive: true, force: true });
     });
 });
-//# sourceMappingURL=backupWal.test.js.map

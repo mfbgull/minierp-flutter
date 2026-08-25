@@ -72,4 +72,3 @@ describe('AccountingService.postEntry period rollover', () => {
         expect(countPeriods(SEPT_PERIOD)).toBe(0);
     });
 });
-//# sourceMappingURL=accountingPeriodRoller.test.js.map

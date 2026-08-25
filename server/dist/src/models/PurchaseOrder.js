@@ -618,4 +618,3 @@ class PurchaseOrderModel {
 // Import SupplierLedgerModel at the bottom to avoid circular dependency
 const SupplierLedger_1 = __importDefault(require("./SupplierLedger"));
 exports.default = PurchaseOrderModel;
-//# sourceMappingURL=PurchaseOrder.js.map

@@ -13,4 +13,3 @@ router.post('/logout', auth_1.authenticateToken, authController_1.default.logout
 router.get('/me', auth_1.authenticateToken, authController_1.default.getCurrentUser);
 router.post('/change-password', auth_1.authenticateToken, rateLimiter_1.passwordChangeLimiter, authController_1.default.changePassword);
 exports.default = router;
-//# sourceMappingURL=auth.js.map

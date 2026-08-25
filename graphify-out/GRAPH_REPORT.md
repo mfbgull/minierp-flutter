@@ -1,12 +1,12 @@
-# Graph Report - /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter  (2026-08-24)
+# Graph Report - /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter  (2026-08-25)
 
 ## Corpus Check
-- 476 files · ~615,968 words
+- 484 files · ~625,483 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4491 nodes · 7235 edges · 130 communities detected
-- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 944 edges (avg confidence: 0.8)
+- 4561 nodes · 7356 edges · 130 communities detected
+- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 958 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -142,20 +142,18 @@
 - [[_COMMUNITY_Community 129|Community 129]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `package:flutter/material.dart` - 163 edges
-2. `package:flutter_riverpod/flutter_riverpod.dart` - 163 edges
-3. `run()` - 160 edges
-4. `../l10n/app_localizations.dart` - 139 edges
-5. `../data/repositories/api_result.dart` - 108 edges
-6. `number` - 96 edges
-7. `../core/utils/formatters.dart` - 79 edges
+1. `run()` - 166 edges
+2. `package:flutter/material.dart` - 165 edges
+3. `package:flutter_riverpod/flutter_riverpod.dart` - 165 edges
+4. `../l10n/app_localizations.dart` - 141 edges
+5. `../data/repositories/api_result.dart` - 109 edges
+6. `number` - 98 edges
+7. `../core/utils/formatters.dart` - 80 edges
 8. `package:minierp_app/core/theme/app_border_radius.dart` - 60 edges
 9. `../../widgets/app_toast.dart` - 56 edges
 10. `getQueryParam()` - 45 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `generateId()` --calls--> `toString`  [INFERRED]
-  /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/dashboard/useDashboardLayout.ts → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/lib/data/repositories/repository_client.dart
 - `number` --calls--> `getTopCustomers()`  [INFERRED]
   /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/lib/core/utils/formatters.dart → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/controllers/dashboardController.ts
 - `number` --calls--> `getStockMovementSummary()`  [INFERRED]
@@ -164,48 +162,50 @@
   /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/lib/core/utils/formatters.dart → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/services/cashService.ts
 - `toString` --calls--> `generateInvoiceNumber()`  [INFERRED]
   /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/lib/data/repositories/repository_client.dart → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/models/MobileInvoice.ts
+- `repairUnbatchedStock()` --calls--> `run()`  [INFERRED]
+  /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/scripts/repair-stock.ts → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/__tests__/glPoCommitment.test.ts
 
 ## Communities
 
 ### Community 0 - "Community 0"
 Cohesion: 0.01
-Nodes (441): ../activity_log/activity_log_providers.dart, ../admin/admin_providers.dart, ../core/utils/date_range_math.dart, ../core/utils/date_utils.dart, ../customers/customer_providers.dart, ../dashboard/dashboard_providers.dart, ../../data/models/activity_log.dart, ../../data/models/customer.dart (+433 more)
+Nodes (459): ../activity_log/activity_log_providers.dart, ../admin/admin_providers.dart, ../core/utils/date_utils.dart, ../customers/customer_providers.dart, ../dashboard/dashboard_providers.dart, ../../data/models/activity_log.dart, ../../data/models/customer.dart, ../../data/models/expense.dart (+451 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.01
-Nodes (204): activityLogBackstop(), newCorrelationId(), getUserActivity(), logCRUD(), newCorrelationId(), authenticateToken(), generateToken(), requireAdmin() (+196 more)
+Nodes (211): logCRUD(), newCorrelationId(), BOMModel, createBOM(), deleteBOM(), getAllBOMs(), getBOMById(), getBOMsByFinishedItem() (+203 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.01
-Nodes (338): activity_log_cleanup_dialog.dart, activity_log_detail_dialog.dart, activity_log_providers.dart, bom_detail_dialog.dart, bom_form_dialog.dart, ../../core/utils/csv_export.dart, ../../core/utils/expense_status.dart, ../core/utils/formatters.dart (+330 more)
+Nodes (344): activity_log_cleanup_dialog.dart, activity_log_detail_dialog.dart, activity_log_providers.dart, bom_detail_dialog.dart, bom_form_dialog.dart, ../../core/utils/csv_export.dart, ../../core/utils/expense_status.dart, ../core/utils/formatters.dart (+336 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.01
-Nodes (140): ActivityLoggerService, capSnapshot(), cleanupLogs(), disposeLogger(), flushLogs(), getEntityLogs(), getRecentLogs(), getUserLogs() (+132 more)
+Nodes (238): admin_models.dart, admin_providers.dart, admin_repository.dart, app_border_radius.dart, bom_screen.dart, ../core/theme/app_border_radius.dart, ../../core/theme/status_colors.dart, items_screen.dart (+230 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.01
-Nodes (237): admin_models.dart, admin_providers.dart, admin_repository.dart, app_border_radius.dart, bom_screen.dart, ../core/theme/app_border_radius.dart, ../../core/theme/status_colors.dart, items_screen.dart (+229 more)
+Nodes (113): createFixture(), addCurrency(), computeInvoiceGrandTotal(), computeInvoiceTotal(), computeLineAmount(), decomposeLineAmount(), multiplyCurrency(), parseCurrency() (+105 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.01
-Nodes (161): activity_log_presenters.dart, batch_management_screen.dart, ../../core/utils/movement_type_label.dart, ../../data/models/sales_return.dart, edit_payment_dialog.dart, invoice_return_type.dart, _ActivityLogDetailDialog, build (+153 more)
+Nodes (179): ../../data/models/price_history.dart, ../data/models/statement.dart, detail_error.dart, detail_labels.dart, detail_rows.dart, employee_detail_dialog.dart, employee_document_dialog.dart, employee_form_dialog.dart (+171 more)
 
 ### Community 6 - "Community 6"
 Cohesion: 0.01
-Nodes (152): calculations/invoice_calculations.dart, calculations/invoice_line_calc.dart, dart:math, line_items_grid.dart, _assertEditorFocus, build, _buildAmount, _closeOverlay (+144 more)
+Nodes (174): activity_log_presenters.dart, batch_management_screen.dart, ../../core/utils/movement_type_label.dart, ../../core/utils/purchase_return_type.dart, edit_payment_dialog.dart, exportToPDF(), formatCurrencyForExport(), exportToCSV() (+166 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.01
-Nodes (146): app_localizations.dart, app_localizations_en.dart, app_localizations_ur.dart, dart:convert, ../data/models/user_preferences.dart, ../../data/repositories/preferences_repository.dart, Locale, LocaleNotifier (+138 more)
+Cohesion: 0.02
+Nodes (133): ../api/api_client.dart, api_result.dart, app.dart, ../auth/session_events.dart, ../auth/token_storage.dart, ../../core/api/api_client.dart, ../../core/api/endpoints.dart, ../core/utils/date_range_math.dart (+125 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.02
-Nodes (123): ../api/api_client.dart, api_result.dart, ../auth/session_events.dart, ../auth/token_storage.dart, ../../core/api/api_client.dart, ../../core/api/endpoints.dart, ../../core/utils/error_mapper.dart, ../../data/models/auth_user.dart (+115 more)
+Cohesion: 0.01
+Nodes (119): json_helpers.dart, ledger_entry.dart, ActivityCount, ActivityLog, ActivityLogUser, ActivityStats, AuthUser, BackupFile (+111 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.02
-Nodes (132): app_toast.dart, calculations/invoice_rules.dart, ../../core/utils/invoice_status.dart, ../core/utils/print_utils.dart, invoice_payment_dialog.dart, invoice_pdf.dart, invoice_return_dialog.dart, line_cells.dart (+124 more)
+Nodes (133): app_toast.dart, calculations/invoice_rules.dart, ../../core/utils/invoice_status.dart, ../core/utils/print_utils.dart, invoice_payment_dialog.dart, invoice_pdf.dart, invoice_return_dialog.dart, line_cells.dart (+125 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.02
@@ -217,67 +217,67 @@ Nodes (117): cash_opening_balance_dialog.dart, cash_position_detail_dialog.dart,
 
 ### Community 12 - "Community 12"
 Cohesion: 0.02
-Nodes (115): demand_forecast_screen.dart, forecast_accuracy_screen.dart, forecast_dashboard_screen.dart, forecast_models.dart, forecast_providers.dart, forecast_repository.dart, forecast_trends_screen.dart, ../inventory/item_detail_dialog.dart (+107 more)
+Nodes (106): demand_forecast_screen.dart, forecast_accuracy_screen.dart, forecast_dashboard_screen.dart, forecast_models.dart, forecast_providers.dart, forecast_repository.dart, forecast_trends_screen.dart, ../inventory/item_detail_dialog.dart (+98 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.03
-Nodes (78): create(), createTemplate(), duplicate(), findById(), getTemplates(), markRun(), remove(), update() (+70 more)
+Cohesion: 0.02
+Nodes (102): dart:math, _applyAllDates, _applyPreset, _barText, build, _buildDayCell, _buildFooter, _buildPanel (+94 more)
 
 ### Community 14 - "Community 14"
 Cohesion: 0.02
-Nodes (82): json_helpers.dart, ledger_entry.dart, ActivityCount, ActivityLog, ActivityLogUser, ActivityStats, AuthUser, Bom (+74 more)
+Nodes (101): calculations/invoice_calculations.dart, calculations/invoice_line_calc.dart, line_items_grid.dart, _assertEditorFocus, build, _buildAmount, _closeOverlay, Column (+93 more)
 
 ### Community 15 - "Community 15"
-Cohesion: 0.02
-Nodes (99): ../../data/models/price_history.dart, ../data/models/statement.dart, detail_error.dart, detail_labels.dart, detail_rows.dart, ledger_table.dart, _amountController, _amountNode (+91 more)
+Cohesion: 0.03
+Nodes (46): AccountingService, collectFlows(), getCashAccountTotals(), getCashAccountTransactions(), getGlBalances(), getOpeningBalances(), isValidPaymentMethod(), normalizeCashMethod() (+38 more)
 
 ### Community 16 - "Community 16"
-Cohesion: 0.03
-Nodes (58): AccountingService, collectFlows(), getCashAccountTotals(), getCashAccountTransactions(), getGlBalances(), getOpeningBalances(), isValidPaymentMethod(), normalizeCashMethod() (+50 more)
+Cohesion: 0.04
+Nodes (69): getUserActivity(), authenticateToken(), generateToken(), requireAdmin(), create(), createTemplate(), duplicate(), findById() (+61 more)
 
 ### Community 17 - "Community 17"
 Cohesion: 0.02
 Nodes (87): ApiFailure, ApiSuccess, build, Builder, CustomerPaymentsTab, _CustomerPaymentsTabState, _editPayment, _empty (+79 more)
 
 ### Community 18 - "Community 18"
-Cohesion: 0.03
-Nodes (81): csv_export.dart, dart:io, dart:typed_data, ../../data/models/purchase_order.dart, ../../data/models/sales_order.dart, expense_status.dart, ../features/sales/models/sales_forms.dart, formatters.dart (+73 more)
+Cohesion: 0.02
+Nodes (86): app_localizations.dart, ../../data/models/backup.dart, ../../data/models/setting.dart, ../../data/repositories/backup_repository.dart, ../../data/repositories/settings_repository.dart, bytes, compactRange, currency (+78 more)
 
 ### Community 19 - "Community 19"
 Cohesion: 0.02
-Nodes (82): app.dart, ../../core/auth/auth_notifier.dart, core/auth/session_events.dart, ../../core/i18n/locale_provider.dart, core/theme/app_theme.dart, ../../core/theme/theme_mode_provider.dart, features/activity_log/activity_log_screen.dart, features/admin/admin_shell.dart (+74 more)
+Nodes (81): ../../core/auth/auth_notifier.dart, core/auth/session_events.dart, ../../core/i18n/locale_provider.dart, core/theme/app_theme.dart, ../../core/theme/theme_mode_provider.dart, features/activity_log/activity_log_screen.dart, features/admin/admin_shell.dart, features/auth/change_password_screen.dart (+73 more)
 
 ### Community 20 - "Community 20"
 Cohesion: 0.03
-Nodes (80): employee_detail_dialog.dart, employee_document_dialog.dart, employee_form_dialog.dart, employee_models.dart, employee_providers.dart, employee_repository.dart, ../../features/sales/payment_panel.dart, ApiFailure (+72 more)
+Nodes (77): cash_movement_labels.dart, csv_export.dart, dart:io, dart:typed_data, ../data/models/payment.dart, expense_status.dart, ../features/sales/models/sales_forms.dart, formatters.dart (+69 more)
 
 ### Community 21 - "Community 21"
 Cohesion: 0.03
-Nodes (75): calculations/production_calculations.dart, ../../data/models/bom.dart, ../../data/models/production.dart, ../../data/repositories/production_repository.dart, ApiFailure, ApiSuccess, BomDetailDialog, build (+67 more)
+Nodes (76): calculations/production_calculations.dart, ../../data/models/bom.dart, ../../data/models/production.dart, ../../data/models/warehouse.dart, ../../data/repositories/production_repository.dart, ApiFailure, ApiSuccess, BomDetailDialog (+68 more)
 
 ### Community 22 - "Community 22"
 Cohesion: 0.03
-Nodes (29): ActivityLogModel, localDateToUtcBound(), cleanupLogs(), exportLogs(), getActivityLogs(), getActivityStats(), getEntityActivity(), getRecentActivity() (+21 more)
+Nodes (32): activityLogBackstop(), ActivityLogModel, localDateToUtcBound(), newCorrelationId(), cleanupLogs(), exportLogs(), getActivityLogs(), getActivityStats() (+24 more)
 
 ### Community 23 - "Community 23"
-Cohesion: 0.03
-Nodes (60): ../../data/models/search_result.dart, ../../data/repositories/search_repository.dart, build, Center, dispose, Divider, _EmptyState, Focus (+52 more)
+Cohesion: 0.05
+Nodes (48): closePeriod(), getAccount(), getAccountBalance(), getCurrentPeriod(), getPeriod(), getReconciliation(), isValidIsoDate(), listAccountBalances() (+40 more)
 
 ### Community 24 - "Community 24"
-Cohesion: 0.09
-Nodes (34): closePeriod(), getAccount(), getAccountBalance(), getCurrentPeriod(), getPeriod(), getReconciliation(), isValidIsoDate(), listAccountBalances() (+26 more)
+Cohesion: 0.06
+Nodes (49): ActivityLoggerService, capSnapshot(), cleanupLogs(), disposeLogger(), flushLogs(), getEntityLogs(), getRecentLogs(), getUserLogs() (+41 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.07
-Nodes (52): deleteSeasonalEventHandler(), generateForecasts(), getAccuracyData(), getAccuracyDetail(), getDashboard(), getDemand(), getExport(), getModelConfigHandler() (+44 more)
+Cohesion: 0.03
+Nodes (61): ../../data/models/search_result.dart, ../../data/repositories/search_repository.dart, build, Center, dispose, Divider, _EmptyState, Focus (+53 more)
 
 ### Community 26 - "Community 26"
-Cohesion: 0.06
-Nodes (34): ApAgingBucket, ApAgingReport, ApAgingSummary, ArAgingBucket, ArAgingReport, ArAgingSummary, ArSummaryReport, ArSummaryStatusBreakdown (+26 more)
+Cohesion: 0.04
+Nodes (52): app_localizations_en.dart, app_localizations_ur.dart, dart:convert, ../data/models/user_preferences.dart, ../../data/repositories/preferences_repository.dart, Locale, LocaleNotifier, _systemOrEnglish (+44 more)
 
 ### Community 27 - "Community 27"
-Cohesion: 0.06
-Nodes (31): ../../data/models/expense.dart, ../../data/repositories/expense_repository.dart, expense_category_dialog.dart, expense_providers.dart, ApiFailure, ApiSuccess, build, _categoryRow (+23 more)
+Cohesion: 0.07
+Nodes (52): deleteSeasonalEventHandler(), generateForecasts(), getAccuracyData(), getAccuracyDetail(), getDashboard(), getDemand(), getExport(), getModelConfigHandler() (+44 more)
 
 ### Community 28 - "Community 28"
 Cohesion: 0.1
@@ -289,119 +289,119 @@ Nodes (17): getSearch(), resolvePermissionContext(), search(), searchBOMs(), sea
 
 ### Community 30 - "Community 30"
 Cohesion: 0.16
-Nodes (15): create(), deleteRole(), getAllPermissions(), getById(), getByName(), getPermissionsForRole(), update(), updatePermissions() (+7 more)
-
-### Community 31 - "Community 31"
-Cohesion: 0.16
 Nodes (12): buildIntegrationStatus(), getByKey(), getIntegrationKeys(), updateBulk(), updateIntegrationSetting(), upsert(), getIntegrationSettings(), getSetting() (+4 more)
 
-### Community 32 - "Community 32"
+### Community 31 - "Community 31"
 Cohesion: 0.13
 Nodes (14): DiscountScope, EditedField, InvoiceFormItem, InvoiceFormPayment, InvoiceFormState, InvoiceV2Customer, InvoiceV2FormItem, InvoiceV2Payment (+6 more)
 
-### Community 33 - "Community 33"
-Cohesion: 0.24
-Nodes (9): exportToPDF(), formatCurrencyForExport(), exportToCSV(), exportToPDF(), handlePrint(), prepareExportData(), sanitizeCustomerName(), todayStr() (+1 more)
-
-### Community 34 - "Community 34"
+### Community 32 - "Community 32"
 Cohesion: 0.17
 Nodes (11): addDays, dateOnly, daysInRange, endOfWeek, mondayBasedIndex, presetRange, presetType, shiftRange (+3 more)
 
-### Community 35 - "Community 35"
+### Community 33 - "Community 33"
 Cohesion: 0.23
 Nodes (1): QuotationModel
 
-### Community 36 - "Community 36"
+### Community 34 - "Community 34"
+Cohesion: 0.31
+Nodes (9): deleteBackupFile(), ensureBackupDir(), lastBackupAgeMs(), lastBackupAt(), listBackups(), pruneRetention(), resolveBackupFilePath(), runBackup() (+1 more)
+
+### Community 35 - "Community 35"
 Cohesion: 0.33
 Nodes (8): click_label(), detect_overflow_stripes(), main(), nav_to(), Scan screenshots for Flutter's yellow/black overflow stripes., Click the first semantics node whose aria-label contains needle., Click a navigation rail item by its semantics label., shot()
 
-### Community 37 - "Community 37"
+### Community 36 - "Community 36"
 Cohesion: 0.39
 Nodes (7): dump_labels(), enable_semantics(), force_click(), main(), Print up to 40 visible aria-labels — helps diagnose the DOM state., Force-click the first flt-semantics node whose label contains needle., shot()
 
-### Community 38 - "Community 38"
+### Community 37 - "Community 37"
 Cohesion: 0.46
 Nodes (7): click_label(), dump_labels(), main(), open_pill(), Open the popover by clicking the pill's date label., shot(), wait_for_inputs()
 
-### Community 39 - "Community 39"
+### Community 38 - "Community 38"
 Cohesion: 0.57
 Nodes (7): click_label(), dump_labels(), enable_semantics(), log(), main(), shot(), wait_and_boot()
 
-### Community 40 - "Community 40"
+### Community 39 - "Community 39"
 Cohesion: 0.57
 Nodes (6): dump_labels(), force_click_label(), main(), nav(), shot(), wait_for()
 
-### Community 41 - "Community 41"
+### Community 40 - "Community 40"
 Cohesion: 0.29
 Nodes (6): ApiError, ApiFailure, ApiResult, ApiSuccess, Function, toString
 
-### Community 42 - "Community 42"
+### Community 41 - "Community 41"
 Cohesion: 0.33
 Nodes (0): 
 
-### Community 43 - "Community 43"
+### Community 42 - "Community 42"
 Cohesion: 0.33
 Nodes (3): AppDelegate, FlutterAppDelegate, FlutterImplicitEngineDelegate
 
-### Community 44 - "Community 44"
-Cohesion: 0.53
-Nodes (5): ensureBackupDir(), lastBackupAgeMs(), pruneRetention(), runBackup(), startBackupScheduler()
-
-### Community 45 - "Community 45"
+### Community 43 - "Community 43"
 Cohesion: 0.7
 Nodes (4): validateZod(), validateZodBody(), validateZodParams(), validateZodQuery()
 
-### Community 46 - "Community 46"
+### Community 44 - "Community 44"
 Cohesion: 0.83
 Nodes (3): api(), check(), main()
 
-### Community 47 - "Community 47"
+### Community 45 - "Community 45"
 Cohesion: 0.5
 Nodes (0): 
 
-### Community 48 - "Community 48"
+### Community 46 - "Community 46"
 Cohesion: 0.5
 Nodes (2): handle_new_rx_page(), Intercept NOTIFY_DEBUGGER_ABOUT_RX_PAGES and touch the pages.
 
-### Community 49 - "Community 49"
+### Community 47 - "Community 47"
 Cohesion: 0.5
 Nodes (2): RunnerTests, XCTestCase
 
-### Community 50 - "Community 50"
+### Community 48 - "Community 48"
 Cohesion: 0.5
 Nodes (3): SearchAction, SearchResponse, SearchResult
 
-### Community 51 - "Community 51"
+### Community 49 - "Community 49"
 Cohesion: 0.5
 Nodes (3): OffsetPagedResponse, PagedRequest, PagedResponse
 
-### Community 52 - "Community 52"
+### Community 50 - "Community 50"
 Cohesion: 0.5
 Nodes (2): shutdownRateLimiters(), globalTeardown()
 
-### Community 53 - "Community 53"
+### Community 51 - "Community 51"
 Cohesion: 0.5
+Nodes (0): 
+
+### Community 52 - "Community 52"
+Cohesion: 0.67
+Nodes (0): 
+
+### Community 53 - "Community 53"
+Cohesion: 0.67
 Nodes (0): 
 
 ### Community 54 - "Community 54"
 Cohesion: 0.67
-Nodes (0): 
+Nodes (2): GeneratedPluginRegistrant, -registerWithRegistry
 
 ### Community 55 - "Community 55"
 Cohesion: 0.67
-Nodes (0): 
+Nodes (2): FlutterSceneDelegate, SceneDelegate
 
 ### Community 56 - "Community 56"
 Cohesion: 0.67
-Nodes (2): GeneratedPluginRegistrant, -registerWithRegistry
+Nodes (2): ItemPriceHistory, _num
 
 ### Community 57 - "Community 57"
 Cohesion: 0.67
-Nodes (2): FlutterSceneDelegate, SceneDelegate
+Nodes (0): 
 
 ### Community 58 - "Community 58"
 Cohesion: 0.67
-Nodes (2): ItemPriceHistory, _num
+Nodes (0): 
 
 ### Community 59 - "Community 59"
 Cohesion: 0.67
@@ -416,28 +416,28 @@ Cohesion: 0.67
 Nodes (0): 
 
 ### Community 62 - "Community 62"
-Cohesion: 0.67
+Cohesion: 1.0
 Nodes (0): 
 
 ### Community 63 - "Community 63"
-Cohesion: 0.67
+Cohesion: 1.0
 Nodes (0): 
 
 ### Community 64 - "Community 64"
 Cohesion: 1.0
-Nodes (0): 
+Nodes (1): isoDate
 
 ### Community 65 - "Community 65"
 Cohesion: 1.0
-Nodes (0): 
+Nodes (1): asBool
 
 ### Community 66 - "Community 66"
 Cohesion: 1.0
-Nodes (1): isoDate
+Nodes (0): 
 
 ### Community 67 - "Community 67"
 Cohesion: 1.0
-Nodes (1): asBool
+Nodes (0): 
 
 ### Community 68 - "Community 68"
 Cohesion: 1.0
@@ -688,53 +688,57 @@ Cohesion: 1.0
 Nodes (0): 
 
 ## Knowledge Gaps
-- **2674 isolated node(s):** `Click the first semantics node whose aria-label contains needle.`, `Click a navigation rail item by its semantics label.`, `Scan screenshots for Flutter's yellow/black overflow stripes.`, `Print up to 40 visible aria-labels — helps diagnose the DOM state.`, `Force-click the first flt-semantics node whose label contains needle.` (+2669 more)
+- **2716 isolated node(s):** `Click the first semantics node whose aria-label contains needle.`, `Click a navigation rail item by its semantics label.`, `Scan screenshots for Flutter's yellow/black overflow stripes.`, `Print up to 40 visible aria-labels — helps diagnose the DOM state.`, `Force-click the first flt-semantics node whose label contains needle.` (+2711 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Community 64`** (2 nodes): `verify-crash.py`, `main()`
+- **Thin community `Community 62`** (2 nodes): `verify-crash.py`, `main()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 65`** (2 nodes): `SkeletonCard()`, `ForecastTrends.tsx`
+- **Thin community `Community 63`** (2 nodes): `SkeletonCard()`, `ForecastTrends.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 66`** (2 nodes): `date_utils.dart`, `isoDate`
+- **Thin community `Community 64`** (2 nodes): `date_utils.dart`, `isoDate`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 67`** (2 nodes): `json_helpers.dart`, `asBool`
+- **Thin community `Community 65`** (2 nodes): `json_helpers.dart`, `asBool`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 68`** (2 nodes): `requirePermission.ts`, `requirePermission()`
+- **Thin community `Community 66`** (2 nodes): `requirePermission.ts`, `requirePermission()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 69`** (2 nodes): `upload.ts`, `documentFilter()`
+- **Thin community `Community 67`** (2 nodes): `upload.ts`, `documentFilter()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 70`** (2 nodes): `toLocalDate()`, `activityLog.test.ts`
+- **Thin community `Community 68`** (2 nodes): `paramName()`, `adminBackup.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 71`** (2 nodes): `fingerprint()`, `bootIdempotency.test.ts`
+- **Thin community `Community 69`** (2 nodes): `toLocalDate()`, `activityLog.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 72`** (2 nodes): `search.test.ts`, `createFixture()`
+- **Thin community `Community 70`** (2 nodes): `fingerprint()`, `bootIdempotency.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 73`** (2 nodes): `setup.ts`, `cleanupTestDb()`
+- **Thin community `Community 71`** (2 nodes): `search.test.ts`, `createFixture()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 74`** (1 nodes): `probe-page.py`
+- **Thin community `Community 72`** (2 nodes): `setup.ts`, `cleanupTestDb()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 75`** (1 nodes): `validation-schemas.ts`
+- **Thin community `Community 73`** (1 nodes): `probe-page.py`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 76`** (1 nodes): `dashboardConstants.ts`
+- **Thin community `Community 74`** (1 nodes): `validation-schemas.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 77`** (1 nodes): `Package.swift`
+- **Thin community `Community 75`** (1 nodes): `dashboardConstants.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 78`** (1 nodes): `FlutterGeneratedPluginSwiftPackage.swift`
+- **Thin community `Community 76`** (1 nodes): `Package.swift`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 79`** (1 nodes): `GeneratedPluginRegistrant.h`
+- **Thin community `Community 77`** (1 nodes): `FlutterGeneratedPluginSwiftPackage.swift`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 80`** (1 nodes): `Runner-Bridging-Header.h`
+- **Thin community `Community 78`** (1 nodes): `GeneratedPluginRegistrant.h`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 81`** (1 nodes): `endpoints.dart`
+- **Thin community `Community 79`** (1 nodes): `Runner-Bridging-Header.h`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 82`** (1 nodes): `dbg-flush.ts`
+- **Thin community `Community 80`** (1 nodes): `endpoints.dart`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 83`** (1 nodes): `dbg-pay01.ts`
+- **Thin community `Community 81`** (1 nodes): `dbg-flush.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 84`** (1 nodes): `eslint.config.js`
+- **Thin community `Community 82`** (1 nodes): `dbg-pay01.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 85`** (1 nodes): `jest.config.js`
+- **Thin community `Community 83`** (1 nodes): `eslint.config.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 86`** (1 nodes): `cleanup-e2e-test-data.js`
+- **Thin community `Community 84`** (1 nodes): `jest.config.js`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 85`** (1 nodes): `cleanup-e2e-test-data.js`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 86`** (1 nodes): `repair-orphaned-ledger.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 87`** (1 nodes): `accounting.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -826,16 +830,16 @@ Nodes (0):
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `package:flutter_riverpod/flutter_riverpod.dart` connect `Community 8` to `Community 0`, `Community 2`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 15`, `Community 17`, `Community 19`, `Community 20`, `Community 21`, `Community 23`, `Community 27`?**
-  _High betweenness centrality (0.242) - this node is a cross-community bridge._
-- **Why does `number` connect `Community 1` to `Community 3`, `Community 7`, `Community 13`, `Community 16`, `Community 25`, `Community 29`?**
-  _High betweenness centrality (0.235) - this node is a cross-community bridge._
-- **Why does `package:intl/intl.dart` connect `Community 7` to `Community 0`?**
-  _High betweenness centrality (0.223) - this node is a cross-community bridge._
-- **Are the 159 inferred relationships involving `run()` (e.g. with `repairUnbatchedStock()` and `repairOrphanedBatches()`) actually correct?**
-  _`run()` has 159 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `package:flutter_riverpod/flutter_riverpod.dart` connect `Community 7` to `Community 0`, `Community 2`, `Community 3`, `Community 5`, `Community 6`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 13`, `Community 17`, `Community 18`, `Community 19`, `Community 21`, `Community 25`, `Community 26`?**
+  _High betweenness centrality (0.228) - this node is a cross-community bridge._
+- **Why does `number` connect `Community 1` to `Community 4`, `Community 15`, `Community 16`, `Community 18`, `Community 24`, `Community 27`, `Community 29`?**
+  _High betweenness centrality (0.215) - this node is a cross-community bridge._
+- **Why does `package:intl/intl.dart` connect `Community 18` to `Community 0`, `Community 26`, `Community 13`?**
+  _High betweenness centrality (0.215) - this node is a cross-community bridge._
+- **Are the 165 inferred relationships involving `run()` (e.g. with `repairUnbatchedStock()` and `repairOrphanedBatches()`) actually correct?**
+  _`run()` has 165 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `Click the first semantics node whose aria-label contains needle.`, `Click a navigation rail item by its semantics label.`, `Scan screenshots for Flutter's yellow/black overflow stripes.` to the rest of the system?**
-  _2674 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _2716 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.01 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**

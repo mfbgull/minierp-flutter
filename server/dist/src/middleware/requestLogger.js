@@ -64,4 +64,3 @@ function errorLogger(err, req, res, next) {
     });
     next(err);
 }
-//# sourceMappingURL=requestLogger.js.map

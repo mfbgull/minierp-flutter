@@ -96,4 +96,3 @@ describe('POST /api/inventory/stock-transfers (INV-02)', () => {
         expect(after.n).toBe(beforeN); // nothing recorded
     });
 });
-//# sourceMappingURL=stockTransfer.test.js.map

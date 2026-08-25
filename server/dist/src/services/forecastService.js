@@ -1074,4 +1074,3 @@ function getForecastRuns(limit = 20) {
     SELECT * FROM forecast_runs ORDER BY started_at DESC LIMIT ?
   `).all(limit);
 }
-//# sourceMappingURL=forecastService.js.map

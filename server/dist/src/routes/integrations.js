@@ -39,4 +39,3 @@ router.put('/settings/:service', (0, requirePermission_1.requirePermission)('int
     }
 });
 exports.default = router;
-//# sourceMappingURL=integrations.js.map

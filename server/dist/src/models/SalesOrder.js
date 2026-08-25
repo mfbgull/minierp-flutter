@@ -565,4 +565,3 @@ class SalesOrderModel {
     }
 }
 exports.default = SalesOrderModel;
-//# sourceMappingURL=SalesOrder.js.map

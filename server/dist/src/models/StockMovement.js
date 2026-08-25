@@ -588,4 +588,3 @@ class StockMovementModel {
     }
 }
 exports.default = StockMovementModel;
-//# sourceMappingURL=StockMovement.js.map

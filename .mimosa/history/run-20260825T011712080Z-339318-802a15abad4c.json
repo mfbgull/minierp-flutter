@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "mimosa-finding-history/v1",
+  "runId": "20260825T011712080Z-339318-802a15abad4c",
+  "runStatus": "inconclusive",
+  "errors": [
+    "baseline-read:.vscode/settings.json: baseline_snapshot_unreadable: file is missing from task baseline",
+    "agent-check:.: spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT"
+  ],
+  "target": ".",
+  "revision": "c202c158be02ae42938b71bb1387ff635639d809",
+  "diffHash": "2d3be0d1362d4eccb51c2e0ea958df92bf7ce2bc8894fb26fe37f9706b8d4d74",
+  "rulesVersion": "unavailable",
+  "recordedAt": "2026-08-25T01:17:12.080Z",
+  "timing": {
+    "startedAt": "2026-08-25T01:17:09.085Z",
+    "completedAt": "2026-08-25T01:17:12.080Z",
+    "durationMs": 2995
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "modelCalls": 0,
+    "measurement": "known-zero"
+  },
+  "findings": {
+    "total": 0,
+    "bySeverity": {},
+    "byStatus": {}
+  },
+  "coverage": {
+    "status": "partial",
+    "reasonCounts": {
+      "baseline_snapshot_unreadable": 1,
+      "project_check_failed": 2
+    }
+  },
+  "evidenceBoundary": "static_only",
+  "immutableReport": ".mimosa/reports/task-review-sess_1c9d7369-b1ca-4882-b1b7-cfd78e85dfdc-20260825T011712080Z-339318-802a15abad4c.json"
+}

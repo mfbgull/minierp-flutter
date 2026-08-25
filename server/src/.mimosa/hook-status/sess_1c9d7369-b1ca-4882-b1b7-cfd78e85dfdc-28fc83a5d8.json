@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-08-25T03:16:54.517Z",
+  "sessionId": "sess_1c9d7369-b1ca-4882-b1b7-cfd78e85dfdc",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "__tests__/ledgerIntegrity.test.ts",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 68,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

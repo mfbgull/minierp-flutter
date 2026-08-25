@@ -50,4 +50,3 @@ describe('localDateToUtcBound', () => {
         expect(start < end).toBe(true);
     });
 });
-//# sourceMappingURL=activityLog.test.js.map

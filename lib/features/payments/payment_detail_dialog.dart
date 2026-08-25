@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/status_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/payment.dart' show Payment;
 import '../../data/repositories/api_result.dart'
@@ -124,10 +125,11 @@ class _DetailBody extends ConsumerWidget {
                       payment.paymentNo,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    if (payment.customerName != null) ...[
+                    if (payment.customerName != null ||
+                        payment.supplierName != null) ...[
                       const SizedBox(height: 4),
                       Text(
-                        payment.customerName!,
+                        payment.customerName ?? payment.supplierName!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
@@ -137,6 +139,16 @@ class _DetailBody extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 12),
+              // Direction first — In (from customer) vs Out (to supplier).
+              StatusBadge(
+                status: payment.supplierId != null
+                    ? l10n.paymentsTypeout
+                    : l10n.paymentsTypein,
+                color: payment.supplierId != null
+                    ? StatusColors.of(context).error
+                    : StatusColors.of(context).success,
+              ),
+              const SizedBox(width: 6),
               StatusBadge(status: payment.paymentMethod, color: Theme.of(context).colorScheme.tertiary),
             ],
           ),
@@ -164,8 +176,12 @@ class _DetailBody extends ConsumerWidget {
                 const SizedBox(height: 12),
                 DetailInfoRows(
                   rows: [
-                    // Customer already heads the dialog — keep the rows
-                    // to method/reference/notes/invoice only.
+                    // The party name also heads the dialog — label which
+                    // side of the transaction it is.
+                    if (payment.supplierName != null)
+                      (l10n.fieldsSupplier, payment.supplierName!)
+                    else if (payment.customerName != null)
+                      (l10n.fieldsCustomer, payment.customerName!),
                     (l10n.expensesPaymentmethod, payment.paymentMethod),
                     if (payment.invoiceNo != null)
                       (l10n.fieldsInvoice, payment.invoiceNo!),

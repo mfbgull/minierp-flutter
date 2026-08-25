@@ -32,6 +32,11 @@ class PurchaseSort {
 /// Active server-side sort; null = server default (purchase_date DESC).
 final purchasesSortProvider = StateProvider<PurchaseSort?>((ref) => null);
 
+/// Whether voided purchases are shown in the grid. Default false — the
+/// server hides them (`p.voided_at IS NULL`) unless this sends
+/// `include_voided=1` (the toolbar's "Show Voided" chip).
+final purchasesIncludeVoidedProvider = StateProvider<bool>((ref) => false);
+
 /// One page of direct purchases — server-paginated like customers/suppliers
 /// (`GET /purchases` returns a `pagination` block). Re-runs when any of
 /// the paging/filter state changes; the screen invalidates it on refresh,
@@ -42,6 +47,7 @@ final purchasesProvider = FutureProvider<PagedResponse<Purchase>>((ref) async {
   final page = ref.watch(purchasesPageProvider);
   final limit = ref.watch(purchasesLimitProvider);
   final sort = ref.watch(purchasesSortProvider);
+  final includeVoided = ref.watch(purchasesIncludeVoidedProvider);
 
   final result = await ref.watch(purchaseRepositoryProvider).listPaged(
     PagedRequest(
@@ -50,6 +56,7 @@ final purchasesProvider = FutureProvider<PagedResponse<Purchase>>((ref) async {
       search: search.isEmpty ? null : search,
       sortBy: sort?.column,
       sortOrder: sort?.order ?? 'ASC',
+      extra: includeVoided ? {'include_voided': '1'} : null,
     ),
   );
 
@@ -66,9 +73,15 @@ final purchasesProvider = FutureProvider<PagedResponse<Purchase>>((ref) async {
 final filteredPurchasesProvider =
     FutureProvider<List<Purchase>>((ref) async {
       final search = ref.watch(purchasesSearchProvider);
+      final includeVoided = ref.watch(purchasesIncludeVoidedProvider);
 
       final result = await ref.watch(purchaseRepositoryProvider).listPaged(
-        PagedRequest(page: 1, limit: 10000, search: search.isEmpty ? null : search),
+        PagedRequest(
+          page: 1,
+          limit: 10000,
+          search: search.isEmpty ? null : search,
+          extra: includeVoided ? {'include_voided': '1'} : null,
+        ),
       );
 
       return switch (result) {

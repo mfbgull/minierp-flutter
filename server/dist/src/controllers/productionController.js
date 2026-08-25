@@ -129,4 +129,3 @@ exports.default = {
     getProductionSummaryByItem,
     deleteProduction
 };
-//# sourceMappingURL=productionController.js.map

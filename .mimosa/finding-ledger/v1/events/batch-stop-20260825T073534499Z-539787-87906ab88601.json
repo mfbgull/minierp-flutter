@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260825T073534499Z-539787-87906ab88601",
+  "runId": "20260825T073534499Z-539787-87906ab88601",
+  "runStatus": "inconclusive",
+  "coverage": {
+    "status": "partial",
+    "reasons": [
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "server/src/services/backupService.ts",
+        "detail": "spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "server/src/services/activityLogger.ts",
+        "detail": "spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "server/src/routes/adminBackup.ts",
+        "detail": "spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "server/src/app.ts",
+        "detail": "spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "scanner_failed",
+        "stage": "scan",
+        "target": "server/src/__tests__/adminBackup.test.ts",
+        "detail": "spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "server/src/services/backupService.ts",
+        "detail": "scanner_failed: spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "server/src/services/activityLogger.ts",
+        "detail": "scanner_failed: spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "server/src/routes/adminBackup.ts",
+        "detail": "scanner_failed: spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "server/src/app.ts",
+        "detail": "scanner_failed: spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "scan",
+        "target": "server/src/__tests__/adminBackup.test.ts",
+        "detail": "scanner_failed: spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+        "affectsCompletion": true
+      }
+    ]
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "c202c158be02ae42938b71bb1387ff635639d809",
+  "diffHash": "a1e8b5178d53d542d17c1b65aa6e38dce54ef22643eb2f48b4ab350f95e9a739",
+  "rulesVersion": "unavailable",
+  "sessionHash": "64e768c7eb489c3e4bcd91faa0215f00060a87fe6100c6c3e4a8b4a215f63721",
+  "reportRef": ".mimosa/reports/task-review-sess_0aa0dcab-099d-44a3-b892-33d559baf61f-20260825T073534499Z-539787-87906ab88601.json",
+  "events": [],
+  "observedFindingIds": [],
+  "verifiedFiles": [],
+  "recordedAt": "2026-08-25T07:35:35.992Z"
+}

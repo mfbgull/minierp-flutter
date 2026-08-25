@@ -25,6 +25,10 @@ import '../models/sales_forms.dart'
 
 /* ── Item-level calculations ────────────────────────────────────── */
 
+/// Round to cents — mirrors the server's `roundCurrency` so the
+/// displayed totals agree with ACC-18 validation and storage exactly.
+num _round2(num value) => (value * 100).round() / 100;
+
 /// Base amount of a line. Amount-driven loose lines (flip model, spec
 /// §5.2) bill the entered amount verbatim — qty × rate would differ by
 /// the quantity rounding.
@@ -35,68 +39,86 @@ num calculateItemBase(CalculableLine item) {
   return item.quantity * item.rate;
 }
 
-/// Discount amount for a single item.
-num calculateItemDiscount(CalculableLine item) {
-  final subtotal = calculateItemBase(item);
-  if (item.discount.type == DiscountType.percentage) {
-    return (subtotal * item.discount.value) / 100;
-  }
-  return item.discount.value;
+/// Rounded gross of a line — the server's `decomposeLineAmount` rounds
+/// the base before applying discount/tax.
+num _lineGross(CalculableLine item) => _round2(calculateItemBase(item));
+
+/// Discount amount for a single item (capped at the gross, like the
+/// server's `Math.min(discountAmount, gross)`).
+num _lineDiscount(CalculableLine item, num gross) {
+  final raw = item.discount.type == DiscountType.percentage
+      ? gross * item.discount.value / 100
+      : item.discount.value;
+  final rounded = _round2(raw);
+  return rounded > gross ? gross : (rounded < 0 ? 0 : rounded);
 }
 
-/// Total for a single item (subtotal − discount + tax).
+/// Net (pre-tax) amount of a line after its item-scope discount.
+num _lineNet(CalculableLine item, num gross, DiscountScope discountScope) {
+  final discount = discountScope == DiscountScope.item
+      ? _lineDiscount(item, gross)
+      : 0;
+  return _round2(gross - discount);
+}
+
+/// Discount amount for a single item.
+num calculateItemDiscount(CalculableLine item) =>
+    _lineDiscount(item, _lineGross(item));
+
+/// Total for a single line (gross − item-scope discount + tax), each
+/// boundary rounded like the server stores it.
 num calculateItemTotal(
   CalculableLine item, {
   DiscountScope discountScope = DiscountScope.item,
 }) {
-  final subtotal = calculateItemBase(item);
-  final discount = discountScope == DiscountScope.item
-      ? calculateItemDiscount(item)
-      : 0;
-  final afterDiscount = subtotal - discount;
-  final taxAmount = (afterDiscount * item.tax) / 100;
-  return afterDiscount + taxAmount;
+  final net = _lineNet(item, _lineGross(item), discountScope);
+  final taxAmount = _round2(net * item.tax / 100);
+  return net + taxAmount;
 }
 
 /* ── Aggregate calculations ─────────────────────────────────────── */
 
-/// Subtotal (sum of qty × rate for all items).
+/// Subtotal (Σ of rounded line grosses).
 num calculateSubtotal(List<CalculableLine> items) {
-  return items.fold<num>(0, (sum, item) => sum + calculateItemBase(item));
+  return items.fold<num>(0, (sum, item) => sum + _lineGross(item));
 }
 
-/// Total tax across all items.
+/// Total tax across all items (per-line rounded, on the post-discount
+/// net — invoice-scope discounts don't reduce the tax base).
 num calculateTax(
   List<CalculableLine> items, {
   DiscountScope discountScope = DiscountScope.item,
 }) {
   return items.fold<num>(0, (sum, item) {
-    final subtotal = calculateItemBase(item);
-    final discount = discountScope == DiscountScope.item
-        ? calculateItemDiscount(item)
-        : 0;
-    final afterDiscount = subtotal - discount;
-    return sum + (afterDiscount * item.tax) / 100;
+    final net = _lineNet(item, _lineGross(item), discountScope);
+    return sum + _round2(net * item.tax / 100);
   });
 }
 
-/// Total discount across all items (or invoice-level discount).
+/// Total discount across all items (or invoice-level discount applied
+/// on the subtotal, capped at it).
 num calculateDiscount(
   List<CalculableLine> items,
   DiscountScope discountScope,
   Discount invoiceDiscount,
 ) {
   if (discountScope == DiscountScope.item) {
-    return items.fold<num>(0, (sum, item) => sum + calculateItemDiscount(item));
+    return items.fold<num>(
+      0,
+      (sum, item) => sum + _lineDiscount(item, _lineGross(item)),
+    );
   }
   final subtotal = calculateSubtotal(items);
-  if (invoiceDiscount.type == DiscountType.percentage) {
-    return (subtotal * invoiceDiscount.value) / 100;
-  }
-  return invoiceDiscount.value;
+  final raw = invoiceDiscount.type == DiscountType.percentage
+      ? subtotal * invoiceDiscount.value / 100
+      : invoiceDiscount.value;
+  final rounded = _round2(raw);
+  return rounded > subtotal ? subtotal : (rounded < 0 ? 0 : rounded);
 }
 
-/// Grand total (subtotal + tax − discount).
+/// Grand total (subtotal + tax − discount). With every boundary rounded
+/// here exactly like `computeInvoiceGrandTotal` on the server, this is
+/// the number ACC-18 validation expects as `total_amount`.
 num calculateTotal(
   List<CalculableLine> items,
   DiscountScope discountScope,

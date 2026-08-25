@@ -1,8 +1,8 @@
 // Supplier detail page — web `SupplierDetailPage` parity (same treatment
 // as the customer module). Full screen under the shell's `/suppliers/:id`
 // branch: header (name + contact + Record Payment), quick-stats bar
-// (Balance / Payment Terms, the web SupplierHeader's stats) and 5 tabs —
-// Overview, POs, Ledger, Payments, Statement. Every tab owns its provider
+// (Balance / Payment Terms, the web SupplierHeader's stats) and 6 tabs —
+// Overview, POs, Purchases, Ledger, Payments, Statement. Every tab owns its provider
 // watch; the page only watches detail + balance for the stats bar.
 
 import 'package:flutter/material.dart';
@@ -20,6 +20,7 @@ import 'supplier_payment_modal.dart' show showSupplierPaymentModal;
 import 'supplier_payments_tab.dart';
 import 'supplier_pos_tab.dart';
 import 'supplier_providers.dart';
+import 'supplier_purchases_tab.dart';
 import 'supplier_statement_tab.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
@@ -40,7 +41,7 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -78,9 +79,7 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
     // Balance quick-stat source (web SupplierHeader's balanceData).
     final balance = ref.watch(supplierBalanceProvider(widget.supplierId));
     final currentBalance =
-        balance.valueOrNull?.currentBalance ??
-        supplier.currentBalance ??
-        0;
+        balance.valueOrNull?.currentBalance ?? supplier.currentBalance ?? 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -194,6 +193,7 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
           tabs: [
             Tab(text: l10n.suppliersOverview),
             Tab(text: l10n.suppliersPos),
+            Tab(text: l10n.suppliersPurchases),
             Tab(text: l10n.suppliersLedger),
             Tab(text: l10n.suppliersPayments),
             Tab(text: l10n.suppliersStatement),
@@ -205,6 +205,7 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
             children: [
               SupplierOverviewTab(supplierId: widget.supplierId),
               SupplierPosTab(supplierId: widget.supplierId),
+              SupplierPurchasesTab(supplierId: widget.supplierId),
               SupplierLedgerTab(supplierId: widget.supplierId),
               SupplierPaymentsTab(supplierId: widget.supplierId),
               SupplierStatementTab(supplierId: widget.supplierId),
@@ -258,9 +259,9 @@ class _QuickStat extends StatelessWidget {
               ),
               Text(
                 label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ],
           ),

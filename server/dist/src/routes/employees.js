@@ -42,4 +42,3 @@ router.get('/:id/documents/file/:filename', (0, requirePermission_1.requirePermi
     });
 });
 exports.default = router;
-//# sourceMappingURL=employees.js.map

@@ -54,4 +54,3 @@ class WarehouseModel {
     }
 }
 exports.default = WarehouseModel;
-//# sourceMappingURL=Warehouse.js.map

@@ -1,0 +1,266 @@
+{
+  "schema_version": "mimosa-task-review/v2",
+  "run_id": "20260825T011712080Z-339318-802a15abad4c",
+  "run_status": "inconclusive",
+  "errors": [
+    {
+      "stage": "baseline-read",
+      "target": ".vscode/settings.json",
+      "reason": "baseline_snapshot_unreadable: file is missing from task baseline"
+    },
+    {
+      "stage": "agent-check",
+      "target": ".",
+      "reason": "spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT"
+    }
+  ],
+  "coverage": {
+    "schema_version": "mimosa-hook-coverage/v1",
+    "status": "partial",
+    "scope": "hook_observed_diff",
+    "baseline": {
+      "complete": true,
+      "captured_files": 369,
+      "candidate_limit": 5000,
+      "truncated": false,
+      "enumeration_error_count": 0,
+      "snapshot_error_count": 0,
+      "compensated_target_count": 3
+    },
+    "change_tracking": {
+      "touched_observed": 2,
+      "touched_retained": 2,
+      "truncated": false,
+      "bash_mutation": true,
+      "bash_discovered": 4,
+      "bash_discovery_limit": 80,
+      "bash_discovery_truncated": false
+    },
+    "candidates": {
+      "eligible_files": 4,
+      "selected_files": 4,
+      "limit": 20,
+      "truncated": false
+    },
+    "scanning": {
+      "required_files": 3,
+      "scanned_files": 3,
+      "skipped_files": 0,
+      "failed_files": 0,
+      "project_checks_required": 1,
+      "project_checks_completed": 0
+    },
+    "notification": {
+      "eligible_findings": 0,
+      "detailed_findings": 0,
+      "detail_limit": 3,
+      "truncated": false
+    },
+    "reason_counts": {
+      "baseline_snapshot_unreadable": 1,
+      "project_check_failed": 2
+    },
+    "reasons": [
+      {
+        "code": "baseline_snapshot_unreadable",
+        "stage": "baseline-read",
+        "target": ".vscode/settings.json",
+        "detail": "file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "baseline-read",
+        "target": ".vscode/settings.json",
+        "detail": "baseline_snapshot_unreadable: file is missing from task baseline",
+        "affects_completion": true
+      },
+      {
+        "code": "project_check_failed",
+        "stage": "agent-check",
+        "target": ".",
+        "detail": "spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+        "affects_completion": true
+      }
+    ],
+    "reasons_truncated": false
+  },
+  "generated_at": "2026-08-25T01:17:12.080Z",
+  "session_id": "sess_1c9d7369-b1ca-4882-b1b7-cfd78e85dfdc",
+  "target": ".",
+  "revision": "c202c158be02ae42938b71bb1387ff635639d809",
+  "rules_version": "unavailable",
+  "diff_hash": "2d3be0d1362d4eccb51c2e0ea958df92bf7ce2bc8894fb26fe37f9706b8d4d74",
+  "diff": {
+    "algorithm": "sha256",
+    "changed_file_count": 4,
+    "changed_files": [
+      {
+        "file": ".vscode/settings.json",
+        "ranges": [
+          {
+            "start": 1,
+            "end": 3
+          }
+        ],
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "de90a87915dbe732020c8893e7aec46246af0c2030514dd039296a8d7f4c5a7e"
+      },
+      {
+        "file": "server/src/__tests__/purchaseVoid.test.ts",
+        "ranges": [
+          {
+            "start": 56,
+            "end": 60
+          },
+          {
+            "start": 195,
+            "end": 333
+          }
+        ],
+        "before_hash": "0435ad93f28613eac39d3ba5fc715d2d2f19e6bbec0faeda584d0de96f166e44",
+        "after_hash": "3b0839a1b540179dd1eca381e54c3523b16c9a831e12dbf98cd6dad10b2ca83b"
+      },
+      {
+        "file": "server/src/controllers/purchaseController.ts",
+        "ranges": [
+          {
+            "start": 10,
+            "end": 44
+          },
+          {
+            "start": 91,
+            "end": 91
+          },
+          {
+            "start": 100,
+            "end": 100
+          }
+        ],
+        "before_hash": "4d25849d19415c0fe336d95aee4163bfc4e497b11663b3689377abc464915f7e",
+        "after_hash": "99b4a8cd852730fd7c0d148593c9b1df644ae37aa30d0b4b05ab7bdb26dd2173"
+      },
+      {
+        "file": "server/src/models/Purchase.ts",
+        "ranges": [
+          {
+            "start": 25,
+            "end": 27
+          },
+          {
+            "start": 47,
+            "end": 48
+          },
+          {
+            "start": 92,
+            "end": 109
+          },
+          {
+            "start": 126,
+            "end": 126
+          },
+          {
+            "start": 132,
+            "end": 150
+          },
+          {
+            "start": 152,
+            "end": 266
+          },
+          {
+            "start": 268,
+            "end": 280
+          },
+          {
+            "start": 282,
+            "end": 291
+          },
+          {
+            "start": 294,
+            "end": 305
+          },
+          {
+            "start": 307,
+            "end": 326
+          },
+          {
+            "start": 328,
+            "end": 333
+          },
+          {
+            "start": 335,
+            "end": 349
+          },
+          {
+            "start": 351,
+            "end": 351
+          },
+          {
+            "start": 353,
+            "end": 369
+          },
+          {
+            "start": 371,
+            "end": 373
+          },
+          {
+            "start": 406,
+            "end": 413
+          }
+        ],
+        "before_hash": "c5b56683080b609521e56bb9ca3d584caa64f3aced0b0bec183b17e1c398c418",
+        "after_hash": "75949863f89d723b708fd93add19c5700b1ef5aea06cd690703551a3558cec01"
+      }
+    ]
+  },
+  "timing": {
+    "started_at": "2026-08-25T01:17:09.085Z",
+    "completed_at": "2026-08-25T01:17:12.080Z",
+    "duration_ms": 2995,
+    "measurement": "hook_wall_clock"
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "model_calls": 0,
+    "measurement": "known-zero"
+  },
+  "telemetry": {
+    "schemaVersion": "mimosa-gate-telemetry/v1",
+    "profile": "gate",
+    "operation": "Stop",
+    "outcome": "partial/INCONCLUSIVE",
+    "latencyMs": 2995,
+    "peakMemoryBytes": 182280192,
+    "memoryMeasurement": "max-observed-process-rss",
+    "scannedFiles": 3,
+    "cache": {
+      "hits": 0,
+      "misses": 0,
+      "measurement": "not-applicable"
+    },
+    "denyCount": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "total": 0,
+      "modelCalls": 0,
+      "measurement": "known-zero"
+    }
+  },
+  "finding_count": 0,
+  "rewake_finding_count": 0,
+  "evidence_boundary": {
+    "scan": "candidate",
+    "static_fix_verification": "observed_static_only",
+    "runtime_verification": "not_performed"
+  },
+  "finding_events": [],
+  "findings": [],
+  "artifacts": {
+    "immutable_report": ".mimosa/reports/task-review-sess_1c9d7369-b1ca-4882-b1b7-cfd78e85dfdc-20260825T011712080Z-339318-802a15abad4c.json",
+    "latest_report": ".mimosa/reports/task-review-sess_1c9d7369-b1ca-4882-b1b7-cfd78e85dfdc.json",
+    "history_summary": ".mimosa/history/run-20260825T011712080Z-339318-802a15abad4c.json"
+  }
+}

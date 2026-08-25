@@ -1469,6 +1469,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesVoidreasonplaceholder => 'منسوخی کی وجہ درج کریں...';
 
   @override
+  String get purchasesShowvoided => 'منسوخ دکھائیں';
+
+  @override
   String get purchasesReturnvoided => 'واپسی کامیابی سے منسوخ ہوگئی';
 
   @override
@@ -2294,6 +2297,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get fieldsStatus => 'حالت';
+
+  @override
+  String get fieldsType => 'قسم';
 
   @override
   String get fieldsDescription => 'تفصیل';
@@ -3176,6 +3182,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get suppliersNopos => 'کوئی پروکیورمنٹ آرڈر نہیں ملا';
 
   @override
+  String get suppliersNopurchases => 'کوئی خریداری نہیں ملی';
+
+  @override
   String get suppliersNotes => 'نوٹس';
 
   @override
@@ -3217,6 +3226,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get suppliersPrintreceipta4 => 'رسید پرنٹ کریں (A4)';
+
+  @override
+  String get suppliersPurchases => 'خریداریاں';
 
   @override
   String get suppliersRecordpayment => 'ادائیگی ریکارڈ کریں';
@@ -3562,6 +3574,12 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get customersContactperson => 'رابطہ شخص';
+
+  @override
+  String get customersCredit => 'کریڈٹ';
+
+  @override
+  String get customersCreditAbbrev => 'کریڈٹ';
 
   @override
   String get customersCreditlimit => 'کریڈٹ حد';
@@ -4171,6 +4189,15 @@ class AppLocalizationsUr extends AppLocalizations {
   String get paymentsPaymentno => 'ادائیگی نمبر';
 
   @override
+  String get paymentsTypein => 'وصولی';
+
+  @override
+  String get paymentsTypeout => 'ادائیگی';
+
+  @override
+  String get paymentsParty => 'فریق';
+
+  @override
   String get paymentsRecordedsuccess => 'ادائیگی کامیابی سے ریکارڈ ہوگئی';
 
   @override
@@ -4767,6 +4794,46 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesreturnsSelectinvoice => 'بل منتخب کریں';
 
   @override
+  String get settingsBackupDeleteFailed => 'بیک اپ حذف کرنے میں ناکامی';
+
+  @override
+  String get settingsBackupDeleteMessage =>
+      'اس سے بیک اپ فائل سرور سے مستقل حذف ہو جائے گی۔ یہ عمل واپس نہیں ہو سکتا۔';
+
+  @override
+  String get settingsBackupDeleteTitle => 'بیک اپ حذف کریں؟';
+
+  @override
+  String get settingsBackupDeleted => 'بیک اپ حذف ہو گیا';
+
+  @override
+  String get settingsBackupDownloadFailed => 'بیک اپ ڈاؤن لوڈ کرنے میں ناکامی';
+
+  @override
+  String get settingsBackupDownloaded => 'بیک اپ محفوظ ہو گیا';
+
+  @override
+  String get settingsBackupEmpty => 'ابھی کوئی بیک اپ نہیں';
+
+  @override
+  String get settingsBackupFailed => 'بیک اپ ناکام رہا';
+
+  @override
+  String get settingsBackupFiles => 'بیک اپ فائلز';
+
+  @override
+  String get settingsBackupLast => 'آخری بیک اپ';
+
+  @override
+  String get settingsBackupNever => 'کبھی نہیں';
+
+  @override
+  String get settingsBackupNow => 'ابھی بیک اپ لیں';
+
+  @override
+  String get settingsBackupSuccess => 'بیک اپ تیار ہو گیا';
+
+  @override
   String get settingsEmpty => 'دکھانے کے لیے کوئی ترتیبات نہیں';
 
   @override
@@ -4814,6 +4881,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get settingsSaved => 'ترتیبات محفوظ ہو گئیں';
+
+  @override
+  String get settingsSectionBackup => 'ڈیٹا بیس بیک اپ';
 
   @override
   String get settingsSectionCompany => 'کمپنی';

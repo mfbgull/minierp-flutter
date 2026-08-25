@@ -94,4 +94,3 @@ describe('User self-role guard (SEC-04)', () => {
         expect(after.full_name).toBe('SEC-04 Victim Renamed');
     });
 });
-//# sourceMappingURL=userSelfRole.test.js.map

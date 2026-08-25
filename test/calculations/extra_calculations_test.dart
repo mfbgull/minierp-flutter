@@ -653,6 +653,54 @@ void main() {
       ]);
     });
 
+    test('totalInvoiced nets out returned invoices (INV-2026-462699 case)',
+        () {
+      const invoices = [
+        // Fully paid, then fully returned with 'credit' disposition.
+        Invoice(
+          id: 1,
+          invoiceNo: 'INV-RETURNED',
+          customerId: 1,
+          invoiceDate: '2026-08-19',
+          totalAmount: 600,
+          paidAmount: 600,
+          balanceAmount: 0,
+          status: 'Returned',
+          returnedAmount: 600,
+          returnFee: 0,
+        ),
+        // Partially returned: only the net amount counts.
+        Invoice(
+          id: 2,
+          invoiceNo: 'INV-PARTIAL',
+          customerId: 1,
+          invoiceDate: '2026-08-20',
+          totalAmount: 500,
+          paidAmount: 500,
+          balanceAmount: 0,
+          status: 'Partially Returned',
+          returnedAmount: 200,
+          returnFee: 50,
+        ),
+        // Normal paid invoice.
+        Invoice(
+          id: 3,
+          invoiceNo: 'INV-NORMAL',
+          customerId: 1,
+          invoiceDate: '2026-08-21',
+          totalAmount: 1367,
+          paidAmount: 1367,
+          balanceAmount: 0,
+          status: 'Paid',
+        ),
+      ];
+      // 0 (returned) + (500 - 200 + 50) + 1367 = 1717.
+      expect(calculateTotalInvoiced(invoices), 1717);
+      // Payments received are real money in — unaffected by returns.
+      expect(calculateTotalPaid(invoices), 2467);
+      expect(calculateTotalOutstanding(invoices), 0);
+    });
+
     test('computeCustomerMetrics aggregates everything', () {
       const invoices = [
         Invoice(

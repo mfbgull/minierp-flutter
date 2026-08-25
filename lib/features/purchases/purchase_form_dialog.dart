@@ -1,14 +1,16 @@
-// New-purchase dialog — opened from the Purchases tab toolbar. Records a
-// direct purchase via `POST /purchases` (repo.create): the server writes
-// the purchase row, posts the stock movement, and — when a supplier is
-// linked — posts the AP supplier-ledger entry. The payment section
-// records a supplier payment against the just-created purchase
-// (`POST /payments` with `purchase_allocations`) so a cash purchase is
-// entered in one go. Without a supplier the payment section is disabled
-// (the server has no ledger to apply it to).
+// Record-purchase dialog — opened from the Purchases tab toolbar. Records
+// ONE purchase containing MULTIPLE item lines via `POST /purchases`
+// (repo.createMulti): the server creates one purchase row per line — each
+// with its own doc no, batch, stock movement and ledger/GL entries —
+// atomically in one transaction. The payment section records a supplier
+// payment spread across the just-created purchase rows (`POST /payments`
+// with `purchase_allocations`). Without a linked supplier the payment
+// section is disabled (the server has no ledger to apply it to). On
+// success the dialog closes with a confirmation toast; failures stay
+// inline as an error banner.
 //
 // Layout follows the other data-entry dialogs: sectioned cards
-// (Document / Item / Payment) with a running total and a payment
+// (Document / Items / Payment) with a running total and a payment
 // summary.
 
 import 'package:flutter/material.dart';
@@ -29,7 +31,6 @@ import '../../widgets/form_field.dart' show FormFieldShell;
 import '../../widgets/form_helpers.dart'
     show ErrorBanner, formInputDecoration, numText, submitOnEnter;
 import '../../widgets/form_section_card.dart' show FormSectionCard;
-import '../../widgets/payment_success_screen.dart' show PaymentSuccessScreen;
 import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart'
     show allItemsProvider, warehousesProvider;
@@ -46,6 +47,28 @@ Future<void> showPurchaseFormDialog(BuildContext context) {
     context: context,
     builder: (dialogContext) => const _PurchaseFormDialog(),
   );
+}
+
+/// Mutable form line — the item picker value plus qty/unit-cost fields
+/// (same shape as the PO form's `_PoLine`).
+class _PurchaseLine {
+  _PurchaseLine() : qtyController = TextEditingController(), costController = TextEditingController();
+
+  int? itemId;
+
+  final TextEditingController qtyController;
+  final TextEditingController costController;
+
+  /// Optional expiry date for expiry-tracked items (flows into the batch).
+  DateTime? expiryDate;
+
+  num get quantity => num.tryParse(qtyController.text.trim()) ?? 0;
+  num get unitCost => num.tryParse(costController.text.trim()) ?? 0;
+
+  void dispose() {
+    qtyController.dispose();
+    costController.dispose();
+  }
 }
 
 class _PurchaseFormDialog extends ConsumerStatefulWidget {
@@ -65,12 +88,9 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
   final _invoiceNoController = TextEditingController();
   final _remarksController = TextEditingController();
 
-  // Item.
-  int? _itemId;
+  // Item lines (at least one).
+  final List<_PurchaseLine> _lines = [_PurchaseLine()];
   int? _warehouseId;
-  DateTime? _expiryDate;
-  final _qtyController = TextEditingController();
-  final _costController = TextEditingController();
 
   // Payment.
   bool _recordPayment = true;
@@ -80,16 +100,12 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
   final _referenceController = TextEditingController();
   final _paymentNotesController = TextEditingController();
 
-  /// The line total the amount field was last synced to — lets the
+  /// The grand total the amount field was last synced to — lets the
   /// amount track the total until the user types their own number.
   num _lastSyncedTotal = 0;
 
   bool _busy = false;
   String? _error;
-
-  /// Set once the purchase + payment both saved — the dialog body
-  /// switches to the success screen (print receipt / close).
-  int? _lastPaymentId;
 
   @override
   void initState() {
@@ -102,27 +118,33 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
   void dispose() {
     _invoiceNoController.dispose();
     _remarksController.dispose();
-    _qtyController.dispose();
-    _costController.dispose();
+    for (final line in _lines) {
+      line.dispose();
+    }
     _amountController.dispose();
     _referenceController.dispose();
     _paymentNotesController.dispose();
     super.dispose();
   }
 
-  num get _quantity => num.tryParse(_qtyController.text.trim()) ?? 0;
-  num get _unitCost => num.tryParse(_costController.text.trim()) ?? 0;
-  num get _lineTotal => _quantity * _unitCost;
+  /// Lines with an item chosen — only these are submitted.
+  List<_PurchaseLine> get _filledLines =>
+      _lines.where((line) => line.itemId != null).toList();
+
+  num get _total => _filledLines.fold<num>(
+    0,
+    (sum, line) => sum + line.quantity * line.unitCost,
+  );
   num get _paymentAmount => num.tryParse(_amountController.text.trim()) ?? 0;
 
   /// Whether a payment can actually be posted — needs a linked supplier
   /// and a positive amount.
   bool get _canPay => _supplierId != null && _paymentAmount > 0;
 
-  /// Keeps the payment amount in lock-step with the line total until the
+  /// Keeps the payment amount in lock-step with the items total until the
   /// user edits it themselves (the common flow is "pay the full amount").
   void _syncPaymentToTotal() {
-    final total = _lineTotal;
+    final total = _total;
     final current = num.tryParse(_amountController.text.trim()) ?? 0;
     final untouched = current == 0 || current == _lastSyncedTotal;
     if (_recordPayment && total > 0 && untouched) {
@@ -142,18 +164,25 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
     if (picked != null && mounted) setState(() => _paymentDate = picked);
   }
 
-  Future<void> _pickExpiryDate() async {
+  Future<void> _pickLineExpiryDate(int index) async {
     final picked = await pickDate(
       context,
-      initialDate: _expiryDate ?? DateTime.now(),
+      initialDate: _lines[index].expiryDate ?? DateTime.now(),
       firstDate: DateTime.now(),
     );
-    if (picked != null && mounted) setState(() => _expiryDate = picked);
+    if (picked != null && mounted) {
+      setState(() => _lines[index].expiryDate = picked);
+    }
   }
 
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    final filled = _filledLines;
+    if (filled.isEmpty) {
+      setState(() => _error = l10n.purchaseordersErrorItemsrequired);
+      return;
+    }
     if (_recordPayment && _supplierId != null && _paymentAmount <= 0) {
       setState(() => _error = l10n.paymentsErrorAmountGreaterThanZero);
       return;
@@ -163,16 +192,24 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
       _error = null;
     });
 
-    final result = await ref.read(purchaseRepositoryProvider).create(
-          itemId: _itemId!,
+    final result = await ref
+        .read(purchaseRepositoryProvider)
+        .createMulti(
           warehouseId: _warehouseId!,
-          quantity: _quantity,
-          unitCost: _unitCost,
           purchaseDate: isoDate(_purchaseDate),
           supplierId: _supplierId,
           invoiceNo: _invoiceNoController.text,
           remarks: _remarksController.text,
-          expiryDate: _expiryDate != null ? isoDate(_expiryDate!) : null,
+          items: [
+            for (final line in filled)
+              (
+                itemId: line.itemId!,
+                quantity: line.quantity,
+                unitCost: line.unitCost,
+                expiryDate:
+                    line.expiryDate != null ? isoDate(line.expiryDate!) : null,
+              ),
+          ],
         );
     if (!mounted) return;
 
@@ -185,6 +222,23 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
       case ApiSuccess(:final data):
         ref.invalidate(purchasesProvider);
         if (_recordPayment && _canPay) {
+          // Spread the payment across the created rows in order, capped
+          // at each row's total — with the amount synced to the grand
+          // total this is exactly one allocation per line.
+          var remaining = _paymentAmount;
+          final allocations = <Map<String, dynamic>>[];
+          for (final purchase in data) {
+            if (remaining <= 0) break;
+            final amount =
+                remaining >= purchase.totalCost ? purchase.totalCost : remaining;
+            allocations.add({'purchase_id': purchase.id, 'amount': amount});
+            remaining -= amount;
+          }
+          if (remaining > 0 && allocations.isNotEmpty) {
+            allocations.last['amount'] =
+                (allocations.last['amount'] as num) + remaining;
+          }
+
           final payResult = await ref
               .read(invoiceRepositoryProvider)
               .createSupplierPayment({
@@ -196,18 +250,14 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
                   'reference_no': _referenceController.text.trim(),
                 if (_paymentNotesController.text.trim().isNotEmpty)
                   'notes': _paymentNotesController.text.trim(),
-                'purchase_allocations': [
-                  {'purchase_id': data.id, 'amount': _paymentAmount},
-                ],
+                'purchase_allocations': allocations,
               });
           if (!mounted) return;
           ref.invalidate(paymentsProvider);
           switch (payResult) {
-            case ApiSuccess(:final data):
-              setState(() {
-                _busy = false;
-                _lastPaymentId = data.id;
-              });
+            case ApiSuccess():
+              Navigator.of(context).pop();
+              showAppToast(context, l10n.purchasesPurchasesaved);
             case ApiFailure(:final error):
               Navigator.of(context).pop();
               showAppToast(
@@ -278,34 +328,6 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
 
   // ── Sections ──────────────────────────────────────────────────
 
-  /// Expiry-date picker — only shown when the selected item tracks expiry.
-  Widget _expiryPicker(AppLocalizations l10n) {
-    final items = ref.watch(allItemsProvider).valueOrNull ?? const [];
-    final selectedItem = items.where((i) => i.id == _itemId).firstOrNull;
-    if (selectedItem?.hasExpiry != true) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 12),
-        FormFieldShell(
-          label: l10n.expiryDate,
-          child: SizedBox(
-            height: 42,
-            child: OutlinedButton.icon(
-              onPressed: _busy ? null : _pickExpiryDate,
-              icon: const Icon(Icons.calendar_today_outlined, size: 15),
-              label: Text(
-                _expiryDate != null
-                    ? Formatters.date(isoDate(_expiryDate!))
-                    : l10n.expirySelectDateOptional,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _documentSection(AppLocalizations l10n, List<Supplier> suppliers) {
     final supplierIds = [for (final s in suppliers) s.id];
     return FormSectionCard(
@@ -366,80 +388,194 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          FormFieldShell(
+            label: l10n.purchasesRemarks,
+            child: TextFormField(
+              controller: _remarksController,
+              enabled: !_busy,
+              minLines: 2,
+              maxLines: 3,
+              decoration: formInputDecoration(),
+            ),
+          ),
         ],
       ),
     );
   }
 
+  /// Per-line expiry picker button — shown only when that line's item
+  /// tracks expiry.
+  bool _lineShowsExpiry(int index) {
+    final items = ref.watch(allItemsProvider).valueOrNull ?? const [];
+    final itemId = _lines[index].itemId;
+    final selectedItem = items.where((i) => i.id == itemId).firstOrNull;
+    return selectedItem?.hasExpiry == true;
+  }
+
+  Widget _lineRow(AppLocalizations l10n, int index) {
+    final line = _lines[index];
+    final scheme = Theme.of(context).colorScheme;
+    final amount = line.quantity * line.unitCost;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 3,
+              child: _ItemSelect(
+                selected: line.itemId,
+                onChanged: (value) => setState(() {
+                  line.itemId = value;
+                  if (value == null) line.expiryDate = null;
+                  _syncPaymentToTotal();
+                }),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 92,
+              child: TextFormField(
+                controller: line.qtyController,
+                enabled: !_busy,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: formInputDecoration(),
+                validator: (value) =>
+                    (num.tryParse(value?.trim() ?? '') ?? -1) <= 0
+                    ? l10n.commonRequired
+                    : null,
+                onChanged: (_) => _syncPaymentToTotal(),
+                onFieldSubmitted: submitOnEnter(_submit),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 110,
+              child: TextFormField(
+                controller: line.costController,
+                enabled: !_busy,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: formInputDecoration(),
+                validator: (value) =>
+                    (num.tryParse(value?.trim() ?? '') ?? -1) < 0
+                    ? l10n.commonRequired
+                    : null,
+                onChanged: (_) => _syncPaymentToTotal(),
+                onFieldSubmitted: submitOnEnter(_submit),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 110,
+              child: Container(
+                height: 42,
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  border: Border.all(color: scheme.outlineVariant),
+                  borderRadius: AppBorderRadius.smRadius,
+                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                ),
+                child: Text(
+                  Formatters.currency(amount),
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            SizedBox(
+              width: 34,
+              child: IconButton(
+                tooltip: l10n.commonRemove,
+                icon: const Icon(Icons.remove_circle_outline, size: 18),
+                onPressed: _busy || _lines.length <= 1
+                    ? null
+                    : () => setState(() {
+                        _lines.removeAt(index).dispose();
+                        _syncPaymentToTotal();
+                      }),
+              ),
+            ),
+          ],
+        ),
+        if (_lineShowsExpiry(index)) ...[
+          const SizedBox(height: 6),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: SizedBox(
+              height: 38,
+              child: OutlinedButton.icon(
+                onPressed: _busy ? null : () => _pickLineExpiryDate(index),
+                icon: const Icon(Icons.calendar_today_outlined, size: 15),
+                label: Text(
+                  line.expiryDate != null
+                      ? Formatters.date(isoDate(line.expiryDate!))
+                      : l10n.expirySelectDateOptional,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _itemSection(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    final headerStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+    );
     return FormSectionCard(
       icon: Icons.inventory_2_outlined,
       title: l10n.purchasesItemscard,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          FormFieldShell(
-            label: l10n.fieldsItem,
-            required: true,
-            child: _ItemSelect(
-              selected: _itemId,
-              onChanged: (value) => setState(() {
-                _itemId = value;
-                _syncPaymentToTotal();
-              }),
-            ),
-          ),
-          const SizedBox(height: 12),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: FormFieldShell(
-                  label: l10n.fieldsQuantity,
-                  required: true,
-                  child: TextFormField(
-                    controller: _qtyController,
-                    onChanged: (_) => _syncPaymentToTotal(),
-                    onFieldSubmitted: submitOnEnter(_submit),
-                    enabled: !_busy,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: formInputDecoration(),
-                    validator: (value) {
-                      final qty = num.tryParse(value?.trim() ?? '');
-                      if (qty == null || qty <= 0) return l10n.commonRequired;
-                      return null;
-                    },
-                  ),
+              Expanded(flex: 3, child: Text(l10n.fieldsItem, style: headerStyle)),
+              const SizedBox(width: 8),
+              SizedBox(width: 92, child: Text(l10n.fieldsQuantity, style: headerStyle)),
+              const SizedBox(width: 8),
+              SizedBox(width: 110, child: Text(l10n.purchasesUnitcost, style: headerStyle)),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 110,
+                child: Text(
+                  l10n.fieldsAmount,
+                  textAlign: TextAlign.end,
+                  style: headerStyle,
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FormFieldShell(
-                  label: l10n.purchasesUnitcost,
-                  required: true,
-                  child: TextFormField(
-                    controller: _costController,
-                    onChanged: (_) => _syncPaymentToTotal(),
-                    onFieldSubmitted: submitOnEnter(_submit),
-                    enabled: !_busy,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: formInputDecoration(),
-                    validator: (value) {
-                      final cost = num.tryParse(value?.trim() ?? '');
-                      if (cost == null || cost < 0) return l10n.commonRequired;
-                      return null;
-                    },
-                  ),
-                ),
-              ),
+              const SizedBox(width: 38),
             ],
           ),
-          _expiryPicker(l10n),
-          const SizedBox(height: 14),
+          const SizedBox(height: 6),
+          for (var i = 0; i < _lines.length; i++) ...[
+            _lineRow(l10n, i),
+            if (i < _lines.length - 1) const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () => setState(() => _lines.add(_PurchaseLine())),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(l10n.purchaseordersAdditem),
+            ),
+          ),
+          const Divider(height: 20),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
@@ -458,23 +594,12 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
                 ),
                 const Spacer(),
                 Text(
-                  Formatters.currency(_lineTotal),
+                  Formatters.currency(_total),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          FormFieldShell(
-            label: l10n.purchasesRemarks,
-            child: TextFormField(
-              controller: _remarksController,
-              enabled: !_busy,
-              minLines: 2,
-              maxLines: 3,
-              decoration: formInputDecoration(),
             ),
           ),
         ],
@@ -599,13 +724,13 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
               ],
             ),
             const Divider(height: 22),
-            _summaryLine(l10n.salesGrandtotal, _lineTotal),
+            _summaryLine(l10n.salesGrandtotal, _total),
             _summaryLine(l10n.fieldsAmount, _paymentAmount),
             _summaryLine(
               l10n.salesBalance,
-              _lineTotal - _paymentAmount,
+              _total - _paymentAmount,
               bold: true,
-              color: _lineTotal - _paymentAmount > 0
+              color: _total - _paymentAmount > 0
                   ? scheme.error
                   : const Color(0xff16a34a),
             ),
@@ -620,18 +745,6 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
     final l10n = AppLocalizations.of(context)!;
     final suppliers =
         ref.watch(poSupplierOptionsProvider).valueOrNull ?? const <Supplier>[];
-
-    final paymentId = _lastPaymentId;
-    if (paymentId != null) {
-      final matches = suppliers.where((s) => s.id == _supplierId);
-      final supplier = matches.isEmpty ? null : matches.first;
-      return PaymentSuccessScreen(
-        title: l10n.purchasesPurchasesaved,
-        subtitle: l10n.suppliersWhatnext,
-        paymentId: paymentId,
-        entityName: supplier?.supplierName,
-      );
-    }
 
     return Dialog(
       child: ConstrainedBox(

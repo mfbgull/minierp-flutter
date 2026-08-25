@@ -104,4 +104,3 @@ function changePassword(req, res) {
     }
 }
 exports.default = { login, logout, getCurrentUser, changePassword };
-//# sourceMappingURL=authController.js.map

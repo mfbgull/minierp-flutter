@@ -100,6 +100,8 @@ abstract final class ApiEndpoints {
   static const users = '/users';
   static const roles = '/roles';
   static const customReports = '/custom-reports';
+  // Admin database backups (`server/src/routes/adminBackup.ts`).
+  static const adminBackup = '/admin/backup';
 
   // Global search (command palette)
   static const search = '/search';

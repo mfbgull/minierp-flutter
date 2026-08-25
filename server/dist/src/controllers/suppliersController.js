@@ -317,4 +317,3 @@ exports.default = {
     getSupplierById, getNextSupplierCode, getSupplierLedger, getSupplierStatement,
     getSupplierBalance, recalculateAllBalances
 };
-//# sourceMappingURL=suppliersController.js.map

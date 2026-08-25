@@ -28,4 +28,3 @@ router.delete('/:id', (0, requirePermission_1.requirePermission)('payments', 'de
 router.get('/:id/receipt', (0, requirePermission_1.requirePermission)('payments', 'read'), (0, validation_1.validateZodParams)(validation_1.zodSchemas.id), paymentsController_1.default.getPaymentReceipt);
 router.post('/:id/allocate', (0, requirePermission_1.requirePermission)('payments', 'update'), rateLimiter_1.sensitiveOperationLimiter, paymentsController_1.default.allocatePaymentToInvoice);
 exports.default = router;
-//# sourceMappingURL=payments.js.map

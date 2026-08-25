@@ -30,4 +30,3 @@ router.post('/:id/duplicate', (0, requirePermission_1.requirePermission)('report
 // ── Report Execution ─────────────────────────────────────────
 router.post('/run', (0, requirePermission_1.requirePermission)('reports', 'create'), customReportsController_1.default.runReport);
 exports.default = router;
-//# sourceMappingURL=customReports.js.map

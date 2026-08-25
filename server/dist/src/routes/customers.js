@@ -28,4 +28,3 @@ router.get('/:id/statement', (0, requirePermission_1.requirePermission)('custome
 router.get('/:id/balance', (0, requirePermission_1.requirePermission)('customers', 'read'), customersController_1.default.getCustomerBalance);
 router.post('/recalculate-balances', (0, requirePermission_1.requirePermission)('customers', 'update'), customersController_1.default.recalculateAllBalances);
 exports.default = router;
-//# sourceMappingURL=customers.js.map

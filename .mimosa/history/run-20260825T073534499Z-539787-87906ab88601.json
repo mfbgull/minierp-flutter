@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "mimosa-finding-history/v1",
+  "runId": "20260825T073534499Z-539787-87906ab88601",
+  "runStatus": "inconclusive",
+  "errors": [
+    "scan:server/src/services/backupService.ts: scanner_failed: spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+    "scan:server/src/services/activityLogger.ts: scanner_failed: spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+    "scan:server/src/routes/adminBackup.ts: scanner_failed: spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+    "scan:server/src/app.ts: scanner_failed: spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT",
+    "scan:server/src/__tests__/adminBackup.test.ts: scanner_failed: spawnSync /home/fawad/.nvm/versions/node/v24.13.0/bin/node ETIMEDOUT"
+  ],
+  "target": ".",
+  "revision": "c202c158be02ae42938b71bb1387ff635639d809",
+  "diffHash": "a1e8b5178d53d542d17c1b65aa6e38dce54ef22643eb2f48b4ab350f95e9a739",
+  "rulesVersion": "unavailable",
+  "recordedAt": "2026-08-25T07:35:34.499Z",
+  "timing": {
+    "startedAt": "2026-08-25T07:35:30.545Z",
+    "completedAt": "2026-08-25T07:35:34.499Z",
+    "durationMs": 3954
+  },
+  "tokens": {
+    "input": 0,
+    "output": 0,
+    "total": 0,
+    "modelCalls": 0,
+    "measurement": "known-zero"
+  },
+  "findings": {
+    "total": 0,
+    "bySeverity": {},
+    "byStatus": {}
+  },
+  "coverage": {
+    "status": "partial",
+    "reasonCounts": {
+      "scanner_failed": 5,
+      "project_check_failed": 5
+    }
+  },
+  "evidenceBoundary": "static_only",
+  "immutableReport": ".mimosa/reports/task-review-sess_0aa0dcab-099d-44a3-b892-33d559baf61f-20260825T073534499Z-539787-87906ab88601.json"
+}

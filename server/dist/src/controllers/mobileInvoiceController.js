@@ -203,4 +203,3 @@ exports.default = {
     getPaymentTerms,
     submitInvoice,
 };
-//# sourceMappingURL=mobileInvoiceController.js.map

@@ -479,8 +479,9 @@ class InvoiceModel {
      */
     static createInvoiceItem(db, invoiceId, item) {
         // ACC-18 interim: the stored amount is always the server-computed
-        // line total — round(qty × price − discount) with tax applied at the
-        // line boundary. Client-supplied amounts are never trusted.
+        // line total — round(base − discount) with tax applied at the line
+        // boundary. The base is qty × price, or the entered `amount` for
+        // loose amount-driven lines (the same base the validation summed).
         const { amount, netAmount, taxAmount } = (0, currency_1.decomposeLineAmount)(item);
         db.prepare(`
       INSERT INTO invoice_items (
@@ -813,4 +814,3 @@ class InvoiceModel {
     }
 }
 exports.default = InvoiceModel;
-//# sourceMappingURL=Invoice.js.map

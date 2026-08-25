@@ -16,4 +16,3 @@ router.get('/purchase-returns/:id', (0, requirePermission_1.requirePermission)('
 router.post('/purchase-returns', (0, requirePermission_1.requirePermission)('purchase_returns', 'create'), rateLimiter_1.sensitiveOperationLimiter, purchaseReturnController_1.default.createPurchaseReturn);
 router.post('/purchase-returns/:id/void', (0, requirePermission_1.requirePermission)('purchase_returns', 'void'), rateLimiter_1.sensitiveOperationLimiter, purchaseReturnController_1.default.voidPurchaseReturn);
 exports.default = router;
-//# sourceMappingURL=purchaseReturns.js.map

@@ -253,4 +253,3 @@ exports.default = {
     submitInvoice,
     getInvoiceWithCustomer,
 };
-//# sourceMappingURL=MobileInvoice.js.map

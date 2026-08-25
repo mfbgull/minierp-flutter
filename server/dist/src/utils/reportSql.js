@@ -67,4 +67,3 @@ function cogsForPeriod(db, startDate, endDate) {
 function cogsUpTo(db, asOfDate) {
     return cogsAggregate(db, `sm.movement_date <= ? AND ${cogsCondition()}`, [asOfDate]);
 }
-//# sourceMappingURL=reportSql.js.map

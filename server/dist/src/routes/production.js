@@ -16,4 +16,3 @@ router.get('/productions/:id', (0, requirePermission_1.requirePermission)('produ
 router.delete('/productions/:id', (0, requirePermission_1.requirePermission)('production', 'delete'), rateLimiter_1.sensitiveOperationLimiter, productionController_1.default.deleteProduction);
 router.get('/productions/summary/item/:item_id', (0, requirePermission_1.requirePermission)('production', 'read'), productionController_1.default.getProductionSummaryByItem);
 exports.default = router;
-//# sourceMappingURL=production.js.map

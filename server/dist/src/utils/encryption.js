@@ -42,4 +42,3 @@ function decrypt(encryptedText) {
 function isEncrypted(value) {
     return value.includes(':') && value.split(':').length === 3;
 }
-//# sourceMappingURL=encryption.js.map

@@ -74,4 +74,3 @@ describe('UserPreferences model', () => {
         expect((0, UserPreferences_1.getForUser)(db, 1)).toEqual({ weekStart: 'monday', defaultRange: null, presets: [] });
     });
 });
-//# sourceMappingURL=userPreferences.test.js.map

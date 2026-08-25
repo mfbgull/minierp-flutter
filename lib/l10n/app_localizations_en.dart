@@ -1467,6 +1467,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchasesVoidreasonplaceholder => 'Enter reason for voiding...';
 
   @override
+  String get purchasesShowvoided => 'Show Voided';
+
+  @override
   String get purchasesReturnvoided => 'Return voided successfully';
 
   @override
@@ -2293,6 +2296,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fieldsStatus => 'Status';
+
+  @override
+  String get fieldsType => 'Type';
 
   @override
   String get fieldsDescription => 'Description';
@@ -3176,6 +3182,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get suppliersNopos => 'No purchase orders found';
 
   @override
+  String get suppliersNopurchases => 'No purchases found';
+
+  @override
   String get suppliersNotes => 'Notes';
 
   @override
@@ -3216,6 +3225,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get suppliersPrintreceipta4 => 'Print Receipt (A4)';
+
+  @override
+  String get suppliersPurchases => 'Purchases';
 
   @override
   String get suppliersRecordpayment => 'Record Payment';
@@ -3562,6 +3574,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get customersContactperson => 'Contact Person';
+
+  @override
+  String get customersCredit => 'Credit';
+
+  @override
+  String get customersCreditAbbrev => 'CR';
 
   @override
   String get customersCreditlimit => 'Credit Limit';
@@ -4171,6 +4189,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get paymentsPaymentno => 'Payment No';
 
   @override
+  String get paymentsTypein => 'In';
+
+  @override
+  String get paymentsTypeout => 'Out';
+
+  @override
+  String get paymentsParty => 'Party';
+
+  @override
   String get paymentsRecordedsuccess => 'Payment recorded successfully';
 
   @override
@@ -4771,6 +4798,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get salesreturnsSelectinvoice => 'Select an invoice';
 
   @override
+  String get settingsBackupDeleteFailed => 'Failed to delete backup';
+
+  @override
+  String get settingsBackupDeleteMessage =>
+      'This permanently deletes the backup file from the server. This action cannot be undone.';
+
+  @override
+  String get settingsBackupDeleteTitle => 'Delete backup?';
+
+  @override
+  String get settingsBackupDeleted => 'Backup deleted';
+
+  @override
+  String get settingsBackupDownloadFailed => 'Failed to download backup';
+
+  @override
+  String get settingsBackupDownloaded => 'Backup saved';
+
+  @override
+  String get settingsBackupEmpty => 'No backups yet';
+
+  @override
+  String get settingsBackupFailed => 'Backup failed';
+
+  @override
+  String get settingsBackupFiles => 'Backup files';
+
+  @override
+  String get settingsBackupLast => 'Last backup';
+
+  @override
+  String get settingsBackupNever => 'Never';
+
+  @override
+  String get settingsBackupNow => 'Back Up Now';
+
+  @override
+  String get settingsBackupSuccess => 'Backup created';
+
+  @override
   String get settingsEmpty => 'No settings to display';
 
   @override
@@ -4818,6 +4885,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSaved => 'Settings saved';
+
+  @override
+  String get settingsSectionBackup => 'Database Backup';
 
   @override
   String get settingsSectionCompany => 'Company';

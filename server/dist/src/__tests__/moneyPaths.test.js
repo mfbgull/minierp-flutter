@@ -104,4 +104,3 @@ describe('money-path suites (tasks 9.2–9.4)', () => {
         expect(after.n - before.n).toBe(5);
     });
 });
-//# sourceMappingURL=moneyPaths.test.js.map

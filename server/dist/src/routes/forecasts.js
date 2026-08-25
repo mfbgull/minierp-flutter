@@ -33,4 +33,3 @@ router.delete('/seasonal-events/:id', (0, requirePermission_1.requirePermission)
 router.get('/export', (0, requirePermission_1.requirePermission)('forecasts', 'read'), forecastsController_1.default.getExport);
 router.get('/runs', (0, requirePermission_1.requirePermission)('forecasts', 'read'), forecastsController_1.default.getRuns);
 exports.default = router;
-//# sourceMappingURL=forecasts.js.map

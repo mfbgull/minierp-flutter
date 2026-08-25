@@ -316,4 +316,3 @@ class ActivityLogModel {
 // Export singleton instance
 const activityLogModel = new ActivityLogModel();
 exports.default = activityLogModel;
-//# sourceMappingURL=ActivityLog.js.map

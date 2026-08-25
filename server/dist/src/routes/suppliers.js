@@ -21,4 +21,3 @@ router.put('/:id', (0, requirePermission_1.requirePermission)('suppliers', 'upda
 router.delete('/:id', (0, requirePermission_1.requirePermission)('suppliers', 'delete'), suppliersController_1.default.deleteSupplier);
 router.post('/recalculate-balances', (0, requirePermission_1.requirePermission)('suppliers', 'update'), suppliersController_1.default.recalculateAllBalances);
 exports.default = router;
-//# sourceMappingURL=suppliers.js.map

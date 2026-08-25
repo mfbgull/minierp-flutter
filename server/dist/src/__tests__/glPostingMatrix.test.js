@@ -209,4 +209,3 @@ describe('GL posting matrix', () => {
         expect(ledgerRow).toBeDefined();
     });
 });
-//# sourceMappingURL=glPostingMatrix.test.js.map

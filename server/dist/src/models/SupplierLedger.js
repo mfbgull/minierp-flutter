@@ -88,4 +88,3 @@ class SupplierLedgerModel {
     }
 }
 exports.default = SupplierLedgerModel;
-//# sourceMappingURL=SupplierLedger.js.map

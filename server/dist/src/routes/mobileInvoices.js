@@ -24,4 +24,3 @@ router.get('/payment-terms', (0, requirePermission_1.requirePermission)('invoice
 // Final submission - creates actual invoice from draft or direct data
 router.post('/submit', (0, requirePermission_1.requirePermission)('invoices', 'create'), mobileInvoiceController_1.default.submitInvoice);
 exports.default = router;
-//# sourceMappingURL=mobileInvoices.js.map

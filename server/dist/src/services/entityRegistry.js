@@ -401,4 +401,3 @@ exports.default = {
     getAllEntities,
     getEntityKeys,
 };
-//# sourceMappingURL=entityRegistry.js.map

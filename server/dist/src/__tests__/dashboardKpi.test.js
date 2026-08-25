@@ -256,4 +256,3 @@ describe('dashboard /kpi additional cards (net profit, expenses, etc.)', () => {
         expect(result.value).toBe(1);
     });
 });
-//# sourceMappingURL=dashboardKpi.test.js.map
