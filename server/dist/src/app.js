@@ -221,7 +221,7 @@ app.use('/api/admin', adminBackup_1.default);
 app.use('/api/reports/custom', customReports_1.default);
 app.use('/api/preferences', preferences_1.default);
 app.use('/api/search', search_1.default);
-app.use('/api', (0, stockBatches_1.initStockBatchesRoutes)(database_1.default));
+app.use('/api/inventory', (0, stockBatches_1.initStockBatchesRoutes)(database_1.default));
 // Serve static files from client/dist in production
 // This MUST come AFTER API routes
 if (process.env.NODE_ENV === 'production') {

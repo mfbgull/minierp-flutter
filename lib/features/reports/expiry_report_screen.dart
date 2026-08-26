@@ -11,6 +11,7 @@ import '../../data/models/report.dart' show ExpiryReportRow;
 import '../../data/models/stock_batch.dart' show BatchStatus;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pluto_grid_screen.dart'
     show autoFitPlutoColumns, plutoGridConfigurationFor;
 import '../../widgets/screen_error_panel.dart';
@@ -30,8 +31,16 @@ class ExpiryReportScreen extends ConsumerStatefulWidget {
 class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
   int _currentPage = 1;
   int _pageSize = 50;
+  // Replaced on every grid (re)load — the grid is keyed per page.
+  GridColumnWidths? _widthTracker;
 
   static const _pageSizeOptions = [25, 50, 100, 200];
+
+  @override
+  void dispose() {
+    _widthTracker?.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -137,6 +146,11 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
       onLoaded: (e) {
         e.stateManager.setSelectingMode(PlutoGridSelectingMode.none);
         autoFitPlutoColumns(e.stateManager);
+        _widthTracker?.dispose();
+        _widthTracker = GridColumnWidths.attach(
+          stateManager: e.stateManager,
+          screenKey: 'report_expiry',
+        );
       },
       rowColorCallback: (ctx) {
         final status = BatchStatus.fromString(

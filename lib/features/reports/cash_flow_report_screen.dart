@@ -23,6 +23,7 @@ import '../../data/models/report.dart'
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
+import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart'
     show autoFitPlutoColumns, plutoGridConfigurationFor;
@@ -321,6 +322,13 @@ class _MovementsGrid extends StatefulWidget {
 
 class _MovementsGridState extends State<_MovementsGrid> {
   late final PlutoGridStateManager stateManager;
+  GridColumnWidths? _widthTracker;
+
+  @override
+  void dispose() {
+    _widthTracker?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -402,6 +410,10 @@ class _MovementsGridState extends State<_MovementsGrid> {
         stateManager = e.stateManager;
         stateManager.setSelectingMode(PlutoGridSelectingMode.none);
         autoFitPlutoColumns(stateManager);
+        _widthTracker = GridColumnWidths.attach(
+          stateManager: stateManager,
+          screenKey: 'report_cash_flow',
+        );
       },
     );
   }

@@ -19,6 +19,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
+import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart'
     show autoFitPlutoColumns, plutoGridConfigurationFor, serialGridColumn, withSerialCell;
@@ -52,8 +53,11 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     }
   }
 
+  GridColumnWidths? _widthTracker;
+
   @override
   void dispose() {
+    _widthTracker?.dispose();
     _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
@@ -95,9 +99,16 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       ]);
       // Column widths re-fit to the fresh rows (post-frame: resizeColumn
       // notifies listeners and provider callbacks can fire during build).
+      // The tracker guard keeps auto-fit from recording as user edits and
+      // re-applies dragged widths afterwards.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !identical(_stateManager, manager)) return;
-        autoFitPlutoColumns(manager);
+        final tracker = _widthTracker;
+        if (tracker != null) {
+          tracker.programmaticPass(() => autoFitPlutoColumns(manager));
+        } else {
+          autoFitPlutoColumns(manager);
+        }
       });
     }
   }
@@ -414,6 +425,11 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
             notify: false,
           );
           _applyExpenses(ref.read(expensesProvider));
+          _widthTracker?.dispose();
+          _widthTracker = GridColumnWidths.attach(
+            stateManager: event.stateManager,
+            screenKey: 'expenses',
+          );
         },
         onRowDoubleTap: (event) {
           final id = event.row.cells['id']?.value as int?;

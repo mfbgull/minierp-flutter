@@ -8,6 +8,7 @@ import '../../data/models/report.dart' show TrialBalanceReport;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter, DateRangeMode;
+import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pluto_grid_screen.dart'
     show autoFitPlutoColumns, plutoGridConfigurationFor;
 import '../../widgets/screen_error_panel.dart';
@@ -162,6 +163,13 @@ class _TrialBalanceGrid extends StatefulWidget {
 
 class _TrialBalanceGridState extends State<_TrialBalanceGrid> {
   late final PlutoGridStateManager stateManager;
+  GridColumnWidths? _widthTracker;
+
+  @override
+  void dispose() {
+    _widthTracker?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -212,6 +220,10 @@ class _TrialBalanceGridState extends State<_TrialBalanceGrid> {
         stateManager = e.stateManager;
         stateManager.setSelectingMode(PlutoGridSelectingMode.none);
         autoFitPlutoColumns(stateManager);
+        _widthTracker = GridColumnWidths.attach(
+          stateManager: stateManager,
+          screenKey: 'report_trial_balance',
+        );
       },
     );
   }

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-08-26T03:11:54.981Z",
+  "sessionId": "sess_494c165d-0f37-4dad-87ac-859f77c60ef2",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "test/widgets/grid_column_widths_test.dart",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 6,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

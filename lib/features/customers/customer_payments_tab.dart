@@ -86,6 +86,7 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
                     buildColumns: (l10n) => _columns(context, l10n),
                     gridRowFor: _gridRowFor,
                     hiddenFields: const ['data'],
+                    widthKey: 'customer_payments',
                   ),
                 ),
                 ServerPaginationBar(

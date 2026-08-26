@@ -80,6 +80,7 @@ class _SupplierPurchasesTabState extends ConsumerState<SupplierPurchasesTab> {
                       buildColumns: (l10n) => _columns(context, l10n),
                       gridRowFor: _gridRowFor,
                       hiddenFields: const ['data'],
+                      widthKey: 'supplier_purchases',
                     ),
                   ),
                   ServerPaginationBar(

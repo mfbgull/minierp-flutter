@@ -231,6 +231,7 @@ class _CustomerStatementsReportScreenState
       isLoading: report.isLoading,
       onRowDoubleTap: (row) =>
           showCustomerStatementDetailDialog(context, row: row),
+      widthKey: 'report_customer_statements',
     );
   }
 }

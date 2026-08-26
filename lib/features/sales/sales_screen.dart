@@ -34,6 +34,7 @@ import '../../widgets/app_toast.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
+import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pluto_grid_screen.dart'
     show autoFitPlutoColumns, plutoGridConfigurationFor, serialGridColumn, withSerialCell;
 import '../../widgets/screen_error_panel.dart';
@@ -83,8 +84,11 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     }
   }
 
+  GridColumnWidths? _widthTracker;
+
   @override
   void dispose() {
+    _widthTracker?.dispose();
     _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
@@ -155,9 +159,16 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     manager.setShowLoading(value.isLoading);
     // Column widths re-fit to the fresh rows (post-frame: resizeColumn
     // notifies listeners and provider callbacks can fire during build).
+    // The tracker guard keeps auto-fit from recording as user edits and
+    // re-applies dragged widths afterwards.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !identical(_stateManager, manager)) return;
-      autoFitPlutoColumns(manager);
+      final tracker = _widthTracker;
+      if (tracker != null) {
+        tracker.programmaticPass(() => autoFitPlutoColumns(manager));
+      } else {
+        autoFitPlutoColumns(manager);
+      }
     });
   }
 
@@ -435,6 +446,11 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             notify: false,
           );
           _applyInvoices(ref.read(invoicesProvider));
+          _widthTracker?.dispose();
+          _widthTracker = GridColumnWidths.attach(
+            stateManager: event.stateManager,
+            screenKey: 'sales',
+          );
         },
         onSorted: _onGridSorted,
         onRowDoubleTap: (event) {

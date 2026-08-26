@@ -24,6 +24,7 @@ import 'package:pluto_grid/pluto_grid.dart';
 
 import '../data/repositories/api_result.dart' show ApiError;
 import '../l10n/app_localizations.dart';
+import 'grid_column_widths.dart';
 import 'pluto_grid_shortcuts.dart';
 import 'screen_error_panel.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
@@ -207,9 +208,16 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
   bool _columnsReady = false;
   PlutoGridConfiguration _gridConfiguration = const PlutoGridConfiguration();
   Brightness? _configurationBrightness;
+  GridColumnWidths? _widthTracker;
 
   /// The hidden id column field carrying the row's record id.
   static const _idField = 'id';
+
+  /// Storage key under which this screen's dragged column widths are
+  /// persisted ([GridColumnWidths]). Defaults to the concrete State's
+  /// runtime type; override with a stable string if the class may be
+  /// renamed.
+  String get gridColumnKey => runtimeType.toString();
 
   /// Build the localized column set once (called from
   /// [didChangeDependencies]).
@@ -398,12 +406,25 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
 
   /// Re-fit column widths after fresh rows land (post-frame:
   /// resizeColumn notifies listeners and provider callbacks can fire
-  /// during build).
+  /// during build). Runs under the width tracker's programmatic guard and
+  /// re-applies saved widths afterwards, so a refresh never overwrites
+  /// what the user dragged.
   void scheduleColumnAutoFit(PlutoGridStateManager manager) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !identical(gridStateManager, manager)) return;
-      autoFitPlutoColumns(manager);
+      final tracker = _widthTracker;
+      if (tracker != null) {
+        tracker.programmaticPass(() => autoFitPlutoColumns(manager));
+      } else {
+        autoFitPlutoColumns(manager);
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _widthTracker?.dispose();
+    super.dispose();
   }
 
   /// The standard body: a full-pane error panel on failure (dropping the
@@ -473,6 +494,14 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
                 // Sync any provider state that changed before the grid
                 // finished mounting (e.g. the first loading flag).
                 syncGridRows(ref.read(provider));
+                // Start persisting/restoring dragged widths — attached
+                // last so its restore pass queues behind the auto-fit
+                // this sync just scheduled.
+                _widthTracker?.dispose();
+                _widthTracker = GridColumnWidths.attach(
+                  stateManager: event.stateManager,
+                  screenKey: gridColumnKey,
+                );
               },
               onSorted: onGridSorted,
               onRowDoubleTap: (event) {

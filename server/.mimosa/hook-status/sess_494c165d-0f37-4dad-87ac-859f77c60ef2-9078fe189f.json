@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-08-25T08:53:46.350Z",
+  "sessionId": "sess_494c165d-0f37-4dad-87ac-859f77c60ef2",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "/media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/lib/features/inventory/batch_management_screen.dart",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 15,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

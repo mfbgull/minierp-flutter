@@ -17,6 +17,7 @@ import '../../data/repositories/inventory_repository.dart'
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/date_picker.dart' show pickDate;
+import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pluto_grid_screen.dart'
     show autoFitPlutoColumns, plutoGridConfigurationFor;
 import '../../widgets/searchable_select.dart';
@@ -51,6 +52,15 @@ class _BatchManagementScreenState
   bool _loading = false;
   String? _error;
   num _threshold = 30;
+
+  // Replaced on every grid (re)load — the grid is keyed per item.
+  GridColumnWidths? _widthTracker;
+
+  @override
+  void dispose() {
+    _widthTracker?.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -287,6 +297,11 @@ class _BatchManagementScreenState
           PlutoGridSelectingMode.none,
         );
         autoFitPlutoColumns(e.stateManager);
+        _widthTracker?.dispose();
+        _widthTracker = GridColumnWidths.attach(
+          stateManager: e.stateManager,
+          screenKey: 'batch_management',
+        );
       },
     );
   }
@@ -425,6 +440,7 @@ class _BatchManagementScreenState
         'status': PlutoCell(
           value: b.halted ? BatchStatus.halted.value : status.value,
         ),
+        'actions': PlutoCell(value: ''),
       },
     );
   }

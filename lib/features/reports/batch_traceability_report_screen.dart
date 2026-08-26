@@ -10,6 +10,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../data/models/item.dart' show Item;
 import '../../features/inventory/inventory_providers.dart' show allItemsProvider;
+import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pluto_grid_screen.dart'
     show autoFitPlutoColumns, plutoGridConfigurationFor;
 import '../../widgets/screen_error_panel.dart';
@@ -144,9 +145,25 @@ class _ItemSelector extends ConsumerWidget {
   }
 }
 
-class _BatchTraceabilityContent extends StatelessWidget {
+class _BatchTraceabilityContent extends StatefulWidget {
   const _BatchTraceabilityContent({required this.report});
   final BatchTraceabilityReport report;
+
+  @override
+  State<_BatchTraceabilityContent> createState() =>
+      _BatchTraceabilityContentState();
+}
+
+class _BatchTraceabilityContentState extends State<_BatchTraceabilityContent> {
+  GridColumnWidths? _widthTracker;
+
+  late final BatchTraceabilityReport report = widget.report;
+
+  @override
+  void dispose() {
+    _widthTracker?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -263,6 +280,11 @@ class _BatchTraceabilityContent extends StatelessWidget {
                     e.stateManager
                         .setSelectingMode(PlutoGridSelectingMode.none);
                     autoFitPlutoColumns(e.stateManager);
+                    _widthTracker?.dispose();
+                    _widthTracker = GridColumnWidths.attach(
+                      stateManager: e.stateManager,
+                      screenKey: 'report_batch_traceability',
+                    );
                   },
                 ),
         ),

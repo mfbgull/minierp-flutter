@@ -18,7 +18,7 @@ function initStockBatchesRoutes(database) {
     return router;
 }
 /**
- * GET /api/stock-batches
+ * GET /api/inventory/stock-batches
  * List batches with optional filters
  */
 router.get('/stock-batches', (0, requirePermission_1.requirePermission)('inventory', 'read'), (req, res) => {
@@ -81,7 +81,7 @@ router.get('/stock-batches', (0, requirePermission_1.requirePermission)('invento
     }
 });
 /**
- * PATCH /api/stock-batches/:id
+ * PATCH /api/inventory/stock-batches/:id
  * Update batch expiry_date
  */
 router.patch('/stock-batches/:id', (0, requirePermission_1.requirePermission)('inventory', 'write'), (req, res) => {
@@ -107,7 +107,7 @@ router.patch('/stock-batches/:id', (0, requirePermission_1.requirePermission)('i
     }
 });
 /**
- * PATCH /api/stock-batches/:id/halt
+ * PATCH /api/inventory/stock-batches/:id/halt
  * Halt a batch (exclude from FEFO consumption)
  */
 router.patch('/stock-batches/:id/halt', (0, requirePermission_1.requirePermission)('inventory', 'write'), (req, res) => {
@@ -137,7 +137,7 @@ router.patch('/stock-batches/:id/halt', (0, requirePermission_1.requirePermissio
     }
 });
 /**
- * PATCH /api/stock-batches/:id/unhalt
+ * PATCH /api/inventory/stock-batches/:id/unhalt
  * Unhalt a batch (re-enable in FEFO consumption)
  */
 router.patch('/stock-batches/:id/unhalt', (0, requirePermission_1.requirePermission)('inventory', 'write'), (req, res) => {

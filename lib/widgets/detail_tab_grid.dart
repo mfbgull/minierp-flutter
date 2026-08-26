@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../l10n/app_localizations.dart';
+import 'grid_column_widths.dart';
 import 'pluto_grid_screen.dart'
     show
         autoFitPlutoColumns,
@@ -31,6 +32,7 @@ class DetailTabGrid<T> extends StatefulWidget {
     this.hiddenFields = const [],
     this.rowColorCallback,
     this.noRowsWidget,
+    this.widthKey,
   });
 
   /// The tab's rows. Identity-compared in [State.didUpdateWidget].
@@ -52,6 +54,11 @@ class DetailTabGrid<T> extends StatefulWidget {
 
   final Widget? noRowsWidget;
 
+  /// Storage key for persisted dragged column widths
+  /// ([GridColumnWidths]) — null disables persistence. Must be unique
+  /// per tab usage (e.g. `'customer_invoices'`).
+  final String? widthKey;
+
   @override
   State<DetailTabGrid<T>> createState() => _DetailTabGridState<T>();
 }
@@ -62,6 +69,13 @@ class _DetailTabGridState<T> extends State<DetailTabGrid<T>> {
   PlutoGridConfiguration _configuration = const PlutoGridConfiguration();
   Brightness? _configurationBrightness;
   bool _columnsReady = false;
+  GridColumnWidths? _widthTracker;
+
+  @override
+  void dispose() {
+    _widthTracker?.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -103,7 +117,12 @@ class _DetailTabGridState<T> extends State<DetailTabGrid<T>> {
     // notifies listeners and didUpdateWidget runs during build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !identical(_manager, manager)) return;
-      autoFitPlutoColumns(manager);
+      final tracker = _widthTracker;
+      if (tracker != null) {
+        tracker.programmaticPass(() => autoFitPlutoColumns(manager));
+      } else {
+        autoFitPlutoColumns(manager);
+      }
     });
   }
 
@@ -125,6 +144,15 @@ class _DetailTabGridState<T> extends State<DetailTabGrid<T>> {
           );
         }
         _sync();
+        if (widget.widthKey != null) {
+          // Attach after the sync so the restore pass queues behind the
+          // fit it just scheduled.
+          _widthTracker?.dispose();
+          _widthTracker = GridColumnWidths.attach(
+            stateManager: event.stateManager,
+            screenKey: widget.widthKey!,
+          );
+        }
       },
       rowColorCallback: widget.rowColorCallback,
       noRowsWidget:

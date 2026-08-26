@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "mimosa-finding-ledger-batch/v1",
+  "batchId": "stop-20260825T085644954Z-581883-08e0cf0f7ebd",
+  "runId": "20260825T085644954Z-581883-08e0cf0f7ebd",
+  "runStatus": "completed",
+  "coverage": {
+    "status": "complete",
+    "reasons": []
+  },
+  "source": {
+    "component": "zcode-hook",
+    "operationId": "Stop"
+  },
+  "revision": "c63573c77c70f806dd1ec497867358b71ace367e",
+  "diffHash": "10cf8998c9aa6e9931c42fcdd9cf9d1fd723c533d0bee3551b56eaf9d22d2558",
+  "rulesVersion": "unavailable",
+  "sessionHash": "9078fe189fcdcc086d327f1cd548154b6e11afacf86956b23f6a6ad664f8ce10",
+  "reportRef": ".mimosa/reports/task-review-sess_494c165d-0f37-4dad-87ac-859f77c60ef2-20260825T085644954Z-581883-08e0cf0f7ebd.json",
+  "events": [],
+  "observedFindingIds": [
+    "mimosa-a710a0560ac3640ea30e1fcc",
+    "mimosa-065ab6320ae8a8f0453e5713",
+    "mimosa-ebef59d8f7be3e99c4f93980"
+  ],
+  "verifiedFiles": [
+    {
+      "file": "server/src/app.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    },
+    {
+      "file": "server/src/routes/stockBatches.ts",
+      "direct": "complete",
+      "projectContext": "partial"
+    }
+  ],
+  "recordedAt": "2026-08-25T08:56:45.735Z"
+}
