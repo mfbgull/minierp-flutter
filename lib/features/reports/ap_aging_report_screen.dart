@@ -245,6 +245,7 @@ class _ApAgingReportScreenState extends ConsumerState<ApAgingReportScreen> {
       gridRowFor: _rowFor,
       itemLabel: l10n.customreportsRows,
       isLoading: report.isLoading,
+      widthKey: 'report_ap_aging',
     );
   }
 }

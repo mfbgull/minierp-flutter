@@ -1,0 +1,171 @@
+/**
+ * REP-18 regression tests: computed-column expressions are validated against
+ * a safe grammar on BOTH stored and inline config paths; SQL injection via
+ * expressions is impossible.
+ */
+import request from 'supertest';
+import app from '../app';
+import db from '../config/database';
+import CustomReport from '../models/CustomReport';
+
+const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
+if (!TEST_PASSWORD) {
+  throw new Error('TEST_ADMIN_PASSWORD environment variable must be set.');
+}
+
+async function getAuthCookie(): Promise<string> {
+  const res = await request(app)
+    .post('/api/auth/login')
+    .send({ username: 'admin', password: TEST_PASSWORD });
+  const cookies = res.headers['set-cookie'];
+  if (!cookies) return '';
+  const tokenCookie = (Array.isArray(cookies) ? cookies : [cookies])
+    .find((c: string) => c.startsWith('token='));
+  return tokenCookie ? tokenCookie.split(';')[0] : '';
+}
+
+const INJECTION = '(SELECT password_hash FROM users)';
+
+function invoiceConfig(expression: string) {
+  return {
+    entity: 'invoices',
+    columns: [{ field: 'total_amount' }, { field: 'calc', alias: 'Calc' }],
+    computedColumns: [{ name: 'calc', expression, type: 'number' }],
+  };
+}
+
+describe('Report expression security (REP-18)', () => {
+  let authCookie: string;
+  let userId: number;
+
+  beforeAll(async () => {
+    authCookie = await getAuthCookie();
+    expect(authCookie).not.toBe('');
+    const me = await request(app).get('/api/auth/me').set('Cookie', authCookie);
+    userId = me.body.data.id;
+  });
+
+  afterAll(() => {
+    try {
+      // Remove any report rows this suite created (user-scoped).
+      const reports = db.prepare(
+        `SELECT id FROM custom_reports WHERE user_id = ? AND (name LIKE 'rep18%' OR name LIKE 'REP18%')`
+      ).all(userId) as Array<{ id: number }>;
+      for (const r of reports) {
+        db.prepare('DELETE FROM custom_reports WHERE id = ?').run(r.id);
+      }
+    } catch {
+      /* ignore cleanup errors */
+    }
+  });
+
+  it('rejects an injection expression on the inline run path with 400 and never queries users.password_hash', async () => {
+    const res = await request(app)
+      .post('/api/reports/custom/run')
+      .set('Cookie', authCookie)
+      .send({ config: invoiceConfig(INJECTION) });
+
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toMatch(/not allowed|Unknown field|Invalid/i);
+  });
+
+  it('rejects an injection expression on the stored-report path with 400 and stores nothing', async () => {
+    const createRes = await request(app)
+      .post('/api/reports/custom')
+      .set('Cookie', authCookie)
+      .send({ name: 'rep18-inject-attempt', config: invoiceConfig(INJECTION) });
+    expect(createRes.status).toBe(400);
+    expect(createRes.body.error).toMatch(/Invalid report config/i);
+
+    // Nothing persisted
+    const count = db.prepare(
+      `SELECT COUNT(*) AS c FROM custom_reports WHERE user_id = ? AND name = 'rep18-inject-attempt'`
+    ).get(userId) as { c: number };
+    expect(count.c).toBe(0);
+
+    // Even if a row had been planted directly (legacy/compromised row),
+    // executing it must still fail closed at the engine.
+    const planted = CustomReport.create({
+      user_id: userId,
+      name: 'rep18-planted',
+      description: undefined,
+      config: invoiceConfig(INJECTION),
+    });
+    const runRes = await request(app)
+      .post('/api/reports/custom/run')
+      .set('Cookie', authCookie)
+      .send({ reportId: planted.id });
+    expect(runRes.status).toBe(400);
+  });
+
+  it('still executes legitimate expressions: quantity * unit_price form and ROUND(debit - credit, 2) form', async () => {
+    // Inline path with a real arithmetic expression on invoices fields.
+    const ok1 = await request(app)
+      .post('/api/reports/custom/run')
+      .set('Cookie', authCookie)
+      .send({
+        config: {
+          entity: 'invoices',
+          columns: [
+            { field: 'total_amount' },
+            { field: 'doubled', alias: 'Doubled' },
+          ],
+          computedColumns: [{ name: 'doubled', expression: 'total_amount * 2', type: 'number' }],
+        },
+      });
+    expect(ok1.status).toBe(200);
+    expect(ok1.body.success).toBe(true);
+
+    // journal_lines-style expression via a second entity that has debit/credit.
+    const entitiesRes = await request(app)
+      .get('/api/reports/custom/entities')
+      .set('Cookie', authCookie);
+    expect(entitiesRes.status).toBe(200);
+    const entities = entitiesRes.body.data as Array<{ key: string; fields: Array<{ name: string }> }>;
+    const glEntity = entities.find(e => e.fields.some(f => f.name === 'debit') && e.fields.some(f => f.name === 'credit'));
+    if (glEntity) {
+      const ok2 = await request(app)
+        .post('/api/reports/custom/run')
+        .set('Cookie', authCookie)
+        .send({
+          config: {
+            entity: glEntity.key,
+            columns: [
+              { field: 'debit' },
+              { field: 'net', alias: 'Net' },
+            ],
+            computedColumns: [{ name: 'net', expression: 'ROUND(debit - credit, 2)', type: 'number' }],
+          },
+        });
+      expect(ok2.status).toBe(200);
+      expect(ok2.body.success).toBe(true);
+    }
+  });
+
+  it('validates every existing stored report config — no legacy row breaks under the new grammar', async () => {
+    const rows = db.prepare(`SELECT id, name, config FROM custom_reports`).all() as Array<{ id: number; name: string; config: string }>;
+    expect(Array.isArray(rows)).toBe(true);
+
+    const { validateConfigExpressions } = await import('../services/expressionValidator');
+
+    for (const row of rows) {
+      let parsed: { entity?: string; computedColumns?: unknown };
+      try {
+        parsed = JSON.parse(row.config);
+      } catch {
+        continue; // non-JSON legacy rows are not expression configs
+      }
+      if (!parsed || !Array.isArray(parsed.computedColumns) || parsed.computedColumns.length === 0) {
+        continue;
+      }
+      // Must not throw for any stored report.
+      const entity = db.prepare; // placeholder to satisfy lint on unused import shape
+      void entity;
+      const { getEntity } = await import('../services/entityRegistry');
+      const def = getEntity(parsed.entity);
+      const fields = new Set<string>(def ? def.fields.map((f: { name: string }) => f.name) : []);
+      expect(() => validateConfigExpressions(parsed as { computedColumns?: { name: string; expression: string }[] }, fields))
+        .not.toThrow(`stored report ${row.id} (${row.name}) uses a now-invalid expression`);
+    }
+  });
+});

@@ -211,6 +211,7 @@ class _CustomerLedgerTabState extends ConsumerState<CustomerLedgerTab> {
                 gridRowFor: _gridRowFor,
                 itemLabel: l10n.commonEntries,
                 rowColorCallback: _rowColorCallback,
+                widthKey: 'customer_ledger',
               ),
             ),
           ),

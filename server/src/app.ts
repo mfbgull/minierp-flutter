@@ -241,7 +241,7 @@ app.use('/api/admin', adminBackupRoutes);
 app.use('/api/reports/custom', customReportsRoutes);
 app.use('/api/preferences', preferencesRoutes);
 app.use('/api/search', searchRoutes);
-app.use('/api', initStockBatchesRoutes(db));
+app.use('/api/inventory', initStockBatchesRoutes(db));
 
 // Serve static files from client/dist in production
 // This MUST come AFTER API routes

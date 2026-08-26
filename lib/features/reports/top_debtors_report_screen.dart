@@ -217,6 +217,7 @@ class _TopDebtorsReportScreenState
       hiddenFields: const ['key'],
       isLoading: report.isLoading,
       onRowDoubleTap: (row) => showTopDebtorDetailDialog(context, row: row),
+      widthKey: 'report_top_debtors',
     );
   }
 }

@@ -22,6 +22,7 @@ import 'package:flutter/material.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../l10n/app_localizations.dart';
+import 'grid_column_widths.dart';
 import 'pagination_bar.dart' show ServerPaginationBar;
 import 'pluto_grid_screen.dart'
     show autoFitPlutoColumns, plutoGridConfigurationFor, withSerialCell;
@@ -42,6 +43,7 @@ class ClientPagedGrid<T> extends StatefulWidget {
     this.padding = const EdgeInsets.fromLTRB(16, 8, 16, 0),
     this.compact = true,
     this.autoFitColumns = true,
+    this.widthKey,
   });
 
   /// The full row set. Identity-compared in [State.didUpdateWidget] so
@@ -87,6 +89,11 @@ class ClientPagedGrid<T> extends StatefulWidget {
   /// Pass `compact: false` to restore PlutoGrid's roomier defaults.
   final bool autoFitColumns;
 
+  /// Storage key for persisted dragged column widths
+  /// ([GridColumnWidths]) — null disables persistence. Must be unique
+  /// per grid usage (e.g. `'report_ar_aging'`).
+  final String? widthKey;
+
   @override
   State<ClientPagedGrid<T>> createState() => _ClientPagedGridState<T>();
 }
@@ -95,6 +102,24 @@ class _ClientPagedGridState<T> extends State<ClientPagedGrid<T>> {
   PlutoGridStateManager? _manager;
   int _page = 1;
   int _limit = 10;
+  GridColumnWidths? _widthTracker;
+
+  void _autoFit(PlutoGridStateManager manager) {
+    final tracker = _widthTracker;
+    if (tracker != null) {
+      // Guarded: auto-fit must not record as user edits, and dragged
+      // widths are re-applied over the fitted result.
+      tracker.programmaticPass(() => autoFitPlutoColumns(manager));
+    } else {
+      autoFitPlutoColumns(manager);
+    }
+  }
+
+  @override
+  void dispose() {
+    _widthTracker?.dispose();
+    super.dispose();
+  }
 
   int get _totalPages =>
       widget.data.isEmpty ? 1 : (widget.data.length + _limit - 1) ~/ _limit;
@@ -135,7 +160,7 @@ class _ClientPagedGridState<T> extends State<ClientPagedGrid<T>> {
       // resizeColumn notifies listeners.
       if (widget.autoFitColumns && _manager != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _manager != null) autoFitPlutoColumns(_manager!);
+          if (mounted && _manager != null) _autoFit(_manager!);
         });
       }
     }
@@ -177,7 +202,16 @@ class _ClientPagedGridState<T> extends State<ClientPagedGrid<T>> {
                 }
                 _manager?.setShowLoading(widget.isLoading ?? false);
                 _sync();
-                if (widget.autoFitColumns) autoFitPlutoColumns(_manager!);
+                if (widget.autoFitColumns) _autoFit(_manager!);
+                // Attach last so the restore pass queues behind the
+                // initial fit above.
+                if (widget.widthKey != null) {
+                  _widthTracker?.dispose();
+                  _widthTracker = GridColumnWidths.attach(
+                    stateManager: event.stateManager,
+                    screenKey: widget.widthKey!,
+                  );
+                }
               },
               onRowDoubleTap: widget.onRowDoubleTap == null
                   ? null

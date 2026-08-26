@@ -8,17 +8,27 @@ import '../../data/models/report.dart' show GeneralLedgerRow;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
+import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pluto_grid_screen.dart'
     show autoFitPlutoColumns, plutoGridConfigurationFor;
 import '../../widgets/screen_error_panel.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import 'report_providers.dart';
 
-class GeneralLedgerReportScreen extends ConsumerWidget {
+class GeneralLedgerReportScreen extends ConsumerStatefulWidget {
   const GeneralLedgerReportScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GeneralLedgerReportScreen> createState() =>
+      _GeneralLedgerReportScreenState();
+}
+
+class _GeneralLedgerReportScreenState
+    extends ConsumerState<GeneralLedgerReportScreen> {
+  GridColumnWidths? _widthTracker;
+
+  @override
+  Widget build(BuildContext context) {
     final entries = ref.watch(generalLedgerProvider);
     final l10n = AppLocalizations.of(context)!;
 
@@ -60,6 +70,12 @@ class GeneralLedgerReportScreen extends ConsumerWidget {
         Expanded(child: _body(context, ref, entries)),
       ],
     );
+  }
+
+  @override
+  void dispose() {
+    _widthTracker?.dispose();
+    super.dispose();
   }
 
   Widget _body(
@@ -114,6 +130,11 @@ class GeneralLedgerReportScreen extends ConsumerWidget {
       onLoaded: (e) {
         e.stateManager.setSelectingMode(PlutoGridSelectingMode.none);
         autoFitPlutoColumns(e.stateManager);
+        _widthTracker?.dispose();
+        _widthTracker = GridColumnWidths.attach(
+          stateManager: e.stateManager,
+          screenKey: 'report_general_ledger',
+        );
       },
     );
   }

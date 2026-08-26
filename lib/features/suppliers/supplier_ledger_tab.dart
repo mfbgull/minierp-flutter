@@ -137,6 +137,7 @@ class _SupplierLedgerTabState extends ConsumerState<SupplierLedgerTab> {
                 columns: _gridColumns,
                 gridRowFor: _gridRowFor,
                 itemLabel: l10n.commonEntries,
+                widthKey: 'supplier_ledger',
               ),
             ),
           ),
