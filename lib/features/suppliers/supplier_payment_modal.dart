@@ -11,9 +11,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
+import '../../data/models/purchase.dart' show Purchase;
 import '../../data/models/purchase_order.dart' show PurchaseOrder;
 import '../../data/models/supplier.dart' show Supplier;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
+import '../../data/repositories/purchase_repository.dart'
+    show purchaseRepositoryProvider;
 import '../../data/repositories/invoice_repository.dart'
     show invoiceRepositoryProvider;
 import '../../data/repositories/purchase_order_repository.dart'
@@ -51,6 +54,26 @@ final _openPosProvider = FutureProvider.autoDispose
         ApiSuccess(:final data) => [
           for (final po in data)
             if ((po.balanceAmount > 0)) po,
+        ],
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+/// The supplier's direct purchases with an outstanding balance
+/// (balance > 0) for allocation — the backend's `purchase_allocations`
+/// path. Mirrors [_openPosProvider] but sources `GET /purchases?
+/// supplier_id=<id>` and filters on `balance_amount`.
+final _openPurchasesProvider = FutureProvider.autoDispose
+    .family<List<Purchase>, int>((ref, supplierId) async {
+      final result = await ref
+          .watch(purchaseRepositoryProvider)
+          .listPaged(PagedRequest(page: 1, limit: 1000, extra: {
+            'supplier_id': supplierId,
+          }));
+      return switch (result) {
+        ApiSuccess(:final data) => [
+          for (final p in data.items)
+            if (p.balanceAmount > 0) p,
         ],
         ApiFailure(:final error) => throw error,
       };
