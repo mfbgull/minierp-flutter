@@ -154,6 +154,20 @@ class BalanceSheetReportScreen extends ConsumerWidget {
             data.equity.openingRetainedEarnings,
             Icons.savings_outlined,
           ),
+          if (data.equity.ownerCapital != null)
+            _metricCard(
+              context,
+              'Owner Capital',
+              data.equity.ownerCapital!,
+              Icons.add_card_outlined,
+            ),
+          if (data.equity.ownerDrawings != null)
+            _metricCard(
+              context,
+              'Owner Drawings',
+              data.equity.ownerDrawings!,
+              Icons.call_made_outlined,
+            ),
           _metricCard(
             context,
             'Net Income (YTD)',

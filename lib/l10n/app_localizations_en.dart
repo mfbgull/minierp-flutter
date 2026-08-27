@@ -3449,6 +3449,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cashposSalary => 'Salary';
 
   @override
+  String get cashposOwnercapital => 'Owner Capital';
+
+  @override
+  String get cashposOwnerwithdrawal => 'Owner Withdrawal';
+
+  @override
   String get cashposSupplierpayment => 'Supplier Payment';
 
   @override
@@ -5500,4 +5506,127 @@ class AppLocalizationsEn extends AppLocalizations {
   String batchOverrideCleared(Object count) {
     return '$count expired batch(es) overridden for this sale';
   }
+
+  @override
+  String get navOwnersequity => 'Owner\'s Equity';
+
+  @override
+  String get equityCapital => 'Capital';
+
+  @override
+  String get equityWithdrawals => 'Withdrawals';
+
+  @override
+  String get equityTotalcapitalin => 'Total Capital In';
+
+  @override
+  String get equityTotalwithdrawn => 'Total Withdrawn';
+
+  @override
+  String get equityNetcontributions => 'Net Contributions';
+
+  @override
+  String get equityNewcapital => 'New Capital';
+
+  @override
+  String get equityEditcapital => 'Edit Capital Entry';
+
+  @override
+  String get equityCapitaldate => 'Capital date';
+
+  @override
+  String get equityCapitalno => 'Doc No';
+
+  @override
+  String get equityNewwithdrawal => 'New Withdrawal';
+
+  @override
+  String get equityEditwithdrawal => 'Edit Withdrawal';
+
+  @override
+  String get equityWithdrawalno => 'Doc No';
+
+  @override
+  String get equityKindcash => 'Cash';
+
+  @override
+  String get equityKindgoods => 'Goods';
+
+  @override
+  String get equityAllkinds => 'All kinds';
+
+  @override
+  String get equityKind => 'Kind';
+
+  @override
+  String get equityItemstaken => 'Items taken';
+
+  @override
+  String get equityItem => 'Item';
+
+  @override
+  String get equityItems => 'Items';
+
+  @override
+  String get equityWarehouse => 'Warehouse';
+
+  @override
+  String get equityAdditem => 'Add item';
+
+  @override
+  String get equityMovements => 'Batch movements (at cost)';
+
+  @override
+  String get equityTakenout => 'Taken out';
+
+  @override
+  String get equityReturned => 'Returned';
+
+  @override
+  String get equityCostpreview => 'Costing preview (FIFO)';
+
+  @override
+  String get equityCostpreviewempty =>
+      'Add item lines to see the calculated withdrawal value.';
+
+  @override
+  String get equityCosttotal => 'Total withdrawal value';
+
+  @override
+  String get equityCostatcostnote =>
+      'Value is calculated from inventory cost, not selling price.';
+
+  @override
+  String equityBreakdownTitle(Object docNo) {
+    return 'Withdrawal $docNo';
+  }
+
+  @override
+  String get equitySaved => 'Saved';
+
+  @override
+  String get equityVoided => 'Entry voided';
+
+  @override
+  String get equityDeleteconfirmdesc =>
+      'This voids the general-ledger posting and, for goods withdrawals, returns stock to its original batches. The record stays in history as voided.';
+
+  @override
+  String get equityExported => 'Exported';
+
+  @override
+  String get equityExportfailed => 'Export failed';
+
+  @override
+  String get equityErrorAmountRequired => 'Amount is required';
+
+  @override
+  String get equityErrorAmountInvalid => 'Amount must be a positive number';
+
+  @override
+  String get equityErrorItemsRequired =>
+      'Add at least one item line with a quantity.';
+
+  @override
+  String get fieldsNote => 'Note';
 }

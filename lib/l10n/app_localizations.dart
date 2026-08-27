@@ -6818,6 +6818,18 @@ abstract class AppLocalizations {
   /// **'Salary'**
   String get cashposSalary;
 
+  /// No description provided for @cashposOwnercapital.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner Capital'**
+  String get cashposOwnercapital;
+
+  /// No description provided for @cashposOwnerwithdrawal.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner Withdrawal'**
+  String get cashposOwnerwithdrawal;
+
   /// No description provided for @cashposSupplierpayment.
   ///
   /// In en, this message translates to:
@@ -10767,6 +10779,240 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} expired batch(es) overridden for this sale'**
   String batchOverrideCleared(Object count);
+
+  /// No description provided for @navOwnersequity.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner\'s Equity'**
+  String get navOwnersequity;
+
+  /// No description provided for @equityCapital.
+  ///
+  /// In en, this message translates to:
+  /// **'Capital'**
+  String get equityCapital;
+
+  /// No description provided for @equityWithdrawals.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdrawals'**
+  String get equityWithdrawals;
+
+  /// No description provided for @equityTotalcapitalin.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Capital In'**
+  String get equityTotalcapitalin;
+
+  /// No description provided for @equityTotalwithdrawn.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Withdrawn'**
+  String get equityTotalwithdrawn;
+
+  /// No description provided for @equityNetcontributions.
+  ///
+  /// In en, this message translates to:
+  /// **'Net Contributions'**
+  String get equityNetcontributions;
+
+  /// No description provided for @equityNewcapital.
+  ///
+  /// In en, this message translates to:
+  /// **'New Capital'**
+  String get equityNewcapital;
+
+  /// No description provided for @equityEditcapital.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Capital Entry'**
+  String get equityEditcapital;
+
+  /// No description provided for @equityCapitaldate.
+  ///
+  /// In en, this message translates to:
+  /// **'Capital date'**
+  String get equityCapitaldate;
+
+  /// No description provided for @equityCapitalno.
+  ///
+  /// In en, this message translates to:
+  /// **'Doc No'**
+  String get equityCapitalno;
+
+  /// No description provided for @equityNewwithdrawal.
+  ///
+  /// In en, this message translates to:
+  /// **'New Withdrawal'**
+  String get equityNewwithdrawal;
+
+  /// No description provided for @equityEditwithdrawal.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Withdrawal'**
+  String get equityEditwithdrawal;
+
+  /// No description provided for @equityWithdrawalno.
+  ///
+  /// In en, this message translates to:
+  /// **'Doc No'**
+  String get equityWithdrawalno;
+
+  /// No description provided for @equityKindcash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash'**
+  String get equityKindcash;
+
+  /// No description provided for @equityKindgoods.
+  ///
+  /// In en, this message translates to:
+  /// **'Goods'**
+  String get equityKindgoods;
+
+  /// No description provided for @equityAllkinds.
+  ///
+  /// In en, this message translates to:
+  /// **'All kinds'**
+  String get equityAllkinds;
+
+  /// No description provided for @equityKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get equityKind;
+
+  /// No description provided for @equityItemstaken.
+  ///
+  /// In en, this message translates to:
+  /// **'Items taken'**
+  String get equityItemstaken;
+
+  /// No description provided for @equityItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Item'**
+  String get equityItem;
+
+  /// No description provided for @equityItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Items'**
+  String get equityItems;
+
+  /// No description provided for @equityWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse'**
+  String get equityWarehouse;
+
+  /// No description provided for @equityAdditem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add item'**
+  String get equityAdditem;
+
+  /// No description provided for @equityMovements.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch movements (at cost)'**
+  String get equityMovements;
+
+  /// No description provided for @equityTakenout.
+  ///
+  /// In en, this message translates to:
+  /// **'Taken out'**
+  String get equityTakenout;
+
+  /// No description provided for @equityReturned.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned'**
+  String get equityReturned;
+
+  /// No description provided for @equityCostpreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Costing preview (FIFO)'**
+  String get equityCostpreview;
+
+  /// No description provided for @equityCostpreviewempty.
+  ///
+  /// In en, this message translates to:
+  /// **'Add item lines to see the calculated withdrawal value.'**
+  String get equityCostpreviewempty;
+
+  /// No description provided for @equityCosttotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total withdrawal value'**
+  String get equityCosttotal;
+
+  /// No description provided for @equityCostatcostnote.
+  ///
+  /// In en, this message translates to:
+  /// **'Value is calculated from inventory cost, not selling price.'**
+  String get equityCostatcostnote;
+
+  /// No description provided for @equityBreakdownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdrawal {docNo}'**
+  String equityBreakdownTitle(Object docNo);
+
+  /// No description provided for @equitySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get equitySaved;
+
+  /// No description provided for @equityVoided.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry voided'**
+  String get equityVoided;
+
+  /// No description provided for @equityDeleteconfirmdesc.
+  ///
+  /// In en, this message translates to:
+  /// **'This voids the general-ledger posting and, for goods withdrawals, returns stock to its original batches. The record stays in history as voided.'**
+  String get equityDeleteconfirmdesc;
+
+  /// No description provided for @equityExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported'**
+  String get equityExported;
+
+  /// No description provided for @equityExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed'**
+  String get equityExportfailed;
+
+  /// No description provided for @equityErrorAmountRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount is required'**
+  String get equityErrorAmountRequired;
+
+  /// No description provided for @equityErrorAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount must be a positive number'**
+  String get equityErrorAmountInvalid;
+
+  /// No description provided for @equityErrorItemsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least one item line with a quantity.'**
+  String get equityErrorItemsRequired;
+
+  /// No description provided for @fieldsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get fieldsNote;
 }
 
 class _AppLocalizationsDelegate

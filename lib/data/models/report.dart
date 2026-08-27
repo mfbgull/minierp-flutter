@@ -746,6 +746,8 @@ class BalanceSheetLiabilities {
 class BalanceSheetEquity {
   const BalanceSheetEquity({
     required this.openingRetainedEarnings,
+    this.ownerCapital,
+    this.ownerDrawings,
     required this.netIncomeYtd,
     required this.revenueYtd,
     required this.cogsYtd,
@@ -757,6 +759,10 @@ class BalanceSheetEquity {
       BalanceSheetEquity(
         openingRetainedEarnings:
             asNum(json['opening_retained_earnings']) ?? 0,
+        // Owner-equity module children (3200/3300) — null on responses
+        // from before the owner-equity migration.
+        ownerCapital: asNum(json['owner_capital']),
+        ownerDrawings: asNum(json['owner_drawings']),
         netIncomeYtd: asNum(json['net_income_ytd']) ?? 0,
         revenueYtd: asNum(json['revenue_ytd']) ?? 0,
         cogsYtd: asNum(json['cogs_ytd']) ?? 0,
@@ -765,6 +771,12 @@ class BalanceSheetEquity {
       );
 
   final num openingRetainedEarnings;
+
+  /// 3200 Owner Capital contributions (credit-normal, positive).
+  final num? ownerCapital;
+
+  /// 3300 Owner Drawings — arrives negative (contra-equity).
+  final num? ownerDrawings;
   final num netIncomeYtd;
   final num revenueYtd;
   final num cogsYtd;

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BOM_SORT_COLUMNS = exports.EXPENSE_SORT_COLUMNS = exports.PRODUCTION_SORT_COLUMNS = exports.PURCHASE_RETURN_HEADER_SORT_COLUMNS = exports.PURCHASE_SORT_COLUMNS = exports.PURCHASE_ORDER_SORT_COLUMNS = exports.INVOICE_RETURN_SORT_COLUMNS = exports.QUOTATION_SORT_COLUMNS = exports.SALES_ORDER_SORT_COLUMNS = exports.INVOICE_SORT_COLUMNS = exports.PHYSICAL_COUNT_SORT_COLUMNS = exports.STOCK_BALANCE_SORT_COLUMNS = exports.ITEM_SORT_COLUMNS = exports.STOCK_MOVEMENT_SORT_COLUMNS = exports.PAYMENT_SORT_COLUMNS = exports.LEDGER_SORT_COLUMNS = exports.SUPPLIER_SORT_COLUMNS = exports.CUSTOMER_SORT_COLUMNS = void 0;
+exports.BOM_SORT_COLUMNS = exports.OWNER_WITHDRAWAL_SORT_COLUMNS = exports.OWNER_CAPITAL_SORT_COLUMNS = exports.EXPENSE_SORT_COLUMNS = exports.PRODUCTION_SORT_COLUMNS = exports.PURCHASE_RETURN_HEADER_SORT_COLUMNS = exports.PURCHASE_SORT_COLUMNS = exports.PURCHASE_ORDER_SORT_COLUMNS = exports.INVOICE_RETURN_SORT_COLUMNS = exports.QUOTATION_SORT_COLUMNS = exports.SALES_ORDER_SORT_COLUMNS = exports.INVOICE_SORT_COLUMNS = exports.PHYSICAL_COUNT_SORT_COLUMNS = exports.STOCK_BALANCE_SORT_COLUMNS = exports.ITEM_SORT_COLUMNS = exports.STOCK_MOVEMENT_SORT_COLUMNS = exports.PAYMENT_SORT_COLUMNS = exports.LEDGER_SORT_COLUMNS = exports.SUPPLIER_SORT_COLUMNS = exports.CUSTOMER_SORT_COLUMNS = void 0;
 exports.sanitizeSortParams = sanitizeSortParams;
 /**
  * Sanitize sort parameters to prevent SQL injection.
@@ -225,6 +225,27 @@ exports.EXPENSE_SORT_COLUMNS = [
     'e.payment_method',
     'e.project',
     'e.created_at'
+];
+// Whitelisted sort columns for owner equity lists (`OwnerCapital` /
+// `OwnerWithdrawal` getAll; users join makes bare names ambiguous)
+exports.OWNER_CAPITAL_SORT_COLUMNS = [
+    'oc.capital_no',
+    'oc.capital_date',
+    'oc.amount',
+    'oc.payment_method',
+    'oc.note',
+    'oc.status',
+    'oc.created_at'
+];
+exports.OWNER_WITHDRAWAL_SORT_COLUMNS = [
+    'ow.withdrawal_no',
+    'ow.withdrawal_date',
+    'ow.kind',
+    'ow.amount',
+    'ow.payment_method',
+    'ow.note',
+    'ow.status',
+    'ow.created_at'
 ];
 // Whitelisted sort columns for BOMs (`BOMModel.getAll`; mapped to
 // qualified SQL columns — the finished-item join)

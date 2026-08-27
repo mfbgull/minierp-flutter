@@ -86,6 +86,13 @@ abstract final class ApiEndpoints {
   static const expensesPaymentMethodOptions =
       '/expenses/payment-method-options';
   static const expensesSummary = '/expenses/summary';
+  static const ownerEquityCapital = '/owner-equity/capital';
+  static const ownerEquityWithdrawals = '/owner-equity/withdrawals';
+  static const ownerEquityWithdrawalsQuote =
+      '/owner-equity/withdrawals/quote';
+  static const ownerEquitySummary = '/owner-equity/summary';
+  static const ownerEquityPaymentMethodOptions =
+      '/owner-equity/payment-method-options';
   static const employees = '/employees';
   // Production (§Production) — note the BOM mount is `/api/boms`
   // (`app.use('/api/boms', bomRoutes)`) while productions live flat on

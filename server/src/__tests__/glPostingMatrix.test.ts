@@ -2,6 +2,7 @@ import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
 import PaymentModel from '../models/Payment';
+import OwnerCapitalModel, { generateCapitalNo } from '../models/OwnerCapital';
 
 /**
  * GL posting-matrix tests (gl-posting-completeness §2).
@@ -55,6 +56,18 @@ describe('GL posting matrix', () => {
   beforeAll(async () => {
     authCookie = await getAuthCookie();
     expect(authCookie).not.toBe('');
+
+    // Cash-out postings (supplier payments, expenses) are funds-guarded —
+    // seed opening capital so the fixture's payouts clear.
+    db.transaction(() => {
+      OwnerCapitalModel.create(db, {
+        capital_no: generateCapitalNo(db, '2026-01-01'),
+        capital_date: '2026-01-01',
+        amount: 1_000_000,
+        payment_method: 'Cash',
+        created_by: 1,
+      });
+    })();
 
     warehouseId = (db.prepare(`SELECT id FROM warehouses ORDER BY id LIMIT 1`).get() as { id: number }).id;
 

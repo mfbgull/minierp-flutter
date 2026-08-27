@@ -325,6 +325,19 @@ class PaymentModel {
             db.prepare('UPDATE suppliers SET current_balance = ? WHERE id = ?').run(newBalance, data.supplier_id);
             // GL posting (ACC-03): Dr 2000 AP / Cr cash-per-method. Without this
             // the cash the business paid out never leaves GL account 1000.
+            // Funds guard: reject payouts that would overdraw the selected
+            // account as of the payment date.
+            const fundsCashCode = accountingService_1.default._cashOrBankAccountCode(data.payment_method);
+            const fundsAccount = accountingService_1.default.getAccountByCode(db, fundsCashCode);
+            if (!fundsAccount) {
+                throw new Error(`Chart of accounts is missing required account: ${fundsCashCode}`);
+            }
+            accountingService_1.default.assertSufficientFunds(db, {
+                accountId: fundsAccount.id,
+                amount: (0, currency_1.parseCurrency)(data.amount),
+                asOfDate: data.payment_date,
+                label: `supplier payment ${paymentNo}`,
+            });
             accountingService_1.default.postSupplierPaymentEntry(db, {
                 paymentId,
                 paymentNo,

@@ -41,6 +41,8 @@ import '../../data/models/activity_log.dart' show ActivityLog;
 import '../../data/models/bom.dart' show Bom;
 import '../../data/models/expense.dart' show Expense;
 import '../../data/models/invoice.dart' show Invoice;
+import '../../data/models/owner_equity.dart'
+    show OwnerCapitalEntry, OwnerWithdrawal;
 import '../../data/models/production.dart' show Production;
 import '../../data/models/purchase_order.dart' show PurchaseOrder;
 import '../../data/models/purchase_return.dart' show PurchaseReturn;
@@ -376,6 +378,64 @@ String buildExpensesCsv(AppLocalizations l10n, List<Expense> expenses) {
   );
 }
 
+String buildOwnerCapitalCsv(
+  AppLocalizations l10n,
+  List<OwnerCapitalEntry> entries,
+) {
+  return _buildGridCsv(
+    [
+      l10n.equityCapitalno,
+      l10n.fieldsDate,
+      l10n.expensesPaymentmethod,
+      l10n.fieldsNote,
+      l10n.fieldsAmount,
+      l10n.fieldsStatus,
+      l10n.expensesCreatedby,
+    ],
+    entries,
+    (e) => [
+      sanitizeCsvCell(e.capitalNo.isEmpty ? '—' : e.capitalNo),
+      e.capitalDate.isEmpty ? '—' : Formatters.date(e.capitalDate),
+      sanitizeCsvCell((e.paymentMethod?.isEmpty ?? true) ? '—' : e.paymentMethod!),
+      sanitizeCsvCell((e.note?.isEmpty ?? true) ? '—' : e.note!),
+      Formatters.currency(e.amount),
+      sanitizeCsvCell(e.status),
+      sanitizeCsvCell((e.createdByName?.isEmpty ?? true) ? '—' : e.createdByName!),
+    ],
+  );
+}
+
+String buildOwnerWithdrawalsCsv(
+  AppLocalizations l10n,
+  List<OwnerWithdrawal> rows,
+) {
+  return _buildGridCsv(
+    [
+      l10n.equityWithdrawalno,
+      l10n.fieldsDate,
+      l10n.equityKind,
+      l10n.fieldsAmount,
+      l10n.equityItems,
+      l10n.expensesPaymentmethod,
+      l10n.fieldsNote,
+      l10n.fieldsStatus,
+      l10n.expensesCreatedby,
+    ],
+    rows,
+    (r) => [
+      sanitizeCsvCell(r.withdrawalNo.isEmpty ? '—' : r.withdrawalNo),
+      r.withdrawalDate.isEmpty ? '—' : Formatters.date(r.withdrawalDate),
+      sanitizeCsvCell(r.kind == 'goods' ? l10n.equityKindgoods : l10n.equityKindcash),
+      Formatters.currency(r.amount),
+      r.kind == 'goods' ? r.itemLineCount.toString() : '—',
+      sanitizeCsvCell((r.paymentMethod?.isEmpty ?? true) ? '—' : r.paymentMethod!),
+      sanitizeCsvCell((r.note?.isEmpty ?? true) ? '—' : r.note!),
+      sanitizeCsvCell(r.status),
+      sanitizeCsvCell((r.createdByName?.isEmpty ?? true) ? '—' : r.createdByName!),
+    ],
+  );
+}
+
 String buildArAgingCsv(AppLocalizations l10n, ArAgingReport report) {
   return _buildGridCsv(
     [
@@ -447,6 +507,12 @@ String buildBalanceSheetCsv(
   buf.writeln();
   buf.writeln('Equity,,');
   buf.writeln('Opening Retained Earnings,,${Formatters.currency(report.equity.openingRetainedEarnings)}');
+  if (report.equity.ownerCapital != null) {
+    buf.writeln('Owner Capital,,${Formatters.currency(report.equity.ownerCapital!)}');
+  }
+  if (report.equity.ownerDrawings != null) {
+    buf.writeln('Owner Drawings,,${Formatters.currency(report.equity.ownerDrawings!)}');
+  }
   buf.writeln('Net Income (YTD),,${Formatters.currency(report.equity.netIncomeYtd)}');
   buf.writeln('Revenue (YTD),,${Formatters.currency(report.equity.revenueYtd)}');
   buf.writeln('COGS (YTD),,${Formatters.currency(report.equity.cogsYtd)}');

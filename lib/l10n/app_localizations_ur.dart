@@ -3450,6 +3450,12 @@ class AppLocalizationsUr extends AppLocalizations {
   String get cashposSalary => 'تنخواہ';
 
   @override
+  String get cashposOwnercapital => 'مالک کا سرمایہ';
+
+  @override
+  String get cashposOwnerwithdrawal => 'مالک کی وانٹھ';
+
+  @override
   String get cashposSupplierpayment => 'سپلائر ادائیگی';
 
   @override
@@ -5497,4 +5503,127 @@ class AppLocalizationsUr extends AppLocalizations {
   String batchOverrideCleared(Object count) {
     return '$count ختم شدہ بیچ(es) اس فروخت کے لیے آورائیڈ کیے گئے';
   }
+
+  @override
+  String get navOwnersequity => 'مالک کی سرمائے کاری';
+
+  @override
+  String get equityCapital => 'سرمایہ';
+
+  @override
+  String get equityWithdrawals => 'وانٹھ';
+
+  @override
+  String get equityTotalcapitalin => 'کل داخل سرمایہ';
+
+  @override
+  String get equityTotalwithdrawn => 'کل واپس لیا گیا';
+
+  @override
+  String get equityNetcontributions => 'خالص تعاون';
+
+  @override
+  String get equityNewcapital => 'نیا سرمایہ';
+
+  @override
+  String get equityEditcapital => 'سرمایہ میں ترمیم';
+
+  @override
+  String get equityCapitaldate => 'سرمایہ کی تاریخ';
+
+  @override
+  String get equityCapitalno => 'دستاویز نمبر';
+
+  @override
+  String get equityNewwithdrawal => 'نئی وانٹھ';
+
+  @override
+  String get equityEditwithdrawal => 'وانٹھ میں ترمیم';
+
+  @override
+  String get equityWithdrawalno => 'دستاویز نمبر';
+
+  @override
+  String get equityKindcash => 'نقد';
+
+  @override
+  String get equityKindgoods => 'مال';
+
+  @override
+  String get equityAllkinds => 'تمام اقسام';
+
+  @override
+  String get equityKind => 'قسم';
+
+  @override
+  String get equityItemstaken => 'لیا گیا مال';
+
+  @override
+  String get equityItem => 'آئٹم';
+
+  @override
+  String get equityItems => 'آئٹمز';
+
+  @override
+  String get equityWarehouse => 'گودام';
+
+  @override
+  String get equityAdditem => 'آئٹم شامل کریں';
+
+  @override
+  String get equityMovements => 'بیچ نقل (لاگت پر)';
+
+  @override
+  String get equityTakenout => 'باہر لیا گیا';
+
+  @override
+  String get equityReturned => 'واپس';
+
+  @override
+  String get equityCostpreview => 'لاگت پیش نظارہ (FIFO)';
+
+  @override
+  String get equityCostpreviewempty =>
+      'حساب شدہ رقم دیکھنے کے لیے آئٹم لائنیں شامل کریں۔';
+
+  @override
+  String get equityCosttotal => 'کل واپس لی گئی رقم';
+
+  @override
+  String get equityCostatcostnote =>
+      'رقم انوینٹری لاگت سے حساب ہوتی ہے، فروخت قیمت سے نہیں۔';
+
+  @override
+  String equityBreakdownTitle(Object docNo) {
+    return 'وانٹھ $docNo';
+  }
+
+  @override
+  String get equitySaved => 'محفوظ ہو گیا';
+
+  @override
+  String get equityVoided => 'اندراج منسوخ';
+
+  @override
+  String get equityDeleteconfirmdesc =>
+      'اس سے جنرل لیجر اندراج منسوخ ہوگا اور مال کی صورت میں اسٹاک اصل بیچز میں واپس چلا جائے گا۔ ریکارڈ تاریخ میں منسوخ شدہ طور پر رہے گا۔';
+
+  @override
+  String get equityExported => 'برآمد ہوگیا';
+
+  @override
+  String get equityExportfailed => 'برآمد ناکام';
+
+  @override
+  String get equityErrorAmountRequired => 'رقم درکار ہے';
+
+  @override
+  String get equityErrorAmountInvalid => 'رقم مثبت عدد ہونی چاہیے';
+
+  @override
+  String get equityErrorItemsRequired =>
+      'کم از کم ایک آئٹم لائن مقدار کے ساتھ شامل کریں۔';
+
+  @override
+  String get fieldsNote => 'نوٹ';
 }

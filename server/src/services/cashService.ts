@@ -140,6 +140,29 @@ export function collectFlows(
     add(row.payment_method, row.inflow, row.outflow);
   }
 
+  // Owner equity (pre-floor fold): capital in / cash withdrawals out,
+  // folded like payments so balances stay exact below the scan floor.
+  const ownerPreFloor = db.prepare(`
+    SELECT payment_method,
+      COALESCE(SUM(amount), 0) as inflow
+    FROM owner_capital
+    WHERE status = 'posted' AND capital_date < ? AND capital_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number }>;
+  const ownerWdPreFloor = db.prepare(`
+    SELECT payment_method,
+      COALESCE(SUM(amount), 0) as outflow
+    FROM owner_withdrawals
+    WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date < ? AND withdrawal_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
+  for (const row of ownerPreFloor) {
+    add(row.payment_method, row.inflow, 0);
+  }
+  for (const row of ownerWdPreFloor) {
+    add(row.payment_method, 0, row.outflow);
+  }
+
 
   // Customer payments: positive amounts are money in; negative amounts
   // (refunds paid out to customers) are money out.
@@ -185,6 +208,29 @@ export function collectFlows(
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
   for (const row of salaries) {
+    add(row.payment_method, 0, row.outflow);
+  }
+
+  // Owner equity: capital contributions are money in; cash-kind
+  // withdrawals are money out (goods withdrawals move no cash). Voided
+  // rows are excluded so the till matches the GL.
+  const ownerCapital = db.prepare(`
+    SELECT payment_method, COALESCE(SUM(amount), 0) as inflow
+    FROM owner_capital
+    WHERE status = 'posted' AND capital_date > ? AND capital_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number }>;
+  for (const row of ownerCapital) {
+    add(row.payment_method, row.inflow, 0);
+  }
+
+  const ownerCashOut = db.prepare(`
+    SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
+    FROM owner_withdrawals
+    WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date > ? AND withdrawal_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
+  for (const row of ownerCashOut) {
     add(row.payment_method, 0, row.outflow);
   }
 
@@ -397,6 +443,41 @@ export function getCashAccountTransactions(
   `).all(uptoDate) as Array<Record<string, unknown>>) {
     const amount = Number(r.amount) || 0;
     push({ method: r.method as string | null, date: r.date as string, reference: r.reference as string | null, description: r.description as string | null, amount: -amount, type: 'salary' });
+  }
+
+  // Owner capital contributions (money in).
+  for (const r of db.prepare(`
+    SELECT capital_date as date, payment_method as method, capital_no as reference,
+           note as description, amount
+    FROM owner_capital
+    WHERE status = 'posted' AND capital_date <= ?
+  `).all(uptoDate) as Array<Record<string, unknown>>) {
+    push({
+      method: r.method as string | null,
+      date: r.date as string,
+      reference: r.reference as string | null,
+      description: r.description as string | null,
+      amount: Number(r.amount) || 0,
+      type: 'owner_capital',
+    });
+  }
+
+  // Cash-kind owner withdrawals (money out); goods withdrawals move no
+  // cash so they never appear on a till walk.
+  for (const r of db.prepare(`
+    SELECT withdrawal_date as date, payment_method as method, withdrawal_no as reference,
+           note as description, amount
+    FROM owner_withdrawals
+    WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date <= ?
+  `).all(uptoDate) as Array<Record<string, unknown>>) {
+    push({
+      method: r.method as string | null,
+      date: r.date as string,
+      reference: r.reference as string | null,
+      description: r.description as string | null,
+      amount: -(Number(r.amount) || 0),
+      type: 'owner_withdrawal',
+    });
   }
 
   out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));

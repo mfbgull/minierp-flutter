@@ -96,6 +96,11 @@ final List<ShellDestination> shellDestinations = [
     icon: Icons.receipt_long_outlined,
   ),
   ShellDestination(
+    path: '/owners-equity',
+    label: (l) => l.navOwnersequity,
+    icon: Icons.savings_outlined,
+  ),
+  ShellDestination(
     path: '/hr',
     label: (l) => l.navEmployees,
     icon: Icons.badge_outlined,
