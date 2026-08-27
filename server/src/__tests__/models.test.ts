@@ -6,6 +6,29 @@ import PurchaseModel from '../models/Purchase';
 import PurchaseOrderModel from '../models/PurchaseOrder';
 import PaymentModel from '../models/Payment';
 import SupplierLedgerModel from '../models/SupplierLedger';
+import OwnerCapitalModel, { generateCapitalNo } from '../models/OwnerCapital';
+
+// The cash-out funds guard blocks postings that would overdraw an account
+// as of the effective date — seed opening capital once per fixture DB so
+// supplier payments in these suites clear (both Cash- and Bank-routed).
+beforeAll(() => {
+  db.transaction(() => {
+    OwnerCapitalModel.create(db, {
+      capital_no: generateCapitalNo(db, '2026-01-01'),
+      capital_date: '2026-01-01',
+      amount: 1_000_000,
+      payment_method: 'Cash',
+      created_by: 1,
+    });
+    OwnerCapitalModel.create(db, {
+      capital_no: generateCapitalNo(db, '2026-01-02'),
+      capital_date: '2026-01-02',
+      amount: 100_000,
+      payment_method: 'Bank',
+      created_by: 1,
+    });
+  })();
+});
 
 describe('ItemModel', () => {
   let createdItemId: number;

@@ -401,6 +401,19 @@ export class PaymentModel {
 
       // GL posting (ACC-03): Dr 2000 AP / Cr cash-per-method. Without this
       // the cash the business paid out never leaves GL account 1000.
+      // Funds guard: reject payouts that would overdraw the selected
+      // account as of the payment date.
+      const fundsCashCode = AccountingService._cashOrBankAccountCode(data.payment_method);
+      const fundsAccount = AccountingService.getAccountByCode(db, fundsCashCode);
+      if (!fundsAccount) {
+        throw new Error(`Chart of accounts is missing required account: ${fundsCashCode}`);
+      }
+      AccountingService.assertSufficientFunds(db, {
+        accountId: fundsAccount.id,
+        amount: parseCurrency(data.amount),
+        asOfDate: data.payment_date,
+        label: `supplier payment ${paymentNo}`,
+      });
       AccountingService.postSupplierPaymentEntry(db, {
         paymentId,
         paymentNo,

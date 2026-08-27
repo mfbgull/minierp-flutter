@@ -112,6 +112,13 @@ import '../sales_orders/sales_order_providers.dart'
         salesOrderCustomerOptionsProvider,
         salesOrdersProvider,
         soItemsProvider;
+import '../owner_equity/owner_equity_providers.dart'
+    show
+        allOwnerCapitalProvider,
+        allOwnerWithdrawalsProvider,
+        equitySummaryProvider,
+        ownerCapitalProvider,
+        ownerWithdrawalsProvider;
 import '../settings/settings_providers.dart' show settingsProvider;
 import '../suppliers/supplier_providers.dart' show suppliersProvider;
 
@@ -163,6 +170,12 @@ final Map<String, ModuleRefresh> moduleRefreshOnVisit = {
     ..invalidate(purchasesProvider)
     ..invalidate(purchaseReturnsProvider)
     ..invalidate(filteredPurchaseReturnsProvider),
+  '/owners-equity': (ref) => ref
+    ..invalidate(ownerCapitalProvider)
+    ..invalidate(allOwnerCapitalProvider)
+    ..invalidate(ownerWithdrawalsProvider)
+    ..invalidate(allOwnerWithdrawalsProvider)
+    ..invalidate(equitySummaryProvider),
   '/suppliers': (ref) => ref.invalidate(suppliersProvider),
   '/production': (ref) => ref
     ..invalidate(productionsProvider)
@@ -256,6 +269,16 @@ final Map<String, List<ModuleRefresh>> moduleTabRefreshOnVisit = {
       ..invalidate(invoiceReturnsProvider)
       ..invalidate(filteredInvoiceReturnsProvider)
       ..invalidate(invoiceReturnPickerProvider),
+  ],
+  '/owners-equity': [
+    (ref) => ref
+      ..invalidate(ownerCapitalProvider)
+      ..invalidate(allOwnerCapitalProvider)
+      ..invalidate(equitySummaryProvider),
+    (ref) => ref
+      ..invalidate(ownerWithdrawalsProvider)
+      ..invalidate(allOwnerWithdrawalsProvider)
+      ..invalidate(equitySummaryProvider),
   ],
   '/purchasing': [
     (ref) => ref

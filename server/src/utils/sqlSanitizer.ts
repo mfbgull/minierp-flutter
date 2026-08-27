@@ -249,6 +249,29 @@ export const EXPENSE_SORT_COLUMNS = [
   'e.created_at'
 ] as const;
 
+// Whitelisted sort columns for owner equity lists (`OwnerCapital` /
+// `OwnerWithdrawal` getAll; users join makes bare names ambiguous)
+export const OWNER_CAPITAL_SORT_COLUMNS = [
+  'oc.capital_no',
+  'oc.capital_date',
+  'oc.amount',
+  'oc.payment_method',
+  'oc.note',
+  'oc.status',
+  'oc.created_at'
+] as const;
+
+export const OWNER_WITHDRAWAL_SORT_COLUMNS = [
+  'ow.withdrawal_no',
+  'ow.withdrawal_date',
+  'ow.kind',
+  'ow.amount',
+  'ow.payment_method',
+  'ow.note',
+  'ow.status',
+  'ow.created_at'
+] as const;
+
 // Whitelisted sort columns for BOMs (`BOMModel.getAll`; mapped to
 // qualified SQL columns — the finished-item join)
 export const BOM_SORT_COLUMNS = [

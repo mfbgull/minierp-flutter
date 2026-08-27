@@ -29,6 +29,19 @@ function create(db, data) {
         // GL posting (ACC-04): Dr 6000 Operating Expenses /
         // Cr cash-per-method. Expenses default to Approved on entry, so
         // posting at creation matches when the cash effect occurs.
+        // Funds guard: reject payouts that would overdraw the selected
+        // account as of the expense date (same primitive reports use).
+        const fundsCashCode = accountingService_1.default._cashOrBankAccountCode(data.payment_method || 'cash');
+        const fundsAccount = accountingService_1.default.getAccountByCode(db, fundsCashCode);
+        if (!fundsAccount) {
+            throw new Error(`Chart of accounts is missing required account: ${fundsCashCode}`);
+        }
+        accountingService_1.default.assertSufficientFunds(db, {
+            accountId: fundsAccount.id,
+            amount: data.amount,
+            asOfDate: data.expense_date,
+            label: `expense ${data.expense_no}`,
+        });
         accountingService_1.default.postExpenseEntry(db, {
             expenseId: newId,
             expenseNo: data.expense_no,

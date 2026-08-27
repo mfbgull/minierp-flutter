@@ -467,9 +467,20 @@ function getBalanceSheet(asOfDate: string, db: Database.Database) {
   );
   const cogsYtd = bal('5000');
   const expensesYtd = round2(sumType('expense') - cogsYtd);
-  const openingRetainedEarnings = sumType('equity'); // contributed capital + posted retained earnings
+  // Equity accounts are credit-normal except contra-equity Owner Drawings
+  // (3300, debit-normal), which must REDUCE equity — same normal-balance
+  // treatment as contra-revenue above. sumType('equity') would add the
+  // drawings balance (already debit-positive) instead of subtracting it.
+  const OWNER_CAPITAL_CODE = '3200';
+  const OWNER_DRAWINGS_CODE = '3300';
+  const ownerCapitalBal = bal(OWNER_CAPITAL_CODE);   // credit-normal ⇒ positive
+  const ownerDrawingsBal = bal(OWNER_DRAWINGS_CODE); // debit-normal ⇒ positive when drawings exist
+  const openingRetainedEarnings = round2(
+    balances.filter(b => b.type === 'equity' && b.account_code !== OWNER_CAPITAL_CODE && b.account_code !== OWNER_DRAWINGS_CODE)
+      .reduce((s, b) => s + (b.normal_balance === 'credit' ? b.balance : -b.balance), 0)
+  );
   const netIncomeYtd = round2(revenueYtd - cogsYtd - expensesYtd);
-  const equity = round2(openingRetainedEarnings + netIncomeYtd);
+  const equity = round2(openingRetainedEarnings + ownerCapitalBal - ownerDrawingsBal + netIncomeYtd);
 
   // --- ASSEMBLE ---
   const totalLiabAndEquity = round2(totalLiabilities + equity);
@@ -492,6 +503,8 @@ function getBalanceSheet(asOfDate: string, db: Database.Database) {
     },
     equity: {
       opening_retained_earnings: openingRetainedEarnings,
+      owner_capital: round2(ownerCapitalBal),
+      owner_drawings: round2(-ownerDrawingsBal), // negative = reduces equity
       net_income_ytd: netIncomeYtd,
       revenue_ytd: revenueYtd,
       cogs_ytd: round2(cogsYtd),

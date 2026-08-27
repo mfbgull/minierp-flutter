@@ -863,6 +863,18 @@ function returnInvoiceItems(req, res) {
                 // but also need to reverse the cash side: Dr AR (credit the original overpayment) / Cr Cash
                 // Since postInvoiceReturnEntry already credited AR, we need an additional entry
                 // that reverses the cash impact: Dr AR / Cr Cash (refund paid out)
+                // Funds guard: refunds are cash-out — block if Cash cannot cover it.
+                const refundCashCode = accountingService_1.default._cashOrBankAccountCode('Cash');
+                const refundCashAccount = accountingService_1.default.getAccountByCode(database_1.default, refundCashCode);
+                if (!refundCashAccount) {
+                    throw new Error(`Chart of accounts is missing required account: ${refundCashCode}`);
+                }
+                accountingService_1.default.assertSufficientFunds(database_1.default, {
+                    accountId: refundCashAccount.id,
+                    amount: netReturn,
+                    asOfDate: todayDate,
+                    label: `refund ${refundPaymentNo}`,
+                });
                 accountingService_1.default.postRefundEntry(database_1.default, {
                     refundPaymentId,
                     refundPaymentNo,

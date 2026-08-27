@@ -19,6 +19,7 @@ import 'features/dashboard/dashboard_screen.dart';
 import 'features/inventory/inventory_shell.dart';
 import 'features/purchases/purchasing_shell.dart';
 import 'features/expenses/expenses_screen.dart';
+import 'features/owner_equity/owners_equity_shell.dart';
 import 'features/forecasts/forecast_shell.dart';
 import 'features/integrations/integrations_screen.dart';
 import 'features/employees/employees_screen.dart';
@@ -138,6 +139,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                     '/suppliers' => const SuppliersScreen(),
                     '/purchasing' => const PurchasingShell(),
                     '/expenses' => const ExpensesScreen(),
+                    '/owners-equity' => const OwnersEquityShell(),
                     '/payments' => const PaymentsScreen(),
                     '/production' => const ProductionShell(),
                     // Sales module shell: invoices grid (branch root) +

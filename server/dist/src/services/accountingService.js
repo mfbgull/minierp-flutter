@@ -498,6 +498,160 @@ class AccountingService {
         return '1010';
     }
     // ------------------------------------------------------------------
+    // Owner equity postings
+    // ------------------------------------------------------------------
+    // Equity children resolve by stable text_code identity (never literal
+    // codes); database.ts boot-asserts exactly one active account per key.
+    static _accountByTextCodeOrThrow(db, textCode, fallbackCode, label) {
+        const acct = AccountingService.getAccountByTextCode(db, textCode);
+        if (!acct || !acct.is_active) {
+            throw new Error(`Chart of accounts is missing required account: ${fallbackCode} (${label}, text_code '${textCode}')`);
+        }
+        return acct;
+    }
+    static _ownerCapitalAccount(db) {
+        return AccountingService._accountByTextCodeOrThrow(db, 'owner_capital', '3200', 'Owner Capital');
+    }
+    static _ownerDrawingsAccount(db) {
+        return AccountingService._accountByTextCodeOrThrow(db, 'owner_drawings', '3300', 'Owner Drawings');
+    }
+    /**
+     * Post an owner capital contribution: Dr cash/bank/wallet-per-method /
+     * Cr 3200 Owner Capital. Called inside the owner-capital write
+     * transaction.
+     */
+    static postOwnerCapitalEntry(db, args) {
+        if (!args.amount || args.amount <= 0)
+            return null;
+        const capital = AccountingService._ownerCapitalAccount(db);
+        const cashCode = AccountingService._cashOrBankAccountCode(args.paymentMethod);
+        const cash = AccountingService.getAccountByCode(db, cashCode);
+        if (!cash) {
+            throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
+        }
+        return AccountingService.postEntry(db, {
+            entry_date: args.capitalDate,
+            description: `Owner capital ${args.capitalNo} — ${args.amount.toFixed(2)} (${cashCode})`,
+            reference_type: 'OWNER_CAPITAL',
+            reference_id: args.capitalId,
+            created_by: args.userId,
+            lines: [
+                { account_id: cash.id, debit: args.amount, description: `Capital contributed via ${args.capitalNo}` },
+                { account_id: capital.id, credit: args.amount, description: `Owner contribution ${args.capitalNo}` },
+            ],
+        });
+    }
+    /**
+     * Post a cash owner withdrawal: Dr 3300 Owner Drawings /
+     * Cr cash-per-method. Called inside the withdrawal write transaction.
+     */
+    static postOwnerWithdrawalCashEntry(db, args) {
+        if (!args.amount || args.amount <= 0)
+            return null;
+        const drawings = AccountingService._ownerDrawingsAccount(db);
+        const cashCode = AccountingService._cashOrBankAccountCode(args.paymentMethod);
+        const cash = AccountingService.getAccountByCode(db, cashCode);
+        if (!cash) {
+            throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
+        }
+        return AccountingService.postEntry(db, {
+            entry_date: args.withdrawalDate,
+            description: `Owner withdrawal ${args.withdrawalNo} — ${args.amount.toFixed(2)} (${cashCode})`,
+            reference_type: 'OWNER_WITHDRAWAL',
+            reference_id: args.withdrawalId,
+            created_by: args.userId,
+            lines: [
+                { account_id: drawings.id, debit: args.amount, description: `Goods/money drawn by owner via ${args.withdrawalNo}` },
+                { account_id: cash.id, credit: args.amount, description: `Cash withdrawn via ${args.withdrawalNo}` },
+            ],
+        });
+    }
+    /**
+     * Post a goods owner withdrawal: Dr 3300 Owner Drawings (Σ actual batch
+     * cost) / Cr inventory asset. `inventoryCredits` lets callers split the
+     * credit side across several inventory accounts should a per-item
+     * mapping ever exist; default is one credit on text_code
+     * 'inventory_asset'. Must be called AFTER the stock movements are
+     * recorded, with totalCost computed from that consumption.
+     */
+    static postOwnerWithdrawalGoodsEntry(db, args) {
+        if (!args.totalCost || args.totalCost <= 0)
+            return null;
+        const drawings = AccountingService._ownerDrawingsAccount(db);
+        let credits = (args.inventoryCredits ?? []).filter((c) => c.amount > 0);
+        if (credits.length === 0) {
+            const inv = AccountingService._accountByTextCodeOrThrow(db, 'inventory_asset', '1200', 'Inventory Asset');
+            credits = [{ accountId: inv.id, amount: args.totalCost }];
+        }
+        const creditTotal = credits.reduce((s, c) => s + c.amount, 0);
+        if (Math.abs(creditTotal - args.totalCost) > 0.01) {
+            throw new Error(`Unbalanced goods withdrawal posting: drawings debit ${args.totalCost.toFixed(2)} != ` +
+                `inventory credits ${creditTotal.toFixed(2)}`);
+        }
+        return AccountingService.postEntry(db, {
+            entry_date: args.withdrawalDate,
+            description: `Owner goods withdrawal ${args.withdrawalNo} — ${args.totalCost.toFixed(2)} (at cost)`,
+            reference_type: 'OWNER_WITHDRAWAL',
+            reference_id: args.withdrawalId,
+            created_by: args.userId,
+            lines: [
+                { account_id: drawings.id, debit: args.totalCost, description: `Goods drawn by owner via ${args.withdrawalNo}` },
+                ...credits.map((c) => ({ account_id: c.accountId, credit: c.amount, description: `Inventory relieved for ${args.withdrawalNo}` })),
+            ],
+        });
+    }
+    // ------------------------------------------------------------------
+    // Edit/delete guards
+    // ------------------------------------------------------------------
+    /**
+     * The CLOSED accounting period covering date, if any. A date with no
+     * period row is NOT closed — postEntry auto-creates open periods for
+     * uncovered dates. Voiding or re-posting something dated inside a
+     * closed period would mutate that closed period, so callers must block.
+     */
+    static getClosedPeriodCovering(db, date) {
+        return db.prepare(`
+      SELECT period_name FROM accounting_periods
+      WHERE status = 'closed' AND start_date <= ? AND end_date >= ?
+    `).get(date, date);
+    }
+    static assertPeriodNotClosed(db, date, what) {
+        const closed = AccountingService.getClosedPeriodCovering(db, date);
+        if (closed) {
+            throw new Error(`${what} is dated ${date} inside closed accounting period '${closed.period_name}' — edit/delete blocked`);
+        }
+    }
+    /**
+     * Reject cash-out postings that would drive the account's book balance
+     * negative as of the transaction's effective date. Built on
+     * getAccountBalance (GL-derived, voided lines excluded) — the same
+     * primitive the reports use; no second balance model. MUST be called
+     * inside the caller's write transaction: better-sqlite3 is synchronous
+     * with a single connection, so the check-and-post pair serializes.
+     */
+    static assertSufficientFunds(db, args) {
+        const bal = AccountingService.getAccountBalance(db, args.accountId, args.asOfDate);
+        if (bal.balance < args.amount - 0.01) {
+            throw new Error(`Insufficient funds in ${bal.account_name}: available ${bal.balance.toFixed(2)}, ` +
+                `required ${args.amount.toFixed(2)}${args.label ? ` — ${args.label}` : ''}`);
+        }
+    }
+    /**
+     * Duplicate-posting invariant: at most ONE current (non-voided) journal
+     * posting may exist per business reference. Call before posting, inside
+     * the write transaction (synchronous single-connection ⇒ race-free).
+     * Protects against retry-after-timeout double submits.
+     */
+    static assertNoActivePosting(db, referenceType, referenceId) {
+        const row = db.prepare(`
+      SELECT COUNT(*) AS n FROM journal_lines
+      WHERE reference_type = ? AND reference_id = ? AND voided = 0
+    `).get(referenceType, referenceId);
+        if (row.n > 0) {
+            throw new Error(`An active GL posting already exists for ${referenceType} #${referenceId} — refusing to double-post`);
+        }
+    }
+    // ------------------------------------------------------------------
     // COGS posting
     // ------------------------------------------------------------------
     /**

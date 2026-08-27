@@ -1385,6 +1385,22 @@ runLedgered('fn.runStockInvariantChecksRebuild', runStockInvariantChecksRebuild,
 // Repair: re-add stock_batches halted/halted_reason when an older rebuild
 // dropped them (FEFO consumption hard-fails without the column).
 runLedgered('fn.runBatchHaltColumnsRepairMigration', runBatchHaltColumnsRepairMigration);
+// Owner Capital & Withdrawals: equity children 3200/3300 + transaction tables.
+runLedgered('add-owner-equity.sql');
+// Post-apply assertion — runtime posting resolves these by text_code, so an
+// unexpected occupant of either slot must fail the boot, never mis-post.
+runLedgered('fn.verifyOwnerEquityAccounts', () => {
+    for (const [textCode, expected] of [
+        ['owner_capital', '3200'],
+        ['owner_drawings', '3300'],
+    ]) {
+        const rows = db.prepare(`SELECT code, name, type, normal_balance FROM chart_of_accounts WHERE text_code = ?`).all(textCode);
+        if (rows.length !== 1 || rows[0].code !== expected || rows[0].type !== 'equity') {
+            throw new Error(`Owner equity account check failed for text_code '${textCode}': expected exactly one ` +
+                `equity account ${expected}, found ${JSON.stringify(rows)}`);
+        }
+    }
+});
 // Rollback support: run if --rollback flag is passed
 if (process.argv.includes('--rollback')) {
     const targetMigration = process.argv.find(arg => arg.startsWith('--rollback='));

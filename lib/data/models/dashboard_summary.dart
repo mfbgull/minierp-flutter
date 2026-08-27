@@ -225,7 +225,8 @@ class CashPositionTransaction {
 
   final String date;
 
-  /// 'payment_received' | 'supplier_payment' | 'expense' | 'salary' | 'refund'.
+  /// 'payment_received' | 'supplier_payment' | 'expense' | 'salary' |
+  /// 'refund' | 'owner_capital' | 'owner_withdrawal'.
   final String type;
   final String? reference;
   final String? description;
