@@ -44,7 +44,7 @@ describe('supplier payment is the only purchase-side outflow (CASH-01)', () => {
     it('a paid purchase appears once via its supplier payment', () => {
         const db = new better_sqlite3_1.default(':memory:');
         db.pragma('foreign_keys = ON');
-        for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'add-gl-foundation.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql']) {
+        for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'add-gl-foundation.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql']) {
             db.exec(fs_1.default.readFileSync(path_1.default.join(__dirname, '..', 'migrations', f), 'utf8'));
         }
         db.prepare(`INSERT INTO users (username, email, password_hash, full_name, role, is_active)
@@ -88,5 +88,46 @@ describe('unclassified methods surface in reconciliation (CASH-02/03)', () => {
         expect(src.includes("key: 'unclassified'")).toBe(true);
         expect((0, cashService_1.normalizeCashMethod)('Cash on delivery')).toBe('unclassified');
         expect((0, cashService_1.normalizeCashMethod)('IOU')).not.toBe('bank');
+    });
+});
+describe('owner equity appears in the cash till walk', () => {
+    it('capital is inflow; cash-kind withdrawal is outflow; goods never touch cash', () => {
+        const db = new better_sqlite3_1.default(':memory:');
+        for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'add-gl-foundation.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql']) {
+            db.exec(fs_1.default.readFileSync(path_1.default.join(__dirname, '..', 'migrations', f), 'utf8'));
+        }
+        db.prepare(`INSERT INTO users (username, email, password_hash, full_name, role, is_active)
+                VALUES ('u','e@x.c','h','U','admin',1)`).run();
+        db.prepare(`INSERT INTO items (item_code, item_name) VALUES ('I1','Item')`).run();
+        db.prepare(`INSERT INTO warehouses (warehouse_code, warehouse_name) VALUES ('W1','Main')`).run();
+        const insertCapital = db.prepare(`
+      INSERT INTO owner_capital (capital_no, capital_date, amount, payment_method, status)
+      VALUES (?, ?, ?, ?, 'posted')
+    `);
+        insertCapital.run('CAP1', '2026-08-05', 1000, 'Cash');
+        insertCapital.run('CAP2', '2026-08-05', 5000, 'Bank Transfer');
+        const insertWithdrawal = db.prepare(`
+      INSERT INTO owner_withdrawals (withdrawal_no, withdrawal_date, kind, amount, payment_method, status)
+      VALUES (?, ?, ?, ?, ?, 'posted')
+    `);
+        insertWithdrawal.run('WD1', '2026-08-06', 'cash', 200, 'Cash');
+        // Goods withdrawals move no cash — must never appear in the till.
+        insertWithdrawal.run('WD2', '2026-08-07', 'goods', 999, null);
+        // Voided rows are excluded.
+        insertWithdrawal.run('WD3', '2026-08-07', 'cash', 500, 'Cash');
+        db.prepare(`UPDATE owner_withdrawals SET status = 'voided' WHERE withdrawal_no = 'WD3'`).run();
+        const totals = (0, cashService_1.collectFlows)(db, '2026-08-31');
+        expect(totals.get('cash').inflow).toBe(1000);
+        expect(totals.get('cash').outflow).toBe(200);
+        expect(totals.get('bank').inflow).toBe(5000);
+        const txs = (0, cashService_1.getCashAccountTransactions)(db, 'cash', '2026-08-31');
+        const types = txs.map((t) => t.type);
+        expect(types).toContain('owner_capital');
+        expect(types).toContain('owner_withdrawal');
+        expect(txs.filter((t) => t.type === 'owner_capital')
+            .reduce((s, t) => s + t.amount, 0)).toBe(1000);
+        expect(txs.filter((t) => t.type === 'owner_withdrawal')
+            .reduce((s, t) => s + Math.abs(t.amount), 0)).toBe(200);
+        db.close();
     });
 });

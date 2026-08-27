@@ -3044,7 +3044,31 @@ class AppLocalizationsUr extends AppLocalizations {
   String get suppliersAccountsettings => 'اکاؤنٹ کی ترتیبات';
 
   @override
+  String get suppliersAllocatedpurchases => 'Allocated Purchases';
+
+  @override
   String get suppliersAllocatedpos => 'تخصیص شدہ پی اوز';
+
+  @override
+  String get suppliersAllocationpurchases => 'Purchases';
+
+  @override
+  String get suppliersAvailablepurchases => 'Available Purchases';
+
+  @override
+  String get suppliersAllpurchasesallocated => 'All purchases allocated';
+
+  @override
+  String get suppliersNoopenpurchases =>
+      'No open purchases to allocate against';
+
+  @override
+  String get suppliersRecordpaymentforpurchase =>
+      'Record payment for this purchase';
+
+  @override
+  String get suppliersAllocationrequiredpurchases =>
+      'At least one PO or purchase allocation is required';
 
   @override
   String get suppliersAllocation => 'تخصیص';
@@ -5626,4 +5650,100 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get fieldsNote => 'نوٹ';
+
+  @override
+  String get paymentsNewpayment => 'نئی ادائیگی';
+
+  @override
+  String get paymentsFilterAll => 'سب';
+
+  @override
+  String get paymentsFilterBytype => 'قسم کے لحاظ سے فلٹر کریں';
+
+  @override
+  String get paymentsTypeCustomer => 'کسٹمر';
+
+  @override
+  String get paymentsTypeSupplier => 'سپلائر';
+
+  @override
+  String get paymentsTypeExpense => 'خرچہ';
+
+  @override
+  String get paymentsTypeSalary => 'تنخواہ';
+
+  @override
+  String get paymentsTypeOwnerCapital => 'مالک کیپیٹل';
+
+  @override
+  String get paymentsTypeOwnerWithdrawal => 'مالک کی نکاسی';
+
+  @override
+  String get paymentsTypeUnknown => 'نامعلوم';
+
+  @override
+  String get paymentsMethodCash => 'نقد';
+
+  @override
+  String get paymentsMethodBank => 'بینک';
+
+  @override
+  String get paymentsMethodCard => 'کارڈ';
+
+  @override
+  String get paymentsMethodMobileWallet => 'موبائل والیٹ';
+
+  @override
+  String get paymentsMethodCredit => 'کریڈٹ';
+
+  @override
+  String get paymentsMethodOther => 'دیگر';
+
+  @override
+  String get paymentsMethodUnknown => 'نامعلوم';
+
+  @override
+  String get paymentsReceiveFromCustomer => 'کسٹمر سے وصولی';
+
+  @override
+  String get paymentsPayToSupplier => 'سپلائر کو ادائیگی';
+
+  @override
+  String get paymentsRecordExpense => 'خرچہ درج کریں';
+
+  @override
+  String get paymentsPaySalary => 'تنخواہ ادا کریں';
+
+  @override
+  String get paymentsOwnerCapital => 'مالک کیپیٹل';
+
+  @override
+  String get paymentsOwnerWithdrawal => 'مالک کی نکاسی';
+
+  @override
+  String get paymentsSelectSupplier => 'سپلائر منتخب کریں';
+
+  @override
+  String get paymentsSelectEmployee => 'ملازم منتخب کریں';
+
+  @override
+  String get paymentsTransactionDetail => 'لین دین کی تفصیل';
+
+  @override
+  String get paymentsViewEmployee => 'ملازم دیکھیں';
+
+  @override
+  String get paymentsSalaryPaymentDetail => 'تنخواہ ادائیگی کی تفصیل';
+
+  @override
+  String get paymentsExpenseDetail => 'خرچے کی تفصیل';
+
+  @override
+  String get paymentsOwnerCapitalDetail => 'مالک کیپیٹل کی تفصیل';
+
+  @override
+  String get paymentsOwnerWithdrawalDetail => 'مالک نکاسی کی تفصیل';
+
+  @override
+  String get paymentsUnknownRow => 'غلط / پرانا ریکارڈ';
 }

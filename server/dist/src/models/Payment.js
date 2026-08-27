@@ -136,6 +136,134 @@ class PaymentModel {
         return { payments, total: total.total, pageNum, limitNum };
     }
     /**
+     * Emits a SQL CASE fragment that normalizes a raw payment-method string
+     * into the unified allowed set (cash | bank | card | mobile_wallet |
+     * credit | other | unknown). This is SQL text, NOT a TS function call —
+     * better-sqlite3 cannot invoke a JS helper inside a query.
+     */
+    static unifiedMethodSql(column) {
+        return `CASE LOWER(TRIM(COALESCE(${column}, '')))
+      WHEN '' THEN 'unknown'
+      WHEN 'cash' THEN 'cash'
+      WHEN 'bank' THEN 'bank'
+      WHEN 'bank transfer' THEN 'bank'
+      WHEN 'check' THEN 'bank'
+      WHEN 'online transfer' THEN 'bank'
+      WHEN 'online payment' THEN 'bank'
+      WHEN 'raast' THEN 'bank'
+      WHEN 'easypaisa' THEN 'mobile_wallet'
+      WHEN 'jazzcash' THEN 'mobile_wallet'
+      WHEN 'upaisa' THEN 'mobile_wallet'
+      WHEN 'mobile wallet' THEN 'mobile_wallet'
+      WHEN 'credit card' THEN 'card'
+      WHEN 'debit card' THEN 'card'
+      WHEN 'credit' THEN 'credit'
+      ELSE 'other' END`;
+    }
+    /**
+     * Unified cash-movement projection across the five payment-related
+     * sources (payments, expenses, salary_payments, owner_capital,
+     * owner_withdrawals). Read-only aggregation — creation stays in each
+     * source's own flow, so GL posting is never duplicated.
+     *
+     * Invariants enforced server-side:
+     *  - `amount` is ALWAYS a positive absolute value (ABS).
+     *  - `direction` (in | out | unknown) is derived from `type`, never from
+     *    the raw amount sign. Legacy invalid payment rows (both or neither
+     *    counterparty id) surface as type='unknown' / direction='unknown'
+     *    rather than being silently classified as customer payments.
+     *  - `owner_withdrawals` is filtered to kind='cash' (goods withdrawals are
+     *    inventory movements, not payments).
+     *  - Data and count queries share the exact same predicate builder, so
+     *    `totalItems` always matches the filtered result.
+     *  - Sorting appends a deterministic tie-breaker (sort_created_at, source,
+     *    source_id) for stable server-side pagination.
+     */
+    static getUnifiedPayments(db, filters = {}) {
+        const pageNum = filters.page || 1;
+        const limitNum = filters.limit || 10;
+        const rawCte = `
+      SELECT 'payment' source, p.id source_id, p.payment_no ref_no, p.payment_date date, ABS(p.amount) amount,
+             ${PaymentModel.unifiedMethodSql('p.payment_method')} method,
+             CASE WHEN p.supplier_id IS NOT NULL AND p.customer_id IS NOT NULL THEN 'unknown'
+                  WHEN p.supplier_id IS NOT NULL THEN 'supplier'
+                  WHEN p.customer_id IS NOT NULL THEN 'customer' ELSE 'unknown' END type,
+             COALESCE(c.customer_name, s.supplier_name) party,
+             CASE WHEN p.supplier_id IS NOT NULL THEN p.supplier_id
+                  WHEN p.customer_id IS NOT NULL THEN p.customer_id ELSE NULL END party_id,
+             CASE WHEN p.supplier_id IS NOT NULL THEN 'supplier'
+                  WHEN p.customer_id IS NOT NULL THEN 'customer' ELSE 'unknown' END party_type,
+             'posted' status, p.notes description,
+             COALESCE(p.created_at, p.payment_date) sort_created_at
+      FROM payments p
+      LEFT JOIN customers c ON p.customer_id = c.id
+      LEFT JOIN suppliers s ON p.supplier_id = s.id
+      UNION ALL
+      SELECT 'expense', e.id, e.expense_no, e.expense_date, ABS(e.amount),
+             ${PaymentModel.unifiedMethodSql('e.payment_method')}, 'expense',
+             COALESCE(e.vendor_name, e.expense_category) party, NULL party_id, NULL party_type,
+             e.status, e.description,
+             COALESCE(e.created_at, e.expense_date)
+      FROM expenses e WHERE e.status = 'Paid'
+      UNION ALL
+      SELECT 'salary', sp.id, 'SAL-' || sp.id, sp.payment_date, ABS(sp.amount),
+             ${PaymentModel.unifiedMethodSql('sp.payment_method')}, 'salary',
+             TRIM(sp_emp.first_name || ' ' || sp_emp.last_name) party, sp.employee_id party_id, 'employee' party_type,
+             sp.status, sp.notes,
+             COALESCE(sp.created_at, sp.payment_date)
+      FROM salary_payments sp LEFT JOIN employees sp_emp ON sp_emp.id = sp.employee_id
+      UNION ALL
+      SELECT 'owner_capital', oc.id, oc.capital_no, oc.capital_date, ABS(oc.amount),
+             ${PaymentModel.unifiedMethodSql('oc.payment_method')}, 'owner_capital',
+             'Owner' party, NULL party_id, NULL party_type,
+             oc.status, oc.note,
+             COALESCE(oc.created_at, oc.capital_date)
+      FROM owner_capital oc WHERE oc.status = 'posted'
+      UNION ALL
+      SELECT 'owner_withdrawal', ow.id, ow.withdrawal_no, ow.withdrawal_date, ABS(ow.amount),
+             ${PaymentModel.unifiedMethodSql('ow.payment_method')}, 'owner_withdrawal',
+             'Owner' party, NULL party_id, NULL party_type,
+             ow.status, ow.note,
+             COALESCE(ow.created_at, ow.withdrawal_date)
+      FROM owner_withdrawals ow WHERE ow.status = 'posted' AND ow.kind = 'cash'
+    `;
+        const directionSql = `CASE type
+        WHEN 'customer' THEN 'in' WHEN 'owner_capital' THEN 'in'
+        WHEN 'supplier' THEN 'out' WHEN 'expense' THEN 'out'
+        WHEN 'salary' THEN 'out' WHEN 'owner_withdrawal' THEN 'out'
+        ELSE 'unknown' END`;
+        const whereParts = [];
+        const params = [];
+        if (filters.type && filters.type !== 'all') {
+            whereParts.push('type = ?');
+            params.push(filters.type);
+        }
+        if (filters.fromDate) {
+            whereParts.push('date >= ?');
+            params.push(filters.fromDate);
+        }
+        if (filters.toDate) {
+            whereParts.push('date <= ?');
+            params.push(filters.toDate);
+        }
+        if (filters.search) {
+            const term = `%${filters.search}%`;
+            whereParts.push('(ref_no LIKE ? OR party LIKE ? OR description LIKE ?)');
+            params.push(term, term, term);
+        }
+        const whereSql = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+        const sortColumns = { date: 'date', amount: 'amount', type: 'type', party: 'party', ref_no: 'ref_no' };
+        const sortBy = sortColumns[filters.sortBy ?? ''] ? sortColumns[filters.sortBy] : 'date';
+        const order = filters.sortOrder === 'ASC' ? 'ASC' : 'DESC';
+        const orderSql = `ORDER BY ${sortBy} ${order}, sort_created_at DESC, source ASC, source_id DESC`;
+        const ctes = `WITH unified_raw AS (${rawCte}), unified AS (SELECT *, ${directionSql} direction FROM unified_raw)`;
+        const rows = db.prepare(`${ctes} SELECT * FROM unified ${whereSql} ${orderSql} LIMIT ? OFFSET ?`)
+            .all(...params, limitNum, (pageNum - 1) * limitNum);
+        const totalRow = db.prepare(`${ctes} SELECT COUNT(*) AS total FROM unified ${whereSql}`)
+            .get(...params);
+        return { payments: rows, total: totalRow.total, pageNum, limitNum };
+    }
+    /**
      * Create a new payment
      */
     static create(db, data) {

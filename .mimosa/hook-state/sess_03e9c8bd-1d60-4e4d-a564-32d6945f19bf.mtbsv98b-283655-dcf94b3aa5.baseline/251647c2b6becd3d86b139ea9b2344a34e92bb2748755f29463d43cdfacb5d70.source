@@ -1,0 +1,285 @@
+/**
+ * Sanitize sort parameters to prevent SQL injection.
+ * Uses whitelist-based validation for column and order.
+ * @param sortBy - The column to sort by (user input)
+ * @param sortOrder - The order direction (user input)
+ * @param allowedColumns - Array of allowed column names
+ * @param defaultColumn - Default column to use if sortBy is not in allowedColumns
+ * @param defaultOrder - Default order to use if sortOrder is not ASC or DESC
+ * @returns Object with sanitized column and order
+ */
+export function sanitizeSortParams(
+  sortBy: string,
+  sortOrder: string,
+  allowedColumns: readonly string[],
+  defaultColumn?: string,
+  defaultOrder?: string
+): { column: string; order: string } {
+  // Default sort column (first allowed column) and order
+  const columnDefault = defaultColumn ?? (allowedColumns[0] || 'id');
+  const orderDefault = defaultOrder ?? 'ASC';
+
+  // Validate sortBy against allowed columns
+  const column = allowedColumns.includes(sortBy) ? sortBy : columnDefault;
+
+  // Validate sortOrder - only allow ASC or DESC (case-insensitive)
+  const order = sortOrder.toUpperCase() === 'DESC' ? 'DESC' : orderDefault;
+
+  return { column, order };
+}
+
+// Whitelisted sort columns for customers
+export const CUSTOMER_SORT_COLUMNS = [
+  'customer_code',
+  'customer_name',
+  'contact_person',
+  'email',
+  'phone',
+  'billing_address',
+  'shipping_address',
+  'payment_terms',
+  'credit_limit',
+  'current_balance',
+  'created_at',
+  'is_active'
+] as const;
+
+// Whitelisted sort columns for suppliers
+export const SUPPLIER_SORT_COLUMNS = [
+  'supplier_code',
+  'supplier_name',
+  'contact_person',
+  'email',
+  'phone',
+  'address',
+  'payment_terms',
+  'current_balance',
+  'created_at',
+  'is_active'
+] as const;
+
+// Whitelisted sort columns for customer ledger
+export const LEDGER_SORT_COLUMNS = [
+  'transaction_date',
+  'transaction_type',
+  'reference_no',
+  'debit',
+  'credit',
+  'balance',
+  'description',
+  'created_at'
+] as const;
+
+// Whitelisted sort columns for payments
+export const PAYMENT_SORT_COLUMNS = [
+  'payment_no',
+  'payment_date',
+  'amount',
+  'payment_method',
+  'reference_no',
+  'created_at'
+] as const;
+
+// Whitelisted sort columns for stock movements (the grid's sortable
+// columns; mapped to qualified SQL columns in StockMovementModel.getAll)
+export const STOCK_MOVEMENT_SORT_COLUMNS = [
+  'movement_no',
+  'movement_date',
+  'item_name',
+  'warehouse_name',
+  'movement_type',
+  'quantity',
+  'reference_docno',
+  'created_at'
+] as const;
+
+// Whitelisted sort columns for items (`ItemModel.getAll`; unqualified —
+// the items table has no joins)
+export const ITEM_SORT_COLUMNS = [
+  'item_code',
+  'item_name',
+  'category',
+  'current_stock',
+  'reorder_level'
+] as const;
+
+// Whitelisted sort columns for stock balances (the stock-by-warehouse
+// grid; mapped to qualified SQL columns in StockMovementModel.getStockBalances)
+export const STOCK_BALANCE_SORT_COLUMNS = [
+  'item_code',
+  'item_name',
+  'warehouse_name',
+  'quantity'
+] as const;
+
+// Whitelisted sort columns for physical counts (mapped to qualified SQL
+// columns in PhysicalCountModel.getAll — the users join makes bare
+// `created_at` ambiguous)
+export const PHYSICAL_COUNT_SORT_COLUMNS = [
+  'count_no',
+  'count_date',
+  'warehouse_name',
+  'status',
+  'created_at'
+] as const;
+
+// Whitelisted sort columns for invoices (`InvoiceModel.getAll`; mapped to
+// qualified SQL columns — the customer/sales-order/quotation/user joins
+// make bare names ambiguous)
+export const INVOICE_SORT_COLUMNS = [
+  'invoice_no',
+  'invoice_date',
+  'customer_name',
+  'status',
+  'total_amount',
+  'paid_amount',
+  'balance_amount',
+  'due_date',
+  'created_at'
+] as const;
+
+// Whitelisted sort columns for sales orders (`SalesOrderModel.getAll`;
+// mapped to qualified SQL columns — the warehouse/user/quotation joins)
+export const SALES_ORDER_SORT_COLUMNS = [
+  'so_no',
+  'so_date',
+  'customer_name',
+  'status',
+  'total_amount',
+  'delivery_date',
+  'created_at'
+] as const;
+
+// Whitelisted sort columns for quotations (`QuotationModel.getAll`;
+// mapped to qualified SQL columns — the warehouse/user joins)
+export const QUOTATION_SORT_COLUMNS = [
+  'quotation_no',
+  'quotation_date',
+  'customer_name',
+  'status',
+  'total_amount',
+  'expiry_date',
+  'created_at'
+] as const;
+
+// Whitelisted sort columns for invoice-return history
+// (`InvoiceModel.getReturnHistory`; mapped to qualified SQL columns — the
+// item/warehouse/user/invoice joins)
+export const INVOICE_RETURN_SORT_COLUMNS = [
+  'movement_no',
+  'return_date',
+  'item_name',
+  'customer_name',
+  'warehouse_name',
+  'quantity',
+  'unit_cost',
+  'created_at'
+] as const;
+
+// Whitelisted sort columns for purchase orders (`PurchaseOrderModel.getAll`;
+// mapped to qualified SQL columns — the supplier/warehouse/user/allocations
+// joins)
+export const PURCHASE_ORDER_SORT_COLUMNS = [
+  'po_no',
+  'po_date',
+  'supplier_name',
+  'status',
+  'total_amount',
+  'balance_amount',
+  'expected_delivery_date',
+  'created_at'
+] as const;
+
+// Whitelisted sort columns for direct purchases (`PurchaseModel.getAll`;
+// mapped to qualified SQL columns — the item/warehouse/user joins)
+export const PURCHASE_SORT_COLUMNS = [
+  'purchase_no',
+  'purchase_date',
+  'item_name',
+  'supplier_name',
+  'quantity',
+  'unit_cost',
+  'total_cost',
+  'paid_amount',
+  'balance_amount',
+  'warehouse_name',
+  'created_at'
+] as const;
+
+// Whitelisted sort columns for purchase-return headers
+// (`PurchaseReturnModel.getAll`; mapped to qualified SQL columns — the
+// warehouse/user/credit-note joins make bare names ambiguous)
+export const PURCHASE_RETURN_HEADER_SORT_COLUMNS = [
+  'return_no',
+  'return_date',
+  'source_no',
+  'total_amount',
+  'status',
+  'warehouse_name',
+  'created_at'
+] as const;
+
+// Whitelisted sort columns for productions (`ProductionModel.getAll`;
+// mapped to qualified SQL columns — the item/warehouse/user joins make
+// bare names ambiguous)
+export const PRODUCTION_SORT_COLUMNS = [
+  'production_no',
+  'production_date',
+  'output_item_name',
+  'warehouse_name',
+  'output_quantity',
+  'unit_cost',
+  'total_batch_cost',
+  'batch_no',
+  'created_at'
+] as const;
+
+// Whitelisted sort columns for expenses (`ExpenseModel.getAll`; mapped
+// to qualified SQL columns — the users join makes bare names ambiguous)
+export const EXPENSE_SORT_COLUMNS = [
+  'e.expense_no',
+  'e.expense_date',
+  'e.expense_category',
+  'e.description',
+  'e.amount',
+  'e.status',
+  'e.vendor_name',
+  'e.payment_method',
+  'e.project',
+  'e.created_at'
+] as const;
+
+// Whitelisted sort columns for owner equity lists (`OwnerCapital` /
+// `OwnerWithdrawal` getAll; users join makes bare names ambiguous)
+export const OWNER_CAPITAL_SORT_COLUMNS = [
+  'oc.capital_no',
+  'oc.capital_date',
+  'oc.amount',
+  'oc.payment_method',
+  'oc.note',
+  'oc.status',
+  'oc.created_at'
+] as const;
+
+export const OWNER_WITHDRAWAL_SORT_COLUMNS = [
+  'ow.withdrawal_no',
+  'ow.withdrawal_date',
+  'ow.kind',
+  'ow.amount',
+  'ow.payment_method',
+  'ow.note',
+  'ow.status',
+  'ow.created_at'
+] as const;
+
+// Whitelisted sort columns for BOMs (`BOMModel.getAll`; mapped to
+// qualified SQL columns — the finished-item join)
+export const BOM_SORT_COLUMNS = [
+  'bom_no',
+  'bom_name',
+  'finished_item_name',
+  'quantity',
+  'item_count',
+  'total_material_cost',
+  'created_at'
+] as const;

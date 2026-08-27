@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/invoice.dart' show Invoice;
 import '../../data/models/payment.dart' show Payment;
+import '../../data/models/unified_payment.dart' show UnifiedPayment;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/customer_repository.dart'
     show customerRepositoryProvider;
@@ -10,6 +11,11 @@ import '../../data/repositories/invoice_repository.dart'
     show InvoiceFilters, invoiceRepositoryProvider;
 import '../../data/repositories/paged_request.dart'
     show PagedRequest, PagedResponse;
+import '../../features/employees/employee_providers.dart'
+    show employeeSalaryHistoryProvider;
+import '../../features/expenses/expense_providers.dart' show expensesProvider;
+import '../../features/owner_equity/owner_equity_providers.dart'
+    show ownerCapitalProvider, ownerWithdrawalsProvider;
 
 /// Server-side sort — the API column name (from the server's
 /// `PAYMENT_SORT_COLUMNS` whitelist) plus the order.
@@ -107,3 +113,75 @@ final customerOpenInvoicesProvider = FutureProvider.autoDispose
         ApiFailure(:final error) => throw error,
       };
     });
+
+/// ---------------------------------------------------------------------------
+/// Unified payment / cash-movement hub
+/// ---------------------------------------------------------------------------
+
+/// Type filter for the unified hub: `all` or one of the backend `type`
+/// values (customer | supplier | expense | salary | owner_capital |
+/// owner_withdrawal).
+final unifiedPaymentsTypeFilterProvider = StateProvider<String>((ref) => 'all');
+
+/// Server-side search term for the unified hub.
+final unifiedPaymentsSearchProvider = StateProvider<String>((ref) => '');
+
+/// Current page (1-based) for the unified hub's server-side pagination.
+final unifiedPaymentsPageProvider = StateProvider<int>((ref) => 1);
+
+/// Rows per page for the unified hub.
+final unifiedPaymentsLimitProvider = StateProvider<int>((ref) => 10);
+
+/// Active server-side sort for the unified hub; null = server default
+/// (date DESC). Columns map to the backend whitelist: date | amount |
+/// type | party | ref_no.
+final unifiedPaymentsSortProvider = StateProvider<PaymentSort?>((ref) => null);
+
+/// One page of the unified hub (`GET /payments/unified`) — server-paginated
+/// like the legacy payments list, but across every payment-related source.
+/// Re-runs when any paging/search/sort/type state changes; the screen and
+/// the `New Payment` menu invalidate it after a write.
+final unifiedPaymentsProvider =
+    FutureProvider<PagedResponse<UnifiedPayment>>((ref) async {
+  final search = ref.watch(unifiedPaymentsSearchProvider);
+  final page = ref.watch(unifiedPaymentsPageProvider);
+  final limit = ref.watch(unifiedPaymentsLimitProvider);
+  final sort = ref.watch(unifiedPaymentsSortProvider);
+  final type = ref.watch(unifiedPaymentsTypeFilterProvider);
+
+  final result = await ref
+      .watch(invoiceRepositoryProvider)
+      .unifiedPayments(
+        PagedRequest(
+          page: page,
+          limit: limit,
+          search: search.isEmpty ? null : search,
+          sortBy: sort?.column,
+          sortOrder: sort?.order ?? 'DESC',
+          extra: type != 'all' ? {'type': type} : null,
+        ),
+      );
+
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
+});
+
+/// Refresh every list a cash movement could appear in, after a successful
+/// write. Called only on success so cancel/error paths don't needlessly
+/// refetch. [source] is the unified `source` of the recorded transaction.
+void invalidateCashMovementProviders(WidgetRef ref, String source) {
+  ref.invalidate(unifiedPaymentsProvider);
+  ref.invalidate(paymentsProvider);
+  switch (source) {
+    case 'expense':
+      ref.invalidate(expensesProvider);
+    case 'salary':
+      ref.invalidate(employeeSalaryHistoryProvider);
+    case 'owner_capital':
+      ref.invalidate(ownerCapitalProvider);
+    case 'owner_withdrawal':
+      ref.invalidate(ownerWithdrawalsProvider);
+  }
+}

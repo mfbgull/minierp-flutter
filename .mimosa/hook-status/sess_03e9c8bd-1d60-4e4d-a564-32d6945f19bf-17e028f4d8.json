@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-08-27T17:29:25.987Z",
+  "sessionId": "sess_03e9c8bd-1d60-4e4d-a564-32d6945f19bf",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "lib/features/payments/payments_screen.dart",
+  "outcome": "clear",
+  "coverage": "complete",
+  "findingCount": 0,
+  "durationMs": 7,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

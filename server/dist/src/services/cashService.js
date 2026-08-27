@@ -119,6 +119,28 @@ function collectFlows(db, uptoDate, floorDate) {
     for (const row of preFloor) {
         add(row.payment_method, row.inflow, row.outflow);
     }
+    // Owner equity (pre-floor fold): capital in / cash withdrawals out,
+    // folded like payments so balances stay exact below the scan floor.
+    const ownerPreFloor = db.prepare(`
+    SELECT payment_method,
+      COALESCE(SUM(amount), 0) as inflow
+    FROM owner_capital
+    WHERE status = 'posted' AND capital_date < ? AND capital_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate);
+    const ownerWdPreFloor = db.prepare(`
+    SELECT payment_method,
+      COALESCE(SUM(amount), 0) as outflow
+    FROM owner_withdrawals
+    WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date < ? AND withdrawal_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate);
+    for (const row of ownerPreFloor) {
+        add(row.payment_method, row.inflow, 0);
+    }
+    for (const row of ownerWdPreFloor) {
+        add(row.payment_method, 0, row.outflow);
+    }
     // Customer payments: positive amounts are money in; negative amounts
     // (refunds paid out to customers) are money out.
     const customerPayments = db.prepare(`
@@ -160,6 +182,27 @@ function collectFlows(db, uptoDate, floorDate) {
     GROUP BY payment_method
   `).all(floor, uptoDate);
     for (const row of salaries) {
+        add(row.payment_method, 0, row.outflow);
+    }
+    // Owner equity: capital contributions are money in; cash-kind
+    // withdrawals are money out (goods withdrawals move no cash). Voided
+    // rows are excluded so the till matches the GL.
+    const ownerCapital = db.prepare(`
+    SELECT payment_method, COALESCE(SUM(amount), 0) as inflow
+    FROM owner_capital
+    WHERE status = 'posted' AND capital_date > ? AND capital_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate);
+    for (const row of ownerCapital) {
+        add(row.payment_method, row.inflow, 0);
+    }
+    const ownerCashOut = db.prepare(`
+    SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
+    FROM owner_withdrawals
+    WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date > ? AND withdrawal_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate);
+    for (const row of ownerCashOut) {
         add(row.payment_method, 0, row.outflow);
     }
     // CASH-01 (financial-audit-p0-remediation 1.1): direct purchases are NOT
@@ -312,6 +355,39 @@ function getCashAccountTransactions(db, accountKey, uptoDate) {
   `).all(uptoDate)) {
         const amount = Number(r.amount) || 0;
         push({ method: r.method, date: r.date, reference: r.reference, description: r.description, amount: -amount, type: 'salary' });
+    }
+    // Owner capital contributions (money in).
+    for (const r of db.prepare(`
+    SELECT capital_date as date, payment_method as method, capital_no as reference,
+           note as description, amount
+    FROM owner_capital
+    WHERE status = 'posted' AND capital_date <= ?
+  `).all(uptoDate)) {
+        push({
+            method: r.method,
+            date: r.date,
+            reference: r.reference,
+            description: r.description,
+            amount: Number(r.amount) || 0,
+            type: 'owner_capital',
+        });
+    }
+    // Cash-kind owner withdrawals (money out); goods withdrawals move no
+    // cash so they never appear on a till walk.
+    for (const r of db.prepare(`
+    SELECT withdrawal_date as date, payment_method as method, withdrawal_no as reference,
+           note as description, amount
+    FROM owner_withdrawals
+    WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date <= ?
+  `).all(uptoDate)) {
+        push({
+            method: r.method,
+            date: r.date,
+            reference: r.reference,
+            description: r.description,
+            amount: -(Number(r.amount) || 0),
+            type: 'owner_withdrawal',
+        });
     }
     out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     return out;

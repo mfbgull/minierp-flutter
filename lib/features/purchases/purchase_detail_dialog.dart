@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/purchase.dart' show Purchase;
+import '../../data/models/supplier.dart' show Supplier;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
@@ -18,6 +19,7 @@ import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import '../../widgets/payment_history_section.dart'
     show PaymentHistorySection;
+import '../suppliers/supplier_payment_modal.dart' show showSupplierPaymentModal;
 import 'purchase_providers.dart';
 
 /// Opens the detail dialog for [purchaseId].
@@ -157,6 +159,29 @@ class _DetailBody extends ConsumerWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              if (detail.supplierId != null && detail.balanceAmount > 0)
+                FilledButton.icon(
+                  onPressed: () {
+                    final supplier = Supplier(
+                      id: detail.supplierId!,
+                      supplierCode: '',
+                      supplierName: detail.supplierName ?? '',
+                    );
+                    showSupplierPaymentModal(
+                      context,
+                      supplier: supplier,
+                      initialPurchase: detail,
+                    ).then((_) {
+                      ref.invalidate(purchasePaymentsProvider(detail.id));
+                      ref.invalidate(purchaseDetailProvider(detail.id));
+                    });
+                  },
+                  icon: const Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 18,
+                  ),
+                  label: Text(l10n.suppliersRecordpayment),
+                ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(l10n.commonClose),
