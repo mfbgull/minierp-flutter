@@ -6044,11 +6044,53 @@ abstract class AppLocalizations {
   /// **'Account Settings'**
   String get suppliersAccountsettings;
 
+  /// No description provided for @suppliersAllocatedpurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'Allocated Purchases'**
+  String get suppliersAllocatedpurchases;
+
   /// No description provided for @suppliersAllocatedpos.
   ///
   /// In en, this message translates to:
   /// **'Allocated POs'**
   String get suppliersAllocatedpos;
+
+  /// No description provided for @suppliersAllocationpurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchases'**
+  String get suppliersAllocationpurchases;
+
+  /// No description provided for @suppliersAvailablepurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'Available Purchases'**
+  String get suppliersAvailablepurchases;
+
+  /// No description provided for @suppliersAllpurchasesallocated.
+  ///
+  /// In en, this message translates to:
+  /// **'All purchases allocated'**
+  String get suppliersAllpurchasesallocated;
+
+  /// No description provided for @suppliersNoopenpurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'No open purchases to allocate against'**
+  String get suppliersNoopenpurchases;
+
+  /// No description provided for @suppliersRecordpaymentforpurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Record payment for this purchase'**
+  String get suppliersRecordpaymentforpurchase;
+
+  /// No description provided for @suppliersAllocationrequiredpurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'At least one PO or purchase allocation is required'**
+  String get suppliersAllocationrequiredpurchases;
 
   /// No description provided for @suppliersAllocation.
   ///
@@ -11013,6 +11055,198 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Note'**
   String get fieldsNote;
+
+  /// No description provided for @paymentsNewpayment.
+  ///
+  /// In en, this message translates to:
+  /// **'New Payment'**
+  String get paymentsNewpayment;
+
+  /// No description provided for @paymentsFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get paymentsFilterAll;
+
+  /// No description provided for @paymentsFilterBytype.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by type'**
+  String get paymentsFilterBytype;
+
+  /// No description provided for @paymentsTypeCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get paymentsTypeCustomer;
+
+  /// No description provided for @paymentsTypeSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier'**
+  String get paymentsTypeSupplier;
+
+  /// No description provided for @paymentsTypeExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense'**
+  String get paymentsTypeExpense;
+
+  /// No description provided for @paymentsTypeSalary.
+  ///
+  /// In en, this message translates to:
+  /// **'Salary'**
+  String get paymentsTypeSalary;
+
+  /// No description provided for @paymentsTypeOwnerCapital.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner Capital'**
+  String get paymentsTypeOwnerCapital;
+
+  /// No description provided for @paymentsTypeOwnerWithdrawal.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner Withdrawal'**
+  String get paymentsTypeOwnerWithdrawal;
+
+  /// No description provided for @paymentsTypeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get paymentsTypeUnknown;
+
+  /// No description provided for @paymentsMethodCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash'**
+  String get paymentsMethodCash;
+
+  /// No description provided for @paymentsMethodBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank'**
+  String get paymentsMethodBank;
+
+  /// No description provided for @paymentsMethodCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Card'**
+  String get paymentsMethodCard;
+
+  /// No description provided for @paymentsMethodMobileWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile Wallet'**
+  String get paymentsMethodMobileWallet;
+
+  /// No description provided for @paymentsMethodCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit'**
+  String get paymentsMethodCredit;
+
+  /// No description provided for @paymentsMethodOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get paymentsMethodOther;
+
+  /// No description provided for @paymentsMethodUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get paymentsMethodUnknown;
+
+  /// No description provided for @paymentsReceiveFromCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive from Customer'**
+  String get paymentsReceiveFromCustomer;
+
+  /// No description provided for @paymentsPayToSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay to Supplier'**
+  String get paymentsPayToSupplier;
+
+  /// No description provided for @paymentsRecordExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Expense'**
+  String get paymentsRecordExpense;
+
+  /// No description provided for @paymentsPaySalary.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay Salary'**
+  String get paymentsPaySalary;
+
+  /// No description provided for @paymentsOwnerCapital.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner Capital'**
+  String get paymentsOwnerCapital;
+
+  /// No description provided for @paymentsOwnerWithdrawal.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner Withdrawal'**
+  String get paymentsOwnerWithdrawal;
+
+  /// No description provided for @paymentsSelectSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Supplier'**
+  String get paymentsSelectSupplier;
+
+  /// No description provided for @paymentsSelectEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Employee'**
+  String get paymentsSelectEmployee;
+
+  /// No description provided for @paymentsTransactionDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction Detail'**
+  String get paymentsTransactionDetail;
+
+  /// No description provided for @paymentsViewEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'View Employee'**
+  String get paymentsViewEmployee;
+
+  /// No description provided for @paymentsSalaryPaymentDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Salary Payment Detail'**
+  String get paymentsSalaryPaymentDetail;
+
+  /// No description provided for @paymentsExpenseDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense Detail'**
+  String get paymentsExpenseDetail;
+
+  /// No description provided for @paymentsOwnerCapitalDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner Capital Detail'**
+  String get paymentsOwnerCapitalDetail;
+
+  /// No description provided for @paymentsOwnerWithdrawalDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner Withdrawal Detail'**
+  String get paymentsOwnerWithdrawalDetail;
+
+  /// No description provided for @paymentsUnknownRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid / legacy row'**
+  String get paymentsUnknownRow;
 }
 
 class _AppLocalizationsDelegate

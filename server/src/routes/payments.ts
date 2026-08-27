@@ -19,6 +19,7 @@ const paymentListQuery = z.object({
 });
 
 router.get('/', requirePermission('payments', 'read'), validateZodQuery(paymentListQuery), paymentsController.getPayments);
+router.get('/unified', requirePermission('payments', 'read'), paymentsController.getUnifiedPayments);
 router.get('/:id', requirePermission('payments', 'read'), validateZodParams(zodSchemas.id), paymentsController.getPayment);
 router.post('/', requirePermission('payments', 'create'), sensitiveOperationLimiter, paymentsController.createPayment);
 router.put('/:id', requirePermission('payments', 'update'), sensitiveOperationLimiter, paymentsController.updatePayment);

@@ -60,7 +60,7 @@ class _PurchasingShellState extends ConsumerState<PurchasingShell> {
         Expanded(
           child: IndexedStack(
             index: _index,
-            children: const [
+            children: [
               PurchaseOrdersScreen(),
               PurchasesScreen(),
               PurchaseReturnsScreen(),

@@ -3042,7 +3042,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get suppliersAccountsettings => 'Account Settings';
 
   @override
+  String get suppliersAllocatedpurchases => 'Allocated Purchases';
+
+  @override
   String get suppliersAllocatedpos => 'Allocated POs';
+
+  @override
+  String get suppliersAllocationpurchases => 'Purchases';
+
+  @override
+  String get suppliersAvailablepurchases => 'Available Purchases';
+
+  @override
+  String get suppliersAllpurchasesallocated => 'All purchases allocated';
+
+  @override
+  String get suppliersNoopenpurchases =>
+      'No open purchases to allocate against';
+
+  @override
+  String get suppliersRecordpaymentforpurchase =>
+      'Record payment for this purchase';
+
+  @override
+  String get suppliersAllocationrequiredpurchases =>
+      'At least one PO or purchase allocation is required';
 
   @override
   String get suppliersAllocation => 'Allocation';
@@ -5629,4 +5653,100 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fieldsNote => 'Note';
+
+  @override
+  String get paymentsNewpayment => 'New Payment';
+
+  @override
+  String get paymentsFilterAll => 'All';
+
+  @override
+  String get paymentsFilterBytype => 'Filter by type';
+
+  @override
+  String get paymentsTypeCustomer => 'Customer';
+
+  @override
+  String get paymentsTypeSupplier => 'Supplier';
+
+  @override
+  String get paymentsTypeExpense => 'Expense';
+
+  @override
+  String get paymentsTypeSalary => 'Salary';
+
+  @override
+  String get paymentsTypeOwnerCapital => 'Owner Capital';
+
+  @override
+  String get paymentsTypeOwnerWithdrawal => 'Owner Withdrawal';
+
+  @override
+  String get paymentsTypeUnknown => 'Unknown';
+
+  @override
+  String get paymentsMethodCash => 'Cash';
+
+  @override
+  String get paymentsMethodBank => 'Bank';
+
+  @override
+  String get paymentsMethodCard => 'Card';
+
+  @override
+  String get paymentsMethodMobileWallet => 'Mobile Wallet';
+
+  @override
+  String get paymentsMethodCredit => 'Credit';
+
+  @override
+  String get paymentsMethodOther => 'Other';
+
+  @override
+  String get paymentsMethodUnknown => 'Unknown';
+
+  @override
+  String get paymentsReceiveFromCustomer => 'Receive from Customer';
+
+  @override
+  String get paymentsPayToSupplier => 'Pay to Supplier';
+
+  @override
+  String get paymentsRecordExpense => 'Record Expense';
+
+  @override
+  String get paymentsPaySalary => 'Pay Salary';
+
+  @override
+  String get paymentsOwnerCapital => 'Owner Capital';
+
+  @override
+  String get paymentsOwnerWithdrawal => 'Owner Withdrawal';
+
+  @override
+  String get paymentsSelectSupplier => 'Select Supplier';
+
+  @override
+  String get paymentsSelectEmployee => 'Select Employee';
+
+  @override
+  String get paymentsTransactionDetail => 'Transaction Detail';
+
+  @override
+  String get paymentsViewEmployee => 'View Employee';
+
+  @override
+  String get paymentsSalaryPaymentDetail => 'Salary Payment Detail';
+
+  @override
+  String get paymentsExpenseDetail => 'Expense Detail';
+
+  @override
+  String get paymentsOwnerCapitalDetail => 'Owner Capital Detail';
+
+  @override
+  String get paymentsOwnerWithdrawalDetail => 'Owner Withdrawal Detail';
+
+  @override
+  String get paymentsUnknownRow => 'Invalid / legacy row';
 }

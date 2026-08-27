@@ -48,6 +48,29 @@ function getPayments(req, res) {
         res.status(500).json({ success: false, error: 'Failed to fetch payments' });
     }
 }
+function getUnifiedPayments(req, res) {
+    try {
+        const filters = {
+            page: parseInt((0, queryUtils_1.getQueryParam)(req.query.page)) || 1,
+            limit: parseInt((0, queryUtils_1.getQueryParam)(req.query.limit)) || 10,
+            search: (0, queryUtils_1.getQueryParam)(req.query.search),
+            type: (0, queryUtils_1.getQueryParam)(req.query.type),
+            fromDate: (0, queryUtils_1.getQueryParam)(req.query.fromDate),
+            toDate: (0, queryUtils_1.getQueryParam)(req.query.toDate),
+            sortBy: (0, queryUtils_1.getQueryParam)(req.query.sortBy),
+            sortOrder: (0, queryUtils_1.getQueryParam)(req.query.sortOrder),
+        };
+        const { payments, total, pageNum, limitNum } = Payment_1.default.getUnifiedPayments(database_1.default, filters);
+        res.json({
+            success: true, data: payments,
+            pagination: { currentPage: pageNum, totalPages: Math.ceil(total / limitNum), totalItems: total, hasNext: pageNum < Math.ceil(total / limitNum), hasPrev: pageNum > 1 }
+        });
+    }
+    catch (error) {
+        logger_1.default.error('Error fetching unified payments:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch unified payments' });
+    }
+}
 function getPayment(req, res) {
     try {
         const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
@@ -443,5 +466,5 @@ function allocatePaymentToInvoice(req, res) {
     }
 }
 exports.default = {
-    getPayments, getPayment, createPayment, updatePayment, deletePayment, getPaymentReceipt, allocatePaymentToInvoice,
+    getPayments, getUnifiedPayments, getPayment, createPayment, updatePayment, deletePayment, getPaymentReceipt, allocatePaymentToInvoice,
 };

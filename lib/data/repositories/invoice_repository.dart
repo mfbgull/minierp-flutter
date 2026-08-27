@@ -5,6 +5,7 @@ import '../../core/api/endpoints.dart';
 import '../models/price_history.dart' show ItemPriceHistory;
 import '../models/invoice.dart' show Invoice, InvoicePaymentRecord;
 import '../models/payment.dart' show Payment;
+import '../models/unified_payment.dart' show UnifiedPayment;
 import '../models/sales_return.dart' show SalesReturn, SalesReturnResult;
 import 'api_result.dart';
 import 'paged_request.dart' show PagedRequest, PagedResponse;
@@ -105,6 +106,21 @@ class InvoiceRepository {
         queryParameters: request.toQuery(),
         parseItem: (Object? json) =>
             Payment.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// Unified payment / cash-movement hub (`GET /payments/unified`) — a
+  /// read-only projection across payments, expenses, salary payments,
+  /// owner capital and owner withdrawals. Server-paginated + filtered by
+  /// `type` (customer | supplier | expense | salary | owner_capital |
+  /// owner_withdrawal) and searchable across ref_no/party/description.
+  Future<ApiResult<PagedResponse<UnifiedPayment>>> unifiedPayments(
+    PagedRequest request,
+  ) =>
+      _api.getPaged(
+        '${ApiEndpoints.payments}/unified',
+        queryParameters: request.toQuery(),
+        parseItem: (Object? json) =>
+            UnifiedPayment.fromJson(json as Map<String, dynamic>),
       );
 
   /// All payments for one customer (`GET /payments?customerId=<id>` — the

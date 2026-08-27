@@ -49,6 +49,31 @@ function getPayments(req: Request, res: Response): void {
   }
 }
 
+function getUnifiedPayments(req: Request, res: Response): void {
+  try {
+    const filters = {
+      page: parseInt(getQueryParam(req.query.page) as string) || 1,
+      limit: parseInt(getQueryParam(req.query.limit) as string) || 10,
+      search: getQueryParam(req.query.search) as string,
+      type: getQueryParam(req.query.type) as string,
+      fromDate: getQueryParam(req.query.fromDate) as string,
+      toDate: getQueryParam(req.query.toDate) as string,
+      sortBy: getQueryParam(req.query.sortBy) as string,
+      sortOrder: getQueryParam(req.query.sortOrder) as string,
+    };
+
+    const { payments, total, pageNum, limitNum } = PaymentModel.getUnifiedPayments(db, filters);
+
+    res.json({
+      success: true, data: payments,
+      pagination: { currentPage: pageNum, totalPages: Math.ceil(total / limitNum), totalItems: total, hasNext: pageNum < Math.ceil(total / limitNum), hasPrev: pageNum > 1 }
+    });
+  } catch (error) {
+    logger.error('Error fetching unified payments:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch unified payments' });
+  }
+}
+
 function getPayment(req: Request, res: Response): void {
   try {
     const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
@@ -461,6 +486,6 @@ function allocatePaymentToInvoice(req: AuthRequest, res: Response): void {
 }
 
 export default {
-  getPayments, getPayment, createPayment, updatePayment, deletePayment, getPaymentReceipt, allocatePaymentToInvoice,
+  getPayments, getUnifiedPayments, getPayment, createPayment, updatePayment, deletePayment, getPaymentReceipt, allocatePaymentToInvoice,
 };
 

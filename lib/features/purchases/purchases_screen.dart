@@ -12,15 +12,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
-
-import '../../core/utils/formatters.dart';
 import '../../data/models/purchase.dart' show Purchase;
+import '../../data/models/supplier.dart' show Supplier;
+import '../../core/utils/formatters.dart';
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/app_toast.dart' show showAppToast;
+import '../suppliers/supplier_payment_modal.dart' show showSupplierPaymentModal;
 import 'void_purchase_dialog.dart' show showVoidPurchaseDialog;
 import 'purchase_detail_dialog.dart';
 import 'purchase_form_dialog.dart';
@@ -29,7 +30,6 @@ import 'purchase_return_form_dialog.dart'
     show ReturnSource, showPurchaseReturnFormDialog;
 
 class PurchasesScreen extends ConsumerStatefulWidget {
-  const PurchasesScreen({super.key});
 
   @override
   ConsumerState<PurchasesScreen> createState() => _PurchasesScreenState();
@@ -132,6 +132,30 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
         label: l10n.commonView,
         onTap: () => showPurchaseDetailDialog(context, purchaseId: id),
       ),
+      // Record a payment directly against this purchase
+      // (purchase_allocations) — the missing "payment to purchases" path.
+      if (purchase != null &&
+          purchase.supplierId != null &&
+          purchase.balanceAmount > 0)
+        GridRowAction(
+          icon: Icons.account_balance_wallet_outlined,
+          label: l10n.suppliersRecordpayment,
+          onTap: () {
+            final supplier = Supplier(
+              id: purchase.supplierId!,
+              supplierCode: '',
+              supplierName: purchase.supplierName ?? '',
+            );
+            showSupplierPaymentModal(
+              context,
+              supplier: supplier,
+              initialPurchase: purchase,
+            ).then((_) {
+              if (!mounted) return;
+              ref.invalidate(purchasesProvider);
+            });
+          },
+        ),
       // Voided purchases (visible via the "Show Voided" toggle) are
       // read-only: no returns, and re-voiding is rejected server-side.
       if (purchase != null &&

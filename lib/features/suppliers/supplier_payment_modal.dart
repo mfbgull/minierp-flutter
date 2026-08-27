@@ -21,6 +21,7 @@ import '../../data/repositories/invoice_repository.dart'
     show invoiceRepositoryProvider;
 import '../../data/repositories/purchase_order_repository.dart'
     show purchaseOrderRepositoryProvider;
+import '../../data/repositories/paged_request.dart' show PagedRequest;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/form_field.dart';
@@ -33,13 +34,22 @@ import 'supplier_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the web-style Record Payment modal with [supplier] pre-bound.
+///
+/// When [initialPurchase] is supplied (balance > 0) the modal pre-fills
+/// the total with that purchase's outstanding balance and seeds a
+/// purchase allocation for it — the "Record Payment" entry point from a
+/// purchase row / detail.
 Future<void> showSupplierPaymentModal(
   BuildContext context, {
   required Supplier supplier,
+  Purchase? initialPurchase,
 }) {
   return showDialog<void>(
     context: context,
-    builder: (dialogContext) => SupplierPaymentModal(supplier: supplier),
+    builder: (dialogContext) => SupplierPaymentModal(
+      supplier: supplier,
+      initialPurchase: initialPurchase,
+    ),
   );
 }
 
@@ -62,7 +72,7 @@ final _openPosProvider = FutureProvider.autoDispose
 /// The supplier's direct purchases with an outstanding balance
 /// (balance > 0) for allocation — the backend's `purchase_allocations`
 /// path. Mirrors [_openPosProvider] but sources `GET /purchases?
-/// supplier_id=<id>` and filters on `balance_amount`.
+/// supplier_id=ID` and filters on `balance_amount`.
 final _openPurchasesProvider = FutureProvider.autoDispose
     .family<List<Purchase>, int>((ref, supplierId) async {
       final result = await ref
@@ -80,9 +90,15 @@ final _openPurchasesProvider = FutureProvider.autoDispose
     });
 
 class SupplierPaymentModal extends ConsumerStatefulWidget {
-  const SupplierPaymentModal({super.key, required this.supplier});
+  const SupplierPaymentModal({
+    super.key,
+    required this.supplier,
+    this.initialPurchase,
+  });
 
   final Supplier supplier;
+  /// Optional purchase to pre-seed as a full allocation.
+  final Purchase? initialPurchase;
 
   @override
   ConsumerState<SupplierPaymentModal> createState() =>
@@ -97,6 +113,14 @@ class _Allocation {
   final TextEditingController controller;
 }
 
+/// One allocation line: the direct purchase + its amount controller.
+class _PurchaseAllocation {
+  _PurchaseAllocation(this.purchase, this.controller);
+
+  final Purchase purchase;
+  final TextEditingController controller;
+}
+
 class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
   final _formKey = GlobalKey<FormState>();
   late DateTime _paymentDate;
@@ -106,10 +130,7 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
   final _notesController = TextEditingController();
   String _paymentMethod = kPaymentMethods.first;
   final List<_Allocation> _allocations = [];
-  bool _submitting = false;
-  String? _error;
-  int? _lastPaymentId;
-
+  final List<_PurchaseAllocation> _purchaseAllocations = [];
   @override
   void initState() {
     super.initState();
@@ -117,7 +138,22 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
     _dateController = TextEditingController(
       text: Formatters.dateTime(_paymentDate),
     );
+    // Pre-seed a single purchase allocation (and the matching total) when
+    // opened from a purchase row / detail with an outstanding balance.
+    final seed = widget.initialPurchase;
+    if (seed != null && seed.balanceAmount > 0) {
+      _amountController.text = seed.balanceAmount.toStringAsFixed(2);
+      final controller = TextEditingController(
+        text: seed.balanceAmount.toStringAsFixed(2),
+      );
+      controller.addListener(() => setState(() {}));
+      _purchaseAllocations.add(_PurchaseAllocation(seed, controller));
+    }
   }
+  bool _submitting = false;
+  String? _error;
+  int? _lastPaymentId;
+
 
   @override
   void dispose() {
@@ -128,6 +164,9 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
     for (final a in _allocations) {
       a.controller.dispose();
     }
+    for (final a in _purchaseAllocations) {
+      a.controller.dispose();
+    }
     super.dispose();
   }
 
@@ -136,6 +175,9 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
   num get _allocationTotal {
     var total = 0.0;
     for (final a in _allocations) {
+      total += double.tryParse(a.controller.text.trim()) ?? 0;
+    }
+    for (final a in _purchaseAllocations) {
       total += double.tryParse(a.controller.text.trim()) ?? 0;
     }
     return total;
@@ -150,6 +192,15 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
     final allocatedIds = {for (final a in _allocations) a.po.id};
     return [for (final po in all) if (!allocatedIds.contains(po.id)) po];
   }
+
+  List<Purchase> get _availablePurchases {
+    final all =
+        ref.watch(_openPurchasesProvider(widget.supplier.id)).valueOrNull ??
+        const <Purchase>[];
+    final allocatedIds = {for (final a in _purchaseAllocations) a.purchase.id};
+    return [for (final p in all) if (!allocatedIds.contains(p.id)) p];
+  }
+
 
   Future<void> _pickDate() async {
     final picked = await pickDate(
@@ -220,6 +271,56 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
     });
   }
 
+  void _addPurchaseAllocation(Purchase purchase) {
+    if (_purchaseAllocations.any((a) => a.purchase.id == purchase.id)) return;
+    // Same web-parity cap as POs: min(balance, entered total).
+    final initial = purchase.balanceAmount < _totalAmount
+        ? purchase.balanceAmount
+        : _totalAmount;
+    final controller = TextEditingController(text: initial.toStringAsFixed(2));
+    controller.addListener(() => setState(() {}));
+    setState(() {
+      _purchaseAllocations.add(_PurchaseAllocation(purchase, controller));
+      _error = null;
+    });
+  }
+
+  void _removePurchaseAllocation(_PurchaseAllocation allocation) {
+    allocation.controller.dispose();
+    setState(() {
+      _purchaseAllocations.remove(allocation);
+      _error = null;
+    });
+  }
+
+  void _onPurchaseAllocationAmountChanged(
+    _PurchaseAllocation allocation,
+    String value,
+  ) {
+    final parsed = double.tryParse(value) ?? 0;
+    final capped =
+        parsed.clamp(0.0, allocation.purchase.balanceAmount.toDouble());
+    if (parsed != capped) {
+      allocation.controller.text = capped.toStringAsFixed(2);
+    }
+    setState(() {});
+  }
+
+  void _autoAllocatePurchases() {
+    final amountLeft = _totalAmount - _allocationTotal;
+    if (amountLeft <= 0) return;
+    var remaining = amountLeft;
+    for (final p in _availablePurchases) {
+      if (remaining <= 0) break;
+      final take = remaining < p.balanceAmount ? remaining : p.balanceAmount;
+      final controller = TextEditingController(text: take.toStringAsFixed(2));
+      controller.addListener(() => setState(() {}));
+      _purchaseAllocations.add(_PurchaseAllocation(p, controller));
+      remaining -= take;
+    }
+    setState(() => _error = null);
+  }
+
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -227,8 +328,8 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
       setState(() => _error = l10n.paymentsErrorAmountGreaterThanZero);
       return;
     }
-    if (_allocations.isEmpty) {
-      setState(() => _error = l10n.suppliersAllocationrequired);
+    if (_allocations.isEmpty && _purchaseAllocations.isEmpty) {
+      setState(() => _error = l10n.suppliersAllocationrequiredpurchases);
       return;
     }
     if ((_totalAmount - _allocationTotal).abs() > 0.005) {
@@ -246,6 +347,10 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
     });
 
     final poNos = [for (final a in _allocations) a.po.poNo];
+    final purchaseNos = [
+      for (final a in _purchaseAllocations) a.purchase.purchaseNo,
+    ];
+    final references = [...poNos, ...purchaseNos];
     final result = await ref
         .read(invoiceRepositoryProvider)
         .createSupplierPayment({
@@ -257,13 +362,20 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
             'reference_no': _referenceController.text.trim(),
           if (_notesController.text.trim().isNotEmpty)
             'notes': _notesController.text.trim(),
-          'description': poNos.isEmpty
+          'description': references.isEmpty
               ? 'Supplier Payment'
-              : 'Payment for ${poNos.join(', ')}',
+              : 'Payment for ${references.join(', ')}',
           'po_allocations': [
             for (final a in _allocations)
               {
                 'po_id': a.po.id,
+                'amount': double.tryParse(a.controller.text.trim()) ?? 0,
+              },
+          ],
+          'purchase_allocations': [
+            for (final a in _purchaseAllocations)
+              {
+                'purchase_id': a.purchase.id,
                 'amount': double.tryParse(a.controller.text.trim()) ?? 0,
               },
           ],
@@ -301,6 +413,8 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
     }
 
     final openPos = ref.watch(_openPosProvider(widget.supplier.id)).valueOrNull;
+    final openPurchases =
+        ref.watch(_openPurchasesProvider(widget.supplier.id)).valueOrNull;
 
     return Dialog(
       child: ConstrainedBox(
@@ -495,6 +609,98 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
                                       onAdd: () => _addAllocation(po),
                                     ),
                               ],
+
+                              const SizedBox(height: 12),
+                              // Direct-purchase allocations (purchase_allocations).
+                              Text(
+                                l10n.suppliersAllocationpurchases,
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                              const SizedBox(height: 4),
+                              if (openPurchases == null)
+                                const SizedBox(
+                                  height: 120,
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                )
+                              else if (openPurchases.isEmpty &&
+                                  _purchaseAllocations.isEmpty)
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 8),
+                                  child: Text(
+                                    l10n.suppliersNoopenpurchases,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: scheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                )
+                              else ...[
+                                if (_purchaseAllocations.isNotEmpty) ...[
+                                  for (final a in _purchaseAllocations)
+                                    _PurchaseAllocationRow(
+                                      allocation: a,
+                                      onRemove: () =>
+                                          _removePurchaseAllocation(a),
+                                      onAmountChanged: (v) =>
+                                          _onPurchaseAllocationAmountChanged(
+                                        a,
+                                        v,
+                                      ),
+                                    ),
+                                  const SizedBox(height: 8),
+                                ],
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        l10n.suppliersAvailablepurchases,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ),
+                                    TextButton.icon(
+                                      onPressed: _autoAllocatePurchases,
+                                      icon: const Icon(
+                                        Icons.auto_awesome,
+                                        size: 16,
+                                      ),
+                                      label: Text(
+                                        l10n.suppliersAutoallocate,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (_availablePurchases.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 4,
+                                    ),
+                                    child: Text(
+                                      l10n.suppliersAllpurchasesallocated,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: scheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                  )
+                                else
+                                  for (final p in _availablePurchases)
+                                    _AvailablePurchaseRow(
+                                      purchase: p,
+                                      onAdd: () => _addPurchaseAllocation(p),
+                                    ),
+                              ],
                               const SizedBox(height: 10),
                               // Summary: Total / Allocated / Unallocated.
                               _summaryRow(
@@ -672,6 +878,118 @@ class _AvailablePoRow extends StatelessWidget {
                 Text(
                   '${Formatters.currency(po.balanceAmount)} '
                   '${scheme.brightness == Brightness.dark ? '' : ''}',
+                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onAdd,
+            child: const Text('+ Add'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One allocated line: purchase no + balance, editable amount, remove —
+/// mirrors [_AllocationRow] for direct purchases.
+class _PurchaseAllocationRow extends StatelessWidget {
+  const _PurchaseAllocationRow({
+    required this.allocation,
+    required this.onRemove,
+    required this.onAmountChanged,
+  });
+
+  final _PurchaseAllocation allocation;
+  final VoidCallback onRemove;
+  final ValueChanged<String> onAmountChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final purchase = allocation.purchase;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  purchase.purchaseNo,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  Formatters.currency(purchase.balanceAmount),
+                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 130,
+            child: TextField(
+              controller: allocation.controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              onChanged: onAmountChanged,
+              decoration: InputDecoration(
+                isDense: true,
+                border: const OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Remove',
+            onPressed: onRemove,
+            icon: Icon(
+              Icons.close,
+              size: 18,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One available direct purchase: no + balance + an Add button.
+class _AvailablePurchaseRow extends StatelessWidget {
+  const _AvailablePurchaseRow({
+    required this.purchase,
+    required this.onAdd,
+  });
+
+  final Purchase purchase;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  purchase.purchaseNo,
+                  style: const TextStyle(fontSize: 13),
+                ),
+                Text(
+                  Formatters.currency(purchase.balanceAmount),
                   style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                 ),
               ],
