@@ -45,8 +45,8 @@ ResponseBody _json(Object body, {int status = 200}) =>
       },
     );
 
-/// Total catalog size: 16 KPI cards + 5 panels + 1 cash strip.
-const int _totalBlocks = 22;
+/// Total catalog size: 16 KPI cards + 6 panels + 1 cash strip.
+const int _totalBlocks = 23;
 
 void main() {
   late RouteHandler handler;
@@ -90,6 +90,7 @@ void main() {
           'panel_sales_purchases',
           'panel_ar_aging',
           'panel_low_stock',
+          'panel_expiry_alerts',
           'cash_strip',
         ],
       );
@@ -334,7 +335,7 @@ void main() {
           for (final b in controller.state.blocks)
             if (b.id.startsWith('panel_') && b.y == 2) b.id,
         ],
-        ['panel_low_stock', 'panel_stock_by_category', 'panel_top_customers'],
+        ['panel_low_stock', 'panel_expiry_alerts', 'panel_stock_by_category', 'panel_top_customers'],
       );
       // Row 1 unchanged.
       expect(
@@ -352,8 +353,8 @@ void main() {
     test('reorders visible panels within row 2 while row 1 stays put', () async {
       await settle();
       // Default row 2: Stock by Category (off), Top Customers (off),
-      // Low Stock (on). Enable the others first, then move Low Stock
-      // from position 2 to 0.
+      // Low Stock (on), Expiry Alerts (on). Enable the others first,
+      // then move Low Stock from position 0 to 2.
       controller.toggle('panel_stock_by_category', true);
       controller.toggle('panel_top_customers', true);
       controller.reorderPanels(2, 2, 0);
@@ -362,7 +363,7 @@ void main() {
           for (final b in controller.state.blocks)
             if (b.visible && b.id.startsWith('panel_') && b.y == 2) b.id,
         ],
-        ['panel_low_stock', 'panel_stock_by_category', 'panel_top_customers'],
+        ['panel_low_stock', 'panel_expiry_alerts', 'panel_stock_by_category', 'panel_top_customers'],
       );
       // Row 1 unchanged.
       expect(
@@ -436,6 +437,7 @@ void main() {
           'panel_sales_purchases',
           'panel_ar_aging',
           'panel_low_stock',
+          'panel_expiry_alerts',
           'cash_strip',
         ],
       );

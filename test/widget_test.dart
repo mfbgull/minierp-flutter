@@ -249,6 +249,11 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   /// How many times the movement detail GET ran (dialog fetch assertions).
   int movementDetailFetchCount = 0;
 
+  /// Captured body of the last /inventory/stock-transfers POST
+  /// (the atomic transfer flow).
+  Map<String, dynamic>? lastTransferPostBody;
+  bool rejectTransferCreate = false;
+
   /// Production module capture + state fields.
   Map<String, dynamic>? lastProductionPostBody;
   int productionDeleteCount = 0;
@@ -2069,6 +2074,32 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'created_by': 1,
         'created_at': '2026-02-03 10:00:00',
       });
+    }
+    // Atomic stock-transfer endpoint (INV-02).
+    if (options.path == '/inventory/stock-transfers' &&
+        options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      lastTransferPostBody = body;
+      if (rejectTransferCreate) {
+        return _json({
+          'error': 'Insufficient stock for transfer',
+        }, status: 400);
+      }
+      return _json({
+        'id': 10,
+        'movement_no': 'SM-2026-0110',
+        'item_id': body['item_id'],
+        'warehouse_id': body['from_warehouse_id'],
+        'movement_type': 'TRANSFER',
+        'quantity': body['quantity'],
+        'unit_cost': 0,
+        'reference_doctype': 'TRANSFER',
+        'reference_docno': null,
+        'remarks': body['remarks'] ?? '',
+        'movement_date': '2026-02-04',
+        'created_by': 1,
+        'created_at': '2026-02-04 09:00:00',
+      }, status: 201);
     }
     final movementDetailId = RegExp(
       r'^/inventory/stock-movements/(\d+)$',
@@ -6463,7 +6494,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Settings'));
+    // Settings is hideInRail: tap the AppBar settings icon instead.
+    await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
   }
 
@@ -12465,25 +12497,12 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
     await tester.pumpAndSettle();
 
-    expect(adapter.movementPostBodies.length, 2);
-    // Outgoing leg: negative quantity, source warehouse, no reference.
-    expect(adapter.movementPostBodies[0], {
+    // Atomic transfer: one POST to /inventory/stock-transfers
+    expect(adapter.lastTransferPostBody, {
       'item_id': 1,
-      'warehouse_id': 1,
-      'quantity': -5,
-      'movement_type': 'TRANSFER',
-      'reference_doctype': 'TRANSFER',
-      'remarks': 'Move to raw',
-    });
-    // Incoming leg: positive quantity, destination warehouse, linked to
-    // the outgoing movement's server-generated number.
-    expect(adapter.movementPostBodies[1], {
-      'item_id': 1,
-      'warehouse_id': 2,
+      'from_warehouse_id': 1,
+      'to_warehouse_id': 2,
       'quantity': 5,
-      'movement_type': 'TRANSFER',
-      'reference_doctype': 'TRANSFER',
-      'reference_docno': 'SM-2026-0102',
       'remarks': 'Move to raw',
     });
     expect(find.byType(Dialog), findsNothing);
@@ -12547,9 +12566,9 @@ void main() {
     expect(adapter.movementPostCount, 0);
   });
 
-  testWidgets('stock transfer surfaces outgoing-leg rejection', (tester) async {
+  testWidgets('stock transfer surfaces server rejection', (tester) async {
     useWideSurface(tester);
-    final adapter = _AuthFakeAdapter()..rejectMovementCreate = true;
+    final adapter = _AuthFakeAdapter()..rejectTransferCreate = true;
     await bootToItems(tester, adapter: adapter);
 
     await tester.tap(
@@ -12578,107 +12597,16 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
     await tester.pumpAndSettle();
 
-    // The outgoing leg 400s before any INSERT — nothing recorded.
-    expect(adapter.movementPostCount, 1);
-    expect(find.text('Insufficient stock for adjustment'), findsOneWidget);
+    // Atomic transfer 400s — dialog stays open for retry.
+    expect(find.text('Insufficient stock for transfer'), findsOneWidget);
     expect(find.byType(Dialog), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Transfer Stock'), findsOneWidget);
   });
 
-  testWidgets('stock transfer flags a failed incoming leg', (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter()..rejectSecondMovement = true;
-    await bootToItems(tester, adapter: adapter);
-
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.text('Stock Movements'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'New Transfer'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byType(SearchableSelect<int>).at(0));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('FG001 — Widget A').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byType(SearchableSelect<int>).at(1));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Main Warehouse').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byType(SearchableSelect<int>).at(2));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Raw Materials').last);
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField).at(0), '5');
-    await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
-    await tester.pumpAndSettle();
-
-    // The outgoing leg recorded; the incoming leg's 400 surfaces with
-    // the partial-failure prefix so a retry doesn't re-post the OUT.
-    expect(adapter.movementPostCount, 2);
-    expect(find.textContaining('Transfer incomplete:'), findsOneWidget);
-    expect(
-      find.textContaining('Destination warehouse not found'),
-      findsOneWidget,
-    );
-    expect(find.byType(Dialog), findsOneWidget);
-  });
-
-  testWidgets('stock transfer retry re-posts only the incoming leg', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter()..rejectSecondMovement = true;
-    await bootToItems(tester, adapter: adapter);
-
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.text('Stock Movements'),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'New Transfer'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byType(SearchableSelect<int>).at(0));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('FG001 — Widget A').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byType(SearchableSelect<int>).at(1));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Main Warehouse').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byType(SearchableSelect<int>).at(2));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Raw Materials').last);
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField).at(0), '5');
-    await tester.enterText(find.byType(TextFormField).at(1), 'Move to raw');
-    await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
-    await tester.pumpAndSettle();
-    expect(adapter.movementPostCount, 2);
-
-    // Retry: the OUT leg is already on the server, so only the IN leg
-    // re-posts — reusing the same linking reference.
-    await tester.tap(find.widgetWithText(FilledButton, 'Transfer Stock'));
-    await tester.pumpAndSettle();
-    expect(adapter.movementPostBodies.length, 3);
-    expect(adapter.movementPostBodies[2], {
-      'item_id': 1,
-      'warehouse_id': 2,
-      'quantity': 5,
-      'movement_type': 'TRANSFER',
-      'reference_doctype': 'TRANSFER',
-      'reference_docno': 'SM-2026-0102',
-      'remarks': 'Move to raw',
-    });
-    expect(find.textContaining('Transfer incomplete:'), findsOneWidget);
-    expect(find.byType(Dialog), findsOneWidget);
-  });
+  // The old two-POST transfer tests ("flags a failed incoming leg",
+  // "retry re-posts only the incoming leg") were removed: the transfer
+  // is now one atomic server call (INV-02) so there is no partial-
+  // failure or selective retry path.
 
   testWidgets('movement detail fetches and reverses an adjustment', (
     tester,

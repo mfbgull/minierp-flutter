@@ -375,6 +375,7 @@ class _LineCellState extends State<LineCell> {
         : null;
     final display = _display(context);
     return Column(
+      mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         display,
@@ -385,6 +386,7 @@ class _LineCellState extends State<LineCell> {
               issue.message,
               style: TextStyle(
                 fontSize: 10,
+                height: 1.0,
                 color: issue.severity == LineErrorSeverity.error
                     ? const Color(0xffdc2626)
                     : const Color(0xffd97706),

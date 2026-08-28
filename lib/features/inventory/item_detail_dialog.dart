@@ -223,15 +223,17 @@ class _DetailBody extends ConsumerWidget {
                 ),
               ),
               const Spacer(),
-              TextButton.icon(
-                onPressed: () => showStockLedgerDialog(
-                  context,
-                  itemId: detail.item.id,
-                  itemLabel:
-                      '${detail.item.itemCode} · ${detail.item.itemName}',
+              Flexible(
+                child: TextButton.icon(
+                  onPressed: () => showStockLedgerDialog(
+                    context,
+                    itemId: detail.item.id,
+                    itemLabel:
+                        '${detail.item.itemCode} · ${detail.item.itemName}',
+                  ),
+                  icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                  label: Text(l10n.inventoryStockledger),
                 ),
-                icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                label: Text(l10n.inventoryStockledger),
               ),
               const SizedBox(width: 4),
               TextButton.icon(
