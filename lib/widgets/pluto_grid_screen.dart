@@ -159,6 +159,11 @@ const double kAutoFitMaxColumnWidth = 480;
 /// ones (the `#` / ⋮ renderer columns don't measure reliably), clamps to
 /// [kAutoFitMaxColumnWidth], and no-ops per column within 1px so calling
 /// it repeatedly is cheap.
+///
+/// Auto-fit only grows columns when there is slack in the viewport so
+/// that the total width never pushes right-hand columns
+/// (status badges, actions) past the grid edge where PlutoGrid's
+/// horizontal virtualization would never build them.
 void autoFitPlutoColumns(PlutoGridStateManager stateManager) {
   final style = stateManager.configuration.style;
 
@@ -172,8 +177,17 @@ void autoFitPlutoColumns(PlutoGridStateManager stateManager) {
     return width;
   }
 
+  // Snapshot current widths and compute ideal content-based widths.
+  final widths = <PlutoColumn, double>{};
+  final ideals = <PlutoColumn, double>{};
   for (final column in stateManager.columns) {
-    if (column.hide || column.renderer != null) continue;
+    if (column.hide) continue;
+    final current = column.width;
+    widths[column] = current;
+    if (column.renderer != null) {
+      ideals[column] = current;
+      continue;
+    }
     var widest = measuredWidth(column.title, style.columnTextStyle);
     for (final row in stateManager.refRows) {
       final value = row.cells[column.field]?.value;
@@ -187,10 +201,45 @@ void autoFitPlutoColumns(PlutoGridStateManager stateManager) {
       );
     }
     final padding = column.cellPadding ?? style.defaultCellPadding;
-    final target = (widest + padding.horizontal + 12)
-        .clamp(column.minWidth, kAutoFitMaxColumnWidth);
-    if ((target - column.width).abs() < 1) continue;
-    stateManager.resizeColumn(column, target - column.width);
+    ideals[column] =
+        (widest + padding.horizontal + 12).clamp(column.minWidth, kAutoFitMaxColumnWidth);
+  }
+
+  // Compute the viewport budget: maxWidth is the grid's available width;
+  // bodyPadding adds the left/right inset.  Null → fall back to
+  // unbounded behaviour (current: no constraint, wider columns OK).
+  final vp = stateManager.maxWidth;
+  if (vp == null || vp <= 0) {
+    // Viewport unknown — fall back to unbounded per-column resize.
+    for (final entry in ideals.entries) {
+      final column = entry.key;
+      final target = entry.value;
+      if ((target - column.width).abs() < 1) continue;
+      stateManager.resizeColumn(column, target - column.width);
+    }
+    return;
+  }
+
+  // Only grow within available slack so the total never exceeds the
+  // viewport (which would push non-renderer columns off-screen).
+  final currentTotal = widths.values.fold<double>(0, (s, w) => s + w);
+  final slack = vp - currentTotal;
+  if (slack <= 0) return; // no free space — leave hand-tuned widths
+
+  final requests = <PlutoColumn, double>{};
+  for (final entry in ideals.entries) {
+    final delta = entry.value - widths[entry.key]!;
+    if (delta > 1) requests[entry.key] = delta;
+  }
+  if (requests.isEmpty) return;
+
+  final totalRequested = requests.values.fold<double>(0, (s, d) => s + d);
+  final factor = math.min(1.0, slack / totalRequested);
+
+  for (final entry in requests.entries) {
+    final grow = entry.value * factor;
+    if (grow < 1) continue;
+    stateManager.resizeColumn(entry.key, grow);
   }
 }
 

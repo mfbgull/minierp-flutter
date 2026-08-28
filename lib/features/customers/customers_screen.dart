@@ -406,13 +406,16 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
           final customer = ctx.cell.row.cells['data']?.value as Customer?;
           return Builder(
             builder: (cellContext) => Column(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '${ctx.cell.value}',
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  // height keeps the two-line cell inside the 34px row
+                  // (default line height overflows the grid cell by 1px).
+                  style: const TextStyle(fontWeight: FontWeight.w600, height: 1.1),
                 ),
                 if (customer?.contactPerson?.isNotEmpty ?? false)
                   Text(
@@ -420,6 +423,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
+                      height: 1.1,
                       color: Theme.of(
                         cellContext,
                       ).colorScheme.onSurfaceVariant,
@@ -442,16 +446,23 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
           final email = ctx.cell.row.cells['email']?.value?.toString() ?? '';
           return Builder(
             builder: (cellContext) => Column(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${ctx.cell.value}', overflow: TextOverflow.ellipsis),
+                Text(
+                  '${ctx.cell.value}',
+                  overflow: TextOverflow.ellipsis,
+                  // height keeps the two-line cell inside the 34px row.
+                  style: const TextStyle(height: 1.1),
+                ),
                 if (email.isNotEmpty)
                   Text(
                     email,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
+                      height: 1.1,
                       color: Theme.of(
                         cellContext,
                       ).colorScheme.onSurfaceVariant,

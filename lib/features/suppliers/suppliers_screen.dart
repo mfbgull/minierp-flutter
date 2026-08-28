@@ -385,13 +385,16 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen>
           final supplier = ctx.cell.row.cells['data']?.value as Supplier?;
           return Builder(
             builder: (cellContext) => Column(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '${ctx.cell.value}',
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  // height keeps the two-line cell inside the 34px row
+                  // (default line height overflows the grid cell by 1px).
+                  style: const TextStyle(fontWeight: FontWeight.w600, height: 1.1),
                 ),
                 if (supplier?.contactPerson?.isNotEmpty ?? false)
                   Text(
@@ -399,6 +402,7 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen>
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11,
+                      height: 1.1,
                       color: Theme.of(cellContext).colorScheme.onSurfaceVariant,
                     ),
                   ),
