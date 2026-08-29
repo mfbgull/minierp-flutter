@@ -354,8 +354,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   List<Expense> get _filteredRows =>
       ref.read(allExpensesProvider).valueOrNull ?? const <Expense>[];
 
-  bool get _hasNoRows => _filteredRows.isEmpty;
-
   Widget _summaryStrip(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     final rows = _filteredRows;
@@ -486,12 +484,10 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
 
   /// Server-side sort — maps the grid header click to the whitelist and
   /// resets to page 1.
-  void _onGridSorted(PlutoGridOnSortedEvent event) {
-    final sortBy = _sortColumnFor(event.column.field);
-    if (sortBy == null) return;
-    final sort = event.column.sort;
-    if (sort == null) return;
-    final order = sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC';
+  void _onGridSorted(PlutoGridOnSortedEvent event) {      final sortBy = _sortColumnFor(event.column.field);
+      if (sortBy == null) return;
+      final sort = event.column.sort;
+      final order = sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC';
     ref.read(expensesSortProvider.notifier).state = ExpenseSort(sortBy, order);
     if (ref.read(expensesPageProvider) != 1) {
       ref.read(expensesPageProvider.notifier).state = 1;

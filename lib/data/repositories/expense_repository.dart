@@ -82,7 +82,7 @@ class ExpenseRepository {
     ApiEndpoints.expensesCategories,
     body: {
       'category_name': categoryName,
-      if (description != null && description!.isNotEmpty)
+      if (description != null && description.isNotEmpty)
         'description': description,
     },
     parse: (Object? json) =>
