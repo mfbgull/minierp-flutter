@@ -323,7 +323,6 @@ class _LineCellState extends State<LineCell> {
           behavior: HitTestBehavior.opaque,
           onTap: () => nav.requestEdit(row, column),
           child: Container(
-            alignment: Alignment.centerRight,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
               color: highlight
@@ -332,7 +331,11 @@ class _LineCellState extends State<LineCell> {
                     ).colorScheme.primaryContainer.withValues(alpha: 0.35)
                   : null,
             ),
-            child: Text(_displayText(), style: const TextStyle(fontSize: 13)),
+            child: Align(
+              alignment: Alignment.centerRight,
+              heightFactor: 1.0,
+              child: Text(_displayText(), style: const TextStyle(fontSize: 13)),
+            ),
           ),
         ),
       ),
@@ -373,26 +376,25 @@ class _LineCellState extends State<LineCell> {
             ),
           )
         : null;
-    final display = _display(context);
+    if (issue == null) return _display(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        display,
-        if (issue != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              issue.message,
-              style: TextStyle(
-                fontSize: 10,
-                height: 1.0,
-                color: issue.severity == LineErrorSeverity.error
-                    ? const Color(0xffdc2626)
-                    : const Color(0xffd97706),
-              ),
+        _display(context),
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            issue.message,
+            style: TextStyle(
+              fontSize: 10,
+              height: 1.0,
+              color: issue.severity == LineErrorSeverity.error
+                  ? const Color(0xffdc2626)
+                  : const Color(0xffd97706),
             ),
           ),
+        ),
       ],
     );
   }

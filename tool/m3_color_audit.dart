@@ -439,15 +439,8 @@ void main(List<String> args) {
     printJsonReport(usages);
   } else {
     if (outputPath != null) {
-      final buf = StringBuffer();
-      final orig = stdout;
-      // Redirect stdout to buffer
-      printReport(usages);
-      // Actually, just write directly
-      final file = File(outputPath);
-      // Re-run with captured output — simpler to just write the report
+      // TODO: write report to file instead of stdout
       stderr.writeln('Writing report to: $outputPath');
-      // For simplicity, print to stdout (user can redirect)
       printReport(usages);
     } else {
       printReport(usages);

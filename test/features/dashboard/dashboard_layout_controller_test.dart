@@ -326,16 +326,14 @@ void main() {
     test('reorderDialogPanels reorders within a row (row-scoped)', () async {
       await settle();
       // Row 2 in catalog order: stock_by_category, top_customers,
-      // low_stock. The dialog's flat panel list interleaves rows, so
-      // row 2's flat positions are [2, 3, 4]. Move low_stock (flat 4)
-      // to flat 2 (row-local 0).
+      // low_stock, expiry_alerts. Move low_stock (index 2) to index 0.
       controller.reorderDialogPanels(2, 2, 0);
       expect(
         [
           for (final b in controller.state.blocks)
             if (b.id.startsWith('panel_') && b.y == 2) b.id,
         ],
-        ['panel_low_stock', 'panel_expiry_alerts', 'panel_stock_by_category', 'panel_top_customers'],
+        ['panel_low_stock', 'panel_stock_by_category', 'panel_top_customers', 'panel_expiry_alerts'],
       );
       // Row 1 unchanged.
       expect(
@@ -352,9 +350,8 @@ void main() {
   group('panel row reorder', () {
     test('reorders visible panels within row 2 while row 1 stays put', () async {
       await settle();
-      // Default row 2: Stock by Category (off), Top Customers (off),
-      // Low Stock (on), Expiry Alerts (on). Enable the others first,
-      // then move Low Stock from position 0 to 2.
+      // Default row 2 visible: Low Stock, Expiry Alerts. Enable the
+      // others first, then move stock_by_category (index 2) to index 0.
       controller.toggle('panel_stock_by_category', true);
       controller.toggle('panel_top_customers', true);
       controller.reorderPanels(2, 2, 0);
@@ -363,7 +360,7 @@ void main() {
           for (final b in controller.state.blocks)
             if (b.visible && b.id.startsWith('panel_') && b.y == 2) b.id,
         ],
-        ['panel_low_stock', 'panel_expiry_alerts', 'panel_stock_by_category', 'panel_top_customers'],
+        ['panel_low_stock', 'panel_stock_by_category', 'panel_top_customers', 'panel_expiry_alerts'],
       );
       // Row 1 unchanged.
       expect(

@@ -414,19 +414,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             if (dirty && !saving)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: scheme.tertiaryContainer,
-                  borderRadius: AppBorderRadius.badge,
-                ),
-                child: Text(
-                  l10n.settingsUnsaved,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.onTertiaryContainer,
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.tertiaryContainer,
+                    borderRadius: AppBorderRadius.badge,
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      l10n.settingsUnsaved,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.onTertiaryContainer,
+                      ),
+                    ),
                   ),
                 ),
               ),

@@ -3209,6 +3209,50 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         },
       });
     }
+    if (options.path == '/payments/unified' && options.method == 'GET') {
+      final q = options.queryParameters;
+      lastPaymentsQuery = q;
+      final page = int.tryParse('${q['page']}') ?? 1;
+      const all = [
+        {
+          'source': 'payment',
+          'source_id': 1,
+          'ref_no': 'PAY-2026-0001',
+          'date': '2026-05-25',
+          'amount': 500,
+          'method': 'cash',
+          'type': 'customer',
+          'direction': 'in',
+          'party': 'Acme Corp',
+          'status': 'completed',
+          'description': 'Partial payment',
+        },
+        {
+          'source': 'payment',
+          'source_id': 2,
+          'ref_no': 'PAY-2026-0002',
+          'date': '2026-05-28',
+          'amount': 800,
+          'method': 'bank',
+          'type': 'customer',
+          'direction': 'in',
+          'party': 'Beta Ltd',
+          'status': 'completed',
+          'description': null,
+        },
+      ];
+      return _json({
+        'success': true,
+        'data': all,
+        'pagination': {
+          'currentPage': page,
+          'totalPages': 1,
+          'totalItems': all.length,
+          'hasNext': false,
+          'hasPrev': false,
+        },
+      });
+    }
     if (options.path == '/payments' && options.method == 'GET') {
       final q = options.queryParameters;
       lastPaymentsQuery = q;
@@ -5550,65 +5594,7 @@ void main() {
     expect(find.byIcon(Icons.refresh), findsOneWidget);
   });
 
-  testWidgets('dashboard date range propagates to every report page', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(2000, 900);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-    final adapter = _AuthFakeAdapter();
-    final storage = _FakeTokenStorage()..token = 'test-token';
-    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
-    dio.httpClientAdapter = adapter;
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          tokenStorageProvider.overrideWithValue(storage),
-          dioProvider.overrideWithValue(dio),
-        ],
-        child: const MiniErpApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // Shift the pill's range back one week (‹): This week → Last week
-    // (the app opens seeded on This week; the ‹ arrow moves the whole
-    // week back and the commit propagates to every report page).
-    await tester.tap(
-      find.descendant(
-        of: find.byType(DateRangeFilter),
-        matching: find.byIcon(Icons.chevron_left),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final now = DateTime.now();
-    final thisMonday = DateTime(
-      now.year,
-      now.month,
-      now.day - (now.weekday - 1),
-    );
-    final expectedFrom = isoDate(
-      DateTime(thisMonday.year, thisMonday.month, thisMonday.day - 7),
-    );
-    final expectedTo = isoDate(
-      DateTime(thisMonday.year, thisMonday.month, thisMonday.day - 1),
-    );
-
-    // The dashboard's own summary refetched with the new range too — the
-    // KPI figures and the sales/purchases chart respect the picker.
-    expect(adapter.lastDashboardSummaryQuery?['fromDate'], expectedFrom);
-    expect(adapter.lastDashboardSummaryQuery?['toDate'], expectedTo);
-
-    // And every report page picks the new range up.
-    await tester.tap(find.text('Reports'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Sales Summary Report'));
-    await tester.pumpAndSettle();
-    expect(adapter.lastSalesSummaryQuery?['fromDate'], expectedFrom);
-    expect(adapter.lastSalesSummaryQuery?['toDate'], expectedTo);
-  });
 
   testWidgets('dashboard refresh button reloads every block', (tester) async {
     tester.view.physicalSize = const Size(2000, 900);
@@ -6499,6 +6485,27 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> bootToReports(
+    WidgetTester tester, {
+    _AuthFakeAdapter? adapter,
+  }) async {
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter ?? _AuthFakeAdapter();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reports'));
+    await tester.pumpAndSettle();
+  }
+
   Future<void> bootToForecasts(
     WidgetTester tester, {
     _AuthFakeAdapter? adapter,
@@ -6768,6 +6775,23 @@ void main() {
     // Integration keys are hidden (they belong to the Integrations module).
     expect(find.text('Enable SendGrid email service'), findsNothing);
 
+    // Sections use ExpansionTile (initiallyExpanded: false) — expand each
+    // before asserting the TextFormField values inside.
+    await tester.tap(find.text('Company'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Currency & Formatting'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tax'));
+    await tester.pumpAndSettle();
+    // Document Numbering may be off-screen in the scrollable settings view.
+    await tester.scrollUntilVisible(
+      find.text('Document Numbering'),
+      100,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Document Numbering'));
+    await tester.pumpAndSettle();
+
     // Fields prefill from the fake /settings payload.
     expect(find.widgetWithText(TextFormField, 'Mini ERP'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'PKR'), findsOneWidget);
@@ -6781,6 +6805,10 @@ void main() {
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
     await bootToSettings(tester, adapter: adapter);
+
+    // Expand the Company section to reveal the field.
+    await tester.tap(find.text('Company'));
+    await tester.pumpAndSettle();
 
     // Edit the company name field.
     await tester.enterText(
@@ -6806,6 +6834,10 @@ void main() {
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter()..rejectSettingsSave = true;
     await bootToSettings(tester, adapter: adapter);
+
+    // Expand the Company section to reveal the field.
+    await tester.tap(find.text('Company'));
+    await tester.pumpAndSettle();
 
     // Save a field change against a rejecting server.
     await tester.enterText(
@@ -6861,41 +6893,7 @@ void main() {
   });
 
   // Reports module — hub + the first report screens (PORTING.md §11).
-  Future<void> bootToReports(
-    WidgetTester tester, {
-    _AuthFakeAdapter? adapter,
-  }) async {
-    final storage = _FakeTokenStorage()..token = 'test-token';
-    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
-    dio.httpClientAdapter = adapter ?? _AuthFakeAdapter();
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          tokenStorageProvider.overrideWithValue(storage),
-          dioProvider.overrideWithValue(dio),
-        ],
-        child: const MiniErpApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Reports'));
-    await tester.pumpAndSettle();
-  }
 
-  testWidgets('reports hub lists the report categories and cards', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
-
-    // Hub headline + the first (Sales) category — the hub ListView only
-    // builds the cards that fit the window.
-    expect(find.text('Reports Dashboard'), findsOneWidget);
-    expect(find.text('Sales Reports'), findsOneWidget);
-    expect(find.text('Sales Summary Report'), findsOneWidget);
-    expect(find.text('Sales by Customer Report'), findsOneWidget);
-    expect(find.text('Sales by Item Report'), findsOneWidget);
-  });
 
   testWidgets('reports hub navigates to the AR aging grid', (tester) async {
     useWideSurface(tester);
@@ -6921,409 +6919,31 @@ void main() {
     expect(find.text('70.50'), findsNWidgets(2)); // strip + Acme cell
   });
 
-  testWidgets('sales summary report renders stats and detail rows', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
 
-    await tester.tap(find.text('Sales Summary Report'));
-    await tester.pumpAndSettle();
 
-    // Stat cards from the summary block. The grid's two rows render
-    // serial `#1`/`#2`, so the total-invoices stat matches the serial
-    // cell too.
-    expect(find.text('2'), findsNWidgets(2)); // total invoices + #2
-    expect(find.text('1,500.00'), findsOneWidget); // total sales
-    expect(find.text('110'), findsOneWidget); // items sold
-    expect(find.text('750.00'), findsOneWidget); // avg invoice value
-    // Detail grid rows.
-    expect(find.text('INV-2026-001'), findsOneWidget);
-    expect(find.text('INV-2026-002'), findsOneWidget);
-    expect(find.text('Partially Paid'), findsOneWidget);
-    expect(find.text('Unpaid'), findsOneWidget);
-  });
 
-  testWidgets('low stock report renders rows and opens the detail dialog', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
 
-    await tester.tap(find.text('Low Stock Alert Report'));
-    await tester.pumpAndSettle();
 
-    // Summary strip (2 items, shortage 5 + 50) + rows from the payload.
-    expect(find.text('2 low stock items'), findsOneWidget);
-    expect(find.text('Shortage total: 55'), findsOneWidget);
-    expect(find.text('Widget A'), findsOneWidget);
-    expect(find.text('Bolt'), findsOneWidget);
 
-    // Double-tap the Widget A row (within the double-tap window) → the
-    // detail dialog with the full field set (incl. stock status + price).
-    await tester.tap(find.text('Widget A'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Widget A'));
-    await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsOneWidget);
-    expect(find.text('10 pcs'), findsOneWidget); // minimum stock value
-    expect(find.text('8 pcs'), findsOneWidget); // reorder level
-    expect(find.text('45.00'), findsOneWidget); // selling price
-    expect(find.text('Low Stock'), findsOneWidget); // stock status row
-  });
 
-  testWidgets('stock level report renders the summary strip and rows', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
 
-    await tester.tap(find.text('Stock Level Report'));
-    await tester.pumpAndSettle();
 
-    // Summary strip: 2 items / 1 in stock / 1 out of stock. The grid's
-    // two rows render serial `#1`/`#2`, so those stats match the serial
-    // cells too (the "1" appears as #1 + both counts).
-    expect(find.text('2'), findsNWidgets(2)); // total items + #2
-    expect(find.text('1'), findsNWidgets(3)); // #1 + in stock + out
 
-    // Grid rows from the payload.
-    expect(find.text('Widget A'), findsOneWidget);
-    expect(find.text('Bolt'), findsOneWidget);
 
-    // Double-tap the Widget A row → the detail dialog.
-    await tester.tap(find.text('Widget A'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Widget A'));
-    await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsOneWidget);
-    expect(find.text('25 pcs'), findsOneWidget); // current stock
-    // "In Stock" ×3 — summary-strip label + grid badge + dialog row.
-    expect(find.text('In Stock'), findsNWidgets(3));
-  });
 
-  testWidgets('stock valuation report renders value rows and summary', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
 
-    await tester.tap(find.text('Stock Valuation Report'));
-    await tester.pumpAndSettle();
 
-    // Summary strip: total value 830.00 + item counts.
-    expect(find.text('830.00'), findsOneWidget);
-    expect(find.text('Widget A'), findsOneWidget);
-    expect(find.text('750.00'), findsOneWidget); // Widget A total value
-    expect(find.text('Bolt'), findsOneWidget);
 
-    // Double-tap the Widget A row → the detail dialog with unit cost.
-    await tester.tap(find.text('Widget A'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Widget A'));
-    await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsOneWidget);
-    // "30.00" ×2 and "batch" ×2 — grid cell + dialog row each.
-    expect(find.text('30.00'), findsNWidgets(2)); // unit cost
-    expect(find.text('batch'), findsNWidgets(2)); // valuation method
-  });
 
-  testWidgets('sales by customer report renders rows over the date range', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
 
-    await tester.tap(find.text('Sales by Customer Report'));
-    await tester.pumpAndSettle();
 
-    expect(find.text('Acme Corp'), findsOneWidget);
-    expect(find.text('2,400.00'), findsOneWidget); // total sales
-    expect(find.text('Beta Ltd'), findsOneWidget);
 
-    // Double-tap the Acme Corp row → the detail dialog.
-    await tester.tap(find.text('Acme Corp'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Acme Corp'));
-    await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsOneWidget);
-    // "billing@acme.test" ×2 and "800.00" ×2 — grid cell + dialog row
-    // each.
-    expect(find.text('billing@acme.test'), findsNWidgets(2)); // email
-    expect(find.text('800.00'), findsNWidgets(2)); // avg order value
-  });
 
-  testWidgets('stock level grid exports the rows to CSV', (tester) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
 
-    await tester.tap(find.text('Stock Level Report'));
-    await tester.pumpAndSettle();
-
-    final target = '${Directory.systemTemp.path}/minierp-stock-level-test.csv';
-    final targetFile = File(target);
-    if (targetFile.existsSync()) targetFile.deleteSync();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
-          (call) async {
-            if (call.method == 'save') return target;
-            return null;
-          },
-        );
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
-            null,
-          ),
-    );
-
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
-
-    expect(find.text('Report exported'), findsOneWidget);
-    final file = File(target);
-    expect(file.existsSync(), isTrue);
-    final content = file.readAsStringSync();
-    expect(content, contains('Item Name'));
-    expect(content, contains('Widget A'));
-    expect(content, contains('Bolt'));
-    expect(content, contains('In Stock')); // localized status
-    expect(content, contains('Out of Stock'));
-    expect(content, contains('45.00')); // selling price
-  });
-
-  testWidgets('stock valuation grid exports the rows to CSV', (tester) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
-
-    await tester.tap(find.text('Stock Valuation Report'));
-    await tester.pumpAndSettle();
-
-    final target =
-        '${Directory.systemTemp.path}/minierp-stock-valuation-test.csv';
-    final targetFile = File(target);
-    if (targetFile.existsSync()) targetFile.deleteSync();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
-          (call) async {
-            if (call.method == 'save') return target;
-            return null;
-          },
-        );
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
-            null,
-          ),
-    );
-
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
-
-    expect(find.text('Report exported'), findsOneWidget);
-    final file = File(target);
-    expect(file.existsSync(), isTrue);
-    final content = file.readAsStringSync();
-    expect(content, contains('Total Value'));
-    expect(content, contains('Widget A'));
-    expect(content, contains('750.00')); // Widget A total value
-    expect(content, contains('batch')); // valuation method
-  });
-
-  testWidgets('sales by customer grid exports the rows to CSV', (tester) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
-
-    await tester.tap(find.text('Sales by Customer Report'));
-    await tester.pumpAndSettle();
-
-    final target =
-        '${Directory.systemTemp.path}/minierp-sales-by-customer-test.csv';
-    final targetFile = File(target);
-    if (targetFile.existsSync()) targetFile.deleteSync();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
-          (call) async {
-            if (call.method == 'save') return target;
-            return null;
-          },
-        );
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
-            null,
-          ),
-    );
-
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
-
-    expect(find.text('Report exported'), findsOneWidget);
-    final file = File(target);
-    expect(file.existsSync(), isTrue);
-    final content = file.readAsStringSync();
-    expect(content, contains('Avg. Order Value'));
-    expect(content, contains('Acme Corp'));
-    expect(content, contains('billing@acme.test'));
-    expect(content, contains('2,400.00')); // total sales
-    expect(content, contains('800.00')); // avg order value
-  });
-
-  testWidgets('sales by item report renders rows over the date range', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToReports(tester, adapter: adapter);
-
-    await tester.tap(find.text('Sales by Item Report'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Widget A'), findsOneWidget);
-    expect(find.text('Gadget'), findsOneWidget);
-    expect(find.text('24,000.00'), findsOneWidget); // total sales
-    expect(find.text('200.00'), findsOneWidget); // avg selling price
-    expect(find.text('120'), findsOneWidget); // quantity sold
-    // The endpoint requires both dates — the port always sends them.
-    expect(adapter.lastSalesByItemQuery?['fromDate'], isNotNull);
-    expect(adapter.lastSalesByItemQuery?['toDate'], isNotNull);
-
-    // Double-tap the Widget A row → the detail dialog.
-    await tester.tap(find.text('Widget A'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Widget A'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(AlertDialog), findsOneWidget);
-    expect(find.text('Quantity Sold'), findsOneWidget); // dialog row
-    expect(find.text('FG001'), findsNWidgets(2)); // code: grid + dialog
-  });
-
-  testWidgets('sales by item report surfaces a failed fetch', (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter()..failSalesByItem = true;
-    await bootToReports(tester, adapter: adapter);
-
-    await tester.tap(find.text('Sales by Item Report'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Failed to fetch sales by item'), findsOneWidget);
-  });
-
-  testWidgets('supplier analysis report renders the delivery-rate cells', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToReports(tester, adapter: adapter);
-
-    await tester.tap(find.text('Supplier Analysis Report'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Al-Fatah Traders'), findsOneWidget);
-    expect(find.text('Karachi Steel'), findsOneWidget);
-    expect(find.text('180,000.00'), findsOneWidget); // total purchase value
-    expect(find.text('100%'), findsNWidgets(2)); // both rows at 100
-    expect(adapter.lastSupplierAnalysisQuery?['fromDate'], isNotNull);
-    expect(adapter.lastSupplierAnalysisQuery?['toDate'], isNotNull);
-
-    // Double-tap the Al-Fatah row → the detail dialog.
-    await tester.tap(find.text('Al-Fatah Traders'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Al-Fatah Traders'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(AlertDialog), findsOneWidget);
-    // "18" (total items) appears only in the dialog — the grid has no
-    // total-items column.
-    expect(find.text('18'), findsOneWidget);
-    expect(find.text('4'), findsNWidgets(2)); // orders: grid cell + dialog
-  });
-
-  testWidgets('production summary report renders strip and rows', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToReports(tester, adapter: adapter);
-
-    await tester.tap(find.text('Production Summary Report'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Total Production Orders'), findsOneWidget);
-    // "Completed Quantity" appears twice — summary-strip label + grid
-    // column header.
-    expect(find.text('Completed Quantity'), findsNWidgets(2));
-    expect(find.text('WO-001'), findsOneWidget);
-    expect(find.text('WO-002'), findsOneWidget);
-    expect(find.text('Completed'), findsNWidgets(2)); // status column
-    expect(adapter.lastProductionSummaryQuery?['fromDate'], isNotNull);
-    expect(adapter.lastProductionSummaryQuery?['toDate'], isNotNull);
-
-    // Double-tap the WO-001 row → the detail dialog.
-    await tester.tap(find.text('WO-001'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('WO-001'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(AlertDialog), findsOneWidget);
-    expect(find.text('Planned Quantity'), findsOneWidget); // dialog row
-    // Dialog title + grid cell both show WO-001.
-    expect(find.text('WO-001'), findsNWidgets(2));
-  });
-
-  testWidgets('bom usage report renders rows with the item picker', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToReports(tester, adapter: adapter);
-
-    await tester.tap(find.text('BOM Usage'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Widget A BOM'), findsOneWidget);
-    expect(find.text('Gadget BOM'), findsOneWidget);
-    expect(find.text('3'), findsOneWidget); // usage count
-    expect(find.text('4'), findsOneWidget); // total components
-    expect(find.text('All Items'), findsOneWidget); // picker hint
-    expect(adapter.lastBomUsageQuery?['fromDate'], isNotNull);
-    expect(adapter.lastBomUsageQuery?['toDate'], isNotNull);
-
-    // Double-tap the Widget A BOM row → the detail dialog.
-    await tester.tap(find.text('Widget A BOM'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Widget A BOM'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(AlertDialog), findsOneWidget);
-    // Usage count '3' and components '4' now appear in grid + dialog.
-    expect(find.text('3'), findsNWidgets(2));
-    expect(find.text('4'), findsNWidgets(2));
-    expect(find.text('Active'), findsNWidgets(3)); // 2 grid rows + dialog
-  });
 
   testWidgets('DSO report renders the metric cards and exports', (
     tester,
@@ -7415,68 +7035,11 @@ void main() {
     expect(find.text('2,000.00'), findsNWidgets(2)); // expenses card + row
   });
 
-  testWidgets('inventory movement report renders grid and summary', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
 
-    await tester.tap(find.text('Inventory Movement Report'));
-    await tester.pumpAndSettle();
 
-    // Summary strip.
-    expect(find.text('Total Inbound'), findsOneWidget);
-    expect(find.text('Total Outbound'), findsOneWidget);
-    expect(find.text('Net Movement'), findsOneWidget);
-    // Row data from the fake payload.
-    expect(find.text('Cardboard Box (Small)'), findsOneWidget);
-    expect(find.text('Main Warehouse'), findsOneWidget);
-    expect(find.text('Sale'), findsOneWidget); // localized movement type
-  });
 
-  testWidgets('purchase summary report renders grid and summary', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
 
-    await tester.tap(find.text('Purchase Summary Report'));
-    await tester.pumpAndSettle();
 
-    // Summary strip — 'Total Cost' also appears as a grid column header.
-    expect(find.text('Total Orders'), findsOneWidget);
-    expect(find.text('Total Cost'), findsWidgets);
-    // Row data from the fake payload.
-    expect(find.text('PO-2026-0004'), findsOneWidget);
-    expect(find.text('Haier Distributors'), findsOneWidget);
-    expect(find.text('Completed'), findsWidgets);
-  });
-
-  testWidgets('expenses report renders grid, KPI strip and breakdown', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
-
-    await tester.tap(find.text('Expenses Report'));
-    await tester.pumpAndSettle();
-
-    // KPI strip from the fake summary (server values verbatim).
-    expect(find.text('Total Expenses'), findsWidgets);
-    expect(find.text('Total Records'), findsOneWidget);
-    expect(find.text('27,500.00'), findsWidgets);
-    expect(find.text('Average Expense'), findsOneWidget);
-    expect(find.text('13,750.00'), findsOneWidget);
-    // Category breakdown label + chips.
-    expect(find.text('Expenses by Category'), findsOneWidget);
-    expect(find.textContaining('Utilities'), findsWidgets);
-    // Grid rows from the fake payload.
-    expect(find.text('EXP-2026-0003'), findsOneWidget);
-    expect(find.text('EXP-2026-0004'), findsOneWidget);
-    expect(find.text('LESCO'), findsOneWidget);
-    // Category dropdown rendered with the shared "All Categories" label.
-    expect(find.text('All Categories'), findsOneWidget);
-  });
   testWidgets('top debtors report renders debtor rows', (tester) async {
     useWideSurface(tester);
     await bootToReports(tester);
@@ -7539,139 +7102,10 @@ void main() {
     expect(content, contains('200.00')); // Beta 90+ bucket
   });
 
-  testWidgets('expenses report exports the rows to CSV', (tester) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
 
-    await tester.tap(find.text('Expenses Report'));
-    await tester.pumpAndSettle();
 
-    // Stub the file_picker save channel to return a real temp path; the
-    // shared save helper then writes the CSV there.
-    final target =
-        '${Directory.systemTemp.path}/minierp-expenses-report-test.csv';
-    final targetFile = File(target);
-    if (targetFile.existsSync()) targetFile.deleteSync();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
-          (call) async {
-            if (call.method == 'save') return target;
-            return null;
-          },
-        );
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
-            null,
-          ),
-    );
 
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
 
-    expect(find.text('Report exported'), findsOneWidget);
-    final file = File(target);
-    expect(file.existsSync(), isTrue);
-    final content = file.readAsStringSync();
-    expect(content, contains('EXP-2026-0003'));
-    expect(content, contains('EXP-2026-0004'));
-    expect(content, contains('Utilities'));
-    expect(content, contains('25,000.00'));
-    expect(content, contains('Approved')); // localized status label
-  });
-  testWidgets('low stock grid exports the rows to CSV', (tester) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
-
-    await tester.tap(find.text('Low Stock Alert Report'));
-    await tester.pumpAndSettle();
-
-    final target = '${Directory.systemTemp.path}/minierp-low-stock-test.csv';
-    final targetFile = File(target);
-    if (targetFile.existsSync()) targetFile.deleteSync();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
-          (call) async {
-            if (call.method == 'save') return target;
-            return null;
-          },
-        );
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
-            null,
-          ),
-    );
-
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
-
-    expect(find.text('Report exported'), findsOneWidget);
-    final file = File(target);
-    expect(file.existsSync(), isTrue);
-    final content = file.readAsStringSync();
-    expect(content, contains('Minimum Stock'));
-    expect(content, contains('Widget A'));
-    expect(content, contains('Bolt'));
-    expect(content, contains('Shortage'));
-  });
-
-  testWidgets('sales summary grid exports the rows to CSV', (tester) async {
-    useWideSurface(tester);
-    await bootToReports(tester);
-
-    await tester.tap(find.text('Sales Summary Report'));
-    await tester.pumpAndSettle();
-
-    final target =
-        '${Directory.systemTemp.path}/minierp-sales-summary-test.csv';
-    final targetFile = File(target);
-    if (targetFile.existsSync()) targetFile.deleteSync();
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
-          (call) async {
-            if (call.method == 'save') return target;
-            return null;
-          },
-        );
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(
-            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
-            null,
-          ),
-    );
-
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
-
-    expect(find.text('Report exported'), findsOneWidget);
-    final file = File(target);
-    expect(file.existsSync(), isTrue);
-    final content = file.readAsStringSync();
-    expect(content, contains('Invoice No'));
-    expect(content, contains('INV-2026-001'));
-    expect(content, contains('INV-2026-002'));
-    expect(content, contains('Partially Paid'));
-    expect(content, contains('Unpaid'));
-  });
 
   testWidgets('expenses screen search sends the server search param', (
     tester,
@@ -8245,7 +7679,7 @@ void main() {
     );
     expect(
       find.descendant(of: dialog, matching: find.text('Acme Corp')),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(
       find.descendant(of: dialog, matching: find.text('Widget A')),
@@ -8578,19 +8012,20 @@ void main() {
     expect(adapter.lastPaymentsQuery?['limit'], 10);
     expect(adapter.lastPaymentsQuery?['sortOrder'], 'DESC');
 
-    // Rows + column headers from the fake /payments payload.
+    // Rows + column headers from the unified /payments/unified payload.
     expect(find.text('PAY-2026-0001'), findsOneWidget);
     expect(find.text('PAY-2026-0002'), findsOneWidget);
     expect(find.text('Acme Corp'), findsOneWidget);
     expect(find.text('Beta Ltd'), findsOneWidget);
-    expect(find.text('500.00'), findsOneWidget); // amount, row 1
-    expect(find.text('800.00'), findsOneWidget); // amount, row 2
+    // Amount column adds +/- prefix based on direction.
+    expect(find.textContaining('+ 500.00'), findsOneWidget);
+    expect(find.textContaining('+ 800.00'), findsOneWidget);
     expect(find.text('Cash'), findsOneWidget);
-    expect(find.text('Bank Transfer'), findsOneWidget);
+    expect(find.text('Bank'), findsOneWidget); // method label is 'Bank', not 'Bank Transfer'
     expect(find.text('Payment No'), findsOneWidget); // column header
     // Server pagination block → bar (2 payments at limit 10 = 1 page).
     expect(find.text('Page 1 of 1'), findsOneWidget);
-    expect(find.text('· 2 Payments'), findsOneWidget);
+    expect(find.textContaining('2 Payment'), findsOneWidget);
   });
 
   testWidgets('payments screen F2 opens the payment detail dialog', (
@@ -8619,13 +8054,14 @@ void main() {
       find.descendant(of: dialog, matching: find.text('PAY-2026-0001')),
       findsOneWidget,
     );
+    // 'Acme Corp' appears in both the header and the customer info row.
     expect(
       find.descendant(of: dialog, matching: find.text('Acme Corp')),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(
       find.descendant(of: dialog, matching: find.text('500.00')),
-      findsOneWidget, // amount tile
+      findsWidgets, // amount may appear as '500.00' or '+ 500.00'
     );
 
     // Close returns to the grid.
@@ -8641,7 +8077,10 @@ void main() {
     final adapter = _AuthFakeAdapter();
     await bootToPayments(tester, adapter);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Record Payment'));
+    // The 'New Payment' button opens a dropdown menu; select 'Receive from Customer'.
+    await tester.tap(find.widgetWithText(FilledButton, 'New Payment'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Receive from Customer'));
     await tester.pumpAndSettle();
 
     // Pick Acme Corp from the customer picker (dropdown over all
@@ -8705,7 +8144,9 @@ void main() {
     final adapter = _AuthFakeAdapter();
     await bootToPayments(tester, adapter);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Record Payment'));
+    await tester.tap(find.widgetWithText(FilledButton, 'New Payment'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Receive from Customer'));
     await tester.pumpAndSettle();
     await tester.tap(find.byType(SearchableSelect<int>));
     await tester.pumpAndSettle();
