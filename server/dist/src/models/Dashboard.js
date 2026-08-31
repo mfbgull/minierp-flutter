@@ -506,6 +506,14 @@ function getKPI(db, metric, fromDate, toDate) {
       `).get();
             return { metric, value: result.count, unit: 'count', label: 'Low Stock Items' };
         }
+        case 'outstanding_loans': {
+            const result = db.prepare(`
+        SELECT COALESCE(SUM(balance), 0) as total
+        FROM employee_loans
+        WHERE status IN ('active', 'overdue')
+      `).get();
+            return { metric, value: result.total, unit: 'currency', label: 'Outstanding Loans' };
+        }
         default:
             return { metric, value: 0, unit: '', label: 'Unknown Metric' };
     }

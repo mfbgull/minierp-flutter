@@ -24,6 +24,7 @@ import 'detail_labels.dart';
 import 'detail_rows.dart';
 import 'ledger_table.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// What differs between the customer and supplier statements: the
 /// localized strings and the `autoDispose` family provider that fetches
@@ -73,10 +74,11 @@ class StatementDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final statement = ref.watch(config.statementProvider(entryId));
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 680),
-        child: switch (statement) {
+    return MovableDialog(
+      dialogId: 'statement',
+      maxWidth: 720,
+      maxHeight: 680,
+      child: switch (statement) {
           AsyncData(:final value) => _StatementBody(
             entryName: entryName,
             statement: value,
@@ -92,7 +94,6 @@ class StatementDialog extends ConsumerWidget {
             child: Center(child: CircularProgressIndicator()),
           ),
         },
-      ),
     );
   }
 }

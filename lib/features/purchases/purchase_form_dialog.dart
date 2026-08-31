@@ -40,6 +40,7 @@ import '../purchase_orders/purchase_order_providers.dart'
 import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'purchase_providers.dart' show purchasesProvider;
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the new-purchase dialog (create only).
 Future<void> showPurchaseFormDialog(BuildContext context) {
@@ -746,10 +747,11 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
     final suppliers =
         ref.watch(poSupplierOptionsProvider).valueOrNull ?? const <Supplier>[];
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 760),
-        child: Form(
+    return MovableDialog(
+      dialogId: 'purchase_form',
+      maxWidth: 620,
+      maxHeight: 760,
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -848,7 +850,6 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

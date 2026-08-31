@@ -22,6 +22,7 @@ import 'detail_error.dart';
 import 'detail_labels.dart';
 import 'ledger_table.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// What differs between the customer and supplier ledgers: the localized
 /// strings and the `autoDispose` family provider that fetches the entries
@@ -77,10 +78,11 @@ class LedgerDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ledger = ref.watch(config.entriesProvider(entryId));
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 640),
-        child: switch (ledger) {
+    return MovableDialog(
+      dialogId: 'ledger',
+      maxWidth: 720,
+      maxHeight: 640,
+      child: switch (ledger) {
           AsyncData(:final value) => _LedgerBody(
             entryName: entryName,
             entries: value,
@@ -97,7 +99,6 @@ class LedgerDialog extends ConsumerWidget {
             child: Center(child: CircularProgressIndicator()),
           ),
         },
-      ),
     );
   }
 }

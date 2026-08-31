@@ -194,8 +194,74 @@ class EmployeeDocument {
   final String? updatedAt;
 }
 
-/// One row of `GET /employees/:id/salary/history` — `salary_payments`
-/// table rows.
+/// Aggregated salary history row — one per pay_period (month).
+/// From `GET /employees/:id/salary/history`.
+class SalaryMonthSummary {
+  const SalaryMonthSummary({
+    required this.payPeriod,
+    required this.employeeSalary,
+    required this.totalPaid,
+    required this.remaining,
+    required this.status,
+    required this.paymentCount,
+    this.advanceCarryover = 0,
+    this.advanceSourcePeriod,
+    this.firstPaymentDate,
+    this.lastPaymentDate,
+  });
+
+  factory SalaryMonthSummary.fromJson(Map<String, dynamic> json) =>
+      SalaryMonthSummary(
+        payPeriod: asString(json['pay_period']) ?? '',
+        employeeSalary: asNum(json['employee_salary']) ?? 0,
+        totalPaid: asNum(json['total_paid']) ?? 0,
+        remaining: asNum(json['remaining']) ?? 0,
+        status: asString(json['status']) ?? 'partial',
+        paymentCount: asInt(json['payment_count']) ?? 0,
+        advanceCarryover: asNum(json['advance_carryover']) ?? 0,
+        advanceSourcePeriod: asString(json['advance_source_period']),
+        firstPaymentDate: asString(json['first_payment_date']),
+        lastPaymentDate: asString(json['last_payment_date']),
+      );
+
+  final String payPeriod;
+  final num employeeSalary;
+  final num totalPaid;
+  final num remaining;
+  final String status;
+  final int paymentCount;
+  final num advanceCarryover;
+  final String? advanceSourcePeriod;
+  final String? firstPaymentDate;
+  final String? lastPaymentDate;
+
+  /// Display label for the source month, e.g. "August 2026".
+  String? get displaySourceMonth {
+    if (advanceSourcePeriod == null) return null;
+    final parts = advanceSourcePeriod!.split('-');
+    if (parts.length != 2) return advanceSourcePeriod;
+    final month = int.tryParse(parts[1]) ?? 0;
+    const months = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${months[month]} ${parts[0]}';
+  }
+
+  /// Display label like "August 2026".
+  String get displayMonth {
+    final parts = payPeriod.split('-');
+    if (parts.length != 2) return payPeriod;
+    final month = int.tryParse(parts[1]) ?? 0;
+    const months = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${months[month]} ${parts[0]}';
+  }
+}
+
+/// Individual payment within a month — from `GET /employees/:id/salary/month/:payPeriod`.
 class SalaryPayment {
   const SalaryPayment({
     required this.id,
@@ -207,6 +273,7 @@ class SalaryPayment {
     this.notes,
     this.journalEntryId,
     this.paidBy,
+    this.paymentType = 'full',
     this.createdAt,
   });
 
@@ -220,6 +287,7 @@ class SalaryPayment {
     notes: asString(json['notes']),
     journalEntryId: asInt(json['journal_entry_id']),
     paidBy: asInt(json['paid_by']),
+    paymentType: asString(json['payment_type']) ?? 'full',
     createdAt: asString(json['created_at']),
   );
 
@@ -232,5 +300,37 @@ class SalaryPayment {
   final String? notes;
   final int? journalEntryId;
   final int? paidBy;
+  final String paymentType;
   final String? createdAt;
+}
+
+/// Month detail response — from `GET /employees/:id/salary/month/:payPeriod`.
+class SalaryMonthDetail {
+  const SalaryMonthDetail({
+    required this.payPeriod,
+    required this.employeeSalary,
+    required this.totalPaid,
+    required this.remaining,
+    required this.advanceCarryover,
+    required this.payments,
+  });
+
+  factory SalaryMonthDetail.fromJson(Map<String, dynamic> json) =>
+      SalaryMonthDetail(
+        payPeriod: asString(json['pay_period']) ?? '',
+        employeeSalary: asNum(json['employee_salary']) ?? 0,
+        totalPaid: asNum(json['total_paid']) ?? 0,
+        remaining: asNum(json['remaining']) ?? 0,
+        advanceCarryover: asNum(json['advance_carryover']) ?? 0,
+        payments: (json['payments'] as List<dynamic>? ?? [])
+            .map((p) => SalaryPayment.fromJson(p as Map<String, dynamic>))
+            .toList(),
+      );
+
+  final String payPeriod;
+  final num employeeSalary;
+  final num totalPaid;
+  final num remaining;
+  final num advanceCarryover;
+  final List<SalaryPayment> payments;
 }

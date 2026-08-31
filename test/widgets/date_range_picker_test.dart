@@ -477,11 +477,11 @@ void main() {
       await tester.tap(find.byType(DateRangeFilter));
       await tester.pumpAndSettle();
 
-      // Reduced preset set — no week/span presets.
+      // Reduced preset set — fewer than range mode (no custom range).
       expect(find.text('Today'), findsWidgets);
       expect(find.text('Yesterday'), findsWidgets);
+      expect(find.text('This week'), findsWidgets);
       expect(find.text('This month'), findsWidgets);
-      expect(find.text('This week'), findsNothing);
       expect(find.text('Custom range'), findsNothing);
 
       // Tap a day → commits immediately.

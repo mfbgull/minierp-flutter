@@ -29,6 +29,7 @@ import 'quotation_form_dialog.dart';
 import 'quotation_pdf.dart' show buildA4QuotationPdf;
 import 'quotation_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the read-only detail dialog for [quotationId].
 Future<void> showQuotationDetailDialog(
@@ -50,10 +51,11 @@ class _QuotationDetailDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(quotationDetailProvider(quotationId));
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640, maxHeight: 680),
-        child: switch (detail) {
+    return MovableDialog(
+      dialogId: 'quotation_detail',
+      maxWidth: 640,
+      maxHeight: 680,
+      child: switch (detail) {
           AsyncData(:final value) => _DetailBody(detail: value),
           AsyncError(:final error) => DetailError(
             message: error is ApiError ? error.message : '$error',
@@ -65,7 +67,6 @@ class _QuotationDetailDialog extends ConsumerWidget {
             child: Center(child: CircularProgressIndicator()),
           ),
         },
-      ),
     );
   }
 }

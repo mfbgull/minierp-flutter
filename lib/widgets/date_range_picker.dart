@@ -937,7 +937,10 @@ class _RangePopover extends ConsumerWidget {
       return const [
         DatePreset.today,
         DatePreset.yesterday,
+        DatePreset.thisWeek,
+        DatePreset.lastWeek,
         DatePreset.thisMonth,
+        DatePreset.lastMonth,
       ];
     }
     return const [

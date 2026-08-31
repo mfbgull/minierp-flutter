@@ -22,6 +22,16 @@ router.delete('/:id', (0, requirePermission_1.requirePermission)('employees', 'd
 // Salary payment routes
 router.post('/:id/salary/pay', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.paySalary);
 router.get('/:id/salary/history', (0, requirePermission_1.requirePermission)('employees', 'read'), employeeController_1.default.getSalaryHistory);
+router.get('/:id/salary/month/:payPeriod', (0, requirePermission_1.requirePermission)('employees', 'read'), employeeController_1.default.getSalaryMonthDetail);
+router.delete('/:id/salary/:paymentId', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.deleteSalaryPayment);
+// Loan routes
+router.get('/:id/loans', (0, requirePermission_1.requirePermission)('employees', 'read'), employeeController_1.default.getLoans);
+router.post('/:id/loans', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.createLoan);
+router.get('/:id/loans/:loanId', (0, requirePermission_1.requirePermission)('employees', 'read'), employeeController_1.default.getLoanDetail);
+router.post('/:id/loans/:loanId/repay', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.repayLoan);
+router.post('/:id/loans/:loanId/write-off', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.writeOffLoan);
+router.delete('/:id/loans/:loanId', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.deleteLoan);
+router.post('/:id/loans/:loanId/repayments/:repaymentId/void', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.voidLoanRepayment);
 // Document sub-routes
 router.get('/:id/documents', (0, requirePermission_1.requirePermission)('employees', 'read'), employeeController_1.default.getEmployeeDocuments);
 router.post('/:id/documents', (0, requirePermission_1.requirePermission)('employees', 'update'), upload_1.uploadEmployeeDoc.single('file'), employeeController_1.default.addEmployeeDocument);

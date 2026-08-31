@@ -4958,14 +4958,43 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'success': true,
         'data': [
           {
-            'id': 7,
-            'employee_id': int.parse(salaryHistoryId.group(1)!),
-            'amount': 45000,
-            'payment_date': '2026-08-01',
-            'payment_method': 'bank',
-            'reference_no': 'REF-1',
+            'pay_period': '2026-08',
+            'employee_salary': 45000,
+            'total_paid': 45000,
+            'remaining': 0,
+            'status': 'paid',
+            'payment_count': 1,
+            'first_payment_date': '2026-08-01',
+            'last_payment_date': '2026-08-01',
           },
         ],
+      });
+    }
+    // Salary month detail
+    final salaryMonthId = RegExp(
+      r'^/employees/(\d+)/salary/month/([\d-]+)$',
+    ).firstMatch(options.path);
+    if (salaryMonthId != null && options.method == 'GET') {
+      return _json({
+        'success': true,
+        'data': {
+          'pay_period': salaryMonthId.group(2),
+          'employee_salary': 45000,
+          'total_paid': 45000,
+          'remaining': 0,
+          'advance_carryover': 0,
+          'payments': [
+            {
+              'id': 7,
+              'employee_id': int.parse(salaryMonthId.group(1)!),
+              'amount': 45000,
+              'payment_date': '2026-08-01',
+              'payment_method': 'bank',
+              'reference_no': 'REF-1',
+              'payment_type': 'full',
+            },
+          ],
+        },
       });
     }
     final employeeDocsId = RegExp(
@@ -5559,7 +5588,7 @@ void main() {
     final cashEntry = (body!['accounts'] as List).cast<Map<String, dynamic>>()
         .firstWhere((a) => a['key'] == 'cash');
     expect(cashEntry['amount'], 25000);
-    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byKey(const Key('confirm_dialog')), findsNothing);
     expect(find.text('Opening balances saved'), findsOneWidget);
   });
 
@@ -9210,7 +9239,7 @@ void main() {
     // Choose Delete → the confirm dialog appears → confirm it.
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
     await tester.pumpAndSettle();
 
@@ -9265,7 +9294,7 @@ void main() {
     // The toolbar's Fix Balances button → confirm dialog.
     await tester.tap(find.text('Fix Balances'));
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
 
     // Confirm via the dialog's FilledButton (rendered last, above the
     // toolbar's same-labelled button).
@@ -10659,7 +10688,7 @@ void main() {
       find.descendant(of: find.byType(Dialog), matching: find.text('Submit')),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
     expect(
       find.text(
         'Submit this purchase order? It will be locked and posted to the supplier ledger.',
@@ -10668,7 +10697,7 @@ void main() {
     );
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byKey(const Key('confirm_dialog')),
         matching: find.widgetWithText(FilledButton, 'Submit'),
       ),
     );
@@ -10711,7 +10740,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byKey(const Key('confirm_dialog')),
         matching: find.widgetWithText(FilledButton, 'Submit'),
       ),
     );
@@ -10753,7 +10782,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byKey(const Key('confirm_dialog')),
         matching: find.widgetWithText(FilledButton, 'Submit'),
       ),
     );
@@ -10874,7 +10903,7 @@ void main() {
     // Confirm dialog → Delete.
     await tester.tap(find.widgetWithText(OutlinedButton, 'Delete'));
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
     expect(
       find.text(
         'Are you sure you want to delete this purchase order? This cannot be undone.',
@@ -10883,7 +10912,7 @@ void main() {
     );
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byKey(const Key('confirm_dialog')),
         matching: find.widgetWithText(FilledButton, 'Delete'),
       ),
     );
@@ -11379,7 +11408,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
     expect(
       find.text(
         'Complete this count? Adjustments will be posted for any items with variances.',
@@ -11388,7 +11417,7 @@ void main() {
     );
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byKey(const Key('confirm_dialog')),
         matching: find.widgetWithText(FilledButton, 'Complete Count'),
       ),
     );
@@ -11447,14 +11476,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
     expect(
       find.text('Cancel this count? It cannot be completed afterward.'),
       findsOneWidget,
     );
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byKey(const Key('confirm_dialog')),
         matching: find.widgetWithText(FilledButton, 'Cancel Count'),
       ),
     );
@@ -11513,7 +11542,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byKey(const Key('confirm_dialog')),
         matching: find.widgetWithText(FilledButton, 'Complete Count'),
       ),
     );
@@ -11722,14 +11751,14 @@ void main() {
     // Confirm dialog → Delete.
     await tester.tap(find.widgetWithText(OutlinedButton, 'Delete'));
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
     expect(
       find.text('Delete this warehouse? It cannot be undone.'),
       findsOneWidget,
     );
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byKey(const Key('confirm_dialog')),
         matching: find.widgetWithText(FilledButton, 'Delete'),
       ),
     );
@@ -11767,7 +11796,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byKey(const Key('confirm_dialog')),
         matching: find.widgetWithText(FilledButton, 'Delete'),
       ),
     );
@@ -12089,7 +12118,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byKey(const Key('confirm_dialog')),
         matching: find.widgetWithText(FilledButton, 'Reverse Adjustment'),
       ),
     );
@@ -12177,7 +12206,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byKey(const Key('confirm_dialog')),
         matching: find.widgetWithText(FilledButton, 'Reverse Adjustment'),
       ),
     );
@@ -13085,11 +13114,12 @@ void main() {
     expect(find.text('EMP-001 · Ali Khan'), findsOneWidget);
     expect(find.text('Operator · Production'), findsOneWidget);
 
-    // Salary History tab shows the fetched payment row.
+    // Salary History tab shows the fetched monthly aggregated row.
     await tester.tap(find.text('Salary History'));
     await tester.pumpAndSettle();
     expect(adapter.salaryHistoryFetchCount, greaterThanOrEqualTo(1));
-    expect(find.text('REF-1'), findsOneWidget);
+    expect(find.text('August 2026'), findsOneWidget);
+    expect(find.text('Paid'), findsOneWidget);
 
     // Documents tab lists the fetched document.
     await tester.tap(find.text('Documents'));

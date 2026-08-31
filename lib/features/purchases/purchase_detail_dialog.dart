@@ -21,6 +21,7 @@ import '../../widgets/payment_history_section.dart'
     show PaymentHistorySection;
 import '../suppliers/supplier_payment_modal.dart' show showSupplierPaymentModal;
 import 'purchase_providers.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the detail dialog for [purchaseId].
 Future<void> showPurchaseDetailDialog(
@@ -41,10 +42,11 @@ class _PurchaseDetailDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(purchaseDetailProvider(purchaseId));
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 620),
-        child: switch (detail) {
+    return MovableDialog(
+      dialogId: 'purchase_detail',
+      maxWidth: 560,
+      maxHeight: 620,
+      child: switch (detail) {
           AsyncData(:final value) => _DetailBody(detail: value),
           AsyncError(:final error) => DetailError(
             message: error is ApiError ? error.message : '$error',
@@ -56,7 +58,6 @@ class _PurchaseDetailDialog extends ConsumerWidget {
             child: Center(child: CircularProgressIndicator()),
           ),
         },
-      ),
     );
   }
 }

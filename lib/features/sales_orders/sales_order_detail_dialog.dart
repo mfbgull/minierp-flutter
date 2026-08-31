@@ -29,6 +29,7 @@ import 'sales_order_form_dialog.dart';
 import 'sales_order_pdf.dart' show buildA4SalesOrderPdf;
 import 'sales_order_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the read-only detail dialog for [soId].
 Future<void> showSalesOrderDetailDialog(
@@ -49,10 +50,11 @@ class _SalesOrderDetailDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(salesOrderDetailProvider(soId));
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640, maxHeight: 680),
-        child: switch (detail) {
+    return MovableDialog(
+      dialogId: 'sales_order_detail',
+      maxWidth: 640,
+      maxHeight: 680,
+      child: switch (detail) {
           AsyncData(:final value) => _DetailBody(detail: value),
           AsyncError(:final error) => DetailError(
             message: error is ApiError ? error.message : '$error',
@@ -64,7 +66,6 @@ class _SalesOrderDetailDialog extends ConsumerWidget {
             child: Center(child: CircularProgressIndicator()),
           ),
         },
-      ),
     );
   }
 }

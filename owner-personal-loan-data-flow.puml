@@ -1,0 +1,145 @@
+@startuml
+!theme plain
+title Owner Personal Loans — Data Flow
+
+|#E8F5E9| Create Loan |
+start
+:Owner opens loan create dialog;
+:Selects or creates borrower;
+:Enters amount, currency, date,\\npurpose, due date (optional);
+:Submits;
+:Backend: generateDocNo(db, 'PL')\\n→ PL-2026-0001;
+:Backend: Auto-create borrower\\nif not in owner_personal_loan_borrowers;
+:INSERT INTO owner_personal_loans\\n(balance = amount, status = 'pending');
+:Return created loan;
+:Frontend: Refresh tab + summary cards;
+stop
+
+|#E3F2FD| Record Repayment |
+start
+:Owner opens loan detail dialog;
+:Clicks [Add Repayment];
+:Enters amount, date, notes;
+:Submits;
+:Backend: Validate amount <= balance;
+:INSERT INTO owner_personal_loan_repayments;
+:UPDATE owner_personal_loans\\nSET balance = balance - amount;
+if (balance = 0?) then (yes)
+  :status = 'settled';
+else (no)
+  :status = 'partial';
+endif
+:Return updated balance + status;
+:Frontend: Refresh detail + tab + summary;
+stop
+
+|#FFF3E0| Write Off Loan |
+start
+:Owner clicks [⋮] → [Write Off];
+:Confirmation dialog: "Write off Rs. X?";
+:Backend: UPDATE owner_personal_loans\\nSET status = 'written_off',\\nbalance = 0;
+:No GL entry;
+:Frontend: Refresh tab + summary;
+stop
+
+|#FCE4EC| Delete Loan |
+start
+:Owner clicks [⋮] → [Delete];
+if (Has repayments?) then (yes)
+  :Reject: "Cannot delete loan\\nwith repayment history";
+else (no)
+  :Confirmation dialog;
+  :DELETE FROM owner_personal_loans;
+  :No GL voiding needed;
+  :Frontend: Refresh tab + summary;
+endif
+stop
+
+|#F3E5F5| Delete Repayment |
+start
+:Owner opens loan detail dialog;
+:Clicks [🗑] on a repayment row;
+:Confirmation dialog;
+:DELETE FROM owner_personal_loan_repayments;
+:Restore balance: balance += amount;
+:Recompute status;
+if (balance = amount?) then (yes)
+  :status = 'pending';
+elseif (balance > 0?) then (yes)
+  :status = 'partial';
+else (no)
+  :status = 'settled';
+endif
+:Frontend: Refresh detail + tab + summary;
+stop
+
+|#E1F5FE| Void / Revert Status |
+start
+:Owner clicks [⋮] → [Void];
+if (Status?) then (settled)
+  :Recompute balance from repayments;
+  :status = 'partial';
+elseif (written_off) then
+  :Restore balance from repayments;
+  :status = 'partial';
+endif
+:Frontend: Refresh tab + summary;
+stop
+
+|#F3E5F5| Edit Loan |
+start
+:Owner clicks [⋮] → [Edit];
+:Opens create dialog in edit mode;
+:Modifies fields;
+if (Amount changed?) then (yes)
+  :Validate amount >= repaid amount;
+else (no)
+endif
+:UPDATE owner_personal_loans;
+:No GL impact;
+:Frontend: Refresh tab + summary;
+stop
+
+|#E8EAF6| Merge Borrowers |
+start
+:Owner opens Manage Borrowers;
+:Clicks [⋮] → [Merge Into…];
+:Selects target borrower;
+:Confirmation dialog;
+:Backend: UPDATE owner_personal_loans\\nSET borrower_id = target_id,\\nborrower_name = target_name\\nWHERE borrower_id = source_id;
+:Backend: UPDATE owner_personal_loan_borrowers\\nSET is_active = 0\\nWHERE id = source_id;
+:Frontend: Refresh borrower list + loan list;
+stop
+
+|#FFF9C4| Unlink Borrower |
+start
+:Owner opens Manage Borrowers;
+:Clicks [⋮] → [Unlink];
+:Confirmation dialog;
+:Backend: UPDATE owner_personal_loan_borrowers\\nSET linked_type = NULL,\\nlinked_id = NULL\\nWHERE id = borrower_id;
+:Existing loans keep borrower_type snapshot;
+:Frontend: Refresh borrower list;
+stop
+
+|#FFECB3| Deactivate Borrower |
+start
+:Owner opens Manage Borrowers;
+:Clicks [⋮] → [Deactivate];
+if (Has loans?) then (yes)
+  :Reject: "Cannot deactivate\\nborrower with existing loans";
+else (no)
+  :Confirmation dialog;
+  :UPDATE owner_personal_loan_borrowers\\nSET is_active = 0;
+  :Borrower disappears from dropdown;
+endif
+stop
+
+|#C8E6C9| Reactivate Borrower |
+start
+:Owner filters to inactive borrowers;
+:Clicks [⋮] → [Reactivate];
+:UPDATE owner_personal_loan_borrowers\\nSET is_active = 1;
+:Borrower reappears in dropdown;
+stop
+
+@enduml

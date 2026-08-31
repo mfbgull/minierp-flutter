@@ -19,6 +19,7 @@ import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
 import 'employee_providers.dart';
 import 'employee_repository.dart' show employeeRepositoryProvider;
+import '../../widgets/movable_dialog.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Extensions the server's upload filter accepts (`documentFilter` in
@@ -181,9 +182,9 @@ class _EmployeeDocumentDialogState
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
+    return MovableDialog(
+      dialogId: 'employee_document',
+      maxWidth: 480,
         child: Form(
           key: _formKey,
           child: Column(
@@ -362,8 +363,7 @@ class _EmployeeDocumentDialogState
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _dateField({

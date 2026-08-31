@@ -120,6 +120,11 @@ import '../owner_equity/owner_equity_providers.dart'
         equitySummaryProvider,
         ownerCapitalProvider,
         ownerWithdrawalsProvider;
+import '../owner_equity/personal_loan_providers.dart'
+    show
+        borrowersProvider,
+        personalLoanSummaryProvider,
+        personalLoansProvider;
 import '../settings/settings_providers.dart' show settingsProvider;
 import '../suppliers/supplier_providers.dart' show suppliersProvider;
 
@@ -177,7 +182,10 @@ final Map<String, ModuleRefresh> moduleRefreshOnVisit = {
     ..invalidate(allOwnerCapitalProvider)
     ..invalidate(ownerWithdrawalsProvider)
     ..invalidate(allOwnerWithdrawalsProvider)
-    ..invalidate(equitySummaryProvider),
+    ..invalidate(equitySummaryProvider)
+    ..invalidate(personalLoansProvider)
+    ..invalidate(personalLoanSummaryProvider)
+    ..invalidate(borrowersProvider),
   '/suppliers': (ref) => ref.invalidate(suppliersProvider),
   '/production': (ref) => ref
     ..invalidate(productionsProvider)
@@ -281,6 +289,10 @@ final Map<String, List<ModuleRefresh>> moduleTabRefreshOnVisit = {
       ..invalidate(ownerWithdrawalsProvider)
       ..invalidate(allOwnerWithdrawalsProvider)
       ..invalidate(equitySummaryProvider),
+    (ref) => ref
+      ..invalidate(personalLoansProvider)
+      ..invalidate(personalLoanSummaryProvider)
+      ..invalidate(borrowersProvider),
   ],
   '/purchasing': [
     (ref) => ref

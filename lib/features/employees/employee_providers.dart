@@ -94,7 +94,7 @@ final employeeDetailProvider = FutureProvider.autoDispose
 
 /// Salary history for one employee (`GET /employees/:id/salary/history`).
 final employeeSalaryHistoryProvider = FutureProvider.autoDispose
-    .family<List<SalaryPayment>, int>((ref, employeeId) async {
+    .family<List<SalaryMonthSummary>, int>((ref, employeeId) async {
       final result = await ref
           .watch(employeeRepositoryProvider)
           .salaryHistory(employeeId);
@@ -103,6 +103,8 @@ final employeeSalaryHistoryProvider = FutureProvider.autoDispose
         ApiFailure(:final error) => throw error,
       };
     });
+
+
 
 /// Documents for one employee (`GET /employees/:id/documents`).
 final employeeDocumentsProvider = FutureProvider.autoDispose

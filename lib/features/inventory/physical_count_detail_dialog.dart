@@ -22,6 +22,7 @@ import '../../widgets/detail_rows.dart' show DetailInfoRows;
 import '../../widgets/status_badge.dart';
 import 'inventory_providers.dart';
 import 'record_count_dialog.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the read-only detail dialog for the count [countId].
 Future<void> showPhysicalCountDetailDialog(
@@ -42,10 +43,11 @@ class _PhysicalCountDetailDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(physicalCountDetailProvider(countId));
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
-        child: switch (detail) {
+    return MovableDialog(
+      dialogId: 'physical_count_detail',
+      maxWidth: 560,
+      maxHeight: 640,
+      child: switch (detail) {
           AsyncData(:final value) => _DetailBody(detail: value),
           AsyncError(:final error) => DetailError(
             message: error is ApiError ? error.message : '$error',
@@ -57,7 +59,6 @@ class _PhysicalCountDetailDialog extends ConsumerWidget {
             child: Center(child: CircularProgressIndicator()),
           ),
         },
-      ),
     );
   }
 }

@@ -5917,4 +5917,201 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get paymentsUnknownRow => 'غلط / پرانا ریکارڈ';
+
+  @override
+  String get equityPersonalLoans => 'ذاتی قرضے';
+
+  @override
+  String get equityPersonalLoansDescription =>
+      'مالک کے ذاتی قرضوں کو ٹریک کریں';
+
+  @override
+  String get equityPersonalLoanNew => 'نیا قرضہ';
+
+  @override
+  String get equityPersonalLoanEdit => 'قرضہ ترمیم';
+
+  @override
+  String get equityPersonalLoanDetail => 'قرضے کی تفصیل';
+
+  @override
+  String get equityPersonalLoanBorrower => 'قرضہ لینے والا';
+
+  @override
+  String get equityPersonalLoanBorrowerName => 'نام';
+
+  @override
+  String get equityPersonalLoanBorrowerPhone => 'فون';
+
+  @override
+  String get equityPersonalLoanBorrowerLinkTo => 'لنک کریں';
+
+  @override
+  String get equityPersonalLoanBorrowerTypeCustomer => 'گاہک';
+
+  @override
+  String get equityPersonalLoanBorrowerTypeSupplier => 'سپلائر';
+
+  @override
+  String get equityPersonalLoanBorrowerRequired => 'قرضہ لینے والا ضروری ہے';
+
+  @override
+  String get equityPersonalLoanAddBorrower => 'نیا قرضہ لینے والا شامل کریں';
+
+  @override
+  String get equityPersonalLoanManageBorrowers => 'قرضہ لینے والوں کا انتظام';
+
+  @override
+  String get equityPersonalLoanEditBorrower => 'ترمیم کریں';
+
+  @override
+  String get equityPersonalLoanMergeBorrower => 'ملائیں...';
+
+  @override
+  String get equityPersonalLoanUnlinkBorrower => 'لنک ہٹائیں';
+
+  @override
+  String get equityPersonalLoanUnlinkBorrowerBody =>
+      'قرضہ لینے والا ریکارڈ رہے گا لیکن لنک نہیں رہے گا۔';
+
+  @override
+  String get equityPersonalLoanDeactivateBorrower => 'غیر فعال کریں';
+
+  @override
+  String get equityPersonalLoanDeactivateBorrowerConfirm => 'غیر فعال کریں؟';
+
+  @override
+  String get equityPersonalLoanReactivateBorrower => 'فعال کریں';
+
+  @override
+  String get equityPersonalLoanBorrowerMerged => 'کامیابی سے ملا دیا گیا';
+
+  @override
+  String get equityPersonalLoanBorrowerUnlinked => 'لنک ہٹا دیا گیا';
+
+  @override
+  String get equityPersonalLoanBorrowerDeactivated => 'غیر فعال ہو گیا';
+
+  @override
+  String get equityPersonalLoanBorrowerReactivated => 'فعال ہو گیا';
+
+  @override
+  String get equityPersonalLoanBorrowerUpdated => 'ترمیم ہو گئی';
+
+  @override
+  String get equityPersonalLoanAmount => 'رقم';
+
+  @override
+  String get equityPersonalLoanBalance => 'باقی رقم';
+
+  @override
+  String get equityPersonalLoanCurrency => 'کرنسی';
+
+  @override
+  String get equityPersonalLoanDateGiven => 'تاریخ';
+
+  @override
+  String get equityPersonalLoanDueDate => 'آخری تاریخ';
+
+  @override
+  String get equityPersonalLoanPurpose => 'مقصد';
+
+  @override
+  String get equityPersonalLoanNotes => 'نوٹس';
+
+  @override
+  String get equityPersonalLoanLoanNo => 'قرضے نمبر';
+
+  @override
+  String get equityPersonalLoanStatusPending => 'زیر التوا';
+
+  @override
+  String get equityPersonalLoanStatusPartial => 'جزوی';
+
+  @override
+  String get equityPersonalLoanStatusSettled => 'ادا شدہ';
+
+  @override
+  String get equityPersonalLoanStatusWrittenOff => 'مال ہو چکا';
+
+  @override
+  String get equityPersonalLoanTotalLent => 'کل دیا گیا';
+
+  @override
+  String get equityPersonalLoanTotalRepaid => 'واپس شدہ';
+
+  @override
+  String get equityPersonalLoanTotalPending => 'باقی';
+
+  @override
+  String get equityPersonalLoanActiveCount => 'فعال';
+
+  @override
+  String get equityPersonalLoanNoLoans => 'کوئی ذاتی قرضہ ریکارڈ نہیں';
+
+  @override
+  String get equityPersonalLoanNoBorrowers => 'کوئی قرضہ لینے والا نہیں ملا';
+
+  @override
+  String get equityPersonalLoanNoRepayments => 'ابھی تک کوئی ادائیگی نہیں';
+
+  @override
+  String get equityPersonalLoanCreated => 'قرضہ کامیابی سے ریکارڈ ہو گیا';
+
+  @override
+  String get equityPersonalLoanUpdated => 'قرضے میں ترمیم ہو گئی';
+
+  @override
+  String get equityPersonalLoanDeleted => 'قرضہ حذف ہو گیا';
+
+  @override
+  String get equityPersonalLoanDeleteConfirm => 'یہ قرضہ حذف کریں؟';
+
+  @override
+  String get equityPersonalLoanRepaymentAdded => 'ادائیگی ریکارڈ ہو گئی';
+
+  @override
+  String get equityPersonalLoanRepaymentDeleteConfirm => 'ادائیگی حذف کریں';
+
+  @override
+  String get equityPersonalLoanRepaymentExceeds => 'ادائیگی قرضے سے زیادہ ہے';
+
+  @override
+  String get equityPersonalLoanAddRepayment => 'ادائیگی شامل کریں';
+
+  @override
+  String get equityPersonalLoanRepaymentAmount => 'ادائیگی رقم';
+
+  @override
+  String get equityPersonalLoanRepaymentDate => 'وصولی کی تاریخ';
+
+  @override
+  String get equityPersonalLoanRepaymentNotes => 'نوٹس';
+
+  @override
+  String get equityPersonalLoanRepaymentHistory => 'ادائیگیوں کی تاریخ';
+
+  @override
+  String get equityPersonalLoanWrittenOff => 'قرضہ مال ہو گیا';
+
+  @override
+  String get equityPersonalLoanExported => 'کامیابی سے ایکسپورٹ ہو گیا';
+
+  @override
+  String get equityPersonalLoanExportFailed => 'ایکسپورٹ ناکام ہو گیا';
+
+  @override
+  String get equityPersonalLoanFilterAll => 'سب';
+
+  @override
+  String get equityPersonalLoanFilterWithLoans => 'فعال قرضوں والے';
+
+  @override
+  String get equityPersonalLoanFilterCustomers => 'صرف گاہک';
+
+  @override
+  String get equityPersonalLoanFilterSuppliers => 'صرف سپلائر';
+
+  @override
+  String get equityPersonalLoanFilterPersonal => 'ذاتی رشتہ دار';
 }

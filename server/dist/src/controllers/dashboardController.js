@@ -7,6 +7,7 @@ const database_1 = __importDefault(require("../config/database"));
 const logger_1 = __importDefault(require("../utils/logger"));
 const queryUtils_1 = require("../utils/queryUtils");
 const Dashboard_1 = __importDefault(require("../models/Dashboard"));
+const EmployeeLoan_1 = require("../models/EmployeeLoan");
 const Reports_1 = __importDefault(require("../models/Reports"));
 const cashService_1 = require("../services/cashService");
 // ═══════════════════════════════════════════════════════════════
@@ -244,6 +245,30 @@ function saveCashOpeningBalances(req, res) {
         res.status(500).json({ error: 'Failed to save cash opening balances' });
     }
 }
+// ═══════════════════════════════════════════════════════════════
+//  EMPLOYEE LOANS DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+/**
+ * GET /api/dashboard/active-loans
+ * Active loans across all employees with aging summary.
+ */
+function getActiveLoans(req, res) {
+    try {
+        const loans = EmployeeLoan_1.EmployeeLoanModel.getGlobalActiveLoans(database_1.default);
+        const summary = EmployeeLoan_1.EmployeeLoanModel.getGlobalLoanSummary(database_1.default);
+        res.json({
+            success: true,
+            data: {
+                ...summary,
+                loans,
+            },
+        });
+    }
+    catch (error) {
+        logger_1.default.error('Active loans error:', error);
+        res.status(500).json({ error: 'Failed to fetch active loans' });
+    }
+}
 exports.default = {
     getSummary,
     getCashPosition,
@@ -258,4 +283,5 @@ exports.default = {
     getKPI,
     getKPIBatch,
     getARSummary,
+    getActiveLoans,
 };

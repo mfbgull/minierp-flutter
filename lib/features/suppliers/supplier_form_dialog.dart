@@ -19,6 +19,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
 import 'supplier_providers.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the create ([supplier] == null) or edit form dialog.
 Future<void> showSupplierFormDialog(
@@ -159,10 +160,11 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 680),
-        child: Form(
+    return MovableDialog(
+      dialogId: 'supplier_form',
+      maxWidth: 520,
+      maxHeight: 680,
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -365,7 +367,6 @@ class _SupplierFormDialogState extends ConsumerState<SupplierFormDialog> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

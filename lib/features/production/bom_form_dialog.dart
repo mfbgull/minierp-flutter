@@ -26,6 +26,7 @@ import '../../widgets/searchable_select.dart';
 import 'calculations/production_calculations.dart' show bomMaterialCost;
 import 'production_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Mutable BOM material line.
 class _BomLine {
@@ -185,10 +186,11 @@ class _BomFormDialogState extends ConsumerState<BomFormDialog> {
         ref.watch(productionOutputItemsProvider).valueOrNull ?? const <Item>[];
     final materialCost = _materialCost;
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 860, maxHeight: 680),
-        child: Form(
+    return MovableDialog(
+      dialogId: 'bom_form',
+      maxWidth: 860,
+      maxHeight: 680,
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -358,7 +360,6 @@ class _BomFormDialogState extends ConsumerState<BomFormDialog> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

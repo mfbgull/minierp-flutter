@@ -23,6 +23,7 @@ import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import 'production_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the read-only detail dialog for [productionId].
 Future<void> showProductionDetailDialog(
@@ -44,10 +45,11 @@ class ProductionDetailDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(productionDetailProvider(productionId));
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 700),
-        child: switch (detail) {
+    return MovableDialog(
+      dialogId: 'production_detail',
+      maxWidth: 720,
+      maxHeight: 700,
+      child: switch (detail) {
           AsyncData(:final value) => _DetailBody(
             detail: value,
             productionId: productionId,
@@ -63,7 +65,6 @@ class ProductionDetailDialog extends ConsumerWidget {
             child: Center(child: CircularProgressIndicator()),
           ),
         },
-      ),
     );
   }
 }

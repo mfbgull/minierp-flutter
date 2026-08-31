@@ -19,6 +19,7 @@ import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
 import '../../widgets/searchable_select.dart';
 import 'inventory_providers.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the create ([item] == null) or edit form dialog.
 Future<void> showItemFormDialog(BuildContext context, {Item? item}) {
@@ -184,10 +185,11 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
     );
     final uomItems = _withCurrent(uoms.valueOrNull ?? const [], _uom);
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 680),
-        child: Form(
+    return MovableDialog(
+      dialogId: 'item_form',
+      maxWidth: 520,
+      maxHeight: 680,
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -479,7 +481,6 @@ class _ItemFormDialogState extends ConsumerState<ItemFormDialog> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

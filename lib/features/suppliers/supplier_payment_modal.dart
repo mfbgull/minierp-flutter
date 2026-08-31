@@ -32,6 +32,7 @@ import '../payments/payments_providers.dart' show paymentsProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'supplier_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the web-style Record Payment modal with [supplier] pre-bound.
 ///
@@ -416,10 +417,11 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
     final openPurchases =
         ref.watch(_openPurchasesProvider(widget.supplier.id)).valueOrNull;
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
-        child: Padding(
+    return MovableDialog(
+      dialogId: 'supplier_payment',
+      maxWidth: 680,
+      maxHeight: 720,
+      child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -753,7 +755,6 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

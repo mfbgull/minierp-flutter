@@ -25,6 +25,7 @@ import 'item_form_dialog.dart';
 import 'stock_ledger_dialog.dart';
 import 'batch_management_screen.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the read-only detail dialog for [itemId].
 Future<void> showItemDetailDialog(BuildContext context, {required int itemId}) {
@@ -42,10 +43,11 @@ class _ItemDetailDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(itemDetailProvider(itemId));
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
-        child: switch (detail) {
+    return MovableDialog(
+      dialogId: 'item_detail',
+      maxWidth: 560,
+      maxHeight: 640,
+      child: switch (detail) {
           AsyncData(:final value) => _DetailBody(detail: value),
           AsyncError(:final error) => DetailError(
             message: error is ApiError ? error.message : '$error',
@@ -57,7 +59,6 @@ class _ItemDetailDialog extends ConsumerWidget {
             child: Center(child: CircularProgressIndicator()),
           ),
         },
-      ),
     );
   }
 }

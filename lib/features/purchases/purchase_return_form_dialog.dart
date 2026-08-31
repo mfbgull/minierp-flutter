@@ -24,6 +24,7 @@ import '../../data/repositories/purchase_repository.dart'
     show purchaseRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/form_field.dart' show FormFieldShell;
 import '../../widgets/form_helpers.dart'
@@ -429,10 +430,11 @@ class _PurchaseReturnFormDialogState
       (sum, line) => sum + _lineQty(line) * line.unitCost,
     );
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 780, maxHeight: 640),
-        child: Column(
+    return MovableDialog(
+      dialogId: 'purchase_return_form',
+      maxWidth: 780,
+      maxHeight: 640,
+      child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -571,7 +573,6 @@ class _PurchaseReturnFormDialogState
               ),
             ),
           ],
-        ),
       ),
     );
   }

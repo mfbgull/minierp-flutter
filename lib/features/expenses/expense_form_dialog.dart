@@ -30,6 +30,7 @@ import '../../widgets/searchable_select.dart';
 import 'expense_category_dialog.dart';
 import 'expense_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the create ([expense] == null) or edit form dialog.
 Future<void> showExpenseFormDialog(BuildContext context, {Expense? expense}) {
@@ -246,10 +247,11 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
         o.value,
     ], _paymentMethod);
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 680),
-        child: Form(
+    return MovableDialog(
+      dialogId: 'expense_form',
+      maxWidth: 560,
+      maxHeight: 680,
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -496,7 +498,6 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

@@ -31,6 +31,7 @@ import '../../widgets/form_helpers.dart' show numText, submitOnEnter;
 import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show warehousesProvider;
 import 'purchase_order_providers.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the receive-goods dialog for [detail] (a non-Draft, non-Cancelled
 /// PO with at least one line still pending). Returns after the receipt is
@@ -182,10 +183,11 @@ class _ReceiveGoodsDialogState extends ConsumerState<ReceiveGoodsDialog> {
         ref.watch(warehousesProvider).valueOrNull ?? const <Warehouse>[];
     final warehouseIds = [for (final w in warehouses) w.id];
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 680),
-        child: Form(
+    return MovableDialog(
+      dialogId: 'receive_goods',
+      maxWidth: 620,
+      maxHeight: 680,
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -317,7 +319,6 @@ class _ReceiveGoodsDialogState extends ConsumerState<ReceiveGoodsDialog> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

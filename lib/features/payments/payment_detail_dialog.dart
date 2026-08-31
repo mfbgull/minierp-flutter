@@ -26,6 +26,7 @@ import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'edit_payment_dialog.dart';
 import 'payments_providers.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the read-only detail dialog for [paymentId].
 Future<void> showPaymentDetailDialog(
@@ -46,10 +47,11 @@ class _PaymentDetailDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(paymentDetailProvider(paymentId));
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 560),
-        child: switch (detail) {
+    return MovableDialog(
+      dialogId: 'payment_detail',
+      maxWidth: 520,
+      maxHeight: 560,
+      child: switch (detail) {
           AsyncData(:final value) => _DetailBody(
             payment: value,
             paymentId: paymentId,
@@ -64,7 +66,6 @@ class _PaymentDetailDialog extends ConsumerWidget {
             child: Center(child: CircularProgressIndicator()),
           ),
         },
-      ),
     );
   }
 }

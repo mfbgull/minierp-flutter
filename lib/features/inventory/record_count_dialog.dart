@@ -19,6 +19,7 @@ import '../../widgets/app_toast.dart';
 import '../../widgets/detail_labels.dart' show detailSectionLabel;
 import '../../widgets/form_helpers.dart' show ErrorBanner, formInputDecoration;
 import 'inventory_providers.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the record-count dialog for [countId] with the count's item
 /// lines ([items]) prefilled from their current counted quantities.
@@ -139,10 +140,11 @@ class _RecordCountDialogState extends ConsumerState<_RecordCountDialog> {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
-        child: Column(
+    return MovableDialog(
+      dialogId: 'record_count',
+      maxWidth: 560,
+      maxHeight: 640,
+      child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -256,7 +258,6 @@ class _RecordCountDialogState extends ConsumerState<_RecordCountDialog> {
               ),
             ),
           ],
-        ),
       ),
     );
   }

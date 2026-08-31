@@ -46,6 +46,7 @@ import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'purchase_order_pdf.dart' show buildA4PurchaseOrderPdf;
 import 'purchase_order_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the create ([detail] == null) or edit form dialog.
 Future<void> showPurchaseOrderFormDialog(
@@ -1158,10 +1159,11 @@ class _PurchaseOrderFormDialogState
           widget.detail;
     }
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760, maxHeight: 780),
-        child: Form(
+    return MovableDialog(
+      dialogId: 'purchase_order_form',
+      maxWidth: 760,
+      maxHeight: 780,
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1290,7 +1292,6 @@ class _PurchaseOrderFormDialogState
               ),
             ],
           ),
-        ),
       ),
     );
   }

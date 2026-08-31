@@ -171,12 +171,28 @@ class EmployeeRepository {
     parse: (Object? json) => json! as Map<String, dynamic>,
   );
 
-  /// `GET /employees/:id/salary/history` — newest-first by payment_date.
-  Future<ApiResult<List<SalaryPayment>>> salaryHistory(int id) =>
+  /// `GET /employees/:id/salary/history` — aggregated by month.
+  Future<ApiResult<List<SalaryMonthSummary>>> salaryHistory(int id) =>
       _client.getList(
         '${ApiEndpoints.employees}/$id/salary/history',
         parseItem: (Object? json) =>
-            SalaryPayment.fromJson(json! as Map<String, dynamic>),
+            SalaryMonthSummary.fromJson(json! as Map<String, dynamic>),
+      );
+
+  /// `GET /employees/:id/salary/month/:payPeriod` — individual payments for a month.
+  Future<ApiResult<SalaryMonthDetail>> salaryMonthDetail(
+    int id,
+    String payPeriod,
+  ) => _client.get(
+    '${ApiEndpoints.employees}/$id/salary/month/$payPeriod',
+    parse: (Object? json) =>
+        SalaryMonthDetail.fromJson(json! as Map<String, dynamic>),
+  );
+
+  /// `DELETE /employees/:id/salary/:paymentId` — voids GL entry + deletes record.
+  Future<ApiResult<void>> deleteSalaryPayment(int id, int paymentId) =>
+      _client.deleteRaw(
+        '${ApiEndpoints.employees}/$id/salary/$paymentId',
       );
 
   /// `GET /employees/:id/documents` — newest-first by created_at.

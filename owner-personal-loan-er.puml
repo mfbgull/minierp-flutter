@@ -1,0 +1,167 @@
+@startuml
+!theme plain
+allowmixing
+title Owner Personal Loans — Database ER Diagram
+
+skinparam backgroundColor #FAFAFA
+skinparam EntityBorderColor #555555
+skinparam EntityBackgroundColor #F8F9FA
+skinparam EntityFontSize 12
+skinparam ArrowColor #333333
+skinparam NoteBorderColor #AAAAAA
+skinparam NoteBackgroundColor #FFFDE7
+skinparam PackageBorderColor #888888
+
+' ══════════════════════════════════════════════════════════════
+' EXISTING TABLES (referenced)
+' ══════════════════════════════════════════════════════════════
+
+entity "customers" as cust <<existing>> #E8F5E9 {
+  * id : INTEGER <<PK>> --
+  customer_code : TEXT
+  customer_name : TEXT
+  is_active : BOOLEAN
+  ...
+}
+
+entity "suppliers" as sup <<existing>> #E8F5E9 {
+  * id : INTEGER <<PK>> --
+  supplier_code : TEXT
+  supplier_name : TEXT
+  is_active : BOOLEAN
+  ...
+}
+
+entity "users" as usr <<existing>> #E8F5E9 {
+  * id : INTEGER <<PK>> --
+  username : TEXT
+  ...
+}
+
+' ══════════════════════════════════════════════════════════════
+' NEW TABLES
+' ══════════════════════════════════════════════════════════════
+
+entity "owner_personal_loan_borrowers" as opb <<NEW>> #BBDEFB {
+  * id : INTEGER <<PK>> --
+  name : VARCHAR(200) NOT NULL
+  phone : VARCHAR(50)
+  linked_type : TEXT
+  linked_id : INTEGER
+  is_active : INTEGER DEFAULT 1
+  created_at : TIMESTAMP
+  <<UNIQUE(name, linked_type, linked_id)>>
+}
+
+entity "owner_personal_loans" as opl <<NEW>> #BBDEFB {
+  * id : INTEGER <<PK>> --
+  loan_no : VARCHAR(50) UNIQUE NOT NULL
+  borrower_name : VARCHAR(200) NOT NULL
+  borrower_id : INTEGER <<FK>>
+  borrower_type : TEXT
+  amount : DECIMAL(15,2) NOT NULL
+  balance : DECIMAL(15,2) NOT NULL
+  currency : VARCHAR(3) DEFAULT PKR
+  loan_date : DATE NOT NULL
+  due_date : DATE
+  purpose : VARCHAR(100)
+  status : VARCHAR(20) DEFAULT pending
+  notes : TEXT
+  created_by : INTEGER <<FK>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "owner_personal_loan_repayments" as opr <<NEW>> #BBDEFB {
+  * id : INTEGER <<PK>> --
+  * loan_id : INTEGER <<FK>> NOT NULL
+  amount : DECIMAL(15,2) NOT NULL
+  payment_date : DATE NOT NULL
+  notes : TEXT
+  created_by : INTEGER <<FK>>
+  created_at : TIMESTAMP
+}
+
+' ══════════════════════════════════════════════════════════════
+' RELATIONSHIPS
+' ══════════════════════════════════════════════════════════════
+
+' owner_personal_loans relationships
+opl }o--o| opb : "borrower_id\\n(nullable FK)"
+opl }o--o| usr : "created_by"
+
+' owner_personal_loan_repayments relationships
+opr }o--|| opl : "loan_id"
+opr }o--o| usr : "created_by"
+
+' owner_personal_loan_borrowers relationships
+' OPTIONAL — cosmetic badge only, NO business logic dependency
+opb }o--o| cust : "linked_id\\n(cosmetic badge only)"
+opb }o--o| sup : "linked_id\\n(cosmetic badge only)"
+
+' ══════════════════════════════════════════════════════════════
+' INDEXES & CONSTRAINTS
+' ══════════════════════════════════════════════════════════════
+
+note right of opl
+  **Indexes:**
+  idx_own_personal_loans_borrower (borrower_name)
+  idx_own_personal_loans_status (status)
+  idx_own_personal_loans_date (loan_date)
+
+  **Constraints:**
+  status IN (pending, partial, settled, written_off)
+  borrower_type IN (customer, supplier) OR NULL
+  amount > 0
+  balance >= 0
+end note
+
+note right of opr
+  **Indexes:**
+  idx_own_loan_repayments_loan (loan_id)
+  idx_own_loan_repayments_date (payment_date)
+
+  **Constraints:**
+  amount > 0
+  No ON DELETE CASCADE
+  (backend rejects delete if repayments exist)
+end note
+
+note bottom of opb
+  **Indexes:**
+  idx_own_loan_borrowers_name (name)
+  idx_own_loan_borrowers_active (is_active)
+
+  **Constraints:**
+  linked_type IN (customer, supplier) OR NULL
+  UNIQUE(name, linked_type, linked_id)
+  Soft-delete via is_active flag
+end note
+
+' ══════════════════════════════════════════════════════════════
+' STATUS STATE DIAGRAM
+' ══════════════════════════════════════════════════════════════
+
+package "Loan Status Transitions" #FFF3E0 {
+  rectangle "pending" as s_pending #C8E6C9
+  rectangle "partial" as s_partial #BBDEFB
+  rectangle "settled" as s_settled #E0E0E0
+  rectangle "written_off" as s_writtenoff #F8BBD0
+
+  s_pending --> s_partial : "1st repayment recorded"
+  s_partial --> s_settled : "balance == 0"
+  s_pending --> s_settled : "full amount repaid at once"
+  s_pending --> s_writtenoff : "write-off"
+  s_partial --> s_writtenoff : "write-off"
+  s_settled --> s_partial : "delete last repayment"  s_writtenoff --> s_partial : "void write-off"
+}
+
+note bottom of opl
+  **⚠️ Completely Independent of Business Data**
+  No GL entries, no accounting impact.
+  No effect on sales, purchases, invoices,
+  payments, inventory, or financial reports.
+  Customer/Supplier links are cosmetic badges only.
+end note
+
+@enduml

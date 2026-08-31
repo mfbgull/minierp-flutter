@@ -15,6 +15,7 @@ import '../../data/repositories/owner_equity_repository.dart'
 import '../../l10n/app_localizations.dart';
 import '../../widgets/screen_error_panel.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 Future<void> showOwnerWithdrawalDetailDialog(
   BuildContext context,
@@ -45,10 +46,11 @@ class _OwnerWithdrawalDetailDialogState
     final scheme = Theme.of(context).colorScheme;
     final detail = ref.watch(_detailProvider(widget.withdrawalId));
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 640),
-        child: Column(
+    return MovableDialog(
+      dialogId: 'owner_withdrawal_detail',
+      maxWidth: 720,
+      maxHeight: 640,
+      child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -89,7 +91,6 @@ class _OwnerWithdrawalDetailDialogState
               ),
             ),
           ],
-        ),
       ),
     );
   }

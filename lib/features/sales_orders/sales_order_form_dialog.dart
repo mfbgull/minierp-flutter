@@ -31,6 +31,7 @@ import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show warehousesProvider;
 import 'sales_order_pdf.dart' show buildA4SalesOrderPdf;
 import 'sales_order_providers.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the create ([detail] == null) or edit form dialog.
 Future<void> showSalesOrderFormDialog(
@@ -390,10 +391,11 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
     final customerIds = [for (final c in customers) c.id];
     final warehouseIds = [for (final w in warehouses) w.id];
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
-        child: Form(
+    return MovableDialog(
+      dialogId: 'sales_order_form',
+      maxWidth: 680,
+      maxHeight: 720,
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -603,7 +605,6 @@ class _SalesOrderFormDialogState extends ConsumerState<SalesOrderFormDialog> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

@@ -25,6 +25,7 @@ import '../../widgets/searchable_select.dart';
 import 'employee_models.dart';
 import 'employee_providers.dart';
 import 'employee_repository.dart' show employeeRepositoryProvider;
+import '../../widgets/movable_dialog.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the create ([employee] == null) or edit form dialog.
@@ -328,9 +329,10 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
     final l10n = AppLocalizations.of(context)!;
     final nextCode = ref.watch(employeeNextCodeProvider).valueOrNull;
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760, maxHeight: 720),
+    return MovableDialog(
+      dialogId: 'employee_form',
+      maxWidth: 760,
+      maxHeight: 720,
         child: Form(
           key: _formKey,
           child: Column(
@@ -844,8 +846,7 @@ class _EmployeeFormDialogState extends ConsumerState<EmployeeFormDialog> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   List<T> _withCurrent<T>(List<T> loaded, T? current) {

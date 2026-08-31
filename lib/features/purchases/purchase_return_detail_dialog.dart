@@ -18,6 +18,7 @@ import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Provider that fetches the full return detail (header + items).
 final _returnDetailProvider =
@@ -57,10 +58,11 @@ class _PurchaseReturnDetailDialog extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final detailAsync = ref.watch(_returnDetailProvider(fallback.id));
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 680),
-        child: detailAsync.when(
+    return MovableDialog(
+      dialogId: 'purchase_return_detail',
+      maxWidth: 620,
+      maxHeight: 680,
+      child: detailAsync.when(
           loading: () => const SizedBox(
             width: 380,
             height: 200,
@@ -71,7 +73,6 @@ class _PurchaseReturnDetailDialog extends ConsumerWidget {
             return _buildContent(context, l10n, fallback);
           },
           data: (full) => _buildContent(context, l10n, full),
-        ),
       ),
     );
   }

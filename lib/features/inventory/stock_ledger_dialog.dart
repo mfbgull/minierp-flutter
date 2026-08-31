@@ -28,6 +28,7 @@ import '../../widgets/detail_labels.dart';
 import '../../widgets/searchable_select.dart';
 import 'inventory_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the stock ledger for [itemId]; [itemLabel] is the item
 /// code/name shown in the header.
@@ -62,10 +63,11 @@ class _StockLedgerDialogState extends ConsumerState<_StockLedgerDialog> {
     final ledger = ref.watch(
       stockLedgerProvider((widget.itemId, _warehouseId)),
     );
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760, maxHeight: 600),
-        child: switch (ledger) {
+    return MovableDialog(
+      dialogId: 'stock_ledger',
+      maxWidth: 760,
+      maxHeight: 600,
+      child: switch (ledger) {
           AsyncData(:final value) => _LedgerBody(
             itemLabel: widget.itemLabel,
             movements: value,
@@ -84,7 +86,6 @@ class _StockLedgerDialogState extends ConsumerState<_StockLedgerDialog> {
             child: Center(child: CircularProgressIndicator()),
           ),
         },
-      ),
     );
   }
 }

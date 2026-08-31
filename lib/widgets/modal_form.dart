@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'movable_dialog.dart';
+
 /// Placeholder modal form scaffold (create/edit dialogs).
 ///
 /// Port the web app's `ModalForm` component (PORTING.md §1 widgets list):
@@ -23,7 +25,9 @@ class ModalForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
+    return MovableDialog(
+      dialogId: 'modal_form',
+      maxWidth: 500,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(

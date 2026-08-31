@@ -24,6 +24,7 @@ import '../../widgets/form_helpers.dart';
 import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show warehousesProvider;
 import 'invoice_providers.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 import 'invoice_return_providers.dart' show invoiceReturnsProvider;
 
 /// Opens the return-processing dialog for [invoiceId].
@@ -177,10 +178,11 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
-        child: Padding(
+    return MovableDialog(
+      dialogId: 'invoice_return',
+      maxWidth: 560,
+      maxHeight: 640,
+      child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -201,7 +203,6 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
               Flexible(child: _buildBody(l10n)),
             ],
           ),
-        ),
       ),
     );
   }
