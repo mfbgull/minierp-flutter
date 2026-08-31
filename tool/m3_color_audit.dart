@@ -1,4 +1,6 @@
-#!/usr/bin/env dart
+// ignore_for_file: avoid_print
+//
+// Standalone CLI tool — print() is the correct way to write to stdout.
 // tool/m3_color_audit.dart
 //
 // Scans all `lib/**/*.dart` files and reports hardcoded `Colors.*` usage

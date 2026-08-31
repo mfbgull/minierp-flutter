@@ -16,6 +16,7 @@ import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'activity_log_presenters.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the read-only detail dialog for [log].
 Future<void> showActivityLogDetailDialog(
@@ -41,10 +42,11 @@ class _ActivityLogDetailDialog extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
-        child: Padding(
+    return MovableDialog(
+      dialogId: 'activity_log_detail',
+      maxWidth: 560,
+      maxHeight: 640,
+      child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -116,7 +118,6 @@ class _ActivityLogDetailDialog extends StatelessWidget {
               ),
             ],
           ),
-        ),
       ),
     );
   }

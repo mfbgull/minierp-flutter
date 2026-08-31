@@ -1,0 +1,153 @@
+@startuml
+!theme plain
+title Owner Personal Loans — Full Architecture
+
+skinparam backgroundColor #FAFAFA
+skinparam componentBorderColor #555555
+skinparam arrowColor #333333
+skinparam packageBorderColor #888888
+skinparam packageBackgroundColor #FAFAFA
+skinparam databaseBorderColor #555555
+skinparam databaseBackgroundColor #E8EAF6
+
+' ══════════════════════════════════════════════════════════════
+' DATABASE LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Database (SQLite)" as db #E8EAF6 {
+  database "owner_personal_loans" as opl #C5CAE9 {
+  }
+  database "owner_personal_loan_repayments" as opr #C5CAE9 {
+  }
+  database "owner_personal_loan_borrowers" as opb #C5CAE9 {
+  }
+  database "customers" as cust #C5CAE9 {
+  }
+  database "suppliers" as sup #C5CAE9 {
+  }
+  database "users" as usr #C5CAE9 {
+  }
+
+  opl ||--o{ opr : "has repayments"
+  opl }o--|| opb : "borrower_id (nullable)"
+  opl }o--o| usr : "created_by"
+  opr }o--o| usr : "created_by"
+  opb }o--o| cust : "linked_id (nullable)"
+  opb }o--o| sup : "linked_id (nullable)"
+}
+
+' ══════════════════════════════════════════════════════════════
+' BACKEND LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Backend (Node.js + Express + TypeScript)" as backend #E8F5E9 {
+
+  package "Routes" as routes #C8E6C9 {
+    component "ownerEquity.ts\\n(+ personal-loans routes)" as oe_routes
+  }
+
+  package "Controllers" as controllers #C8E6C9 {
+    component "ownerPersonalLoansController.ts\\n(CRUD, repayments,\\nborrowers, merge)" as opl_ctrl
+  }
+
+  package "Models" as models #C8E6C9 {
+    component "OwnerPersonalLoan.ts\\n(balance, status,\\nborrower mgmt)" as opl_model
+  }
+
+  package "Utils" as utils #C8E6C9 {
+    component "sequence.ts\\ngenerateDocNo(db, 'PL')" as seq_util
+  }
+
+  oe_routes --> opl_ctrl
+  opl_ctrl --> opl_model
+  opl_ctrl --> seq_util
+  opl_model --> db
+}
+
+' ══════════════════════════════════════════════════════════════
+' API CONTRACT
+' ══════════════════════════════════════════════════════════════
+
+package "REST API" as api #FFF3E0 {
+  rectangle "Personal Loans" as api_loans #FFE0B2 {
+    component "GET /personal-loans"
+    component "POST /personal-loans"
+    component "GET /personal-loans/:id"
+    component "PUT /personal-loans/:id"
+    component "DELETE /personal-loans/:id"
+    component "POST /personal-loans/:id/repayments"
+    component "DELETE /personal-loans/:id/repayments/:rid"
+    component "GET /personal-loans/summary"
+  }
+  rectangle "Borrowers" as api_borrowers #FFE0B2 {
+    component "GET /borrowers"
+    component "POST /borrowers"
+    component "PUT /borrowers/:id"
+    component "PUT /borrowers/:id/deactivate"
+    component "PUT /borrowers/:id/reactivate"
+    component "PUT /borrowers/:id/unlink"
+    component "POST /borrowers/:id/merge"
+  }
+}
+
+' ══════════════════════════════════════════════════════════════
+' FRONTEND LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Frontend (Flutter + Riverpod)" as frontend #E3F2FD {
+
+  package "Owner Equity Shell" as shell #BBDEFB {
+    component "Tab 0: Capital"
+    component "Tab 1: Withdrawals"
+    component "Tab 2: Personal Loans\n(personal_loan_tab.dart)" as loans_tab
+  }
+
+  package "Loan Dialogs" as loan_dialogs #BBDEFB {
+    component "personal_loan_create_dialog.dart\\n(+ inline borrower form)"
+    component "personal_loan_detail_dialog.dart\\n(+ repayment history)"
+    component "personal_loan_repay_dialog.dart"
+  }
+
+  package "Borrower Dialogs" as borrower_dialogs #BBDEFB {
+    component "personal_loan_borrower_list_dialog.dart\\n(full-screen manage screen)"
+    component "personal_loan_borrower_form_dialog.dart\\n(create/edit)"
+    component "personal_loan_borrower_merge_dialog.dart\\n(merge duplicates)"
+  }
+
+  package "Data Layer" as data_layer #BBDEFB {
+    component "personal_loan_models.dart"
+    component "personal_loan_repository.dart"
+    component "personal_loan_providers.dart"
+  }
+
+  loans_tab --> loan_dialogs
+  loans_tab --> borrower_dialogs
+  loan_dialogs --> data_layer
+  borrower_dialogs --> data_layer
+}
+
+' ══════════════════════════════════════════════════════════════
+' CONNECTIONS
+' ══════════════════════════════════════════════════════════════
+
+api_loans --> opl_ctrl : "Dio HTTP"
+api_borrowers --> opl_ctrl : "Dio HTTP"
+
+data_layer --> api_loans : "Dio"
+data_layer --> api_borrowers : "Dio"
+
+' ══════════════════════════════════════════════════════════════
+' NOTE: NO GL IMPACT
+' ══════════════════════════════════════════════════════════════
+
+note bottom of backend
+  **Completely Independent of Business Data**
+  • No GL entries, no journal entries
+  • No effect on sales, purchases, invoices, payments
+  • No effect on accounting or financial reports
+  • Customers/Suppliers link is OPTIONAL —
+    just for showing a badge in the UI
+  • Owner's personal notes/record-keeping only
+end note
+
+@enduml

@@ -43,8 +43,8 @@ export function initializeSequenceFromMax(
   columnName: string,
   prefixPattern: string
 ): void {
-  const allowedTables = new Set(['customers', 'suppliers', 'items', 'purchases', 'invoices', 'payments', 'productions']);
-  const allowedColumns = new Set(['customer_code', 'supplier_code', 'item_code', 'purchase_no', 'invoice_no', 'payment_no', 'production_no']);
+  const allowedTables = new Set(['customers', 'suppliers', 'items', 'purchases', 'invoices', 'payments', 'productions', 'employees']);
+  const allowedColumns = new Set(['customer_code', 'supplier_code', 'item_code', 'purchase_no', 'invoice_no', 'payment_no', 'production_no', 'employee_code']);
   if (!allowedTables.has(tableName) || !allowedColumns.has(columnName)) {
     throw new Error(`Invalid table or column name: ${tableName}.${columnName}`);
   }

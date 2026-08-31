@@ -15,6 +15,7 @@ import 'admin_models.dart';
 import 'admin_providers.dart';
 import 'admin_repository.dart' show adminRepositoryProvider;
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the permissions editor for one role.
 Future<void> showRolePermissionsDialog(
@@ -50,10 +51,11 @@ class _RolePermissionsDialogState extends ConsumerState<RolePermissionsDialog> {
     final l10n = AppLocalizations.of(context)!;
     final permissions = ref.watch(rolePermissionsProvider(widget.role.id));
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640, maxHeight: 620),
-        child: Column(
+    return MovableDialog(
+      dialogId: 'role_permissions',
+      maxWidth: 640,
+      maxHeight: 620,
+      child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -160,7 +162,6 @@ class _RolePermissionsDialogState extends ConsumerState<RolePermissionsDialog> {
               ),
             ),
           ],
-        ),
       ),
     );
   }

@@ -1509,6 +1509,7 @@ runLedgered('fn.runCashAccountsMigration', runCashAccountsMigration);
 runLedgered('fn.runOpeningBalancesMigration', runOpeningBalancesMigration);
 runLedgered('fn.runUserPreferencesMigration', runUserPreferencesMigration);
 runLedgered('fn.runEmployeeLoansMigration', runEmployeeLoansMigration);
+runLedgered('fn.runOwnerPersonalLoansMigration', runOwnerPersonalLoansMigration);
 // INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
 // INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
 runLedgered('fn.runGLVoidAttributionMigration', runGLVoidAttributionMigration);
@@ -2447,6 +2448,30 @@ function runEmployeeLoansMigration(): void {
     }
   } catch (error: any) {
     throw new Error('Employee loans migration error:: ' + error.message, { cause: error });
+  }
+}
+
+function runOwnerPersonalLoansMigration(): void {
+  try {
+    const tableCheck = db.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE type='table' AND name='owner_personal_loans'
+    `).get() as { name: string } | undefined;
+
+    if (!tableCheck) {
+      logger.info('Running owner personal loans migration...');
+
+      const migrationSQL = fs.readFileSync(
+        path.join(MIGRATIONS_DIR, 'add-owner-personal-loans.sql'),
+        'utf8'
+      );
+
+      db.exec(migrationSQL);
+
+      logger.info('✅ Owner personal loans migration completed!');
+    }
+  } catch (error: any) {
+    throw new Error('Owner personal loans migration error:: ' + error.message, { cause: error });
   }
 }
 

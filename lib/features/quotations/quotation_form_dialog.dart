@@ -33,6 +33,7 @@ import '../sales_orders/sales_order_providers.dart'
     show salesOrderCustomerOptionsProvider, soItemsProvider;
 import 'quotation_pdf.dart' show buildA4QuotationPdf;
 import 'quotation_providers.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the create ([detail] == null) or edit form dialog.
 Future<void> showQuotationFormDialog(
@@ -398,10 +399,11 @@ class _QuotationFormDialogState extends ConsumerState<QuotationFormDialog> {
     final customerIds = [for (final c in customers) c.id];
     final warehouseIds = [for (final w in warehouses) w.id];
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
-        child: Form(
+    return MovableDialog(
+      dialogId: 'quotation_form',
+      maxWidth: 680,
+      maxHeight: 720,
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -633,7 +635,6 @@ class _QuotationFormDialogState extends ConsumerState<QuotationFormDialog> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

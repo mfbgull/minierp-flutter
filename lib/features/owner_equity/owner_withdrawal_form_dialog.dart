@@ -36,6 +36,7 @@ import '../inventory/inventory_providers.dart' show warehousesProvider;
 import 'owner_equity_providers.dart';
 
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the create ([entry] == null) or edit form dialog.
 Future<void> showOwnerWithdrawalFormDialog(
@@ -345,10 +346,11 @@ class _OwnerWithdrawalFormDialogState
       paymentItems.add(_paymentMethod!);
     }
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 760),
-        child: Form(
+    return MovableDialog(
+      dialogId: 'owner_withdrawal_form',
+      maxWidth: 680,
+      maxHeight: 760,
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -554,7 +556,6 @@ class _OwnerWithdrawalFormDialogState
               ),
             ],
           ),
-        ),
       ),
     );
   }

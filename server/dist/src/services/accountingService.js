@@ -966,6 +966,80 @@ class AccountingService {
         });
     }
     // ------------------------------------------------------------------
+    // Employee loan postings
+    // ------------------------------------------------------------------
+    /**
+     * Post loan disbursement. Dr 1300 Loan Receivable, Cr Cash/Bank.
+     */
+    static postLoanDisbursement(db, args) {
+        if (!args.amount || args.amount <= 0)
+            return null;
+        const loanReceivable = AccountingService.getAccountByCode(db, '1300');
+        const cashCode = AccountingService._cashOrBankAccountCode(args.paymentMethod);
+        const cashAcct = AccountingService.getAccountByCode(db, cashCode);
+        if (!loanReceivable || !cashAcct) {
+            throw new Error(`Chart of accounts is missing: 1300 (Employee Loan Receivable) or ${cashCode}`);
+        }
+        return AccountingService.postEntry(db, {
+            entry_date: args.disbursementDate,
+            description: `Loan to ${args.employeeName} (${args.employeeCode}) — ${args.amount.toFixed(2)}`,
+            reference_type: 'LOAN_DISBURSEMENT',
+            reference_id: args.loanId,
+            created_by: args.userId,
+            lines: [
+                { account_id: loanReceivable.id, debit: args.amount, description: `Loan receivable for ${args.employeeCode}` },
+                { account_id: cashAcct.id, credit: args.amount, description: `Cash disbursed to ${args.employeeCode}` },
+            ],
+        });
+    }
+    /**
+     * Post direct loan repayment. Dr Cash/Bank, Cr 1300 Loan Receivable.
+     */
+    static postLoanRepayment(db, args) {
+        if (!args.amount || args.amount <= 0)
+            return null;
+        const loanReceivable = AccountingService.getAccountByCode(db, '1300');
+        const cashCode = AccountingService._cashOrBankAccountCode(args.paymentMethod);
+        const cashAcct = AccountingService.getAccountByCode(db, cashCode);
+        if (!loanReceivable || !cashAcct) {
+            throw new Error(`Chart of accounts is missing: 1300 (Employee Loan Receivable) or ${cashCode}`);
+        }
+        return AccountingService.postEntry(db, {
+            entry_date: args.paymentDate,
+            description: `Loan repayment from ${args.employeeName} (${args.employeeCode}) — ${args.amount.toFixed(2)}`,
+            reference_type: 'LOAN_REPAYMENT',
+            reference_id: args.repaymentId,
+            created_by: args.userId,
+            lines: [
+                { account_id: cashAcct.id, debit: args.amount, description: `Cash received from ${args.employeeCode}` },
+                { account_id: loanReceivable.id, credit: args.amount, description: `Loan receivable reduced for ${args.employeeCode}` },
+            ],
+        });
+    }
+    /**
+     * Post loan write-off. Dr 6300 Loan Write-off, Cr 1300 Loan Receivable.
+     */
+    static postLoanWriteOff(db, args) {
+        if (!args.amount || args.amount <= 0)
+            return null;
+        const loanReceivable = AccountingService.getAccountByCode(db, '1300');
+        const writeOffAcct = AccountingService.getAccountByCode(db, '6300');
+        if (!loanReceivable || !writeOffAcct) {
+            throw new Error('Chart of accounts is missing: 1300 (Employee Loan Receivable) or 6300 (Loan Write-off)');
+        }
+        return AccountingService.postEntry(db, {
+            entry_date: args.writeOffDate,
+            description: `Loan write-off for ${args.employeeName} (${args.employeeCode}) — ${args.amount.toFixed(2)}`,
+            reference_type: 'LOAN_WRITE_OFF',
+            reference_id: args.loanId,
+            created_by: args.userId,
+            lines: [
+                { account_id: writeOffAcct.id, debit: args.amount, description: `Loan written off for ${args.employeeCode}` },
+                { account_id: loanReceivable.id, credit: args.amount, description: `Loan receivable written off for ${args.employeeCode}` },
+            ],
+        });
+    }
+    // ------------------------------------------------------------------
     // Report helpers
     // ------------------------------------------------------------------
     /**

@@ -26,6 +26,7 @@ import '../../widgets/status_badge.dart';
 import 'bom_form_dialog.dart';
 import 'production_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the BOM detail dialog for [bomId].
 Future<void> showBomDetailDialog(BuildContext context, {required int bomId}) {
@@ -43,10 +44,11 @@ class BomDetailDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(bomDetailProvider(bomId));
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 700),
-        child: switch (detail) {
+    return MovableDialog(
+      dialogId: 'bom_detail',
+      maxWidth: 720,
+      maxHeight: 700,
+      child: switch (detail) {
           AsyncData(:final value) => _DetailBody(bomId: bomId, bom: value),
           AsyncError(:final error) => DetailError(
             message: error is ApiError ? error.message : '$error',
@@ -58,7 +60,6 @@ class BomDetailDialog extends ConsumerWidget {
             child: Center(child: CircularProgressIndicator()),
           ),
         },
-      ),
     );
   }
 }

@@ -22,6 +22,7 @@ import '../../widgets/confirm_dialog.dart';
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
 import 'expense_providers.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the category manager. Returns the last created category name
 /// (so the caller can pre-select it), or null when nothing was created.
@@ -149,10 +150,11 @@ class _ExpenseCategoryDialogState extends ConsumerState<ExpenseCategoryDialog> {
     final l10n = AppLocalizations.of(context)!;
     final categories = ref.watch(expenseCategoriesProvider);
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460, maxHeight: 640),
-        child: Column(
+    return MovableDialog(
+      dialogId: 'expense_category',
+      maxWidth: 460,
+      maxHeight: 640,
+      child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -285,7 +287,6 @@ class _ExpenseCategoryDialogState extends ConsumerState<ExpenseCategoryDialog> {
               ),
             ),
           ],
-        ),
       ),
     );
   }

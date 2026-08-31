@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 import '../../widgets/form_field.dart' show FormFieldShell;
 import '../../widgets/form_helpers.dart' show formInputDecoration;
 import 'purchase_return_form_dialog.dart'
@@ -77,10 +78,11 @@ class _ReturnSourcePickerDialogState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 560),
-        child: Column(
+    return MovableDialog(
+      dialogId: 'return_source_picker',
+      maxWidth: 620,
+      maxHeight: 560,
+      child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -133,7 +135,6 @@ class _ReturnSourcePickerDialogState
             const Divider(height: 1),
             Expanded(child: _sourceList(l10n)),
           ],
-        ),
       ),
     );
   }

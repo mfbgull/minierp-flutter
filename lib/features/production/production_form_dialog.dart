@@ -33,6 +33,7 @@ import '../../widgets/searchable_select.dart';
 import 'calculations/production_calculations.dart';
 import 'production_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// One read-only material row of the production form — derived from
 /// the selected BOM (scaled to the entered output quantity) with the
@@ -360,10 +361,11 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
 
     InputDecoration deco() => formInputDecoration();
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 900, maxHeight: 760),
-        child: Form(
+    return MovableDialog(
+      dialogId: 'production_form',
+      maxWidth: 900,
+      maxHeight: 760,
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -683,7 +685,6 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

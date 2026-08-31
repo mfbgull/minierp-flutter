@@ -5919,4 +5919,204 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get paymentsUnknownRow => 'Invalid / legacy row';
+
+  @override
+  String get equityPersonalLoans => 'Personal Loans';
+
+  @override
+  String get equityPersonalLoansDescription =>
+      'Track personal loans given by the owner';
+
+  @override
+  String get equityPersonalLoanNew => 'New Loan';
+
+  @override
+  String get equityPersonalLoanEdit => 'Edit Loan';
+
+  @override
+  String get equityPersonalLoanDetail => 'Loan Detail';
+
+  @override
+  String get equityPersonalLoanBorrower => 'Borrower';
+
+  @override
+  String get equityPersonalLoanBorrowerName => 'Borrower Name';
+
+  @override
+  String get equityPersonalLoanBorrowerPhone => 'Phone';
+
+  @override
+  String get equityPersonalLoanBorrowerLinkTo => 'Link to';
+
+  @override
+  String get equityPersonalLoanBorrowerTypeCustomer => 'Customer';
+
+  @override
+  String get equityPersonalLoanBorrowerTypeSupplier => 'Supplier';
+
+  @override
+  String get equityPersonalLoanBorrowerRequired => 'Borrower is required';
+
+  @override
+  String get equityPersonalLoanAddBorrower => 'Add New Borrower';
+
+  @override
+  String get equityPersonalLoanManageBorrowers => 'Manage Borrowers';
+
+  @override
+  String get equityPersonalLoanEditBorrower => 'Edit Borrower';
+
+  @override
+  String get equityPersonalLoanMergeBorrower => 'Merge Into...';
+
+  @override
+  String get equityPersonalLoanUnlinkBorrower => 'Unlink Customer/Supplier';
+
+  @override
+  String get equityPersonalLoanUnlinkBorrowerBody =>
+      'The borrower record will remain but will no longer be linked.';
+
+  @override
+  String get equityPersonalLoanDeactivateBorrower => 'Deactivate';
+
+  @override
+  String get equityPersonalLoanDeactivateBorrowerConfirm =>
+      'Deactivate this borrower?';
+
+  @override
+  String get equityPersonalLoanReactivateBorrower => 'Reactivate';
+
+  @override
+  String get equityPersonalLoanBorrowerMerged =>
+      'Borrowers merged successfully';
+
+  @override
+  String get equityPersonalLoanBorrowerUnlinked => 'Link removed';
+
+  @override
+  String get equityPersonalLoanBorrowerDeactivated => 'Borrower deactivated';
+
+  @override
+  String get equityPersonalLoanBorrowerReactivated => 'Borrower reactivated';
+
+  @override
+  String get equityPersonalLoanBorrowerUpdated => 'Borrower updated';
+
+  @override
+  String get equityPersonalLoanAmount => 'Amount';
+
+  @override
+  String get equityPersonalLoanBalance => 'Balance';
+
+  @override
+  String get equityPersonalLoanCurrency => 'Currency';
+
+  @override
+  String get equityPersonalLoanDateGiven => 'Date Given';
+
+  @override
+  String get equityPersonalLoanDueDate => 'Due Date';
+
+  @override
+  String get equityPersonalLoanPurpose => 'Purpose';
+
+  @override
+  String get equityPersonalLoanNotes => 'Notes';
+
+  @override
+  String get equityPersonalLoanLoanNo => 'Loan No';
+
+  @override
+  String get equityPersonalLoanStatusPending => 'Pending';
+
+  @override
+  String get equityPersonalLoanStatusPartial => 'Partial';
+
+  @override
+  String get equityPersonalLoanStatusSettled => 'Settled';
+
+  @override
+  String get equityPersonalLoanStatusWrittenOff => 'Written Off';
+
+  @override
+  String get equityPersonalLoanTotalLent => 'Total Lent';
+
+  @override
+  String get equityPersonalLoanTotalRepaid => 'Repaid';
+
+  @override
+  String get equityPersonalLoanTotalPending => 'Pending';
+
+  @override
+  String get equityPersonalLoanActiveCount => 'Active';
+
+  @override
+  String get equityPersonalLoanNoLoans => 'No personal loans recorded';
+
+  @override
+  String get equityPersonalLoanNoBorrowers => 'No borrowers found';
+
+  @override
+  String get equityPersonalLoanNoRepayments => 'No repayments yet';
+
+  @override
+  String get equityPersonalLoanCreated => 'Loan recorded successfully';
+
+  @override
+  String get equityPersonalLoanUpdated => 'Loan updated';
+
+  @override
+  String get equityPersonalLoanDeleted => 'Loan deleted';
+
+  @override
+  String get equityPersonalLoanDeleteConfirm => 'Delete this loan?';
+
+  @override
+  String get equityPersonalLoanRepaymentAdded => 'Repayment recorded';
+
+  @override
+  String get equityPersonalLoanRepaymentDeleteConfirm => 'Delete repayment';
+
+  @override
+  String get equityPersonalLoanRepaymentExceeds =>
+      'Repayment exceeds loan balance';
+
+  @override
+  String get equityPersonalLoanAddRepayment => 'Add Repayment';
+
+  @override
+  String get equityPersonalLoanRepaymentAmount => 'Repayment Amount';
+
+  @override
+  String get equityPersonalLoanRepaymentDate => 'Date Received';
+
+  @override
+  String get equityPersonalLoanRepaymentNotes => 'Notes';
+
+  @override
+  String get equityPersonalLoanRepaymentHistory => 'Repayment History';
+
+  @override
+  String get equityPersonalLoanWrittenOff => 'Loan written off';
+
+  @override
+  String get equityPersonalLoanExported => 'Exported successfully';
+
+  @override
+  String get equityPersonalLoanExportFailed => 'Export failed';
+
+  @override
+  String get equityPersonalLoanFilterAll => 'All';
+
+  @override
+  String get equityPersonalLoanFilterWithLoans => 'With Active Loans';
+
+  @override
+  String get equityPersonalLoanFilterCustomers => 'Customers Only';
+
+  @override
+  String get equityPersonalLoanFilterSuppliers => 'Suppliers Only';
+
+  @override
+  String get equityPersonalLoanFilterPersonal => 'Personal Contacts';
 }

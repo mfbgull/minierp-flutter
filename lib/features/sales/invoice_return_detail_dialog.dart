@@ -13,6 +13,7 @@ import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'invoice_return_type.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the read-only detail dialog for a return row.
 Future<void> showInvoiceReturnDetailDialog(
@@ -38,10 +39,11 @@ class _InvoiceReturnDetailDialog extends StatelessWidget {
       salesReturn.referenceDocType,
     );
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 600),
-        child: Padding(
+    return MovableDialog(
+      dialogId: 'invoice_return_detail',
+      maxWidth: 520,
+      maxHeight: 600,
+      child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -117,7 +119,6 @@ class _InvoiceReturnDetailDialog extends StatelessWidget {
               ),
             ],
           ),
-        ),
       ),
     );
   }

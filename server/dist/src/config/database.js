@@ -1341,6 +1341,8 @@ runLedgered('fn.runLooseItemMigration', runLooseItemMigration);
 runLedgered('fn.runCashAccountsMigration', runCashAccountsMigration);
 runLedgered('fn.runOpeningBalancesMigration', runOpeningBalancesMigration);
 runLedgered('fn.runUserPreferencesMigration', runUserPreferencesMigration);
+runLedgered('fn.runEmployeeLoansMigration', runEmployeeLoansMigration);
+runLedgered('fn.runOwnerPersonalLoansMigration', runOwnerPersonalLoansMigration);
 // INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
 // INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
 runLedgered('fn.runGLVoidAttributionMigration', runGLVoidAttributionMigration);
@@ -1385,6 +1387,12 @@ runLedgered('fn.runStockInvariantChecksRebuild', runStockInvariantChecksRebuild,
 // Repair: re-add stock_batches halted/halted_reason when an older rebuild
 // dropped them (FEFO consumption hard-fails without the column).
 runLedgered('fn.runBatchHaltColumnsRepairMigration', runBatchHaltColumnsRepairMigration);
+// Salary payment duplicate guard: pay_period column + unique index
+runLedgered('add-salary-pay-period.sql');
+// Salary payment type: full / advance / partial
+runLedgered('add-salary-payment-type.sql');
+// Allow multiple salary payments per month (advance/partial)
+runLedgered('drop-salary-unique-period.sql');
 // Owner Capital & Withdrawals: equity children 3200/3300 + transaction tables.
 runLedgered('add-owner-equity.sql');
 // Post-apply assertion — runtime posting resolves these by text_code, so an
@@ -2082,6 +2090,40 @@ function runUserPreferencesMigration() {
     }
     catch (error) {
         throw new Error('User preferences migration error:: ' + error.message, { cause: error });
+    }
+}
+function runEmployeeLoansMigration() {
+    try {
+        const tableCheck = db.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE type='table' AND name='employee_loans'
+    `).get();
+        if (!tableCheck) {
+            logger_1.default.info('Running employee loans migration...');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-employee-loans.sql'), 'utf8');
+            db.exec(migrationSQL);
+            logger_1.default.info('✅ Employee loans migration completed!');
+        }
+    }
+    catch (error) {
+        throw new Error('Employee loans migration error:: ' + error.message, { cause: error });
+    }
+}
+function runOwnerPersonalLoansMigration() {
+    try {
+        const tableCheck = db.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE type='table' AND name='owner_personal_loans'
+    `).get();
+        if (!tableCheck) {
+            logger_1.default.info('Running owner personal loans migration...');
+            const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-owner-personal-loans.sql'), 'utf8');
+            db.exec(migrationSQL);
+            logger_1.default.info('✅ Owner personal loans migration completed!');
+        }
+    }
+    catch (error) {
+        throw new Error('Owner personal loans migration error:: ' + error.message, { cause: error });
     }
 }
 /** Read-only comparison of stock_balances vs SUM(stock_movements). */

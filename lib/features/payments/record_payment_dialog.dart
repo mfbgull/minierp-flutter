@@ -33,6 +33,7 @@ import '../sales/invoice_providers.dart' show invoicesProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'payments_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the Record Payment dialog (customer + allocations).
 Future<void> showRecordPaymentDialog(BuildContext context) {
@@ -214,10 +215,11 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
     // Keep the per-line controllers aligned with the loaded invoice set.
     if (openInvoices != null) _syncAmountControllers(openInvoices);
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 680),
-        child: Padding(
+    return MovableDialog(
+      dialogId: 'record_payment',
+      maxWidth: 620,
+      maxHeight: 680,
+      child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -240,7 +242,6 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

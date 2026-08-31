@@ -91,9 +91,11 @@ abstract final class ApiEndpoints {
   static const ownerEquityWithdrawals = '/owner-equity/withdrawals';
   static const ownerEquityWithdrawalsQuote =
       '/owner-equity/withdrawals/quote';
-  static const ownerEquitySummary = '/owner-equity/summary';
-  static const ownerEquityPaymentMethodOptions =
-      '/owner-equity/payment-method-options';
+  static const ownerEquitySummary = '/owner-equity/summary';  static const ownerEquityPaymentMethodOptions = '/owner-equity/payment-method-options';
+  // Owner personal loans (purely record-keeping, no GL impact)
+  static const ownerPersonalLoans = '/owner-equity/personal-loans';
+  static const ownerPersonalLoansSummary = '/owner-equity/personal-loans/summary';
+  static const ownerBorrowers = '/owner-equity/borrowers';
   static const employees = '/employees';
   // Production (§Production) — note the BOM mount is `/api/boms`
   // (`app.use('/api/boms', bomRoutes)`) while productions live flat on

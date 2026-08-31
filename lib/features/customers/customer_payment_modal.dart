@@ -30,6 +30,7 @@ import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'customer_providers.dart';
 import '../../widgets/payment_receipt_pdf.dart' show buildPaymentReceiptPdf;
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 
 /// Opens the web-style Record Payment modal with [customer] pre-bound.
 Future<void> showCustomerPaymentModal(
@@ -356,10 +357,11 @@ class _CustomerPaymentModalState extends ConsumerState<CustomerPaymentModal> {
     final openInvoices =
         ref.watch(_openInvoicesProvider(widget.customer.id)).valueOrNull;
 
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
-        child: Padding(
+    return MovableDialog(
+      dialogId: 'customer_payment',
+      maxWidth: 680,
+      maxHeight: 720,
+      child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -601,7 +603,6 @@ class _CustomerPaymentModalState extends ConsumerState<CustomerPaymentModal> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

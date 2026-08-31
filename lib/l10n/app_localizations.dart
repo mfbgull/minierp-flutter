@@ -11577,6 +11577,396 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invalid / legacy row'**
   String get paymentsUnknownRow;
+
+  /// No description provided for @equityPersonalLoans.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal Loans'**
+  String get equityPersonalLoans;
+
+  /// No description provided for @equityPersonalLoansDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Track personal loans given by the owner'**
+  String get equityPersonalLoansDescription;
+
+  /// No description provided for @equityPersonalLoanNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New Loan'**
+  String get equityPersonalLoanNew;
+
+  /// No description provided for @equityPersonalLoanEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Loan'**
+  String get equityPersonalLoanEdit;
+
+  /// No description provided for @equityPersonalLoanDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan Detail'**
+  String get equityPersonalLoanDetail;
+
+  /// No description provided for @equityPersonalLoanBorrower.
+  ///
+  /// In en, this message translates to:
+  /// **'Borrower'**
+  String get equityPersonalLoanBorrower;
+
+  /// No description provided for @equityPersonalLoanBorrowerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Borrower Name'**
+  String get equityPersonalLoanBorrowerName;
+
+  /// No description provided for @equityPersonalLoanBorrowerPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get equityPersonalLoanBorrowerPhone;
+
+  /// No description provided for @equityPersonalLoanBorrowerLinkTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Link to'**
+  String get equityPersonalLoanBorrowerLinkTo;
+
+  /// No description provided for @equityPersonalLoanBorrowerTypeCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get equityPersonalLoanBorrowerTypeCustomer;
+
+  /// No description provided for @equityPersonalLoanBorrowerTypeSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier'**
+  String get equityPersonalLoanBorrowerTypeSupplier;
+
+  /// No description provided for @equityPersonalLoanBorrowerRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Borrower is required'**
+  String get equityPersonalLoanBorrowerRequired;
+
+  /// No description provided for @equityPersonalLoanAddBorrower.
+  ///
+  /// In en, this message translates to:
+  /// **'Add New Borrower'**
+  String get equityPersonalLoanAddBorrower;
+
+  /// No description provided for @equityPersonalLoanManageBorrowers.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Borrowers'**
+  String get equityPersonalLoanManageBorrowers;
+
+  /// No description provided for @equityPersonalLoanEditBorrower.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Borrower'**
+  String get equityPersonalLoanEditBorrower;
+
+  /// No description provided for @equityPersonalLoanMergeBorrower.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge Into...'**
+  String get equityPersonalLoanMergeBorrower;
+
+  /// No description provided for @equityPersonalLoanUnlinkBorrower.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlink Customer/Supplier'**
+  String get equityPersonalLoanUnlinkBorrower;
+
+  /// No description provided for @equityPersonalLoanUnlinkBorrowerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The borrower record will remain but will no longer be linked.'**
+  String get equityPersonalLoanUnlinkBorrowerBody;
+
+  /// No description provided for @equityPersonalLoanDeactivateBorrower.
+  ///
+  /// In en, this message translates to:
+  /// **'Deactivate'**
+  String get equityPersonalLoanDeactivateBorrower;
+
+  /// No description provided for @equityPersonalLoanDeactivateBorrowerConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Deactivate this borrower?'**
+  String get equityPersonalLoanDeactivateBorrowerConfirm;
+
+  /// No description provided for @equityPersonalLoanReactivateBorrower.
+  ///
+  /// In en, this message translates to:
+  /// **'Reactivate'**
+  String get equityPersonalLoanReactivateBorrower;
+
+  /// No description provided for @equityPersonalLoanBorrowerMerged.
+  ///
+  /// In en, this message translates to:
+  /// **'Borrowers merged successfully'**
+  String get equityPersonalLoanBorrowerMerged;
+
+  /// No description provided for @equityPersonalLoanBorrowerUnlinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Link removed'**
+  String get equityPersonalLoanBorrowerUnlinked;
+
+  /// No description provided for @equityPersonalLoanBorrowerDeactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Borrower deactivated'**
+  String get equityPersonalLoanBorrowerDeactivated;
+
+  /// No description provided for @equityPersonalLoanBorrowerReactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Borrower reactivated'**
+  String get equityPersonalLoanBorrowerReactivated;
+
+  /// No description provided for @equityPersonalLoanBorrowerUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Borrower updated'**
+  String get equityPersonalLoanBorrowerUpdated;
+
+  /// No description provided for @equityPersonalLoanAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get equityPersonalLoanAmount;
+
+  /// No description provided for @equityPersonalLoanBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get equityPersonalLoanBalance;
+
+  /// No description provided for @equityPersonalLoanCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get equityPersonalLoanCurrency;
+
+  /// No description provided for @equityPersonalLoanDateGiven.
+  ///
+  /// In en, this message translates to:
+  /// **'Date Given'**
+  String get equityPersonalLoanDateGiven;
+
+  /// No description provided for @equityPersonalLoanDueDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Due Date'**
+  String get equityPersonalLoanDueDate;
+
+  /// No description provided for @equityPersonalLoanPurpose.
+  ///
+  /// In en, this message translates to:
+  /// **'Purpose'**
+  String get equityPersonalLoanPurpose;
+
+  /// No description provided for @equityPersonalLoanNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get equityPersonalLoanNotes;
+
+  /// No description provided for @equityPersonalLoanLoanNo.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan No'**
+  String get equityPersonalLoanLoanNo;
+
+  /// No description provided for @equityPersonalLoanStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get equityPersonalLoanStatusPending;
+
+  /// No description provided for @equityPersonalLoanStatusPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial'**
+  String get equityPersonalLoanStatusPartial;
+
+  /// No description provided for @equityPersonalLoanStatusSettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Settled'**
+  String get equityPersonalLoanStatusSettled;
+
+  /// No description provided for @equityPersonalLoanStatusWrittenOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Written Off'**
+  String get equityPersonalLoanStatusWrittenOff;
+
+  /// No description provided for @equityPersonalLoanTotalLent.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Lent'**
+  String get equityPersonalLoanTotalLent;
+
+  /// No description provided for @equityPersonalLoanTotalRepaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Repaid'**
+  String get equityPersonalLoanTotalRepaid;
+
+  /// No description provided for @equityPersonalLoanTotalPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get equityPersonalLoanTotalPending;
+
+  /// No description provided for @equityPersonalLoanActiveCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get equityPersonalLoanActiveCount;
+
+  /// No description provided for @equityPersonalLoanNoLoans.
+  ///
+  /// In en, this message translates to:
+  /// **'No personal loans recorded'**
+  String get equityPersonalLoanNoLoans;
+
+  /// No description provided for @equityPersonalLoanNoBorrowers.
+  ///
+  /// In en, this message translates to:
+  /// **'No borrowers found'**
+  String get equityPersonalLoanNoBorrowers;
+
+  /// No description provided for @equityPersonalLoanNoRepayments.
+  ///
+  /// In en, this message translates to:
+  /// **'No repayments yet'**
+  String get equityPersonalLoanNoRepayments;
+
+  /// No description provided for @equityPersonalLoanCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan recorded successfully'**
+  String get equityPersonalLoanCreated;
+
+  /// No description provided for @equityPersonalLoanUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan updated'**
+  String get equityPersonalLoanUpdated;
+
+  /// No description provided for @equityPersonalLoanDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan deleted'**
+  String get equityPersonalLoanDeleted;
+
+  /// No description provided for @equityPersonalLoanDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this loan?'**
+  String get equityPersonalLoanDeleteConfirm;
+
+  /// No description provided for @equityPersonalLoanRepaymentAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Repayment recorded'**
+  String get equityPersonalLoanRepaymentAdded;
+
+  /// No description provided for @equityPersonalLoanRepaymentDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete repayment'**
+  String get equityPersonalLoanRepaymentDeleteConfirm;
+
+  /// No description provided for @equityPersonalLoanRepaymentExceeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Repayment exceeds loan balance'**
+  String get equityPersonalLoanRepaymentExceeds;
+
+  /// No description provided for @equityPersonalLoanAddRepayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Repayment'**
+  String get equityPersonalLoanAddRepayment;
+
+  /// No description provided for @equityPersonalLoanRepaymentAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Repayment Amount'**
+  String get equityPersonalLoanRepaymentAmount;
+
+  /// No description provided for @equityPersonalLoanRepaymentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date Received'**
+  String get equityPersonalLoanRepaymentDate;
+
+  /// No description provided for @equityPersonalLoanRepaymentNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get equityPersonalLoanRepaymentNotes;
+
+  /// No description provided for @equityPersonalLoanRepaymentHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Repayment History'**
+  String get equityPersonalLoanRepaymentHistory;
+
+  /// No description provided for @equityPersonalLoanWrittenOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan written off'**
+  String get equityPersonalLoanWrittenOff;
+
+  /// No description provided for @equityPersonalLoanExported.
+  ///
+  /// In en, this message translates to:
+  /// **'Exported successfully'**
+  String get equityPersonalLoanExported;
+
+  /// No description provided for @equityPersonalLoanExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed'**
+  String get equityPersonalLoanExportFailed;
+
+  /// No description provided for @equityPersonalLoanFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get equityPersonalLoanFilterAll;
+
+  /// No description provided for @equityPersonalLoanFilterWithLoans.
+  ///
+  /// In en, this message translates to:
+  /// **'With Active Loans'**
+  String get equityPersonalLoanFilterWithLoans;
+
+  /// No description provided for @equityPersonalLoanFilterCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers Only'**
+  String get equityPersonalLoanFilterCustomers;
+
+  /// No description provided for @equityPersonalLoanFilterSuppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'Suppliers Only'**
+  String get equityPersonalLoanFilterSuppliers;
+
+  /// No description provided for @equityPersonalLoanFilterPersonal.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal Contacts'**
+  String get equityPersonalLoanFilterPersonal;
 }
 
 class _AppLocalizationsDelegate

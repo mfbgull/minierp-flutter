@@ -14,6 +14,8 @@ import '../shell/module_refresh.dart' show moduleTabRefreshOnVisit;
 import 'owner_capital_tab.dart';
 import 'owner_equity_providers.dart';
 import 'owner_withdrawals_tab.dart';
+import 'personal_loan_tab.dart';
+import 'personal_loan_providers.dart' show personalLoanSummaryProvider;
 
 class OwnersEquityShell extends ConsumerStatefulWidget {
   const OwnersEquityShell({super.key});
@@ -39,8 +41,6 @@ class _OwnersEquityShellState extends ConsumerState<OwnersEquityShell> {
           selectedIndex: _index,
           onDestinationSelected: (i) {
             setState(() => _index = i);
-            // Refresh the clicked tab's data (the IndexedStack keeps
-            // every tab alive, so its providers would stay cached).
             moduleTabRefreshOnVisit['/owners-equity']?[i].call(ref);
           },
           destinations: [
@@ -54,12 +54,17 @@ class _OwnersEquityShellState extends ConsumerState<OwnersEquityShell> {
               selectedIcon: const Icon(Icons.call_made),
               label: l10n.equityWithdrawals,
             ),
+            NavigationDestination(
+              icon: const Icon(Icons.handshake_outlined),
+              selectedIcon: const Icon(Icons.handshake),
+              label: l10n.equityPersonalLoans,
+            ),
           ],
         ),
         Expanded(
           child: IndexedStack(
             index: _index,
-            children: const [OwnerCapitalTab(), OwnerWithdrawalsTab()],
+            children: const [OwnerCapitalTab(), OwnerWithdrawalsTab(), PersonalLoansTab()],
           ),
         ),
       ],
@@ -68,8 +73,10 @@ class _OwnersEquityShellState extends ConsumerState<OwnersEquityShell> {
 
   Widget _summaryCards(AppLocalizations l10n) {
     final summary = ref.watch(equitySummaryProvider);
+    final loanSummary = ref.watch(personalLoanSummaryProvider);
     final scheme = Theme.of(context).colorScheme;
     final data = summary.valueOrNull;
+    final loanData = loanSummary.valueOrNull;
 
     return Card(
       elevation: 0,
@@ -80,37 +87,80 @@ class _OwnersEquityShellState extends ConsumerState<OwnersEquityShell> {
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        child: Row(
+        child: Column(
           children: [
-            Expanded(
-              child: _Stat(
-                icon: Icons.savings_outlined,
-                label: l10n.equityTotalcapitalin,
-                value:
-                    Formatters.currency(data?.totalCapitalIn ?? 0),
-                color: scheme.primary,
-              ),
-            ),
-            _statDivider(scheme),
-            Expanded(
-              child: _Stat(
-                icon: Icons.call_made_outlined,
-                label: l10n.equityTotalwithdrawn,
-                value: Formatters.currency(
-                  (data?.totalWithdrawnCash ?? 0) +
-                      (data?.totalWithdrawnGoods ?? 0),
+            Row(
+              children: [
+                Expanded(
+                  child: _Stat(
+                    icon: Icons.savings_outlined,
+                    label: l10n.equityTotalcapitalin,
+                    value: Formatters.currency(data?.totalCapitalIn ?? 0),
+                    color: scheme.primary,
+                  ),
                 ),
-                color: scheme.error,
-              ),
+                _statDivider(scheme),
+                Expanded(
+                  child: _Stat(
+                    icon: Icons.call_made_outlined,
+                    label: l10n.equityTotalwithdrawn,
+                    value: Formatters.currency(
+                      (data?.totalWithdrawnCash ?? 0) +
+                          (data?.totalWithdrawnGoods ?? 0),
+                    ),
+                    color: scheme.error,
+                  ),
+                ),
+                _statDivider(scheme),
+                Expanded(
+                  child: _Stat(
+                    icon: Icons.account_balance_outlined,
+                    label: l10n.equityNetcontributions,
+                    value: Formatters.currency(data?.netContributions ?? 0),
+                    color: scheme.tertiary,
+                  ),
+                ),
+              ],
             ),
-            _statDivider(scheme),
-            Expanded(
-              child: _Stat(
-                icon: Icons.account_balance_outlined,
-                label: l10n.equityNetcontributions,
-                value: Formatters.currency(data?.netContributions ?? 0),
-                color: scheme.tertiary,
-              ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _Stat(
+                    icon: Icons.handshake_outlined,
+                    label: l10n.equityPersonalLoanTotalLent,
+                    value: Formatters.currency(loanData?.totalLent ?? 0),
+                    color: scheme.primary,
+                  ),
+                ),
+                _statDivider(scheme),
+                Expanded(
+                  child: _Stat(
+                    icon: Icons.payments_outlined,
+                    label: l10n.equityPersonalLoanTotalRepaid,
+                    value: Formatters.currency(loanData?.totalRepaid ?? 0),
+                    color: scheme.tertiary,
+                  ),
+                ),
+                _statDivider(scheme),
+                Expanded(
+                  child: _Stat(
+                    icon: Icons.pending_outlined,
+                    label: l10n.equityPersonalLoanTotalPending,
+                    value: Formatters.currency(loanData?.totalPending ?? 0),
+                    color: scheme.error,
+                  ),
+                ),
+                _statDivider(scheme),
+                Expanded(
+                  child: _Stat(
+                    icon: Icons.list_alt_outlined,
+                    label: l10n.equityPersonalLoanActiveCount,
+                    value: '${loanData?.activeCount ?? 0}',
+                    color: scheme.secondary,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
