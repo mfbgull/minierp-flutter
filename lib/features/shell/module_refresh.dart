@@ -35,6 +35,7 @@ import '../dashboard/dashboard_providers.dart'
         dashboardTopCustomersProvider,
         invalidateDashboardKpiCards;
 import '../employees/employee_providers.dart' show employeesProvider;
+import '../employees/loan_providers.dart' show dashboardActiveLoansProvider2;
 import '../expenses/expense_providers.dart'
     show
         expenseCategoriesProvider,
@@ -139,7 +140,8 @@ final Map<String, ModuleRefresh> moduleRefreshOnVisit = {
       ..invalidate(dashboardArSummaryProvider)
       ..invalidate(dashboardCashPositionProvider)
       ..invalidate(dashboardCashOpeningBalancesProvider)
-      ..invalidate(dashboardTopCustomersProvider);
+      ..invalidate(dashboardTopCustomersProvider)
+      ..invalidate(dashboardActiveLoansProvider2);
   },
   '/inventory': (ref) => ref
     ..invalidate(itemsProvider)

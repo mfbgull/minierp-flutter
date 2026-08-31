@@ -135,6 +135,47 @@ class AppLocalizationsUr extends AppLocalizations {
   String get dashboardcardPanelExpiryalerts => 'جلد ختم ہو رہا ہے';
 
   @override
+  String get dashboardcardPanelActiveloans => 'فعال قرضے';
+
+  @override
+  String get dashboardcardOutstandingloans => 'باقی قرضے';
+
+  @override
+  String get dashboardOutstandingloansHint =>
+      'تمام ملازمین سے باقی قرضوں کا کل بیلنس';
+
+  @override
+  String get dashboardActiveLoansCount => 'فعال';
+
+  @override
+  String get dashboardOverdueCount => 'واجب التاریخ';
+
+  @override
+  String dashboardDaysUntilDue(Object days) {
+    return '$days دنوں میں واجب التاریخ';
+  }
+
+  @override
+  String dashboardDaysOverdue(Object days) {
+    return '$days دن واجب التاریخ ہو گئے';
+  }
+
+  @override
+  String get loanAgingCurrent => 'جاری';
+
+  @override
+  String get loanAgingDueSoon => 'جلد واجب التاریخ';
+
+  @override
+  String get loanAgingDueToday => 'آج واجب التاریخ';
+
+  @override
+  String get loanAgingOverdue1_30 => 'واجب التاریخ 1-30 دن';
+
+  @override
+  String get loanAgingOverdue30Plus => 'واجب التاریخ 30+ دن';
+
+  @override
   String get dashboardcardCashstrip => 'نقدی اور بینک پوزیشن';
 
   @override
@@ -3921,7 +3962,137 @@ class AppLocalizationsUr extends AppLocalizations {
   String get employeesSalarynotes => 'نوٹس';
 
   @override
+  String get employeesPaymenttype => 'ادائیگی کی قسم';
+
+  @override
+  String get employeesPaymenttypeFull => 'مکمل';
+
+  @override
+  String get employeesPaymenttypeAdvance => 'پیشگی';
+
+  @override
+  String get employeesPaymenttypePartial => 'جزوی';
+
+  @override
+  String get employeesRemainingbalance => 'باقی بیلنس';
+
+  @override
+  String get employeesSalarydeleted => 'تنخواہ کی ادائیگی حذف ہو گئی';
+
+  @override
   String get employeesSalarypaid => 'تنخواہ کی ادائیگی درج ہو گئی';
+
+  @override
+  String get employeesSalarystatusPaid => 'ادا شدہ';
+
+  @override
+  String get employeesSalarystatusPartial => 'جزوی';
+
+  @override
+  String get employeesSalarystatusAdvance => 'پیشگی';
+
+  @override
+  String get employeesAlreadyPaid => 'اس مہینے پہلے سے ادا ہو چکا';
+
+  @override
+  String get employeesAdvanceFromPrevious => 'پچھلے مہینے سے پیشگی';
+
+  @override
+  String get employeesAdvanceFrom => 'پیشگی از';
+
+  @override
+  String get employeesTotaladvance => 'کل پیشگی بیلنس';
+
+  @override
+  String get employeesMonthdetail => 'تنخواہ کی تفصیلات';
+
+  @override
+  String get employeesPaymore => 'مزید ادائیگی کریں';
+
+  @override
+  String get employeesLoans => 'قرضے';
+
+  @override
+  String get employeesNoLoans => 'کوئی قرضے ریکارڈ نہیں کیے گئے';
+
+  @override
+  String get employeesNewLoan => 'نیا قرضہ';
+
+  @override
+  String get employeesRepayLoan => 'قرضہ ادا کریں';
+
+  @override
+  String get employeesLoanAmount => 'قرضے کی رقم';
+
+  @override
+  String get employeesLoanBalance => 'باقی بیلنس';
+
+  @override
+  String get employeesLoanPurpose => 'مقصد';
+
+  @override
+  String get employeesLoanDisbursementDate => 'تخصیص کی تاریخ';
+
+  @override
+  String get employeesLoanDueDate => 'واجب التاریخ';
+
+  @override
+  String get employeesLoanMonthlyInstallment => 'ماہانہ قسط';
+
+  @override
+  String get employeesLoanPaymentMethod => 'ادائیگی کا طریقہ';
+
+  @override
+  String get employeesLoanStatusActive => 'فعال';
+
+  @override
+  String get employeesLoanStatusCompleted => 'مکمل';
+
+  @override
+  String get employeesLoanStatusOverdue => 'واجب التاریخ';
+
+  @override
+  String get employeesLoanStatusWrittenOff => 'مالیاتی چھوٹ';
+
+  @override
+  String get employeesLoanCreated => 'قرضہ کامیابی سے ریکارڈ ہو گیا';
+
+  @override
+  String get employeesLoanRepaid => 'ادائیگی ریکارڈ ہو گئی';
+
+  @override
+  String get employeesLoanWrittenOff => 'قرضہ مالیاتی چھوٹ کر دیا گیا';
+
+  @override
+  String get employeesLoanDeleted => 'قرضہ حذف ہو گیا';
+
+  @override
+  String get employeesLoanRepaymentAmount => 'ادائیگی کی رقم';
+
+  @override
+  String get employeesLoanRepaymentDate => 'ادائیگی کی تاریخ';
+
+  @override
+  String get employeesLoanRepaymentTypeDirect => 'براہ راست ادائیگی';
+
+  @override
+  String get employeesLoanRepaymentTypeSalary => 'تنخواہ میں کٹوتی';
+
+  @override
+  String get employeesLoanRepaymentExceeds =>
+      'ادائیگی قرضے کے بیلنس سے زیادہ ہے';
+
+  @override
+  String get employeesLoanOutstanding => 'کل باقی قرضے';
+
+  @override
+  String get employeesLoanTotalRepaid => 'کل ادا شدہ';
+
+  @override
+  String get employeesLoanDeductFromSalary => 'تنخواہ میں سے قرضہ کاٹیں';
+
+  @override
+  String get employeesLoanSuggestedInstallment => 'تجویز کردہ';
 
   @override
   String get employeesSearch => 'عملہ تلاش کریں...';

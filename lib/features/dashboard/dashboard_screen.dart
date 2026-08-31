@@ -40,6 +40,7 @@ import 'dashboard_layout_controller.dart'
         dashboardLayoutControllerProvider;
 import 'dashboard_panel_catalog.dart' show panelById;
 import 'dashboard_providers.dart';
+import 'panels/active_loans_panel.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Landing screen behind the auth gate — renders the server-side
@@ -614,6 +615,7 @@ class _PanelFrameState extends ConsumerState<_PanelFrame> {
       'panel_top_customers' => const _TopCustomersPanel(),
       'panel_low_stock' => _LowStockPanel(items: widget.summary.lowStockItems),
       'panel_expiry_alerts' => const _ExpiryAlertsPanel(),
+      'panel_active_loans' => const ActiveLoansPanel(),
       _ => const SizedBox.shrink(),
     };
 

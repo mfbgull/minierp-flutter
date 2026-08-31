@@ -1508,6 +1508,7 @@ runLedgered('fn.runLooseItemMigration', runLooseItemMigration);
 runLedgered('fn.runCashAccountsMigration', runCashAccountsMigration);
 runLedgered('fn.runOpeningBalancesMigration', runOpeningBalancesMigration);
 runLedgered('fn.runUserPreferencesMigration', runUserPreferencesMigration);
+runLedgered('fn.runEmployeeLoansMigration', runEmployeeLoansMigration);
 // INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
 // INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
 runLedgered('fn.runGLVoidAttributionMigration', runGLVoidAttributionMigration);
@@ -1552,6 +1553,13 @@ runLedgered('fn.runStockInvariantChecksRebuild', runStockInvariantChecksRebuild,
 // Repair: re-add stock_batches halted/halted_reason when an older rebuild
 // dropped them (FEFO consumption hard-fails without the column).
 runLedgered('fn.runBatchHaltColumnsRepairMigration', runBatchHaltColumnsRepairMigration);
+
+// Salary payment duplicate guard: pay_period column + unique index
+runLedgered('add-salary-pay-period.sql');
+// Salary payment type: full / advance / partial
+runLedgered('add-salary-payment-type.sql');
+// Allow multiple salary payments per month (advance/partial)
+runLedgered('drop-salary-unique-period.sql');
 
 // Owner Capital & Withdrawals: equity children 3200/3300 + transaction tables.
 runLedgered('add-owner-equity.sql');
@@ -2415,6 +2423,30 @@ function runUserPreferencesMigration(): void {
     }
   } catch (error: any) {
     throw new Error('User preferences migration error:: ' + error.message, { cause: error });
+  }
+}
+
+function runEmployeeLoansMigration(): void {
+  try {
+    const tableCheck = db.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE type='table' AND name='employee_loans'
+    `).get() as { name: string } | undefined;
+
+    if (!tableCheck) {
+      logger.info('Running employee loans migration...');
+
+      const migrationSQL = fs.readFileSync(
+        path.join(MIGRATIONS_DIR, 'add-employee-loans.sql'),
+        'utf8'
+      );
+
+      db.exec(migrationSQL);
+
+      logger.info('✅ Employee loans migration completed!');
+    }
+  } catch (error: any) {
+    throw new Error('Employee loans migration error:: ' + error.message, { cause: error });
   }
 }
 

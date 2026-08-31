@@ -1,0 +1,82 @@
+@startuml
+!theme plain
+title Employee Loan - GL Accounting Flow
+
+|#E8F5E9| Loan Disbursement |
+start
+:Create loan record;
+:GL Dr 1300 Loan Receivable;
+:GL Cr 1000/1010 Cash/Bank;
+:journal_entry_id saved;
+stop
+
+|#E3F2FD| Direct Repayment |
+start
+:Record repayment (type=direct);
+:GL Dr 1000/1010 Cash/Bank;
+:GL Cr 1300 Loan Receivable;
+:balance reduced;
+if (balance = 0?) then (yes)
+  :status = completed;
+else (no)
+endif
+stop
+
+|#FFF3E0| Salary Deduction |
+start
+:Record salary payment (Dr 6100, Cr Cash);
+:Record repayment (type=salary_deduction);
+:balance reduced;
+if (balance = 0?) then (yes)
+  :status = completed;
+else (no)
+endif
+stop
+
+|#FCE4EC| Loan Write-Off |
+start
+:Record written_off_amount;
+:GL Dr 6300 Loan Write-off;
+:GL Cr 1300 Loan Receivable;
+:balance = 0, status = written_off;
+stop
+
+|#F3E5F5| Void Disbursement |
+start
+if (Has repayments?) then (yes)
+  :Reject;
+else (no)
+  :Void GL (LOAN_DISBURSEMENT);
+  :Delete loan;
+endif
+stop
+
+|#F3E5F5| Void Direct Repayment |
+start
+:Void GL (LOAN_REPAYMENT);
+:Restore balance;
+if (Was completed?) then (yes)
+  :status = active;
+else (no)
+endif
+:Delete repayment;
+stop
+
+|#F3E5F5| Void Salary Deduction |
+start
+:Restore balance;
+if (Was completed?) then (yes)
+  :status = active;
+else (no)
+endif
+:Delete repayment;
+stop
+
+|#F3E5F5| Void Write-Off |
+start
+:Void GL (LOAN_WRITE_OFF);
+:Restore balance;
+:status = active;
+stop
+
+@enduml

@@ -4,6 +4,7 @@ import db from '../config/database';
 import logger from '../utils/logger';
 import { getQueryParam } from '../utils/queryUtils';
 import DashboardModel from '../models/Dashboard';
+import { EmployeeLoanModel } from '../models/EmployeeLoan';
 import ReportsModel from '../models/Reports';
 import {
   CASH_ACCOUNTS,
@@ -255,6 +256,32 @@ function saveCashOpeningBalances(req: AuthRequest, res: Response): void {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  EMPLOYEE LOANS DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/dashboard/active-loans
+ * Active loans across all employees with aging summary.
+ */
+function getActiveLoans(req: AuthRequest, res: Response): void {
+  try {
+    const loans = EmployeeLoanModel.getGlobalActiveLoans(db);
+    const summary = EmployeeLoanModel.getGlobalLoanSummary(db);
+
+    res.json({
+      success: true,
+      data: {
+        ...summary,
+        loans,
+      },
+    });
+  } catch (error) {
+    logger.error('Active loans error:', error);
+    res.status(500).json({ error: 'Failed to fetch active loans' });
+  }
+}
+
 export default {
   getSummary,
   getCashPosition,
@@ -269,4 +296,5 @@ export default {
   getKPI,
   getKPIBatch,
   getARSummary,
+  getActiveLoans,
 };
