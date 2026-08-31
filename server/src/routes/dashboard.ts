@@ -25,6 +25,7 @@ router.get('/cash-position', requirePermission('dashboard', 'read'), dashboardCo
 router.get('/expiry-alerts', requirePermission('dashboard', 'read'), dashboardController.getExpiryAlerts);
 router.get('/cash-opening-balances', requirePermission('dashboard', 'read'), dashboardController.getCashOpeningBalances);
 router.put('/cash-opening-balances', requirePermission('dashboard', 'update'), dashboardController.saveCashOpeningBalances);
+router.get('/active-loans', requirePermission('dashboard', 'read'), dashboardController.getActiveLoans);
 
 // ============ Layout CRUD ============
 

@@ -100,6 +100,13 @@ const List<DashboardPanelDefinition> panelCatalog = [
     icon: Icons.event_busy_outlined,
     defaultVisible: true,
   ),
+  DashboardPanelDefinition(
+    id: 'panel_active_loans',
+    labelKey: 'dashboardcardPanelActiveloans',
+    row: 3,
+    flex: 3,
+    icon: Icons.account_balance_wallet_outlined,
+  ),
 ];
 
 /// The cash & bank strip — a single fixed block at the top of the
@@ -143,6 +150,8 @@ String dashboardPanelLabel(AppLocalizations l10n, String labelKey) {
       return l10n.dashboardcardPanelLowstock;
     case 'dashboardcardPanelExpiryalerts':
       return l10n.dashboardcardPanelExpiryalerts;
+    case 'dashboardcardPanelActiveloans':
+      return l10n.dashboardcardPanelActiveloans;
     case 'dashboardcardCashstrip':
       return l10n.dashboardcardCashstrip;
     default:

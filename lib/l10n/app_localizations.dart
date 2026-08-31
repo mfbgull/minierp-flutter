@@ -350,6 +350,78 @@ abstract class AppLocalizations {
   /// **'Expiring Soon'**
   String get dashboardcardPanelExpiryalerts;
 
+  /// No description provided for @dashboardcardPanelActiveloans.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Loans'**
+  String get dashboardcardPanelActiveloans;
+
+  /// No description provided for @dashboardcardOutstandingloans.
+  ///
+  /// In en, this message translates to:
+  /// **'Outstanding Loans'**
+  String get dashboardcardOutstandingloans;
+
+  /// No description provided for @dashboardOutstandingloansHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Total loan balance outstanding across all employees'**
+  String get dashboardOutstandingloansHint;
+
+  /// No description provided for @dashboardActiveLoansCount.
+  ///
+  /// In en, this message translates to:
+  /// **'active'**
+  String get dashboardActiveLoansCount;
+
+  /// No description provided for @dashboardOverdueCount.
+  ///
+  /// In en, this message translates to:
+  /// **'overdue'**
+  String get dashboardOverdueCount;
+
+  /// No description provided for @dashboardDaysUntilDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Due in {days} days'**
+  String dashboardDaysUntilDue(Object days);
+
+  /// No description provided for @dashboardDaysOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days overdue'**
+  String dashboardDaysOverdue(Object days);
+
+  /// No description provided for @loanAgingCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get loanAgingCurrent;
+
+  /// No description provided for @loanAgingDueSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Due Soon'**
+  String get loanAgingDueSoon;
+
+  /// No description provided for @loanAgingDueToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Due Today'**
+  String get loanAgingDueToday;
+
+  /// No description provided for @loanAgingOverdue1_30.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue 1-30'**
+  String get loanAgingOverdue1_30;
+
+  /// No description provided for @loanAgingOverdue30Plus.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue 30+'**
+  String get loanAgingOverdue30Plus;
+
   /// No description provided for @dashboardcardCashstrip.
   ///
   /// In en, this message translates to:
@@ -7736,11 +7808,269 @@ abstract class AppLocalizations {
   /// **'Notes'**
   String get employeesSalarynotes;
 
+  /// No description provided for @employeesPaymenttype.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Type'**
+  String get employeesPaymenttype;
+
+  /// No description provided for @employeesPaymenttypeFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Full'**
+  String get employeesPaymenttypeFull;
+
+  /// No description provided for @employeesPaymenttypeAdvance.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance'**
+  String get employeesPaymenttypeAdvance;
+
+  /// No description provided for @employeesPaymenttypePartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial'**
+  String get employeesPaymenttypePartial;
+
+  /// No description provided for @employeesRemainingbalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining Balance'**
+  String get employeesRemainingbalance;
+
+  /// No description provided for @employeesSalarydeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Salary payment deleted'**
+  String get employeesSalarydeleted;
+
   /// No description provided for @employeesSalarypaid.
   ///
   /// In en, this message translates to:
   /// **'Salary payment recorded'**
   String get employeesSalarypaid;
+
+  /// No description provided for @employeesSalarystatusPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get employeesSalarystatusPaid;
+
+  /// No description provided for @employeesSalarystatusPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial'**
+  String get employeesSalarystatusPartial;
+
+  /// No description provided for @employeesSalarystatusAdvance.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance'**
+  String get employeesSalarystatusAdvance;
+
+  /// No description provided for @employeesAlreadyPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Already paid this month'**
+  String get employeesAlreadyPaid;
+
+  /// No description provided for @employeesAdvanceFromPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance from previous month'**
+  String get employeesAdvanceFromPrevious;
+
+  /// No description provided for @employeesAdvanceFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance from'**
+  String get employeesAdvanceFrom;
+
+  /// No description provided for @employeesTotaladvance.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Advance Carryover'**
+  String get employeesTotaladvance;
+
+  /// No description provided for @employeesMonthdetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Salary Details'**
+  String get employeesMonthdetail;
+
+  /// No description provided for @employeesPaymore.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay More'**
+  String get employeesPaymore;
+
+  /// No description provided for @employeesLoans.
+  ///
+  /// In en, this message translates to:
+  /// **'Loans'**
+  String get employeesLoans;
+
+  /// No description provided for @employeesNoLoans.
+  ///
+  /// In en, this message translates to:
+  /// **'No loans recorded'**
+  String get employeesNoLoans;
+
+  /// No description provided for @employeesNewLoan.
+  ///
+  /// In en, this message translates to:
+  /// **'New Loan'**
+  String get employeesNewLoan;
+
+  /// No description provided for @employeesRepayLoan.
+  ///
+  /// In en, this message translates to:
+  /// **'Repay Loan'**
+  String get employeesRepayLoan;
+
+  /// No description provided for @employeesLoanAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan Amount'**
+  String get employeesLoanAmount;
+
+  /// No description provided for @employeesLoanBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining Balance'**
+  String get employeesLoanBalance;
+
+  /// No description provided for @employeesLoanPurpose.
+  ///
+  /// In en, this message translates to:
+  /// **'Purpose'**
+  String get employeesLoanPurpose;
+
+  /// No description provided for @employeesLoanDisbursementDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Disbursement Date'**
+  String get employeesLoanDisbursementDate;
+
+  /// No description provided for @employeesLoanDueDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Due Date'**
+  String get employeesLoanDueDate;
+
+  /// No description provided for @employeesLoanMonthlyInstallment.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly Installment'**
+  String get employeesLoanMonthlyInstallment;
+
+  /// No description provided for @employeesLoanPaymentMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Method'**
+  String get employeesLoanPaymentMethod;
+
+  /// No description provided for @employeesLoanStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get employeesLoanStatusActive;
+
+  /// No description provided for @employeesLoanStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get employeesLoanStatusCompleted;
+
+  /// No description provided for @employeesLoanStatusOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue'**
+  String get employeesLoanStatusOverdue;
+
+  /// No description provided for @employeesLoanStatusWrittenOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Written Off'**
+  String get employeesLoanStatusWrittenOff;
+
+  /// No description provided for @employeesLoanCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan recorded successfully'**
+  String get employeesLoanCreated;
+
+  /// No description provided for @employeesLoanRepaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Repayment recorded'**
+  String get employeesLoanRepaid;
+
+  /// No description provided for @employeesLoanWrittenOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan written off'**
+  String get employeesLoanWrittenOff;
+
+  /// No description provided for @employeesLoanDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan deleted'**
+  String get employeesLoanDeleted;
+
+  /// No description provided for @employeesLoanRepaymentAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Repayment Amount'**
+  String get employeesLoanRepaymentAmount;
+
+  /// No description provided for @employeesLoanRepaymentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Repayment Date'**
+  String get employeesLoanRepaymentDate;
+
+  /// No description provided for @employeesLoanRepaymentTypeDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct Payment'**
+  String get employeesLoanRepaymentTypeDirect;
+
+  /// No description provided for @employeesLoanRepaymentTypeSalary.
+  ///
+  /// In en, this message translates to:
+  /// **'Salary Deduction'**
+  String get employeesLoanRepaymentTypeSalary;
+
+  /// No description provided for @employeesLoanRepaymentExceeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Repayment exceeds loan balance'**
+  String get employeesLoanRepaymentExceeds;
+
+  /// No description provided for @employeesLoanOutstanding.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Outstanding'**
+  String get employeesLoanOutstanding;
+
+  /// No description provided for @employeesLoanTotalRepaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Repaid'**
+  String get employeesLoanTotalRepaid;
+
+  /// No description provided for @employeesLoanDeductFromSalary.
+  ///
+  /// In en, this message translates to:
+  /// **'Deduct for loan'**
+  String get employeesLoanDeductFromSalary;
+
+  /// No description provided for @employeesLoanSuggestedInstallment.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested'**
+  String get employeesLoanSuggestedInstallment;
 
   /// No description provided for @employeesSearch.
   ///

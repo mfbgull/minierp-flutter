@@ -72,6 +72,7 @@ abstract final class ApiEndpoints {
   static const reportTrialBalance = '/reports/trial-balance';
   static const reportExpiry = '/reports/expiry';
   static const dashboardExpiryAlerts = '/dashboard/expiry-alerts';
+  static const dashboardActiveLoans = '/dashboard/active-loans';
   static const reportGeneralLedger = '/reports/general-ledger';
   static const reportIncomeStatement = '/reports/income-statement';
   static const reportTaxSummary = '/reports/tax-summary';

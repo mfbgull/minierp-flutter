@@ -1,0 +1,163 @@
+@startuml
+!theme plain
+title Employee Loan Feature — Full Architecture
+
+skinparam backgroundColor #FAFAFA
+skinparam componentBorderColor #555555
+skinparam arrowColor #333333
+skinparam packageBorderColor #888888
+skinparam packageBackgroundColor #FAFAFA
+skinparam databaseBorderColor #555555
+skinparam databaseBackgroundColor #E8EAF6
+
+' ══════════════════════════════════════════════════════════════
+' DATABASE LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Database (SQLite)" as db #E8EAF6 {
+  database "employee_loans" as emp_loans #C5CAE9 {
+  }
+  database "employee_loan_repayments" as emp_repay #C5CAE9 {
+  }
+  database "chart_of_accounts" as coa #C5CAE9 {
+  }
+  database "journal_lines" as jl #C5CAE9 {
+  }
+  database "employees" as emp #C5CAE9 {
+  }
+  database "salary_payments" as sal_pay #C5CAE9 {
+  }
+
+  emp_loans ||--o{ emp_repay : "has repayments"
+  emp_loans }o--|| emp : "belongs to"
+  emp_repay }o--|| emp : "belongs to"
+  emp_repay }o--o| sal_pay : "salary_deduction"
+  emp_loans }o--|| jl : "disbursement GL"
+  emp_repay }o--|| jl : "repayment GL"
+}
+
+' ══════════════════════════════════════════════════════════════
+' BACKEND LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Backend (Node.js + Express + TypeScript)" as backend #E8F5E9 {
+
+  package "Routes" as routes #C8E6C9 {
+    component "employees.ts" as emp_routes
+    component "dashboard.ts" as dash_routes
+  }
+
+  package "Controllers" as controllers #C8E6C9 {
+    component "employeeController.ts\n(CRUD, repay, write-off, void)" as emp_ctrl
+    component "dashboardController.ts\n(active-loans endpoint)" as dash_ctrl
+  }
+
+  package "Models" as models #C8E6C9 {
+    component "EmployeeLoan.ts\n(balance, status, void)" as emp_model
+    component "Dashboard.ts\n(outstanding_loans KPI)" as dash_model
+  }
+
+  package "Services" as services #C8E6C9 {
+    component "AccountingService.ts\n(3 GL posting methods)" as acct_svc
+  }
+
+  emp_routes --> emp_ctrl
+  dash_routes --> dash_ctrl
+  emp_ctrl --> emp_model
+  emp_ctrl --> acct_svc
+  dash_ctrl --> dash_model
+  emp_model --> db
+  dash_model --> db
+  acct_svc --> db
+}
+
+' ══════════════════════════════════════════════════════════════
+' API CONTRACT
+' ══════════════════════════════════════════════════════════════
+
+package "REST API" as api #FFF3E0 {
+  rectangle "Employee Loans" as api_loans #FFE0B2 {
+    component "GET /:id/loans"
+    component "POST /:id/loans"
+    component "POST /:id/loans/:loanId/repay"
+    component "POST /:id/loans/:loanId/write-off"
+    component "DELETE /:id/loans/:loanId"
+    component "POST /:id/loans/:loanId/repayments/:rid/void"
+  }
+  rectangle "Dashboard" as api_dash #FFE0B2 {
+    component "GET /dashboard/active-loans"
+    component "GET /dashboard/kpi?metric=outstanding_loans"
+  }
+  rectangle "Salary" as api_sal #FFE0B2 {
+    component "POST /:id/salary/pay\n(+ loan deduction)"
+  }
+}
+
+' ══════════════════════════════════════════════════════════════
+' FRONTEND LAYER
+' ══════════════════════════════════════════════════════════════
+
+package "Frontend (Flutter + Riverpod)" as frontend #E3F2FD {
+
+  package "Employee Detail Dialog" as detail #BBDEFB {
+    component "Tab 0: Overview"
+    component "Tab 1: Salary History"
+    component "Tab 2: Documents"
+    component "Tab 3: Loans\n(loans_tab.dart)" as loans_tab
+  }
+
+  package "Loan Dialogs" as loan_dialogs #BBDEFB {
+    component "loan_create_dialog.dart"
+    component "loan_detail_dialog.dart"
+    component "loan_repay_dialog.dart"
+  }
+
+  package "Salary Pay Dialog" as sal_dialog #BBDEFB {
+    component "salary_pay_dialog.dart\n(+ loan deduction section)"
+  }
+
+  package "Data Layer" as data_layer #BBDEFB {
+    component "loan_models.dart"
+    component "loan_repository.dart"
+    component "loan_providers.dart"
+  }
+
+  package "Dashboard" as dash_ui #BBDEFB {
+    component "kpi_outstanding_loans\n(KPI card)"
+    component "panel_active_loans\n(ActiveLoansPanel)"
+    component "dashboard_providers.dart\n(dashboardActiveLoansProvider)"
+    component "dashboard_repository.dart\n(activeLoans())"
+  }
+
+  loans_tab --> loan_dialogs
+  sal_dialog --> data_layer
+  loan_dialogs --> data_layer
+  dash_ui --> data_layer
+}
+
+' ══════════════════════════════════════════════════════════════
+' CONNECTIONS
+' ══════════════════════════════════════════════════════════════
+
+api_loans --> emp_ctrl : "Dio HTTP"
+api_dash --> dash_ctrl : "Dio HTTP"
+api_sal --> emp_ctrl : "Dio HTTP"
+
+data_layer --> api_loans : "Dio"
+data_layer --> api_dash : "Dio"
+data_layer --> api_sal : "Dio"
+
+' ══════════════════════════════════════════════════════════════
+' GL ACCOUNTS
+' ══════════════════════════════════════════════════════════════
+
+package "GL Accounts" as gl #FCE4EC {
+  rectangle "1300 Employee Loan\nReceivable" as acct_1300 #F8BBD0
+  rectangle "6300 Loan\nWrite-off" as acct_6300 #F8BBD0
+  rectangle "1000/1010\nCash/Bank" as acct_cash #F8BBD0
+  rectangle "6100 Wages &\nSalaries" as acct_6100 #F8BBD0
+}
+
+acct_svc --> gl : "posts entries"
+
+@enduml

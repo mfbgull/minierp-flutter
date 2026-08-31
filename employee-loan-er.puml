@@ -1,0 +1,180 @@
+@startuml
+!theme plain
+allowmixing
+title Employee Loan — Database ER Diagram
+
+skinparam backgroundColor #FAFAFA
+skinparam EntityBorderColor #555555
+skinparam EntityBackgroundColor #F8F9FA
+skinparam EntityFontSize 12
+skinparam ArrowColor #333333
+skinparam NoteBorderColor #AAAAAA
+skinparam NoteBackgroundColor #FFFDE7
+skinparam PackageBorderColor #888888
+
+' ══════════════════════════════════════════════════════════════
+' EXISTING TABLES (referenced)
+' ══════════════════════════════════════════════════════════════
+
+entity "employees" as emp <<existing>> #E8F5E9 {
+  * id : INTEGER <<PK>>
+  --
+  employee_code : TEXT
+  first_name : TEXT
+  last_name : TEXT
+  salary : REAL
+  is_active : BOOLEAN
+  ...
+}
+
+entity "salary_payments" as sal <<existing>> #E8F5E9 {
+  * id : INTEGER <<PK>>
+  --
+  * employee_id : INTEGER <<FK>>
+  amount : REAL
+  payment_date : TEXT
+  pay_period : TEXT
+  payment_type : TEXT
+  ...
+}
+
+entity "chart_of_accounts" as coa <<existing>> #E8F5E9 {
+  * id : INTEGER <<PK>>
+  --
+  code : TEXT <<UNIQUE>>
+  name : TEXT
+  type : TEXT
+  normal_balance : TEXT
+  text_code : TEXT
+  ...
+}
+
+entity "journal_lines" as jl <<existing>> #E8F5E9 {
+  * id : INTEGER <<PK>>
+  --
+  * account_id : INTEGER <<FK>>
+  journal_entry_id : INTEGER
+  debit : REAL
+  credit : REAL
+  line_date : TEXT
+  reference_type : TEXT
+  reference_id : INTEGER
+  voided : BOOLEAN
+  ...
+}
+
+entity "users" as usr <<existing>> #E8F5E9 {
+  * id : INTEGER <<PK>>
+  --
+  username : TEXT
+  ...
+}
+
+' ══════════════════════════════════════════════════════════════
+' NEW TABLES
+' ══════════════════════════════════════════════════════════════
+
+entity "employee_loans" as el <<NEW>> #BBDEFB {
+  * id : INTEGER <<PK>>
+  --
+  * employee_id : INTEGER <<FK>> NOT NULL
+  amount : REAL NOT NULL
+  balance : REAL NOT NULL
+  purpose : TEXT
+  payment_method : TEXT DEFAULT cash
+  disbursement_date : TEXT NOT NULL
+  due_date : TEXT
+  monthly_installment : REAL DEFAULT 0
+  status : TEXT DEFAULT active
+  written_off_amount : REAL DEFAULT 0
+  notes : TEXT
+  journal_entry_id : INTEGER <<FK>>
+  created_by : INTEGER <<FK>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "employee_loan_repayments" as elr <<NEW>> #BBDEFB {
+  * id : INTEGER <<PK>>
+  --
+  * loan_id : INTEGER <<FK>> NOT NULL
+  * employee_id : INTEGER <<FK>> NOT NULL
+  amount : REAL NOT NULL
+  payment_date : TEXT NOT NULL
+  payment_method : TEXT DEFAULT cash
+  reference_no : TEXT
+  notes : TEXT
+  repayment_type : TEXT DEFAULT direct
+  journal_entry_id : INTEGER <<FK>>
+  salary_payment_id : INTEGER <<FK>>
+  created_by : INTEGER <<FK>>
+  created_at : TIMESTAMP
+}
+
+' ══════════════════════════════════════════════════════════════
+' RELATIONSHIPS
+' ══════════════════════════════════════════════════════════════
+
+' employee_loans relationships
+el }o--|| emp : "employee_id"
+el }o--o| jl : "journal_entry_id\ndisbursement GL"
+el }o--o| usr : "created_by"
+
+' employee_loan_repayments relationships
+elr }o--|| el : "loan_id"
+elr }o--|| emp : "employee_id"
+elr }o--o| jl : "journal_entry_id\ndirect repay GL"
+elr }o--o| sal : "salary_payment_id\nsalary deduction"
+elr }o--o| usr : "created_by"
+
+' Existing relationships
+sal }o--|| emp : "employee_id"
+
+' ══════════════════════════════════════════════════════════════
+' INDEXES & CONSTRAINTS
+' ══════════════════════════════════════════════════════════════
+
+note right of el
+  **Indexes:**
+  idx_employee_loans_employee (employee_id)
+  idx_employee_loans_status (status)
+
+  **Constraints:**
+  status IN (active, completed, overdue, written_off)
+  amount > 0
+  balance >= 0
+  due_date > disbursement_date
+end note
+
+note right of elr
+  **Indexes:**
+  idx_loan_repayments_loan (loan_id)
+  idx_loan_repayments_employee (employee_id)
+
+  **Constraints:**
+  repayment_type IN (direct, salary_deduction)
+  amount > 0
+  journal_entry_id IS NULL
+    when repayment_type = salary_deduction
+end note
+
+' ══════════════════════════════════════════════════════════════
+' STATUS STATE DIAGRAM
+' ══════════════════════════════════════════════════════════════
+
+package "Loan Status Transitions" #FFF3E0 {
+  rectangle "active" as s_active #C8E6C9
+  rectangle "overdue" as s_overdue #FFCDD2
+  rectangle "completed" as s_completed #E0E0E0
+  rectangle "written_off" as s_writtenoff #F8BBD0
+
+  s_active --> s_overdue : "due_date < today AND balance > 0"
+  s_active --> s_completed : "balance == 0"
+  s_overdue --> s_completed : "balance == 0"
+  s_active --> s_writtenoff : "write-off"
+  s_overdue --> s_writtenoff : "write-off"
+  s_completed --> s_active : "void last repayment"
+  s_writtenoff --> s_active : "void write-off"
+}
+
+@enduml

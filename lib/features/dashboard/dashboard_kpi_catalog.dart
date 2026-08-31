@@ -177,6 +177,14 @@ const List<KpiCardDefinition> kpiCardCatalog = [
     icon: Icons.warning_amber_outlined,
     format: KpiCardFormat.number,
   ),
+  KpiCardDefinition(
+    id: 'kpi_outstanding_loans',
+    metric: 'outstanding_loans',
+    labelKey: 'dashboardcardOutstandingloans',
+    icon: Icons.account_balance_wallet_outlined,
+    format: KpiCardFormat.currency,
+    hintKey: 'dashboardOutstandingloansHint',
+  ),
 ];
 
 /// Lookup by block id — the strip and dialog resolve a saved layout
@@ -220,6 +228,8 @@ String kpiCardLabel(AppLocalizations l10n, String labelKey) {
       return l10n.dashboardcardCustomers;
     case 'dashboardcardLowstockcount':
       return l10n.dashboardcardLowstockcount;
+    case 'dashboardcardOutstandingloans':
+      return l10n.dashboardcardOutstandingloans;
     default:
       return labelKey;
   }
@@ -233,6 +243,8 @@ String? kpiCardHint(AppLocalizations l10n, String? hintKey) {
       return l10n.dashboardPurchaseOrdersHint;
     case 'dashboardArHint':
       return l10n.dashboardArHint;
+    case 'dashboardOutstandingloansHint':
+      return l10n.dashboardOutstandingloansHint;
     default:
       return null;
   }

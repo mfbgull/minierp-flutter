@@ -20,6 +20,17 @@ router.delete('/:id', requirePermission('employees', 'delete'), employeeControll
 // Salary payment routes
 router.post('/:id/salary/pay', requirePermission('employees', 'update'), employeeController.paySalary);
 router.get('/:id/salary/history', requirePermission('employees', 'read'), employeeController.getSalaryHistory);
+router.get('/:id/salary/month/:payPeriod', requirePermission('employees', 'read'), employeeController.getSalaryMonthDetail);
+router.delete('/:id/salary/:paymentId', requirePermission('employees', 'update'), employeeController.deleteSalaryPayment);
+
+// Loan routes
+router.get('/:id/loans', requirePermission('employees', 'read'), employeeController.getLoans);
+router.post('/:id/loans', requirePermission('employees', 'update'), employeeController.createLoan);
+router.get('/:id/loans/:loanId', requirePermission('employees', 'read'), employeeController.getLoanDetail);
+router.post('/:id/loans/:loanId/repay', requirePermission('employees', 'update'), employeeController.repayLoan);
+router.post('/:id/loans/:loanId/write-off', requirePermission('employees', 'update'), employeeController.writeOffLoan);
+router.delete('/:id/loans/:loanId', requirePermission('employees', 'update'), employeeController.deleteLoan);
+router.post('/:id/loans/:loanId/repayments/:repaymentId/void', requirePermission('employees', 'update'), employeeController.voidLoanRepayment);
 
 // Document sub-routes
 router.get('/:id/documents', requirePermission('employees', 'read'), employeeController.getEmployeeDocuments);

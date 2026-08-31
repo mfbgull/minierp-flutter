@@ -135,6 +135,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboardcardPanelExpiryalerts => 'Expiring Soon';
 
   @override
+  String get dashboardcardPanelActiveloans => 'Active Loans';
+
+  @override
+  String get dashboardcardOutstandingloans => 'Outstanding Loans';
+
+  @override
+  String get dashboardOutstandingloansHint =>
+      'Total loan balance outstanding across all employees';
+
+  @override
+  String get dashboardActiveLoansCount => 'active';
+
+  @override
+  String get dashboardOverdueCount => 'overdue';
+
+  @override
+  String dashboardDaysUntilDue(Object days) {
+    return 'Due in $days days';
+  }
+
+  @override
+  String dashboardDaysOverdue(Object days) {
+    return '$days days overdue';
+  }
+
+  @override
+  String get loanAgingCurrent => 'Current';
+
+  @override
+  String get loanAgingDueSoon => 'Due Soon';
+
+  @override
+  String get loanAgingDueToday => 'Due Today';
+
+  @override
+  String get loanAgingOverdue1_30 => 'Overdue 1-30';
+
+  @override
+  String get loanAgingOverdue30Plus => 'Overdue 30+';
+
+  @override
   String get dashboardcardCashstrip => 'Cash & Bank Position';
 
   @override
@@ -3921,7 +3962,136 @@ class AppLocalizationsEn extends AppLocalizations {
   String get employeesSalarynotes => 'Notes';
 
   @override
+  String get employeesPaymenttype => 'Payment Type';
+
+  @override
+  String get employeesPaymenttypeFull => 'Full';
+
+  @override
+  String get employeesPaymenttypeAdvance => 'Advance';
+
+  @override
+  String get employeesPaymenttypePartial => 'Partial';
+
+  @override
+  String get employeesRemainingbalance => 'Remaining Balance';
+
+  @override
+  String get employeesSalarydeleted => 'Salary payment deleted';
+
+  @override
   String get employeesSalarypaid => 'Salary payment recorded';
+
+  @override
+  String get employeesSalarystatusPaid => 'Paid';
+
+  @override
+  String get employeesSalarystatusPartial => 'Partial';
+
+  @override
+  String get employeesSalarystatusAdvance => 'Advance';
+
+  @override
+  String get employeesAlreadyPaid => 'Already paid this month';
+
+  @override
+  String get employeesAdvanceFromPrevious => 'Advance from previous month';
+
+  @override
+  String get employeesAdvanceFrom => 'Advance from';
+
+  @override
+  String get employeesTotaladvance => 'Total Advance Carryover';
+
+  @override
+  String get employeesMonthdetail => 'Salary Details';
+
+  @override
+  String get employeesPaymore => 'Pay More';
+
+  @override
+  String get employeesLoans => 'Loans';
+
+  @override
+  String get employeesNoLoans => 'No loans recorded';
+
+  @override
+  String get employeesNewLoan => 'New Loan';
+
+  @override
+  String get employeesRepayLoan => 'Repay Loan';
+
+  @override
+  String get employeesLoanAmount => 'Loan Amount';
+
+  @override
+  String get employeesLoanBalance => 'Remaining Balance';
+
+  @override
+  String get employeesLoanPurpose => 'Purpose';
+
+  @override
+  String get employeesLoanDisbursementDate => 'Disbursement Date';
+
+  @override
+  String get employeesLoanDueDate => 'Due Date';
+
+  @override
+  String get employeesLoanMonthlyInstallment => 'Monthly Installment';
+
+  @override
+  String get employeesLoanPaymentMethod => 'Payment Method';
+
+  @override
+  String get employeesLoanStatusActive => 'Active';
+
+  @override
+  String get employeesLoanStatusCompleted => 'Completed';
+
+  @override
+  String get employeesLoanStatusOverdue => 'Overdue';
+
+  @override
+  String get employeesLoanStatusWrittenOff => 'Written Off';
+
+  @override
+  String get employeesLoanCreated => 'Loan recorded successfully';
+
+  @override
+  String get employeesLoanRepaid => 'Repayment recorded';
+
+  @override
+  String get employeesLoanWrittenOff => 'Loan written off';
+
+  @override
+  String get employeesLoanDeleted => 'Loan deleted';
+
+  @override
+  String get employeesLoanRepaymentAmount => 'Repayment Amount';
+
+  @override
+  String get employeesLoanRepaymentDate => 'Repayment Date';
+
+  @override
+  String get employeesLoanRepaymentTypeDirect => 'Direct Payment';
+
+  @override
+  String get employeesLoanRepaymentTypeSalary => 'Salary Deduction';
+
+  @override
+  String get employeesLoanRepaymentExceeds => 'Repayment exceeds loan balance';
+
+  @override
+  String get employeesLoanOutstanding => 'Total Outstanding';
+
+  @override
+  String get employeesLoanTotalRepaid => 'Total Repaid';
+
+  @override
+  String get employeesLoanDeductFromSalary => 'Deduct for loan';
+
+  @override
+  String get employeesLoanSuggestedInstallment => 'Suggested';
 
   @override
   String get employeesSearch => 'Search employees...';
