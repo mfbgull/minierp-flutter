@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/print_service.dart' show PrintService;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
@@ -273,6 +274,7 @@ class _PersonalLoanDetailDialogState
               for (final rep in detail.repayments)
                 _RepaymentRow(
                   repayment: rep,
+                  onPrint: () => _printRepaymentReceipt(rep),
                   onDelete: canRepay ? () => _deleteRepayment(context, rep) : null,
                 ),
           ],
@@ -318,6 +320,26 @@ class _PersonalLoanDetailDialogState
     }
   }
 
+  Future<void> _printRepaymentReceipt(PersonalLoanRepayment repayment) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final service = PrintService(context);
+      await service.printPersonalLoanRepaymentReceipt(
+        _detail!.loan,
+        repayment,
+        allRepayments: _detail?.repayments,
+      );
+    } catch (error) {
+      if (mounted) {
+        showAppToast(
+          context,
+          '${l10n.errorsFailed}: $error',
+          isError: true,
+        );
+      }
+    }
+  }
+
   Future<void> _deleteRepayment(
       BuildContext context, PersonalLoanRepayment rep) async {
     final l10n = AppLocalizations.of(context)!;
@@ -360,9 +382,14 @@ class _PersonalLoanDetailDialogState
 }
 
 class _RepaymentRow extends StatelessWidget {
-  const _RepaymentRow({required this.repayment, this.onDelete});
+  const _RepaymentRow({
+    required this.repayment,
+    this.onPrint,
+    this.onDelete,
+  });
 
   final PersonalLoanRepayment repayment;
+  final VoidCallback? onPrint;
   final VoidCallback? onDelete;
 
   @override
@@ -403,6 +430,14 @@ class _RepaymentRow extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
             ),
+            if (onPrint != null) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onPrint,
+                child: Icon(Icons.print_outlined,
+                    size: 16, color: scheme.onSurfaceVariant),
+              ),
+            ],
             if (onDelete != null) ...[
               const SizedBox(width: 8),
               GestureDetector(

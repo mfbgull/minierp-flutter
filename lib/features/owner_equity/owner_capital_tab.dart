@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/csv_export.dart';
@@ -137,6 +138,10 @@ class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: _equitySummaryCards(l10n),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: _toolbar(l10n),
         ),
         Expanded(child: _buildBody(capital)),
@@ -431,5 +436,108 @@ class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab> {
         },
       ),
     ];
+  }
+
+  Widget _equitySummaryCards(AppLocalizations l10n) {
+    final summary = ref.watch(equitySummaryProvider);
+    final scheme = Theme.of(context).colorScheme;
+    final data = summary.valueOrNull;
+
+    return Card(
+      elevation: 0,
+      color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      shape: RoundedRectangleBorder(
+        borderRadius: AppBorderRadius.smRadius,
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: _EquityStat(
+                icon: Icons.savings_outlined,
+                label: l10n.equityTotalcapitalin,
+                value: Formatters.currency(data?.totalCapitalIn ?? 0),
+                color: scheme.primary,
+              ),
+            ),
+            _equityStatDivider(scheme),
+            Expanded(
+              child: _EquityStat(
+                icon: Icons.call_made_outlined,
+                label: l10n.equityTotalwithdrawn,
+                value: Formatters.currency(
+                  (data?.totalWithdrawnCash ?? 0) +
+                      (data?.totalWithdrawnGoods ?? 0),
+                ),
+                color: scheme.error,
+              ),
+            ),
+            _equityStatDivider(scheme),
+            Expanded(
+              child: _EquityStat(
+                icon: Icons.account_balance_outlined,
+                label: l10n.equityNetcontributions,
+                value: Formatters.currency(data?.netContributions ?? 0),
+                color: scheme.tertiary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _equityStatDivider(ColorScheme scheme) => Container(
+    width: 1,
+    height: 36,
+    color: scheme.outlineVariant,
+  );
+
+}
+
+class _EquityStat extends StatelessWidget {
+  const _EquityStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }

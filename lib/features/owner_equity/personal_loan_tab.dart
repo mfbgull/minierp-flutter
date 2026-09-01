@@ -13,6 +13,7 @@ import '../../core/utils/formatters.dart';
 import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart'
@@ -69,6 +70,15 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab> {
       if (!mounted) return;
       ref.read(personalLoansSearchProvider.notifier).state = value.trim();
     });
+  }
+
+  bool get _hasActiveFilters =>
+      ref.read(personalLoansFromDateProvider) != null ||
+      ref.read(personalLoansToDateProvider) != null;
+
+  void _clearFilters() {
+    ref.read(personalLoansFromDateProvider.notifier).state = null;
+    ref.read(personalLoansToDateProvider.notifier).state = null;
   }
 
   void _applyRows(AsyncValue<PagedResponse<PersonalLoan>> value) {
@@ -294,6 +304,13 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab> {
               ref.read(personalLoansPageProvider.notifier).state = 1;
             }
           },
+        ),
+        DateRangeFilter(
+          height: 40,
+          fromProvider: personalLoansFromDateProvider,
+          toProvider: personalLoansToDateProvider,
+          onClear: _clearFilters,
+          showClear: () => _hasActiveFilters,
         ),
       ],
       onRefresh: () => ref.invalidate(personalLoansProvider),

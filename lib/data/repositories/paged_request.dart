@@ -24,15 +24,24 @@ class PagedRequest {
   final Map<String, dynamic>? extra;
 
   /// Query parameters for the request. Empty search/sortBy are omitted so
-  /// the server applies its own defaults.
-  Map<String, dynamic> toQuery() => {
-    'page': page,
-    'limit': limit,
-    if (search != null && search!.isNotEmpty) 'search': search,
-    if (sortBy != null && sortBy!.isNotEmpty) 'sortBy': sortBy,
-    'sortOrder': sortOrder,
-    ...?extra,
-  };
+  /// the server applies its own defaults. Null values in [extra] are also
+  /// omitted — Dio serialises them as the string `"null"`, which the server
+  /// would interpret as a literal filter value (e.g. `status = 'null'`).
+  Map<String, dynamic> toQuery() {
+    final q = <String, dynamic>{
+      'page': page,
+      'limit': limit,
+      'sortOrder': sortOrder,
+    };
+    if (search != null && search!.isNotEmpty) q['search'] = search;
+    if (sortBy != null && sortBy!.isNotEmpty) q['sortBy'] = sortBy;
+    if (extra != null) {
+      for (final e in extra!.entries) {
+        if (e.value != null) q[e.key] = e.value;
+      }
+    }
+    return q;
+  }
 }
 
 /// Enveloped list result including the server's `pagination` block

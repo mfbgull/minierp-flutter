@@ -14,6 +14,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pdf/pdf.dart' show PdfPageFormat;
 import 'package:printing/printing.dart';
 
+import '../../core/utils/print_service.dart' show PrintFormat, PrintService;
 import '../../core/utils/print_utils.dart' show printPdfBytes;
 import '../../data/models/invoice.dart'
     show Invoice, InvoicePaymentRecord;
@@ -111,14 +112,34 @@ class _InvoicePrintPreviewPageState
     context.push('/sales/form', extra: invoice);
   }
 
-  /// Native print dialog for the previewed bytes; share/save-as-PDF
-  /// fallback is handled by [printPdfBytes]. Failures toast (no silent
-  /// failures, PORTING.md §9).
-  Future<void> _print(Uint8List bytes) async {
+  /// Shows a format-picker dialog for printing.
+  Future<void> _showPrintFormatPicker() async {
+    final service = PrintService(context);
+    final result = await service.pickFormatAndView();
+    if (result == null) return;
+
+    final (format, viewPdf) = result;
+
+    if (viewPdf) {
+      // View A4 PDF only — no printing
+      await printPdfBytes(_bytes!, '${widget.invoice.invoiceNo}.pdf', context);
+      return;
+    }
+
+    await _printWithFormat(format);
+  }
+
+  /// Print with selected format.
+  Future<void> _printWithFormat(PrintFormat format) async {
     final l10n = AppLocalizations.of(context)!;
     setState(() => _printing = true);
     try {
-      await printPdfBytes(bytes, '${widget.invoice.invoiceNo}.pdf', context);
+      final service = PrintService(context);
+      await service.printInvoice(
+        _detail ?? widget.invoice,
+        payments: const [],
+        format: format,
+      );
     } catch (error) {
       if (mounted) {
         showAppToast(context, '${l10n.errorsFailed}: $error', isError: true);
@@ -221,7 +242,9 @@ class _InvoicePrintPreviewPageState
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: TextButton.icon(
-              onPressed: !ready || _printing ? null : () => _print(_bytes!),
+              onPressed: !ready || _printing
+                  ? null
+                  : () => _showPrintFormatPicker(),
               icon: _printing
                   ? const SizedBox(
                       width: 16,
@@ -229,7 +252,7 @@ class _InvoicePrintPreviewPageState
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.print_outlined, size: 18),
-              label: Text(l10n.salesPrinta4),
+              label: Text(l10n.actionsPrint),
             ),
           ),
           Padding(
