@@ -12,7 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
-import '../../core/utils/print_utils.dart' show printPdfBytes;
+import '../../core/utils/print_service.dart' show PrintService;
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/invoice.dart' show Invoice;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -28,7 +28,6 @@ import '../payments/payments_providers.dart' show paymentsProvider;
 import '../sales/invoice_providers.dart' show invoicesProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'customer_providers.dart';
-import '../../widgets/payment_receipt_pdf.dart' show buildPaymentReceiptPdf;
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:minierp_app/widgets/movable_dialog.dart';
 
@@ -276,6 +275,9 @@ class _CustomerPaymentModalState extends ConsumerState<CustomerPaymentModal> {
     final l10n = AppLocalizations.of(context)!;
     final id = _lastPaymentId;
     if (id == null) return;
+    final service = PrintService(context);
+    final format = await service.pickFormat();
+    if (format == null) return;
     try {
       final result = await ref.read(invoiceRepositoryProvider).payment(id);
       final payment = switch (result) {
@@ -283,9 +285,7 @@ class _CustomerPaymentModalState extends ConsumerState<CustomerPaymentModal> {
         ApiFailure() => null,
       };
       if (payment == null) return;
-      final bytes = await buildPaymentReceiptPdf(payment);
-      if (!mounted) return;
-      await printPdfBytes(bytes, 'receipt-$id.pdf', context);
+      await service.printPaymentReceipt(payment, format: format);
     } catch (error) {
       if (mounted) {
         showAppToast(context, '${l10n.errorsFailed}: $error', isError: true);
@@ -340,7 +340,7 @@ class _CustomerPaymentModalState extends ConsumerState<CustomerPaymentModal> {
                 FilledButton.icon(
                   onPressed: _printReceipt,
                   icon: const Icon(Icons.print_outlined, size: 18),
-                  label: Text(l10n.customersPrintreceipta4),
+                  label: Text(l10n.actionsPrint),
                 ),
                 const SizedBox(height: 8),
                 TextButton(

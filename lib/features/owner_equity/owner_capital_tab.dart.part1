@@ -1,0 +1,125 @@
+// Owner capital list tab — read-only PlutoGrid over
+// `GET /owner-equity/capital` with server-side paging + search + date
+// filters (`PagedResponse<OwnerCapitalEntry>` + `ServerPaginationBar`,
+// same shape as the expenses screen).
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:pluto_grid/pluto_grid.dart';
+
+import '../../core/utils/csv_export.dart';
+import '../../core/utils/formatters.dart';
+import '../../data/models/owner_equity.dart' show OwnerCapitalEntry;
+import '../../data/repositories/api_result.dart' show ApiError;
+import '../../data/repositories/paged_request.dart' show PagedResponse;
+import '../../l10n/app_localizations.dart';
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
+import '../../widgets/grid_column_widths.dart';
+import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
+import '../../widgets/pluto_grid_screen.dart'
+    show autoFitPlutoColumns, plutoGridConfigurationFor, serialGridColumn, withSerialCell;
+import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart';
+import 'owner_capital_form_dialog.dart';
+import 'owner_equity_providers.dart';
+
+class OwnerCapitalTab extends ConsumerStatefulWidget {
+  const OwnerCapitalTab({super.key});
+
+  @override
+  ConsumerState<OwnerCapitalTab> createState() => _OwnerCapitalTabState();
+}
+
+class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab> {
+  Timer? _debounce;
+  final TextEditingController _searchController = TextEditingController();
+  PlutoGridStateManager? _stateManager;
+  late List<PlutoColumn> _columns;
+  bool _columnsReady = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_columnsReady) {
+      _columns = _buildColumns(AppLocalizations.of(context)!);
+      _columnsReady = true;
+    }
+  }
+
+  GridColumnWidths? _widthTracker;
+
+  @override
+  void dispose() {
+    _widthTracker?.dispose();
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      ref.read(capitalSearchProvider.notifier).state = value.trim();
+    });
+  }
+
+  bool get _hasActiveFilters =>
+      ref.read(capitalFromDateProvider) != null ||
+      ref.read(capitalToDateProvider) != null;
+
+  void _clearFilters() {
+    ref.read(capitalFromDateProvider.notifier).state = null;
+    ref.read(capitalToDateProvider.notifier).state = null;
+  }
+
+  void _applyRows(AsyncValue<PagedResponse<OwnerCapitalEntry>> value) {
+    final manager = _stateManager;
+    if (manager == null) return;
+    manager.setShowLoading(value.isLoading);
+    if (value.hasValue) {
+      manager.removeAllRows();
+      manager.appendRows([
+        for (final (index, entry) in (value.value!.items).indexed)
+          _rowFor(entry, index),
+      ]);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !identical(_stateManager, manager)) return;
+        final tracker = _widthTracker;
+        if (tracker != null) {
+          tracker.programmaticPass(() => autoFitPlutoColumns(manager));
+        } else {
+          autoFitPlutoColumns(manager);
+        }
+      });
+    }
+  }
+
+  Future<void> _openRowMenu(
+    BuildContext cellContext,
+    OwnerCapitalEntry? entry,
+  ) async {
+    if (entry == null || !mounted) return;
+    showOwnerCapitalFormDialog(context, entry: entry);
+  }
+
+  PlutoRow _rowFor(OwnerCapitalEntry entry, int index) => withSerialCell(
+    PlutoRow(
+      cells: {
+        'data': PlutoCell(value: entry),
+        'id': PlutoCell(value: entry.id),
+        'capital_no': PlutoCell(value: entry.capitalNo),
+        'capital_date': PlutoCell(value: entry.capitalDate),
+        'payment_method': PlutoCell(value: entry.paymentMethod ?? ''),
+        'note': PlutoCell(value: entry.note ?? ''),
+        'amount': PlutoCell(value: entry.amount),
+        'status': PlutoCell(value: entry.status),
+        'created_by': PlutoCell(value: entry.createdByName ?? ''),
+      },
+    ),
+    index,
+  );
+

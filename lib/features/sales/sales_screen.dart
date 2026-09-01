@@ -23,7 +23,7 @@ import 'package:pluto_grid/pluto_grid.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/invoice_status.dart';
-import '../../core/utils/print_utils.dart' show printPdfBytes;
+import '../../core/utils/print_service.dart' show PrintService;
 import '../../data/models/invoice.dart' show Invoice, InvoicePaymentRecord;
 import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
 import '../../data/repositories/invoice_repository.dart'
@@ -42,7 +42,6 @@ import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'calculations/invoice_rules.dart'
     show canReturnInvoice, canShowDeleteAction;
-import 'invoice_pdf.dart' show buildA4InvoicePdf;
 import 'invoice_payment_dialog.dart' show showInvoicePaymentDialog;
 import 'invoice_providers.dart';
 import 'invoice_return_dialog.dart' show showInvoiceReturnDialog;
@@ -258,7 +257,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             children: [
               const Icon(Icons.print_outlined, size: 18),
               const SizedBox(width: 8),
-              Text(l10n.salesPrinta4),
+              Text(l10n.actionsPrint),
             ],
           ),
         ),
@@ -306,11 +305,14 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     }
   }
 
-  /// A4 print from the row menu — reuses the same PDF pipeline as the
-  /// print-preview page (fresh detail + payments → A4 bytes → native
-  /// print), without leaving the list.
+  /// Print invoice from the row menu — reuses the same PDF pipeline as the
+  /// print-preview page (fresh detail + payments → bytes → native
+  /// print), without leaving the list. Supports A4 and thermal formats.
   Future<void> _printInvoice(Invoice invoice) async {
     final l10n = AppLocalizations.of(context)!;
+    final service = PrintService(context);
+    final format = await service.pickFormat();
+    if (format == null) return;
     try {
       final repo = ref.read(invoiceRepositoryProvider);
       final detailResult = await repo.invoice(invoice.id);
@@ -323,12 +325,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         ApiSuccess(:final data) => data,
         ApiFailure() => const <InvoicePaymentRecord>[],
       };
-      final bytes = await buildA4InvoicePdf(
-        invoice: detail,
-        payments: payments,
-      );
-      if (!mounted) return;
-      await printPdfBytes(bytes, '${invoice.invoiceNo}.pdf', context);
+      await service.printInvoice(detail, payments: payments, format: format);
     } catch (error) {
       if (mounted) {
         showAppToast(context, '${l10n.errorsFailed}: $error', isError: true);

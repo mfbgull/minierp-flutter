@@ -9,7 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/utils/formatters.dart';
-import '../../core/utils/print_utils.dart' show printPdfBytes;
+import '../../core/utils/print_service.dart' show PrintService;
 import '../../data/models/payment.dart' show Payment;
 import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
 import '../../data/repositories/invoice_repository.dart'
@@ -23,7 +23,6 @@ import '../payments/edit_payment_dialog.dart' show showPaymentEditDialog;
 import '../payments/payments_providers.dart' show paymentsProvider;
 import 'customer_providers.dart';
 import '../../widgets/detail_tab_grid.dart';
-import '../../widgets/payment_receipt_pdf.dart' show buildPaymentReceiptPdf;
 
 enum _PaymentRowAction { print, edit, delete }
 
@@ -298,14 +297,11 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
 
   Future<void> _printReceipt(Payment payment) async {
     final l10n = AppLocalizations.of(context)!;
+    final service = PrintService(context);
+    final format = await service.pickFormat();
+    if (format == null) return;
     try {
-      final bytes = await buildPaymentReceiptPdf(payment);
-      if (!mounted) return;
-      await printPdfBytes(
-        bytes,
-        '${payment.paymentNo.isEmpty ? 'receipt' : payment.paymentNo}.pdf',
-        context,
-      );
+      await service.printPaymentReceipt(payment, format: format);
     } catch (error) {
       if (mounted) {
         showAppToast(context, '${l10n.errorsFailed}: $error', isError: true);

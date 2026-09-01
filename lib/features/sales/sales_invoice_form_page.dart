@@ -26,7 +26,7 @@ import '../../widgets/pluto_grid_screen.dart'
     show plutoGridConfigurationFor;
 
 import '../../core/utils/date_utils.dart' show isoDate;
-import '../../core/utils/print_utils.dart' show printPdfBytes;
+import '../../core/utils/print_service.dart' show PrintFormat, PrintService;
 import '../../core/utils/formatters.dart';
 import '../../core/utils/invoice_status.dart';
 import '../../data/models/customer.dart' show Customer;
@@ -61,7 +61,6 @@ import 'calculations/invoice_calculations.dart'
         generateInvoiceNo;
 import 'calculations/invoice_rules.dart'
     show doesPaymentExceedBalance, isValidPaymentAmount;
-import 'invoice_pdf.dart' show buildA4InvoicePdf;
 import 'invoice_providers.dart';
 import 'invoice_return_dialog.dart' show showInvoiceReturnDialog;
 import 'line_cells.dart' show DescriptionCell, LineCell, RemoveCell, SerialCell;
@@ -786,13 +785,21 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     }
   }
 
-  // ── A4 print (edit mode) ──────────────────────────────────────
+  // ── Print (edit mode) ──────────────────────────────────────
 
-  /// Builds the A4 invoice PDF from the *saved* invoice (fresh
-  /// `GET /invoices/:id` detail + payments, PORTING.md §12) and shows the
-  /// native print dialog. Falls back to the share/save-as-PDF sheet when
-  /// the platform has no print backend (e.g. some Linux setups).
-  Future<void> _printInvoice(int invoiceId) async {
+  /// Shows the format picker and prints in the chosen format.
+  Future<void> _showPrintFormatPicker(int invoiceId) async {
+    final service = PrintService(context);
+    final format = await service.pickFormat();
+    if (format == null || !mounted) return;
+    await _printInvoiceWithFormat(invoiceId, format);
+  }
+
+  /// Prints invoice in the given format.
+  Future<void> _printInvoiceWithFormat(
+    int invoiceId,
+    PrintFormat format,
+  ) async {
     final l10n = AppLocalizations.of(context)!;
     setState(() => _printing = true);
     try {
@@ -814,12 +821,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         ApiFailure() => const <InvoicePaymentRecord>[],
       };
 
-      final bytes = await buildA4InvoicePdf(
-        invoice: invoice,
-        payments: payments,
-      );
-      if (!mounted) return;
-      await printPdfBytes(bytes, '${invoice.invoiceNo}.pdf', context);
+      final service = PrintService(context);
+      await service.printInvoice(invoice, payments: payments, format: format);
     } catch (error) {
       if (mounted) _printError('${l10n.errorsFailed}: $error');
     } finally {
@@ -1067,13 +1070,13 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     showAppToast(context, l10n.salesInvoicesaved);
   }
 
-  /// Ctrl+P — save (create/update), then print the A4 PDF from the saved
-  /// invoice, then close the form (spec §7).
+  /// Ctrl+P — save (create/update), then show format picker and print,
+  /// then close the form (spec §7).
   Future<void> _saveAndPrint() async {
     final l10n = AppLocalizations.of(context)!;
     final saved = await _save();
     if (!mounted || saved == null) return;
-    await _printInvoice(saved.id);
+    await _showPrintFormatPicker(saved.id);
     if (!mounted) return;
     ref.invalidate(invoicesProvider);
     Navigator.of(context).pop();
@@ -1302,7 +1305,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
               child: TextButton.icon(
                 onPressed: _printing || _submitting
                     ? null
-                    : () => _printInvoice(widget.invoice!.id),
+                    : () => _showPrintFormatPicker(widget.invoice!.id),
                 icon: _printing
                     ? const SizedBox(
                         width: 16,
@@ -1310,7 +1313,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.print_outlined, size: 18),
-                label: Text(l10n.salesPrinta4),
+                label: Text(l10n.actionsPrint),
               ),
             ),
             Padding(

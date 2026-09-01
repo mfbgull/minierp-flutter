@@ -1,0 +1,99 @@
+  @override
+  Widget build(BuildContext context) {
+    final capital = ref.watch(ownerCapitalProvider);
+    final page = capital.valueOrNull;
+    final l10n = AppLocalizations.of(context)!;
+
+    ref.listen(ownerCapitalProvider, (previous, next) => _applyRows(next));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: _equitySummaryCards(l10n),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: _toolbar(l10n),
+        ),
+        Expanded(child: _buildBody(capital)),
+        if (page != null)
+          ServerPaginationBar(
+            page: page.currentPage,
+            totalPages: page.totalPages,
+            totalItems: page.totalItems,
+            hasNext: page.hasNext,
+            hasPrev: page.hasPrev,
+            limit: ref.watch(capitalLimitProvider),
+            itemLabel: l10n.equityCapital,
+            onPageChanged: (p) =>
+                ref.read(capitalPageProvider.notifier).state = p,
+            onLimitChanged: (limit) {
+              ref.read(capitalLimitProvider.notifier).state = limit;
+              if (ref.read(capitalPageProvider) != 1) {
+                ref.read(capitalPageProvider.notifier).state = 1;
+              }
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _equitySummaryCards(AppLocalizations l10n) {
+    final summary = ref.watch(equitySummaryProvider);
+    final scheme = Theme.of(context).colorScheme;
+    final data = summary.valueOrNull;
+
+    return Card(
+      elevation: 0,
+      color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      shape: RoundedRectangleBorder(
+        borderRadius: AppBorderRadius.smRadius,
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: _EquityStat(
+                icon: Icons.savings_outlined,
+                label: l10n.equityTotalcapitalin,
+                value: Formatters.currency(data?.totalCapitalIn ?? 0),
+                color: scheme.primary,
+              ),
+            ),
+            _equityStatDivider(scheme),
+            Expanded(
+              child: _EquityStat(
+                icon: Icons.call_made_outlined,
+                label: l10n.equityTotalwithdrawn,
+                value: Formatters.currency(
+                  (data?.totalWithdrawnCash ?? 0) +
+                      (data?.totalWithdrawnGoods ?? 0),
+                ),
+                color: scheme.error,
+              ),
+            ),
+            _equityStatDivider(scheme),
+            Expanded(
+              child: _EquityStat(
+                icon: Icons.account_balance_outlined,
+                label: l10n.equityNetcontributions,
+                value: Formatters.currency(data?.netContributions ?? 0),
+                color: scheme.tertiary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _equityStatDivider(ColorScheme scheme) => Container(
+    width: 1,
+    height: 36,
+    color: scheme.outlineVariant,
+  );
+
