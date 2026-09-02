@@ -87,6 +87,11 @@ function createPOSSale(req: AuthRequest, res: Response): void {
 
     const customerName = customer_name || 'Walk-in Customer';
 
+    // The actual amount applied to the invoice is min(cash, total).
+    // Any overpayment is change returned to the customer — it must not
+    // appear in the customer ledger or invoice paid_amount.
+    const paymentAmount = Math.min(cashAmount, total);
+
     // Stock validation — check all items have sufficient stock before proceeding
     for (const item of items) {
       const stockBalance = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?').get(item.item_id, warehouse_id) as { quantity: number } | undefined;
@@ -121,8 +126,8 @@ function createPOSSale(req: AuthRequest, res: Response): void {
         sale_date, // due_date = sale_date (immediate payment)
         'Paid',
         total,
-        cashAmount,
-        Math.max(0, total - cashAmount),
+        paymentAmount,
+        total - paymentAmount,
         `POS Transaction: ${transactionNo}`,
         userId,
         'POS'
@@ -194,13 +199,16 @@ function createPOSSale(req: AuthRequest, res: Response): void {
         });
       }
 
-      // Record payment
-      if (cashAmount > 0) {
+      // Record payment — only the invoice total, not the full cash
+      // received. Any overpayment (change) is returned to the customer
+      // and must NOT be recorded in the customer ledger, otherwise the
+      // walk-in accumulates a spurious Cr balance.
+      if (paymentAmount > 0) {
         const paymentNo = InvoiceModel.generatePaymentNoAtomic(db);
-        const paymentId = InvoiceModel.createPayment(db, paymentNo, walkinCustomerId, sale_date, cashAmount, 'Cash', null, `POS Transaction ${transactionNo}`);
-        InvoiceModel.createPaymentAllocation(db, paymentId, invoiceId, cashAmount);
+        const paymentId = InvoiceModel.createPayment(db, paymentNo, walkinCustomerId, sale_date, paymentAmount, 'Cash', null, `POS Transaction ${transactionNo}`);
+        InvoiceModel.createPaymentAllocation(db, paymentId, invoiceId, paymentAmount);
         // Create ledger entry for payment
-        InvoiceModel.createLedgerEntry(db, walkinCustomerId, 'PAYMENT', paymentNo, sale_date, 0, cashAmount, `Payment ${paymentNo} for POS ${transactionNo}`);
+        InvoiceModel.createLedgerEntry(db, walkinCustomerId, 'PAYMENT', paymentNo, sale_date, 0, paymentAmount, `Payment ${paymentNo} for POS ${transactionNo}`);
       }
 
       // Create ledger entry for the sale
@@ -242,7 +250,7 @@ function createPOSSale(req: AuthRequest, res: Response): void {
         });
       }
 
-      if (cashAmount > 0) {
+      if (paymentAmount > 0) {
         const posPayment = db.prepare(
           'SELECT id FROM payments WHERE notes = ? ORDER BY id DESC LIMIT 1'
         ).get(`POS Transaction ${transactionNo}`) as { id: number } | undefined;
@@ -250,7 +258,7 @@ function createPOSSale(req: AuthRequest, res: Response): void {
           AccountingService.postPaymentEntry(db, {
             paymentId: posPayment.id,
             paymentNo: `POS-${transactionNo}`,
-            amount: cashAmount,
+            amount: paymentAmount,
             paymentDate: sale_date,
             paymentMethod: 'cash',
             customerId: walkinCustomerId,
