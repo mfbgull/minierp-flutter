@@ -18,16 +18,19 @@ import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import 'inventory_providers.dart'
     show
         GridSort,
         movementTypeFilterProvider,
+        stockMovementsFromDateProvider,
         stockMovementsLimitProvider,
         stockMovementsPageProvider,
         stockMovementsProvider,
-        stockMovementsSortProvider;
+        stockMovementsSortProvider,
+        stockMovementsToDateProvider;
 import 'stock_adjustment_dialog.dart';
 import 'stock_transfer_dialog.dart';
 import 'stock_movement_detail_dialog.dart';
@@ -181,6 +184,16 @@ class _StockMovementScreenState extends ConsumerState<StockMovementScreen>
                 if (newFilter == null) {
                   ref.invalidate(stockMovementsProvider(null));
                 }
+              },
+            ),
+            DateRangeFilter(
+              fromProvider: stockMovementsFromDateProvider,
+              toProvider: stockMovementsToDateProvider,
+              onChanged: () {
+                if (ref.read(stockMovementsPageProvider) != 1) {
+                  ref.read(stockMovementsPageProvider.notifier).state = 1;
+                }
+                ref.invalidate(stockMovementsProvider(filter));
               },
             ),
           ],

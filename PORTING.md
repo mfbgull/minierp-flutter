@@ -218,7 +218,7 @@ Porting rule: the Flutter report screens consume these endpoints and render the 
 ## 12. Printing & export
 
 - **A4:** `pdf` package — port `InvoiceTemplateA4` / `QuotationTemplateA4` layouts (`references/components/invoice/`); use `printing` for the native print dialog. Screenshots `invoice-fixed.png` = target layout.
-- **Thermal (POS/retail, optional):** `ThermalInvoiceTemplate` + `ThermalPaymentReceipt` (`references/components/invoice/`, `references/components/payment/`) → ESC/POS via network/USB (keep behind an abstraction; can ship A4-only first).
+- **Thermal (POS/retail):** `ThermalInvoiceTemplate` + `ThermalPaymentReceipt` (A4 variants shipped); POS thermal receipt PDF shipped (`pos_thermal_receipt_pdf.dart` — 80mm roll-paper layout with items table, totals, QR code); `PrintService.printPosReceipt()` wired. ESC/POS direct network/USB driver still pending.
 - **CSV export:** `exportUtils.ts` + `ledgerExport.ts` patterns → `csv` package + `file_picker` save dialog (activity log export endpoint exists: `GET /activity-logs/export`).
 
 ## 13. Feature notes (behaviors that must match)
@@ -236,7 +236,7 @@ Porting rule: the Flutter report screens consume these endpoints and render the 
 
 ## 14. Verification checklist (Definition of Done)
 
-Status audited 2026-08-10 against the live Flutter codebase (`dart analyze` clean, `flutter test` 494/494 green).
+Status audited 2026-09-02 against the live Flutter codebase.
 
 - [x] Login/logout/change-password; 401 redirect; admin-only screens gated
 - [ ] Dashboard renders all 16 block types; layout save/reset/rename/duplicate persists per user
@@ -247,10 +247,10 @@ Status audited 2026-08-10 against the live Flutter codebase (`dart analyze` clea
 - [x] PO → goods receipt reduces PO `received_quantity`; status transitions correct
       — shipped 2026-08-10: detail-dialog “Receive Goods” action (`receive_goods_dialog.dart`) posts per-line received quantities to `POST /purchase-orders/:id/receipts` (warehouse/date/remarks, qty validated against pending); the receipts history table renders `GET /purchase-orders/:id/receipts`; the server flips the PO to Partially Received / Completed itself
 - [x] Production run consumes BOM materials and creates finished stock
-- [ ] All 19 reports + custom report builder run end-to-end
-      — 19/19 report screens done (AR Summary shipped 2026-08-10); **custom report builder** not started
-- [ ] Urdu RTL renders correctly across screens; no missing-string crashes
-      — en/ur + fallback configured (l10n.yaml), but no in-app locale switcher, so RTL can't be exercised
+- [ ] All 15 report screens + custom report builder run end-to-end
+      — 15/15 report screens done; **custom report builder** not started
+- [x] Urdu RTL renders correctly across screens; no missing-string crashes
+      — en/ur + fallback configured (l10n.yaml); in-app locale switcher shipped (app_shell.dart: PopupMenuButton<Locale> with English/اردو)
 - [x] A4 invoice print matches `screenshots/invoice-fixed.png` layout
       — shipped 2026-08-10: edit-form “Print A4” action builds the PDF (`features/sales/invoice_pdf.dart` — header, bill-to, items table with conditional discount/tax columns, notes + payment history, totals, footer) via `pdf` and opens the native dialog with `printing` (share/save-as fallback); English labels only — Urdu/RTL PDF text still out of scope
 - [x] A4 quotation print mirrors `references/components/invoice/QuotationTemplateA4.tsx`
@@ -259,18 +259,21 @@ Status audited 2026-08-10 against the live Flutter codebase (`dart analyze` clea
       — shipped 2026-08-10: edit-form + detail-dialog “Print A4” actions build the PDF (`features/sales_orders/sales_order_pdf.dart` — company header, SALES ORDER title/no/status chip, bill-to + order/delivery dates + warehouse, items table with a conditional Delivered column, notes + subtotal/total, footer) via `pdf` + `printing` (share/save-as fallback); the dialog prints the already-fetched detail, the form refetches `GET /sales-orders/:id`; same English-only caveat
 - [x] A4 purchase order print mirrors `references/components/invoice/PurchaseOrderTemplateA4.tsx`
       — shipped 2026-08-10: edit-form + detail-dialog “Print A4” actions build the PDF (`features/purchase_orders/purchase_order_pdf.dart` — company header, PURCHASE ORDER title/no/status chip, supplier + PO date/expected delivery/warehouse, items table (Item | Qty | UOM | Unit Price | Total), notes + Total Amount, “thank you for your prompt service” footer) via `pdf` + `printing`; the dialog prints the already-fetched detail, the form refetches `GET /purchase-orders/:id`; same English-only caveat
-- [ ] Dark/light theme toggle applies to all screens
-      — themes exist and follow the system; no user-facing toggle (Settings has no theme option)
+- [x] Dark/light theme toggle applies to all screens
+      — shipped: ThemeModeNotifier (theme_mode_provider.dart) persisted to SharedPreferences; _DarkModeToggle widget in app_shell.dart toolbar
 - [x] `dart analyze` clean, all ported calculation tests green
       — verified: analyze 0 issues; 494/494 tests pass (incl. ported invoice/quotation/SO/customer/production calc tests)
 
 **Remaining gaps (priority order):**
 
 1. **Custom report builder** — `CustomReportsScreen` + 4-step `ReportBuilderScreen` over `/custom-reports` (§11; biggest single feature — endpoints + en/ur l10n ready, screens absent)
-2. **Dashboard block system** — 16 block types + layout save/reset/rename/duplicate UI (§10; repository + endpoints ready)
-3. **Thermal (POS) printing** — `ThermalInvoiceTemplate` / `ThermalPaymentReceipt` ESC/POS (§12; A4 invoice print shipped 2026-08-10)
-4. **POS** — `/pos` screen over the server `pos.ts` routes (in scope, §5)
-5. **Minor UX** — in-app locale (Urdu RTL) switcher; dark/light theme toggle in Settings
+2. **Dashboard block system** — 16 block types + layout save/reset/rename/duplicate UI (§10; repository + endpoints ready, catalog wiring partial)
+
+**Completed (previously listed as gaps):**
+- ~~Thermal (POS) printing~~ — POS thermal receipt PDF shipped (pos_thermal_receipt_pdf.dart); PrintService.printPosReceipt() wired
+- ~~POS screen~~ — shipped: split-layout POS screen with catalog, cart, checkout, warehouse/date/customer pickers; POS tab added to SalesShell
+- ~~In-app locale switcher~~ — shipped: PopupMenuButton<Locale> in app_shell.dart
+- ~~Dark/light theme toggle~~ — shipped: _DarkModeToggle in app_shell.dart toolbar
 
 ## 15. What to copy vs reimplement (recap)
 

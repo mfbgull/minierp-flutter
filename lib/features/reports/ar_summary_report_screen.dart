@@ -11,8 +11,12 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart' show ArSummaryReport;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/date_range_picker.dart'
+    show DateRangeFilter, DateRangeMode;
 import '../../widgets/screen_error_panel.dart';
-import 'report_providers.dart';
+import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
+import 'report_providers.dart'
+    show arSummaryAsOfDateProvider, arSummaryProvider;
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class ArSummaryReportScreen extends ConsumerWidget {
@@ -29,21 +33,23 @@ class ArSummaryReportScreen extends ConsumerWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.reportsTabsReceivables_summary,
-                  style: textTheme.titleLarge,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                tooltip: l10n.commonRefresh,
-                onPressed: () => ref.invalidate(arSummaryProvider),
-              ),
-            ],
+          child: Text(
+            l10n.reportsTabsReceivables_summary,
+            style: textTheme.titleLarge,
           ),
+        ),
+        ScreenToolbar(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          onRefresh: () => ref.invalidate(arSummaryProvider),
+          filters: [
+            DateRangeFilter(
+              mode: DateRangeMode.singleDate,
+              fromProvider: arSummaryAsOfDateProvider,
+              toProvider: arSummaryAsOfDateProvider,
+              dateProvider: arSummaryAsOfDateProvider,
+              showAllDates: false,
+            ),
+          ],
         ),
         Expanded(child: _body(context, ref, report)),
       ],

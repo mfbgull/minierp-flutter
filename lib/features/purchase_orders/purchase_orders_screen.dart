@@ -20,13 +20,24 @@ import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import '../../features/purchases/purchase_return_form_dialog.dart'
     show ReturnSource, showPurchaseReturnFormDialog;
 import 'purchase_order_detail_dialog.dart';
 import 'purchase_order_form_dialog.dart';
-import 'purchase_order_providers.dart';
+import 'purchase_order_providers.dart'
+    show
+        PurchaseOrderSort,
+        filteredPurchaseOrdersProvider,
+        purchaseOrdersFromDateProvider,
+        purchaseOrdersLimitProvider,
+        purchaseOrdersPageProvider,
+        purchaseOrdersProvider,
+        purchaseOrdersSearchProvider,
+        purchaseOrdersSortProvider,
+        purchaseOrdersToDateProvider;
 
 class PurchaseOrdersScreen extends ConsumerStatefulWidget {
   const PurchaseOrdersScreen({super.key});
@@ -181,6 +192,17 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
           searchHint: l10n.commonSearch,
           onSearchChanged: _onSearchChanged,
           onRefresh: () => ref.invalidate(purchaseOrdersProvider),
+          filters: [
+            DateRangeFilter(
+              fromProvider: purchaseOrdersFromDateProvider,
+              toProvider: purchaseOrdersToDateProvider,
+              onChanged: () {
+                if (ref.read(purchaseOrdersPageProvider) != 1) {
+                  ref.read(purchaseOrdersPageProvider.notifier).state = 1;
+                }
+              },
+            ),
+          ],
           actions: [
             // CSV export — mirrors the sales-orders/returns grids: the
             // pure builder runs over the currently-filtered rows and

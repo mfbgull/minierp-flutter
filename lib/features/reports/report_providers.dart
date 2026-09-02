@@ -68,11 +68,11 @@ final reportDsoToDateProvider = StateProvider<DateTime?>((ref) => initialRange(r
 
 /// Loads GET /reports/dso, re-running when the date range changes.
 final dsoReportProvider = FutureProvider<DSOMetric>((ref) async {
-  final from = ref.watch(reportDsoFromDateProvider) ?? initialRange(ref).from;
-  final to = ref.watch(reportDsoToDateProvider) ?? initialRange(ref).to;
+  final from = ref.watch(reportDsoFromDateProvider);
+  final to = ref.watch(reportDsoToDateProvider);
   final result = await ref
       .watch(reportRepositoryProvider)
-      .dso(fromDate: isoDate(from), toDate: isoDate(to));
+      .dso(fromDate: from == null ? null : isoDate(from), toDate: to == null ? null : isoDate(to));
   return switch (result) {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,
@@ -88,11 +88,11 @@ final reportCashFlowToDateProvider = StateProvider<DateTime?>((ref) => initialRa
 
 /// Loads GET /reports/cash-flow, re-running when the date range changes.
 final cashFlowReportProvider = FutureProvider<CashFlowReport>((ref) async {
-  final from = ref.watch(reportCashFlowFromDateProvider) ?? initialRange(ref).from;
-  final to = ref.watch(reportCashFlowToDateProvider) ?? initialRange(ref).to;
+  final from = ref.watch(reportCashFlowFromDateProvider);
+  final to = ref.watch(reportCashFlowToDateProvider);
   final result = await ref
       .watch(reportRepositoryProvider)
-      .cashFlow(fromDate: isoDate(from), toDate: isoDate(to));
+      .cashFlow(fromDate: from == null ? null : isoDate(from), toDate: to == null ? null : isoDate(to));
   return switch (result) {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,
@@ -104,16 +104,15 @@ final cashFlowReportProvider = FutureProvider<CashFlowReport>((ref) async {
 /// Date-range filters for the P&L report.
 final reportProfitLossFromDateProvider =
     StateProvider<DateTime?>((ref) => initialRange(ref).from);
-final reportProfitLossToDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).to);
+final reportProfitLossToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
 
 /// Loads GET /reports/profit-loss, re-running when the date range changes.
 final profitLossReportProvider = FutureProvider<ProfitLossReport>((ref) async {
-  final from = ref.watch(reportProfitLossFromDateProvider) ?? initialRange(ref).from;
-  final to = ref.watch(reportProfitLossToDateProvider) ?? initialRange(ref).to;
+  final from = ref.watch(reportProfitLossFromDateProvider);
+  final to = ref.watch(reportProfitLossToDateProvider);
   final result = await ref
       .watch(reportRepositoryProvider)
-      .profitLoss(fromDate: isoDate(from), toDate: isoDate(to));
+      .profitLoss(fromDate: from == null ? null : isoDate(from), toDate: to == null ? null : isoDate(to));
   return switch (result) {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,
@@ -125,8 +124,7 @@ final profitLossReportProvider = FutureProvider<ProfitLossReport>((ref) async {
 /// Date-range filters for the customer statements report.
 final reportStatementsFromDateProvider =
     StateProvider<DateTime?>((ref) => initialRange(ref).from);
-final reportStatementsToDateProvider =
-    StateProvider<DateTime?>((ref) => initialRange(ref).to);
+final reportStatementsToDateProvider = StateProvider<DateTime?>((ref) => initialRange(ref).to);
 
 /// Active customer filter for the customer statements report.
 final reportStatementsCustomerIdProvider = StateProvider<int?>((ref) => null);
@@ -146,14 +144,14 @@ final customersForReportProvider = FutureProvider<List<Customer>>((ref) async {
 /// or selected customer changes.
 final customerStatementsReportProvider =
     FutureProvider<List<CustomerStatementRow>>((ref) async {
-  final from = ref.watch(reportStatementsFromDateProvider) ?? initialRange(ref).from;
-  final to = ref.watch(reportStatementsToDateProvider) ?? initialRange(ref).to;
+  final from = ref.watch(reportStatementsFromDateProvider);
+  final to = ref.watch(reportStatementsToDateProvider);
   final customerId = ref.watch(reportStatementsCustomerIdProvider);
   final result = await ref
       .watch(reportRepositoryProvider)
       .customerStatements(
-        fromDate: isoDate(from),
-        toDate: isoDate(to),
+        fromDate: from == null ? null : isoDate(from),
+        toDate: to == null ? null : isoDate(to),
         customerId: customerId,
       );
   return switch (result) {
@@ -167,12 +165,21 @@ final customerStatementsReportProvider =
 /// Row limit for the top-debtors report.
 final topDebtorsLimitProvider = StateProvider<int>((ref) => 10);
 
-/// Loads GET /reports/top-debtors, re-running when the limit changes.
+/// As-of date for the top-debtors report.
+final topDebtorsAsOfDateProvider = StateProvider<DateTime?>(
+  (ref) => initialRange(ref).to,
+);
+
+/// Loads GET /reports/top-debtors, re-running when the limit or asOfDate changes.
 final topDebtorsReportProvider = FutureProvider<List<TopDebtorRow>>((ref) async {
   final limit = ref.watch(topDebtorsLimitProvider);
+  final asOf = ref.watch(topDebtorsAsOfDateProvider);
   final result = await ref
       .watch(reportRepositoryProvider)
-      .topDebtors(limit: limit);
+      .topDebtors(
+        limit: limit,
+        asOfDate: asOf?.toIso8601String().split('T').first,
+      );
   return switch (result) {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,
@@ -200,9 +207,17 @@ final cashReconciliationProvider = FutureProvider<CashReconciliation>((ref) asyn
 
 // ── AR summary ───────────────────────────────────────────────────────
 
-/// Loads GET /reports/ar-summary (server default: as of today).
+/// As-of date for the AR summary report (defaults to today).
+final arSummaryAsOfDateProvider = StateProvider<DateTime?>(
+  (ref) => _today(),
+);
+
+/// Loads GET /reports/ar-summary, re-running when the as-of date changes.
 final arSummaryProvider = FutureProvider<ArSummaryReport>((ref) async {
-  final result = await ref.watch(reportRepositoryProvider).arSummary();
+  final asOf = ref.watch(arSummaryAsOfDateProvider);
+  final result = await ref.watch(reportRepositoryProvider).arSummary(
+    asOfDate: asOf?.toIso8601String().split('T').first,
+  );
   return switch (result) {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,
@@ -260,7 +275,7 @@ final globalReportToDateProvider = StateProvider<DateTime?>(
 /// Every report page's From/To provider pair — the targets of the
 /// dashboard's global date range.
 final reportTrialBalanceAsOfDateProvider = StateProvider<DateTime?>(
-  (ref) => null,
+  (ref) => initialRange(ref).to,
 );
 final trialBalanceProvider = FutureProvider<TrialBalanceReport>((ref) async {
   final asOf = ref.watch(reportTrialBalanceAsOfDateProvider);
@@ -285,8 +300,8 @@ final generalLedgerProvider = FutureProvider<List<GeneralLedgerRow>>((ref) async
   final to = ref.watch(reportGeneralLedgerToDateProvider);
   final repo = ref.watch(reportRepositoryProvider);
   final result = await repo.generalLedger(
-    startDate: from?.toIso8601String().split('T').first ?? '',
-    endDate: to?.toIso8601String().split('T').first ?? '',
+    startDate: from?.toIso8601String().split('T').first,
+    endDate: to?.toIso8601String().split('T').first,
   );
   return switch (result) {
     ApiSuccess(:final data) => data,
@@ -305,8 +320,8 @@ final incomeStatementProvider = FutureProvider<IncomeStatementReport>((ref) asyn
   final to = ref.watch(reportIncomeStatementToDateProvider);
   final repo = ref.watch(reportRepositoryProvider);
   final result = await repo.incomeStatement(
-    startDate: from?.toIso8601String().split('T').first ?? '',
-    endDate: to?.toIso8601String().split('T').first ?? '',
+    startDate: from?.toIso8601String().split('T').first,
+    endDate: to?.toIso8601String().split('T').first,
   );
   return switch (result) {
     ApiSuccess(:final data) => data,

@@ -11,10 +11,21 @@ import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_toolbar.dart';
 import 'production_detail_dialog.dart';
 import 'production_form_dialog.dart';
-import 'production_providers.dart';
+import 'production_providers.dart'
+    show
+        ProductionSort,
+        filteredProductionsProvider,
+        productionsFromDateProvider,
+        productionsLimitProvider,
+        productionsPageProvider,
+        productionsProvider,
+        productionsSortProvider,
+        productionsToDateProvider,
+        searchTextProvider;
 
 class ProductionScreen extends ConsumerStatefulWidget {
   const ProductionScreen({super.key});
@@ -147,6 +158,17 @@ class _ProductionScreenState extends ConsumerState<ProductionScreen>
           searchHint: l10n.commonSearch,
           onSearchChanged: _onSearchChanged,
           onRefresh: () => ref.invalidate(productionsProvider),
+          filters: [
+            DateRangeFilter(
+              fromProvider: productionsFromDateProvider,
+              toProvider: productionsToDateProvider,
+              onChanged: () {
+                if (ref.read(productionsPageProvider) != 1) {
+                  ref.read(productionsPageProvider.notifier).state = 1;
+                }
+              },
+            ),
+          ],
           actions: [
             TextButton.icon(
               onPressed: productions.isLoading || filteredRows.isEmpty

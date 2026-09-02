@@ -7,6 +7,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/bom.dart';
 import '../../data/models/item.dart' show Item;
 import '../../data/models/production.dart';
@@ -18,6 +19,7 @@ import '../../data/repositories/paged_request.dart'
     show PagedRequest, PagedResponse;
 import '../../data/repositories/production_repository.dart'
     show productionRepositoryProvider;
+import '../preferences/preference_providers.dart' show initialRange;
 
 /// Server-side search term for the BOM grid (`GET /boms` gained a
 /// `search` param — grid-pagination §7.2).
@@ -94,6 +96,12 @@ final productionsLimitProvider = StateProvider<int>((ref) => 10);
 /// Active server-side sort; null = server default (production_date DESC).
 final productionsSortProvider = StateProvider<ProductionSort?>((ref) => null);
 
+/// Inclusive date-range filter for productions.
+final productionsFromDateProvider =
+    StateProvider<DateTime?>((ref) => initialRange(ref).from);
+final productionsToDateProvider =
+    StateProvider<DateTime?>((ref) => initialRange(ref).to);
+
 /// Server-side sort for productions — the API column name (from the
 /// server's `PRODUCTION_SORT_COLUMNS` whitelist) plus the order.
 class ProductionSort {
@@ -111,6 +119,8 @@ final productionsProvider = FutureProvider<PagedResponse<Production>>((ref) asyn
   final page = ref.watch(productionsPageProvider);
   final limit = ref.watch(productionsLimitProvider);
   final sort = ref.watch(productionsSortProvider);
+  final fromDate = ref.watch(productionsFromDateProvider);
+  final toDate = ref.watch(productionsToDateProvider);
 
   final result = await ref
       .watch(productionRepositoryProvider)
@@ -121,6 +131,10 @@ final productionsProvider = FutureProvider<PagedResponse<Production>>((ref) asyn
           search: search.isEmpty ? null : search,
           sortBy: sort?.column,
           sortOrder: sort?.order ?? 'ASC',
+          extra: {
+            if (fromDate != null) 'start_date': isoDate(fromDate),
+            if (toDate != null) 'end_date': isoDate(toDate),
+          },
         ),
       );
   return switch (result) {
