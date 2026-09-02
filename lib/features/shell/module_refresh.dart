@@ -107,6 +107,11 @@ import '../sales/invoice_return_providers.dart'
         filteredInvoiceReturnsProvider,
         invoiceReturnPickerProvider,
         invoiceReturnsProvider;
+import '../sales/pos_providers.dart'
+    show
+        posCatalogProvider,
+        posTransactionsProvider,
+        posWarehousesProvider;
 import '../sales_orders/sales_order_providers.dart'
     show
         filteredSalesOrdersProvider,
@@ -169,7 +174,10 @@ final Map<String, ModuleRefresh> moduleRefreshOnVisit = {
     ..invalidate(filteredQuotationsProvider)
     ..invalidate(invoiceReturnsProvider)
     ..invalidate(filteredInvoiceReturnsProvider)
-    ..invalidate(invoiceReturnPickerProvider),
+    ..invalidate(invoiceReturnPickerProvider)
+    ..invalidate(posCatalogProvider)
+    ..invalidate(posWarehousesProvider)
+    ..invalidate(posTransactionsProvider),
   '/purchasing': (ref) => ref
     ..invalidate(purchaseOrdersProvider)
     ..invalidate(poSupplierOptionsProvider)
@@ -279,6 +287,10 @@ final Map<String, List<ModuleRefresh>> moduleTabRefreshOnVisit = {
       ..invalidate(invoiceReturnsProvider)
       ..invalidate(filteredInvoiceReturnsProvider)
       ..invalidate(invoiceReturnPickerProvider),
+    (ref) => ref
+      ..invalidate(posCatalogProvider)
+      ..invalidate(posWarehousesProvider)
+      ..invalidate(posTransactionsProvider),
   ],
   '/owners-equity': [
     (ref) => ref

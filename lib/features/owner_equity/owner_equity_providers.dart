@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../preferences/preference_providers.dart' show initialRange;
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/expense.dart' show ExpenseOption;
@@ -8,6 +7,7 @@ import '../../data/models/item.dart' show Item;
 import '../../data/models/owner_equity.dart'
     show EquitySummary, OwnerCapitalEntry, OwnerWithdrawal;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
+import '../preferences/preference_providers.dart' show initialRange;
 import '../../data/repositories/inventory_repository.dart'
     show inventoryRepositoryProvider;
 import '../../data/repositories/owner_equity_repository.dart'

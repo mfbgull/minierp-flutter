@@ -59,11 +59,11 @@ class ReportRepository {
   /// GET /reports/cash-flow — cash inflow/outflow over a date range.
   /// The endpoint requires both dates.
   Future<ApiResult<CashFlowReport>> cashFlow({
-    required String fromDate,
-    required String toDate,
+    String? fromDate,
+    String? toDate,
   }) => _api.get(
     ApiEndpoints.reportCashFlow,
-    queryParameters: {'fromDate': fromDate, 'toDate': toDate},
+    queryParameters: {'fromDate': ?fromDate, 'toDate': ?toDate},
     parse: (Object? json) =>
         CashFlowReport.fromJson(json as Map<String, dynamic>),
   );
@@ -71,11 +71,11 @@ class ReportRepository {
   /// GET /reports/profit-loss — revenue/COGS/expenses breakdown over a
   /// date range. The endpoint requires both dates.
   Future<ApiResult<ProfitLossReport>> profitLoss({
-    required String fromDate,
-    required String toDate,
+    String? fromDate,
+    String? toDate,
   }) => _api.get(
     ApiEndpoints.reportProfitLoss,
-    queryParameters: {'fromDate': fromDate, 'toDate': toDate},
+    queryParameters: {'fromDate': ?fromDate, 'toDate': ?toDate},
     parse: (Object? json) =>
         ProfitLossReport.fromJson(json as Map<String, dynamic>),
   );
@@ -107,10 +107,16 @@ class ReportRepository {
 
   /// GET /reports/top-debtors — customers with the highest outstanding
   /// balances. Returns a **bare array**; `limit` defaults to 10.
-  Future<ApiResult<List<TopDebtorRow>>> topDebtors({int limit = 10}) =>
+  Future<ApiResult<List<TopDebtorRow>>> topDebtors({
+    int limit = 10,
+    String? asOfDate,
+  }) =>
       _api.getList(
         ApiEndpoints.reportTopDebtors,
-        queryParameters: {'limit': limit},
+        queryParameters: {
+          'limit': limit,
+          if (asOfDate != null) 'asOfDate': asOfDate,
+        },
         parseItem: (Object? json) =>
             TopDebtorRow.fromJson(json as Map<String, dynamic>),
       );
@@ -188,14 +194,14 @@ class ReportRepository {
 
   /// GET /reports/general-ledger — ledger entries within a date range.
   Future<ApiResult<List<GeneralLedgerRow>>> generalLedger({
-    required String startDate,
-    required String endDate,
+    String? startDate,
+    String? endDate,
   }) =>
       _api.getList(
         ApiEndpoints.reportGeneralLedger,
         queryParameters: <String, dynamic>{
-          'startDate': startDate,
-          'endDate': endDate,
+          'startDate': ?startDate,
+          'endDate': ?endDate,
         },
         parseItem: (Object? json) =>
             GeneralLedgerRow.fromJson(json as Map<String, dynamic>),
@@ -203,14 +209,14 @@ class ReportRepository {
 
   /// GET /reports/income-statement — revenue, COGS, expenses, net income.
   Future<ApiResult<IncomeStatementReport>> incomeStatement({
-    required String startDate,
-    required String endDate,
+    String? startDate,
+    String? endDate,
   }) =>
       _api.get(
         ApiEndpoints.reportIncomeStatement,
         queryParameters: <String, dynamic>{
-          'startDate': startDate,
-          'endDate': endDate,
+          'startDate': ?startDate,
+          'endDate': ?endDate,
         },
         parse: (Object? json) =>
             IncomeStatementReport.fromJson(json as Map<String, dynamic>),
@@ -218,14 +224,14 @@ class ReportRepository {
 
   /// GET /reports/tax-summary — total tax for a date range.
   Future<ApiResult<TaxSummaryReport>> taxSummary({
-    required String startDate,
-    required String endDate,
+    String? startDate,
+    String? endDate,
   }) =>
       _api.get(
         ApiEndpoints.reportTaxSummary,
         queryParameters: <String, dynamic>{
-          'startDate': startDate,
-          'endDate': endDate,
+          'startDate': ?startDate,
+          'endDate': ?endDate,
         },
         parse: (Object? json) =>
             TaxSummaryReport.fromJson(json as Map<String, dynamic>),

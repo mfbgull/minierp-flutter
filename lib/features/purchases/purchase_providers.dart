@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/invoice.dart' show InvoicePaymentRecord;
 import '../../data/models/purchase.dart' show Purchase;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -7,6 +8,7 @@ import '../../data/repositories/paged_request.dart'
     show PagedRequest, PagedResponse;
 import '../../data/repositories/purchase_repository.dart'
     show purchaseRepositoryProvider;
+import '../preferences/preference_providers.dart' show initialRange;
 
 /// Server-side search term (purchase no / item / supplier); empty omits
 /// the param. The endpoint gained a `search` param (grid-pagination §6).
@@ -37,6 +39,13 @@ final purchasesSortProvider = StateProvider<PurchaseSort?>((ref) => null);
 /// `include_voided=1` (the toolbar's "Show Voided" chip).
 final purchasesIncludeVoidedProvider = StateProvider<bool>((ref) => false);
 
+/// Inclusive date-range filter — null means unbounded (sent as
+/// `start_date`/`end_date`).
+final purchasesFromDateProvider =
+    StateProvider<DateTime?>((ref) => initialRange(ref).from);
+final purchasesToDateProvider =
+    StateProvider<DateTime?>((ref) => initialRange(ref).to);
+
 /// One page of direct purchases — server-paginated like customers/suppliers
 /// (`GET /purchases` returns a `pagination` block). Re-runs when any of
 /// the paging/filter state changes; the screen invalidates it on refresh,
@@ -48,6 +57,8 @@ final purchasesProvider = FutureProvider<PagedResponse<Purchase>>((ref) async {
   final limit = ref.watch(purchasesLimitProvider);
   final sort = ref.watch(purchasesSortProvider);
   final includeVoided = ref.watch(purchasesIncludeVoidedProvider);
+  final fromDate = ref.watch(purchasesFromDateProvider);
+  final toDate = ref.watch(purchasesToDateProvider);
 
   final result = await ref.watch(purchaseRepositoryProvider).listPaged(
     PagedRequest(
@@ -56,7 +67,11 @@ final purchasesProvider = FutureProvider<PagedResponse<Purchase>>((ref) async {
       search: search.isEmpty ? null : search,
       sortBy: sort?.column,
       sortOrder: sort?.order ?? 'ASC',
-      extra: includeVoided ? {'include_voided': '1'} : null,
+      extra: {
+        if (includeVoided) 'include_voided': '1',
+        if (fromDate != null) 'start_date': isoDate(fromDate),
+        if (toDate != null) 'end_date': isoDate(toDate),
+      },
     ),
   );
 
@@ -74,13 +89,19 @@ final filteredPurchasesProvider =
     FutureProvider<List<Purchase>>((ref) async {
       final search = ref.watch(purchasesSearchProvider);
       final includeVoided = ref.watch(purchasesIncludeVoidedProvider);
+      final fromDate = ref.watch(purchasesFromDateProvider);
+      final toDate = ref.watch(purchasesToDateProvider);
 
       final result = await ref.watch(purchaseRepositoryProvider).listPaged(
         PagedRequest(
           page: 1,
           limit: 10000,
           search: search.isEmpty ? null : search,
-          extra: includeVoided ? {'include_voided': '1'} : null,
+          extra: {
+            if (includeVoided) 'include_voided': '1',
+            if (fromDate != null) 'start_date': isoDate(fromDate),
+            if (toDate != null) 'end_date': isoDate(toDate),
+          },
         ),
       );
 

@@ -7,15 +7,16 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../preferences/preference_providers.dart' show initialRange;
 
 import '../../core/utils/date_utils.dart' show isoDate;
+import '../preferences/preference_providers.dart' show initialRange;
 import '../../data/models/activity_log.dart'
     show ActivityLog, ActivityLogUser, ActivityStats;
 import '../../data/repositories/activity_log_repository.dart'
     show ActivityLogFilters, activityLogRepositoryProvider;
-import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
-import '../../data/repositories/paged_request.dart' show OffsetPagedResponse;
+import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;import '../../data/repositories/paged_request.dart' show OffsetPagedResponse;
+
+
 
 /// Server-side search term; empty omits the param (matches description
 /// and entity_type with LIKE).

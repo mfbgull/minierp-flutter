@@ -31,6 +31,8 @@ import '../../features/sales_orders/sales_order_pdf.dart' show buildA4SalesOrder
 import '../../features/purchase_orders/purchase_order_pdf.dart' show buildA4PurchaseOrderPdf;
 import '../../features/owner_equity/thermal_repayment_receipt_pdf.dart'
     show buildThermalRepaymentReceiptPdf;
+import '../../features/sales/pos_thermal_receipt_pdf.dart'
+    show buildPosThermalReceiptPdf;
 
 /// Print format options.
 enum PrintFormat {
@@ -197,6 +199,16 @@ class PrintService {
     final bytes = await buildA4PurchaseOrderPdf(purchaseOrder: purchaseOrder);
     final no = purchaseOrder.poNo ?? 'purchase-order';
     await _printBytes(bytes, '$no.pdf');
+  }
+
+  /// Prints a POS thermal (80mm) receipt. POS receipts are roll-paper
+  /// only — there is no A4 variant, so no format picker.
+  Future<void> printPosReceipt(
+    dynamic sale, {
+    CompanyInfo? company,
+  }) async {
+    final bytes = await buildPosThermalReceiptPdf(sale);
+    await _printBytes(bytes, '${sale.transactionNo}-pos.pdf');
   }
 
   /// Prints a personal-loan repayment receipt (thermal).

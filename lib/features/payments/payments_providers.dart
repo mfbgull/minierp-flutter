@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/invoice.dart' show Invoice;
 import '../../data/models/payment.dart' show Payment;
@@ -16,6 +17,7 @@ import '../../features/employees/employee_providers.dart'
 import '../../features/expenses/expense_providers.dart' show expensesProvider;
 import '../../features/owner_equity/owner_equity_providers.dart'
     show ownerCapitalProvider, ownerWithdrawalsProvider;
+import '../preferences/preference_providers.dart' show initialRange;
 
 /// Server-side sort — the API column name (from the server's
 /// `PAYMENT_SORT_COLUMNS` whitelist) plus the order.
@@ -137,6 +139,12 @@ final unifiedPaymentsLimitProvider = StateProvider<int>((ref) => 10);
 /// type | party | ref_no.
 final unifiedPaymentsSortProvider = StateProvider<PaymentSort?>((ref) => null);
 
+/// Inclusive date-range filter for the unified hub.
+final unifiedPaymentsFromDateProvider =
+    StateProvider<DateTime?>((ref) => initialRange(ref).from);
+final unifiedPaymentsToDateProvider =
+    StateProvider<DateTime?>((ref) => initialRange(ref).to);
+
 /// One page of the unified hub (`GET /payments/unified`) — server-paginated
 /// like the legacy payments list, but across every payment-related source.
 /// Re-runs when any paging/search/sort/type state changes; the screen and
@@ -148,6 +156,8 @@ final unifiedPaymentsProvider =
   final limit = ref.watch(unifiedPaymentsLimitProvider);
   final sort = ref.watch(unifiedPaymentsSortProvider);
   final type = ref.watch(unifiedPaymentsTypeFilterProvider);
+  final fromDate = ref.watch(unifiedPaymentsFromDateProvider);
+  final toDate = ref.watch(unifiedPaymentsToDateProvider);
 
   final result = await ref
       .watch(invoiceRepositoryProvider)
@@ -158,7 +168,11 @@ final unifiedPaymentsProvider =
           search: search.isEmpty ? null : search,
           sortBy: sort?.column,
           sortOrder: sort?.order ?? 'DESC',
-          extra: type != 'all' ? {'type': type} : null,
+          extra: {
+            if (type != 'all') 'type': type,
+            if (fromDate != null) 'fromDate': isoDate(fromDate),
+            if (toDate != null) 'toDate': isoDate(toDate),
+          },
         ),
       );
 

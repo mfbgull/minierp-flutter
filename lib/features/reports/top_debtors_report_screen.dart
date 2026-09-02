@@ -16,8 +16,14 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/client_paged_grid.dart';
 import '../../widgets/pluto_grid_screen.dart' show serialGridColumn;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/date_range_picker.dart'
+    show DateRangeFilter, DateRangeMode;
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
-import 'report_providers.dart';
+import 'report_providers.dart'
+    show
+        topDebtorsAsOfDateProvider,
+        topDebtorsLimitProvider,
+        topDebtorsReportProvider;
 import 'top_debtor_detail_dialog.dart';
 
 class TopDebtorsReportScreen extends ConsumerStatefulWidget {
@@ -173,6 +179,13 @@ class _TopDebtorsReportScreenState
                   ref.read(topDebtorsLimitProvider.notifier).state = limit;
                 },
               ),
+            ),
+            DateRangeFilter(
+              mode: DateRangeMode.singleDate,
+              fromProvider: topDebtorsAsOfDateProvider,
+              toProvider: topDebtorsAsOfDateProvider,
+              dateProvider: topDebtorsAsOfDateProvider,
+              showAllDates: false,
             ),
           ],
           onRefresh: () => ref.invalidate(topDebtorsReportProvider),

@@ -19,13 +19,25 @@ import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/app_toast.dart' show showAppToast;
 import '../suppliers/supplier_payment_modal.dart' show showSupplierPaymentModal;
 import 'void_purchase_dialog.dart' show showVoidPurchaseDialog;
 import 'purchase_detail_dialog.dart';
 import 'purchase_form_dialog.dart';
-import 'purchase_providers.dart';
+import 'purchase_providers.dart'
+    show
+        PurchaseSort,
+        filteredPurchasesProvider,
+        purchasesFromDateProvider,
+        purchasesIncludeVoidedProvider,
+        purchasesLimitProvider,
+        purchasesPageProvider,
+        purchasesProvider,
+        purchasesSearchProvider,
+        purchasesSortProvider,
+        purchasesToDateProvider;
 import 'purchase_return_form_dialog.dart'
     show ReturnSource, showPurchaseReturnFormDialog;
 
@@ -243,6 +255,15 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
                 ref.read(purchasesIncludeVoidedProvider.notifier).state =
                     selected;
                 // A different voided view starts back at page 1.
+                if (ref.read(purchasesPageProvider) != 1) {
+                  ref.read(purchasesPageProvider.notifier).state = 1;
+                }
+              },
+            ),
+            DateRangeFilter(
+              fromProvider: purchasesFromDateProvider,
+              toProvider: purchasesToDateProvider,
+              onChanged: () {
                 if (ref.read(purchasesPageProvider) != 1) {
                   ref.read(purchasesPageProvider.notifier).state = 1;
                 }

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
+import '../preferences/preference_providers.dart' show initialRange;
 import '../../data/models/purchase.dart' show Purchase;
 import '../../data/models/purchase_order.dart' show PurchaseOrder;
 import '../../data/models/purchase_return.dart' show PurchaseReturn;
@@ -44,8 +45,10 @@ final purchaseReturnsStatusFilterProvider = StateProvider<String?>(
 
 /// Inclusive date-range filter — null means unbounded (sent as
 /// `start_date`/`end_date`).
-final purchaseReturnsFromDateProvider = StateProvider<DateTime?>((ref) => null);
-final purchaseReturnsToDateProvider = StateProvider<DateTime?>((ref) => null);
+final purchaseReturnsFromDateProvider =
+    StateProvider<DateTime?>((ref) => initialRange(ref).from);
+final purchaseReturnsToDateProvider =
+    StateProvider<DateTime?>((ref) => initialRange(ref).to);
 
 /// One page of purchase-return headers — server-paginated like
 /// customers/suppliers (`GET /purchase-returns` returns a `pagination`

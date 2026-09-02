@@ -23,7 +23,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/utils/date_range_math.dart' show WeekStart;
+import '../../core/utils/date_range_math.dart'
+    show DatePreset, WeekStart, presetRange;
 import '../../data/models/backup.dart' show BackupFile, BackupStatus;
 import '../../data/models/setting.dart' show AppSetting;
 import '../../data/repositories/api_result.dart'
@@ -36,7 +37,11 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/confirm_dialog.dart' show showConfirmDialog;
 import '../../widgets/screen_error_panel.dart';
 import '../preferences/preference_providers.dart'
-    show saveDefaultRange, saveWeekStart, weekStartProvider;
+    show
+        activeDefaultRangeProvider,
+        saveDefaultRange,
+        saveWeekStart,
+        weekStartProvider;
 import '../reports/report_providers.dart'
     show globalReportFromDateProvider, globalReportToDateProvider;
 import 'settings_providers.dart';
@@ -548,9 +553,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
           ),
           const SizedBox(height: 16),
-          // Set current range as default — captures the active range
-          // from the dashboard / reports and persists it as the default
-          // for next app open (spec §6.2).
+          // Default date range — a preset dropdown that sets the
+          // initial range for all date pickers across the app.
           Row(
             children: [
               Icon(
@@ -565,27 +569,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
-              FilledButton.tonalIcon(
-                onPressed: !hasActiveRange
-                    ? null
-                    : () async {
-                        final error = await saveDefaultRange(
-                          ref,
-                          (from: fromDate, to: toDate),
-                        );
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              error == null
-                                  ? l10n.drpDefaultSet
-                                  : l10n.drpDefaultFailed,
-                            ),
-                          ),
-                        );
-                      },
-                icon: const Icon(Icons.bookmark_add_outlined, size: 18),
-                label: Text(l10n.drpSetDefault),
+              DropdownButtonHideUnderline(
+                child: DropdownButton<DatePreset?>(
+                  value: _currentDefaultPreset(ref),
+                  isDense: true,
+                  items: [
+                    DropdownMenuItem(
+                      value: null,
+                      child: Text(l10n.drpPresetThisMonth),
+                    ),
+                    for (final preset in DatePreset.values)
+                      DropdownMenuItem(
+                        value: preset,
+                        child: Text(_presetLabel(l10n, preset)),
+                      ),
+                  ],
+                  onChanged: (preset) async {
+                    final weekStart = ref.read(weekStartProvider);
+                    final now = DateTime.now();
+                    final range = preset == null
+                        ? null
+                        : presetRange(preset, now, weekStart);
+                    final error = await saveDefaultRange(ref, range);
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          error == null
+                              ? l10n.drpDefaultSet
+                              : l10n.drpDefaultFailed,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -593,6 +610,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
+
+  /// Maps the persisted default range back to a [DatePreset] by comparing
+  /// against each preset's computed range. Returns null when no default is
+  /// saved or when the saved range doesn't match any preset (the user
+  /// captured an ad-hoc range from the dashboard).
+  DatePreset? _currentDefaultPreset(WidgetRef ref) {
+    final saved = ref.watch(activeDefaultRangeProvider);
+    if (saved == null) return null; // null default = "This month" fallback
+    final weekStart = ref.read(weekStartProvider);
+    final today = DateTime.now();
+    for (final preset in DatePreset.values) {
+      final r = presetRange(preset, today, weekStart);
+      if (r.from == saved.from && r.to == saved.to) return preset;
+    }
+    // Saved range doesn't match any preset — show as "Custom" by
+    // returning null (which maps to the "This month" fallback item).
+    return null;
+  }
+
+  String _presetLabel(AppLocalizations l10n, DatePreset preset) => switch (preset) {
+    DatePreset.today => l10n.drpPresetToday,
+    DatePreset.yesterday => l10n.drpPresetYesterday,
+    DatePreset.thisWeek => l10n.drpPresetThisWeek,
+    DatePreset.lastWeek => l10n.drpPresetLastWeek,
+    DatePreset.last7 => l10n.drpPresetLast7,
+    DatePreset.last30 => l10n.drpPresetLast30,
+    DatePreset.last90 => l10n.drpPresetLast90,
+    DatePreset.thisMonth => l10n.drpPresetThisMonth,
+    DatePreset.lastMonth => l10n.drpPresetLastMonth,
+  };
 
   // ── Database Backup section (/admin/backup) ──────────────────────────
   Widget _backupSection(AppLocalizations l10n) {

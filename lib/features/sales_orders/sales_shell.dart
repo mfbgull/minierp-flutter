@@ -11,6 +11,7 @@ import '../../l10n/app_localizations.dart';
 import '../shell/module_refresh.dart' show moduleTabRefreshOnVisit;
 import '../quotations/quotations_screen.dart';
 import '../sales/invoice_returns_screen.dart';
+import '../sales/pos_screen.dart';
 import '../sales/sales_screen.dart';
 import 'sales_orders_screen.dart';
 
@@ -61,6 +62,11 @@ class _SalesShellState extends ConsumerState<SalesShell> {
               selectedIcon: const Icon(Icons.assignment_return),
               label: l10n.navInvoicereturns,
             ),
+            const NavigationDestination(
+              icon: Icon(Icons.point_of_sale_outlined),
+              selectedIcon: Icon(Icons.point_of_sale),
+              label: 'POS',
+            ),
           ],
         ),
         Expanded(
@@ -71,6 +77,7 @@ class _SalesShellState extends ConsumerState<SalesShell> {
               SalesOrdersScreen(),
               QuotationsScreen(),
               InvoiceReturnsScreen(),
+              PosScreen(),
             ],
           ),
         ),

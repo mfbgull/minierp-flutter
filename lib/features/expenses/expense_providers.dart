@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../preferences/preference_providers.dart' show initialRange;
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/expense.dart'
     show Expense, ExpenseCategory, ExpenseOption;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
+import '../preferences/preference_providers.dart' show initialRange;
 import '../../data/repositories/expense_repository.dart'
     show expenseRepositoryProvider;
 import '../../data/repositories/paged_request.dart'

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/item.dart' show Item;
 import '../../data/models/physical_count.dart' show PhysicalCount;
 import '../../data/models/stock_balance.dart' show StockBalance;
@@ -9,6 +10,7 @@ import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/inventory_repository.dart'
     show ItemDetail, PhysicalCountDetail, inventoryRepositoryProvider;
 import '../../data/repositories/paged_request.dart' show PagedRequest, PagedResponse;
+import '../preferences/preference_providers.dart' show initialRange;
 
 /// Server-side search term for the items grid (PORTING.md §2: list
 /// endpoints accept `search`; the items endpoint filters code/name/desc).
@@ -177,6 +179,12 @@ final stockMovementsLimitProvider = StateProvider<int>((ref) => 10);
 /// Active server-side sort; null = server default (movement_date DESC).
 final stockMovementsSortProvider = StateProvider<GridSort?>((ref) => null);
 
+/// Inclusive date-range filter for stock movements.
+final stockMovementsFromDateProvider =
+    StateProvider<DateTime?>((ref) => initialRange(ref).from);
+final stockMovementsToDateProvider =
+    StateProvider<DateTime?>((ref) => initialRange(ref).to);
+
 /// All movements (unfiltered, newest-first) for the movement-detail
 /// dialog's counterpart lookup — the grid's own provider only holds the
 /// current page, and the counterpart (e.g. a transfer's other leg) can
@@ -206,6 +214,8 @@ final stockMovementsProvider =
         final page = ref.watch(stockMovementsPageProvider);
         final limit = ref.watch(stockMovementsLimitProvider);
         final sort = ref.watch(stockMovementsSortProvider);
+        final fromDate = ref.watch(stockMovementsFromDateProvider);
+        final toDate = ref.watch(stockMovementsToDateProvider);
         final repo = ref.watch(inventoryRepositoryProvider);
         final result = await repo.stockMovements(
           PagedRequest(
@@ -213,8 +223,11 @@ final stockMovementsProvider =
             limit: limit,
             sortBy: sort?.column,
             sortOrder: sort?.order ?? 'ASC',
-            // Endpoint-specific filter: `?movement_type=<type>`.
-            extra: type == null ? null : {'movement_type': type},
+            extra: {
+              if (type != null) 'movement_type': type,
+              if (fromDate != null) 'date_from': isoDate(fromDate),
+              if (toDate != null) 'date_to': isoDate(toDate),
+            },
           ),
         );
         return switch (result) {

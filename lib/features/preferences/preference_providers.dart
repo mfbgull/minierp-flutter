@@ -228,7 +228,7 @@ DateRange initialRange(Ref ref) {
   final saved = ref.read(activeDefaultRangeProvider);
   if (saved != null) return saved;
   return presetRange(
-    DatePreset.thisWeek,
+    DatePreset.thisMonth,
     DateTime.now(),
     ref.read(weekStartProvider),
   );

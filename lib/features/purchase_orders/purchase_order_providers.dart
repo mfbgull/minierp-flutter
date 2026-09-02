@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/invoice.dart' show InvoicePaymentRecord;
 import '../../data/models/item.dart' show Item;
 import '../../data/models/purchase_order.dart'
@@ -14,6 +15,7 @@ import '../../data/repositories/purchase_order_repository.dart'
     show purchaseOrderRepositoryProvider;
 import '../../data/repositories/supplier_repository.dart'
     show supplierRepositoryProvider;
+import '../preferences/preference_providers.dart' show initialRange;
 
 /// Server-side search term (PO no / supplier name); empty omits the
 /// param. The endpoint gained a `search` param (grid-pagination §6).
@@ -39,6 +41,12 @@ class PurchaseOrderSort {
 /// Active server-side sort; null = server default (po_date DESC).
 final purchaseOrdersSortProvider = StateProvider<PurchaseOrderSort?>((ref) => null);
 
+/// Inclusive date-range filter — null means unbounded.
+final purchaseOrdersFromDateProvider =
+    StateProvider<DateTime?>((ref) => initialRange(ref).from);
+final purchaseOrdersToDateProvider =
+    StateProvider<DateTime?>((ref) => initialRange(ref).to);
+
 /// One page of purchase orders — server-paginated like customers/suppliers
 /// (`GET /purchase-orders` returns a `pagination` block). Re-runs when any
 /// of the paging/filter state changes; the screen invalidates it on
@@ -48,6 +56,8 @@ final purchaseOrdersProvider = FutureProvider<PagedResponse<PurchaseOrder>>((ref
   final page = ref.watch(purchaseOrdersPageProvider);
   final limit = ref.watch(purchaseOrdersLimitProvider);
   final sort = ref.watch(purchaseOrdersSortProvider);
+  final fromDate = ref.watch(purchaseOrdersFromDateProvider);
+  final toDate = ref.watch(purchaseOrdersToDateProvider);
 
   final result = await ref.watch(purchaseOrderRepositoryProvider).listPaged(
     PagedRequest(
@@ -56,6 +66,10 @@ final purchaseOrdersProvider = FutureProvider<PagedResponse<PurchaseOrder>>((ref
       search: search.isEmpty ? null : search,
       sortBy: sort?.column,
       sortOrder: sort?.order ?? 'ASC',
+      extra: {
+        if (fromDate != null) 'start_date': isoDate(fromDate),
+        if (toDate != null) 'end_date': isoDate(toDate),
+      },
     ),
   );
 

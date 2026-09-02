@@ -26,6 +26,7 @@ import '../../features/owner_equity/owner_withdrawal_form_dialog.dart'
 import '../../features/suppliers/supplier_payment_modal.dart'
     show showSupplierPaymentModal;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
@@ -37,11 +38,13 @@ import '../payments/payments_providers.dart'
     show
         PaymentSort,
         invalidateCashMovementProviders,
+        unifiedPaymentsFromDateProvider,
         unifiedPaymentsLimitProvider,
         unifiedPaymentsPageProvider,
         unifiedPaymentsProvider,
         unifiedPaymentsSearchProvider,
         unifiedPaymentsSortProvider,
+        unifiedPaymentsToDateProvider,
         unifiedPaymentsTypeFilterProvider;
 import '../payments/record_payment_dialog.dart' show showRecordPaymentDialog;
 import '../payments/unified_payment_detail_sheet.dart'
@@ -240,6 +243,17 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
             }
           },
           onRefresh: () => ref.invalidate(unifiedPaymentsProvider),
+          filters: [
+            DateRangeFilter(
+              fromProvider: unifiedPaymentsFromDateProvider,
+              toProvider: unifiedPaymentsToDateProvider,
+              onChanged: () {
+                if (ref.read(unifiedPaymentsPageProvider) != 1) {
+                  ref.read(unifiedPaymentsPageProvider.notifier).state = 1;
+                }
+              },
+            ),
+          ],
           primaryActions: [
             MenuAnchor(
               menuChildren: [

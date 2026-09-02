@@ -210,8 +210,6 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
             _select(_filtered[_selectedIndex]);
             return KeyEventResult.handled;
           }
-          // No highlight — commit the typed text as-is? No: just close
-          // and let Tab move focus to the next form field.
           _close();
           return KeyEventResult.ignored;
         case LogicalKeyboardKey.escape:
@@ -226,10 +224,6 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
   @override
   void didUpdateWidget(_SearchableSelectField<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // The option list arrived/refreshed while the popup is open (e.g. the
-    // customer popup auto-opens before the async provider resolves, spec
-    // §8.1): re-filter against the live items so the options appear
-    // without reopening.
     if (oldWidget.items != widget.items && _open) {
       final query = _searchController.text.trim().toLowerCase();
       setState(() {
@@ -241,7 +235,6 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
               ];
         _selectedIndex = _filtered.isEmpty ? -1 : 0;
       });
-      // Overlay refresh must wait for the build phase to finish.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _overlay?.markNeedsBuild();
       });
@@ -259,8 +252,6 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
     super.dispose();
   }
 
-  /// Alt+C (or the on-load auto-open) — opens the popup when closed;
-  /// re-focuses its filter when it is already open (spec §7).
   void _onOpenSignal() {
     if (!mounted) return;
     if (_open) {
@@ -285,33 +276,126 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
     if (!mounted) return;
     final box = _anchorKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.attached) return;
-    final topLeft = box.localToGlobal(Offset.zero);
     final screen = MediaQuery.sizeOf(context);
-    // At least as wide as the trigger, clamped to the screen edge.
+    final overlay = Overlay.of(context);
+    final overlayBox =
+        overlay.context.findRenderObject() as RenderBox?;
+    final overlayOrigin = overlayBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+
     final width = math.min(math.max(box.size.width, 240.0), screen.width - 16);
-    var left = topLeft.dx;
+    var left = box.localToGlobal(Offset.zero).dx;
     if (left + width > screen.width - 8) {
       left = math.max(8.0, screen.width - width - 8);
     }
-    // Drop below the trigger; clamp so the tallest menu stays on-screen.
-    final maxHeight = widget.menuMaxHeight + 52;
-    final top = math.min(
-      topLeft.dy + box.size.height + 2,
-      math.max(8.0, screen.height - maxHeight),
+
+    final desiredTop = box.localToGlobal(Offset.zero).dy + box.size.height + 2;
+    final maxMenuHeight = widget.menuMaxHeight + 52;
+    var top = math.min(
+      desiredTop,
+      math.max(overlayOrigin.dy + 8.0, screen.height - maxMenuHeight),
     );
+
+    // If not enough room below, consider flipping above, but still keep
+    // the menu below the trigger when it can fit.
+    final roomBelow = screen.height - desiredTop;
+    if (roomBelow < maxMenuHeight) {
+      final flippedTop = math.max(
+        overlayOrigin.dy + 8.0,
+        desiredTop - box.size.height - 2 - maxMenuHeight,
+      );
+      if (flippedTop < desiredTop) top = flippedTop;
+    }
+
     setState(() {
       _open = true;
       _filtered = [...widget.items];
       _selectedIndex = -1;
     });
+
     _overlay = OverlayEntry(
-      builder: (overlayContext) => _popup(overlayContext, left, top, width),
+      builder: (context) {
+        final localLeft = left - overlayOrigin.dx;
+        final localTop = top - overlayOrigin.dy;
+        final theme = Theme.of(context);
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _close,
+              ),
+            ),
+            Positioned(
+              left: localLeft,
+              top: localTop,
+              width: width,
+              child: Material(
+                elevation: 6,
+                borderRadius: AppBorderRadius.xsRadius,
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        border: Border(
+                          bottom: BorderSide(
+                            color: theme.colorScheme.outlineVariant,
+                          ),
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _searchFocus,
+                        autofocus: true,
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: widget.searchHint,
+                          prefixIcon: const Icon(Icons.search, size: 18),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onChanged: _filter,
+                      ),
+                    ),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: widget.menuMaxHeight),
+                      child: _filtered.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Text(
+                                widget.emptyText ?? 'No results',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: theme.colorScheme.outline,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: _scroll,
+                              shrinkWrap: true,
+                              itemCount: _filtered.length,
+                              itemBuilder: (context, index) => _option(
+                                context,
+                                _filtered[index],
+                                index,
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
-    Overlay.of(context).insert(_overlay!);
-    // Autofocus on the filter field is unreliable inside a freshly
-    // inserted overlay entry (esp. when it opens during a route
-    // transition or before async items resolve) — request focus
-    // explicitly once the entry is live.
+    overlay.insert(_overlay!);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _open) _searchFocus.requestFocus();
     });
@@ -335,7 +419,7 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
           ? (delta > 0 ? 0 : count - 1)
           : (_selectedIndex + delta + count) % count;
     });
-    _overlay?.markNeedsBuild(); // the popup lives in a separate overlay tree
+    _overlay?.markNeedsBuild();
     _scrollToSelected();
   }
 
@@ -362,101 +446,12 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
             ];
       _selectedIndex = _filtered.isEmpty ? -1 : 0;
     });
-    // The popup is a separate overlay tree — mark it dirty so the
-    // filtered list actually re-renders as the user types.
     _overlay?.markNeedsBuild();
   }
 
   void _select(T value) {
     _close();
     widget.onSelected(value);
-  }
-
-  /// Popup built inside the overlay's own tree — never touches this
-  /// state's `context` after the entry is live.
-  Widget _popup(
-    BuildContext overlayContext,
-    double left,
-    double top,
-    double width,
-  ) {
-    final theme = Theme.of(overlayContext);
-    return Stack(
-      children: [
-        // Full-screen barrier closes on outside tap.
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _close,
-          ),
-        ),
-        Positioned(
-          left: left,
-          top: top,
-          width: width,
-          child: Material(
-            elevation: 6,
-            borderRadius: AppBorderRadius.xsRadius,
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    border: Border(
-                      bottom: BorderSide(
-                        color: theme.colorScheme.outlineVariant,
-                      ),
-                    ),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    focusNode: _searchFocus,
-                    autofocus: true,
-                    style: const TextStyle(fontSize: 13),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: widget.searchHint,
-                      prefixIcon: const Icon(Icons.search, size: 18),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    onChanged: _filter,
-                  ),
-                ),
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: widget.menuMaxHeight),
-                  child: _filtered.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Text(
-                            widget.emptyText ?? 'No results',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: theme.colorScheme.outline,
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          controller: _scroll,
-                          shrinkWrap: true,
-                          itemCount: _filtered.length,
-                          itemBuilder: (context, index) => _option(
-                            overlayContext,
-                            _filtered[index],
-                            index,
-                          ),
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
   }
 
   Widget _option(BuildContext overlayContext, T item, int index) {
@@ -503,14 +498,14 @@ class _SearchableSelectFieldState<T> extends State<_SearchableSelectField<T>> {
         child: InputDecorator(
           decoration: decoration,
           isEmpty: widget.label.isEmpty,
-        child: Text(
-          widget.label.isEmpty ? (widget.hint ?? '') : widget.label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: widget.label.isEmpty
-              ? widget.textStyle.copyWith(color: scheme.outline)
-              : widget.textStyle,
-        ),
+          child: Text(
+            widget.label.isEmpty ? (widget.hint ?? '') : widget.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: widget.label.isEmpty
+                ? widget.textStyle.copyWith(color: scheme.outline)
+                : widget.textStyle,
+          ),
         ),
       ),
     );
