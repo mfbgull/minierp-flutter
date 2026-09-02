@@ -226,6 +226,13 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       initialStatus = status || 'Unpaid';
     }
 
+    // Default due_date to 15 days after invoice_date when not provided.
+    const resolvedDueDate = due_date || (() => {
+      const d = new Date(invoice_date);
+      d.setDate(d.getDate() + 15);
+      return d.toISOString().slice(0, 10);
+    })();
+
     // Insert invoice
     // CRITICAL-1 fix: pass the controller-computed initial paid and
     // balance through to the model so the monetary columns on the
@@ -236,7 +243,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       invoice_no,
       customer_id: parsedCustomerId,
       invoice_date,
-      due_date,
+      due_date: resolvedDueDate,
       status: initialStatus as InvoiceStatus,
       total_amount: totalAmountNum,
       paid_amount: initialPaidAmount,
@@ -579,10 +586,15 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         const returnedAmt = parseCurrency(originalInvoice?.returned_amount || 0);
         const newBalanceAmount = Math.max(0, subtractCurrency(subtractCurrency(totalAmountNum, totalPaid), returnedAmt));
 
-        // Determine status (considering returned amount)
+        // Determine status: auto-compute only when the user did NOT
+        // explicitly set a status. Draft, Sent, Cancelled, and other
+        // manual statuses must be preserved on update.
         let newStatus: InvoiceStatus;
         const fullyReturned = returnedAmt >= totalAmountNum && totalAmountNum > 0;
-        if (fullyReturned) {
+        if (status && status !== 'Unpaid') {
+            // User explicitly set a non-default status — respect it.
+            newStatus = status;
+        } else if (fullyReturned) {
             newStatus = 'Returned';
         } else if (newBalanceAmount <= 0 && totalAmountNum > 0) {
             newStatus = 'Paid';

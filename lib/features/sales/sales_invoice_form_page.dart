@@ -174,7 +174,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     _status = invoice?.status ?? 'Unpaid';
     _invoiceDate =
         DateTime.tryParse(invoice?.invoiceDate ?? '') ?? DateTime.now();
-    _dueDate = DateTime.tryParse(invoice?.dueDate ?? '') ?? _invoiceDate;
+    _dueDate = DateTime.tryParse(invoice?.dueDate ?? '') ?? _invoiceDate.add(const Duration(days: 15));
     _paymentDate = _invoiceDate;
     // Create mode defaults to per-item discount scope (spec §4.2); edit
     // mode honors the saved scope so invoice-level discounts round-trip
