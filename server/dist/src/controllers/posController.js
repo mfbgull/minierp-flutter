@@ -77,6 +77,10 @@ function createPOSSale(req, res) {
             return;
         }
         const customerName = customer_name || 'Walk-in Customer';
+        // The actual amount applied to the invoice is min(cash, total).
+        // Any overpayment is change returned to the customer — it must not
+        // appear in the customer ledger or invoice paid_amount.
+        const paymentAmount = Math.min(cashAmount, total);
         // Stock validation — check all items have sufficient stock before proceeding
         for (const item of items) {
             const stockBalance = database_1.default.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?').get(item.item_id, warehouse_id);
@@ -102,7 +106,7 @@ function createPOSSale(req, res) {
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(transactionNo, walkinCustomerId, customerName, sale_date, sale_date, // due_date = sale_date (immediate payment)
-            'Paid', total, cashAmount, Math.max(0, total - cashAmount), `POS Transaction: ${transactionNo}`, userId, 'POS');
+            'Paid', total, paymentAmount, total - paymentAmount, `POS Transaction: ${transactionNo}`, userId, 'POS');
             const invoiceId = invoiceResult.lastInsertRowid;
             // Create invoice_items and stock movements for each cart item
             const itemDetails = [];
@@ -147,13 +151,16 @@ function createPOSSale(req, res) {
                     line_total: lineTotal
                 });
             }
-            // Record payment
-            if (cashAmount > 0) {
+            // Record payment — only the invoice total, not the full cash
+            // received. Any overpayment (change) is returned to the customer
+            // and must NOT be recorded in the customer ledger, otherwise the
+            // walk-in accumulates a spurious Cr balance.
+            if (paymentAmount > 0) {
                 const paymentNo = Invoice_1.default.generatePaymentNoAtomic(database_1.default);
-                const paymentId = Invoice_1.default.createPayment(database_1.default, paymentNo, walkinCustomerId, sale_date, cashAmount, 'Cash', null, `POS Transaction ${transactionNo}`);
-                Invoice_1.default.createPaymentAllocation(database_1.default, paymentId, invoiceId, cashAmount);
+                const paymentId = Invoice_1.default.createPayment(database_1.default, paymentNo, walkinCustomerId, sale_date, paymentAmount, 'Cash', null, `POS Transaction ${transactionNo}`);
+                Invoice_1.default.createPaymentAllocation(database_1.default, paymentId, invoiceId, paymentAmount);
                 // Create ledger entry for payment
-                Invoice_1.default.createLedgerEntry(database_1.default, walkinCustomerId, 'PAYMENT', paymentNo, sale_date, 0, cashAmount, `Payment ${paymentNo} for POS ${transactionNo}`);
+                Invoice_1.default.createLedgerEntry(database_1.default, walkinCustomerId, 'PAYMENT', paymentNo, sale_date, 0, paymentAmount, `Payment ${paymentNo} for POS ${transactionNo}`);
             }
             // Create ledger entry for the sale
             Invoice_1.default.createLedgerEntry(database_1.default, walkinCustomerId, 'INVOICE', transactionNo, sale_date, total, 0, `POS Sale ${transactionNo}`);
@@ -190,13 +197,13 @@ function createPOSSale(req, res) {
                     userId,
                 });
             }
-            if (cashAmount > 0) {
+            if (paymentAmount > 0) {
                 const posPayment = database_1.default.prepare('SELECT id FROM payments WHERE notes = ? ORDER BY id DESC LIMIT 1').get(`POS Transaction ${transactionNo}`);
                 if (posPayment) {
                     accountingService_1.default.postPaymentEntry(database_1.default, {
                         paymentId: posPayment.id,
                         paymentNo: `POS-${transactionNo}`,
-                        amount: cashAmount,
+                        amount: paymentAmount,
                         paymentDate: sale_date,
                         paymentMethod: 'cash',
                         customerId: walkinCustomerId,
