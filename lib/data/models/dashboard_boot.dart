@@ -8,8 +8,6 @@ import 'dashboard_summary.dart'
         TopCustomer;
 import 'report.dart' show ExpiryAlert;
 
-import 'json_helpers.dart';
-
 /// `GET /dashboard/boot` (spec 7.1) — the whole dashboard's initial
 /// payload in ONE round trip: summary, active layout, KPI batch, cash
 /// position, AR summary, expiry alerts and top customers. Cuts the

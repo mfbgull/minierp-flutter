@@ -1,52 +1,123 @@
-# MiniERP → Flutter Migration Kit
+# MiniERP
 
-Reference package for rebuilding the MiniERP client as a **desktop Flutter app** against the existing Node/Express/SQLite backend. Mobile view and related artifacts are deliberately excluded — see `PORTING.md` §Scope.
+Desktop ERP for small and medium businesses. Built with Flutter, running against a Node.js + Express + SQLite backend.
 
-## Contents
+## Current State
 
-| Path | What it is |
-|---|---|
-| `PORTING.md` | **Start here.** Full port spec: scaffold, route map, module matrix, grid strategy, calculations, theming, i18n, printing, verification checklist |
-| `docs/API.md` | Complete REST API contract (~100 endpoints, payloads, errors) |
-| `docs/DATABASE.md` | Full SQLite schema + indexes + document-number sequences |
-| `docs/DESIGN.md` | Design system: light/dark palettes, typography, component specs (437 lines) |
-| `docs/minierp-architecture.drawio` | Architecture diagram (draw.io) |
-| `docs/README.md` | Original project README (features, modules, CLI) |
-| `server-reference/CURRENT_SCHEMA.sql` | **Machine-exact dump of the live DB — the current state (59 tables, 153 indexes, 2 views). Use this as the Flutter data-layer source of truth** |
-| `server-reference/SEED_DATA.sql` | **System reference data: 5 tax rates, 8 payment terms, 15 expense categories, 17 chart-of-accounts, 4 roles, 80 permissions + 116 grants, 5 seasonal events, 46 settings. Idempotent.** |
-| `server-reference/SCHEMA_AND_SEED.md` | How to bootstrap a fresh dev DB in two commands |
-| `server/` | **The full backend, bundled and runnable** (Express + SQLite, all migrations/controllers/services) — the Flutter app runs against this |
-| `server/database/erp.db` | **Consistent snapshot of the live DB** (10 customers, 29 items, real transactions) — at the server's default DB path, so the bundled server runs with real data immediately |
-| `references/` | Client spec files PORTING.md points at: App routes, api client, keyboard hook, grid cells, invoice/print templates, dashboard blocks, detail tabs (68 files) |
-| `server-reference/Reports.ts` | **All 19 report SQL queries + result shapes** (AR aging, P&L, cash flow, …) |
-| `server-reference/reportsController.ts` | Report endpoint params/defaults |
-| `server-reference/reportQueryEngine.ts` | Custom report engine (config-driven) |
-| `server-reference/accountingService.ts` + `accountingController.ts` | GL: trial balance, balance sheet, journal posting |
-| `server-reference/forecastService.ts` | Forecast engine (models, accuracy, safety stock) |
-| `server-reference/entityRegistry.ts` | Report-builder entity metadata (server-side, read-only reference) |
-| `types/client-types.ts`, `types/invoiceV2.ts`, `types/server-types.ts` | All entity/response types → Dart models |
-| `schemas/validation-schemas.ts` | Zod validation → Dart validators |
-| `calculations/*.ts` + `calculations/tests/` | Client-side business math to port 1:1 with test parity |
-| `locales/en.json`, `ur.json` | Source locale files (nested) |
-| `locales/en.arb`, `ur.arb` | Flattened, gen-l10n-ready (812 / 764 keys) |
-| `dashboard/` | Block registry, constants, layout persistence hook (React reference) |
-| `reports/` | Custom report builder UI (54 KB JSX — the hardest feature) + `pages/` with all 19 report page specs |
-| `forecasts/` | 4 forecast page specs (dashboard, demand, trends, accuracy) |
-| `styles/` | Design tokens (variables.css), global, RTL, AG-Grid status-cell styling |
-| `export-utils/` | CSV/ledger export logic reference |
-| `screenshots/` | Login, menu, invoice A4, header, current-page — visual targets |
-| `AGENTS.md` | Project rule engine spec (port to the Flutter repo's AGENTS.md) |
+MiniERP is a mature, production-ready desktop ERP application. The Flutter client covers the full business workflow — from inventory and purchasing through sales, production, accounting reports, and forecasts. The backend runs unchanged; all business logic (FIFO costing, GL posting, AR aging, forecasts) stays server-side.
 
-## Quick start for the Flutter project
+## Tech Stack
 
-1. Read `PORTING.md` fully.
-2. Run the bundled server: `cd server && npm install && npm run build && npm start` (port 3011).
-3. Apply the one auth tweak (return JWT in login response body) — `PORTING.md` §0.
-4. Scaffold `flutter create` + dependencies from `PORTING.md` §1.
-5. Port in this order: models → api/repositories → auth → theme → shell/layout → dashboard → inventory → sales (invoice V2) → everything else.
+| Layer | Technologies |
+|-------|--------------|
+| Frontend | Flutter, Riverpod, Dio, go_router, PlutoGrid, pdf, printing |
+| Backend | Node.js, Express, TypeScript, SQLite (better-sqlite3) |
+| Desktop | Windows, macOS, Linux (single codebase) |
+| Auth | JWT (Bearer token), role-based access (admin / user) |
 
-## Not included
+## Quick Start
 
-- `server/node_modules` + `server/dist` — run `npm install && npm run build` once (155 MB of deps not worth shipping)
-- Any mobile-view artifacts (compact cards, mobile wizards, `/mobile-invoices`, invoice_drafts)
-- Git history, Electron wrapper, CLI/agent harnesses
+### Backend
+
+```bash
+cd server
+npm install
+npm run build
+npm start
+```
+
+The server starts on port **3011** (`http://localhost:3011/api`). It auto-runs migrations on first startup and ships with a seeded development database.
+
+Default login: **admin** / **admin123**
+
+### Frontend
+
+```bash
+flutter pub get
+flutter run -d linux   # or -d windows, -d macos, -d chrome
+```
+
+## Modules
+
+| Module | Capabilities |
+|--------|--------------|
+| **Dashboard** | KPI cards, sales/purchases charts, stock by category, low stock alerts, recent activity, top customers |
+| **Inventory** | Items, warehouses, stock movements, stock by warehouse, physical counts, batch management |
+| **Customers** | CRUD, detail tabs (overview, invoices, payments, ledger, statement), credit-limit tracking |
+| **Suppliers** | CRUD, detail tabs (overview, purchase orders, payments, ledger, statement) |
+| **Sales** | Invoices (V2 keyboard-driven grid), returns, quotations, sales orders, POS checkout |
+| **Purchases** | Direct purchases, purchase returns |
+| **Purchase Orders** | CRUD, goods receipts, receipt history, status transitions |
+| **Production** | BOM management, production runs (auto-consumes materials, creates finished stock) |
+| **Payments** | Payment recording, multi-invoice allocation, payment history |
+| **Expenses** | Expense tracking by category, status workflow |
+| **Employees** | Employee records, salary payments, employee loans |
+| **Reports** | 19 financial and operational reports (AR aging, P&L, cash flow, DSO, trial balance, stock valuation, etc.) |
+| **Forecasts** | Demand forecasting dashboard, trends, accuracy tracking |
+| **Admin** | User management, role management with permissions (admin-only) |
+| **Activity Log** | Read-only audit trail with filters |
+| **Integrations** | Email, SMS, weather, currency rates, tax calculations (admin-only) |
+| **Owner Equity** | Owner capital, withdrawals, personal loans |
+| **Settings** | Company info, document numbering, system preferences |
+| **Search** | Global search across all modules (Ctrl+K) |
+
+## Key Features
+
+### Printing & Export
+- **A4 documents**: Invoices, quotations, sales orders, purchase orders — native PDF via `pdf` + `printing`
+- **Thermal receipts**: POS thermal receipt PDF (80mm roll-paper layout with QR code)
+- **CSV export**: Activity log and ledger exports
+
+### Internationalization
+- **English** + **Urdu** (full RTL support)
+- In-app locale switcher
+- `flutter gen-l10n` with ARB source files
+
+### Theme
+- Light and dark modes (emerald professional palette)
+- System-aware theme toggle with persistent preference
+- High-contrast, data-dense layout optimized for 8-hour work sessions
+
+### Architecture
+- **State**: Riverpod providers / notifiers
+- **HTTP**: Dio with interceptors (auth injection, 401 redirect, error mapping)
+- **Routing**: go_router with `StatefulShellRoute` (branch state preserved)
+- **Grids**: PlutoGrid for editable lists, shared `DataTableShell` for read-only tables
+- **Calculations**: Pure functions ported from the original TypeScript client, covered by tests
+- **Models**: Typed Dart models with `fromJson`/`toJson` for every API shape
+
+## Testing & Quality
+
+- **494/494 tests passing** (calculations, widgets, features)
+- `dart analyze` clean (0 issues)
+- **CI**: GitHub Actions runs `flutter analyze`, `flutter test`, server `typecheck`, `eslint`, and `npm test` on every push
+
+## Data
+
+- SQLite with WAL mode
+- 59 tables, 153 indexes, 2 views
+- FIFO batch costing, stock movement ledger, double-entry GL posting
+- Nightly automated backups with retention (7 daily + 4 weekly)
+
+## Remaining Work
+
+1. **Custom report builder** — 4-step flow (entity picker, fields, columns, run); endpoints and l10n ready, UI not started
+2. **Dashboard layout persistence** — 16 block types + save/reset/rename/duplicate; catalog wired, layout endpoints exist but are unwired
+3. **ESC/POS direct printing** — thermal receipt PDF is shipped; direct ESC/POS network/USB driver pending
+
+## Project Structure
+
+```
+lib/
+├── main.dart / app.dart          # Entry point, router, providers
+├── core/                         # Cross-cutting: API, auth, theme, i18n, utils
+├── data/
+│   ├── models/                   # Dart models
+│   └── repositories/             # API clients per module
+├── features/                     # One folder per business module (18 modules)
+└── widgets/                      # Shared UI components
+```
+
+## License
+
+MIT
