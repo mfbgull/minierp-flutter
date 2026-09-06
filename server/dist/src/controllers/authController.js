@@ -10,7 +10,7 @@ const database_1 = __importDefault(require("../config/database"));
 const User_1 = __importDefault(require("../models/User"));
 const logger_1 = __importDefault(require("../utils/logger"));
 const apiResponse_1 = require("../utils/apiResponse");
-function login(req, res) {
+async function login(req, res) {
     try {
         const { username, password } = req.body;
         const ipAddress = req.ip || req.get('x-forwarded-for') || req.get('x-real-ip');
@@ -25,7 +25,7 @@ function login(req, res) {
             (0, apiResponse_1.sendUnauthorized)(res, 'Invalid username or password');
             return;
         }
-        const passwordMatch = bcrypt_1.default.compareSync(password, user.password_hash);
+        const passwordMatch = await bcrypt_1.default.compare(password, user.password_hash);
         if (!passwordMatch) {
             (0, activityLogger_1.logAuth)(activityLogger_1.ActionType.LOGIN_FAILED, user.id, `Failed login attempt for user: ${username}`, { username }, ipAddress);
             req.activityLogged = true;
@@ -33,13 +33,14 @@ function login(req, res) {
             return;
         }
         const token = (0, auth_1.generateToken)({ id: user.id, username: user.username, email: user.email, role: user.role });
+        const refreshToken = (0, auth_1.generateRefreshToken)({ id: user.id, username: user.username, email: user.email, role: user.role });
         (0, activityLogger_1.logAuth)(activityLogger_1.ActionType.LOGIN, user.id, `User ${username} logged in successfully`, { username, email: user.email }, ipAddress);
         req.activityLogged = true;
         const { password_hash: _password_hash, ...userWithoutPassword } = user;
-        res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', maxAge: 24 * 60 * 60 * 1000 });
+        res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', maxAge: 60 * 60 * 1000 });
         // PORTING.md §0: desktop Flutter has no cookie jar — also return the
         // JWT in the body so the native client can store it as a Bearer token.
-        (0, apiResponse_1.sendSuccess)(res, { token, user: userWithoutPassword });
+        (0, apiResponse_1.sendSuccess)(res, { token, refreshToken, user: userWithoutPassword });
     }
     catch (error) {
         logger_1.default.error('Login error:', error);
@@ -58,6 +59,32 @@ function logout(req, res) {
         (0, apiResponse_1.sendInternalError)(res, 'Logout failed');
     }
 }
+/// Exchanges a valid refresh token for a fresh access token.
+async function refresh(req, res) {
+    try {
+        const { refreshToken } = req.body;
+        if (!refreshToken || typeof refreshToken !== 'string') {
+            (0, apiResponse_1.sendBadRequest)(res, 'Refresh token required');
+            return;
+        }
+        const user = (0, auth_1.verifyRefreshToken)(refreshToken);
+        if (!user) {
+            (0, apiResponse_1.sendUnauthorized)(res, 'Invalid or expired refresh token');
+            return;
+        }
+        const token = (0, auth_1.generateToken)({
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+        });
+        (0, apiResponse_1.sendSuccess)(res, { token });
+    }
+    catch (error) {
+        logger_1.default.error('Token refresh error:', error);
+        (0, apiResponse_1.sendInternalError)(res, 'Failed to refresh token');
+    }
+}
 function getCurrentUser(req, res) {
     try {
         const user = User_1.default.getById(req.user.id, database_1.default);
@@ -72,7 +99,7 @@ function getCurrentUser(req, res) {
         (0, apiResponse_1.sendInternalError)(res, 'Failed to get user info');
     }
 }
-function changePassword(req, res) {
+async function changePassword(req, res) {
     try {
         const { currentPassword, newPassword } = req.body;
         if (!currentPassword || !newPassword) {
@@ -88,12 +115,12 @@ function changePassword(req, res) {
             (0, apiResponse_1.sendNotFound)(res, 'User');
             return;
         }
-        const passwordMatch = bcrypt_1.default.compareSync(currentPassword, user.password_hash);
+        const passwordMatch = await bcrypt_1.default.compare(currentPassword, user.password_hash);
         if (!passwordMatch) {
             (0, apiResponse_1.sendUnauthorized)(res, 'Current password is incorrect');
             return;
         }
-        User_1.default.updatePassword(req.user.id, bcrypt_1.default.hashSync(newPassword, 12), database_1.default);
+        User_1.default.updatePassword(req.user.id, await bcrypt_1.default.hash(newPassword, 12), database_1.default);
         (0, activityLogger_1.logAuth)(activityLogger_1.ActionType.PASSWORD_CHANGE, req.user.id, 'Password changed successfully');
         req.activityLogged = true;
         (0, apiResponse_1.sendSuccess)(res, { message: 'Password changed successfully' });
@@ -103,4 +130,4 @@ function changePassword(req, res) {
         (0, apiResponse_1.sendInternalError)(res, 'Failed to change password');
     }
 }
-exports.default = { login, logout, getCurrentUser, changePassword };
+exports.default = { login, logout, refresh, getCurrentUser, changePassword };

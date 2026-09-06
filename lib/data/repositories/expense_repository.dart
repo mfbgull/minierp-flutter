@@ -14,7 +14,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../models/expense.dart' show Expense, ExpenseCategory, ExpenseOption;
@@ -126,5 +125,5 @@ class ExpenseRepository {
 }
 
 final expenseRepositoryProvider = Provider<ExpenseRepository>(
-  (ref) => ExpenseRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => ExpenseRepository(ref.watch(repositoryClientProvider)),
 );

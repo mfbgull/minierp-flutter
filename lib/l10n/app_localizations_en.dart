@@ -2471,6 +2471,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonNoresults => 'No results found';
 
   @override
+  String get posItemNotFound => 'Item not found';
+
+  @override
   String get commonEntries => 'entries';
 
   @override
@@ -2499,6 +2502,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonThemeMode => 'Dark mode';
+
+  @override
+  String get commonUserMenu => 'User menu';
 
   @override
   String get commonCurrency => 'Currency';
@@ -2550,6 +2556,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonEdit => 'Edit';
+
+  @override
+  String get commonUndo => 'Undo';
 
   @override
   String get commonSearch => 'Search';
@@ -2607,6 +2616,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonLoading => 'Loading...';
+
+  @override
+  String get commonNoRecordsInPeriod => 'No records in the selected period';
+
+  @override
+  String get commonNoRecordsInPeriodHint =>
+      'Try a wider date range or choose All dates';
 
   @override
   String get commonSales => 'Sales';
@@ -3696,6 +3712,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get customersExportcsv => 'Export to CSV';
+
+  @override
+  String get customersExportfailed => 'Failed to export customers';
 
   @override
   String get customersExportimage => 'Image';
@@ -5544,6 +5563,61 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get batchManagement => 'Batch Management';
+
+  @override
+  String bulkSelectedCount(Object count) {
+    return '$count selected';
+  }
+
+  @override
+  String get bulkExportSelected => 'Export selected';
+
+  @override
+  String get bulkDeleteSelected => 'Delete selected';
+
+  @override
+  String get bulkActivateSelected => 'Activate selected';
+
+  @override
+  String get bulkDeactivateSelected => 'Deactivate selected';
+
+  @override
+  String bulkDeleted(Object count) {
+    return '$count deleted';
+  }
+
+  @override
+  String get bulkDeleteFailed => 'Some items could not be deleted';
+
+  @override
+  String bulkActivated(Object count) {
+    return '$count activated';
+  }
+
+  @override
+  String bulkDeactivated(Object count) {
+    return '$count deactivated';
+  }
+
+  @override
+  String get bulkUpdateFailed => 'Some items could not be updated';
+
+  @override
+  String get bulkSetStatus => 'Set status';
+
+  @override
+  String bulkSetStatusTo(Object status) {
+    return 'Set status: $status';
+  }
+
+  @override
+  String get bulkStatusSubmitWarning =>
+      'Submit posts the selected orders to the supplier ledger. Orders that cannot make this transition are skipped.';
+
+  @override
+  String bulkStatusCancelled(Object count, Object status) {
+    return '$count purchase orders set to $status';
+  }
 
   @override
   String get expiryStatus => 'Expiry Status';

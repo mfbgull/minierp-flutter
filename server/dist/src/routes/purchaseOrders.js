@@ -10,25 +10,25 @@ const requirePermission_1 = require("../middleware/requirePermission");
 const purchaseOrderController_1 = __importDefault(require("../controllers/purchaseOrderController"));
 router.use(auth_1.authenticateToken);
 // CRUD - Purchase Orders
-router.post('/purchase-orders', (0, requirePermission_1.requirePermission)('purchase_orders', 'create'), purchaseOrderController_1.default.createPurchaseOrder);
-router.get('/purchase-orders', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getPurchaseOrders);
-router.get('/purchase-orders/:id', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getPurchaseOrder);
-router.put('/purchase-orders/:id', (0, requirePermission_1.requirePermission)('purchase_orders', 'update'), purchaseOrderController_1.default.updatePurchaseOrder);
-router.delete('/purchase-orders/:id', (0, requirePermission_1.requirePermission)('purchase_orders', 'delete'), purchaseOrderController_1.default.deletePurchaseOrder);
+router.post('/', (0, requirePermission_1.requirePermission)('purchase_orders', 'create'), purchaseOrderController_1.default.createPurchaseOrder);
+router.get('/', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getPurchaseOrders);
+router.get('/:id', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getPurchaseOrder);
+router.put('/:id', (0, requirePermission_1.requirePermission)('purchase_orders', 'update'), purchaseOrderController_1.default.updatePurchaseOrder);
+router.delete('/:id', (0, requirePermission_1.requirePermission)('purchase_orders', 'delete'), purchaseOrderController_1.default.deletePurchaseOrder);
 // Line Items
-router.post('/purchase-orders/:id/items', (0, requirePermission_1.requirePermission)('purchase_orders', 'create'), purchaseOrderController_1.default.addLineItem);
-router.put('/purchase-orders/:id/items/:itemId', (0, requirePermission_1.requirePermission)('purchase_orders', 'update'), purchaseOrderController_1.default.updateLineItem);
-router.delete('/purchase-orders/:id/items/:itemId', (0, requirePermission_1.requirePermission)('purchase_orders', 'delete'), purchaseOrderController_1.default.deleteLineItem);
+router.post('/:id/items', (0, requirePermission_1.requirePermission)('purchase_orders', 'create'), purchaseOrderController_1.default.addLineItem);
+router.put('/:id/items/:itemId', (0, requirePermission_1.requirePermission)('purchase_orders', 'update'), purchaseOrderController_1.default.updateLineItem);
+router.delete('/:id/items/:itemId', (0, requirePermission_1.requirePermission)('purchase_orders', 'delete'), purchaseOrderController_1.default.deleteLineItem);
 // Status
-router.post('/purchase-orders/:id/status', (0, requirePermission_1.requirePermission)('purchase_orders', 'update'), purchaseOrderController_1.default.updateStatus);
-router.get('/purchase-orders/pending', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getPendingOrders);
+router.post('/:id/status', (0, requirePermission_1.requirePermission)('purchase_orders', 'update'), purchaseOrderController_1.default.updateStatus);
+router.get('/pending', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getPendingOrders);
 // Payments (history allocated to this PO)
-router.get('/purchase-orders/:id/payments', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getPurchaseOrderPayments);
+router.get('/:id/payments', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getPurchaseOrderPayments);
 // Goods Receipts
-router.get('/purchase-orders/:id/receipts', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getGoodsReceipts);
-router.post('/purchase-orders/:id/receipts', (0, requirePermission_1.requirePermission)('purchase_orders', 'create'), purchaseOrderController_1.default.createGoodsReceipt);
+router.get('/:id/receipts', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getGoodsReceipts);
+router.post('/:id/receipts', (0, requirePermission_1.requirePermission)('purchase_orders', 'create'), purchaseOrderController_1.default.createGoodsReceipt);
 // Summary & Reporting
-router.get('/purchase-orders/summary/supplier/:supplierId', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getSummaryBySupplier);
+router.get('/summary/supplier/:supplierId', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getSummaryBySupplier);
 // Supplier Ledger (AP)
 router.get('/suppliers/:supplierId/balance', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getSupplierBalance);
 router.get('/suppliers/:supplierId/transactions', (0, requirePermission_1.requirePermission)('purchase_orders', 'read'), purchaseOrderController_1.default.getSupplierTransactions);

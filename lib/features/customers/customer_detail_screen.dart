@@ -16,6 +16,7 @@ import '../../data/models/invoice.dart' show Invoice;
 import '../../data/models/ledger_entry.dart' show LedgerEntry;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_error_panel.dart';
 import 'calculations/customer_calculations.dart'
     show computeCustomerMetrics;
@@ -41,6 +42,11 @@ class CustomerDetailScreen extends ConsumerStatefulWidget {
 class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+
+  /// One stable id per detail-page instance — the unified range's page
+  /// scope (unified-detail-date-picker-spec §3.1): every tab + the header
+  /// pill read the same pair, and a second open page can't share it.
+  late final int _sessionId = nextCustomerDetailSession();
 
   @override
   void initState() {
@@ -164,6 +170,19 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                 icon: const Icon(Icons.add, size: 18),
                 label: Text(l10n.customersRecordpayment),
               ),
+              // Unified detail-page date range (spec D3): one pill drives
+              // every data tab; sits right of Record Payment and never
+              // wraps — the identity Expanded absorbs all narrowing. The
+              // pill's onChanged is the page's single commit rule
+              // (ranged → global, All dates → page-local only).
+              const SizedBox(width: 8),
+              DateRangeFilter(
+                fromProvider: customerDetailFromDateProvider(_sessionId),
+                toProvider: customerDetailToDateProvider(_sessionId),
+                showAllDates: true,
+                onChanged: () =>
+                    commitCustomerDetailRange(ref, _sessionId),
+              ),
             ],
           ),
         ),
@@ -244,11 +263,26 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
           child: TabBarView(
             controller: _tabController,
             children: [
-              CustomerOverviewTab(customerId: widget.customerId),
-              CustomerInvoicesTab(customerId: widget.customerId),
-              CustomerLedgerTab(customerId: widget.customerId),
-              CustomerPaymentsTab(customerId: widget.customerId),
-              CustomerStatementTab(customerId: widget.customerId),
+              CustomerOverviewTab(
+                customerId: widget.customerId,
+                sessionId: _sessionId,
+              ),
+              CustomerInvoicesTab(
+                customerId: widget.customerId,
+                sessionId: _sessionId,
+              ),
+              CustomerLedgerTab(
+                customerId: widget.customerId,
+                sessionId: _sessionId,
+              ),
+              CustomerPaymentsTab(
+                customerId: widget.customerId,
+                sessionId: _sessionId,
+              ),
+              CustomerStatementTab(
+                customerId: widget.customerId,
+                sessionId: _sessionId,
+              ),
             ],
           ),
         ),

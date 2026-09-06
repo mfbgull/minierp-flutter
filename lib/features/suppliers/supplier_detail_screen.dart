@@ -13,6 +13,7 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/supplier.dart' show Supplier;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_error_panel.dart';
 import 'supplier_ledger_tab.dart';
 import 'supplier_overview_tab.dart';
@@ -37,6 +38,11 @@ class SupplierDetailScreen extends ConsumerStatefulWidget {
 class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+
+  /// One stable id per detail-page instance — the unified range's page
+  /// scope (unified-detail-date-picker-spec §3.1): every tab + the header
+  /// pill read the same pair, and a second open page can't share it.
+  late final int _sessionId = nextSupplierDetailSession();
 
   @override
   void initState() {
@@ -148,6 +154,19 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
                 icon: const Icon(Icons.add, size: 18),
                 label: Text(l10n.suppliersRecordpayment),
               ),
+              // Unified detail-page date range (spec D3, §7): one pill
+              // drives every data tab; sits right of Record Payment and
+              // never wraps — the identity Expanded absorbs all
+              // narrowing. The pill's onChanged is the page's single
+              // commit rule (ranged → global, All dates → page-local).
+              const SizedBox(width: 8),
+              DateRangeFilter(
+                fromProvider: supplierDetailFromDateProvider(_sessionId),
+                toProvider: supplierDetailToDateProvider(_sessionId),
+                showAllDates: true,
+                onChanged: () =>
+                    commitSupplierDetailRange(ref, _sessionId),
+              ),
             ],
           ),
         ),
@@ -203,12 +222,30 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
           child: TabBarView(
             controller: _tabController,
             children: [
-              SupplierOverviewTab(supplierId: widget.supplierId),
-              SupplierPosTab(supplierId: widget.supplierId),
-              SupplierPurchasesTab(supplierId: widget.supplierId),
-              SupplierLedgerTab(supplierId: widget.supplierId),
-              SupplierPaymentsTab(supplierId: widget.supplierId),
-              SupplierStatementTab(supplierId: widget.supplierId),
+              SupplierOverviewTab(
+                supplierId: widget.supplierId,
+                sessionId: _sessionId,
+              ),
+              SupplierPosTab(
+                supplierId: widget.supplierId,
+                sessionId: _sessionId,
+              ),
+              SupplierPurchasesTab(
+                supplierId: widget.supplierId,
+                sessionId: _sessionId,
+              ),
+              SupplierLedgerTab(
+                supplierId: widget.supplierId,
+                sessionId: _sessionId,
+              ),
+              SupplierPaymentsTab(
+                supplierId: widget.supplierId,
+                sessionId: _sessionId,
+              ),
+              SupplierStatementTab(
+                supplierId: widget.supplierId,
+                sessionId: _sessionId,
+              ),
             ],
           ),
         ),

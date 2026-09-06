@@ -135,7 +135,7 @@ function createLoan(req, res) {
             loanNo = (0, sequence_1.generateDocNo)(database_1.default, 'PL');
             // Auto-create borrower if not provided
             let finalBorrowerId = borrower_id || null;
-            let finalBorrowerType = borrower_type || null;
+            const finalBorrowerType = borrower_type || null;
             if (!finalBorrowerId && borrower_name.trim()) {
                 const existing = database_1.default.prepare(`SELECT id FROM owner_personal_loan_borrowers WHERE name = ? AND linked_type IS NULL AND linked_id IS NULL`).get(borrower_name.trim());
                 if (existing) {

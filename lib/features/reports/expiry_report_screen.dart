@@ -47,13 +47,13 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
     super.initState();
     // Reset page when filters change
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.listen(expiryReportWarehouseIdProvider, (_, __) {
+      ref.listen(expiryReportWarehouseIdProvider, (_, _) {
         if (mounted) setState(() => _currentPage = 1);
       });
-      ref.listen(expiryReportStatusProvider, (_, __) {
+      ref.listen(expiryReportStatusProvider, (_, _) {
         if (mounted) setState(() => _currentPage = 1);
       });
-      ref.listen(expiryReportThresholdProvider, (_, __) {
+      ref.listen(expiryReportThresholdProvider, (_, _) {
         if (mounted) setState(() => _currentPage = 1);
       });
     });

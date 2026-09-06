@@ -12,6 +12,7 @@ import 'package:minierp_app/data/models/purchase_return.dart';
 import 'package:minierp_app/data/models/quotation.dart';
 import 'package:minierp_app/data/models/sales_order.dart';
 import 'package:minierp_app/data/models/bom.dart' show Bom;
+import 'package:minierp_app/data/models/customer.dart';
 import 'package:minierp_app/data/models/expense.dart';
 import 'package:minierp_app/data/models/invoice.dart';
 import 'package:minierp_app/data/models/production.dart' show Production;
@@ -522,6 +523,57 @@ void main() {
     expect(csv, isNot(contains('+admin')));
     expect(csv, contains('admin'));
     expect(csv, contains('800.00'));
+  });
+
+  test('buildCustomersCsv emits the grid columns and sanitizes cells', () {
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    final csv = buildCustomersCsv(l10n, [
+      Customer(
+        id: 1,
+        customerCode: 'CUST001',
+        customerName: 'Acme Corp',
+        phone: '555-0101',
+        email: 'a@acme.com',
+        billingAddress: 'Gulhaji Plaza',
+        creditLimit: 10000,
+        currentBalance: 120.5,
+        creditUtilizationPercent: 12,
+        paymentTermsDays: 30,
+        isActive: true,
+      ),
+      Customer(
+        id: 2,
+        customerCode: '=HYPERLINK("x")', // sanitized
+        customerName: '+Beta Ltd', // sanitized
+        phone: '555-0102',
+        email: 'b@beta.com',
+        currentBalance: 0,
+        isActive: false,
+      ),
+    ]);
+    final lines = csv.trim().split('\r\n');
+
+    expect(lines.length, 3);
+    expect(lines.first, contains('Customer Code'));
+    expect(lines.first, contains('Customer Name'));
+    expect(lines.first, contains('Phone'));
+    expect(lines.first, contains('Email'));
+    expect(lines.first, contains('Credit Limit'));
+    expect(lines.first, contains('Current Balance'));
+    expect(lines.first, contains('Credit Utilization'));
+    expect(lines.first, contains('Payment Terms'));
+    expect(lines.first, contains('Status'));
+
+    expect(csv, contains('CUST001'));
+    expect(csv, contains('Acme Corp'));
+    expect(csv, contains('120.50'));
+    expect(csv, contains('Active')); // localized status label
+    // Formula characters stripped from user-controlled string cells.
+    expect(csv, isNot(contains('=Hyperlink')));
+    expect(csv, contains('HYPERLINK'));
+    expect(csv, isNot(contains('+Beta Ltd')));
+    expect(csv, contains('Beta Ltd'));
+    expect(csv, contains('Inactive'));
   });
 
   test('buildExpensesCsv emits the grid columns and sanitizes cells', () {

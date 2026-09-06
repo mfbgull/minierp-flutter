@@ -23,6 +23,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/client_paged_grid.dart';
 import '../../widgets/detail_error.dart';
+import '../../widgets/filtered_empty_state.dart';
 import 'calculations/customer_calculations.dart'
     show calculateLedgerTotals;
 import '../../core/utils/ledger_export.dart'
@@ -64,9 +65,17 @@ class _LedgerGridRow {
 }
 
 class CustomerLedgerTab extends ConsumerStatefulWidget {
-  const CustomerLedgerTab({super.key, required this.customerId});
+  const CustomerLedgerTab({
+    super.key,
+    required this.customerId,
+    required this.sessionId,
+  });
 
   final int customerId;
+
+  /// The detail-page instance's range-session id — this tab derives its
+  /// fetch args from the header pill's pair (spec §3.1/§9).
+  final int sessionId;
 
   @override
   ConsumerState<CustomerLedgerTab> createState() => _CustomerLedgerTabState();
@@ -99,23 +108,33 @@ class _CustomerLedgerTabState extends ConsumerState<CustomerLedgerTab> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final ledger = ref.watch(customerLedgerProvider(widget.customerId));
+    // The page's unified range — part of the fetch identity (§9); null =
+    // All dates = the full-history ledger.
+    final range = customerDetailRangeIso(ref, widget.sessionId);
+    final args = CustomerLedgerArgs(
+      customerId: widget.customerId,
+      fromDate: range.from,
+      toDate: range.to,
+    );
+    final ledger = ref.watch(customerLedgerRangedProvider(args));
 
     return switch (ledger) {
       AsyncData(:final value) => value.isEmpty
-          ? Center(
-              child: Text(
-                l10n.customersLedgerNoentries,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            )
+          ? (range.from != null
+                ? const FilteredEmptyState()
+                : Center(
+                    child: Text(
+                      l10n.customersLedgerNoentries,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ))
           : _buildBody(context, l10n, value),
       AsyncError(:final error) => DetailError(
         message: error is ApiError ? error.message : '$error',
         onRetry: () =>
-            ref.invalidate(customerLedgerProvider(widget.customerId)),
+            ref.invalidate(customerLedgerRangedProvider(args)),
       ),
       _ => const Center(child: CircularProgressIndicator()),
     };

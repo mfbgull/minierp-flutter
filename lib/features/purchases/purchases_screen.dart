@@ -29,7 +29,6 @@ import 'purchase_form_dialog.dart';
 import 'purchase_providers.dart'
     show
         PurchaseSort,
-        filteredPurchasesProvider,
         purchasesFromDateProvider,
         purchasesIncludeVoidedProvider,
         purchasesLimitProvider,
@@ -42,6 +41,7 @@ import 'purchase_return_form_dialog.dart'
     show ReturnSource, showPurchaseReturnFormDialog;
 
 class PurchasesScreen extends ConsumerStatefulWidget {
+  const PurchasesScreen({super.key});
 
   @override
   ConsumerState<PurchasesScreen> createState() => _PurchasesScreenState();

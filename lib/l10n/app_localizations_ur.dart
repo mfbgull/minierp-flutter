@@ -2472,6 +2472,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get commonNoresults => 'کوئی نتیجہ نہیں ملی';
 
   @override
+  String get posItemNotFound => 'آئٹم نہیں ملا';
+
+  @override
   String get commonEntries => 'اندراجات';
 
   @override
@@ -2500,6 +2503,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get commonThemeMode => 'ڈارک موڈ';
+
+  @override
+  String get commonUserMenu => 'صارف مینو';
 
   @override
   String get commonCurrency => 'کرنسی';
@@ -2551,6 +2557,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get commonEdit => 'ترمیم';
+
+  @override
+  String get commonUndo => 'واپس';
 
   @override
   String get commonSearch => 'تلاش';
@@ -2608,6 +2617,13 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get commonLoading => 'لوڈ ہو رہا ہے...';
+
+  @override
+  String get commonNoRecordsInPeriod => 'منتخب مدت میں کوئی ریکارڈ نہیں ملا';
+
+  @override
+  String get commonNoRecordsInPeriodHint =>
+      'براہ کرم تاریخ کی حد وسیع کریں یا تمام تاریخیں منتخب کریں';
 
   @override
   String get commonSales => 'فروخت';
@@ -3696,6 +3712,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get customersExportcsv => 'CSV برآمد کریں';
+
+  @override
+  String get customersExportfailed => 'کسٹمرز برآمد کرنے میں ناکامی';
 
   @override
   String get customersExportimage => 'تصویر';
@@ -5542,6 +5561,61 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get batchManagement => 'بیچ مینجمنٹ';
+
+  @override
+  String bulkSelectedCount(Object count) {
+    return '$count منتخب';
+  }
+
+  @override
+  String get bulkExportSelected => 'منتخب ایکسپورٹ کریں';
+
+  @override
+  String get bulkDeleteSelected => 'منتخب حذف کریں';
+
+  @override
+  String get bulkActivateSelected => 'منتخب فعال کریں';
+
+  @override
+  String get bulkDeactivateSelected => 'منتخب غیر فعال کریں';
+
+  @override
+  String bulkDeleted(Object count) {
+    return '$count حذف ہو گئے';
+  }
+
+  @override
+  String get bulkDeleteFailed => 'کچھ آئٹمز حذف نہ ہو سکے';
+
+  @override
+  String bulkActivated(Object count) {
+    return '$count فعال ہو گئے';
+  }
+
+  @override
+  String bulkDeactivated(Object count) {
+    return '$count غیر فعال ہو گئے';
+  }
+
+  @override
+  String get bulkUpdateFailed => 'کچھ آئٹمز اپڈیٹ نہ ہو سکے';
+
+  @override
+  String get bulkSetStatus => 'حالت مقرر کریں';
+
+  @override
+  String bulkSetStatusTo(Object status) {
+    return 'حالت مقرر کریں: $status';
+  }
+
+  @override
+  String get bulkStatusSubmitWarning =>
+      'انٹری سپلائر لیجر میں درج ہو جائے گی۔ جن آرڈرز کی حالت تبدیل نہیں ہو سکتی وہ چھوڑ دیے جائیں گے۔';
+
+  @override
+  String bulkStatusCancelled(Object count, Object status) {
+    return '$count خرید کے آرڈرز $status ہو گئے';
+  }
 
   @override
   String get expiryStatus => 'مونثی کی حیثیت';

@@ -135,7 +135,9 @@ function deleteItem(req, res) {
             res.status(400).json({ error: `Cannot delete item with existing stock (${totalStock.total} units)` });
             return;
         }
-        Item_1.default.delete(itemId, database_1.default);
+        // Soft-delete (SHORTCOMINGS-FIX 4.2): stamp deleted_at + deactivate
+        // so the row can be restored instead of being lost forever.
+        Item_1.default.delete(itemId, req.user.id, database_1.default);
         // Log item deletion using activity logger
         (0, activityLogger_1.logCRUD)(activityLogger_1.ActionType.ITEM_DELETE, 'Item', itemId, `Deleted item: ${item.item_name}`, req.user.id, {
             item_code: item.item_code
@@ -261,6 +263,27 @@ function updateWarehouse(req, res) {
     catch (error) {
         logger_1.default.error('Update warehouse error:', error);
         res.status(500).json({ error: 'Failed to update warehouse' });
+    }
+}
+function restoreItem(req, res) {
+    try {
+        const itemId = Number(req.params.id);
+        const item = Item_1.default.getById(itemId, database_1.default);
+        if (!item) {
+            res.status(404).json({ error: 'Item not found' });
+            return;
+        }
+        Item_1.default.restore(itemId, database_1.default);
+        const restoredItem = Item_1.default.getById(itemId, database_1.default);
+        (0, activityLogger_1.logCRUD)(activityLogger_1.ActionType.ITEM_RESTORE, 'Item', itemId, `Restored item: ${item.item_name}`, req.user.id, {
+            item_code: item.item_code
+        });
+        req.activityLogged = true;
+        res.json({ success: true, data: restoredItem, message: 'Item restored successfully' });
+    }
+    catch (error) {
+        logger_1.default.error('Restore item error:', error);
+        res.status(500).json({ error: 'Failed to restore item' });
     }
 }
 function deleteWarehouse(req, res) {
@@ -623,7 +646,7 @@ exports.default = {
     getItem,
     createItem,
     updateItem,
-    deleteItem,
+    deleteItem, restoreItem,
     getCategories,
     getLowStock,
     getUnitsOfMeasure,

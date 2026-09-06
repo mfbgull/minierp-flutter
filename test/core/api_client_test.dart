@@ -7,6 +7,7 @@
 // - A 401 from any other endpoint means "expired/invalid token" → clear
 //   the token + notify the app so it routes to /login.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -19,6 +20,7 @@ import 'package:minierp_app/core/auth/token_storage.dart';
 
 class _MemoryStorage implements TokenStorage {
   String? token;
+  String? refreshToken;
 
   @override
   Future<String?> readToken() async => token;
@@ -27,13 +29,22 @@ class _MemoryStorage implements TokenStorage {
   Future<void> writeToken(String value) async => token = value;
 
   @override
-  Future<void> clear() async => token = null;
+  Future<String?> readRefreshToken() async => refreshToken;
+
+  @override
+  Future<void> writeRefreshToken(String value) async => refreshToken = value;
+
+  @override
+  Future<void> clear() async {
+    token = null;
+    refreshToken = null;
+  }
 }
 
 class _Adapter implements HttpClientAdapter {
   _Adapter(this.handler);
 
-  final ResponseBody Function(RequestOptions) handler;
+  final FutureOr<ResponseBody> Function(RequestOptions) handler;
 
   @override
   Future<ResponseBody> fetch(
@@ -137,5 +148,81 @@ void main() {
         expect(unauthorizedFires, hasLength(1));
       },
     );
+
+    test(
+      '401 retries transparently when the refresh token works',
+      () async {
+        storage.refreshToken = 'valid-refresh-token';
+        var invoiceHits = 0;
+        dio.httpClientAdapter = _Adapter((options) {
+          if (options.path == ApiEndpoints.refresh) {
+            return _json({
+              'success': true,
+              'data': {'token': 'fresh-access-token'},
+            });
+          }
+          if (options.path == '/invoices') {
+            invoiceHits++;
+            if (invoiceHits == 1) return _expiredToken401();
+            return _json({'success': true, 'data': []});
+          }
+          return _json({'success': true, 'data': null});
+        });
+
+        final response = await dio.get('/invoices');
+        expect(response.statusCode, 200);
+        expect(invoiceHits, 2); // original + one retry
+        expect(storage.token, 'fresh-access-token');
+        expect(unauthorizedFires, isEmpty);
+      },
+    );
+
+    test(
+      'concurrent 401s share a single refresh round-trip',
+      () async {
+        storage.refreshToken = 'valid-refresh-token';
+        var refreshHits = 0;
+        var invoiceHits = 0;
+        dio.httpClientAdapter = _Adapter((options) async {
+          if (options.path == ApiEndpoints.refresh) {
+            refreshHits++;
+            return _json({
+              'success': true,
+              'data': {'token': 'fresh-access-token'},
+            });
+          }
+          if (options.path == '/invoices') {
+            invoiceHits++;
+            if (invoiceHits <= 2) return _expiredToken401();
+            return _json({'success': true, 'data': []});
+          }
+          return _json({'success': true, 'data': null});
+        });
+
+        final results = await Future.wait([
+          dio.get('/invoices'),
+          dio.get('/invoices'),
+        ]);
+        expect(results.every((r) => r.statusCode == 200), isTrue);
+        expect(refreshHits, 1);
+        expect(unauthorizedFires, isEmpty);
+      },
+    );
+
+    test('refresh failure falls back to clearing the session', () async {
+      storage.refreshToken = 'expired-refresh-token';
+      dio.httpClientAdapter = _Adapter((options) {
+        if (options.path == ApiEndpoints.refresh) {
+          return _json({'error': 'Invalid or expired refresh token'},
+              status: 401);
+        }
+        return _expiredToken401();
+      });
+
+      await expectLater(dio.get('/invoices'), throwsA(isA<DioException>()));
+      await Future<void>.delayed(Duration.zero);
+      expect(storage.token, isNull);
+      expect(unauthorizedFires, hasLength(1));
+    });
   });
 }

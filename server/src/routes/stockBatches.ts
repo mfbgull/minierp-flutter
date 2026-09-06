@@ -2,6 +2,7 @@ import { Router } from 'express';
 import Database from 'better-sqlite3';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
+import { validateZodBody, zodBodySchemas } from '../middleware/validation';
 import logger from '../utils/logger';
 import { parsePageParams, envelope } from '../utils/paginate';
 
@@ -87,7 +88,7 @@ router.get('/stock-batches', requirePermission('inventory', 'read'), (req, res) 
  * PATCH /api/inventory/stock-batches/:id
  * Update batch expiry_date
  */
-router.patch('/stock-batches/:id', requirePermission('inventory', 'write'), (req, res) => {
+router.patch('/stock-batches/:id', requirePermission('inventory', 'write'), validateZodBody(zodBodySchemas.batchExpiry), (req, res) => {
   try {
     const batchId = Number(req.params.id);
     const { expiry_date } = req.body;
@@ -116,7 +117,7 @@ router.patch('/stock-batches/:id', requirePermission('inventory', 'write'), (req
  * PATCH /api/inventory/stock-batches/:id/halt
  * Halt a batch (exclude from FEFO consumption)
  */
-router.patch('/stock-batches/:id/halt', requirePermission('inventory', 'write'), (req, res) => {
+router.patch('/stock-batches/:id/halt', requirePermission('inventory', 'write'), validateZodBody(zodBodySchemas.batchHalt), (req, res) => {
   try {
     const batchId = Number(req.params.id);
     const { reason } = req.body;
@@ -150,7 +151,7 @@ router.patch('/stock-batches/:id/halt', requirePermission('inventory', 'write'),
  * PATCH /api/inventory/stock-batches/:id/unhalt
  * Unhalt a batch (re-enable in FEFO consumption)
  */
-router.patch('/stock-batches/:id/unhalt', requirePermission('inventory', 'write'), (req, res) => {
+router.patch('/stock-batches/:id/unhalt', requirePermission('inventory', 'write'), validateZodBody(zodBodySchemas.object), (req, res) => {
   try {
     const batchId = Number(req.params.id);
 

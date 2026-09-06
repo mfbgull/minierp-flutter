@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/ledger_entry.dart' show LedgerEntry;
 import '../../data/models/payment.dart' show Payment;
 import '../../data/models/purchase.dart' show Purchase;
@@ -16,6 +17,11 @@ import '../../data/repositories/purchase_repository.dart'
     show purchaseRepositoryProvider;
 import '../../data/repositories/supplier_repository.dart'
     show SupplierBalance, SupplierStatement, supplierRepositoryProvider;
+import '../reports/report_providers.dart'
+    show
+        globalReportFromDateProvider,
+        globalReportToDateProvider,
+        setGlobalReportRange;
 
 /// Server-side sort — the API column name (from the server's
 /// `SUPPLIER_SORT_COLUMNS` whitelist) plus the order.
@@ -89,13 +95,65 @@ final supplierDetailProvider = FutureProvider.autoDispose.family<Supplier, int>(
 );
 
 /// The supplier's AP ledger (`GET /suppliers/:id/ledger`, enveloped array,
-/// newest-first by transaction_date). autoDispose: each ledger UI owns its
-/// fetch, so leaving it frees the state.
+/// newest-first by transaction_date) — **full history, no date filter**.
+/// autoDispose: each ledger UI owns its fetch, so leaving it frees the
+/// state. The date-ranged ledger the Ledger tab shows is
+/// [supplierLedgerRangedProvider].
 final supplierLedgerProvider = FutureProvider.autoDispose
     .family<List<LedgerEntry>, int>((ref, supplierId) async {
       final result = await ref
           .watch(supplierRepositoryProvider)
           .ledger(supplierId);
+      return switch (result) {
+        ApiSuccess(:final data) => data,
+        ApiFailure(:final error) => throw error,
+      };
+    });
+
+/// Ranged-ledger fetch args — the family key (spec §7.4: the range is part
+/// of the provider key). Null dates = full history (parameters omitted).
+class SupplierLedgerArgs {
+  const SupplierLedgerArgs({
+    required this.supplierId,
+    this.fromDate,
+    this.toDate,
+  });
+
+  final int supplierId;
+
+  /// Optional inclusive range (ISO `YYYY-MM-DD`) sent as `fromDate` /
+  /// `toDate` (the ledger endpoint's names — spec §14 Rule 4).
+  final String? fromDate;
+  final String? toDate;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SupplierLedgerArgs &&
+      other.supplierId == supplierId &&
+      other.fromDate == fromDate &&
+      other.toDate == toDate;
+
+  @override
+  int get hashCode => Object.hash(supplierId, fromDate, toDate);
+}
+
+/// Bumped by [invalidateSupplierQueries] so the open Ledger tab refetches
+/// its current range after a mutation (the ranged key — dates — is
+/// invisible to the mutating code).
+final supplierLedgerVersionProvider = StateProvider<int>((ref) => 0);
+
+/// The date-ranged AP ledger (`GET /suppliers/:id/ledger?fromDate&toDate`;
+/// the Ledger tab's feed under the unified detail-page range). The same
+/// returned list drives the grid, footer and exports (spec §7.4).
+/// autoDispose: owned by the Ledger tab.
+final supplierLedgerRangedProvider = FutureProvider.autoDispose
+    .family<List<LedgerEntry>, SupplierLedgerArgs>((ref, args) async {
+      ref.watch(supplierLedgerVersionProvider);
+      final result = await ref.watch(supplierRepositoryProvider).ledger(
+        args.supplierId,
+        fromDate: args.fromDate,
+        toDate: args.toDate,
+      );
       return switch (result) {
         ApiSuccess(:final data) => data,
         ApiFailure(:final error) => throw error,
@@ -136,21 +194,32 @@ class SupplierPurchaseOrdersArgs {
     required this.supplierId,
     required this.page,
     required this.limit,
+    this.fromDate,
+    this.toDate,
   });
 
   final int supplierId;
   final int page;
   final int limit;
 
+  /// Optional inclusive range (ISO `YYYY-MM-DD`) sent as the PO endpoint's
+  /// own parameter names (`start_date`/`end_date` — spec §7.2/§14 Rule 4).
+  /// Null = no date filter; nulls are omitted by [PagedRequest.toQuery].
+  final String? fromDate;
+  final String? toDate;
+
   @override
   bool operator ==(Object other) =>
       other is SupplierPurchaseOrdersArgs &&
       other.supplierId == supplierId &&
       other.page == page &&
-      other.limit == limit;
+      other.limit == limit &&
+      other.fromDate == fromDate &&
+      other.toDate == toDate;
 
   @override
-  int get hashCode => Object.hash(supplierId, page, limit);
+  int get hashCode =>
+      Object.hash(supplierId, page, limit, fromDate, toDate);
 }
 
 /// Bumped by [invalidateSupplierQueries] so an open paged tab refetches
@@ -173,7 +242,11 @@ final supplierPurchaseOrdersPagedProvider = FutureProvider.autoDispose
             PagedRequest(
               page: args.page,
               limit: args.limit,
-              extra: {'supplier_id': args.supplierId},
+              extra: {
+                'supplier_id': args.supplierId,
+                'start_date': args.fromDate,
+                'end_date': args.toDate,
+              },
             ),
           );
       return switch (result) {
@@ -188,21 +261,32 @@ class SupplierPurchasesArgs {
     required this.supplierId,
     required this.page,
     required this.limit,
+    this.fromDate,
+    this.toDate,
   });
 
   final int supplierId;
   final int page;
   final int limit;
 
+  /// Optional inclusive range (ISO `YYYY-MM-DD`) sent as the purchases
+  /// endpoint's own parameter names (`start_date`/`end_date` — spec
+  /// §7.3/§14 Rule 4). Null = no date filter.
+  final String? fromDate;
+  final String? toDate;
+
   @override
   bool operator ==(Object other) =>
       other is SupplierPurchasesArgs &&
       other.supplierId == supplierId &&
       other.page == page &&
-      other.limit == limit;
+      other.limit == limit &&
+      other.fromDate == fromDate &&
+      other.toDate == toDate;
 
   @override
-  int get hashCode => Object.hash(supplierId, page, limit);
+  int get hashCode =>
+      Object.hash(supplierId, page, limit, fromDate, toDate);
 }
 
 /// One page of the supplier's direct purchases (`GET /purchases` +
@@ -219,7 +303,11 @@ final supplierPurchasesPagedProvider = FutureProvider.autoDispose
               page: args.page,
               limit: args.limit,
               sortOrder: 'DESC',
-              extra: {'supplier_id': args.supplierId},
+              extra: {
+                'supplier_id': args.supplierId,
+                'start_date': args.fromDate,
+                'end_date': args.toDate,
+              },
             ),
           );
       return switch (result) {
@@ -228,14 +316,53 @@ final supplierPurchasesPagedProvider = FutureProvider.autoDispose
       };
     });
 
+/// PO-summary fetch args — the family key (supplier id + optional range).
+/// The effective range is part of the identity so one range's counts can
+/// never render under another (spec §9). Null dates = lifetime summary
+/// (parameters omitted).
+class SupplierPOSummaryArgs {
+  const SupplierPOSummaryArgs({
+    required this.supplierId,
+    this.fromDate,
+    this.toDate,
+  });
+
+  final int supplierId;
+
+  /// Optional inclusive range (ISO `YYYY-MM-DD`) sent as `start_date` /
+  /// `end_date` — the purchase-order convention (spec §7.1).
+  final String? fromDate;
+  final String? toDate;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SupplierPOSummaryArgs &&
+      other.supplierId == supplierId &&
+      other.fromDate == fromDate &&
+      other.toDate == toDate;
+
+  @override
+  int get hashCode => Object.hash(supplierId, fromDate, toDate);
+}
+
+/// Bumped by [invalidateSupplierQueries] so the open Overview refetches
+/// its current PO-summary range after a mutation.
+final supplierPOSummaryVersionProvider = StateProvider<int>((ref) => 0);
+
 /// PO summary for the supplier (`GET /purchase-orders/summary/supplier/<id>`,
-/// bare `POSummary`) — the Overview tab's PO-status counts. autoDispose:
-/// owned by the detail page.
+/// bare `POSummary`) — the Overview tab's PO-status counts, optionally
+/// scoped to the page range (spec §7.1). autoDispose: owned by the
+/// Overview tab.
 final supplierPOSummaryProvider = FutureProvider.autoDispose
-    .family<POSummary, int>((ref, supplierId) async {
+    .family<POSummary, SupplierPOSummaryArgs>((ref, args) async {
+      ref.watch(supplierPOSummaryVersionProvider);
       final result = await ref
           .watch(purchaseOrderRepositoryProvider)
-          .summaryBySupplier(supplierId);
+          .summaryBySupplier(
+            args.supplierId,
+            startDate: args.fromDate,
+            endDate: args.toDate,
+          );
       return switch (result) {
         ApiSuccess(:final data) => data,
         ApiFailure(:final error) => throw error,
@@ -261,21 +388,32 @@ class SupplierPaymentsArgs {
     required this.supplierId,
     required this.page,
     required this.limit,
+    this.fromDate,
+    this.toDate,
   });
 
   final int supplierId;
   final int page;
   final int limit;
 
+  /// Optional inclusive range (ISO `YYYY-MM-DD`) sent as the payments
+  /// endpoint's own parameter names (`fromDate`/`toDate` — spec §7.5/
+  /// §14 Rule 4). Null = no date filter.
+  final String? fromDate;
+  final String? toDate;
+
   @override
   bool operator ==(Object other) =>
       other is SupplierPaymentsArgs &&
       other.supplierId == supplierId &&
       other.page == page &&
-      other.limit == limit;
+      other.limit == limit &&
+      other.fromDate == fromDate &&
+      other.toDate == toDate;
 
   @override
-  int get hashCode => Object.hash(supplierId, page, limit);
+  int get hashCode =>
+      Object.hash(supplierId, page, limit, fromDate, toDate);
 }
 
 /// One page of the supplier's payments (`GET /payments?supplierId=<id>`
@@ -291,7 +429,11 @@ final supplierPaymentsPagedProvider = FutureProvider.autoDispose
               page: args.page,
               limit: args.limit,
               sortOrder: 'DESC',
-              extra: {'supplierId': args.supplierId},
+              extra: {
+                'supplierId': args.supplierId,
+                'fromDate': args.fromDate,
+                'toDate': args.toDate,
+              },
             ),
           );
       return switch (result) {
@@ -301,16 +443,21 @@ final supplierPaymentsPagedProvider = FutureProvider.autoDispose
     });
 
 /// Statement fetch arguments — the family key (supplier id + date range).
+/// Null [fromDate]/[toDate] = full-history statement (both date parameters
+/// omitted — spec §6.5 mirror; the server returns the complete statement
+/// with opening 0 after the Phase-2 fix).
 class SupplierStatementArgs {
   const SupplierStatementArgs({
     required this.supplierId,
-    required this.fromDate,
-    required this.toDate,
+    this.fromDate,
+    this.toDate,
   });
 
   final int supplierId;
-  final String fromDate;
-  final String toDate;
+
+  /// Optional inclusive range (ISO `YYYY-MM-DD`).
+  final String? fromDate;
+  final String? toDate;
 
   @override
   bool operator ==(Object other) =>
@@ -346,6 +493,58 @@ final supplierStatementProvider = FutureProvider.autoDispose
       };
     });
 
+// ── Detail-page unified date range (unified-detail-date-picker-spec) ──
+//
+// Supplier mirror of the customer detail-page range (§7): one page-scoped
+// pair per detail-page instance. See the customer-side block in
+// customer_providers.dart for the full rationale — session-id scoping
+// (§3.1), snapshot-on-open seeding from the global range (§3.2), and the
+// single commit rule (ranged → global, All dates → page-local only, §3.3).
+
+int _supplierDetailSessionSeq = 0;
+
+/// A fresh, stable session id for one supplier detail-page instance.
+int nextSupplierDetailSession() => ++_supplierDetailSessionSeq;
+
+final supplierDetailFromDateProvider =
+    StateProvider.family<DateTime?, int>((ref, sessionId) {
+      return ref.read(globalReportFromDateProvider);
+    });
+final supplierDetailToDateProvider =
+    StateProvider.family<DateTime?, int>((ref, sessionId) {
+      return ref.read(globalReportToDateProvider);
+    });
+
+/// The supplier detail page's active range as the endpoint-ready ISO
+/// strings, or (null, null) for "All dates" (spec §5.3: null = omit the
+/// parameters). Watches the page-session pair — same contract as
+/// [customerDetailRangeIso] (customer_providers.dart).
+({String? from, String? to}) supplierDetailRangeIso(
+  WidgetRef ref,
+  int sessionId,
+) {
+  final from = ref.watch(supplierDetailFromDateProvider(sessionId));
+  final to = ref.watch(supplierDetailToDateProvider(sessionId));
+  return (
+    from: from == null ? null : isoDate(from),
+    to: to == null ? null : isoDate(to),
+  );
+}
+
+/// The supplier detail page's single range-commit rule — identical
+/// semantics to [commitCustomerDetailRange] (customer_providers.dart).
+void commitSupplierDetailRange(WidgetRef ref, int sessionId) {
+  final from = ref.read(supplierDetailFromDateProvider(sessionId));
+  final to = ref.read(supplierDetailToDateProvider(sessionId));
+  assert(
+    (from == null) == (to == null),
+    'supplier detail range must be complete (both or neither set)',
+  );
+  if (from != null && to != null) {
+    setGlobalReportRange(ref, from, to);
+  }
+}
+
 /// Invalidates every supplier-scoped query after a mutation (record/edit/
 /// delete payment), so every detail tab refetches.
 void invalidateSupplierQueries(WidgetRef ref, int supplierId) {
@@ -353,10 +552,13 @@ void invalidateSupplierQueries(WidgetRef ref, int supplierId) {
   ref.invalidate(supplierLedgerProvider(supplierId));
   ref.invalidate(supplierBalanceProvider(supplierId));
   ref.invalidate(supplierPurchaseOrdersProvider(supplierId));
-  ref.invalidate(supplierPOSummaryProvider(supplierId));
   ref.invalidate(supplierPaymentsProvider(supplierId));
-  // The paged tab providers watch this version, so the page the user is
-  // currently on refetches after any mutation.
+  // The paged tab + ranged-ledger + statement + PO-summary providers
+  // watch these versions, so the range the user is currently on refetches
+  // after any mutation (the ranged keys — page/dates — are invisible to
+  // mutators).
   ref.read(supplierTabsVersionProvider.notifier).state++;
+  ref.read(supplierLedgerVersionProvider.notifier).state++;
   ref.read(supplierStatementVersionProvider.notifier).state++;
+  ref.read(supplierPOSummaryVersionProvider.notifier).state++;
 }

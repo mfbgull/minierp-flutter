@@ -3,11 +3,16 @@
 // statement summary (Opening / Closing / Total Debits / Total Credits)
 // and the transaction table with an opening-balance row, per-row running
 // balances and a closing-balance row.
+//
+// Under the unified detail-page range (unified-detail-date-picker-spec D1)
+// the range comes from the page header pill via the session pair — this
+// tab no longer owns its own filter. "All dates" (session range null)
+// fetches the full-history statement (opening 0 — Phase-2 server fix) and
+// the framing row labels read from the statement's own from/to.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/ledger_entry.dart' show LedgerEntry;
@@ -15,108 +20,39 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../data/repositories/customer_repository.dart'
     show CustomerStatement;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/detail_error.dart';
+import '../../widgets/filtered_empty_state.dart';
 import 'customer_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
-class CustomerStatementTab extends ConsumerStatefulWidget {
-  const CustomerStatementTab({super.key, required this.customerId});
+class CustomerStatementTab extends ConsumerWidget {
+  const CustomerStatementTab({
+    super.key,
+    required this.customerId,
+    required this.sessionId,
+  });
 
   final int customerId;
 
-  @override
-  ConsumerState<CustomerStatementTab> createState() =>
-      _CustomerStatementTabState();
-}
-
-class _CustomerStatementTabState extends ConsumerState<CustomerStatementTab> {
-  late DateTime _from;
-  late DateTime _to;
-  late final TextEditingController _fromController;
-  late final TextEditingController _toController;
+  /// The detail-page instance's range-session id — this tab reads the
+  /// header pill's pair through it (spec §3.1).
+  final int sessionId;
 
   @override
-  void initState() {
-    super.initState();
-    _to = DateTime.now();
-    _from = DateTime(_to.year, _to.month - 1, _to.day);
-    _fromController = TextEditingController(
-      text: Formatters.date(isoDate(_from)),
-    );
-    _toController = TextEditingController(text: Formatters.date(isoDate(_to)));
-  }
-
-  @override
-  void dispose() {
-    _fromController.dispose();
-    _toController.dispose();
-    super.dispose();
-  }
-
-  void _syncDateFields() {
-    _fromController.text = Formatters.date(isoDate(_from));
-    _toController.text = Formatters.date(isoDate(_to));
-  }
-
-  Future<void> _pickFrom() async {
-    final picked = await pickDate(context, initialDate: _from, lastDate: _to);
-    if (picked != null) {
-      setState(() {
-        _from = picked;
-        _syncDateFields();
-      });
-    }
-  }
-
-  Future<void> _pickTo() async {
-    final picked = await pickDate(context, initialDate: _to);
-    if (picked != null) {
-      setState(() {
-        _to = picked;
-        _syncDateFields();
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
+    final range = customerDetailRangeIso(ref, sessionId);
     final args = CustomerStatementArgs(
-      customerId: widget.customerId,
-      fromDate: isoDate(_from),
-      toDate: isoDate(_to),
+      customerId: customerId,
+      fromDate: range.from,
+      toDate: range.to,
     );
     final statement = ref.watch(customerStatementProvider(args));
-    final customer = ref.watch(customerDetailProvider(widget.customerId));
+    final customer = ref.watch(customerDetailProvider(customerId));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Date-range filter.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
-            children: [
-              _dateField(
-                context,
-                l10n.commonFrom,
-                _fromController,
-                _pickFrom,
-              ),
-              const SizedBox(width: 12),
-              _dateField(context, l10n.commonTo, _toController, _pickTo),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () =>
-                    ref.invalidate(customerStatementProvider(args)),
-                icon: const Icon(Icons.refresh, size: 18),
-                label: Text(l10n.commonRefresh),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
         Expanded(
           child: switch (statement) {
             AsyncData(:final value) => _buildContent(
@@ -137,28 +73,6 @@ class _CustomerStatementTabState extends ConsumerState<CustomerStatementTab> {
     );
   }
 
-  Widget _dateField(
-    BuildContext context,
-    String label,
-    TextEditingController controller,
-    VoidCallback onTap,
-  ) {
-    return SizedBox(
-      width: 180,
-      child: TextField(
-        readOnly: true,
-        onTap: onTap,
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          isDense: true,
-          border: const OutlineInputBorder(),
-          suffixIcon: const Icon(Icons.calendar_today, size: 16),
-        ),
-      ),
-    );
-  }
-
   Widget _buildContent(
     BuildContext context,
     AppLocalizations l10n,
@@ -174,6 +88,17 @@ class _CustomerStatementTabState extends ConsumerState<CustomerStatementTab> {
       0,
       (sum, t) => sum + t.credit,
     );
+
+    // All-dates (full history) statements open at 0 — the Phase-2 server
+    // fix — and the opening row carries no range label; ranged statements
+    // label it with the range start (web parity).
+    final openingLabel = statement.fromDate == null
+        ? l10n.customersOpeningbalance
+        : '${l10n.customersOpeningbalance} (${Formatters.date(statement.fromDate!)})';
+
+    if (statement.transactions.isEmpty) {
+      return const FilteredEmptyState();
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -231,7 +156,7 @@ class _CustomerStatementTabState extends ConsumerState<CustomerStatementTab> {
             clipBehavior: Clip.antiAlias,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: _buildTable(context, l10n, statement),
+              child: _buildTable(context, l10n, statement, openingLabel),
             ),
           ),
         ],
@@ -243,6 +168,7 @@ class _CustomerStatementTabState extends ConsumerState<CustomerStatementTab> {
     BuildContext context,
     AppLocalizations l10n,
     CustomerStatement statement,
+    String openingLabel,
   ) {
     final scheme = Theme.of(context).colorScheme;
     final headers = [
@@ -306,7 +232,7 @@ class _CustomerStatementTabState extends ConsumerState<CustomerStatementTab> {
           children: [
             cell(statement.fromDate ?? ''),
             cell(
-              l10n.customersOpeningbalance,
+              openingLabel,
               style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
             ),
             cell(l10n.customersOpeningbalance),

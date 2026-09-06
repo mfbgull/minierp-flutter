@@ -296,11 +296,18 @@ function getPendingOrders(req, res) {
 function getSummaryBySupplier(req, res) {
     try {
         const { supplierId } = req.params;
+        const startDateParam = (0, queryUtils_1.getQueryParam)(req.query.start_date);
+        const endDateParam = (0, queryUtils_1.getQueryParam)(req.query.end_date);
         if (!supplierId) {
             res.status(400).json({ error: 'Supplier ID is required' });
             return;
         }
-        const summary = PurchaseOrder_1.default.getSummaryBySupplier(Number(supplierId), database_1.default);
+        // Optional inclusive po_date bounds (unified detail date picker) — same
+        // param names as the PO list endpoint (start_date/end_date).
+        const summary = PurchaseOrder_1.default.getSummaryBySupplier(Number(supplierId), database_1.default, {
+            startDate: startDateParam || undefined,
+            endDate: endDateParam || undefined,
+        });
         // Return default object if no purchase orders exist for this supplier
         res.json(summary || {
             total_pos: 0,

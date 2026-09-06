@@ -598,7 +598,24 @@ class PurchaseOrderModel {
             return 'Submitted'; // Default if not Draft
         }
     }
-    static getSummaryBySupplier(supplierId, db) {
+    /**
+     * Supplier PO summary (supplier Overview cards). Optional inclusive
+     * `po_date` bounds mirror the PO list filter (getAll: `po.po_date >= ?` /
+     * `<= ?`). Aggregation behavior is preserved byte-for-byte: totals count
+     * every status (incl. Draft/Cancelled), buckets cover only the four live
+     * statuses — the range only narrows which rows feed both.
+     */
+    static getSummaryBySupplier(supplierId, db, opts = {}) {
+        const conditions = ['supplier_id = ?'];
+        const params = [supplierId];
+        if (opts.startDate) {
+            conditions.push('po_date >= ?');
+            params.push(opts.startDate);
+        }
+        if (opts.endDate) {
+            conditions.push('po_date <= ?');
+            params.push(opts.endDate);
+        }
         return db.prepare(`
       SELECT
         COUNT(*) as total_pos,
@@ -608,8 +625,8 @@ class PurchaseOrderModel {
         SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as completed_pos,
         SUM(total_amount) as total_value
       FROM purchase_orders
-      WHERE supplier_id = ?
-    `).get(supplierId);
+      WHERE ${conditions.join(' AND ')}
+    `).get(...params);
     }
     static getPendingOrders(db) {
         return this.getAll({ status: 'Submitted', limit: 1000 }, db).rows;

@@ -21,7 +21,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/bom.dart';
 import '../models/production.dart';
@@ -112,5 +111,5 @@ class ProductionRepository {
 }
 
 final productionRepositoryProvider = Provider<ProductionRepository>(
-  (ref) => ProductionRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => ProductionRepository(ref.watch(repositoryClientProvider)),
 );

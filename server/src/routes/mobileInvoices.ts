@@ -3,13 +3,14 @@ const router = express.Router();
 import mobileInvoiceController from '../controllers/mobileInvoiceController';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
+import { validateZodBody, zodBodySchemas } from '../middleware/validation';
 
 // All routes require authentication
 router.use(authenticateToken);
 
 // Draft management - for saving incomplete invoice state
-router.post('/draft', requirePermission('invoices', 'create'), mobileInvoiceController.createDraft);
-router.put('/draft/:id', requirePermission('invoices', 'update'), mobileInvoiceController.updateDraft);
+router.post('/draft', requirePermission('invoices', 'create'), validateZodBody(zodBodySchemas.mobileDraft), mobileInvoiceController.createDraft);
+router.put('/draft/:id', requirePermission('invoices', 'update'), validateZodBody(zodBodySchemas.mobileDraft), mobileInvoiceController.updateDraft);
 router.get('/draft/:id', requirePermission('invoices', 'read'), mobileInvoiceController.getDraft);
 router.delete('/draft/:id', requirePermission('invoices', 'delete'), mobileInvoiceController.deleteDraft);
 
@@ -22,6 +23,6 @@ router.get('/tax-rates', requirePermission('invoices', 'read'), mobileInvoiceCon
 router.get('/payment-terms', requirePermission('invoices', 'read'), mobileInvoiceController.getPaymentTerms);
 
 // Final submission - creates actual invoice from draft or direct data
-router.post('/submit', requirePermission('invoices', 'create'), mobileInvoiceController.submitInvoice);
+router.post('/submit', requirePermission('invoices', 'create'), validateZodBody(zodBodySchemas.mobileSubmit), mobileInvoiceController.submitInvoice);
 
 export default router;

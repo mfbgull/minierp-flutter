@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
+import '../../data/models/dashboard_boot.dart' show DashboardBoot;
 import '../../data/models/dashboard_summary.dart'
     show
         ArSummaryResult,
@@ -21,122 +22,84 @@ import '../reports/report_providers.dart'
     show globalReportFromDateProvider, globalReportToDateProvider;
 import 'dashboard_kpi_catalog.dart' show kpiCardCatalog;
 
-/// Loads the aggregated dashboard KPIs (GET /dashboard/summary), filtered
-/// by the dashboard's global date range (the money figures + chart react
-/// to the range picker). Failures surface as [ApiFailure.error]; the
-/// screen offers a retry via `ref.invalidate`.
-final dashboardSummaryProvider = FutureProvider<DashboardSummary>((ref) async {
+// ── Boot ───────────────────────────────────────────────────────────────────────
+
+/// Composite boot payload (`GET /dashboard/boot`, spec 7.1): summary,
+/// active layout, KPI batch, cash position, AR summary, expiry alerts
+/// and top customers in one round trip. The dashboard providers derive
+/// from this instead of firing 8 parallel GETs at login.
+final dashboardBootProvider =
+    FutureProvider<DashboardBoot>((ref) async {
   final from = ref.watch(globalReportFromDateProvider);
   final to = ref.watch(globalReportToDateProvider);
-  final result = await ref.watch(dashboardRepositoryProvider).summary(
+  final result = await ref.watch(dashboardRepositoryProvider).boot(
+    metrics: [for (final def in kpiCardCatalog) def.metric],
     fromDate: from == null ? null : isoDate(from),
     toDate: to == null ? null : isoDate(to),
   );
-  return _data(result);
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure(:final error) => throw error,
+  };
 });
 
-/// Resolves an [ApiResult] to its data or throws the failure (the block
-/// screens show the error via their own error panels + retry).
-T _data<T>(ApiResult<T> result) => switch (result) {
-  ApiSuccess(:final data) => data,
-  ApiFailure(:final error) => throw error,
-};
+// ── Derived providers (single source of truth, boot-only defaults) ─────────────
 
-/// `GET /dashboard/top-customers` (default limit 5).
+/// At boot, this provider's initial value comes from
+/// [dashboardBootProvider]. After boot only callers that
+/// explicitly `ref.invalidate` it refetch.
+final provider: Provide<DashboardSummary>;
+  data: Tracker<ref.watch(dashboardBootProvider)>.when(
+    (data) => data != null ? data.summary : const DashboardSummary({});
+  ),
+  shouldFetch: always,
+);
+final arSummaryProvider =
+    Provider<ArSummaryResult>.family(dashboardBootProvider, (ref, boot) {
+  ref.watch(dashboardBootProvider);
+  final bootData = ref.watch(dashboardBootProvider);
+  return bootData.ar ?? const ArSummaryResult(
+    totalAr: 0,
+    currentAmount: 0,
+    amount130: 0,
+    amount3160: 0,
+    amount6190: 0,
+    amountOver90: 0,
+    customerCount: 0,
+  );
+});
+
+final dashboardKpiBatchProvider =
+    Provider<Map<String, KpiResult>>.family(dashboardBootProvider, (ref, boot) {
+  final bootData = ref.watch(dashboardBootProvider);
+  return bootData.kpis;
+});
+
+final dashboardCashPositionProvider =
+    Provider<CashPositionSummary>.family(dashboardBootProvider, (ref, boot) {
+  final bootData = ref.watch(dashboardBootProvider);
+  return bootData.cash ?? const CashPositionSummary(
+    date: '',
+    accounts: [],
+    total: 0,
+  );
+});
+
 final dashboardTopCustomersProvider =
-    FutureProvider.family<List<TopCustomer>, int>((ref, limit) async {
-      final result = await ref
-          .watch(dashboardRepositoryProvider)
-          .topCustomers(limit: limit);
-      return _data(result);
-    });
-
-/// `GET /dashboard/sales-summary?period=`.
-final dashboardSalesSummaryProvider =
-    FutureProvider.family<SalesSummaryResult, String>((ref, period) async {
-      final result = await ref
-          .watch(dashboardRepositoryProvider)
-          .salesSummary(period: period);
-      return _data(result);
-    });
-
-/// `GET /dashboard/expense-summary?period=`.
-final dashboardExpenseSummaryProvider =
-    FutureProvider.family<ExpenseSummaryResult, String>((ref, period) async {
-      final result = await ref
-          .watch(dashboardRepositoryProvider)
-          .expenseSummary(period: period);
-      return _data(result);
-    });
-
-/// `GET /dashboard/production-status`.
-final dashboardProductionStatusProvider =
-    FutureProvider<ProductionStatusResult>((ref) async {
-      final result = await ref
-          .watch(dashboardRepositoryProvider)
-          .productionStatus();
-      return _data(result);
-    });
-
-/// `GET /dashboard/stock-movement-summary?days=`.
-final dashboardStockMovementSummaryProvider =
-    FutureProvider.family<StockMovementSummaryResult, int>((ref, days) async {
-      final result = await ref
-          .watch(dashboardRepositoryProvider)
-          .stockMovementSummary(days: days);
-      return _data(result);
-    });
-
-/// `GET /dashboard/kpi?metric=` — respects the dashboard's global date
-/// range (spec §6.4: all blocks follow the global range), so a card and
-/// the summary always agree when a range is active.
-final dashboardKpiProvider = FutureProvider.family<KpiResult, String>((
-  ref,
-  metric,
-) async {
-  final from = ref.watch(globalReportFromDateProvider);
-  final to = ref.watch(globalReportToDateProvider);
-  final result = await ref.watch(dashboardRepositoryProvider).kpi(
-    metric: metric,
-    fromDate: from == null ? null : isoDate(from),
-    toDate: to == null ? null : isoDate(to),
-  );
-  return _data(result);
+    Provider<List<TopCustomer>>.family(dashboardBootProvider, (ref, boot) {
+  final bootData = ref.watch(dashboardBootProvider);
+  return bootData.topCustomers;
 });
 
-/// Invalidates every KPI card metric (the strip cards fetch per-card
-/// `/dashboard/kpi` values, so a new sale / invoice isn't reflected
-/// until their providers are rebuilt). Iterating the whole catalog is
-/// cheap — invalidating a family member nobody watches only marks it
-/// stale; the fetch happens on the next watch.
-void invalidateDashboardKpiCards(WidgetRef ref) {
-  for (final def in kpiCardCatalog) {
-    ref.invalidate(dashboardKpiProvider(def.metric));
-  }
-}
+// ── Third-party helpers ────────────────────────────────────────────────────────
 
-/// `GET /dashboard/ar-summary`.
-final dashboardArSummaryProvider = FutureProvider<ArSummaryResult>((ref) async {
-  final result = await ref.watch(dashboardRepositoryProvider).arSummary();
-  return _data(result);
-});
+/// `T` loaded from [source]'s value, falling back to [fallback] on
+/// null (used above for the boot-derived providers that degrade
+/// independently).
+typedef Tracker<T> = T? Function(T);
+typedef Fallback<T> = T;
 
-/// `GET /dashboard/cash-position` — closing balance per cash account
-/// (Cash, Bank, Easypaisa, JazzCash, UPaisa) as of today.
-final dashboardCashPositionProvider = FutureProvider<CashPositionSummary>((
-  ref,
-) async {
-  final result = await ref.watch(dashboardRepositoryProvider).cashPosition();
-  return _data(result);
-});
+T default<T>(T? value, T fallback) => value ?? fallback;
 
-/// `GET /dashboard/cash-opening-balances` — the starting (seed) balances
-/// each cash account was founded with. Edited from the dashboard cash
-/// strip; saving invalidates this + the cash-position provider.
-final dashboardCashOpeningBalancesProvider =
-    FutureProvider<CashOpeningBalances>((ref) async {
-      final result = await ref
-          .watch(dashboardRepositoryProvider)
-          .cashOpeningBalances();
-      return _data(result);
-    });
+/// Reset the boilerplate fallback for null trackers.
+T? Tracker<T>.when(T? value, T fallback) => value ?? fallback;

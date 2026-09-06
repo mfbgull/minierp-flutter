@@ -5,6 +5,7 @@ import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
 import { uploadEmployeeDoc } from '../middleware/upload';
 import { employeeDocsDir } from '../middleware/upload';
+import { validateZodBody, zodBodySchemas } from '../middleware/validation';
 import path from 'path';
 
 // All employee routes require authentication
@@ -13,19 +14,19 @@ router.use(authenticateToken);
 router.get('/', requirePermission('employees', 'read'), employeeController.getEmployees);
 router.get('/next-code', requirePermission('employees', 'read'), employeeController.getNextEmployeeCode);
 router.get('/:id', requirePermission('employees', 'read'), employeeController.getEmployee);
-router.post('/', requirePermission('employees', 'create'), employeeController.createEmployee);
-router.put('/:id', requirePermission('employees', 'update'), employeeController.updateEmployee);
+router.post('/', requirePermission('employees', 'create'), validateZodBody(zodBodySchemas.employeeCreate), employeeController.createEmployee);
+router.put('/:id', requirePermission('employees', 'update'), validateZodBody(zodBodySchemas.object), employeeController.updateEmployee);
 router.delete('/:id', requirePermission('employees', 'delete'), employeeController.deleteEmployee);
 
 // Salary payment routes
-router.post('/:id/salary/pay', requirePermission('employees', 'update'), employeeController.paySalary);
+router.post('/:id/salary/pay', requirePermission('employees', 'update'), validateZodBody(zodBodySchemas.object), employeeController.paySalary);
 router.get('/:id/salary/history', requirePermission('employees', 'read'), employeeController.getSalaryHistory);
 router.get('/:id/salary/month/:payPeriod', requirePermission('employees', 'read'), employeeController.getSalaryMonthDetail);
 router.delete('/:id/salary/:paymentId', requirePermission('employees', 'update'), employeeController.deleteSalaryPayment);
 
 // Loan routes
 router.get('/:id/loans', requirePermission('employees', 'read'), employeeController.getLoans);
-router.post('/:id/loans', requirePermission('employees', 'update'), employeeController.createLoan);
+router.post('/:id/loans', requirePermission('employees', 'update'), validateZodBody(zodBodySchemas.object), employeeController.createLoan);
 router.get('/:id/loans/:loanId', requirePermission('employees', 'read'), employeeController.getLoanDetail);
 router.post('/:id/loans/:loanId/repay', requirePermission('employees', 'update'), employeeController.repayLoan);
 router.post('/:id/loans/:loanId/write-off', requirePermission('employees', 'update'), employeeController.writeOffLoan);

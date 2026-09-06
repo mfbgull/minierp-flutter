@@ -39,7 +39,6 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
-    "sqlite3": "^5.1.7",
     "winston": "^3.19.0",
     "zod": "^4.3.6"
   },

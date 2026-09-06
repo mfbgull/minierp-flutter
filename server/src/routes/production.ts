@@ -3,14 +3,15 @@ const router = express.Router();
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
 import { sensitiveOperationLimiter } from '../middleware/rateLimiter';
+import { validateZodBody, zodBodySchemas } from '../middleware/validation';
 import productionController from '../controllers/productionController';
 
 router.use(authenticateToken);
 
-router.post('/productions', requirePermission('production', 'create'), sensitiveOperationLimiter, productionController.recordProduction);
-router.get('/productions', requirePermission('production', 'read'), productionController.getProductions);
-router.get('/productions/:id', requirePermission('production', 'read'), productionController.getProduction);
-router.delete('/productions/:id', requirePermission('production', 'delete'), sensitiveOperationLimiter, productionController.deleteProduction);
-router.get('/productions/summary/item/:item_id', requirePermission('production', 'read'), productionController.getProductionSummaryByItem);
+router.post('/', requirePermission('production', 'create'), validateZodBody(zodBodySchemas.productionCreate), sensitiveOperationLimiter, productionController.recordProduction);
+router.get('/', requirePermission('production', 'read'), productionController.getProductions);
+router.get('/:id', requirePermission('production', 'read'), productionController.getProduction);
+router.delete('/:id', requirePermission('production', 'delete'), sensitiveOperationLimiter, productionController.deleteProduction);
+router.get('/summary/item/:item_id', requirePermission('production', 'read'), productionController.getProductionSummaryByItem);
 
 export default router;

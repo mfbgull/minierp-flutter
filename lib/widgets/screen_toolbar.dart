@@ -179,6 +179,70 @@ class ScreenToolbar extends StatefulWidget {
   ScreenToolbarState createState() => ScreenToolbarState();
 }
 
+/// The bulk-selection action bar that appears between the toolbar and
+/// the grid while checkbox rows are selected (SHORTCOMINGS-FIX 4.4). A
+/// bordered strip reading "N selected" with the screen's bulk actions
+/// (export / delete / activate / deactivate) and a close button that
+/// clears the selection. The screens own the actions and pass them as
+/// [actions]; the strip only arranges them.
+class BulkActionBar extends StatelessWidget {
+  const BulkActionBar({
+    super.key,
+    required this.count,
+    this.actions = const [],
+    this.onClearSelection,
+  });
+
+  /// Number of currently selected rows.
+  final int count;
+
+  /// The bulk actions (e.g. Export / Delete buttons) shown right-aligned
+  /// before the close button.
+  final List<Widget> actions;
+
+  /// Clears the selection (the strip's close button); the grid checkboxes
+  /// uncheck as the selection notifier resets.
+  final VoidCallback? onClearSelection;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          color: scheme.secondaryContainer.withValues(alpha: 0.4),
+          borderRadius: AppBorderRadius.smRadius,
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.checklist, size: 18, color: scheme.onSecondaryContainer),
+            const SizedBox(width: 8),
+            Text(
+              l10n.bulkSelectedCount(count),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: scheme.onSecondaryContainer,
+              ),
+            ),
+            const Spacer(),
+            ...actions,
+            if (onClearSelection != null)
+              IconButton(
+                icon: const Icon(Icons.close, size: 18),
+                tooltip: l10n.commonClear,
+                onPressed: onClearSelection,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// The toolbar's state — public so the shell's [ScreenShortcutScope] can
 /// resolve the visible screen's toolbar and dispatch Ctrl+F / Ctrl+N to
 /// it (see screen_shortcuts.dart).

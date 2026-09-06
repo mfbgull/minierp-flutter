@@ -29,7 +29,7 @@ function getUser(req: AuthRequest, res: Response): void {
   }
 }
 
-function createUser(req: AuthRequest, res: Response): void {
+async function createUser(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { username, email, password, full_name, role_id, is_active = true } = req.body;
 
@@ -58,7 +58,8 @@ function createUser(req: AuthRequest, res: Response): void {
       return;
     }
 
-    const passwordHash = bcrypt.hashSync(password, 12);
+    // Async bcrypt (spec 2.1) — hashSync blocked the event loop ~300ms.
+    const passwordHash = await bcrypt.hash(password, 12);
     const userId = UserModel.create(db, { username, email, password_hash: passwordHash, full_name, role_id, is_active });
 
     log({ userId: req.user!.id, action: 'USER_CREATE', entityType: 'User', description: `User ${username} created by ${req.user!.username}`, metadata: { username, email, role_id }, ipAddress: String(req.ip || '') });
@@ -146,7 +147,7 @@ function deleteUser(req: AuthRequest, res: Response): void {
   }
 }
 
-function resetPassword(req: AuthRequest, res: Response): void {
+async function resetPassword(req: AuthRequest, res: Response): Promise<void> {
   try {
     const userId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
     const { newPassword } = req.body;
@@ -157,7 +158,8 @@ function resetPassword(req: AuthRequest, res: Response): void {
     const existingUser = UserModel.getPublicById(userId, db);
     if (!existingUser) { res.status(404).json({ error: 'User not found' }); return; }
 
-    const passwordHash = bcrypt.hashSync(newPassword, 12);
+    // Async bcrypt (spec 2.1) — hashSync blocked the event loop ~300ms.
+    const passwordHash = await bcrypt.hash(newPassword, 12);
     UserModel.updatePassword(userId, passwordHash, db);
 
         logAuth(ActionType.PASSWORD_CHANGE, req.user!.id, `Password reset for user ${existingUser.username} by ${req.user!.username}`, { userId, username: existingUser.username }, String(req.ip || ''));

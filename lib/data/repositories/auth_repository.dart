@@ -9,19 +9,23 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/auth_user.dart' show AuthUser;
 import 'api_result.dart';
 import 'repository_client.dart';
 
-/// `{token, user}` from the login response body.
+/// `{token, refreshToken, user}` from the login response body.
 class AuthLoginResult {
-  const AuthLoginResult({required this.token, required this.user});
+  const AuthLoginResult({
+    required this.token,
+    required this.refreshToken,
+    required this.user,
+  });
 
   factory AuthLoginResult.fromJson(Map<String, dynamic> json) =>
       AuthLoginResult(
         token: json['token'] as String? ?? '',
+        refreshToken: json['refreshToken'] as String? ?? '',
         user: AuthUser.fromJson(
           json['user'] is Map<String, dynamic>
               ? json['user'] as Map<String, dynamic>
@@ -30,6 +34,7 @@ class AuthLoginResult {
       );
 
   final String token;
+  final String refreshToken;
   final AuthUser user;
 }
 
@@ -56,6 +61,16 @@ class AuthRepository {
   Future<ApiResult<void>> logout() =>
       _api.post(ApiEndpoints.logout, parse: (_) {});
 
+  /// Exchanges a refresh token for a fresh access token (`POST
+  /// /auth/refresh`). Used by the dio interceptor to transparently recover
+  /// from an expired access token.
+  Future<ApiResult<String>> refresh(String refreshToken) => _api.post(
+    ApiEndpoints.refresh,
+    body: {'refreshToken': refreshToken},
+    parse: (Object? json) =>
+        (json as Map<String, dynamic>)['token'] as String? ?? '',
+  );
+
   /// `POST /auth/change-password` (rate-limited 3/hour). A 401 here means
   /// "wrong current password", not an expired session — the dio interceptor
   /// is told to leave the session alone for this path.
@@ -70,5 +85,5 @@ class AuthRepository {
 }
 
 final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => AuthRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => AuthRepository(ref.watch(repositoryClientProvider)),
 );

@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.authenticateToken = authenticateToken;
 exports.requireAdmin = requireAdmin;
 exports.generateToken = generateToken;
+exports.generateRefreshToken = generateRefreshToken;
+exports.verifyRefreshToken = verifyRefreshToken;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const logger_1 = __importDefault(require("../utils/logger"));
 if (!process.env.JWT_SECRET) {
@@ -62,6 +64,33 @@ function requireAdmin(req, res, next) {
 }
 function generateToken(user) {
     // HS256 is explicitly pinned with issuer/audience below — mimosa-ignore
-    return jsonwebtoken_1.default.sign({ id: user.id, username: user.username, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '24h', issuer: 'mini-erp', audience: 'mini-erp-client', algorithm: 'HS256' });
+    return jsonwebtoken_1.default.sign({ id: user.id, username: user.username, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '1h', issuer: 'mini-erp', audience: 'mini-erp-client', algorithm: 'HS256' });
 }
-exports.default = { authenticateToken, requireAdmin, generateToken };
+/// Long-lived token exchanged for a fresh access token by `POST
+/// /auth/refresh`. Carries a `type: 'refresh'` claim so access tokens can
+/// never be used as refresh tokens.
+function generateRefreshToken(user) {
+    return jsonwebtoken_1.default.sign({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        type: 'refresh',
+    }, JWT_SECRET, { expiresIn: '7d', issuer: 'mini-erp', audience: 'mini-erp-client', algorithm: 'HS256' });
+}
+/// Verifies a refresh token. Returns the embedded user, or `null` for
+/// missing/expired/wrong-type tokens.
+function verifyRefreshToken(token) {
+    try {
+        const payload = jsonwebtoken_1.default.verify(token, JWT_SECRET, {
+            algorithms: ['HS256'],
+            issuer: 'mini-erp',
+            audience: 'mini-erp-client',
+        });
+        return payload.type === 'refresh' ? payload : null;
+    }
+    catch {
+        return null;
+    }
+}
+exports.default = { authenticateToken, requireAdmin, generateToken, generateRefreshToken, verifyRefreshToken };

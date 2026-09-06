@@ -12,7 +12,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/setting.dart' show AppSetting;
 import 'api_result.dart';
@@ -55,5 +54,5 @@ class SettingsRepository {
 }
 
 final settingsRepositoryProvider = Provider<SettingsRepository>(
-  (ref) => SettingsRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => SettingsRepository(ref.watch(repositoryClientProvider)),
 );

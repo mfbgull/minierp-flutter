@@ -14,6 +14,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
 import '../../widgets/detail_tab_grid.dart';
+import '../../widgets/filtered_empty_state.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../purchases/purchase_detail_dialog.dart' show showPurchaseDetailDialog;
 import 'supplier_providers.dart';
@@ -21,9 +22,17 @@ import 'supplier_providers.dart';
 enum _PurchaseRowAction { view }
 
 class SupplierPurchasesTab extends ConsumerStatefulWidget {
-  const SupplierPurchasesTab({super.key, required this.supplierId});
+  const SupplierPurchasesTab({
+    super.key,
+    required this.supplierId,
+    required this.sessionId,
+  });
 
   final int supplierId;
+
+  /// The detail-page instance's range-session id — this tab derives its
+  /// fetch args from the header pill's pair (spec §3.1/§9).
+  final int sessionId;
 
   @override
   ConsumerState<SupplierPurchasesTab> createState() =>
@@ -38,12 +47,37 @@ class _SupplierPurchasesTabState extends ConsumerState<SupplierPurchasesTab> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    // The page's unified range — part of the fetch identity (§9); null =
+    // All dates (no date parameters).
+    final range = supplierDetailRangeIso(ref, widget.sessionId);
+
+    // A range change re-keys the provider, so the old page index is
+    // meaningless — reset to page 1 (spec §7.3).
+    ref.listen(
+      supplierDetailFromDateProvider(widget.sessionId),
+      (previous, next) {
+        if (previous != next && _page != 1) {
+          setState(() => _page = 1);
+        }
+      },
+    );
+    ref.listen(
+      supplierDetailToDateProvider(widget.sessionId),
+      (previous, next) {
+        if (previous != next && _page != 1) {
+          setState(() => _page = 1);
+        }
+      },
+    );
+
     final purchases = ref.watch(
       supplierPurchasesPagedProvider(
         SupplierPurchasesArgs(
           supplierId: widget.supplierId,
           page: _page,
           limit: _limit,
+          fromDate: range.from,
+          toDate: range.to,
         ),
       ),
     );
@@ -56,6 +90,8 @@ class _SupplierPurchasesTabState extends ConsumerState<SupplierPurchasesTab> {
           supplierId: widget.supplierId,
           page: _page,
           limit: _limit,
+          fromDate: range.from,
+          toDate: range.to,
         ),
       ),
       (previous, next) {
@@ -70,7 +106,9 @@ class _SupplierPurchasesTabState extends ConsumerState<SupplierPurchasesTab> {
     return switch (purchases) {
       AsyncData(:final value) =>
         value.items.isEmpty
-            ? _empty(context, l10n.suppliersNopurchases)
+            ? (range.from != null
+                  ? const FilteredEmptyState()
+                  : _empty(context, l10n.suppliersNopurchases))
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -108,6 +146,8 @@ class _SupplierPurchasesTabState extends ConsumerState<SupplierPurchasesTab> {
               supplierId: widget.supplierId,
               page: _page,
               limit: _limit,
+              fromDate: range.from,
+              toDate: range.to,
             ),
           ),
         ),

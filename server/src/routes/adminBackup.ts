@@ -19,6 +19,7 @@ import path from 'path';
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
+import { validateZodBody, zodBodySchemas } from '../middleware/validation';
 import {
   deleteBackupFile,
   lastBackupAt,
@@ -69,7 +70,7 @@ router.get('/backup', requirePermission('admin', 'read'), (_req: Request, res: R
  * activity trail. 202-style long jobs are unnecessary — VACUUM INTO on
  * this database size completes within a request.
  */
-router.post('/backup', requirePermission('admin', 'create'), (req: Request, res: Response): void => {
+router.post('/backup', requirePermission('admin', 'create'), validateZodBody(zodBodySchemas.object), (req: Request, res: Response): void => {
   try {
     const target = runBackup({ trigger: 'manual', userId: req.user?.id ?? null });
     if (!target) {

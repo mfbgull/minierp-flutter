@@ -6,7 +6,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../data/repositories/api_result.dart';
 import '../../data/repositories/repository_client.dart';
@@ -27,7 +26,7 @@ class PosRepository {
     String? customerName,
   }) async {
     return _api.postEnvelope(
-      ApiEndpoints.pos + '/sale',
+      '${ApiEndpoints.pos}/sale',
       body: <String, dynamic>{
         'warehouse_id': warehouseId,
         'sale_date': saleDate,
@@ -37,7 +36,7 @@ class PosRepository {
           'customer_name': customerName,
       },
       parse: (json) => PosSale.fromJson(
-        (json as Map<String, dynamic>)['data'] as Map<String, dynamic>,
+        json['data'] as Map<String, dynamic>,
       ),
     );
   }
@@ -50,10 +49,10 @@ class PosRepository {
     int limit = 50,
   }) async {
     return _api.getList(
-      ApiEndpoints.pos + '/transactions',
+      '${ApiEndpoints.pos}/transactions',
       queryParameters: <String, dynamic>{
-        if (startDate != null) 'start_date': startDate,
-        if (endDate != null) 'end_date': endDate,
+        'start_date': ?startDate,
+        'end_date': ?endDate,
         'limit': '$limit',
       },
       parseItem: (json) => PosTransaction.fromJson(json as Map<String, dynamic>),
@@ -62,5 +61,5 @@ class PosRepository {
 }
 
 final posRepositoryProvider = Provider<PosRepository>(
-  (ref) => PosRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => PosRepository(ref.watch(repositoryClientProvider)),
 );

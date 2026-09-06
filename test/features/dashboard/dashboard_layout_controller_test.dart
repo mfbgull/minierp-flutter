@@ -46,7 +46,7 @@ ResponseBody _json(Object body, {int status = 200}) =>
     );
 
 /// Total catalog size: 16 KPI cards + 6 panels + 1 cash strip.
-const int _totalBlocks = 23;
+const int _totalBlocks = 25;
 
 void main() {
   late RouteHandler handler;
@@ -211,10 +211,11 @@ void main() {
           'kpi_payables',
           'kpi_customers',
           'kpi_low_stock',
+          'kpi_outstanding_loans',
         ],
       );
-      // Panels unaffected (first panel now sits after the 16 KPI cards).
-      expect(controller.state.blocks[16].id, 'panel_sales_purchases');
+      // Panels unaffected (first panel now sits after the 17 KPI cards).
+      expect(controller.state.blocks[17].id, 'panel_sales_purchases');
       expect(controller.state.dirty, isTrue);
     });
   });

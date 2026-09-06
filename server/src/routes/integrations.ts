@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
+import { validateZodBody, zodBodySchemas } from '../middleware/validation';
 import settingsController from '../controllers/settingsController';
 import logger from '../utils/logger';
 
@@ -19,7 +20,7 @@ router.get('/settings', requirePermission('integrations', 'read'), (_req: Reques
   }
 });
 
-router.put('/settings/:service', requirePermission('integrations', 'update'), (req: Request, res: Response): void => {
+router.put('/settings/:service', requirePermission('integrations', 'update'), validateZodBody(zodBodySchemas.integrationSettings), (req: Request, res: Response): void => {
   try {
     const { service } = req.params;
     const serviceKey = typeof service === 'string' ? service : service[0];

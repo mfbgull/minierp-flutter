@@ -294,7 +294,27 @@ class _DetailBody extends ConsumerWidget {
     result.fold(
       onSuccess: (_) {
         Navigator.of(context).pop();
-        showAppToast(context, l10n.inventoryItemdeleted);
+        // 10s window + Undo (SHORTCOMINGS-FIX 4.2) — the delete is a
+        // soft delete server-side, so restore() reverts it in place.
+        showAppToast(
+          context,
+          l10n.inventoryItemdeleted,
+          duration: const Duration(seconds: 10),
+          action: SnackBarAction(
+            label: l10n.commonUndo,
+            onPressed: () async {
+              final undo = await ref
+                  .read(inventoryRepositoryProvider)
+                  .restore(item.id);
+              if (!context.mounted) return;
+              undo.fold(
+                onSuccess: (_) => ref.invalidate(itemsProvider),
+                onFailure: (err) =>
+                    showAppToast(context, err.message, isError: true),
+              );
+            },
+          ),
+        );
       },
       onFailure: (err) => showAppToast(context, err.message, isError: true),
     );

@@ -29,6 +29,7 @@ import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/offline_cache_badge.dart';
 import '../../widgets/confirm_dialog.dart';
 import 'inventory_providers.dart';
 import 'item_detail_dialog.dart';
@@ -119,6 +120,12 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
   @override
   bool get hasRowActions => true;
 
+  /// Bulk selection (SHORTCOMINGS-FIX 4.4): checkbox column + select-all
+  /// header, driving the bulk action bar (activate / deactivate / delete
+  /// with undo). Selection resets whenever the grid rows are replaced.
+  @override
+  bool get enableBulkSelection => true;
+
   @override
   PlutoRow gridRowFor(Item item) => PlutoRow(
     cells: {
@@ -162,6 +169,91 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
     ];
   }
 
+  /// Bulk activate/deactivate of the selected items (SHORTCOMINGS-FIX
+  /// 4.4). Each item's `is_active` flag flips via the standard update
+  /// endpoint; a failed item doesn't stop the rest.
+  Future<void> _bulkSetActive(Set<int> ids, bool active) async {
+    final l10n = AppLocalizations.of(context)!;
+    final repo = ref.read(inventoryRepositoryProvider);
+    var ok = 0;
+    var failed = 0;
+    for (final id in ids) {
+      final result = await repo.update(id, {'is_active': active ? 1 : 0});
+      if (!mounted) return;
+      result.fold(
+        onSuccess: (_) => ok++,
+        onFailure: (_) => failed++,
+      );
+    }
+    if (!mounted) return;
+    bulkSelection.clear();
+    if (failed == 0) {
+      showAppToast(
+        context,
+        active ? l10n.bulkActivated(ok) : l10n.bulkDeactivated(ok),
+      );
+    } else {
+      showAppToast(context, l10n.bulkUpdateFailed, isError: true);
+    }
+    ref.invalidate(itemsProvider);
+  }
+
+  /// Bulk soft-delete of the selected items with the 4.2 undo pattern —
+  /// one 10s toast with a single Undo action that restores every deleted
+  /// item in place.
+  Future<void> _bulkDelete(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonDelete,
+      message: '${l10n.bulkDeleteSelected} (${ids.length})?',
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final repo = ref.read(inventoryRepositoryProvider);
+    var ok = 0;
+    var failed = 0;
+    for (final id in ids) {
+      final result = await repo.delete(id);
+      if (!mounted) return;
+      result.fold(
+        onSuccess: (_) => ok++,
+        onFailure: (_) => failed++,
+      );
+    }
+    if (!mounted) return;
+    bulkSelection.clear();
+    if (failed == 0) {
+      showAppToast(
+        context,
+        l10n.bulkDeleted(ok),
+        duration: const Duration(seconds: 10),
+        action: SnackBarAction(
+          label: l10n.commonUndo,
+          onPressed: () async {
+            for (final id in ids) {
+              final undo = await repo.restore(id);
+              if (!mounted) return;
+              undo.fold(
+                onSuccess: (_) {},
+                onFailure: (err) =>
+                    showAppToast(context, err.message, isError: true),
+              );
+            }
+            if (!mounted) return;
+            ref.invalidate(itemsProvider);
+          },
+        ),
+      );
+    } else {
+      showAppToast(context, l10n.bulkDeleteFailed, isError: true);
+    }
+    ref.invalidate(itemsProvider);
+  }
+
   Future<void> _deleteItem(Item item) async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showConfirmDialog(
@@ -180,8 +272,28 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
     if (!mounted) return;
     result.fold(
       onSuccess: (_) {
+        // 10s window + Undo (SHORTCOMINGS-FIX 4.2) — the delete is a
+        // soft delete server-side, so restore() reverts it in place.
+        showAppToast(
+          context,
+          l10n.inventoryItemdeleted,
+          duration: const Duration(seconds: 10),
+          action: SnackBarAction(
+            label: l10n.commonUndo,
+            onPressed: () async {
+              final undo = await ref
+                  .read(inventoryRepositoryProvider)
+                  .restore(item.id);
+              if (!mounted) return;
+              undo.fold(
+                onSuccess: (_) => ref.invalidate(itemsProvider),
+                onFailure: (err) =>
+                    showAppToast(context, err.message, isError: true),
+              );
+            },
+          ),
+        );
         ref.invalidate(itemsProvider);
-        showAppToast(context, l10n.inventoryItemdeleted);
       },
       onFailure: (err) => showAppToast(context, err.message, isError: true),
     );
@@ -222,6 +334,7 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
             ),
           ],
           onRefresh: () => ref.invalidate(itemsProvider),
+          actions: [const OfflineCacheBadge()],
           primaryActions: [
             FilledButton.tonalIcon(
               onPressed: () => showItemFormDialog(context),
@@ -229,6 +342,39 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
               label: Text(l10n.inventoryNewitem),
             ),
           ],
+        ),
+        // Bulk action bar (checkbox rows selected) — activate /
+        // deactivate / delete-with-undo the selected items
+        // (SHORTCOMINGS-FIX 4.4).
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              actions: [
+                TextButton.icon(
+                  onPressed: () => _bulkSetActive(sel, true),
+                  icon: const Icon(Icons.check_circle_outline, size: 18),
+                  label: Text(l10n.bulkActivateSelected),
+                ),
+                TextButton.icon(
+                  onPressed: () => _bulkSetActive(sel, false),
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: Text(l10n.bulkDeactivateSelected),
+                ),
+                TextButton.icon(
+                  onPressed: () => _bulkDelete(sel),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                  label: Text(l10n.bulkDeleteSelected),
+                ),
+              ],
+            );
+          },
         ),
         Expanded(
           child: gridScreenBody(

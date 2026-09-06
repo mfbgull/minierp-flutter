@@ -125,6 +125,9 @@ export interface Invoice {
   created_by?: number;
   created_at?: string;
   updated_at?: string;
+  deleted_at?: string | null;
+  deleted_by?: number | null;
+  deleted_from_status?: string | null;
 }
 
 // ============ BOM Types ============

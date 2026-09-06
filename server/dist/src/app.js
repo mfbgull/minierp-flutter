@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -22,7 +55,7 @@ const inventory_1 = __importDefault(require("./routes/inventory"));
 const purchases_1 = __importDefault(require("./routes/purchases"));
 const purchaseOrders_1 = __importDefault(require("./routes/purchaseOrders"));
 const purchaseReturns_1 = __importDefault(require("./routes/purchaseReturns"));
-const sales_1 = __importDefault(require("./routes/sales"));
+const sales_1 = __importStar(require("./routes/sales"));
 const production_1 = __importDefault(require("./routes/production"));
 const bom_1 = __importDefault(require("./routes/bom"));
 const settings_1 = __importDefault(require("./routes/settings"));
@@ -208,11 +241,17 @@ app.use('/api/reports', reports_1.default);
 app.use('/api/pos', pos_1.default);
 app.use('/api/suppliers', suppliers_1.default);
 app.use('/api/employees', employees_1.default);
-app.use('/api', purchaseOrders_1.default);
-app.use('/api', purchases_1.default);
-app.use('/api', purchaseReturns_1.default);
-app.use('/api', sales_1.default);
-app.use('/api', production_1.default);
+app.use('/api/purchase-orders', purchaseOrders_1.default);
+app.use('/api/purchases', purchases_1.default);
+app.use('/api/purchase-returns', purchaseReturns_1.default);
+app.use('/api/quotations', sales_1.default);
+app.use('/api/sales-orders', sales_1.salesOrderRouter);
+app.use('/api/sales', sales_1.salesRouter);
+// Legacy exact GET /api/dashboard (sales summary) — must come before the
+// dashboard module so the bare path resolves here while /api/dashboard/*
+// still falls through to dashboardRoutes.
+app.use('/api/dashboard', sales_1.salesRouter);
+app.use('/api/productions', production_1.default);
 app.use('/api/mobile-invoices', mobileInvoices_1.default);
 app.use('/api/integrations', integrations_1.default);
 app.use('/api/dashboard', dashboard_1.default);

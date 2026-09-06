@@ -3,9 +3,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// JWT storage abstraction — PORTING.md §3.
 ///
-/// Desktop Flutter has no cookie jar, so the token from the login response
-/// body (PORTING.md §0) is stored here and attached as
+/// Desktop Flutter has no cookie jar, so the tokens from the login response
+/// body (PORTING.md §0) are stored here and attached as
 /// `Authorization: Bearer <jwt>` by `ApiClient`.
+///
+/// Two tokens are kept (SHORTCOMINGS-FIX 6.1): the short-lived access token
+/// and a 7-day refresh token used to transparently re-authenticate after
+/// the access token expires.
 ///
 /// The concrete [`SecureTokenStorage`] uses flutter_secure_storage (libsecret
 /// on Linux). The interface exists so tests can inject an in-memory fake:
@@ -16,6 +20,10 @@ abstract class TokenStorage {
 
   Future<void> writeToken(String token);
 
+  Future<String?> readRefreshToken();
+
+  Future<void> writeRefreshToken(String token);
+
   Future<void> clear();
 }
 
@@ -24,6 +32,7 @@ class SecureTokenStorage implements TokenStorage {
 
   static const FlutterSecureStorage _storage = FlutterSecureStorage();
   static const String _tokenKey = 'auth_token';
+  static const String _refreshTokenKey = 'auth_refresh_token';
 
   @override
   Future<String?> readToken() => _storage.read(key: _tokenKey);
@@ -33,7 +42,17 @@ class SecureTokenStorage implements TokenStorage {
       _storage.write(key: _tokenKey, value: token);
 
   @override
-  Future<void> clear() => _storage.delete(key: _tokenKey);
+  Future<String?> readRefreshToken() => _storage.read(key: _refreshTokenKey);
+
+  @override
+  Future<void> writeRefreshToken(String token) =>
+      _storage.write(key: _refreshTokenKey, value: token);
+
+  @override
+  Future<void> clear() async {
+    await _storage.delete(key: _tokenKey);
+    await _storage.delete(key: _refreshTokenKey);
+  }
 }
 
 /// Riverpod provider — overridden in tests with an in-memory fake.

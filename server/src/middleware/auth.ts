@@ -75,8 +75,40 @@ export function generateToken(user: AuthUser): string {
   return jwt.sign(
     { id: user.id, username: user.username, email: user.email, role: user.role },
     JWT_SECRET,
-    { expiresIn: '24h', issuer: 'mini-erp', audience: 'mini-erp-client', algorithm: 'HS256' }
+    { expiresIn: '1h', issuer: 'mini-erp', audience: 'mini-erp-client', algorithm: 'HS256' }
   );
 }
 
-export default { authenticateToken, requireAdmin, generateToken };
+/// Long-lived token exchanged for a fresh access token by `POST
+/// /auth/refresh`. Carries a `type: 'refresh'` claim so access tokens can
+/// never be used as refresh tokens.
+export function generateRefreshToken(user: AuthUser): string {
+  return jwt.sign(
+    {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      type: 'refresh',
+    },
+    JWT_SECRET,
+    { expiresIn: '7d', issuer: 'mini-erp', audience: 'mini-erp-client', algorithm: 'HS256' }
+  );
+}
+
+/// Verifies a refresh token. Returns the embedded user, or `null` for
+/// missing/expired/wrong-type tokens.
+export function verifyRefreshToken(token: string): AuthUser | null {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET, {
+      algorithms: ['HS256'],
+      issuer: 'mini-erp',
+      audience: 'mini-erp-client',
+    }) as AuthUser & { type?: string };
+    return payload.type === 'refresh' ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+export default { authenticateToken, requireAdmin, generateToken, generateRefreshToken, verifyRefreshToken };

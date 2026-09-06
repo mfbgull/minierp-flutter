@@ -279,7 +279,16 @@ describe('Sales Controller', () => {
         items: [{ item_id: 1, quantity: 1, unit_price: 10 }]
       });
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain('Customer');
+    // Spec 2.3: validation failures use the consistent envelope with a
+    // structured `error` object (code + message + details), not the old
+    // bare controller string.
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'customer_id' }),
+      ]),
+    );
   });
 
   it('createQuotation rejects missing items', async () => {
@@ -289,7 +298,14 @@ describe('Sales Controller', () => {
       .set('x-csrf-token', csrfToken)
       .send({ customer_id: 1, quotation_date: '2026-01-01' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain('item');
+    // Spec 2.3: structured VALIDATION_ERROR envelope pointing at `items`.
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'items' }),
+      ]),
+    );
   });
 
   it('createQuotation rejects empty items array', async () => {

@@ -20,6 +20,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/detail_error.dart';
+import '../../widgets/filtered_empty_state.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/status_badge.dart';
 import '../sales/calculations/invoice_rules.dart'
@@ -31,9 +32,17 @@ import 'customer_providers.dart';
 enum _InvoiceRowAction { view, delete, cancel }
 
 class CustomerInvoicesTab extends ConsumerStatefulWidget {
-  const CustomerInvoicesTab({super.key, required this.customerId});
+  const CustomerInvoicesTab({
+    super.key,
+    required this.customerId,
+    required this.sessionId,
+  });
 
   final int customerId;
+
+  /// The detail-page instance's range-session id — this tab derives its
+  /// fetch args from the header pill's pair (spec §3.1/§9).
+  final int sessionId;
 
   @override
   ConsumerState<CustomerInvoicesTab> createState() =>
@@ -49,12 +58,39 @@ class _CustomerInvoicesTabState extends ConsumerState<CustomerInvoicesTab> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    // The page's unified range — part of the fetch identity (§9); null =
+    // All dates (no date parameters).
+    final range = customerDetailRangeIso(ref, widget.sessionId);
+
+    // A range change re-keys the provider, so the old page index is
+    // meaningless — reset to page 1 (spec §9: "paged tabs reset to page
+    // 1"). ref.listen fires after build, so the reset re-renders once
+    // with the new range already in the args.
+    ref.listen(
+      customerDetailFromDateProvider(widget.sessionId),
+      (previous, next) {
+        if (previous != next && _page != 1) {
+          setState(() => _page = 1);
+        }
+      },
+    );
+    ref.listen(
+      customerDetailToDateProvider(widget.sessionId),
+      (previous, next) {
+        if (previous != next && _page != 1) {
+          setState(() => _page = 1);
+        }
+      },
+    );
+
     final invoices = ref.watch(
       customerInvoicesPagedProvider(
         CustomerInvoicesArgs(
           customerId: widget.customerId,
           page: _page,
           limit: _limit,
+          fromDate: range.from,
+          toDate: range.to,
         ),
       ),
     );
@@ -68,6 +104,8 @@ class _CustomerInvoicesTabState extends ConsumerState<CustomerInvoicesTab> {
           customerId: widget.customerId,
           page: _page,
           limit: _limit,
+          fromDate: range.from,
+          toDate: range.to,
         ),
       ),
       (previous, next) {
@@ -81,7 +119,9 @@ class _CustomerInvoicesTabState extends ConsumerState<CustomerInvoicesTab> {
 
     return switch (invoices) {
       AsyncData(:final value) => value.items.isEmpty
-          ? _empty(context, l10n.customersNoinvoices)
+          ? (range.from != null
+                ? const FilteredEmptyState()
+                : _empty(context, l10n.customersNoinvoices))
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -119,6 +159,8 @@ class _CustomerInvoicesTabState extends ConsumerState<CustomerInvoicesTab> {
               customerId: widget.customerId,
               page: _page,
               limit: _limit,
+              fromDate: range.from,
+              toDate: range.to,
             ),
           ),
         ),
@@ -133,6 +175,7 @@ class _CustomerInvoicesTabState extends ConsumerState<CustomerInvoicesTab> {
       style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
     ),
   );
+
 
   List<PlutoColumn> _columns(BuildContext context, AppLocalizations l10n) {
     PlutoColumn textCol(

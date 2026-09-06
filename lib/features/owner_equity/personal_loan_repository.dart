@@ -20,7 +20,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import 'personal_loan_models.dart';
 import '../../data/repositories/api_result.dart';
@@ -101,7 +100,7 @@ class PersonalLoanRepository {
         ApiEndpoints.ownerBorrowers,
         queryParameters: {
           if (search?.isNotEmpty == true) 'search': search,
-          if (status != null) 'status': status,
+          'status': ?status,
         },
         parseItem: (Object? json) =>
             PersonalLoanBorrower.fromJson(json! as Map<String, dynamic>),
@@ -158,5 +157,5 @@ class PersonalLoanRepository {
 }
 
 final personalLoanRepositoryProvider = Provider<PersonalLoanRepository>(
-  (ref) => PersonalLoanRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => PersonalLoanRepository(ref.watch(repositoryClientProvider)),
 );

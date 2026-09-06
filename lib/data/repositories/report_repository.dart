@@ -6,7 +6,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../data/models/report.dart'
     show
@@ -115,7 +114,7 @@ class ReportRepository {
         ApiEndpoints.reportTopDebtors,
         queryParameters: {
           'limit': limit,
-          if (asOfDate != null) 'asOfDate': asOfDate,
+          'asOfDate': ?asOfDate,
         },
         parseItem: (Object? json) =>
             TopDebtorRow.fromJson(json as Map<String, dynamic>),
@@ -254,9 +253,9 @@ class ReportRepository {
   }) => _api.getRawList(
     ApiEndpoints.reportExpiry,
     queryParameters: <String, dynamic>{
-      if (warehouseId != null) 'warehouse_id': warehouseId,
-      if (thresholdDays != null) 'threshold_days': thresholdDays,
-      if (status != null) 'status': status,
+      'warehouse_id': ?warehouseId,
+      'threshold_days': ?thresholdDays,
+      'status': ?status,
     },
     parseItem: (Object? json) =>
         ExpiryReportRow.fromJson(json as Map<String, dynamic>),
@@ -273,5 +272,5 @@ class ReportRepository {
 }
 
 final reportRepositoryProvider = Provider<ReportRepository>(
-  (ref) => ReportRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => ReportRepository(ref.watch(repositoryClientProvider)),
 );

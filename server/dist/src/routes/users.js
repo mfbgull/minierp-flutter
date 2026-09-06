@@ -8,13 +8,14 @@ const router = express_1.default.Router();
 const userController_1 = __importDefault(require("../controllers/userController"));
 const auth_1 = require("../middleware/auth");
 const requirePermission_1 = require("../middleware/requirePermission");
+const validation_1 = require("../middleware/validation");
 // All user routes require authentication
 router.use(auth_1.authenticateToken);
 router.get('/', (0, requirePermission_1.requirePermission)('users', 'read'), userController_1.default.getUsers);
 router.get('/:id', (0, requirePermission_1.requirePermission)('users', 'read'), userController_1.default.getUser);
-router.post('/', (0, requirePermission_1.requirePermission)('users', 'create'), userController_1.default.createUser);
-router.put('/:id', (0, requirePermission_1.requirePermission)('users', 'update'), userController_1.default.updateUser);
+router.post('/', (0, requirePermission_1.requirePermission)('users', 'create'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.userCreate), userController_1.default.createUser);
+router.put('/:id', (0, requirePermission_1.requirePermission)('users', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), userController_1.default.updateUser);
 router.delete('/:id', (0, requirePermission_1.requirePermission)('users', 'delete'), userController_1.default.deleteUser);
-router.put('/:id/reset-password', (0, requirePermission_1.requirePermission)('users', 'update'), userController_1.default.resetPassword);
-router.put('/:id/toggle-status', (0, requirePermission_1.requirePermission)('users', 'update'), userController_1.default.toggleUserStatus);
+router.put('/:id/reset-password', (0, requirePermission_1.requirePermission)('users', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), userController_1.default.resetPassword);
+router.put('/:id/toggle-status', (0, requirePermission_1.requirePermission)('users', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), userController_1.default.toggleUserStatus);
 exports.default = router;

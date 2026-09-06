@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart';
 import '../../core/api/endpoints.dart';
 import '../models/price_history.dart' show ItemPriceHistory;
 import '../models/invoice.dart' show Invoice, InvoicePaymentRecord;
@@ -196,6 +195,13 @@ class InvoiceRepository {
   Future<ApiResult<void>> delete(int id) =>
       _api.deleteRaw('${ApiEndpoints.invoices}/$id');
 
+  /// `POST /invoices/:id/restore` — reverts a soft delete (undo pattern,
+  /// SHORTCOMINGS-FIX 4.2/4.4). Enveloped `{success, message, data}`.
+  Future<ApiResult<void>> restore(int id) => _api.post(
+    '${ApiEndpoints.invoices}/$id/restore',
+    parse: (_) {},
+  );
+
   /// Enveloped `{success, message, data}` response — `put`.
   Future<ApiResult<Invoice>> cancel(int id) => _api.put(
     '${ApiEndpoints.invoices}/$id/cancel',
@@ -253,5 +259,5 @@ class InvoiceRepository {
 }
 
 final invoiceRepositoryProvider = Provider<InvoiceRepository>(
-  (ref) => InvoiceRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => InvoiceRepository(ref.watch(repositoryClientProvider)),
 );

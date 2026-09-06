@@ -39,6 +39,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/models/activity_log.dart' show ActivityLog;
 import '../../data/models/bom.dart' show Bom;
+import '../../data/models/customer.dart' show Customer;
 import '../../data/models/expense.dart' show Expense;
 import '../../data/models/invoice.dart' show Invoice;
 import '../../data/models/owner_equity.dart'
@@ -710,6 +711,43 @@ String buildCustomerStatementsCsv(
       Formatters.currency(r.totalDebits),
       Formatters.currency(r.totalCredits),
       Formatters.currency(r.closingBalance),
+    ],
+  );
+}
+
+/// Builds the CSV text for the customers grid (Customer Code | Name |
+/// Phone | Email | Address | Credit Limit | Current Balance | Credit
+/// Utilization | Payment Terms | Status — mirroring the grid columns),
+/// used by the customers bulk-export action (SHORTCOMINGS-FIX 4.4) and
+/// the full-list export.
+String buildCustomersCsv(AppLocalizations l10n, List<Customer> customers) {
+  return _buildGridCsv(
+    [
+      l10n.customersCustomercode,
+      l10n.customersCustomername,
+      l10n.fieldsPhone,
+      l10n.fieldsEmail,
+      l10n.customersAddress,
+      l10n.customersCreditlimit,
+      l10n.customersCurrentbalance,
+      l10n.customersCreditutilization,
+      l10n.customersPaymenttermsdays,
+      l10n.commonStatus,
+    ],
+    customers,
+    (c) => [
+      sanitizeCsvCell(c.customerCode.isEmpty ? '—' : c.customerCode),
+      sanitizeCsvCell(c.customerName.isEmpty ? '—' : c.customerName),
+      sanitizeCsvCell((c.phone?.isEmpty ?? true) ? '—' : c.phone!),
+      sanitizeCsvCell((c.email?.isEmpty ?? true) ? '—' : c.email!),
+      sanitizeCsvCell(
+        (c.billingAddress?.isEmpty ?? true) ? '—' : c.billingAddress!,
+      ),
+      Formatters.currency(c.creditLimit ?? 0),
+      Formatters.currency(c.currentBalance),
+      Formatters.number(c.creditUtilizationPercent ?? 0),
+      Formatters.number(c.paymentTermsDays ?? 0),
+      sanitizeCsvCell(c.isActive ? l10n.statusActive : l10n.statusInactive),
     ],
   );
 }

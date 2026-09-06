@@ -24,7 +24,6 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../data/repositories/api_result.dart';
 import '../../data/repositories/paged_request.dart' show PagedResponse;
@@ -286,5 +285,5 @@ String _mediaTypeFor(String fileName) {
 }
 
 final employeeRepositoryProvider = Provider<EmployeeRepository>(
-  (ref) => EmployeeRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => EmployeeRepository(ref.watch(repositoryClientProvider)),
 );

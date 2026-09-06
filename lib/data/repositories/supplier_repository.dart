@@ -8,7 +8,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/json_helpers.dart' show asInt, asNum, asString;
 import '../models/ledger_entry.dart' show LedgerEntry;
@@ -57,8 +56,17 @@ class SupplierRepository {
   /// newest-first by default (`transaction_date DESC`, no sort params sent
   /// here), so ledger UIs treat the first row's `balance` as the closing
   /// balance.
-  Future<ApiResult<List<LedgerEntry>>> ledger(int id) => _api.getList(
+  ///
+  /// [fromDate]/[toDate] are an optional inclusive range (the endpoint's
+  /// exact query-param names, ISO `YYYY-MM-DD`); null = full history
+  /// (parameters omitted — unified-detail-date-picker-spec §5.3).
+  Future<ApiResult<List<LedgerEntry>>> ledger(
+    int id, {
+    String? fromDate,
+    String? toDate,
+  }) => _api.getList(
     '${ApiEndpoints.suppliers}/$id/ledger',
+    queryParameters: {'fromDate': ?fromDate, 'toDate': ?toDate},
     parseItem: (Object? json) =>
         LedgerEntry.fromJson(json as Map<String, dynamic>),
   );
@@ -170,5 +178,5 @@ class SupplierStatement {
 }
 
 final supplierRepositoryProvider = Provider<SupplierRepository>(
-  (ref) => SupplierRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => SupplierRepository(ref.watch(repositoryClientProvider)),
 );

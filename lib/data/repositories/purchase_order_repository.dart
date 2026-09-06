@@ -11,7 +11,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/invoice.dart' show InvoicePaymentRecord;
 import '../models/json_helpers.dart' show asInt, asNum;
@@ -55,12 +54,20 @@ class PurchaseOrderRepository {
   /// `GET /purchase-orders/summary/supplier/:supplierId` — **bare object**
   /// `POSummary` (`total_pos`, `total_value`, `draft_pos`, …). The server
   /// returns a zeroed summary when the supplier has no POs.
-  Future<ApiResult<POSummary>> summaryBySupplier(int supplierId) =>
-      _api.getRaw(
-        '${ApiEndpoints.purchaseOrders}/summary/supplier/$supplierId',
-        parse: (Object? json) =>
-            POSummary.fromJson(json as Map<String, dynamic>),
-      );
+  ///
+  /// [startDate]/[endDate] narrow the summary to POs whose `po_date`
+  /// falls in the inclusive range (the purchase-order endpoint's own
+  /// param names); null = lifetime summary (parameters omitted).
+  Future<ApiResult<POSummary>> summaryBySupplier(
+    int supplierId, {
+    String? startDate,
+    String? endDate,
+  }) => _api.getRaw(
+    '${ApiEndpoints.purchaseOrders}/summary/supplier/$supplierId',
+    queryParameters: {'start_date': ?startDate, 'end_date': ?endDate},
+    parse: (Object? json) =>
+        POSummary.fromJson(json as Map<String, dynamic>),
+  );
 
   /// PO detail — bare `{...po, items}` response.
   Future<ApiResult<PurchaseOrderDetail>> detail(int id) => _api.getRaw(
@@ -172,7 +179,7 @@ class PurchaseOrderRepository {
 }
 
 final purchaseOrderRepositoryProvider = Provider<PurchaseOrderRepository>(
-  (ref) => PurchaseOrderRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => PurchaseOrderRepository(ref.watch(repositoryClientProvider)),
 );
 
 /// `GET /purchase-orders/summary/supplier/:supplierId` response DTO — the

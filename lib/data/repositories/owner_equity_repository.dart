@@ -16,7 +16,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/expense.dart' show ExpenseOption;
 import '../models/owner_equity.dart'
@@ -134,5 +133,5 @@ class OwnerEquityRepository {
 }
 
 final ownerEquityRepositoryProvider = Provider<OwnerEquityRepository>(
-  (ref) => OwnerEquityRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => OwnerEquityRepository(ref.watch(repositoryClientProvider)),
 );

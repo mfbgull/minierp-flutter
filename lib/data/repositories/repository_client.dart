@@ -15,9 +15,21 @@
 // (`core/api/api_client.dart`). Failures map to `ApiError` via the
 // existing `mapError` helper so 403/500 `{error}` bodies surface the
 // server's message.
+//
+// Offline cache (SHORTCOMINGS-FIX 4.1): when a [CacheManager] is wired
+// in (see [CachedRepositoryClient]), successful GET responses are
+// snapshotted under `path?query` keys and served from cache when the
+// network is unreachable; writes invalidate the affected read keys.
+
+import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show ValueNotifier;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_client.dart' show dioProvider;
+import '../../core/cache/cache_manager.dart' show CacheManager;
 import '../../core/utils/error_mapper.dart' show mapError;
 import 'api_result.dart';
 import 'paged_request.dart';
@@ -35,9 +47,30 @@ class ApiResponseException implements Exception {
 }
 
 class RepositoryClient {
-  RepositoryClient(this._dio);
+  RepositoryClient(
+    this._dio, {
+    CacheManager? cache,
+    this.cacheTtl = const Duration(minutes: 5),
+    this.ttlForPath = const {},
+    // The named `cache` parameter stays public (callers pass it by name)
+    // while the field is private.
+  }) : _cache = cache; // ignore: prefer_initializing_formals
 
   final Dio _dio;
+  final CacheManager? _cache;
+
+  /// Default TTL for cached reads.
+  final Duration cacheTtl;
+
+  /// Per-path TTL overrides (exact-path match), e.g. dashboard endpoints
+  /// refresh faster than the item/customer lists. Read-heavy endpoints
+  /// that need a different TTL override it per-path via [ttlForPath] in
+  /// [CachedRepositoryClient].
+  final Map<String, Duration> ttlForPath;
+
+  /// True when the most recent read was served from the offline cache
+  /// (server unreachable) — screens render an "Offline" badge off this.
+  final ValueNotifier<bool> servingCached = ValueNotifier<bool>(false);
 
   /* ── Enveloped requests ──────────────────────────────────────── */
 
@@ -46,7 +79,7 @@ class RepositoryClient {
     Map<String, dynamic>? queryParameters,
     required T Function(Object?) parse,
   }) => _parse(
-    _guard(() => _dio.get(path, queryParameters: queryParameters)),
+    _guardGet(path, queryParameters, () => _dio.get(path, queryParameters: queryParameters)),
     parse,
   );
 
@@ -54,7 +87,10 @@ class RepositoryClient {
     String path, {
     Object? body,
     required T Function(Object?) parse,
-  }) => _parse(_guard(() => _dio.post(path, data: body)), parse);
+  }) async {
+    unawaited(_invalidateFor(path));
+    return _parse(_guard(() => _dio.post(path, data: body)), parse);
+  }
 
   /// Enveloped multipart POST — `{success: true, data}` with a
   /// [FormData] body (the employee-document upload posts the metadata
@@ -64,16 +100,23 @@ class RepositoryClient {
     String path, {
     required FormData formData,
     required T Function(Object?) parse,
-  }) => _parse(_guard(() => _dio.post(path, data: formData)), parse);
+  }) async {
+    unawaited(_invalidateFor(path));
+    return _parse(_guard(() => _dio.post(path, data: formData)), parse);
+  }
 
   Future<ApiResult<T>> put<T>(
     String path, {
     Object? body,
     required T Function(Object?) parse,
-  }) => _parse(_guard(() => _dio.put(path, data: body)), parse);
+  }) async {
+    unawaited(_invalidateFor(path));
+    return _parse(_guard(() => _dio.put(path, data: body)), parse);
+  }
 
   /// Enveloped delete — `{success: true, message}`, no data payload.
   Future<ApiResult<void>> delete(String path) async {
+    unawaited(_invalidateFor(path));
     final guarded = await _guard(() => _dio.delete(path));
     try {
       return guarded.map<void>((response) {
@@ -90,7 +133,9 @@ class RepositoryClient {
     Map<String, dynamic>? queryParameters,
     required T Function(Object?) parseItem,
   }) async {
-    final guarded = await _guard(
+    final guarded = await _guardGet(
+      path,
+      queryParameters,
       () => _dio.get(path, queryParameters: queryParameters),
     );
     try {
@@ -115,7 +160,9 @@ class RepositoryClient {
     Map<String, dynamic>? queryParameters,
     required T Function(Object?) parseItem,
   }) async {
-    final guarded = await _guard(
+    final guarded = await _guardGet(
+      path,
+      queryParameters,
       () => _dio.get(path, queryParameters: queryParameters),
     );
     try {
@@ -161,6 +208,7 @@ class RepositoryClient {
     Object? body,
     required T Function(Map<String, dynamic> envelope) parse,
   }) async {
+    unawaited(_invalidateFor(path));
     final guarded = await _guard(() => _dio.post(path, data: body));
     try {
       return guarded.map((response) {
@@ -186,7 +234,9 @@ class RepositoryClient {
     Map<String, dynamic>? queryParameters,
     required T Function(Object?) parseItem,
   }) async {
-    final guarded = await _guard(
+    final guarded = await _guardGet(
+      path,
+      queryParameters,
       () => _dio.get(path, queryParameters: queryParameters),
     );
     try {
@@ -223,7 +273,7 @@ class RepositoryClient {
     Map<String, dynamic>? queryParameters,
     required T Function(Object?) parse,
   }) => _parseRaw(
-    _guard(() => _dio.get(path, queryParameters: queryParameters)),
+    _guardGet(path, queryParameters, () => _dio.get(path, queryParameters: queryParameters)),
     parse,
   );
 
@@ -232,14 +282,20 @@ class RepositoryClient {
     String path, {
     Object? body,
     required T Function(Object?) parse,
-  }) => _parseRaw(_guard(() => _dio.post(path, data: body)), parse);
+  }) async {
+    unawaited(_invalidateFor(path));
+    return _parseRaw(_guard(() => _dio.post(path, data: body)), parse);
+  }
 
   /// PUT returning the updated object directly (item update).
   Future<ApiResult<T>> putRaw<T>(
     String path, {
     Object? body,
     required T Function(Object?) parse,
-  }) => _parseRaw(_guard(() => _dio.put(path, data: body)), parse);
+  }) async {
+    unawaited(_invalidateFor(path));
+    return _parseRaw(_guard(() => _dio.put(path, data: body)), parse);
+  }
 
   /// PATCH returning the updated object directly (BOM toggle-active).
   /// The standard helpers cover the server's GET/POST/PUT/DELETE verbs;
@@ -248,11 +304,15 @@ class RepositoryClient {
     String path, {
     Object? body,
     required T Function(Object?) parse,
-  }) => _parseRaw(_guard(() => _dio.patch(path, data: body)), parse);
+  }) async {
+    unawaited(_invalidateFor(path));
+    return _parseRaw(_guard(() => _dio.patch(path, data: body)), parse);
+  }
 
   /// DELETE returning a bare body (invoice delete: `{message}` — no
   /// envelope, unlike the enveloped `delete` used by items/customers).
   Future<ApiResult<void>> deleteRaw(String path) async {
+    unawaited(_invalidateFor(path));
     final result = await _guard(() => _dio.delete(path));
     return result.map<void>((_) {});
   }
@@ -263,7 +323,9 @@ class RepositoryClient {
     Map<String, dynamic>? queryParameters,
     required T Function(Object?) parseItem,
   }) async {
-    final guarded = await _guard(
+    final guarded = await _guardGet(
+      path,
+      queryParameters,
       () => _dio.get(path, queryParameters: queryParameters),
     );
     try {
@@ -293,6 +355,103 @@ class RepositoryClient {
       return ApiFailure(_toError(e));
     }
   }
+
+  /// GET guarded like [_guard] but with the offline-cache layer (spec
+  /// 4.1): on success the raw response body is snapshotted under
+  /// `path?query`; on a *network* failure the cached body is replayed as
+  /// a synthetic [Response] so the caller's envelope/parse logic runs
+  /// unchanged. Non-network failures and cache misses pass through as-is.
+  /// Server-side errors are never served from cache.
+  Future<ApiResult<Response<dynamic>>> _guardGet(
+    String path,
+    Map<String, dynamic>? queryParameters,
+    Future<Response<dynamic>> Function() request,
+  ) async {
+    final cache = _cache;
+    final key = cache == null ? null : _cacheKey(path, queryParameters);
+    final guarded = await _guard(request);
+    if (guarded case ApiSuccess(:final data)) {
+      final body = data.data;
+      // Snapshot the raw body (only JSON-safe payloads — the server
+      // always returns JSON, so encode only if it round-trips). A cache
+      // write must never break the request, so any failure (e.g. the
+      // storage plugin missing in tests) is swallowed.
+      if (cache != null && key != null && body != null) {
+        try {
+          final json = jsonEncode(body);
+          // Keep the cache small (spec: <10MB): skip oversized bodies.
+          if (json.length <= _maxCacheBytes) {
+            unawaited(
+              cache.put(key, json, ttl: ttlForPath[path] ?? cacheTtl).catchError((_) {}),
+            );
+          }
+        } on JsonUnsupportedObjectError {
+          // Non-JSON body (unexpected) — just don't cache it.
+        }
+      }
+      if (servingCached.value) servingCached.value = false;
+      return guarded;
+    }
+
+    final failure = guarded as ApiFailure<Response<dynamic>>;
+    // Serve last-known data only for connectivity failures — a 400/500
+    // means the server is up and its answer is authoritative.
+    if (failure.error.isNetwork && cache != null && key != null) {
+      try {
+        final cached = await cache.get(key);
+        if (cached != null) {
+          try {
+            servingCached.value = true;
+            return ApiSuccess(
+              Response<dynamic>(
+                requestOptions: RequestOptions(path: path),
+                statusCode: 200,
+                data: jsonDecode(cached),
+              ),
+            );
+          } on FormatException {
+            // Corrupt entry — fall through to the real failure.
+          }
+        }
+      } catch (_) {
+        // Storage plugin unavailable — treat as a cache miss.
+      }
+    }
+    return failure;
+  }
+
+  /// Cache key: `path` or `path?k=v&k2=v2` (sorted) so distinct filter
+  /// combos cache separately but a write can invalidate by path prefix.
+  String? _cacheKey(String path, Map<String, dynamic>? queryParameters) {
+    if (queryParameters == null || queryParameters.isEmpty) return path;
+    final pairs = queryParameters.entries
+        .where((e) => e.value != null)
+        .map((e) => '${e.key}=${e.value}')
+        .toList()
+      ..sort();
+    return pairs.isEmpty ? path : '$path?${pairs.join('&')}';
+  }
+
+  /// Drops cached reads for [path] and its parent (a write to
+  /// `/items/5` invalidates both `/items/5` and `/items?...`).
+  Future<void> _invalidateFor(String path) async {
+    final cache = _cache;
+    if (cache == null) return;
+    try {
+      await cache.invalidate(path);
+      final slash = path.lastIndexOf('/');
+      if (slash > 0) {
+        await cache.invalidate(path.substring(0, slash));
+      }
+    } catch (_) {
+      // Storage plugin unavailable — nothing to invalidate.
+    }
+    if (servingCached.value) servingCached.value = false;
+  }
+
+  /// Upper bound per cached body — keeps total cache well under the
+  /// 10MB acceptance ceiling for the handful of read-heavy endpoints.
+  static const int _maxCacheBytes = 256 * 1024;
 
   Future<ApiResult<T>> _parse<T>(
     Future<ApiResult<Response<dynamic>>> guarded,
@@ -377,3 +536,11 @@ class RepositoryClient {
 
   int? _asInt(Object? value) => value is num ? value.toInt() : null;
 }
+
+/// Single shared [RepositoryClient] for the whole provider tree (spec 1.2):
+/// every feature repository injects this instead of constructing its own
+/// client, so exactly one instance exists per app run and the dependency
+/// graph stays traceable.
+final repositoryClientProvider = Provider<RepositoryClient>(
+  (ref) => RepositoryClient(ref.watch(dioProvider)),
+);

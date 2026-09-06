@@ -11,7 +11,7 @@ class ItemModel {
         // The low-stock rule mirrors the old `getLowStock` predicates:
         // at/below the reorder level with a positive threshold. `reorder_level 0`
         // (or null) means no reorder threshold.
-        const conditions = ['is_active = 1'];
+        const conditions = ['is_active = 1', 'deleted_at IS NULL'];
         const params = [];
         if (filters.category) {
             conditions.push('category = ?');
@@ -90,8 +90,24 @@ class ItemModel {
     `);
         return stmt.run(data.item_name, data.description || null, data.category || null, data.unit_of_measure, data.reorder_level || 0, data.standard_cost || 0, data.standard_selling_price || 0, data.is_raw_material ? 1 : 0, data.is_finished_good ? 1 : 0, data.is_purchased ? 1 : 0, data.is_manufactured ? 1 : 0, data.sale_type === 'loose' ? 'loose' : 'packed', data.qty_decimal_precision || 0, data.rounding_step ?? null, data.has_expiry ? 1 : 0, data.near_expiry_threshold_days ?? 30, id);
     }
-    static delete(id, db) {
-        const stmt = db.prepare('UPDATE items SET is_active = 0 WHERE id = ?');
+    /// Soft-delete (SHORTCOMINGS-FIX 4.2): stamps `deleted_at`/`deleted_by`
+    /// and deactivates instead of removing the row, so an accidental delete
+    /// can be undone via [restore].
+    static delete(id, deletedBy, db) {
+        const stmt = db.prepare(`
+      UPDATE items
+      SET is_active = 0, deleted_at = datetime('now'), deleted_by = ?
+      WHERE id = ?
+    `);
+        return stmt.run(deletedBy, id);
+    }
+    /// Reverts [delete]: clears the delete stamp and reactivates.
+    static restore(id, db) {
+        const stmt = db.prepare(`
+      UPDATE items
+      SET is_active = 1, deleted_at = NULL, deleted_by = NULL
+      WHERE id = ?
+    `);
         return stmt.run(id);
     }
     static getStockByWarehouse(itemId, db) {

@@ -70,7 +70,7 @@ class BackupRepository {
 
 final backupRepositoryProvider = Provider<BackupRepository>(
   (ref) => BackupRepository(
-    RepositoryClient(ref.watch(dioProvider)),
+    ref.watch(repositoryClientProvider),
     ref.watch(dioProvider),
   ),
 );

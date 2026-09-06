@@ -10,23 +10,24 @@ const auth_1 = require("../middleware/auth");
 const requirePermission_1 = require("../middleware/requirePermission");
 const upload_1 = require("../middleware/upload");
 const upload_2 = require("../middleware/upload");
+const validation_1 = require("../middleware/validation");
 const path_1 = __importDefault(require("path"));
 // All employee routes require authentication
 router.use(auth_1.authenticateToken);
 router.get('/', (0, requirePermission_1.requirePermission)('employees', 'read'), employeeController_1.default.getEmployees);
 router.get('/next-code', (0, requirePermission_1.requirePermission)('employees', 'read'), employeeController_1.default.getNextEmployeeCode);
 router.get('/:id', (0, requirePermission_1.requirePermission)('employees', 'read'), employeeController_1.default.getEmployee);
-router.post('/', (0, requirePermission_1.requirePermission)('employees', 'create'), employeeController_1.default.createEmployee);
-router.put('/:id', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.updateEmployee);
+router.post('/', (0, requirePermission_1.requirePermission)('employees', 'create'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.employeeCreate), employeeController_1.default.createEmployee);
+router.put('/:id', (0, requirePermission_1.requirePermission)('employees', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), employeeController_1.default.updateEmployee);
 router.delete('/:id', (0, requirePermission_1.requirePermission)('employees', 'delete'), employeeController_1.default.deleteEmployee);
 // Salary payment routes
-router.post('/:id/salary/pay', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.paySalary);
+router.post('/:id/salary/pay', (0, requirePermission_1.requirePermission)('employees', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), employeeController_1.default.paySalary);
 router.get('/:id/salary/history', (0, requirePermission_1.requirePermission)('employees', 'read'), employeeController_1.default.getSalaryHistory);
 router.get('/:id/salary/month/:payPeriod', (0, requirePermission_1.requirePermission)('employees', 'read'), employeeController_1.default.getSalaryMonthDetail);
 router.delete('/:id/salary/:paymentId', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.deleteSalaryPayment);
 // Loan routes
 router.get('/:id/loans', (0, requirePermission_1.requirePermission)('employees', 'read'), employeeController_1.default.getLoans);
-router.post('/:id/loans', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.createLoan);
+router.post('/:id/loans', (0, requirePermission_1.requirePermission)('employees', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), employeeController_1.default.createLoan);
 router.get('/:id/loans/:loanId', (0, requirePermission_1.requirePermission)('employees', 'read'), employeeController_1.default.getLoanDetail);
 router.post('/:id/loans/:loanId/repay', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.repayLoan);
 router.post('/:id/loans/:loanId/write-off', (0, requirePermission_1.requirePermission)('employees', 'update'), employeeController_1.default.writeOffLoan);

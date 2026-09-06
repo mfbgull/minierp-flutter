@@ -15,6 +15,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/models/invoice.dart' show CompanyInfo, Invoice, InvoicePaymentRecord;
 import '../../data/models/payment.dart' show Payment;
@@ -43,16 +44,61 @@ enum PrintFormat {
   final String label;
 }
 
+/// Remembered-format persistence (SHORTCOMINGS-FIX 4.5).
+///
+/// The user's last print choice is stored locally (SharedPreferences) so
+/// the format picker is not shown on every print. A storage failure
+/// simply degrades to "no memory" — the picker shows as usual.
+abstract class PrintFormatMemory {
+  static const String _key = 'pref_print_format';
+
+  /// The remembered format, or null when unset / unavailable.
+  static Future<PrintFormat?> read() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_key);
+      for (final format in PrintFormat.values) {
+        if (format.name == raw) return format;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> write(PrintFormat format) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_key, format.name);
+    } catch (_) {
+      // Storage unavailable — in-session behavior is unaffected.
+    }
+  }
+
+  /// Cleared on logout so the next user starts unpinned.
+  static Future<void> clear() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_key);
+    } catch (_) {}
+  }
+}
+
 /// Unified print service for all document types.
 class PrintService {
   PrintService(this.context);
 
   final BuildContext context;
 
-  /// Shows a format-picker dialog and returns the user's choice.
-  /// Returns null if the user cancels.
+  /// Returns the user's print format. The first call (or after logout)
+  /// shows the picker and remembers the choice; later calls reuse it
+  /// directly so printing is one tap (SHORTCOMINGS-FIX 4.5). Returns
+  /// null if the user cancels the picker.
   Future<PrintFormat?> pickFormat() async {
-    return showDialog<PrintFormat>(
+    final remembered = await PrintFormatMemory.read();
+    if (remembered != null) return remembered;
+    if (!context.mounted) return null;
+    final chosen = await showDialog<PrintFormat>(
       context: context,
       builder: (context) => SimpleDialog(
         title: const Text('Select Print Format'),
@@ -77,11 +123,22 @@ class PrintService {
             .toList(),
       ),
     );
+    if (chosen != null) await PrintFormatMemory.write(chosen);
+    return chosen;
   }
 
   /// Shows a format-picker dialog that includes a "View PDF" option
   /// for A4 documents. Returns (format, viewPdf) tuple.
+  ///
+  /// A remembered format short-circuits the dialog (the "View A4 PDF"
+  /// option is only offered when nothing is remembered — the preview is
+  /// already rendered on screen at that point).
   Future<(PrintFormat, bool)?> pickFormatAndView() async {
+    final remembered = await PrintFormatMemory.read();
+    if (remembered != null) {
+      return (remembered, false);
+    }
+    if (!context.mounted) return null;
     final result = await showDialog<_FormatChoice>(
       context: context,
       builder: (context) => SimpleDialog(
@@ -127,6 +184,9 @@ class PrintService {
       ),
     );
     if (result == null) return null;
+    // Only actual print choices are remembered — viewing the PDF is a
+    // deliberate preview and must not pin the format.
+    if (!result.viewPdf) await PrintFormatMemory.write(result.format);
     return (result.format, result.viewPdf);
   }
 

@@ -125,16 +125,39 @@ function deleteCustomer(req, res) {
             res.status(400).json({ success: false, error: 'Cannot delete customer with existing transactions' });
             return;
         }
-        Customer_1.default.deactivate(id, database_1.default);
-        (0, activityLogger_1.logCRUD)(activityLogger_1.ActionType.CUSTOMER_DELETE, 'Customer', parseInt(id, 10), `Deactivated customer: ${existingCustomer.customer_name}`, req.user.id, {
+        // Soft-delete (SHORTCOMINGS-FIX 4.2): stamp deleted_at + deactivate
+        // so the row can be restored instead of being lost forever.
+        Customer_1.default.softDelete(id, req.user.id, database_1.default);
+        (0, activityLogger_1.logCRUD)(activityLogger_1.ActionType.CUSTOMER_DELETE, 'Customer', parseInt(id, 10), `Deleted customer: ${existingCustomer.customer_name}`, req.user.id, {
             customer_code: existingCustomer.customer_code
         });
         req.activityLogged = true;
-        res.json({ success: true, message: 'Customer deactivated successfully' });
+        res.json({ success: true, message: 'Customer deleted successfully' });
     }
     catch (error) {
         logger_1.default.error('Error deleting customer:', error);
         res.status(500).json({ success: false, error: 'Failed to delete customer' });
+    }
+}
+function restoreCustomer(req, res) {
+    try {
+        const id = (0, queryUtils_2.getRouteParam)(req.params.id);
+        const existingCustomer = Customer_1.default.getById(id, database_1.default);
+        if (!existingCustomer) {
+            res.status(404).json({ success: false, error: 'Customer not found' });
+            return;
+        }
+        Customer_1.default.restore(id, database_1.default);
+        const restoredCustomer = Customer_1.default.getById(id, database_1.default);
+        (0, activityLogger_1.logCRUD)(activityLogger_1.ActionType.CUSTOMER_UPDATE, 'Customer', parseInt(id, 10), `Restored customer: ${existingCustomer.customer_name}`, req.user.id, {
+            customer_code: existingCustomer.customer_code
+        });
+        req.activityLogged = true;
+        res.json({ success: true, data: restoredCustomer, message: 'Customer restored successfully' });
+    }
+    catch (error) {
+        logger_1.default.error('Error restoring customer:', error);
+        res.status(500).json({ success: false, error: 'Failed to restore customer' });
     }
 }
 function getCustomerLedger(req, res) {
@@ -142,6 +165,8 @@ function getCustomerLedger(req, res) {
         const { id } = req.params;
         const sortByParam = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
         const sortOrderParam = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
+        const fromDateParam = (0, queryUtils_1.getQueryParam)(req.query.fromDate);
+        const toDateParam = (0, queryUtils_1.getQueryParam)(req.query.toDate);
         const sortBy = sortByParam || 'transaction_date';
         const sortOrder = sortOrderParam || 'DESC';
         const sortParams = (0, sqlSanitizer_1.sanitizeSortParams)(sortBy, sortOrder, sqlSanitizer_1.LEDGER_SORT_COLUMNS, 'transaction_date', 'DESC');
@@ -151,8 +176,10 @@ function getCustomerLedger(req, res) {
             return;
         }
         // Task 8.7: bounded ledger listing with a pagination envelope.
+        // Optional inclusive fromDate/toDate bounds (unified detail date picker)
+        // — same convention as the statement endpoint.
         const pageParams = (0, paginate_1.parsePageParams)(req);
-        const { rows, total } = Customer_1.default.getLedger(id, sortParams.column, sortParams.order, database_1.default, pageParams.page, pageParams.limit);
+        const { rows, total } = Customer_1.default.getLedger(id, sortParams.column, sortParams.order, database_1.default, pageParams.page, pageParams.limit, fromDateParam || undefined, toDateParam || undefined);
         res.json({ success: true, data: rows, pagination: (0, paginate_1.envelope)(total, pageParams) });
     }
     catch (error) {
@@ -233,6 +260,6 @@ function recalculateAllBalances(req, res) {
     }
 }
 exports.default = {
-    getCustomers, getCustomer, createCustomer, updateCustomer, deleteCustomer,
+    getCustomers, getCustomer, createCustomer, updateCustomer, deleteCustomer, restoreCustomer,
     getCustomerLedger, getCustomerStatement, getCustomerBalance, recalculateAllBalances
 };

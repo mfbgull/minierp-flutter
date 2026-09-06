@@ -12,8 +12,9 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
+import '../../core/cache/cached_repository.dart'
+    show cachedRepositoryClientProvider;
 import '../models/customer.dart' show Customer;
 import '../models/json_helpers.dart';
 import '../models/ledger_entry.dart' show LedgerEntry;
@@ -120,17 +121,33 @@ class CustomerRepository {
             Customer.fromJson(json as Map<String, dynamic>),
       );
 
-  /// Soft delete (deactivates); fails server-side if the customer has
-  /// invoices/payments.
+  /// Soft delete (stamps `deleted_at`, deactivates); fails server-side if
+  /// the customer has invoices/payments. Reversible via [restore].
   Future<ApiResult<void>> delete(int id) =>
       _api.delete('${ApiEndpoints.customers}/$id');
+
+  /// `POST /customers/:id/restore` — reverts a soft delete.
+  Future<ApiResult<void>> restore(int id) => _api.post(
+    '${ApiEndpoints.customers}/$id/restore',
+    parse: (_) {},
+  );
 
   /// `GET /customers/:id/ledger` — enveloped array. The server sorts
   /// newest-first by default (`transaction_date DESC`, no sort params sent
   /// here), so ledger UIs treat the first row's `balance` as the closing
   /// balance.
-  Future<ApiResult<List<LedgerEntry>>> ledger(int id) => _api.getList(
+  ///
+  /// Optional inclusive [fromDate]/[toDate] bounds (ISO `YYYY-MM-DD`,
+  /// same names as the statement endpoint) narrow the visible rows; null
+  /// omits the parameter → full history. Per-row running balances are
+  /// always the server's full-history values.
+  Future<ApiResult<List<LedgerEntry>>> ledger(
+    int id, {
+    String? fromDate,
+    String? toDate,
+  }) => _api.getList(
     '${ApiEndpoints.customers}/$id/ledger',
+    queryParameters: {'fromDate': ?fromDate, 'toDate': ?toDate},
     parseItem: (Object? json) =>
         LedgerEntry.fromJson(json as Map<String, dynamic>),
   );
@@ -166,5 +183,5 @@ class CustomerRepository {
 }
 
 final customerRepositoryProvider = Provider<CustomerRepository>(
-  (ref) => CustomerRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => CustomerRepository(ref.watch(cachedRepositoryClientProvider)),
 );

@@ -57,7 +57,90 @@ PlutoColumn serialGridColumn() => PlutoColumn(
 /// a custom grid) intact.
 PlutoRow withSerialCell(PlutoRow row, int index) => row
   ..cells['serial'] = PlutoCell(value: index + 1)
-  ..cells['actions'] ??= PlutoCell(value: '');
+  ..cells['actions'] ??= PlutoCell(value: '')
+  // Every column needs a cell (PlutoGrid's initializeRows null-checks
+  // `row.cells[column.field]!` for ALL columns, hidden or not) — the
+  // bulk-selection checkbox column is opt-in via [GridBulkSelection],
+  // so the cell is only guaranteed on rows built through this helper.
+  ..cells[kBulkSelectField] ??= PlutoCell(value: false);
+
+/// The bulk-selection checkbox column's field name.
+const String kBulkSelectField = '_bulk';
+
+/// Reads the record id a row carries in its hidden `id` cell (the same
+/// cell the detail handlers read); null when the cell is missing.
+int? _bulkIdOf(PlutoRow row) =>
+    (row.cells['id']?.value as num?)?.toInt();
+
+/// Drives checkbox bulk-selection on a grid: a `ValueNotifier<Set<int>>`
+/// of the selected record ids that the bulk action bar listens to. The
+/// checked state itself lives in PlutoGrid's native row-checkbox
+/// mechanism ([PlutoColumn.enableRowChecked] — header select-all +
+/// per-row checkboxes, tri-state header), so [syncFromManager] just
+/// mirrors the manager's checked rows into [selected]; the screen shows
+/// a bulk action bar (see [BulkActionBar]) while [count] > 0.
+///
+/// [manager] resolves the live [PlutoGridStateManager] (the grid may not
+/// be loaded when the column is built).
+class GridBulkSelection {
+  GridBulkSelection({required this.manager});
+
+  /// Resolves the live grid manager (or null before the grid loads).
+  final PlutoGridStateManager? Function() manager;
+
+  /// The currently selected record ids — listen to this to show/hide the
+  /// bulk action bar.
+  final ValueNotifier<Set<int>> selected = ValueNotifier(<int>{});
+
+  Set<int> get ids => selected.value;
+  int get count => selected.value.length;
+
+  /// Rebuild the selection set from the manager's checked rows. Wire this
+  /// to the grid's `onRowChecked` (fires for both row and select-all
+  /// toggles) and call it after any programmatic [clear].
+  void syncFromManager() {
+    final manager = this.manager();
+    if (manager == null) return;
+    selected.value = {
+      for (final row in manager.refRows)
+        if (row.checked == true) ?_bulkIdOf(row),
+    };
+  }
+
+  /// Unchecks every row and empties the selection.
+  void clear() {
+    if (selected.value.isEmpty) return;
+    selected.value = <int>{};
+    manager()?.toggleAllRowChecked(false);
+  }
+
+  void dispose() => selected.dispose();
+}
+
+/// The checkbox column for bulk selection — a narrow first column with
+/// PlutoGrid's native select-all header checkbox + per-row checkboxes
+/// ([PlutoColumn.enableRowChecked]). The checked state lives in the
+/// grid's rows; [bulk.syncFromManager] mirrors it into the notifier the
+/// bulk action bar listens to. `readOnly` keeps the cell non-editable
+/// while PlutoGrid still renders the checkbox.
+PlutoColumn bulkSelectColumn(GridBulkSelection bulk) => PlutoColumn(
+  title: '',
+  field: kBulkSelectField,
+  type: PlutoColumnType.text(),
+  // PlutoGrid's native checkbox is a 48px widget (its 0.86 scale is
+  // visual-only via Transform), so the column must fit it — tightened
+  // paddings keep it narrow.
+  width: 56,
+  cellPadding: const EdgeInsets.symmetric(horizontal: 2),
+  titlePadding: const EdgeInsets.symmetric(horizontal: 2),
+  readOnly: true,
+  enableRowChecked: true,
+  enableSorting: false,
+  enableContextMenu: false,
+  enableFilterMenuItem: false,
+  enableHideColumnMenuItem: false,
+  enableSetColumnsMenuItem: false,
+);
 
 /// A single entry in a grid row's ⋮ actions menu.
 class GridRowAction {
@@ -167,13 +250,31 @@ const double kAutoFitMaxColumnWidth = 480;
 void autoFitPlutoColumns(PlutoGridStateManager stateManager) {
   final style = stateManager.configuration.style;
 
+  /// Rows measured per column: measuring every row × every column is
+  /// O(rows × cols) TextPainter layouts (10k layouts for 1000×10), which
+  /// stalls the UI on every data refresh. A 50-row sample keeps the
+  /// worst case at ~500 layouts while still reflecting typical content
+  /// widths (SHORTCOMINGS-FIX 7.2).
+  const int sampleLimit = 50;
+  final sampleRows = stateManager.refRows.length <= sampleLimit
+      ? stateManager.refRows
+      : stateManager.refRows.take(sampleLimit);
+
+  // Text width memo — formatted cell values repeat heavily (statuses,
+  // numbers, dates), so each unique string is laid out once per pass.
+  final measuredCache = <String, double>{};
+
   double measuredWidth(String text, TextStyle textStyle) {
+    final key = '${textStyle.fontSize}|${textStyle.fontWeight}|$text';
+    final cached = measuredCache[key];
+    if (cached != null) return cached;
     final painter = TextPainter(
       text: TextSpan(text: text, style: textStyle),
       textDirection: TextDirection.ltr,
     )..layout();
     final width = painter.width;
     painter.dispose();
+    measuredCache[key] = width;
     return width;
   }
 
@@ -189,7 +290,7 @@ void autoFitPlutoColumns(PlutoGridStateManager stateManager) {
       continue;
     }
     var widest = measuredWidth(column.title, style.columnTextStyle);
-    for (final row in stateManager.refRows) {
+    for (final row in sampleRows) {
       final value = row.cells[column.field]?.value;
       if (value == null) continue;
       widest = math.max(
@@ -300,6 +401,20 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
   /// grid (the last column, like the sales/customers grids).
   bool get hasRowActions => false;
 
+  /// Override to `true` to prepend the bulk-selection checkbox column
+  /// (with a select-all header checkbox) and enable the bulk action bar
+  /// (SHORTCOMINGS-FIX 4.4). The screen watches [bulkSelection] to show
+  /// the bar; selection resets whenever the grid rows are replaced
+  /// (page/filter/refresh).
+  bool get enableBulkSelection => false;
+
+  /// The bulk-selection state for this grid ([GridBulkSelection]). Only
+  /// meaningful when [enableBulkSelection] is true; always disposed with
+  /// the State.
+  late final GridBulkSelection bulkSelection = GridBulkSelection(
+    manager: () => gridStateManager,
+  );
+
   /// Build the row's ⋮ menu entries. Called when the cell renders (to
   /// decide show/hide) and again when the menu opens, so actions always
   /// reflect fresh row state. Return null/empty to hide the button for
@@ -404,6 +519,7 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
       // the plumbing (their `buildGridColumns` stays focused on data).
       // The per-row ⋮ actions column is appended when the screen opts in.
       gridColumns = [
+        if (enableBulkSelection) bulkSelectColumn(bulkSelection),
         serialGridColumn(),
         ...buildGridColumns(AppLocalizations.of(context)!),
         if (hasRowActions)
@@ -444,6 +560,9 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
     if (manager == null) return;
     manager.setShowLoading(value.isLoading);
     if (value.hasValue) {
+      // Rows are being replaced wholesale — a selection made against the
+      // previous page/filter no longer maps to visible rows, so reset it.
+      bulkSelection.clear();
       manager.removeAllRows();
       manager.appendRows([
         for (final (index, row) in gridRowsFrom(value.value).indexed)
@@ -472,6 +591,7 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
 
   @override
   void dispose() {
+    bulkSelection.dispose();
     _widthTracker?.dispose();
     super.dispose();
   }
@@ -553,6 +673,7 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
                 );
               },
               onSorted: onGridSorted,
+              onRowChecked: (_) => bulkSelection.syncFromManager(),
               onRowDoubleTap: (event) {
                 final id = (event.row.cells[_idField]?.value as num?)?.toInt();
                 if (id == null || id <= 0) return;

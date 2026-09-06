@@ -8,6 +8,7 @@ exports.getInvoice = getInvoice;
 exports.createInvoice = createInvoice;
 exports.updateInvoice = updateInvoice;
 exports.deleteInvoice = deleteInvoice;
+exports.restoreInvoice = restoreInvoice;
 exports.cancelInvoice = cancelInvoice;
 exports.getInvoicePayments = getInvoicePayments;
 exports.returnInvoiceItems = returnInvoiceItems;
@@ -596,9 +597,11 @@ function deleteInvoice(req, res) {
                     Payment_1.default.delete(database_1.default, alloc.payment_id);
                 }
             }
-            // Soft-delete marker + rebuild balances
-            database_1.default.prepare('UPDATE invoices SET status = ?, deleted_at = ?, deleted_by = ? WHERE id = ?')
-                .run('Deleted', new Date().toISOString(), userId, invoiceId);
+            // Soft-delete marker + rebuild balances. The pre-delete status is
+            // preserved in `deleted_from_status` so the restore endpoint can
+            // bring the invoice back exactly as it was (undo pattern).
+            database_1.default.prepare('UPDATE invoices SET status = ?, deleted_from_status = ?, deleted_at = ?, deleted_by = ? WHERE id = ?')
+                .run('Deleted', freshInvoice.status, new Date().toISOString(), userId, invoiceId);
             ledgerUtils_1.default.rebuildLedgerBalances(freshInvoice.customer_id);
             ledgerUtils_1.default.recalcCustomerBalanceFromLedger(freshInvoice.customer_id);
         });
@@ -609,6 +612,121 @@ function deleteInvoice(req, res) {
     catch (error) {
         logger_1.default.error('Delete invoice error:', { error });
         res.status(500).json({ error: 'Failed to delete invoice' });
+    }
+}
+/**
+ * POST /api/invoices/:id/restore
+ * Revert a soft-deleted invoice (undo pattern, SHORTCOMINGS-FIX 4.2/4.4).
+ * Mirrors [deleteInvoice] step-for-step in reverse:
+ *   1. Re-consume stock (FIFO/FEFO from oldest batches, new SALE movements)
+ *   2. Un-void the invoice's INVOICE + INVOICE_RETURN journal lines
+ *   3. Undo the customer-ledger reversal (drop the REVERSAL row, un-void
+ *      the original INVOICE row)
+ *   4. Restore the pre-delete status + clear deleted_at/deleted_by
+ *   5. Rebuild ledger + customer balances
+ * Only invoices that are currently soft-deleted (deleted_at set) can be
+ * restored; the endpoint refuses otherwise.
+ */
+function restoreInvoice(req, res) {
+    try {
+        const { id } = req.params;
+        const invoiceId = parseInt(id, 10);
+        const userId = req.user.id;
+        // getById filters deleted rows — a raw lookup is required here.
+        const invoice = database_1.default.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        if (!invoice.deleted_at) {
+            return res.status(400).json({ error: 'Invoice is not deleted' });
+        }
+        const transaction = database_1.default.transaction(() => {
+            const items = Invoice_1.default.getItemsForStockReverse(invoiceId, database_1.default);
+            // 1. Re-consume stock — mirror the create flow: FIFO/FEFO consumption
+            //    from the oldest batches, one SALE movement per consumed batch.
+            for (const item of items) {
+                // The warehouse the sale was dispatched from (same source the
+                // delete's reverseStockForItems reads); fall back to any
+                // warehouse with stock.
+                const saleMovement = database_1.default.prepare(`
+          SELECT warehouse_id
+          FROM stock_movements
+          WHERE item_id = ? AND reference_docno = ? AND movement_type = 'SALE'
+          ORDER BY id
+          LIMIT 1
+        `).get(item.item_id, invoice.invoice_no);
+                const warehouseId = saleMovement?.warehouse_id ??
+                    Invoice_1.default.findWarehouseForItem(database_1.default, item.item_id, item.quantity);
+                const consumption = Invoice_1.default.consumeFromOldestBatches(item.item_id, warehouseId, item.quantity, database_1.default);
+                for (const entry of consumption) {
+                    const batchLabel = entry.batchId ? `(batch ${entry.batchId})` : '(legacy stock)';
+                    StockMovement_1.default.recordMovement({
+                        item_id: item.item_id,
+                        warehouse_id: warehouseId,
+                        movement_type: 'SALE',
+                        quantity: -entry.consumed,
+                        unit_cost: entry.unitCost,
+                        reference_doctype: 'INVOICE',
+                        reference_docno: invoice.invoice_no,
+                        remarks: `Sold via Invoice ${invoice.invoice_no} (restored) ${batchLabel}`,
+                        movement_date: invoice.invoice_date.slice(0, 10),
+                        batch_id: entry.batchId ?? undefined,
+                    }, userId, database_1.default);
+                }
+            }
+            // 2. Un-void the journal lines the delete voided (GL is restored to
+            //    its pre-delete state — no new posting, no double counting).
+            database_1.default.prepare(`
+        UPDATE journal_lines
+        SET voided = 0, voided_by = NULL, void_reason = NULL
+        WHERE reference_type IN ('INVOICE', 'INVOICE_RETURN')
+          AND reference_id = ? AND voided = 1
+      `).run(invoiceId);
+            // 3. Undo the customer-ledger reversal created by
+            //    deleteLedgerEntryByReference: drop the REVERSAL row and
+            //    un-void the original INVOICE entry.
+            const reversals = database_1.default.prepare(`
+        SELECT id FROM customer_ledger
+        WHERE customer_id = ? AND reference_no = ?
+          AND transaction_type = 'REVERSAL:INVOICE' AND voided = 0
+      `).all(invoice.customer_id, invoice.invoice_no);
+            for (const reversal of reversals) {
+                database_1.default.prepare('DELETE FROM customer_ledger WHERE id = ?').run(reversal.id);
+            }
+            database_1.default.prepare(`
+        UPDATE customer_ledger
+        SET voided = 0
+        WHERE customer_id = ? AND reference_no = ?
+          AND transaction_type = 'INVOICE' AND voided = 1
+      `).run(invoice.customer_id, invoice.invoice_no);
+            // 4. Restore status + clear the soft-delete markers.
+            const restoredStatus = invoice.deleted_from_status ||
+                ((0, currency_1.parseCurrency)(invoice.total_amount) > 0 ? 'Unpaid' : 'Draft');
+            database_1.default.prepare(`
+        UPDATE invoices
+        SET status = ?, deleted_at = NULL, deleted_by = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(restoredStatus, invoiceId);
+            // 5. Rebuild balances (same as delete — the ledger chain changed).
+            ledgerUtils_1.default.rebuildLedgerBalances(invoice.customer_id);
+            ledgerUtils_1.default.recalcCustomerBalanceFromLedger(invoice.customer_id);
+        });
+        transaction();
+        (0, activityLogger_1.logCRUD)(activityLogger_1.ActionType.INVOICE_UPDATE, 'Invoice', invoiceId, `Invoice ${invoice.invoice_no} restored`, userId, { total_amount: invoice.total_amount, customer_id: invoice.customer_id }, {
+            oldValue: { status: 'Deleted' },
+            newValue: { status: invoice.deleted_from_status || 'Unpaid' },
+            reason: 'Undo of soft-delete via API',
+        });
+        const restored = Invoice_1.default.getById(invoiceId, database_1.default);
+        res.status(200).json({
+            success: true,
+            data: restored ?? invoice,
+            message: 'Invoice restored successfully',
+        });
+    }
+    catch (error) {
+        logger_1.default.error('Restore invoice error:', { error });
+        res.status(500).json({ error: 'Failed to restore invoice' });
     }
 }
 /**
@@ -1045,6 +1163,7 @@ exports.default = {
     createInvoice,
     updateInvoice,
     deleteInvoice,
+    restoreInvoice,
     cancelInvoice,
     getInvoicePayments,
     returnInvoiceItems,

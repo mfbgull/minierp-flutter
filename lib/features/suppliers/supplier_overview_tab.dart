@@ -16,9 +16,17 @@ import 'supplier_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class SupplierOverviewTab extends ConsumerWidget {
-  const SupplierOverviewTab({super.key, required this.supplierId});
+  const SupplierOverviewTab({
+    super.key,
+    required this.supplierId,
+    required this.sessionId,
+  });
 
   final int supplierId;
+
+  /// The detail-page instance's range-session id — the PO-derived figures
+  /// react to it (spec §7.1); Current Balance stays lifetime.
+  final int sessionId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -26,7 +34,16 @@ class SupplierOverviewTab extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final detail = ref.watch(supplierDetailProvider(supplierId));
     final balance = ref.watch(supplierBalanceProvider(supplierId));
-    final poSummary = ref.watch(supplierPOSummaryProvider(supplierId));
+    final range = supplierDetailRangeIso(ref, sessionId);
+    final poSummary = ref.watch(
+      supplierPOSummaryProvider(
+        SupplierPOSummaryArgs(
+          supplierId: supplierId,
+          fromDate: range.from,
+          toDate: range.to,
+        ),
+      ),
+    );
 
     if (detail case AsyncError(:final error)) {
       return DetailError(
@@ -39,6 +56,8 @@ class SupplierOverviewTab extends ConsumerWidget {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // Current Balance is as-of-now and unfiltered (spec §7.1) — it must
+    // keep matching the top quick-stats bar's standing supplier balance.
     final currentBalance =
         balance.valueOrNull?.currentBalance ??
         supplier.currentBalance ??
@@ -56,6 +75,15 @@ class SupplierOverviewTab extends ConsumerWidget {
           completedPos: 0,
         );
     final totalPos = summary.totalPos;
+    // Zero-PO ranged summary (spec §10.3): PO-derived values show zero,
+    // Current Balance stays, and a filtered-period line replaces any
+    // global "supplier has no data" message.
+    final zeroPoPeriod = range.from != null && totalPos == 0;
+    // Compact period annotation for the two range-scoped cards (spec
+    // §6.1 mirror; hidden on All dates).
+    final periodNote = range.from == null
+        ? null
+        : '${Formatters.date(range.from!)} – ${Formatters.date(range.to!)}';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -78,15 +106,31 @@ class SupplierOverviewTab extends ConsumerWidget {
                 label: l10n.suppliersTotalpovalue,
                 value: Formatters.currency(summary.totalValue),
                 icon: Icons.receipt_long_outlined,
+                annotation: periodNote,
               ),
               const SizedBox(width: 12),
               _SummaryCard(
                 label: l10n.suppliersTotalpos,
                 value: '$totalPos',
                 icon: Icons.inventory_2_outlined,
+                annotation: periodNote,
               ),
             ],
           ),
+          // Zero-PO period line — spec §10.3: only the title, never the
+          // hint, because Current Balance and the contact/account
+          // sections still carry standing data.
+          if (zeroPoPeriod) ...[
+            const SizedBox(height: 10),
+            Text(
+              l10n.commonNoRecordsInPeriod,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: scheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           // PO Status — 4 tiles with proportional bars.
           _sectionTitle(context, l10n.suppliersPostatus),
@@ -246,12 +290,16 @@ class _SummaryCard extends StatelessWidget {
     required this.value,
     required this.icon,
     this.valueColor,
+    this.annotation,
   });
 
   final String label;
   final String value;
   final IconData icon;
   final Color? valueColor;
+
+  /// Compact period annotation for range-scoped figures (spec §7.1).
+  final String? annotation;
 
   @override
   Widget build(BuildContext context) {
@@ -288,6 +336,17 @@ class _SummaryCard extends StatelessWidget {
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
+              if (annotation != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  annotation!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ],
           ),
         ),

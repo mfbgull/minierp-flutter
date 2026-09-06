@@ -144,17 +144,43 @@ function deleteCustomer(req: AuthRequest, res: Response): void {
       return;
     }
 
-    CustomerModel.deactivate(id, db);
+    // Soft-delete (SHORTCOMINGS-FIX 4.2): stamp deleted_at + deactivate
+    // so the row can be restored instead of being lost forever.
+    CustomerModel.softDelete(id, req.user!.id, db);
 
-    logCRUD(ActionType.CUSTOMER_DELETE, 'Customer', parseInt(id, 10), `Deactivated customer: ${existingCustomer.customer_name}`, req.user!.id, {
+    logCRUD(ActionType.CUSTOMER_DELETE, 'Customer', parseInt(id, 10), `Deleted customer: ${existingCustomer.customer_name}`, req.user!.id, {
       customer_code: existingCustomer.customer_code
     });
     req.activityLogged = true;
 
-    res.json({ success: true, message: 'Customer deactivated successfully' });
+    res.json({ success: true, message: 'Customer deleted successfully' });
   } catch (error) {
     logger.error('Error deleting customer:', error);
     res.status(500).json({ success: false, error: 'Failed to delete customer' });
+  }
+}
+
+function restoreCustomer(req: AuthRequest, res: Response): void {
+  try {
+    const id = getRouteParam(req.params.id);
+    const existingCustomer = CustomerModel.getById(id, db);
+    if (!existingCustomer) {
+      res.status(404).json({ success: false, error: 'Customer not found' });
+      return;
+    }
+
+    CustomerModel.restore(id, db);
+    const restoredCustomer = CustomerModel.getById(id, db);
+
+    logCRUD(ActionType.CUSTOMER_UPDATE, 'Customer', parseInt(id, 10), `Restored customer: ${existingCustomer.customer_name}`, req.user!.id, {
+      customer_code: existingCustomer.customer_code
+    });
+    req.activityLogged = true;
+
+    res.json({ success: true, data: restoredCustomer, message: 'Customer restored successfully' });
+  } catch (error) {
+    logger.error('Error restoring customer:', error);
+    res.status(500).json({ success: false, error: 'Failed to restore customer' });
   }
 }
 
@@ -163,6 +189,8 @@ function getCustomerLedger(req: Request, res: Response): void {
     const { id } = req.params;
     const sortByParam = getQueryParam(req.query.sortBy);
     const sortOrderParam = getQueryParam(req.query.sortOrder);
+    const fromDateParam = getQueryParam(req.query.fromDate);
+    const toDateParam = getQueryParam(req.query.toDate);
     const sortBy = (sortByParam as string) || 'transaction_date';
     const sortOrder = (sortOrderParam as string) || 'DESC';
 
@@ -175,8 +203,15 @@ function getCustomerLedger(req: Request, res: Response): void {
     }
 
     // Task 8.7: bounded ledger listing with a pagination envelope.
+    // Optional inclusive fromDate/toDate bounds (unified detail date picker)
+    // — same convention as the statement endpoint.
     const pageParams = parsePageParams(req);
-    const { rows, total } = CustomerModel.getLedger(id, sortParams.column, sortParams.order, db, pageParams.page, pageParams.limit);
+    const { rows, total } = CustomerModel.getLedger(
+      id, sortParams.column, sortParams.order, db,
+      pageParams.page, pageParams.limit,
+      (fromDateParam as string) || undefined,
+      (toDateParam as string) || undefined
+    );
     res.json({ success: true, data: rows, pagination: envelope(total, pageParams) });
   } catch (error) {
     logger.error('Error fetching customer ledger:', error);
@@ -262,6 +297,6 @@ function recalculateAllBalances(req: AuthRequest, res: Response): void {
 }
 
 export default {
-  getCustomers, getCustomer, createCustomer, updateCustomer, deleteCustomer,
+  getCustomers, getCustomer, createCustomer, updateCustomer, deleteCustomer, restoreCustomer,
   getCustomerLedger, getCustomerStatement, getCustomerBalance, recalculateAllBalances
 };

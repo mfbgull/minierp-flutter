@@ -166,6 +166,16 @@ function initializeDatabase(): void {
   runCustomerARMigrations();
 }
 
+// Async bcrypt (spec 2.1): the seed hash no longer blocks the event loop
+// ~300ms at import time. Boot code that needs the admin user (server.ts
+// before `listen`, jest setup before suites run) awaits [dbSeedReady].
+// [initializeDatabase] itself stays synchronous — it runs from the boot
+// sequence below, which is sync by design (better-sqlite3).
+let seedAdminUserResolve: (() => void) | undefined;
+export const dbSeedReady: Promise<void> = new Promise((resolve) => {
+  seedAdminUserResolve = resolve;
+});
+
 function createDefaultUser(): void {
   const existingUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
 
@@ -178,19 +188,33 @@ function createDefaultUser(): void {
       defaultPassword = 'admin123';
     }
     if (!defaultPassword) {
+      // Nothing to seed — release any awaiter so it doesn't hang forever.
+      seedAdminUserResolve?.();
       throw new Error('FATAL: DEFAULT_ADMIN_PASSWORD environment variable must be set');
     }
-    const passwordHash = bcrypt.hashSync(defaultPassword, 12);
-
-    const stmt = db.prepare(`
+    // Fire-and-forget: the boot sequence below is synchronous; [dbSeedReady]
+    // gates consumers on the seeded row instead.
+    void bcrypt
+      .hash(defaultPassword, 12)
+      .then((passwordHash) => {
+        const stmt = db.prepare(`
       INSERT INTO users (username, email, password_hash, full_name, role, is_active)
       VALUES (?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run('admin', 'admin@minierp.local', passwordHash, 'Administrator', 'admin', 1);
+        stmt.run('admin', 'admin@minierp.local', passwordHash, 'Administrator', 'admin', 1);
 
-    logger.info('✅ Default admin user created');
+        logger.info('✅ Default admin user created');
+      })
+      .catch((err: unknown) => {
+        logger.error('FATAL: default admin seed failed:', err);
+        process.exit(1);
+      })
+      .finally(() => seedAdminUserResolve?.());
+    return;
   }
+  // Admin already exists — nothing to await.
+  seedAdminUserResolve?.();
 }
 
 function createDefaultWarehouse(): void {
@@ -1523,6 +1547,10 @@ runLedgered('drop-search-indexes.sql');
 runLedgered('add-audit-trail-fields.sql');
 runLedgered('add-activity-log-purge-permission.sql');
 runLedgered('add-invoice-soft-delete.sql');
+// Pre-delete status capture so the invoice restore endpoint (undo
+// pattern) can bring the invoice back to exactly its prior state.
+runLedgered('add-invoice-restore-status.sql');
+runLedgered('add-customer-item-soft-delete.sql');
 runLedgered('add-hot-path-indexes.sql');
 runLedgered('normalize-payment-methods.sql', undefined, { noTxn: true }); // rebuilds payments — FK off required
 runLedgered('add-payments-counterparty-check.sql', undefined, { noTxn: true });

@@ -174,7 +174,7 @@ describe('ItemModel', () => {
 
   describe('delete', () => {
     it('soft-deletes an item (sets is_active=0)', () => {
-      const result = ItemModel.delete(createdItemId, db);
+      const result = ItemModel.delete(createdItemId, 1, db);
       expect(result.changes).toBe(1);
 
       const deleted = ItemModel.getById(createdItemId, db);
@@ -419,7 +419,7 @@ describe('StockMovementModel', () => {
       db.prepare(`DELETE FROM stock_movements WHERE item_id = ?`).run(testItemId);
       db.prepare(`DELETE FROM stock_balances WHERE item_id = ?`).run(testItemId);
       db.prepare(`DELETE FROM stock_batches WHERE item_id = ?`).run(testItemId);
-      ItemModel.delete(testItemId, db);
+      ItemModel.delete(testItemId, 1, db);
     });
 
     it('consumes from oldest batch first (FIFO)', () => {
@@ -682,7 +682,7 @@ describe('StockMovementModel', () => {
       db.prepare(`DELETE FROM purchases WHERE supplier_id = ?`).run(supplierId);
       db.prepare(`DELETE FROM supplier_ledger WHERE supplier_id = ?`).run(supplierId);
       db.prepare(`DELETE FROM suppliers WHERE id = ?`).run(supplierId);
-      ItemModel.delete(itemId, db);
+      ItemModel.delete(itemId, 1, db);
     });
 
     it('records a purchase linked to a supplier and posts the AP ledger entry', () => {
@@ -971,7 +971,7 @@ describe('StockMovementModel', () => {
       db.prepare(`DELETE FROM stock_movements WHERE item_id = ?`).run(testItemId2);
       db.prepare(`DELETE FROM stock_balances WHERE item_id = ?`).run(testItemId2);
       db.prepare(`DELETE FROM stock_batches WHERE item_id = ?`).run(testItemId2);
-      ItemModel.delete(testItemId2, db);
+      ItemModel.delete(testItemId2, 1, db);
     });
 
     it('delegates to recordMovement for incoming movements', () => {

@@ -12,7 +12,10 @@ import 'endpoints.dart' show ApiEndpoints;
 /// - 10s timeouts (matches the web client).
 /// - Request interceptor attaches `Authorization: Bearer <jwt>` from the
 ///   injected [TokenStorage].
-/// - On 401 the stored token is cleared so the UI can route to login.
+/// - On 401 (and the stored refresh token is usable) the request is
+///   transparently retried once after exchanging the refresh token
+///   (SHORTCOMINGS-FIX 6.1); only when refresh fails is the session
+///   cleared so the UI can route to login.
 class ApiClient {
   ApiClient({Dio? dio, TokenStorage? tokenStorage, this.sessionEvents})
     : tokenStorage = tokenStorage ?? const SecureTokenStorage(),
@@ -23,6 +26,10 @@ class ApiClient {
   final Dio dio;
   final TokenStorage tokenStorage;
   final SessionEvents? sessionEvents;
+
+  /// Single-flight refresh: concurrent 401s share one `/auth/refresh`
+  /// round-trip instead of stampeding the server.
+  Future<bool>? _refreshing;
 
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
@@ -54,7 +61,32 @@ class ApiClient {
           handler.next(options);
         },
         onError: (error, handler) async {
-          if (error.response?.statusCode == 401 && !_isCredential401(error)) {
+          final is401 = error.response?.statusCode == 401;
+          final canRefresh =
+              is401 &&
+              !_isCredential401(error) &&
+              error.requestOptions.path != ApiEndpoints.refresh;
+          if (canRefresh) {
+            final refreshed = await _refreshAccessToken();
+            if (refreshed && error.requestOptions.extra['_retried'] != true) {
+              // Re-send the original request; the request interceptor
+              // re-attaches the fresh access token.
+              error.requestOptions.extra['_retried'] = true;
+              try {
+                final retried = await dio.fetch(error.requestOptions);
+                handler.resolve(retried);
+                return;
+              } catch (_) {
+                // Fall through: the retry also failed → expire the session.
+              }
+            }
+          }
+          // The refresh endpoint's own 401 is expected (bad/expired
+          // refresh token) — the original request's handler below fires
+          // the expiry event once, so skip it here to avoid double-firing.
+          if (is401 &&
+              !_isCredential401(error) &&
+              error.requestOptions.path != ApiEndpoints.refresh) {
             try {
               await tokenStorage.clear();
             } catch (_) {}
@@ -67,6 +99,47 @@ class ApiClient {
         },
       ),
     );
+  }
+
+  /// Tries to exchange the stored refresh token for a fresh access token.
+  /// Returns `true` when a new access token was stored. Concurrent callers
+  /// await the same in-flight exchange.
+  Future<bool> _refreshAccessToken() {
+    final inFlight = _refreshing;
+    if (inFlight != null) return inFlight;
+    final future = _doRefresh();
+    _refreshing = future;
+    return future.whenComplete(() => _refreshing = null);
+  }
+
+  Future<bool> _doRefresh() async {
+    String? refreshToken;
+    try {
+      refreshToken = await tokenStorage.readRefreshToken();
+    } catch (_) {}
+    if (refreshToken == null || refreshToken.isEmpty) return false;
+    try {
+      final response = await dio.post(
+        ApiEndpoints.refresh,
+        data: {'refreshToken': refreshToken},
+      );
+      final body = response.data;
+      if (body is Map<String, dynamic> && body['success'] == true) {
+        final data = body['data'];
+        final token = data is Map<String, dynamic>
+            ? data['token'] as String?
+            : null;
+        if (token != null && token.isNotEmpty) {
+          try {
+            await tokenStorage.writeToken(token);
+          } catch (_) {}
+          return true;
+        }
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Whether a 401 means "bad credentials for this request" (the stored
