@@ -122,9 +122,11 @@ class _InvoicePrintPreviewPageState
 
     if (viewPdf) {
       // View A4 PDF only — no printing
+      if (!mounted) return;
       await printPdfBytes(_bytes!, '${widget.invoice.invoiceNo}.pdf', context);
       return;
     }
+    if (!mounted) return;
 
     await _printWithFormat(format);
   }

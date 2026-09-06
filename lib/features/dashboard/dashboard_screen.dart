@@ -21,6 +21,7 @@ import '../../data/models/dashboard_summary.dart'
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
+import '../../widgets/offline_cache_badge.dart';
 import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../reports/report_providers.dart'
     show applyGlobalReportRange, globalReportFromDateProvider, globalReportToDateProvider;
@@ -42,6 +43,7 @@ import 'dashboard_panel_catalog.dart' show panelById;
 import 'dashboard_providers.dart';
 import 'panels/active_loans_panel.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/skeleton_loader.dart';
 
 /// Landing screen behind the auth gate — renders the server-side
 /// aggregated KPIs (GET /dashboard/summary, PORTING.md §10). The
@@ -86,6 +88,7 @@ class DashboardScreen extends ConsumerWidget {
               ),
             ),
           ],
+          actions: [const OfflineCacheBadge()],
           onRefresh: () {
             // The KPI strip cards fetch per-card `/dashboard/kpi`
             // values — they need their own invalidation or a new sale /
@@ -113,7 +116,19 @@ class DashboardScreen extends ConsumerWidget {
         ),
         Expanded(
           child: summary.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const SingleChildScrollView(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  KpiStripSkeleton(),
+                  SizedBox(height: 16),
+                  SizedBox(height: 320, child: ChartPanelSkeleton()),
+                  SizedBox(height: 16),
+                  SizedBox(height: 320, child: ListPanelSkeleton()),
+                ],
+              ),
+            ),
             error: (error, _) => _DashboardError(
               message: error is ApiError ? error.message : error.toString(),
               onRetry: () => ref.invalidate(dashboardSummaryProvider),
@@ -282,8 +297,34 @@ class _CashPositionStripState extends ConsumerState<_CashPositionStrip> {
                 child: SizedBox(
                   height: 86,
                   child: position.when(
-                    loading: () => const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                    // Compact strip skeleton matching the real cards:
+                    // 4 placeholder cards sized to the 86px strip.
+                    loading: () => ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: 4,
+                      separatorBuilder: (_, _) => const SizedBox(width: 10),
+                      itemBuilder: (_, _) => Container(
+                        width: 190,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerHighest.withValues(
+                            alpha: 0.5,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SkeletonBar(height: 10, width: 80),
+                            SizedBox(height: 6),
+                            SkeletonBar(height: 16, width: 100),
+                          ],
+                        ),
+                      ),
                     ),
                     error: (error, _) => _PanelError(
                       message: error is ApiError
@@ -465,7 +506,7 @@ class _CashTotalCard extends StatelessWidget {
 
 /// The horizontal KPI stat strip — reads the dashboard layout controller
 /// and renders only the visible cards, in order, each fetching its own
-/// metric via `dashboardKpiProvider`. Reorderable (spec §6.3: reorder
+/// metric via `dashboardKpiBatchProvider`. Reorderable (spec §6.3: reorder
 /// on the strip itself, drag handle on hover / long-press on touch).
 class _KpiStrip extends ConsumerWidget {
   const _KpiStrip();
@@ -694,7 +735,9 @@ class _KpiMetricCardState extends ConsumerState<_KpiMetricCard> {
 
     final label = kpiCardLabel(l10n, def.labelKey);
     final hint = kpiCardHint(l10n, def.hintKey);
-    final kpi = ref.watch(dashboardKpiProvider(def.metric));
+    // All KPI values arrive in one batched fetch (spec 7.3) — read the
+    // card's metric out of the shared map.
+    final kpi = ref.watch(dashboardKpiBatchProvider);
 
     // Per-size styling (spec §6.3): Small = denser padding + smaller
     // value font; Large = extra padding + larger value font; Medium =
@@ -777,11 +820,22 @@ class _KpiMetricCardState extends ConsumerState<_KpiMetricCard> {
                     '—',
                     style: valueTextStyle.copyWith(color: scheme.error),
                   ),
-                  data: (data) => Text(
-                    _formatKpiValue(def.format, data),
-                    maxLines: 1,
-                    style: valueTextStyle,
-                  ),
+                  data: (values) {
+                    final kpi = values[def.metric];
+                    if (kpi == null) {
+                      return Text(
+                        '—',
+                        style: valueTextStyle.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      );
+                    }
+                    return Text(
+                      _formatKpiValue(def.format, kpi),
+                      maxLines: 1,
+                      style: valueTextStyle,
+                    );
+                  },
                 ),
               ),
             ],
@@ -1221,7 +1275,7 @@ class _ArSummaryPanel extends ConsumerWidget {
             const SizedBox(height: 8),
             Expanded(
               child: ar.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const ListPanelSkeleton(),
                 error: (error, _) => _PanelError(
                   message: error is ApiError ? error.message : error.toString(),
                   onRetry: () => ref.invalidate(dashboardArSummaryProvider),
@@ -1385,7 +1439,7 @@ class _TopCustomersPanel extends ConsumerWidget {
             const SizedBox(height: 8),
             Expanded(
               child: customers.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const ListPanelSkeleton(),
                 error: (error, _) => _PanelError(
                   message: error is ApiError ? error.message : error.toString(),
                   onRetry: () =>
@@ -1625,10 +1679,7 @@ class _ExpiryAlertsPanel extends ConsumerWidget {
                       error is ApiError ? error.message : '$error',
                       style: TextStyle(color: scheme.onSurfaceVariant),
                     ),
-                  ),
-                AsyncLoading() => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
+                  ),                AsyncLoading() => const ListPanelSkeleton(),
                 AsyncData(:final value) => value.isEmpty
                     ? Center(
                         child: Text(

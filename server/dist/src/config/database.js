@@ -1356,6 +1356,10 @@ runLedgered('drop-search-indexes.sql');
 runLedgered('add-audit-trail-fields.sql');
 runLedgered('add-activity-log-purge-permission.sql');
 runLedgered('add-invoice-soft-delete.sql');
+// Pre-delete status capture so the invoice restore endpoint (undo
+// pattern) can bring the invoice back to exactly its prior state.
+runLedgered('add-invoice-restore-status.sql');
+runLedgered('add-customer-item-soft-delete.sql');
 runLedgered('add-hot-path-indexes.sql');
 runLedgered('normalize-payment-methods.sql', undefined, { noTxn: true }); // rebuilds payments — FK off required
 runLedgered('add-payments-counterparty-check.sql', undefined, { noTxn: true });

@@ -44,7 +44,15 @@ process.on('SIGTERM', () => {
   process.exit(143);
 });
 
-// 5. Clean up rate limiter intervals and logger after all tests in this worker
+// 5. Async seed gate (spec 2.1): the admin user is bcrypt-hashed off the
+// event loop now, so hold the suites until the seeded row is committed.
+import { dbSeedReady } from '../config/database';
+
+beforeAll(async () => {
+  await dbSeedReady;
+}, 15000);
+
+// 6. Clean up rate limiter intervals and logger after all tests in this worker
 import { shutdownRateLimiters } from '../middleware/rateLimiter';
 import logger from '../utils/logger';
 

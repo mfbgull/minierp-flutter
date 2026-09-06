@@ -6,7 +6,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../data/repositories/api_result.dart';
 import '../../data/repositories/paged_request.dart' show PagedRequest, PagedResponse;
@@ -97,5 +96,5 @@ class ForecastRepository {
 }
 
 final forecastRepositoryProvider = Provider<ForecastRepository>(
-  (ref) => ForecastRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => ForecastRepository(ref.watch(repositoryClientProvider)),
 );

@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 import { Server } from 'http';
 import app from './src/app';
-import db from './src/config/database';
+import db, { dbSeedReady } from './src/config/database';
 import settingsController from './src/controllers/settingsController';
 import logger from './src/utils/logger';
 import { disposeLogger } from './src/services/activityLogger';
@@ -41,7 +41,8 @@ function gracefulExit(exitCode: number): void {
     process.exit(exitCode || 1);
   }, SHUTDOWN_TIMEOUT_MS);
 
-  server.close(() => {
+  // Server may not be bound yet if a signal lands before the seed gate opens.
+  server?.close(() => {
     if (timedOut) return;
     clearTimeout(forceTimer);
     try {
@@ -63,14 +64,19 @@ function gracefulExit(exitCode: number): void {
   });
 }
 
-const server: Server = app.listen(PORT, HOST, () => {
-  console.log('\n=================================');
-  console.log('🚀 Mini ERP Server Started');
-  console.log('=================================');
-  console.log(`📍 Local:    http://localhost:${PORT}`);
-  console.log(`📍 Network:  http://${getLocalIP()}:${PORT}`);
-  console.log(`🗄️  Database: SQLite (./database/erp.db)`);
-  console.log('=================================\n');
+// Async seed gate (spec 2.1): the admin user is hashed off the event
+// loop — hold the bind until the row exists so early logins can't race it.
+let server: Server;
+void dbSeedReady.then(() => {
+  server = app.listen(PORT, HOST, () => {
+    console.log('\n=================================');
+    console.log('🚀 Mini ERP Server Started');
+    console.log('=================================');
+    console.log(`📍 Local:    http://localhost:${PORT}`);
+    console.log(`📍 Network:  http://${getLocalIP()}:${PORT}`);
+    console.log(`🗄️  Database: SQLite (./database/erp.db)`);
+    console.log('=================================\n');
+  });
 });
 
 function getLocalIP(): string {

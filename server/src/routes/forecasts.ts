@@ -3,6 +3,7 @@ const router = express.Router();
 import forecastsController from '../controllers/forecastsController';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
+import { validateZodBody, zodBodySchemas } from '../middleware/validation';
 
 router.use(authenticateToken);
 
@@ -11,22 +12,22 @@ router.use(authenticateToken);
 router.get('/dashboard', requirePermission('forecasts', 'read'), forecastsController.getDashboard);
 router.get('/demand', requirePermission('forecasts', 'read'), forecastsController.getDemand);
 router.get('/trends', requirePermission('forecasts', 'read'), forecastsController.getTrends);
-router.post('/generate', requirePermission('forecasts', 'create'), forecastsController.generateForecasts);
+router.post('/generate', requirePermission('forecasts', 'create'), validateZodBody(zodBodySchemas.object), forecastsController.generateForecasts);
 
 // ============ ACCURACY ROUTES ============
 
 router.get('/accuracy', requirePermission('forecasts', 'read'), forecastsController.getAccuracyData);
 router.get('/accuracy/:itemId', requirePermission('forecasts', 'read'), forecastsController.getAccuracyDetail);
-router.post('/compute-accuracy', requirePermission('forecasts', 'create'), forecastsController.postComputeAccuracy);
+router.post('/compute-accuracy', requirePermission('forecasts', 'create'), validateZodBody(zodBodySchemas.object), forecastsController.postComputeAccuracy);
 
 // ============ MODEL CONFIG ROUTES ============
 
 router.get('/models/:itemId', requirePermission('forecasts', 'read'), forecastsController.getModelConfigHandler);
-router.put('/models/:itemId', requirePermission('forecasts', 'create'), forecastsController.setModelConfigHandler);
+router.put('/models/:itemId', requirePermission('forecasts', 'create'), validateZodBody(zodBodySchemas.modelConfig), forecastsController.setModelConfigHandler);
 
 // ============ OVERRIDE ROUTES ============
 
-router.post('/override', requirePermission('forecasts', 'create'), forecastsController.postOverride);
+router.post('/override', requirePermission('forecasts', 'create'), validateZodBody(zodBodySchemas.forecastOverride), forecastsController.postOverride);
 
 // ============ SAFETY STOCK ROUTES ============
 
@@ -35,7 +36,7 @@ router.get('/safety-stock', requirePermission('forecasts', 'read'), forecastsCon
 // ============ SEASONAL EVENTS ROUTES ============
 
 router.get('/seasonal-events', requirePermission('forecasts', 'read'), forecastsController.getSeasonalEventsHandler);
-router.post('/seasonal-events', requirePermission('forecasts', 'create'), forecastsController.postSeasonalEvent);
+router.post('/seasonal-events', requirePermission('forecasts', 'create'), validateZodBody(zodBodySchemas.seasonalEvent), forecastsController.postSeasonalEvent);
 router.delete('/seasonal-events/:id', requirePermission('forecasts', 'delete'), forecastsController.deleteSeasonalEventHandler);
 
 // ============ EXPORT & RUNS ============

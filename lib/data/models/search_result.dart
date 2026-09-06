@@ -1,5 +1,5 @@
-/// Models for the global search / command palette response
-/// (server `SearchResponse` envelope from `GET /api/search`).
+// Models for the global search / command palette response
+// (server `SearchResponse` envelope from `GET /api/search`).
 
 class SearchAction {
   const SearchAction({required this.id, required this.label});

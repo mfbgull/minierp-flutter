@@ -15,14 +15,23 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
 import 'calculations/customer_calculations.dart'
-    show computeCustomerMetrics;
+    show calculateTotalInvoiced, calculateTotalPaid, computeCustomerMetrics;
 import 'customer_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class CustomerOverviewTab extends ConsumerWidget {
-  const CustomerOverviewTab({super.key, required this.customerId});
+  const CustomerOverviewTab({
+    super.key,
+    required this.customerId,
+    required this.sessionId,
+  });
 
   final int customerId;
+
+  /// The detail-page instance's range-session id — only the two
+  /// period-scoped figures react to it (spec §6.1); everything else
+  /// stays lifetime.
+  final int sessionId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,6 +40,7 @@ class CustomerOverviewTab extends ConsumerWidget {
     final detail = ref.watch(customerDetailProvider(customerId));
     final invoices = ref.watch(customerInvoicesProvider(customerId));
     final ledger = ref.watch(customerLedgerProvider(customerId));
+    final range = customerDetailRangeIso(ref, sessionId);
 
     if (detail case AsyncError(:final error)) {
       return DetailError(
@@ -43,14 +53,41 @@ class CustomerOverviewTab extends ConsumerWidget {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final allInvoices = invoices.valueOrNull ?? const <Invoice>[];
+    // Period cohort — spec §6.1: invoices whose invoiceDate falls inside
+    // the active inclusive range. Only Total Invoiced / Total Received
+    // react to it. Deliberately built from the ALREADY-fetched full list
+    // (no new endpoint): Total Received sums each cohort invoice's
+    // paidAmount, so payments made OUTSIDE the period still count toward
+    // it when they belong to a cohort invoice (intentional — §6.1). All
+    // other Overview figures (Outstanding, credit footer, status bars,
+    // Avg. Days to Pay) stay lifetime.
+    final cohort = range.from == null
+        ? allInvoices
+        : allInvoices
+              .where(
+                (inv) =>
+                    inv.invoiceDate.isNotEmpty &&
+                    inv.invoiceDate.compareTo(range.from!) >= 0 &&
+                    inv.invoiceDate.compareTo(range.to!) <= 0,
+              )
+              .toList();
+    final cohortEmpty = range.from != null && cohort.isEmpty;
+
     final metrics = computeCustomerMetrics(
-      invoices.valueOrNull ?? const <Invoice>[],
+      allInvoices,
       ledger.valueOrNull ?? const <LedgerEntry>[],
       customer,
     );
     final totalInvoices = metrics.paidInvoicesCount +
         metrics.unpaidInvoicesCount +
         metrics.overdueInvoicesCount;
+
+    // Compact period annotation for the two range-scoped cards (spec
+    // §6.1 Active-range annotation; hidden on All dates).
+    final periodNote = range.from == null
+        ? null
+        : '${Formatters.date(range.from!)} – ${Formatters.date(range.to!)}';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -64,14 +101,16 @@ class CustomerOverviewTab extends ConsumerWidget {
             children: [
               _SummaryCard(
                 label: l10n.customersTotalinvoiced,
-                value: Formatters.currency(metrics.totalInvoiced),
+                value: Formatters.currency(calculateTotalInvoiced(cohort)),
                 icon: Icons.receipt_long_outlined,
+                annotation: periodNote,
               ),
               const SizedBox(width: 12),
               _SummaryCard(
                 label: l10n.customersTotalreceived,
-                value: Formatters.currency(metrics.totalPaid),
+                value: Formatters.currency(calculateTotalPaid(cohort)),
                 icon: Icons.savings_outlined,
+                annotation: periodNote,
               ),
               const SizedBox(width: 12),
               _SummaryCard(
@@ -96,6 +135,20 @@ class CustomerOverviewTab extends ConsumerWidget {
               ),
             ],
           ),
+          // Empty-cohort line — spec §6.1/§10.2: only the title, never
+          // the hint, because the rest of the Overview still carries
+          // standing lifetime data.
+          if (cohortEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              l10n.commonNoRecordsInPeriod,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: scheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           // Invoice Status — 4 tiles with proportional bars.
           _sectionTitle(context, l10n.customersInvoicestatus),
@@ -266,6 +319,7 @@ class _SummaryCard extends StatelessWidget {
     required this.icon,
     this.valueColor,
     this.footer,
+    this.annotation,
   });
 
   final String label;
@@ -275,6 +329,9 @@ class _SummaryCard extends StatelessWidget {
 
   /// Optional small note under the label (e.g. available credit).
   final String? footer;
+
+  /// Compact period annotation for range-scoped figures (spec §6.1).
+  final String? annotation;
 
   @override
   Widget build(BuildContext context) {
@@ -311,6 +368,17 @@ class _SummaryCard extends StatelessWidget {
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
+              if (annotation != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  annotation!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
               if (footer != null) ...[
                 const SizedBox(height: 4),
                 Text(

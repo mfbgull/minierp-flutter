@@ -11,6 +11,7 @@ import '../../employees/employee_detail_dialog.dart' show showEmployeeDetailDial
 import '../../employees/loan_models.dart' show ActiveLoanRow, ActiveLoansResult;
 import '../../employees/loan_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import 'package:minierp_app/widgets/skeleton_loader.dart';
 
 /// Dashboard panel showing active loans across all employees.
 /// Fetches GET /dashboard/active-loans.
@@ -35,7 +36,7 @@ class ActiveLoansPanel extends ConsumerWidget {
             const SizedBox(height: 8),
             Expanded(
               child: loans.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const ListPanelSkeleton(),
                 error: (error, _) => _PanelError(
                   message: error is ApiError ? error.message : error.toString(),
                   onRetry: () => ref.invalidate(dashboardActiveLoansProvider2),

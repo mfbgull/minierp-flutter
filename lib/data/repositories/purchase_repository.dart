@@ -22,7 +22,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/invoice.dart' show InvoicePaymentRecord;
 import '../models/purchase.dart' show Purchase;
@@ -221,5 +220,5 @@ class PurchaseRepository {
 }
 
 final purchaseRepositoryProvider = Provider<PurchaseRepository>(
-  (ref) => PurchaseRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => PurchaseRepository(ref.watch(repositoryClientProvider)),
 );

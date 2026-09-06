@@ -23,9 +23,9 @@ const paymentListQuery = zod_1.z.object({
 router.get('/', (0, requirePermission_1.requirePermission)('payments', 'read'), (0, validation_1.validateZodQuery)(paymentListQuery), paymentsController_1.default.getPayments);
 router.get('/unified', (0, requirePermission_1.requirePermission)('payments', 'read'), paymentsController_1.default.getUnifiedPayments);
 router.get('/:id', (0, requirePermission_1.requirePermission)('payments', 'read'), (0, validation_1.validateZodParams)(validation_1.zodSchemas.id), paymentsController_1.default.getPayment);
-router.post('/', (0, requirePermission_1.requirePermission)('payments', 'create'), rateLimiter_1.sensitiveOperationLimiter, paymentsController_1.default.createPayment);
-router.put('/:id', (0, requirePermission_1.requirePermission)('payments', 'update'), rateLimiter_1.sensitiveOperationLimiter, paymentsController_1.default.updatePayment);
+router.post('/', (0, requirePermission_1.requirePermission)('payments', 'create'), rateLimiter_1.sensitiveOperationLimiter, (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.paymentCreate), paymentsController_1.default.createPayment);
+router.put('/:id', (0, requirePermission_1.requirePermission)('payments', 'update'), rateLimiter_1.sensitiveOperationLimiter, (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), paymentsController_1.default.updatePayment);
 router.delete('/:id', (0, requirePermission_1.requirePermission)('payments', 'delete'), rateLimiter_1.sensitiveOperationLimiter, paymentsController_1.default.deletePayment);
 router.get('/:id/receipt', (0, requirePermission_1.requirePermission)('payments', 'read'), (0, validation_1.validateZodParams)(validation_1.zodSchemas.id), paymentsController_1.default.getPaymentReceipt);
-router.post('/:id/allocate', (0, requirePermission_1.requirePermission)('payments', 'update'), rateLimiter_1.sensitiveOperationLimiter, paymentsController_1.default.allocatePaymentToInvoice);
+router.post('/:id/allocate', (0, requirePermission_1.requirePermission)('payments', 'update'), rateLimiter_1.sensitiveOperationLimiter, (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), paymentsController_1.default.allocatePaymentToInvoice);
 exports.default = router;

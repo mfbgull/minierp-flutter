@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
+import { validateZodBody, zodBodySchemas } from '../middleware/validation';
 import activityLogController from '../controllers/activityLogController';
 
 const router: Router = Router();
@@ -41,6 +42,6 @@ router.get('/entity/:type/:id', requirePermission('activity_log', 'read'), activ
 router.get('/export', requirePermission('activity_log', 'read'), activityLogController.exportLogs);
 
 // Cleanup old logs (admin only)
-router.post('/cleanup', requirePermission('activity_log', 'purge'), activityLogController.cleanupLogs);
+router.post('/cleanup', requirePermission('activity_log', 'purge'), validateZodBody(zodBodySchemas.cleanupLogs), activityLogController.cleanupLogs);
 
 export default router;

@@ -3,6 +3,8 @@ const router = express.Router();
 import suppliersController from '../controllers/suppliersController';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
+import { validateZodQuery, zodSchemas } from '../middleware/validation';
+import { z } from 'zod';
 
 // All supplier routes require authentication
 router.use(authenticateToken);
@@ -10,7 +12,7 @@ router.use(authenticateToken);
 router.get('/', requirePermission('suppliers', 'read'), suppliersController.getSuppliers);
 router.get('/next-code', requirePermission('suppliers', 'read'), suppliersController.getNextSupplierCode);
 router.get('/:id', requirePermission('suppliers', 'read'), suppliersController.getSupplierById);
-router.get('/:id/ledger', requirePermission('suppliers', 'read'), suppliersController.getSupplierLedger);
+router.get('/:id/ledger', requirePermission('suppliers', 'read'), validateZodQuery(z.object({ ...zodSchemas.dateRange.shape })), suppliersController.getSupplierLedger);
 router.get('/:id/statement', requirePermission('suppliers', 'read'), suppliersController.getSupplierStatement);
 router.get('/:id/balance', requirePermission('suppliers', 'read'), suppliersController.getSupplierBalance);
 router.post('/', requirePermission('suppliers', 'create'), suppliersController.createSupplier);

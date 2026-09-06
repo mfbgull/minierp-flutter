@@ -40,6 +40,22 @@ final posCatalogProvider = FutureProvider<List<PosItem>>((ref) async {
   };
 });
 
+/// Scanner lookup (SHORTCOMINGS-FIX 4.3): resolves a scanned code against
+/// the loaded POS catalog. Item codes are the barcode stand-in (the item
+/// schema has no separate barcode column), matched case-insensitively.
+/// Returns null for an unknown code or while the catalog is loading.
+final posScannerLookupProvider = Provider<Future<PosItem?> Function(String)>(
+  (ref) => (String code) async {
+    final catalog = await ref.watch(posCatalogProvider.future);
+    final normalized = code.trim().toLowerCase();
+    if (normalized.isEmpty) return null;
+    for (final item in catalog) {
+      if (item.itemCode.toLowerCase() == normalized) return item;
+    }
+    return null;
+  },
+);
+
 /// Warehouses selectable on the POS screen — all active warehouses.
 final posWarehousesProvider = FutureProvider<List<PosWarehouse>>(
   (ref) async {

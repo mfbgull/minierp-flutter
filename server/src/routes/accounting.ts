@@ -21,6 +21,7 @@ import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
 import { sensitiveOperationLimiter } from '../middleware/rateLimiter';
+import { validateZodBody, zodBodySchemas } from '../middleware/validation';
 import accountingController from '../controllers/accountingController';
 
 const router = Router();
@@ -62,6 +63,7 @@ router.get('/periods/:id', requirePermission('accounting', 'read'), accountingCo
 router.post(
   '/periods',
   requirePermission('accounting', 'update'),
+  validateZodBody(zodBodySchemas.periodOpen),
   sensitiveOperationLimiter,
   accountingController.openPeriod
 );
@@ -70,6 +72,7 @@ router.post(
 router.post(
   '/periods/:id/close',
   requirePermission('accounting', 'update'),
+  validateZodBody(zodBodySchemas.object),
   sensitiveOperationLimiter,
   accountingController.closePeriod
 );

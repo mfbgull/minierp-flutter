@@ -18,6 +18,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/detail_error.dart';
+import '../../widgets/filtered_empty_state.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../payments/edit_payment_dialog.dart' show showPaymentEditDialog;
 import '../payments/payments_providers.dart' show paymentsProvider;
@@ -27,9 +28,17 @@ import '../../widgets/detail_tab_grid.dart';
 enum _PaymentRowAction { print, edit, delete }
 
 class CustomerPaymentsTab extends ConsumerStatefulWidget {
-  const CustomerPaymentsTab({super.key, required this.customerId});
+  const CustomerPaymentsTab({
+    super.key,
+    required this.customerId,
+    required this.sessionId,
+  });
 
   final int customerId;
+
+  /// The detail-page instance's range-session id — this tab derives its
+  /// fetch args from the header pill's pair (spec §3.1/§9).
+  final int sessionId;
 
   @override
   ConsumerState<CustomerPaymentsTab> createState() =>
@@ -44,12 +53,38 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    // The page's unified range — part of the fetch identity (§9); null =
+    // All dates (no date parameters).
+    final range = customerDetailRangeIso(ref, widget.sessionId);
+
+    // A range change re-keys the provider, so the old page index is
+    // meaningless — reset to page 1 (spec §9: "paged tabs reset to page
+    // 1").
+    ref.listen(
+      customerDetailFromDateProvider(widget.sessionId),
+      (previous, next) {
+        if (previous != next && _page != 1) {
+          setState(() => _page = 1);
+        }
+      },
+    );
+    ref.listen(
+      customerDetailToDateProvider(widget.sessionId),
+      (previous, next) {
+        if (previous != next && _page != 1) {
+          setState(() => _page = 1);
+        }
+      },
+    );
+
     final payments = ref.watch(
       customerPaymentsPagedProvider(
         CustomerPaymentsArgs(
           customerId: widget.customerId,
           page: _page,
           limit: _limit,
+          fromDate: range.from,
+          toDate: range.to,
         ),
       ),
     );
@@ -62,6 +97,8 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
           customerId: widget.customerId,
           page: _page,
           limit: _limit,
+          fromDate: range.from,
+          toDate: range.to,
         ),
       ),
       (previous, next) {
@@ -75,7 +112,9 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
 
     return switch (payments) {
       AsyncData(:final value) => value.items.isEmpty
-          ? _empty(context, l10n.customersNopayments)
+          ? (range.from != null
+                ? const FilteredEmptyState()
+                : _empty(context, l10n.customersNopayments))
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -113,6 +152,8 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
               customerId: widget.customerId,
               page: _page,
               limit: _limit,
+              fromDate: range.from,
+              toDate: range.to,
             ),
           ),
         ),

@@ -153,7 +153,9 @@ function deleteItem(req: AuthRequest, res: Response): void {
       return;
     }
 
-    ItemModel.delete(itemId, db);
+    // Soft-delete (SHORTCOMINGS-FIX 4.2): stamp deleted_at + deactivate
+    // so the row can be restored instead of being lost forever.
+    ItemModel.delete(itemId, req.user!.id, db);
 
     // Log item deletion using activity logger
     logCRUD(ActionType.ITEM_DELETE, 'Item', itemId, `Deleted item: ${item.item_name}`, req.user!.id, {
@@ -292,6 +294,31 @@ function updateWarehouse(req: AuthRequest, res: Response): void {
   } catch (error) {
     logger.error('Update warehouse error:', error);
     res.status(500).json({ error: 'Failed to update warehouse' });
+  }
+}
+
+function restoreItem(req: AuthRequest, res: Response): void {
+  try {
+    const itemId = Number(req.params.id);
+    const item = ItemModel.getById(itemId, db);
+
+    if (!item) {
+      res.status(404).json({ error: 'Item not found' });
+      return;
+    }
+
+    ItemModel.restore(itemId, db);
+    const restoredItem = ItemModel.getById(itemId, db);
+
+    logCRUD(ActionType.ITEM_RESTORE, 'Item', itemId, `Restored item: ${item.item_name}`, req.user!.id, {
+      item_code: item.item_code
+    });
+    req.activityLogged = true;
+
+    res.json({ success: true, data: restoredItem, message: 'Item restored successfully' });
+  } catch (error) {
+    logger.error('Restore item error:', error);
+    res.status(500).json({ error: 'Failed to restore item' });
   }
 }
 
@@ -698,7 +725,7 @@ export default {
   getItem,
   createItem,
   updateItem,
-  deleteItem,
+  deleteItem, restoreItem,
   getCategories,
   getLowStock,
   getUnitsOfMeasure,

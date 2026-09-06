@@ -4,6 +4,7 @@ import db from '../config/database';
 import logger from '../utils/logger';
 import { getQueryParam } from '../utils/queryUtils';
 import DashboardModel from '../models/Dashboard';
+import DashboardLayoutModel from '../models/DashboardLayout';
 import { EmployeeLoanModel } from '../models/EmployeeLoan';
 import ReportsModel from '../models/Reports';
 import {
@@ -203,6 +204,78 @@ function getExpiryAlerts(req: AuthRequest, res: Response): void {
 }
 
 /**
+ * GET /api/dashboard/boot?metrics=a,b,c&fromDate&toDate  (spec 7.1)
+ * The whole dashboard's initial payload in ONE round trip: summary,
+ * active layout, KPI batch, cash position, AR summary, expiry alerts
+ * and top customers. Cuts the login boot from 8 parallel GETs to 1
+ * (plus /auth/me + /preferences = the <= 3 boot-call criterion).
+ * Field failures degrade independently: only summary/layout can 500 —
+ * the KPI loop and optional blocks never throw (null / empty on error).
+ */
+function getBoot(req: AuthRequest, res: Response): void {
+  try {
+    const userId = req.user!.id;
+    const fromDate = String((req.query.fromDate as string) || (req.query.from_date as string) || '') || undefined;
+    const toDate = String((req.query.toDate as string) || (req.query.to_date as string) || '') || undefined;
+    const rawMetrics = String(req.query.metrics || '');
+    const metrics = rawMetrics.split(',').map(s => s.trim()).filter(Boolean).slice(0, 12);
+
+    const kpis: Record<string, unknown> = {};
+    for (const metric of metrics) {
+      try {
+        kpis[metric] = DashboardModel.getKPI(db, metric, fromDate, toDate);
+      } catch {
+        kpis[metric] = null;
+      }
+    }
+
+    let topCustomers: unknown = [];
+    try {
+      topCustomers = DashboardModel.getTopCustomers(db, 5);
+    } catch (error) {
+      logger.error('Boot top-customers error:', error);
+    }
+
+    let expiryAlerts: unknown = [];
+    try {
+      expiryAlerts = ReportsModel.getExpiryAlerts(db, 30);
+    } catch (error) {
+      logger.error('Boot expiry-alerts error:', error);
+    }
+
+    let ar: unknown = null;
+    try {
+      ar = DashboardModel.getARSummary(db);
+    } catch (error) {
+      logger.error('Boot AR-summary error:', error);
+    }
+
+    let cash: unknown = null;
+    try {
+      cash = DashboardModel.getCashPosition(db);
+    } catch (error) {
+      logger.error('Boot cash-position error:', error);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        summary: DashboardModel.getSummary(db, fromDate, toDate),
+        layout: DashboardLayoutModel.getActiveLayout(userId),
+        kpis,
+        cash,
+        ar,
+        expiryAlerts,
+        topCustomers,
+      },
+    });
+  } catch (error) {
+    logger.error('Dashboard boot error:', error);
+    res.status(500).json({ error: 'Failed to fetch dashboard boot data' });
+  }
+}
+
+/**
  * GET /api/dashboard/cash-opening-balances
  * The per-account opening (seed) balances a new business starts with.
  */
@@ -283,6 +356,7 @@ function getActiveLoans(req: AuthRequest, res: Response): void {
 }
 
 export default {
+  getBoot,
   getSummary,
   getCashPosition,
   getExpiryAlerts,

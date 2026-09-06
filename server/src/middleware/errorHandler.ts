@@ -21,13 +21,15 @@ function errorHandler(
     userId: req.user?.id,
   });
 
+  // Never leak stack traces to clients (even in development) — they are
+  // logged server-side via Winston above. The dev branch only widens the
+  // message for easier local debugging.
   if (process.env.NODE_ENV === 'development') {
     res.status(status).json({
       success: false,
       error: {
         code: 'INTERNAL_ERROR',
         message,
-        stack: err.stack,
       },
     });
   } else {

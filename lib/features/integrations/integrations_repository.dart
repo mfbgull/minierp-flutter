@@ -5,7 +5,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../data/repositories/api_result.dart';
 import '../../data/repositories/repository_client.dart';
@@ -58,5 +57,5 @@ class IntegrationsRepository {
 
 final integrationsRepositoryProvider = Provider<IntegrationsRepository>(
   (ref) =>
-      IntegrationsRepository(RepositoryClient(ref.watch(dioProvider))),
+      IntegrationsRepository(ref.watch(repositoryClientProvider)),
 );

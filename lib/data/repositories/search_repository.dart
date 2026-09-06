@@ -1,10 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/search_result.dart' show SearchResponse;
 import 'api_result.dart' show ApiResult;
-import 'repository_client.dart' show RepositoryClient;
+import 'repository_client.dart' show RepositoryClient, repositoryClientProvider;
 
 class SearchRepository {
   SearchRepository(this._client);
@@ -26,5 +25,5 @@ class SearchRepository {
 }
 
 final searchRepositoryProvider = Provider<SearchRepository>(
-  (ref) => SearchRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => SearchRepository(ref.watch(repositoryClientProvider)),
 );

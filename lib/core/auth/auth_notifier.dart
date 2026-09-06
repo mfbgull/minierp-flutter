@@ -53,6 +53,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<ApiError?> _applyLogin(AuthLoginResult login) async {
     await _writeToken(login.token);
+    await _writeRefreshToken(login.refreshToken);
     state = AuthState(status: AuthStatus.authenticated, user: login.user);
     return null;
   }
@@ -70,6 +71,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
+  /// Stores a fresh access token produced by the dio refresh interceptor
+  /// (the user object is unchanged, so the session state stays put).
+  Future<void> updateAccessToken(String token) async {
+    await _writeToken(token);
+  }
+
   // Storage calls are wrapped so a storage failure (headless keyring,
   // missing plugin) degrades to "no session" instead of crashing.
   Future<String?> _readToken() async {
@@ -83,6 +90,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _writeToken(String token) async {
     try {
       await _storage.writeToken(token);
+    } catch (_) {}
+  }
+
+  Future<void> _writeRefreshToken(String token) async {
+    try {
+      await _storage.writeRefreshToken(token);
     } catch (_) {}
   }
 

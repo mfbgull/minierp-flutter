@@ -8,12 +8,14 @@ const router = express_1.default.Router();
 const suppliersController_1 = __importDefault(require("../controllers/suppliersController"));
 const auth_1 = require("../middleware/auth");
 const requirePermission_1 = require("../middleware/requirePermission");
+const validation_1 = require("../middleware/validation");
+const zod_1 = require("zod");
 // All supplier routes require authentication
 router.use(auth_1.authenticateToken);
 router.get('/', (0, requirePermission_1.requirePermission)('suppliers', 'read'), suppliersController_1.default.getSuppliers);
 router.get('/next-code', (0, requirePermission_1.requirePermission)('suppliers', 'read'), suppliersController_1.default.getNextSupplierCode);
 router.get('/:id', (0, requirePermission_1.requirePermission)('suppliers', 'read'), suppliersController_1.default.getSupplierById);
-router.get('/:id/ledger', (0, requirePermission_1.requirePermission)('suppliers', 'read'), suppliersController_1.default.getSupplierLedger);
+router.get('/:id/ledger', (0, requirePermission_1.requirePermission)('suppliers', 'read'), (0, validation_1.validateZodQuery)(zod_1.z.object({ ...validation_1.zodSchemas.dateRange.shape })), suppliersController_1.default.getSupplierLedger);
 router.get('/:id/statement', (0, requirePermission_1.requirePermission)('suppliers', 'read'), suppliersController_1.default.getSupplierStatement);
 router.get('/:id/balance', (0, requirePermission_1.requirePermission)('suppliers', 'read'), suppliersController_1.default.getSupplierBalance);
 router.post('/', (0, requirePermission_1.requirePermission)('suppliers', 'create'), suppliersController_1.default.createSupplier);

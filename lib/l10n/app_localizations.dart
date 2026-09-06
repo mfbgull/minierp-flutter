@@ -4898,6 +4898,12 @@ abstract class AppLocalizations {
   /// **'No results found'**
   String get commonNoresults;
 
+  /// No description provided for @posItemNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Item not found'**
+  String get posItemNotFound;
+
   /// No description provided for @commonEntries.
   ///
   /// In en, this message translates to:
@@ -4957,6 +4963,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dark mode'**
   String get commonThemeMode;
+
+  /// No description provided for @commonUserMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'User menu'**
+  String get commonUserMenu;
 
   /// No description provided for @commonCurrency.
   ///
@@ -5059,6 +5071,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edit'**
   String get commonEdit;
+
+  /// No description provided for @commonUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get commonUndo;
 
   /// No description provided for @commonSearch.
   ///
@@ -5173,6 +5191,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loading...'**
   String get commonLoading;
+
+  /// No description provided for @commonNoRecordsInPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'No records in the selected period'**
+  String get commonNoRecordsInPeriod;
+
+  /// No description provided for @commonNoRecordsInPeriodHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try a wider date range or choose All dates'**
+  String get commonNoRecordsInPeriodHint;
 
   /// No description provided for @commonSales.
   ///
@@ -7291,6 +7321,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Export to CSV'**
   String get customersExportcsv;
+
+  /// No description provided for @customersExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export customers'**
+  String get customersExportfailed;
 
   /// No description provided for @customersExportimage.
   ///
@@ -10879,6 +10915,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Batch Management'**
   String get batchManagement;
+
+  /// No description provided for @bulkSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String bulkSelectedCount(Object count);
+
+  /// No description provided for @bulkExportSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Export selected'**
+  String get bulkExportSelected;
+
+  /// No description provided for @bulkDeleteSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete selected'**
+  String get bulkDeleteSelected;
+
+  /// No description provided for @bulkActivateSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate selected'**
+  String get bulkActivateSelected;
+
+  /// No description provided for @bulkDeactivateSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Deactivate selected'**
+  String get bulkDeactivateSelected;
+
+  /// No description provided for @bulkDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} deleted'**
+  String bulkDeleted(Object count);
+
+  /// No description provided for @bulkDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Some items could not be deleted'**
+  String get bulkDeleteFailed;
+
+  /// No description provided for @bulkActivated.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} activated'**
+  String bulkActivated(Object count);
+
+  /// No description provided for @bulkDeactivated.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} deactivated'**
+  String bulkDeactivated(Object count);
+
+  /// No description provided for @bulkUpdateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Some items could not be updated'**
+  String get bulkUpdateFailed;
+
+  /// No description provided for @bulkSetStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Set status'**
+  String get bulkSetStatus;
+
+  /// No description provided for @bulkSetStatusTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Set status: {status}'**
+  String bulkSetStatusTo(Object status);
+
+  /// No description provided for @bulkStatusSubmitWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit posts the selected orders to the supplier ledger. Orders that cannot make this transition are skipped.'**
+  String get bulkStatusSubmitWarning;
+
+  /// No description provided for @bulkStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} purchase orders set to {status}'**
+  String bulkStatusCancelled(Object count, Object status);
 
   /// No description provided for @expiryStatus.
   ///

@@ -8,7 +8,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/activity_log.dart'
     show ActivityLog, ActivityLogUser, ActivityStats;
@@ -105,5 +104,5 @@ class ActivityLogRepository {
 }
 
 final activityLogRepositoryProvider = Provider<ActivityLogRepository>(
-  (ref) => ActivityLogRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => ActivityLogRepository(ref.watch(repositoryClientProvider)),
 );

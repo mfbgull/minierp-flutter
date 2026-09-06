@@ -193,7 +193,7 @@ describe('ItemModel', () => {
     });
     describe('delete', () => {
         it('soft-deletes an item (sets is_active=0)', () => {
-            const result = Item_1.default.delete(createdItemId, database_1.default);
+            const result = Item_1.default.delete(createdItemId, 1, database_1.default);
             expect(result.changes).toBe(1);
             const deleted = Item_1.default.getById(createdItemId, database_1.default);
             expect(deleted?.is_active).toBe(0);
@@ -405,7 +405,7 @@ describe('StockMovementModel', () => {
             database_1.default.prepare(`DELETE FROM stock_movements WHERE item_id = ?`).run(testItemId);
             database_1.default.prepare(`DELETE FROM stock_balances WHERE item_id = ?`).run(testItemId);
             database_1.default.prepare(`DELETE FROM stock_batches WHERE item_id = ?`).run(testItemId);
-            Item_1.default.delete(testItemId, database_1.default);
+            Item_1.default.delete(testItemId, 1, database_1.default);
         });
         it('consumes from oldest batch first (FIFO)', () => {
             const batch1Result = StockMovement_1.default.recordMovement({
@@ -604,7 +604,7 @@ describe('StockMovementModel', () => {
             database_1.default.prepare(`DELETE FROM purchases WHERE supplier_id = ?`).run(supplierId);
             database_1.default.prepare(`DELETE FROM supplier_ledger WHERE supplier_id = ?`).run(supplierId);
             database_1.default.prepare(`DELETE FROM suppliers WHERE id = ?`).run(supplierId);
-            Item_1.default.delete(itemId, database_1.default);
+            Item_1.default.delete(itemId, 1, database_1.default);
         });
         it('records a purchase linked to a supplier and posts the AP ledger entry', () => {
             const purchase = Purchase_1.default.recordPurchase({
@@ -825,7 +825,7 @@ describe('StockMovementModel', () => {
             database_1.default.prepare(`DELETE FROM stock_movements WHERE item_id = ?`).run(testItemId2);
             database_1.default.prepare(`DELETE FROM stock_balances WHERE item_id = ?`).run(testItemId2);
             database_1.default.prepare(`DELETE FROM stock_batches WHERE item_id = ?`).run(testItemId2);
-            Item_1.default.delete(testItemId2, database_1.default);
+            Item_1.default.delete(testItemId2, 1, database_1.default);
         });
         it('delegates to recordMovement for incoming movements', () => {
             const results = StockMovement_1.default.recordBatchMovement({

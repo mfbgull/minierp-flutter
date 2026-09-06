@@ -21,12 +21,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:minierp_app/core/theme/status_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
-import '../../core/utils/formatters.dart';
+import '../../core/utils/csv_export.dart';
 import '../../data/models/customer.dart' show Customer;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/customer_repository.dart'
@@ -38,7 +37,9 @@ import '../../widgets/confirm_dialog.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
-import '../../widgets/status_badge.dart';
+import '../../widgets/offline_cache_badge.dart';
+import 'customers_grid_columns.dart';
+import 'customers_row_actions.dart';
 import 'customer_form_dialog.dart';
 import 'customer_providers.dart';
 
@@ -48,8 +49,6 @@ import 'customer_providers.dart';
 enum _StatusFilter { all, active, inactive }
 
 /// The per-row actions menu items (web ⋮ dropdown: View / Edit / Delete).
-enum _RowAction { view, edit, delete }
-
 class CustomersScreen extends ConsumerStatefulWidget {
   const CustomersScreen({super.key});
 
@@ -82,6 +81,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
   /// [Customer] object the actions menu needs (hidden `data` cell).
   @override
   List<String> get hiddenGridColumnFields => const ['id', 'data'];
+
+  /// Bulk selection (SHORTCOMINGS-FIX 4.4): checkbox column + select-all
+  /// header, driving the bulk action bar (export the selected rows).
+  /// Selection resets whenever the grid rows are replaced.
+  @override
+  bool get enableBulkSelection => true;
 
   @override
   PlutoRow gridRowFor(Customer customer) => PlutoRow(
@@ -171,42 +176,24 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
     }
   }
 
-  void _onRowAction(_RowAction action, Customer? customer) {
-    if (customer == null || !mounted) return;
-    switch (action) {
-      case _RowAction.view:
-        openRowDetail(customer.id);
-      case _RowAction.edit:
-        showCustomerFormDialog(context, customer: customer);
-      case _RowAction.delete:
-        _deleteCustomer(customer);
-    }
-  }
-
-  Future<void> _deleteCustomer(Customer customer) async {
+  /// Bulk CSV export — the selected customers' rows only (SHORTCOMINGS-
+  /// FIX 4.4), mirroring the grid columns via [buildCustomersCsv].
+  void _bulkExport(Set<int> ids) {
     final l10n = AppLocalizations.of(context)!;
-    final confirmed = await showConfirmDialog(
+    final customers =
+        ref.read(customersProvider).valueOrNull?.items ?? const <Customer>[];
+    final selected = [
+      for (final c in customers)
+        if (ids.contains(c.id)) c,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
       context,
-      title: l10n.customersDelete,
-      message: '${l10n.customersConfirmdelete} "${customer.customerName}"?',
-      confirmLabel: l10n.customersDelete,
-      destructive: true,
+      suggestedName: csvSuggestedName('customers'),
+      csv: buildCustomersCsv(l10n, selected),
+      successMessage: l10n.customersExportsuccess,
+      errorMessage: l10n.customersExportfailed,
     );
-    if (!confirmed || !mounted) return;
-
-    final result = await ref.read(customerRepositoryProvider).delete(
-      customer.id,
-    );
-    if (!mounted) return;
-    switch (result) {
-      case ApiSuccess():
-        showAppToast(context, l10n.customersCustomerdeleted);
-        ref.invalidate(customersProvider);
-      case ApiFailure(:final error):
-        // Surfaces the server 400 ("Cannot delete customer with existing
-        // transactions") verbatim.
-        showAppToast(context, error.message, isError: true);
-    }
   }
 
   Future<void> _fixBalances() async {
@@ -297,6 +284,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
             ),
           ],
           onRefresh: () => ref.invalidate(customersProvider),
+          actions: [const OfflineCacheBadge()],
           // The web's "Fix Balances" action (recalculate all customer
           // balances from unpaid invoices). Kept AFTER the New-customer
           // button so the Ctrl+N chord stays on Add Customer and the
@@ -319,6 +307,25 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
               label: Text(l10n.customersFixbalances),
             ),
           ],
+        ),
+        // Bulk action bar (checkbox rows selected) — export the selected
+        // customers to CSV (SHORTCOMINGS-FIX 4.4).
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              actions: [
+                TextButton.icon(
+                  onPressed: () => _bulkExport(sel),
+                  icon: const Icon(Icons.file_download_outlined, size: 18),
+                  label: Text(l10n.bulkExportSelected),
+                ),
+              ],
+            );
+          },
         ),
         Expanded(child: gridScreenBody(customers, provider: customersProvider)),
         if (page != null)
@@ -350,433 +357,18 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
   /// Actions. Balance/utilization cells carry the web's color coding
   /// (due = amber, clear = green, utilization ≥90% red / ≥75% amber).
   ///
-  /// PlutoGrid renderers have no BuildContext, so cells needing theme
-  /// colors wrap themselves in a [Builder] (same pattern as the payments
-  /// screen's date cell).
+  /// Column definitions live in `customers_grid_columns.dart` (spec 1.3);
+  /// this method only wires the row-menu callback into the shared builder.
   @override
   List<PlutoColumn> buildGridColumns(AppLocalizations l10n) {
-    PlutoColumn textColumn(String field, String title, double width) =>
-        PlutoColumn(
-          title: title,
-          field: field,
-          type: PlutoColumnType.text(),
-          width: width,
-          readOnly: true,
-          enableContextMenu: false,
-        );
-
-    return [
-      // Hidden record-id cell (the mixin's id pattern) — never revealed.
-      PlutoColumn(
-        title: '',
-        field: 'id',
-        type: PlutoColumnType.number(),
-        width: 80,
-        readOnly: true,
-        renderer: (ctx) => const SizedBox.shrink(),
-        enableContextMenu: false,
-        enableFilterMenuItem: false,
-        enableHideColumnMenuItem: false,
-        enableSetColumnsMenuItem: false,
-      ),
-      // Hidden cell carrying the full Customer for the actions menu —
-      // hidden with the id column in onLoaded.
-      PlutoColumn(
-        title: '',
-        field: 'data',
-        type: PlutoColumnType.text(),
-        width: 80,
-        readOnly: true,
-        renderer: (ctx) => const SizedBox.shrink(),
-        enableContextMenu: false,
-        enableFilterMenuItem: false,
-        enableHideColumnMenuItem: false,
-        enableSetColumnsMenuItem: false,
-      ),
-      textColumn('code', l10n.customersCustomercode, 110),
-      // Customer name + contact person sub-line.
-      PlutoColumn(
-        title: l10n.customersCustomername,
-        field: 'name',
-        type: PlutoColumnType.text(),
-        width: 200,
-        readOnly: true,
-        enableContextMenu: false,
-        renderer: (ctx) {
-          final customer = ctx.cell.row.cells['data']?.value as Customer?;
-          return Builder(
-            builder: (cellContext) => Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${ctx.cell.value}',
-                  overflow: TextOverflow.ellipsis,
-                  // height keeps the two-line cell inside the 34px row
-                  // (default line height overflows the grid cell by 1px).
-                  style: const TextStyle(fontWeight: FontWeight.w600, height: 1.1),
-                ),
-                if (customer?.contactPerson?.isNotEmpty ?? false)
-                  Text(
-                    customer!.contactPerson!,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.1,
-                      color: Theme.of(
-                        cellContext,
-                      ).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
-      ),
-      // Contact info: phone + email sub-line.
-      PlutoColumn(
-        title: l10n.customersContactinfo,
-        field: 'phone',
-        type: PlutoColumnType.text(),
-        width: 180,
-        readOnly: true,
-        enableContextMenu: false,
-        renderer: (ctx) {
-          final email = ctx.cell.row.cells['email']?.value?.toString() ?? '';
-          return Builder(
-            builder: (cellContext) => Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${ctx.cell.value}',
-                  overflow: TextOverflow.ellipsis,
-                  // height keeps the two-line cell inside the 34px row.
-                  style: const TextStyle(height: 1.1),
-                ),
-                if (email.isNotEmpty)
-                  Text(
-                    email,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.1,
-                      color: Theme.of(
-                        cellContext,
-                      ).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
-      ),
-      // Billing address (multi-line, capped at 3 lines).
-      PlutoColumn(
-        title: l10n.customersAddress,
-        field: 'address',
-        type: PlutoColumnType.text(),
-        width: 200,
-        readOnly: true,
-        enableContextMenu: false,
-        renderer: (ctx) {
-          final lines = '${ctx.cell.value}'
-              .split('\n')
-              .where((line) => line.isNotEmpty)
-              .take(3)
-              .toList();
-          return Builder(
-            builder: (cellContext) => Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final line in lines)
-                  Text(
-                    line,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(
-                        cellContext,
-                      ).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
-      ),
-      // Credit limit — colored by utilization (web getCreditUtilizationClass).
-      PlutoColumn(
-        title: l10n.customersCreditlimit,
-        field: 'creditLimit',
-        type: PlutoColumnType.number(format: '#,###.00'),
-        width: 120,
-        readOnly: true,
-        textAlign: PlutoColumnTextAlign.end,
-        titleTextAlign: PlutoColumnTextAlign.end,
-        enableContextMenu: false,
-        renderer: (ctx) {
-          final customer = ctx.cell.row.cells['data']?.value as Customer?;
-          final limit = (ctx.cell.value as num?) ?? 0;
-          final utilization = customer?.creditUtilizationPercent ??
-              ((customer?.currentBalance ?? 0) / (limit == 0 ? 1 : limit)) *
-                  100;
-          return Builder(
-            builder: (cellContext) {
-              final color = _utilizationColor(
-                cellContext,
-                utilization,
-                limit,
-              );
-              return Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  Formatters.currency(limit),
-                  style: color == null ? null : TextStyle(color: color),
-                ),
-              );
-            },
-          );
-        },
-      ),
-      // Current balance — due (amber) when positive, clear (green) when
-      // zero/negative (web getBalanceCellClass).
-      PlutoColumn(
-        title: l10n.customersCurrentbalance,
-        field: 'balance',
-        type: PlutoColumnType.number(format: '#,###.00'),
-        width: 140,
-        readOnly: true,
-        textAlign: PlutoColumnTextAlign.end,
-        titleTextAlign: PlutoColumnTextAlign.end,
-        enableContextMenu: false,
-        renderer: (ctx) {
-          final balance = (ctx.cell.value as num?) ?? 0;
-          return Builder(
-            builder: (cellContext) => Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                Formatters.currency(balance),
-                style: TextStyle(
-                  color: _balanceColor(cellContext, balance),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-      // Credit utilization % — N/A when no credit limit; colored ≥90% red,
-      // ≥75% amber, else low (web credit-utilization classes).
-      PlutoColumn(
-        title: l10n.customersCreditutilization,
-        field: 'utilization',
-        type: PlutoColumnType.number(format: '#,###.00'),
-        width: 140,
-        readOnly: true,
-        textAlign: PlutoColumnTextAlign.end,
-        titleTextAlign: PlutoColumnTextAlign.end,
-        enableContextMenu: false,
-        renderer: (ctx) {
-          final customer = ctx.cell.row.cells['data']?.value as Customer?;
-          final limit = customer?.creditLimit ?? 0;
-          final utilization = (ctx.cell.value as num?) ?? 0;
-          return Builder(
-            builder: (cellContext) {
-              if (limit <= 0) {
-                return Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    l10n.customersNotapplicable,
-                    style: TextStyle(
-                      color: Theme.of(
-                        cellContext,
-                      ).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                );
-              }
-              final color = _utilizationColor(
-                cellContext,
-                utilization,
-                limit,
-              );
-              return Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  // Two decimals like the web (`(value || 0).toFixed(2)`).
-                  '${utilization.toStringAsFixed(2)}%',
-                  style: color == null ? null : TextStyle(color: color),
-                ),
-              );
-            },
-          );
-        },
-      ),
-      // Payment terms in days (e.g. "14 days").
-      PlutoColumn(
-        title: l10n.customersPaymenttermsdays,
-        field: 'terms',
-        type: PlutoColumnType.number(),
-        width: 120,
-        readOnly: true,
-        enableContextMenu: false,
-        renderer: (ctx) {
-          final days = (ctx.cell.value as num?) ?? 0;
-          return Text(l10n.customersDays(days));
-        },
-      ),
-      PlutoColumn(
-        title: l10n.commonStatus,
-        field: 'active',
-        type: PlutoColumnType.text(),
-        width: 110,
-        readOnly: true,
-        enableContextMenu: false,
-        renderer: (ctx) {
-          final active = ctx.cell.value == true;
-          return Align(
-            alignment: Alignment.centerLeft,
-            child: StatusBadge(
-              status: active ? l10n.statusActive : l10n.statusInactive,
-              color: StatusColors.of(context).active(active),
-            ),
-          );
-        },
-      ),
-      // Per-row actions menu — the web's ⋮ dropdown (View/Edit/Delete).
-      // A raw Listener opens the menu: PlutoGrid's cell gesture handler
-      // competes in the gesture arena and swallows an IconButton/InkWell
-      // tap, but a Listener receives pointer events regardless of the
-      // arena, so the menu opens reliably (and in widget tests).
-      PlutoColumn(
-        title: l10n.customersActions,
-        field: 'actions',
-        // Pinned to the right edge — stays reachable when the grid scrolls.
-        frozen: PlutoColumnFrozen.end,
-        type: PlutoColumnType.text(),
-        width: 64,
-        readOnly: true,
-        enableContextMenu: false,
-        enableFilterMenuItem: false,
-        enableHideColumnMenuItem: false,
-        enableSetColumnsMenuItem: false,
-        renderer: (ctx) {
-          final customer = ctx.cell.row.cells['data']?.value as Customer?;
-          return Builder(
-            builder: (cellContext) => Listener(
-              behavior: HitTestBehavior.opaque,
-              onPointerDown: (_) => _openRowMenu(cellContext, customer),
-              child: Center(
-                child: Icon(
-                  Icons.more_vert,
-                  size: 18,
-                  color: Theme.of(cellContext).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    ];
+    return buildCustomerColumns(l10n: l10n, onOpenRowMenu: _openRowMenu);
   }
 
-  /// Opens the row-actions menu anchored at [cellContext] (the ⋮ cell).
-  /// Uses [showMenu] directly — the PopupMenuButton trigger can't receive
-  /// the tap inside a PlutoGrid cell, but this path only needs a position.
-  Future<void> _openRowMenu(
-    BuildContext cellContext,
-    Customer? customer,
-  ) async {
+  /// Row-actions menu + delete logic live in `customers_row_actions.dart`
+  /// (spec 1.3); the grid's ⋮ cell only needs to forward the tap.
+  Future<void> _openRowMenu(BuildContext cellContext, Customer? customer) async {
     if (customer == null || !mounted) return;
-    final box = cellContext.findRenderObject() as RenderBox?;
-    if (box == null || !box.hasSize) return;
-    final overlay = Overlay.of(cellContext, rootOverlay: true);
-    final l10n = AppLocalizations.of(cellContext)!;
-    final action = await showMenu<_RowAction>(
-      context: cellContext,
-      position: RelativeRect.fromRect(
-        Rect.fromPoints(
-          box.localToGlobal(Offset.zero),
-          box.localToGlobal(box.size.bottomRight(Offset.zero)),
-        ),
-        Offset.zero & overlay.context.size!,
-      ),
-      items: [
-        PopupMenuItem(
-          value: _RowAction.view,
-          child: Row(
-            children: [
-              const Icon(Icons.visibility_outlined, size: 18),
-              const SizedBox(width: 8),
-              Text(l10n.commonView),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: _RowAction.edit,
-          child: Row(
-            children: [
-              const Icon(Icons.edit_outlined, size: 18),
-              const SizedBox(width: 8),
-              Text(l10n.commonEdit),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: _RowAction.delete,
-          child: Row(
-            children: [
-              Icon(
-                Icons.delete_outline,
-                size: 18,
-                color: Theme.of(cellContext).colorScheme.error,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                l10n.customersDelete,
-                style: TextStyle(
-                  color: Theme.of(cellContext).colorScheme.error,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-    if (action != null && mounted) {
-      _onRowAction(action, customer);
-    }
+    await openCustomerRowMenu(context: cellContext, ref: ref, customer: customer);
   }
 
-  /// Credit-utilization cell color — web `cell-credit-high` (red ≥90%) /
-  /// `cell-credit-warn` (amber ≥75%); null = neutral (no credit limit or
-  /// low utilization).
-  Color? _utilizationColor(
-    BuildContext context,
-    num utilization,
-    num creditLimit,
-  ) {
-    if (creditLimit <= 0) return null;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    if (utilization >= 90) {
-      return isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626);
-    }
-    if (utilization >= 75) {
-      return isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
-    }
-    return null;
-  }
-
-  /// Balance cell color — web `cell-balance-due` (amber, balance > 0) /
-  /// `cell-balance-clear` (green, ≤ 0).
-  Color _balanceColor(BuildContext context, num balance) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    if (balance > 0) {
-      return isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
-    }
-    return isDark ? const Color(0xFF4ADE80) : const Color(0xFF15803D);
-  }
 }

@@ -5,8 +5,10 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
+import '../../core/cache/cached_repository.dart'
+    show cachedRepositoryClientProvider;
+import '../models/dashboard_boot.dart' show DashboardBoot;
 import '../models/dashboard_summary.dart'
     show
         ArSummaryResult,
@@ -26,6 +28,27 @@ class DashboardRepository {
   DashboardRepository(this._api);
 
   final RepositoryClient _api;
+
+  /// `GET /dashboard/boot` (spec 7.1) — the composite boot payload:
+  /// summary + active layout + KPI batch + cash position + AR summary
+  /// + expiry alerts + top customers in one round trip. The dashboard
+  /// providers derive from this instead of firing 8 parallel GETs at
+  /// login. Honours the dashboard's global date range for the money
+  /// figures; [metrics] selects the KPI batch entries.
+  Future<ApiResult<DashboardBoot>> boot({
+    required List<String> metrics,
+    String? fromDate,
+    String? toDate,
+  }) => _api.get(
+    ApiEndpoints.dashboardBoot,
+    queryParameters: {
+      'metrics': metrics.join(','),
+      'fromDate': ?fromDate,
+      'toDate': ?toDate,
+    },
+    parse: (Object? json) =>
+        DashboardBoot.fromJson(json as Map<String, dynamic>),
+  );
 
   /// `GET /dashboard/summary` — KPIs + the sales/purchases chart.
   /// [fromDate]/[toDate] filter the money figures and the chart (the
@@ -107,9 +130,10 @@ class DashboardRepository {
         KpiResult.fromJson(json as Map<String, dynamic>),
   );
 
-  /// Task 8.5: `GET /dashboard/kpi-batch?metrics=a,b` — several KPIs in one
-  /// round trip. Values are returned as decoded JSON per metric key.
-  Future<ApiResult<Map<String, dynamic>>> kpiBatch({
+  /// `GET /dashboard/kpi-batch?metrics=a,b` — several KPIs in one round
+  /// trip. Values are parsed per metric key into [KpiResult] (unknown
+  /// metrics come back null and are skipped).
+  Future<ApiResult<Map<String, KpiResult>>> kpiBatch({
     required List<String> metrics,
     String? fromDate,
     String? toDate,
@@ -120,8 +144,14 @@ class DashboardRepository {
       'fromDate': ?fromDate,
       'toDate': ?toDate,
     },
-    parse: (Object? json) =>
-        (json ?? <String, dynamic>{}) as Map<String, dynamic>,
+    parse: (Object? json) {
+      final map = (json ?? <String, dynamic>{}) as Map<String, dynamic>;
+      return {
+        for (final e in map.entries)
+          if (e.value is Map<String, dynamic>)
+            e.key: KpiResult.fromJson(e.value as Map<String, dynamic>),
+      };
+    },
   );
 
   /// `GET /dashboard/ar-summary`.
@@ -164,5 +194,5 @@ class DashboardRepository {
 }
 
 final dashboardRepositoryProvider = Provider<DashboardRepository>(
-  (ref) => DashboardRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => DashboardRepository(ref.watch(cachedRepositoryClientProvider)),
 );

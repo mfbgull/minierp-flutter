@@ -35,8 +35,9 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
+import '../../core/cache/cached_repository.dart'
+    show cachedRepositoryClientProvider;
 import '../models/item.dart' show Item;
 import '../models/physical_count.dart' show PhysicalCount, PhysicalCountItem;
 import '../models/stock_batch.dart' show StockBatch;
@@ -158,8 +159,16 @@ class InventoryRepository {
         parse: (Object? json) => Item.fromJson(json as Map<String, dynamic>),
       );
 
+  /// Soft delete (stamps `deleted_at`, deactivates). Reversible via
+  /// [restore].
   Future<ApiResult<void>> delete(int id) =>
       _api.delete('${ApiEndpoints.items}/$id');
+
+  /// `POST /inventory/items/:id/restore` — reverts a soft delete.
+  Future<ApiResult<void>> restore(int id) => _api.post(
+    '${ApiEndpoints.items}/$id/restore',
+    parse: (_) {},
+  );
 
   Future<ApiResult<List<String>>> categories() => _api.getRawList(
     ApiEndpoints.itemsCategories,
@@ -350,8 +359,8 @@ class InventoryRepository {
   }) => _api.getRawList(
     ApiEndpoints.stockBatches,
     queryParameters: {
-      if (itemId != null) 'item_id': itemId,
-      if (warehouseId != null) 'warehouse_id': warehouseId,
+      'item_id': ?itemId,
+      'warehouse_id': ?warehouseId,
     },
     parseItem: (Object? json) =>
         StockBatch.fromJson(json as Map<String, dynamic>),
@@ -386,5 +395,5 @@ class InventoryRepository {
 }
 
 final inventoryRepositoryProvider = Provider<InventoryRepository>(
-  (ref) => InventoryRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => InventoryRepository(ref.watch(cachedRepositoryClientProvider)),
 );

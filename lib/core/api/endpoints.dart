@@ -3,11 +3,13 @@
 abstract final class ApiEndpoints {
   // Auth (§3)
   static const login = '/auth/login';
+  static const refresh = '/auth/refresh';
   static const logout = '/auth/logout';
   static const me = '/auth/me';
   static const changePassword = '/auth/change-password';
 
   // Dashboard (§10)
+  static const dashboardBoot = '/dashboard/boot';
   static const dashboardSummary = '/dashboard/summary';
   static const dashboardTopCustomers = '/dashboard/top-customers';
   static const dashboardSalesSummary = '/dashboard/sales-summary';

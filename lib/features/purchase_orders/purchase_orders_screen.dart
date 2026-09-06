@@ -18,6 +18,10 @@ import '../../core/utils/po_status.dart';
 import '../../data/models/purchase_order.dart' show PurchaseOrder;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../data/repositories/purchase_order_repository.dart'
+    show purchaseOrderRepositoryProvider;
+import '../../widgets/app_toast.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
@@ -56,7 +60,6 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
   /// built from the page models, so the menu can pre-seed the return
   /// form with the exact PO (its number + warehouse).
   final Map<int, PurchaseOrder> _ordersById = {};
-
   @override
   void dispose() {
     _debounce?.cancel();
@@ -116,6 +119,89 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
   void openRowDetail(int poId) {
     if (!mounted) return;
     showPurchaseOrderDetailDialog(context, poId: poId);
+  }
+
+  /// Opt into the bulk-selection checkbox column + bulk action bar
+  /// (SHORTCOMINGS-FIX 4.4): bulk status change over the selected POs.
+  @override
+  bool get enableBulkSelection => true;
+
+  /// Bulk workflow-status change (SHORTCOMINGS-FIX 4.4). Runs the
+  /// per-PO `POST /purchase-orders/:id/status` for every selected row —
+  /// the server enforces the transition table (Draft → Submitted /
+  /// Cancelled, …) and posts the AP supplier-ledger entry on Submit, so
+  /// an order that cannot make the transition is skipped, not fatal.
+  /// A confirmation dialog warns about the ledger side effect.
+  Future<void> _bulkSetStatus(Set<int> ids, String status) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.bulkSetStatus,
+      message: '${l10n.bulkSetStatusTo(poStatusLabel(l10n, status))} '
+          '(${ids.length})\n\n'
+          '${status == 'Submitted' ? l10n.bulkStatusSubmitWarning : ''}',
+      confirmLabel: l10n.commonConfirm,
+      cancelLabel: l10n.commonCancel,
+    );
+    if (!confirmed || !mounted) return;
+
+    final repo = ref.read(purchaseOrderRepositoryProvider);
+    var ok = 0;
+    var failed = 0;
+    for (final id in ids) {
+      final result = await repo.updateStatus(id, status);
+      if (!mounted) return;
+      result.fold(
+        onSuccess: (_) => ok++,
+        onFailure: (_) => failed++,
+      );
+    }
+    if (!mounted) return;
+    bulkSelection.clear();
+    if (failed == 0) {
+      showAppToast(
+        context,
+        l10n.bulkStatusCancelled(ok, poStatusLabel(l10n, status)),
+      );
+    } else {
+      showAppToast(context, l10n.bulkUpdateFailed, isError: true);
+    }
+    ref.invalidate(purchaseOrdersProvider);
+    ref.invalidate(filteredPurchaseOrdersProvider);
+  }
+
+  /// The status menu for the bulk "Set status" action — only targets the
+  /// server can transition to (terminal Completed / Cancelled-for-terminal
+  /// rows are skipped per-row by the transition guard).
+  Future<void> _showBulkStatusMenu(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final status = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromPoints(
+          box.localToGlobal(Offset.zero),
+          box.localToGlobal(box.size.bottomRight(Offset.zero)),
+        ),
+        Offset.zero & overlay.context.size!,
+      ),
+      items: [
+        for (final target in const [
+          'Submitted',
+          'Partially Received',
+          'Completed',
+          'Cancelled',
+        ])
+          PopupMenuItem(
+            value: target,
+            child: Text(poStatusLabel(l10n, target)),
+          ),
+      ],
+    );
+    if (status == null || !mounted) return;
+    await _bulkSetStatus(ids, status);
   }
 
   /// Opt into the per-row ⋮ actions menu (View detail + Process Return —
@@ -229,10 +315,29 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
             ),
           ],
         ),
+        // Bulk action bar (checkbox rows selected) — bulk workflow-status
+        // change over the selected POs (SHORTCOMINGS-FIX 4.4).
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              actions: [
+                TextButton.icon(
+                  onPressed: () => _showBulkStatusMenu(sel),
+                  icon: const Icon(Icons.published_with_changes_outlined,
+                      size: 18),
+                  label: Text(l10n.bulkSetStatus),
+                ),
+              ],
+            );
+          },
+        ),
         Expanded(
           child: gridScreenBody(orders, provider: purchaseOrdersProvider),
-        ),
-        if (orders.valueOrNull case final page?)
+        ),        if (orders.valueOrNull case final page?)
           ServerPaginationBar(
             page: page.currentPage,
             totalPages: page.totalPages,

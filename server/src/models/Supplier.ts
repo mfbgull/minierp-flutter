@@ -174,16 +174,34 @@ class SupplierModel {
     return db.prepare('SELECT COUNT(*) as count FROM purchase_orders WHERE supplier_id = ?').get(supplierId) as { count: number };
   }
 
-  static getLedger(id: number, sortBy: string, sortOrder: string, db: Database.Database, page = 1, limit = 0): { rows: LedgerEntry[]; total: number } {
+  static getLedger(id: number, sortBy: string, sortOrder: string, db: Database.Database, page = 1, limit = 0, fromDate?: string, toDate?: string): { rows: LedgerEntry[]; total: number } {
     const { sortBy: safeBy, sortOrder: safeOrder } = safeSortBy(sortBy, sortOrder);
     // Task 8.7: bounded pagination; limit 0 keeps the legacy unbounded shape.
+    // Active-set parity with the customer ledger (and SupplierLedgerModel's
+    // getBalance/rebuildBalances): voided originals and their reversal rows
+    // are audit-only and never listed. Optional inclusive date bounds follow
+    // the statement convention (transaction_date >= from AND <= to), applied
+    // to both the count and the page query so the envelope stays consistent.
+    const dateConditions: string[] = [];
+    const dateParams: string[] = [];
+    if (fromDate) {
+      dateConditions.push('transaction_date >= ?');
+      dateParams.push(fromDate);
+    }
+    if (toDate) {
+      dateConditions.push('transaction_date <= ?');
+      dateParams.push(toDate);
+    }
+    const dateSql = dateConditions.length ? ` AND ${dateConditions.join(' AND ')}` : '';
+
+    const activeSql = ' WHERE supplier_id = ? AND voided = 0 AND reversed_by IS NULL';
     const countRow = db.prepare(
-      'SELECT COUNT(*) AS c FROM supplier_ledger WHERE supplier_id = ?'
-    ).get(id) as { c: number };
+      'SELECT COUNT(*) AS c FROM supplier_ledger' + activeSql + dateSql
+    ).get(id, ...dateParams) as { c: number };
     const total = countRow.c;
 
     let pageSql = '';
-    const params: number[] = [id];
+    const params: Array<string | number> = [id, ...dateParams];
     if (limit > 0) {
       pageSql = ' LIMIT ? OFFSET ?';
       params.push(limit, (Math.max(1, page) - 1) * limit);
@@ -192,19 +210,21 @@ class SupplierModel {
     const rows = db.prepare(`
       SELECT id, supplier_id, transaction_date, transaction_type, reference_no,
         debit, credit, balance, description, created_at
-      FROM supplier_ledger
-      WHERE supplier_id = ?
+      FROM supplier_ledger${activeSql}${dateSql}
       ORDER BY ${safeBy} ${safeOrder}${pageSql}
     `).all(...params) as LedgerEntry[];
     return { rows, total };
   }
 
   static getStatement(id: number, fromDate: string | undefined, toDate: string | undefined, db: Database.Database): { transactions: LedgerEntry[]; openingBalance: number } {
+    // Active-set parity with the customer statement (and the authoritative
+    // balance in SupplierLedgerModel): voided originals and their reversal
+    // rows never appear on a statement.
     let query = `
       SELECT transaction_date, transaction_type, reference_no,
         debit, credit, balance, description
       FROM supplier_ledger
-      WHERE supplier_id = ?
+      WHERE supplier_id = ? AND voided = 0 AND reversed_by IS NULL
     `;
     const params: unknown[] = [id];
 
@@ -216,21 +236,27 @@ class SupplierModel {
       query += ' AND transaction_date <= ?';
       params.push(toDate);
     }
-    query += ' ORDER BY transaction_date ASC';
+    // (transaction_date, id) tiebreaker mirrors the customer statement and
+    // the balance-chain order the stored balances were computed in.
+    query += ' ORDER BY transaction_date ASC, id ASC';
 
     const transactions = db.prepare(query).all(...params) as LedgerEntry[];
 
-    let openingBalanceQuery = 'SELECT balance FROM supplier_ledger WHERE supplier_id = ?';
-    const openingBalanceParams: unknown[] = [id];
+    // Full-history statements (fromDate omitted) start from zero — the
+    // stored running balance of the LATEST row is the closing position, not
+    // an opening one, and seeding a statement with it double-counts once the
+    // controller adds the in-window net. When a range is active the opening
+    // is the stored balance of the last active row strictly before fromDate
+    // (deterministic (transaction_date DESC, id DESC) tiebreaker).
+    let openingBalance = 0;
     if (fromDate) {
-      openingBalanceQuery += ' AND transaction_date < ? ORDER BY transaction_date DESC LIMIT 1';
-      openingBalanceParams.push(fromDate);
-    } else {
-      openingBalanceQuery += ' ORDER BY transaction_date DESC LIMIT 1';
+      const openingBalanceResult = db.prepare(
+        'SELECT balance FROM supplier_ledger WHERE supplier_id = ? AND voided = 0 AND reversed_by IS NULL AND transaction_date < ? ORDER BY transaction_date DESC, id DESC LIMIT 1'
+      ).get(id, fromDate) as { balance: number } | undefined;
+      openingBalance = openingBalanceResult ? openingBalanceResult.balance : 0;
     }
 
-    const openingBalanceResult = db.prepare(openingBalanceQuery).get(...openingBalanceParams) as { balance: number } | undefined;
-    return { transactions, openingBalance: openingBalanceResult ? openingBalanceResult.balance : 0 };
+    return { transactions, openingBalance };
   }
 
   static getBalance(id: number, db: Database.Database): { id: number; supplier_name: string; current_balance: number } | undefined {

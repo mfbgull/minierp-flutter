@@ -7,6 +7,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:minierp_app/data/models/dashboard_layout.dart'
     show DashboardBlock;
 import 'package:minierp_app/data/repositories/api_result.dart';
@@ -21,6 +22,9 @@ import 'package:minierp_app/data/repositories/inventory_repository.dart';
 import 'package:minierp_app/data/repositories/invoice_repository.dart';
 import 'package:minierp_app/data/repositories/production_repository.dart';
 import 'package:minierp_app/data/repositories/paged_request.dart';
+import 'package:minierp_app/core/cache/cache_manager.dart' show CacheManager;
+import 'package:minierp_app/core/cache/cached_repository.dart'
+    show CachedRepositoryClient;
 import 'package:minierp_app/data/repositories/repository_client.dart';
 import 'package:minierp_app/features/admin/admin_repository.dart';
 import 'package:minierp_app/features/employees/employee_repository.dart';
@@ -1843,7 +1847,7 @@ void main() {
       expect(result.requireData['journal_entry_id'], 12);
     });
 
-    test('salaryHistory parses enveloped rows', () async {
+    test('salaryHistory parses enveloped per-pay-period rows', () async {
       String? seenPath;
       handler = (o) {
         seenPath = o.path;
@@ -1851,21 +1855,25 @@ void main() {
           'success': true,
           'data': [
             {
-              'id': 4,
-              'employee_id': 1,
-              'amount': 45000,
-              'payment_date': '2026-08-01',
-              'payment_method': 'bank',
-              'reference_no': 'REF-1',
+              'pay_period': '2026-08',
+              'employee_salary': 45000,
+              'total_paid': 45000,
+              'remaining': 0,
+              'status': 'paid',
+              'payment_count': 1,
+              'first_payment_date': '2026-08-01',
+              'last_payment_date': '2026-08-01',
             },
           ],
         });
       };
       final rows = (await repo.salaryHistory(1)).requireData;
       expect(seenPath, '/employees/1/salary/history');
-      expect(rows.single.amount, 45000);
-      expect(rows.single.paymentMethod, 'bank');
-      expect(rows.single.referenceNo, 'REF-1');
+      expect(rows.single.payPeriod, '2026-08');
+      expect(rows.single.totalPaid, 45000);
+      expect(rows.single.remaining, 0);
+      expect(rows.single.status, 'paid');
+      expect(rows.single.paymentCount, 1);
     });
 
     test('documents parses enveloped rows', () async {
@@ -2129,6 +2137,86 @@ void main() {
       final result = await repo.deleteRole(3);
       expect(seenPath, '/roles/3');
       expect(result, isA<ApiSuccess<void>>());
+    });
+  });
+  group('Offline cache (spec 4.1)', () {
+    test('serves last-known data when the server is unreachable', () async {
+      SharedPreferences.setMockInitialValues({});
+      var calls = 0;
+      ResponseBody handler0(RequestOptions o) {
+        calls++;
+        return jsonBody({
+          'success': true,
+          'data': {'id': 1, 'name': 'Acme'},
+        });
+      }
+      final dio0 = Dio(BaseOptions(baseUrl: 'http://localhost:3011/api'));
+      dio0.httpClientAdapter = FakeHttpAdapter(handler0);
+      final api = CachedRepositoryClient(
+        dio0,
+        cache: CacheManager(),
+      );
+
+      // First call hits the server and snapshots the body.
+      final first = await api.get<Map<String, dynamic>>(
+        '/customers/1',
+        parse: (Object? json) => json! as Map<String, dynamic>,
+      );
+      expect(first.requireData['name'], 'Acme');
+      expect(calls, 1);
+
+      // Server dies → the cached body is served instead of failing.
+      dio0.httpClientAdapter = FakeHttpAdapter(
+        (_) => throw DioException.connectionError(
+          requestOptions: RequestOptions(path: '/customers/1'),
+          reason: 'offline',
+        ),
+      );
+      final second = await api.get<Map<String, dynamic>>(
+        '/customers/1',
+        parse: (Object? json) => json! as Map<String, dynamic>,
+      );
+      expect(second, isA<ApiSuccess<Map<String, dynamic>>>());
+      expect(second.requireData['name'], 'Acme');
+      expect(api.servingCached.value, isTrue);
+
+      // Server back → live data flips the offline flag off.
+      dio0.httpClientAdapter = FakeHttpAdapter(handler0);
+      final third = await api.get<Map<String, dynamic>>(
+        '/customers/1',
+        parse: (Object? json) => json! as Map<String, dynamic>,
+      );
+      expect(third.requireData['name'], 'Acme');
+      expect(api.servingCached.value, isFalse);
+    });
+
+    test('a write invalidates the cached read', () async {
+      SharedPreferences.setMockInitialValues({});
+      ResponseBody handler0(RequestOptions o) =>
+          jsonBody({'success': true, 'data': null});
+      final dio0 = Dio(BaseOptions(baseUrl: 'http://localhost:3011/api'));
+      dio0.httpClientAdapter = FakeHttpAdapter(handler0);
+      final api = CachedRepositoryClient(
+        dio0,
+        cache: CacheManager(),
+      );
+      await api.get<Object>('/customers/1', parse: (o) => o!);
+
+      // A write drops the snapshot → a subsequent read must re-hit the
+      // server (even though the snapshot is still physically present).
+      await api.post<Object>(
+        '/customers',
+        body: {'customer_name': 'New'},
+        parse: (o) => o!,
+      );
+      dio0.httpClientAdapter = FakeHttpAdapter(
+        (_) => throw DioException.connectionError(
+          requestOptions: RequestOptions(path: '/customers/1'),
+          reason: 'offline',
+        ),
+      );
+      final afterWrite = await api.get<Object>('/customers/1', parse: (o) => o!);
+      expect(afterWrite, isA<ApiFailure<Object>>());
     });
   });
 }

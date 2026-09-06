@@ -220,6 +220,8 @@ function getSupplierLedger(req, res) {
         const supplierId = parseInt(Array.isArray(id) ? id[0] : id, 10);
         const sortByParam = (0, queryUtils_1.getQueryParam)(req.query.sortBy);
         const sortOrderParam = (0, queryUtils_1.getQueryParam)(req.query.sortOrder);
+        const fromDateParam = (0, queryUtils_1.getQueryParam)(req.query.fromDate);
+        const toDateParam = (0, queryUtils_1.getQueryParam)(req.query.toDate);
         const sortBy = sortByParam || 'transaction_date';
         const sortOrder = sortOrderParam || 'DESC';
         const sortParams = (0, sqlSanitizer_1.sanitizeSortParams)(sortBy, sortOrder, sqlSanitizer_1.LEDGER_SORT_COLUMNS, 'transaction_date', 'DESC');
@@ -229,8 +231,10 @@ function getSupplierLedger(req, res) {
             return;
         }
         // Task 8.7: bounded ledger listing with a pagination envelope.
+        // Optional inclusive fromDate/toDate bounds (unified detail date picker)
+        // — same convention as the statement endpoint.
         const pageParams = (0, paginate_1.parsePageParams)(req);
-        const { rows, total } = Supplier_1.default.getLedger(supplierId, sortParams.column, sortParams.order, database_1.default, pageParams.page, pageParams.limit);
+        const { rows, total } = Supplier_1.default.getLedger(supplierId, sortParams.column, sortParams.order, database_1.default, pageParams.page, pageParams.limit, fromDateParam || undefined, toDateParam || undefined);
         res.json({ success: true, data: rows, pagination: (0, paginate_1.envelope)(total, pageParams) });
     }
     catch (error) {

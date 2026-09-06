@@ -11,24 +11,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
-import '../../core/utils/csv_export.dart';
-import '../../core/utils/expense_status.dart';
-import '../../core/utils/formatters.dart';
 import '../../data/models/expense.dart' show Expense;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
-import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart'
-    show autoFitPlutoColumns, plutoGridConfigurationFor, serialGridColumn, withSerialCell;
+    show autoFitPlutoColumns, plutoGridConfigurationFor, withSerialCell;
 import '../../widgets/screen_error_panel.dart';
-import '../../widgets/screen_toolbar.dart';
-import '../../widgets/status_badge.dart';
 import 'expense_form_dialog.dart';
+import 'expenses_grid_columns.dart';
+import 'expenses_row_actions.dart';
+import 'expenses_summary_strip.dart';
+import 'expenses_toolbar.dart';
 import 'expense_providers.dart';
-import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class ExpensesScreen extends ConsumerStatefulWidget {
   const ExpensesScreen({super.key});
@@ -113,41 +110,11 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     }
   }
 
-  /// Opens the row-actions menu (Edit) anchored at [cellContext].
-  Future<void> _openRowMenu(
-    BuildContext cellContext,
-    Expense? expense,
-  ) async {
+  /// Row-actions menu lives in `expenses_row_actions.dart` (spec 1.3);
+  /// the grid's ⋮ cell only forwards the tap.
+  Future<void> _openRowMenu(BuildContext cellContext, Expense? expense) async {
     if (expense == null || !mounted) return;
-    final box = cellContext.findRenderObject() as RenderBox?;
-    if (box == null || !box.hasSize) return;
-    final overlay = Overlay.of(cellContext, rootOverlay: true);
-    final l10n = AppLocalizations.of(cellContext)!;
-    final action = await showMenu<_ExpenseRowAction>(
-      context: cellContext,
-      position: RelativeRect.fromRect(
-        Rect.fromPoints(
-          box.localToGlobal(Offset.zero),
-          box.localToGlobal(box.size.bottomRight(Offset.zero)),
-        ),
-        Offset.zero & overlay.context.size!,
-      ),
-      items: [
-        PopupMenuItem(
-          value: _ExpenseRowAction.edit,
-          child: Row(
-            children: [
-              const Icon(Icons.edit_outlined, size: 18),
-              const SizedBox(width: 8),
-              Text(l10n.commonEdit),
-            ],
-          ),
-        ),
-      ],
-    );
-    if (action != null && mounted) {
-      showExpenseFormDialog(context, expense: expense);
-    }
+    await openExpenseRowMenu(context: cellContext, expense: expense);
   }
 
   PlutoRow _rowFor(Expense expense, int index) => withSerialCell(
@@ -184,11 +151,16 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: _toolbar(l10n, expenses),
+          child: ExpensesToolbar(
+            searchController: _searchController,
+            onSearchChanged: _onSearchChanged,
+            onClearFilters: _clearFilters,
+            hasActiveFilters: _hasActiveFilters,
+          ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: _summaryStrip(l10n),
+          child: ExpensesSummaryStrip(rows: _filteredRows),
         ),
         Expanded(child: _buildBody(expenses)),
         if (page != null)
@@ -213,182 +185,10 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     );
   }
 
-  Widget _toolbar(AppLocalizations l10n, AsyncValue<PagedResponse<Expense>> expenses) {
-    return ScreenToolbar(
-      searchController: _searchController,
-      searchHint: l10n.commonSearch,
-      onSearchChanged: _onSearchChanged,
-      onClearSearch: () {
-        _searchController.clear();
-        ref.read(expensesSearchProvider.notifier).state = '';
-      },
-      filters: [
-        ScreenToolbarDropdown<String?>(
-          key: const ValueKey('expense-category-filter'),
-          value: ref.watch(expensesCategoryProvider),
-          hint: l10n.expensesAllcategories,
-          items: [
-            null,
-            for (final category
-                in ref.watch(expenseCategoriesProvider).valueOrNull ?? const [])
-              category.categoryName,
-          ],
-          labelBuilder: (v) => v ?? l10n.expensesAllcategories,
-          width: 170,
-          onChanged: (v) {
-            ref.read(expensesCategoryProvider.notifier).state = v;
-            if (ref.read(expensesPageProvider) != 1) {
-              ref.read(expensesPageProvider.notifier).state = 1;
-            }
-          },
-        ),
-        ScreenToolbarDropdown<String?>(
-          key: const ValueKey('expense-status-filter'),
-          value: ref.watch(expensesStatusProvider),
-          hint: l10n.expensesAllstatuses,
-          items: [
-            null,
-            for (final option
-                in ref.watch(expenseStatusOptionsProvider).valueOrNull ??
-                    const [])
-              option.value,
-          ],
-          labelBuilder: (v) => v == null
-              ? l10n.expensesAllstatuses
-              : expenseStatusLabel(l10n, v),
-          width: 150,
-          onChanged: (v) {
-            ref.read(expensesStatusProvider.notifier).state = v;
-            if (ref.read(expensesPageProvider) != 1) {
-              ref.read(expensesPageProvider.notifier).state = 1;
-            }
-          },
-        ),
-        ScreenToolbarDropdown<String?>(
-          key: const ValueKey('expense-sort-filter'),
-          value: ref.watch(expensesSortProvider)?.column,
-          hint: 'Sort',
-          items: const [
-            null,
-            'e.expense_date',
-            'e.amount',
-            'e.expense_category',
-            'e.status',
-            'e.vendor_name',
-            'e.created_at',
-          ],
-          labelBuilder: (v) {
-            switch (v) {
-              case 'e.expense_date':
-                return 'Date';
-              case 'e.amount':
-                return 'Amount';
-              case 'e.expense_category':
-                return 'Category';
-              case 'e.status':
-                return 'Status';
-              case 'e.vendor_name':
-                return 'Vendor';
-              case 'e.created_at':
-                return 'Created';
-              default:
-                return 'Sort';
-            }
-          },
-          width: 130,
-          onChanged: (v) {
-            final current = ref.read(expensesSortProvider);
-            final next = v == null
-                ? null
-                : ExpenseSort(
-                    v,
-                    current == null || current.column != v
-                        ? 'DESC'
-                        : (current.order == 'ASC' ? 'DESC' : 'ASC'),
-                  );
-            ref.read(expensesSortProvider.notifier).state = next;
-            if (ref.read(expensesPageProvider) != 1) {
-              ref.read(expensesPageProvider.notifier).state = 1;
-            }
-          },
-        ),
-        DateRangeFilter(
-          height: 40,
-          fromProvider: expensesFromDateProvider,
-          toProvider: expensesToDateProvider,
-          onClear: _clearFilters,
-          showClear: () => _hasActiveFilters,
-        ),
-      ],
-      onRefresh: () => ref.invalidate(expensesProvider),
-      actions: [
-        TextButton.icon(
-          onPressed: () {
-            final all = ref.read(allExpensesProvider);
-            final rows = all.valueOrNull;
-            if (rows == null || rows.isEmpty) return;
-            saveCsv(
-              context,
-              suggestedName: csvSuggestedName('expenses'),
-              csv: buildExpensesCsv(l10n, rows),
-              successMessage: l10n.expensesExported,
-              errorMessage: l10n.expensesExportfailed,
-            );
-          },
-          icon: const Icon(Icons.file_download_outlined, size: 18),
-          label: Text(l10n.expensesExportcsv),
-        ),
-      ],
-      primaryActions: [
-        FilledButton.tonalIcon(
-          onPressed: () => showExpenseFormDialog(context),
-          icon: const Icon(Icons.add, size: 18),
-          label: Text(l10n.expensesNewexpense),
-        ),
-      ],
-    );
-  }
-
   /// The full filtered list (10k fetch) — feeds the summary strip and
   /// CSV export. Mirrors the sales screen's [filteredInvoicesProvider].
   List<Expense> get _filteredRows =>
       ref.read(allExpensesProvider).valueOrNull ?? const <Expense>[];
-
-  Widget _summaryStrip(AppLocalizations l10n) {
-    final scheme = Theme.of(context).colorScheme;
-    final rows = _filteredRows;
-    final total = rows.fold<num>(0, (sum, e) => sum + e.amount);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: AppBorderRadius.smRadius,
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.receipt_long_outlined, size: 18, color: scheme.primary),
-          const SizedBox(width: 8),
-          Text(l10n.commonTotal, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(width: 6),
-          Text(
-            Formatters.currency(total),
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: scheme.primary,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Text(
-            '${rows.length} ${l10n.expensesCount}',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildBody(AsyncValue<PagedResponse<Expense>> expenses) {
     final errorMessage = switch (expenses) {
@@ -496,120 +296,10 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
 
   /// Column set — dense data-screen conventions (PORTING.md §6), read-only
   /// with the id column hidden.
+  /// Column definitions live in `expenses_grid_columns.dart` (spec 1.3);
+  /// this method only wires the row-menu callback into the shared builder.
   List<PlutoColumn> _buildColumns(AppLocalizations l10n) {
-    PlutoColumn textColumn(String field, String title, double width) =>
-        PlutoColumn(
-          title: title,
-          field: field,
-          type: PlutoColumnType.text(),
-          width: width,
-          readOnly: true,
-          enableContextMenu: false,
-        );
-
-    return [
-      serialGridColumn(),
-      PlutoColumn(
-        title: '',
-        field: 'id',
-        type: PlutoColumnType.number(),
-        width: 80,
-        readOnly: true,
-        renderer: (ctx) => const SizedBox.shrink(),
-        enableContextMenu: false,
-        enableFilterMenuItem: false,
-        enableHideColumnMenuItem: false,
-        enableSetColumnsMenuItem: false,
-      ),
-      textColumn('expense_no', l10n.expensesExpenseno, 140),
-      PlutoColumn(
-        title: l10n.fieldsDate,
-        field: 'expense_date',
-        type: PlutoColumnType.text(),
-        width: 110,
-        readOnly: true,
-        enableContextMenu: false,
-        renderer: (ctx) => Align(
-          alignment: Alignment.centerLeft,
-          child: Text(Formatters.date(ctx.cell.value as String? ?? '')),
-        ),
-      ),
-      textColumn('category', l10n.fieldsCategory, 140),
-      textColumn('description', l10n.expensesDescription, 220),
-      textColumn('vendor', l10n.expensesVendor, 140),
-      textColumn('reference_no', l10n.expensesReferenceno, 120),
-      textColumn('payment_method', l10n.expensesPaymentmethod, 140),
-      textColumn('project', l10n.expensesProject, 110),
-      PlutoColumn(
-        title: l10n.fieldsAmount,
-        field: 'amount',
-        type: PlutoColumnType.number(format: '#,###.##'),
-        width: 120,
-        readOnly: true,
-        textAlign: PlutoColumnTextAlign.end,
-        titleTextAlign: PlutoColumnTextAlign.end,
-        enableContextMenu: false,
-        renderer: (ctx) => Align(
-          alignment: Alignment.centerRight,
-          child: Text(
-            Formatters.currency(ctx.cell.value as num? ?? 0),
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ),
-      ),
-      PlutoColumn(
-        title: l10n.fieldsStatus,
-        field: 'status',
-        type: PlutoColumnType.text(),
-        width: 120,
-        readOnly: true,
-        enableContextMenu: false,
-        renderer: (ctx) => Builder(
-          builder: (cellContext) {
-            final status = ctx.cell.value as String? ?? '';
-            final l10n = AppLocalizations.of(cellContext)!;
-            return Align(
-              alignment: Alignment.centerLeft,
-              child: StatusBadge(
-                status: expenseStatusLabel(l10n, status),
-                color: expenseStatusColor(Theme.of(cellContext).colorScheme, status),
-              ),
-            );
-          },
-        ),
-      ),
-      textColumn('created_by', l10n.expensesCreatedby, 130),
-      PlutoColumn(
-        title: l10n.commonActions,
-        field: 'actions',
-        frozen: PlutoColumnFrozen.end,
-        type: PlutoColumnType.text(),
-        width: 64,
-        readOnly: true,
-        enableContextMenu: false,
-        enableFilterMenuItem: false,
-        enableHideColumnMenuItem: false,
-        enableSetColumnsMenuItem: false,
-        renderer: (ctx) {
-          final expense = ctx.cell.row.cells['data']?.value as Expense?;
-          return Builder(
-            builder: (cellContext) => Listener(
-              behavior: HitTestBehavior.opaque,
-              onPointerDown: (_) => _openRowMenu(cellContext, expense),
-              child: Center(
-                child: Icon(
-                  Icons.more_vert,
-                  size: 18,
-                  color: Theme.of(cellContext).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    ];
+    return buildExpenseColumns(l10n: l10n, onOpenRowMenu: _openRowMenu);
   }
 }
 
-/// The per-row ⋮ menu actions for an expense row.
-enum _ExpenseRowAction { edit }

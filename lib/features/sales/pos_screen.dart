@@ -12,6 +12,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'
+    show KeyDownEvent, KeyEvent, LogicalKeyboardKey;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -36,11 +38,86 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   final _searchController = TextEditingController();
   Timer? _debounce;
 
+  // Barcode-scanner capture (SHORTCOMINGS-FIX 4.3): a hardware scanner
+  // behaves like a very fast keyboard — it types the code (≈50 chars/sec)
+  // and finishes with Enter. We watch raw key events on a hidden focus
+  // node, accumulate characters while they arrive faster than 100ms
+  // apart (the human-typing threshold), and treat Enter as scan-complete.
+  final _scannerFocusNode = FocusNode(debugLabel: 'pos-scanner');
+  final _scanBuffer = StringBuffer();
+  DateTime? _lastScanKeyAt;
+  DateTime? _scanStartedAt;
+
   @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _scannerFocusNode.dispose();
     super.dispose();
+  }
+
+  KeyEventResult _onScannerKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    // Enter = scan complete → resolve the buffered code in the catalog.
+    // Only treated as a scan when the whole code arrived in one fast
+    // burst (<1s from first keystroke): a human typing a search term
+    // then pressing Enter leaves an old/partial buffer and must keep
+    // the normal Enter behavior.
+    if (event.logicalKey == LogicalKeyboardKey.enter) {
+      final code = _scanBuffer.toString();
+      final isFastScan = _scanStartedAt != null &&
+          DateTime.now().difference(_scanStartedAt!) <
+              const Duration(seconds: 1);
+      _scanBuffer.clear();
+      _lastScanKeyAt = null;
+      _scanStartedAt = null;
+      if (code.isNotEmpty && isFastScan) {
+        _completeScan(code);
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored; // plain Enter in a field
+    }
+
+    final char = event.character;
+    if (char == null || char.isEmpty) return KeyEventResult.ignored;
+
+    final now = DateTime.now();
+    final gap = _lastScanKeyAt == null
+        ? Duration.zero
+        : now.difference(_lastScanKeyAt!);
+    _lastScanKeyAt = now;
+    // Gap > 100ms → a human is typing (or a new scan started) — reset.
+    if (gap > const Duration(milliseconds: 100)) {
+      _scanBuffer.clear();
+      _scanStartedAt = now;
+    } else {
+      _scanStartedAt ??= now;
+    }
+    _scanBuffer.write(char);
+    // Never swallow the key: manual search must keep working — the same
+    // characters land in the focused TextField via normal input.
+    return KeyEventResult.ignored;
+  }
+
+  Future<void> _completeScan(String code) async {
+    final l10n = AppLocalizations.of(context)!;
+    final item = await ref.read(posScannerLookupProvider)(code);
+    if (!mounted) return;
+    if (item == null) {
+      showAppToast(
+        context,
+        '${l10n.posItemNotFound} "${code.trim()}"',
+        isError: true,
+      );
+      return;
+    }
+    _addToCart(item);
+    // Leave the scan out of the manual search box.
+    if (_searchController.text.trim() == code.trim()) {
+      _searchController.clear();
+      ref.invalidate(posCatalogProvider);
+    }
   }
 
   void _onSearchChanged(String value) {
@@ -212,26 +289,39 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Toolbar row: warehouse + date + customer + actions.
-        _buildToolbar(l10n, scheme),
-        const SizedBox(height: 8),
-        // Main split layout.
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left: catalog search + grid.
-              Expanded(flex: 3, child: _buildCatalog(l10n, scheme)),
-              const SizedBox(width: 8),
-              // Right: cart + checkout.
-              SizedBox(width: 380, child: _buildCartPanel(l10n, scheme)),
-            ],
+    // A Focus that wraps the whole POS pane and holds the scanner capture:
+    // key events bubble to it from whichever field is focused, so hardware
+    // scans work even while the search box has focus.
+    return Focus(
+      focusNode: _scannerFocusNode,
+      // Holds focus when the POS pane is active so a hardware scanner's
+      // keystrokes land here (spec 4.3: captured when the POS screen is
+      // focused). Clicking a field moves focus there — manual typing
+      // still works, and scans finish with Enter in either case because
+      // key events bubble to this ancestor Focus.
+      autofocus: true,
+      onKeyEvent: _onScannerKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Toolbar row: warehouse + date + customer + actions.
+          _buildToolbar(l10n, scheme),
+          const SizedBox(height: 8),
+          // Main split layout.
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Left: catalog search + grid.
+                Expanded(flex: 3, child: _buildCatalog(l10n, scheme)),
+                const SizedBox(width: 8),
+                // Right: cart + checkout.
+                SizedBox(width: 380, child: _buildCartPanel(l10n, scheme)),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -421,7 +511,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   : ListView.separated(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       itemCount: cart.length,
-                      separatorBuilder: (_, __) =>
+                      separatorBuilder: (_, _) =>
                           const Divider(height: 1),
                       itemBuilder: (ctx, i) => _CartRow(
                         item: cart[i],

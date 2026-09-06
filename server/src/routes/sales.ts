@@ -1,77 +1,89 @@
 import express from 'express';
-const router = express.Router();
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
 import salesController from '../controllers/salesController';
 import { sensitiveOperationLimiter } from '../middleware/rateLimiter';
+import { validateZodBody, zodBodySchemas } from '../middleware/validation';
 
+// SHORTCOMINGS-FIX 2.4: this file was a single router embedding three
+// module prefixes (/quotations, /sales-orders, /sales). It is split into
+// one router per namespace, each mounted with an explicit `/api/<module>`
+// prefix in app.ts. Route paths below are relative to their mount.
+
+const router = express.Router();
 router.use(authenticateToken);
 
-// ============ Quotations Routes ============
+// ============ Quotations Routes (mounted at /api/quotations) ============
 
 // POST /api/quotations - Create new quotation
-router.post('/quotations', requirePermission('quotations', 'create'), salesController.createQuotation);
+router.post('/', requirePermission('quotations', 'create'), validateZodBody(zodBodySchemas.quotationCreate), salesController.createQuotation);
 
 // GET /api/quotations - Get all quotations with filters
-router.get('/quotations', requirePermission('quotations', 'read'), salesController.getQuotations);
+router.get('/', requirePermission('quotations', 'read'), salesController.getQuotations);
 
 // GET /api/quotations/:id - Get single quotation
-router.get('/quotations/:id', requirePermission('quotations', 'read'), salesController.getQuotation);
+router.get('/:id', requirePermission('quotations', 'read'), salesController.getQuotation);
 
 // PUT /api/quotations/:id - Update quotation
-router.put('/quotations/:id', requirePermission('quotations', 'update'), salesController.updateQuotation);
+router.put('/:id', requirePermission('quotations', 'update'), validateZodBody(zodBodySchemas.object), salesController.updateQuotation);
 
 // DELETE /api/quotations/:id - Delete quotation
-router.delete('/quotations/:id', requirePermission('quotations', 'delete'), sensitiveOperationLimiter, salesController.deleteQuotation);
+router.delete('/:id', requirePermission('quotations', 'delete'), sensitiveOperationLimiter, salesController.deleteQuotation);
 
 // POST /api/quotations/:id/convert - Convert quotation to sales order
-router.post('/quotations/:id/convert', requirePermission('quotations', 'update'), salesController.convertQuotationToSalesOrder);
+router.post('/:id/convert', requirePermission('quotations', 'update'), validateZodBody(zodBodySchemas.object), salesController.convertQuotationToSalesOrder);
 
 // GET /api/quotations/:id/cycle-chain - Get sales cycle chain for quotation
-router.get('/quotations/:id/cycle-chain', requirePermission('quotations', 'read'), salesController.getQuotationCycleChain);
-
-// ============ Sales Orders Routes ============
-
-// POST /api/sales-orders - Create new sales order
-router.post('/sales-orders', requirePermission('sales_orders', 'create'), salesController.createSalesOrder);
-
-// GET /api/sales-orders - Get all sales orders with filters
-router.get('/sales-orders', requirePermission('sales_orders', 'read'), salesController.getSalesOrders);
-
-// GET /api/sales-orders/:id - Get single sales order
-router.get('/sales-orders/:id', requirePermission('sales_orders', 'read'), salesController.getSalesOrder);
-
-// PUT /api/sales-orders/:id - Update sales order
-router.put('/sales-orders/:id', requirePermission('sales_orders', 'update'), salesController.updateSalesOrder);
-
-// DELETE /api/sales-orders/:id - Delete sales order
-router.delete('/sales-orders/:id', requirePermission('sales_orders', 'delete'), sensitiveOperationLimiter, salesController.deleteSalesOrder);
-
-// POST /api/sales-orders/:id/cancel - Cancel sales order (reverses stock)
-router.post('/sales-orders/:id/cancel', requirePermission('sales_orders', 'update'), sensitiveOperationLimiter, salesController.cancelSalesOrder);
-
-// POST /api/sales-orders/:id/convert - Convert sales order to invoice
-router.post('/sales-orders/:id/convert', requirePermission('sales_orders', 'create'), salesController.convertSalesOrderToInvoice);
-
-// GET /api/sales-orders/:id/cycle-chain - Get sales cycle chain for sales order
-router.get('/sales-orders/:id/cycle-chain', requirePermission('sales_orders', 'read'), salesController.getSalesOrderCycleChain);
-
-// GET /api/sales-orders/:id/invoices - Get invoices for sales order
-router.get('/sales-orders/:id/invoices', requirePermission('sales_orders', 'read'), salesController.getInvoicesBySalesOrder);
-
-// ============ Invoice Links (from sales cycle) ============
+router.get('/:id/cycle-chain', requirePermission('quotations', 'read'), salesController.getQuotationCycleChain);
 
 // GET /api/quotations/:id/invoices - Get invoices for quotation (via SO or direct)
-router.get('/quotations/:id/invoices', requirePermission('quotations', 'read'), salesController.getInvoicesByQuotation);
+router.get('/:id/invoices', requirePermission('quotations', 'read'), salesController.getInvoicesByQuotation);
 
-// ============ Dashboard ============
+const quotationRoutes = router;
 
-// GET /api/sales/dashboard - Get sales dashboard summary
-router.get('/dashboard', requirePermission('sales', 'read'), salesController.getSalesDashboard);
+// ============ Sales Orders Routes (mounted at /api/sales-orders) ============
 
-// ============ Legacy Routes (migrated to InvoiceModel) ============
+const salesOrderRouter = express.Router();
+salesOrderRouter.use(authenticateToken);
+
+// POST /api/sales-orders - Create new sales order
+salesOrderRouter.post('/', requirePermission('sales_orders', 'create'), salesController.createSalesOrder);
+
+// GET /api/sales-orders - Get all sales orders with filters
+salesOrderRouter.get('/', requirePermission('sales_orders', 'read'), salesController.getSalesOrders);
+
+// GET /api/sales-orders/:id - Get single sales order
+salesOrderRouter.get('/:id', requirePermission('sales_orders', 'read'), salesController.getSalesOrder);
+
+// PUT /api/sales-orders/:id - Update sales order
+salesOrderRouter.put('/:id', requirePermission('sales_orders', 'update'), salesController.updateSalesOrder);
+
+// DELETE /api/sales-orders/:id - Delete sales order
+salesOrderRouter.delete('/:id', requirePermission('sales_orders', 'delete'), sensitiveOperationLimiter, salesController.deleteSalesOrder);
+
+// POST /api/sales-orders/:id/cancel - Cancel sales order (reverses stock)
+salesOrderRouter.post('/:id/cancel', requirePermission('sales_orders', 'update'), sensitiveOperationLimiter, salesController.cancelSalesOrder);
+
+// POST /api/sales-orders/:id/convert - Convert sales order to invoice
+salesOrderRouter.post('/:id/convert', requirePermission('sales_orders', 'create'), salesController.convertSalesOrderToInvoice);
+
+// GET /api/sales-orders/:id/cycle-chain - Get sales cycle chain for sales order
+salesOrderRouter.get('/:id/cycle-chain', requirePermission('sales_orders', 'read'), salesController.getSalesOrderCycleChain);
+
+// GET /api/sales-orders/:id/invoices - Get invoices for sales order
+salesOrderRouter.get('/:id/invoices', requirePermission('sales_orders', 'read'), salesController.getInvoicesBySalesOrder);
+
+// ============ Sales Routes (mounted at /api/sales; legacy dashboard
+// also mounted at /api/dashboard — see app.ts) ============
+
+const salesRouter = express.Router();
+salesRouter.use(authenticateToken);
+
+// GET /api/dashboard (legacy) / /api/sales - Sales dashboard summary
+salesRouter.get('/', requirePermission('sales', 'read'), salesController.getSalesDashboard);
 
 // GET /api/sales/summary/daterange - Sales summary by date range (uses InvoiceModel)
-router.get('/sales/summary/daterange', requirePermission('sales', 'read'), salesController.getSalesSummaryByDateRange);
+salesRouter.get('/summary/daterange', requirePermission('sales', 'read'), salesController.getSalesSummaryByDateRange);
 
-export default router;
+export default quotationRoutes;
+export { salesOrderRouter, salesRouter };

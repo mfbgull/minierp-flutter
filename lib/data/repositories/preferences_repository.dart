@@ -10,7 +10,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../core/utils/date_range_math.dart' show DateRange, WeekStart;
 import '../../core/utils/date_utils.dart' show isoDate;
@@ -67,5 +66,5 @@ class PreferencesRepository {
 }
 
 final preferencesRepositoryProvider = Provider<PreferencesRepository>(
-  (ref) => PreferencesRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => PreferencesRepository(ref.watch(repositoryClientProvider)),
 );

@@ -38,17 +38,25 @@ import 'package:minierp_app/features/sales_orders/sales_order_providers.dart'
     show salesOrdersFromDateProvider, salesOrdersToDateProvider;
 import 'package:minierp_app/features/quotations/quotation_providers.dart'
     show quotationsFromDateProvider, quotationsToDateProvider;
+import 'package:minierp_app/features/purchases/purchase_providers.dart'
+    show purchasesFromDateProvider, purchasesToDateProvider;
 import 'package:minierp_app/features/purchases/purchase_return_providers.dart'
     show
         purchaseReturnsFromDateProvider,
         purchaseReturnsToDateProvider;
 import 'package:minierp_app/features/purchases/purchase_returns_screen.dart'
     show PurchaseReturnsScreen;
+import 'package:minierp_app/features/purchase_orders/purchase_order_providers.dart'
+    show purchaseOrdersFromDateProvider, purchaseOrdersToDateProvider;
 import 'package:minierp_app/l10n/app_localizations.dart';
 import 'package:minierp_app/features/auth/change_password_screen.dart';
 import 'package:minierp_app/features/admin/admin_models.dart' show Role;
+import 'package:minierp_app/features/reports/report_providers.dart'
+    show globalReportFromDateProvider, globalReportToDateProvider;
 import 'package:minierp_app/features/reports/reports_dashboard_screen.dart';
 import 'package:minierp_app/widgets/date_range_picker.dart' show DateRangeFilter;
+import 'package:minierp_app/core/utils/date_range_math.dart'
+    show DatePreset, WeekStart, presetRange;
 import 'package:minierp_app/core/utils/date_utils.dart' show isoDate;
 import 'package:minierp_app/widgets/status_badge.dart' show StatusBadge;
 import 'package:minierp_app/widgets/searchable_select.dart';
@@ -57,6 +65,7 @@ import 'package:printing/printing.dart' show PdfPreview;
 
 class _FakeTokenStorage implements TokenStorage {
   String? token;
+  String? refreshToken;
 
   @override
   Future<String?> readToken() async => token;
@@ -65,7 +74,16 @@ class _FakeTokenStorage implements TokenStorage {
   Future<void> writeToken(String value) async => token = value;
 
   @override
-  Future<void> clear() async => token = null;
+  Future<String?> readRefreshToken() async => refreshToken;
+
+  @override
+  Future<void> writeRefreshToken(String value) async => refreshToken = value;
+
+  @override
+  Future<void> clear() async {
+    token = null;
+    refreshToken = null;
+  }
 }
 
 /// Joined stock-movement rows shared by the list GET fake and the detail
@@ -182,6 +200,300 @@ Map<String, dynamic> _movementTransferInRow() => {
   'created_by_name': 'admin',
 };
 
+// ── Unified detail-page range fixtures (Phase 8) ──────────────────────
+//
+// Deterministic per-entity datasets behind the fake endpoints so the
+// detail-page range acceptance tests can assert exact cohort math, paged
+// resets and empty-state splits. Dates/amounts are chosen so the sums
+// below hold regardless of the test machine's clock (the tests seed the
+// app-wide range to June 2026):
+//
+//   customer 1 invoices: 14 in June (Total Invoiced 10,500 / Received
+//     4,150 / Outstanding 6,350) + 5 off-month (Jan/Mar/May/Jul/Aug) so
+//     All dates = 12,750 / 5,275 / 7,475 — the standing figures stay put
+//     while only the two period-scoped cards react.
+//   customer 1 payments: 12 in June → two grid pages at limit 10.
+//   supplier 1 POs: 4 in January (9,000 total — the pre-existing summary
+//     values) + 12 in June (7,800) → All dates = 16 / 16,600.
+//   supplier 1 purchases / payments: 12 in June → two grid pages.
+List<Map<String, dynamic>> _customer1Invoices() {
+  const juneStatuses = [
+    'Paid',
+    'Unpaid',
+    'Partially Paid',
+    'Paid',
+    'Unpaid',
+    'Partially Paid',
+    'Unpaid',
+    'Paid',
+    'Unpaid',
+    'Partially Paid',
+    'Unpaid',
+    'Paid',
+    'Unpaid',
+    'Partially Paid',
+  ];
+  Map<String, dynamic> invoice({
+    required int id,
+    required String invoiceNo,
+    required String invoiceDate,
+    required String status,
+    required num total,
+  }) {
+    final paid = status == 'Paid'
+        ? total
+        : status == 'Partially Paid'
+        ? total / 2
+        : 0;
+    return {
+      'id': id,
+      'invoice_no': invoiceNo,
+      'customer_id': 1,
+      'so_id': null,
+      'invoice_date': invoiceDate,
+      'due_date': '2026-07-15',
+      'status': status,
+      'total_amount': total,
+      'paid_amount': paid,
+      'balance_amount': total - paid,
+      'notes': null,
+      'created_by': 1,
+      'created_at': '$invoiceDate 10:00:00',
+      'updated_at': '$invoiceDate 10:00:00',
+      'source_type': 'manual',
+      'quotation_id': null,
+      'customer_name': 'Acme Corp',
+      'discount_scope': 'invoice',
+      'discount_type': 'flat',
+      'discount_value': 0,
+      'terms': null,
+      'returned_amount': 0,
+      'return_fee': 0,
+      'so_no': null,
+      'quotation_no': null,
+      'created_by_username': 'Fawad',
+    };
+  }
+
+  return [
+    for (var i = 0; i < 14; i++)
+      invoice(
+        id: 1001 + i,
+        invoiceNo: 'INV-JUN-${(i + 1).toString().padLeft(3, '0')}',
+        invoiceDate: '2026-06-${(2 + i * 2).toString().padLeft(2, '0')}',
+        status: juneStatuses[i],
+        total: (i + 1) * 100,
+      ),
+    invoice(
+      id: 2001,
+      invoiceNo: 'INV-JAN-001',
+      invoiceDate: '2026-01-15',
+      status: 'Paid',
+      total: 250,
+    ),
+    invoice(
+      id: 2002,
+      invoiceNo: 'INV-MAR-001',
+      invoiceDate: '2026-03-10',
+      status: 'Unpaid',
+      total: 350,
+    ),
+    invoice(
+      id: 2003,
+      invoiceNo: 'INV-MAY-001',
+      invoiceDate: '2026-05-05',
+      status: 'Partially Paid',
+      total: 450,
+    ),
+    invoice(
+      id: 2004,
+      invoiceNo: 'INV-JUL-001',
+      invoiceDate: '2026-07-08',
+      status: 'Unpaid',
+      total: 550,
+    ),
+    invoice(
+      id: 2005,
+      invoiceNo: 'INV-AUG-001',
+      invoiceDate: '2026-08-12',
+      status: 'Paid',
+      total: 650,
+    ),
+  ];
+}
+
+/// 12 June customer payments — the Payments tab's two pages.
+List<Map<String, dynamic>> _customer1Payments() => [
+  for (var i = 0; i < 12; i++)
+    {
+      'id': 3001 + i,
+      'payment_no': 'PAY-JUN-${(i + 1).toString().padLeft(3, '0')}',
+      'customer_id': 1,
+      'customer_name': 'Acme Corp',
+      'payment_date': '2026-06-${(1 + i * 2).toString().padLeft(2, '0')}',
+      'amount': (i + 1) * 100,
+      'payment_method': i.isEven ? 'Cash' : 'Bank Transfer',
+      'reference_no': null,
+      'notes': null,
+      'created_at': '2026-06-${(1 + i * 2).toString().padLeft(2, '0')} 10:00:00',
+    },
+];
+
+/// Supplier-1 POs: 4 in January (totalling the pre-existing 9,000 summary)
+/// + 12 in June (7,800) — the POs tab's two pages and the ranged PO
+/// summary's cohort. [po1Status] is the stateful status of PO-2026-001
+/// (the adapter's workflow tests flip it).
+List<Map<String, dynamic>> _supplier1Pos(String po1Status) {
+  Map<String, dynamic> po({
+    required int id,
+    required String poNo,
+    required String poDate,
+    required num total,
+    required String status,
+  }) => {
+    'id': id,
+    'po_no': poNo,
+    'po_date': poDate,
+    'supplier_id': 1,
+    'supplier_name': 'Alpha Traders',
+    'warehouse_name': 'Main Warehouse',
+    'total_amount': total,
+    'paid_amount': 0.0,
+    'balance_amount': total,
+    'status': status,
+    'expected_delivery_date': null,
+  };
+
+  const juneStatuses = [
+    'Draft',
+    'Submitted',
+    'Partially Received',
+    'Completed',
+    'Draft',
+    'Submitted',
+    'Partially Received',
+    'Completed',
+    'Draft',
+    'Submitted',
+    'Partially Received',
+    'Completed',
+  ];
+  return [
+    po(
+      id: 1,
+      poNo: 'PO-2026-001',
+      poDate: '2026-01-20',
+      total: 1500,
+      status: po1Status,
+    ),
+    po(id: 3, poNo: 'PO-2026-003', poDate: '2026-01-05', total: 1000, status: 'Submitted'),
+    po(id: 4, poNo: 'PO-2026-004', poDate: '2026-01-28', total: 2500, status: 'Partially Received'),
+    po(id: 5, poNo: 'PO-2026-005', poDate: '2026-01-12', total: 4000, status: 'Completed'),
+    for (var i = 0; i < 12; i++)
+      po(
+        id: 6 + i,
+        poNo: 'PO-JUN-${(i + 1).toString().padLeft(3, '0')}',
+        poDate: '2026-06-${(1 + i * 2).toString().padLeft(2, '0')}',
+        total: (i + 1) * 100,
+        status: juneStatuses[i],
+      ),
+  ];
+}
+
+/// 12 June supplier purchases — the Purchases tab's two pages.
+List<Map<String, dynamic>> _supplier1Purchases() => [
+  for (var i = 0; i < 12; i++)
+    {
+      'id': 4001 + i,
+      'purchase_no': 'PUR-JUN-${(i + 1).toString().padLeft(3, '0')}',
+      'purchase_date': '2026-06-${(1 + i * 2).toString().padLeft(2, '0')}',
+      'item_id': 4,
+      'item_code': 'RM001',
+      'item_name': 'Raw Material A',
+      'unit_of_measure': 'kg',
+      'quantity': 10.0,
+      'unit_cost': (i + 1) * 10,
+      'total_cost': (i + 1) * 100,
+      'supplier_name': 'Alpha Traders',
+      'warehouse_id': 1,
+      'warehouse_name': 'Main Warehouse',
+      'invoice_no': null,
+      'remarks': null,
+      'returned_quantity': 0,
+      'created_by_username': 'admin',
+    },
+];
+
+/// 12 June supplier payments — the supplier Payments tab's two pages.
+List<Map<String, dynamic>> _supplier1Payments() => [
+  for (var i = 0; i < 12; i++)
+    {
+      'id': 5001 + i,
+      'payment_no': 'PAY-SUP-JUN-${(i + 1).toString().padLeft(3, '0')}',
+      'supplier_id': 1,
+      'supplier_name': 'Alpha Traders',
+      'payment_date': '2026-06-${(1 + i * 2).toString().padLeft(2, '0')}',
+      'amount': (i + 1) * 100,
+      'payment_method': i.isEven ? 'Cash' : 'Bank Transfer',
+      'reference_no': null,
+      'notes': null,
+      'created_at': '2026-06-${(1 + i * 2).toString().padLeft(2, '0')} 10:00:00',
+    },
+];
+
+// ── Unified-range test interactions (Phase 8) ─────────────────────────
+
+/// F2-opens the first grid row into its full-screen detail page — the same
+/// real-key-pipeline dance the F2 tests use, factored out for the Phase-8
+/// range acceptance tests.
+Future<void> _openFirstRowDetail(WidgetTester tester) async {
+  final sm = tester.state<PlutoGridState>(find.byType(PlutoGrid)).stateManager;
+  sm.setCurrentCell(sm.firstCell, 0);
+  sm.gridFocusNode.requestFocus();
+  await tester.pump();
+  await tester.sendKeyDownEvent(LogicalKeyboardKey.f2);
+  await tester.pump();
+  await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
+  await tester.pumpAndSettle();
+}
+
+/// Taps a detail-page tab by its label, scoped to the page's TabBar —
+/// bare `find.text('Payments'|'Ledger'|...)` is ambiguous because the
+/// module rail and app bar reuse the same words.
+Future<void> _tapDetailTab(WidgetTester tester, String label) async {
+  await tester.tap(
+    find.descendant(of: find.byType(TabBar), matching: find.text(label)),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Taps the previous-period ‹ arrow on the page's header pill — scoped to
+/// a [DateRangeFilter] instance because the shell keeps the dashboard
+/// branch alive with its own pill (same chevron icons).
+Future<void> _pillShiftPrev(WidgetTester tester) async {
+  final pill = find.byType(DateRangeFilter).first;
+  await tester.tap(
+    find.descendant(of: pill, matching: find.byIcon(Icons.chevron_left)),
+  );
+  await tester.pumpAndSettle();
+}
+
+/// Opens the header pill's popover via its calendar icon — unique on the
+/// detail page (the offstage dashboard branch is skipped by finders).
+Future<void> _openPill(WidgetTester tester) async {
+  await tester.tap(find.byIcon(Icons.calendar_month_outlined));
+  await tester.pumpAndSettle();
+}
+
+/// Selects "All dates" through the pill popover (the sidebar tile is the
+/// only "All dates" text while the pill bar shows a ranged label; `.last`
+/// also stays correct when the pill already shows All dates).
+Future<void> _pillAllDates(WidgetTester tester) async {
+  await _openPill(tester);
+  await tester.tap(find.text('All dates').last);
+  await tester.pumpAndSettle();
+}
+
 class _AuthFakeAdapter implements HttpClientAdapter {
   _AuthFakeAdapter({
     this.failLogin = false,
@@ -202,6 +514,13 @@ class _AuthFakeAdapter implements HttpClientAdapter {
 
   /// How many times the items list GET ran (Ctrl+R refresh assertion).
   int itemsFetchCount = 0;
+
+  /// Every request the adapter served, in order (`METHOD path`) — the
+  /// boot-call-count test (spec 7.1) filters this to the window after
+  /// login. [recordRequests] gates recording so unrelated suites don't
+  /// accumulate a huge list.
+  bool recordRequests = false;
+  final List<String> requestLog = [];
 
   /// When true, `GET /inventory/stock-ledger/1` returns an empty array.
   bool emptyStockLedger = false;
@@ -295,6 +614,10 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   /// When true, the status POST rejects with a 400 (failure-path test).
   bool rejectPoStatus = false;
 
+  /// Every `POST /purchase-orders/:id/status` the fake served, in order —
+  /// the bulk status-change test asserts on this (id, new status).
+  final List<(int, String)> poStatusCalls = [];
+
   /// Stateful returned qty for purchase #1 — the /purchases GET fakes
   /// read it so the detail/list show the cumulative returned quantity.
   num purchase1ReturnedQty = 0;
@@ -350,6 +673,21 @@ class _AuthFakeAdapter implements HttpClientAdapter {
 
   /// Last customer id the row-menu Delete flow DELETEed.
   int? lastCustomerDeleteId;
+
+  /// Ids the items bulk delete DELETEed (SHORTCOMINGS-FIX 4.4).
+  final List<int> bulkDeletedItemIds = [];
+
+  /// Ids the items bulk-delete Undo restored.
+  final List<int> bulkRestoredItemIds = [];
+
+  /// is_active flips from the items bulk activate/deactivate (id → body).
+  final Map<int, Map<String, dynamic>> bulkItemUpdates = {};
+
+  /// Ids the sales bulk delete DELETEed.
+  final List<int> bulkDeletedInvoiceIds = [];
+
+  /// Ids the sales bulk-delete Undo restored (POST /invoices/:id/restore).
+  final List<int> bulkRestoredInvoiceIds = [];
 
   /// True once the Fix Balances recalculate POST fires.
   bool recalculateBalancesCalled = false;
@@ -529,6 +867,32 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   num invoice1ReturnedQty = 0;
   bool rejectInvoiceReturn = false;
 
+  /// When true, the customer-1 invoice feed (`/invoices?customer_id=1`)
+  /// returns no rows — the All-dates true-no-data empty-state path.
+  bool emptyCustomer1Invoices = false;
+
+  /// When true, the supplier-1 PO feed (`/purchase-orders?supplier_id=1`)
+  /// returns no rows — the All-dates true-no-data empty-state path.
+  bool emptySupplier1Pos = false;
+
+  /// Optional long-name overrides for the detail-page identity-truncation
+  /// acceptance tests (default: 'Acme Corp' / 'Alpha Traders').
+  String? customer1NameOverride;
+  String? supplier1NameOverride;
+
+  /// Captured query params of the last customer/supplier DETAIL fetches
+  /// (unified-detail-page range acceptance tests, Phase 8).
+  Map<String, dynamic>? lastCustomerLedgerQuery;
+  Map<String, dynamic>? lastSupplierLedgerQuery;
+  Map<String, dynamic>? lastCustomerStatementQuery;
+  Map<String, dynamic>? lastSupplierStatementQuery;
+  Map<String, dynamic>? lastSupplierPoSummaryQuery;
+  Map<String, dynamic>? lastSupplierPoListQuery;
+
+  /// Every captured /purchase-orders GET query, in order.
+  final List<Map<String, dynamic>> poListQueries = [];
+  Map<String, dynamic>? lastSupplierPurchasesQuery;
+
   /// Captured dashboard/report state: summary request count (refresh
   /// button) and the last summary/sales-summary query params (global
   /// date range).
@@ -543,6 +907,9 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   /// Captured payments-module request state: paged list query, create/
   /// update bodies, and a delete counter.
   Map<String, dynamic>? lastPaymentsQuery;
+
+  /// Every captured /payments and /payments/unified query, in order.
+  final List<Map<String, dynamic>> paymentsQueries = [];
   Map<String, dynamic>? lastPaymentPostBody;
   Map<String, dynamic>? lastPaymentPutBody;
   int paymentDeleteCount = 0;
@@ -612,12 +979,44 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   /// (failure-path test).
   bool rejectRolePermissionsSave = false;
 
+  /// Shared KPI figures — the strip now fetches all metrics in one
+  /// `/dashboard/kpi-batch` call (spec 7.3); the per-card branch below
+  /// is kept for any test that still drives `/dashboard/kpi?metric=`.
+  Map<String, num> _kpiValues() => {
+    'total_active_items': 150,
+    'stock_value': 245000.50,
+    'sales_revenue': 890000.00,
+    'gross_profit': 330000.00,
+    'purchase_orders': 560000.00,
+    'warehouse_stock': 312,
+    'outstanding_receivables': 420000.00,
+    'inventory_turnover': 2.5,
+    'avg_days_to_pay': 14.0,
+    'stock_health': 85.0,
+    'monthly_revenue': 890000.00,
+  };
+
+  Map<String, dynamic> _kpiData(String metric) {
+    final values = _kpiValues();
+    return {
+      'metric': metric,
+      'value': values[metric],
+      'unit': metric == 'warehouse_stock' || metric == 'total_active_items'
+          ? 'count'
+          : 'currency',
+      'label': metric,
+    };
+  }
+
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    if (recordRequests) {
+      requestLog.add('${options.method} ${options.path}');
+    }
     if (options.path == '/auth/login' && failLogin) {
       return _json({
         'success': false,
@@ -777,7 +1176,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'data': {
           'id': 1,
           'customer_code': 'CUST001',
-          'customer_name': 'Acme Corp',
+          'customer_name': customer1NameOverride ?? 'Acme Corp',
           'contact_person': 'Jane Doe',
           'phone': '555-0101',
           'email': 'a@acme.com',
@@ -848,31 +1247,117 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     if (options.path == '/customers/1/ledger' && options.method == 'GET') {
       // Enveloped array — the real getCustomerLedger shape, newest-first
       // (first row carries the latest running balance = closing balance).
+      // Optional fromDate/toDate apply the same inclusive bounds as the
+      // real Phase-2 ledger query (spec §5.2); absent = full history.
+      lastCustomerLedgerQuery = options.queryParameters;
+      final ledgerQ = options.queryParameters;
+      final from = ledgerQ['fromDate'] as String?;
+      final to = ledgerQ['toDate'] as String?;
+      var rows = [
+        {
+          'id': 1,
+          'transaction_date': '2026-01-20',
+          'transaction_type': 'INVOICE',
+          'reference_no': 'INV-2026-001',
+          'description': 'Invoice for goods',
+          'debit': 500.0,
+          'credit': 0.0,
+          'balance': 620.5,
+        },
+        {
+          'id': 2,
+          'transaction_date': '2026-01-10',
+          'transaction_type': 'PAYMENT',
+          'reference_no': 'PAY-2026-005',
+          'description': 'Payment received',
+          'linked_invoice_no': 'INV-2026-001',
+          'debit': 0.0,
+          'credit': 200.0,
+          'balance': 120.5,
+        },
+      ];
+      if (from != null && from.isNotEmpty) {
+        rows = rows
+            .where(
+              (r) => (r['transaction_date'] as String).compareTo(from) >= 0,
+            )
+            .toList();
+      }
+      if (to != null && to.isNotEmpty) {
+        rows = rows
+            .where(
+              (r) => (r['transaction_date'] as String).compareTo(to) <= 0,
+            )
+            .toList();
+      }
+      return _json({'success': true, 'data': rows});
+    }
+    if (options.path == '/customers/1/statement' && options.method == 'GET') {
+      // Enveloped — the real getCustomerStatement shape; transactions are
+      // ordered oldest-first and carry no id (unlike the ledger rows).
+      // Full history opens at 0 (the Phase-2 fix) and closes at the net;
+      // a ranged fetch filters the rows and frames opening/closing from
+      // the period (empty period → opening == closing == 0, the server's
+      // verified empty-period contract).
+      lastCustomerStatementQuery = options.queryParameters;
+      final statementQ = options.queryParameters;
+      final from = statementQ['fromDate'] as String?;
+      final to = statementQ['toDate'] as String?;
+      final ranged =
+          (from != null && from.isNotEmpty) || (to != null && to.isNotEmpty);
+      var transactions = [
+        {
+          'transaction_date': '2026-01-20',
+          'transaction_type': 'INVOICE',
+          'reference_no': 'INV-2026-001',
+          'description': 'Invoice for goods',
+          'debit': 500.0,
+          'credit': 0.0,
+          'balance': 500.0,
+        },
+        {
+          'transaction_date': '2026-01-10',
+          'transaction_type': 'PAYMENT',
+          'reference_no': 'PAY-2026-005',
+          'description': 'Payment received',
+          'debit': 0.0,
+          'credit': 200.0,
+          'balance': 300.0,
+        },
+      ];
+      if (ranged) {
+        transactions = transactions
+            .where(
+              (t) =>
+                  (from == null ||
+                      from.isEmpty ||
+                      (t['transaction_date'] as String).compareTo(from) >=
+                          0) &&
+                  (to == null ||
+                      to.isEmpty ||
+                      (t['transaction_date'] as String).compareTo(to) <= 0),
+            )
+            .toList();
+      }
+      final debit = transactions.fold<num>(0, (s, t) => s + (t['debit'] as num));
+      final credit = transactions.fold<num>(
+        0,
+        (s, t) => s + (t['credit'] as num),
+      );
+      // Full-history statements open at 0 (Phase-2 fix); ranged statements
+      // frame the period with its own net, and an empty period keeps
+      // opening == closing (the server's verified empty-period contract).
+      final opening = 0.0;
+      final closing = debit - credit;
       return _json({
         'success': true,
-        'data': [
-          {
-            'id': 1,
-            'transaction_date': '2026-01-20',
-            'transaction_type': 'INVOICE',
-            'reference_no': 'INV-2026-001',
-            'description': 'Invoice for goods',
-            'debit': 500.0,
-            'credit': 0.0,
-            'balance': 620.5,
-          },
-          {
-            'id': 2,
-            'transaction_date': '2026-01-10',
-            'transaction_type': 'PAYMENT',
-            'reference_no': 'PAY-2026-005',
-            'description': 'Payment received',
-            'linked_invoice_no': 'INV-2026-001',
-            'debit': 0.0,
-            'credit': 200.0,
-            'balance': 120.5,
-          },
-        ],
+        'data': {
+          'customer': {'id': 1, 'customer_name': 'Acme Corp'},
+          'period': {'fromDate': from, 'toDate': to},
+          'openingBalance': opening,
+          'closingBalance': closing,
+          'transactions': transactions,
+        },
       });
     }
     if (options.path == '/suppliers' && options.method == 'GET') {
@@ -968,7 +1453,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'data': {
           'id': 1,
           'supplier_code': 'SUP001',
-          'supplier_name': 'Alpha Traders',
+          'supplier_name': supplier1NameOverride ?? 'Alpha Traders',
           'contact_person': 'Ali Raza',
           'phone': '555-0201',
           'email': 'a@alpha.com',
@@ -983,63 +1468,112 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     if (options.path == '/suppliers/1/ledger' && options.method == 'GET') {
       // Enveloped array — the real getSupplierLedger shape, newest-first
       // (first row carries the latest running balance = closing balance).
-      return _json({
-        'success': true,
-        'data': [
-          {
-            'id': 1,
-            'transaction_date': '2026-01-20',
-            'transaction_type': 'PURCHASE',
-            'reference_no': 'PO-2026-001',
-            'description': 'Purchase goods',
-            'debit': 500.0,
-            'credit': 0.0,
-            'balance': 620.5,
-          },
-          {
-            'id': 2,
-            'transaction_date': '2026-01-10',
-            'transaction_type': 'PAYMENT',
-            'reference_no': 'PAY-2026-005',
-            'description': 'Payment made',
-            'debit': 0.0,
-            'credit': 200.0,
-            'balance': 120.5,
-          },
-        ],
-      });
+      // Optional fromDate/toDate apply inclusive bounds (spec §7.4);
+      // absent = full history.
+      lastSupplierLedgerQuery = options.queryParameters;
+      final ledgerQ = options.queryParameters;
+      final from = ledgerQ['fromDate'] as String?;
+      final to = ledgerQ['toDate'] as String?;
+      var rows = [
+        {
+          'id': 1,
+          'transaction_date': '2026-01-20',
+          'transaction_type': 'PURCHASE',
+          'reference_no': 'PO-2026-001',
+          'description': 'Purchase goods',
+          'debit': 500.0,
+          'credit': 0.0,
+          'balance': 620.5,
+        },
+        {
+          'id': 2,
+          'transaction_date': '2026-01-10',
+          'transaction_type': 'PAYMENT',
+          'reference_no': 'PAY-2026-005',
+          'description': 'Payment made',
+          'debit': 0.0,
+          'credit': 200.0,
+          'balance': 120.5,
+        },
+      ];
+      if (from != null && from.isNotEmpty) {
+        rows = rows
+            .where(
+              (r) => (r['transaction_date'] as String).compareTo(from) >= 0,
+            )
+            .toList();
+      }
+      if (to != null && to.isNotEmpty) {
+        rows = rows
+            .where(
+              (r) => (r['transaction_date'] as String).compareTo(to) <= 0,
+            )
+            .toList();
+      }
+      return _json({'success': true, 'data': rows});
     }
     if (options.path == '/suppliers/1/statement' && options.method == 'GET') {
       // Enveloped — the real getSupplierStatement shape; transactions are
       // ordered oldest-first and carry no id (unlike the ledger rows).
-      // opening 100 + 500 debit - 200 credit = closing 400.
+      // Full history opens at 100 (the pre-existing fake framing); a
+      // ranged fetch filters the rows and frames opening/closing from the
+      // period (empty period → opening == closing == 0, the server's
+      // verified empty-period contract).
+      lastSupplierStatementQuery = options.queryParameters;
+      final statementQ = options.queryParameters;
+      final from = statementQ['fromDate'] as String?;
+      final to = statementQ['toDate'] as String?;
+      final ranged =
+          (from != null && from.isNotEmpty) || (to != null && to.isNotEmpty);
+      var transactions = [
+        {
+          'transaction_date': '2026-01-10',
+          'transaction_type': 'PURCHASE',
+          'reference_no': 'PO-2026-001',
+          'description': 'Purchase goods',
+          'debit': 500.0,
+          'credit': 0.0,
+          'balance': 600.0,
+        },
+        {
+          'transaction_date': '2026-01-20',
+          'transaction_type': 'PAYMENT',
+          'reference_no': 'PAY-2026-005',
+          'description': 'Payment made',
+          'debit': 0.0,
+          'credit': 200.0,
+          'balance': 400.0,
+        },
+      ];
+      if (ranged) {
+        transactions = transactions
+            .where(
+              (t) =>
+                  (from == null ||
+                      from.isEmpty ||
+                      (t['transaction_date'] as String).compareTo(from) >=
+                          0) &&
+                  (to == null ||
+                      to.isEmpty ||
+                      (t['transaction_date'] as String).compareTo(to) <= 0),
+            )
+            .toList();
+      }
+      final debit = transactions.fold<num>(0, (s, t) => s + (t['debit'] as num));
+      final credit = transactions.fold<num>(
+        0,
+        (s, t) => s + (t['credit'] as num),
+      );
+      final opening = ranged ? 0.0 : 100.0;
+      final closing = ranged ? debit - credit : 400.0;
       return _json({
         'success': true,
         'data': {
           'supplier': {'id': 1, 'supplier_name': 'Alpha Traders'},
-          'period': {'fromDate': null, 'toDate': null},
-          'openingBalance': 100.0,
-          'closingBalance': 400.0,
-          'transactions': [
-            {
-              'transaction_date': '2026-01-10',
-              'transaction_type': 'PURCHASE',
-              'reference_no': 'PO-2026-001',
-              'description': 'Purchase goods',
-              'debit': 500.0,
-              'credit': 0.0,
-              'balance': 600.0,
-            },
-            {
-              'transaction_date': '2026-01-20',
-              'transaction_type': 'PAYMENT',
-              'reference_no': 'PAY-2026-005',
-              'description': 'Payment made',
-              'debit': 0.0,
-              'credit': 200.0,
-              'balance': 400.0,
-            },
-          ],
+          'period': {'fromDate': from, 'toDate': to},
+          'openingBalance': opening,
+          'closingBalance': closing,
+          'transactions': transactions,
         },
       });
     }
@@ -1057,45 +1591,87 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     if (options.path == '/purchase-orders/summary/supplier/1' &&
         options.method == 'GET') {
       // Bare object — the real getSummaryBySupplier shape (no envelope).
+      // Computed from the supplier-1 PO fixtures filtered by the optional
+      // start_date/end_date (spec §7.1: po_date cohort counted by current
+      // status); no params = lifetime summary.
+      lastSupplierPoSummaryQuery = options.queryParameters;
+      final summaryQ = options.queryParameters;
+      final start = summaryQ['start_date'] as String?;
+      final end = summaryQ['end_date'] as String?;
+      final rows = _supplier1Pos(po1Status)
+          .where(
+            (po) =>
+                (start == null ||
+                    start.isEmpty ||
+                    (po['po_date'] as String).compareTo(start) >= 0) &&
+                (end == null ||
+                    end.isEmpty ||
+                    (po['po_date'] as String).compareTo(end) <= 0),
+          )
+          .toList();
+      final totalValue = rows.fold<num>(0, (s, po) => s + (po['total_amount'] as num));
       return _json({
-        'total_pos': 4,
-        'total_value': 9000.0,
-        'draft_pos': 1,
-        'submitted_pos': 1,
-        'partially_received_pos': 1,
-        'completed_pos': 1,
+        'total_pos': rows.length,
+        'total_value': totalValue,
+        'draft_pos': rows.where((po) => po['status'] == 'Draft').length,
+        'submitted_pos': rows.where((po) => po['status'] == 'Submitted').length,
+        'partially_received_pos': rows
+            .where((po) => po['status'] == 'Partially Received')
+            .length,
+        'completed_pos': rows.where((po) => po['status'] == 'Completed').length,
       });
     }
     if (options.path == '/purchase-orders' && options.method == 'GET') {
       final q = options.queryParameters;
-      var rows = [
-        {
-          'id': 1,
-          'po_no': 'PO-2026-001',
-          'po_date': '2026-01-20',
-          'supplier_id': 1,
-          'supplier_name': 'Alpha Traders',
-          'warehouse_name': 'Main Warehouse',
-          'total_amount': 1500.0,
-          'paid_amount': 500.0,
-          'balance_amount': 1000.0,
-          'status': po1Status,
-          'expected_delivery_date': '2026-02-01',
-        },
-        {
-          'id': 2,
-          'po_no': 'PO-2026-002',
-          'po_date': '2026-01-25',
-          'supplier_id': 2,
-          'supplier_name': 'Beta Suppliers',
-          'warehouse_name': 'Raw Materials',
-          'total_amount': 2500.0,
-          'paid_amount': 2500.0,
-          'balance_amount': 0.0,
-          'status': 'Completed',
-          'expected_delivery_date': null,
-        },
-      ];
+      lastSupplierPoListQuery = q;
+      poListQueries.add(q);
+      // The supplier detail POs tab / payment modal scope by supplier;
+      // the module grid does not (and keeps the two base rows).
+      // Dio keeps int params as ints — stringify before comparing.
+      var rows = '${q['supplier_id']}' == '1'
+          ? (emptySupplier1Pos ? <Map<String, dynamic>>[] : _supplier1Pos(po1Status))
+          : [
+              {
+                'id': 1,
+                'po_no': 'PO-2026-001',
+                'po_date': '2026-01-20',
+                'supplier_id': 1,
+                'supplier_name': 'Alpha Traders',
+                'warehouse_name': 'Main Warehouse',
+                'total_amount': 1500.0,
+                'paid_amount': 500.0,
+                'balance_amount': 1000.0,
+                'status': po1Status,
+                'expected_delivery_date': '2026-02-01',
+              },
+              {
+                'id': 2,
+                'po_no': 'PO-2026-002',
+                'po_date': '2026-01-25',
+                'supplier_id': 2,
+                'supplier_name': 'Beta Suppliers',
+                'warehouse_name': 'Raw Materials',
+                'total_amount': 2500.0,
+                'paid_amount': 2500.0,
+                'balance_amount': 0.0,
+                'status': 'Completed',
+                'expected_delivery_date': null,
+              },
+            ];
+      // Optional inclusive po_date bounds (spec §7.2 — the supplier POs
+      // tab sends start_date/end_date under an active page range).
+      final startDate = (q['start_date'] as String?) ?? '';
+      final endDate = (q['end_date'] as String?) ?? '';
+      if (startDate.isNotEmpty) {
+        rows = rows
+            .where((po) => (po['po_date'] as String).compareTo(startDate) >= 0)
+            .toList();
+      }
+      if (endDate.isNotEmpty) {
+        rows = rows
+            .where((po) => (po['po_date'] as String).compareTo(endDate) <= 0)
+            .toList();
+      }
       // Bare array for the full-list consumers (`.list(supplierId:)` —
       // the supplier POs tab / payment modal's getRawList); paged
       // envelope for the grid's listPaged (page param present).
@@ -1232,6 +1808,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         options.method == 'POST') {
       final body = options.data as Map<String, dynamic>;
       lastPoStatusBody = body;
+      poStatusCalls.add((1, body['status'] as String));
       if (rejectPoStatus) {
         return _json({
           'error': 'Cannot transition from Draft to Submitted',
@@ -1239,6 +1816,16 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       }
       po1Status = body['status'] as String;
       return _json({'id': 1, 'po_no': 'PO-2026-001', 'status': po1Status});
+    }
+    if (options.path == '/purchase-orders/2/status' &&
+        options.method == 'POST') {
+      final body = options.data as Map<String, dynamic>;
+      poStatusCalls.add((2, body['status'] as String));
+      // PO-2026-002 is Completed — a terminal state the model refuses to
+      // transition out of.
+      return _json({
+        'error': 'Cannot transition from Completed to ${body['status']}',
+      }, status: 400);
     }
     if (options.path == '/purchase-orders/1/receipts' &&
         options.method == 'GET') {
@@ -1279,47 +1866,70 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     if (options.path == '/purchases' && options.method == 'GET') {
       // Paged envelope — the real Purchase.getAll shape since Phase 6
       // (joined item/warehouse/user fields; server-side search/sort).
+      // The supplier detail Purchases tab scopes by supplier_id and adds
+      // optional inclusive purchase_date bounds (spec §7.3).
       final q = options.queryParameters;
+      lastSupplierPurchasesQuery = q;
       final search = (q['search'] as String?) ?? '';
-      var rows = [
-        {
-          'id': 1,
-          'purchase_no': 'PUR-2026-001',
-          'purchase_date': '2026-01-15',
-          'item_id': 4,
-          'item_code': 'RM001',
-          'item_name': 'Raw Material A',
-          'unit_of_measure': 'kg',
-          'quantity': 100.0,
-          'unit_cost': 10.0,
-          'total_cost': 1000.0,
-          'supplier_name': 'Alpha Traders',
-          'warehouse_id': 1,
-          'warehouse_name': 'Main Warehouse',
-          'invoice_no': 'INV-101',
-          'remarks': 'Bulk order',
-          'returned_quantity': purchase1ReturnedQty,
-          'created_by_username': 'admin',
-        },
-        {
-          'id': 2,
-          'purchase_no': 'PUR-2026-002',
-          'purchase_date': '2026-01-22',
-          'item_id': 5,
-          'item_code': 'FG002',
-          'item_name': 'Finished Good B',
-          'unit_of_measure': 'pcs',
-          'quantity': 25.0,
-          'unit_cost': 40.0,
-          'total_cost': 1000.0,
-          'supplier_name': 'Beta Supplies',
-          'warehouse_id': 1,
-          'warehouse_name': 'Main Warehouse',
-          'invoice_no': 'INV-102',
-          'returned_quantity': 0,
-          'created_by_username': 'admin',
-        },
-      ];
+      // Dio keeps int params as ints — stringify before comparing.
+      var rows = '${q['supplier_id']}' == '1'
+          ? _supplier1Purchases()
+          : [
+              {
+                'id': 1,
+                'purchase_no': 'PUR-2026-001',
+                'purchase_date': '2026-01-15',
+                'item_id': 4,
+                'item_code': 'RM001',
+                'item_name': 'Raw Material A',
+                'unit_of_measure': 'kg',
+                'quantity': 100.0,
+                'unit_cost': 10.0,
+                'total_cost': 1000.0,
+                'supplier_name': 'Alpha Traders',
+                'warehouse_id': 1,
+                'warehouse_name': 'Main Warehouse',
+                'invoice_no': 'INV-101',
+                'remarks': 'Bulk order',
+                'returned_quantity': purchase1ReturnedQty,
+                'created_by_username': 'admin',
+              },
+              {
+                'id': 2,
+                'purchase_no': 'PUR-2026-002',
+                'purchase_date': '2026-01-22',
+                'item_id': 5,
+                'item_code': 'FG002',
+                'item_name': 'Finished Good B',
+                'unit_of_measure': 'pcs',
+                'quantity': 25.0,
+                'unit_cost': 40.0,
+                'total_cost': 1000.0,
+                'supplier_name': 'Beta Supplies',
+                'warehouse_id': 1,
+                'warehouse_name': 'Main Warehouse',
+                'invoice_no': 'INV-102',
+                'returned_quantity': 0,
+                'created_by_username': 'admin',
+              },
+            ];
+      final startDate = (q['start_date'] as String?) ?? '';
+      final endDate = (q['end_date'] as String?) ?? '';
+      if (startDate.isNotEmpty) {
+        rows = rows
+            .where(
+              (p) =>
+                  (p['purchase_date'] as String).compareTo(startDate) >= 0,
+            )
+            .toList();
+      }
+      if (endDate.isNotEmpty) {
+        rows = rows
+            .where(
+              (p) => (p['purchase_date'] as String).compareTo(endDate) <= 0,
+            )
+            .toList();
+      }
       if (search.isNotEmpty) {
         final term = search.toLowerCase();
         rows = rows
@@ -1330,6 +1940,10 @@ class _AuthFakeAdapter implements HttpClientAdapter {
                   (p['supplier_name'] as String).toLowerCase().contains(term),
             )
             .toList();
+      }
+      // Full-list consumers (no page param) get every row.
+      if (q['page'] == null) {
+        return _json({'success': true, 'data': rows});
       }
       final page = int.tryParse('${q['page']}') ?? 1;
       final limit = int.tryParse('${q['limit']}') ?? 10;
@@ -1598,6 +2212,17 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'is_active': 1,
       }, status: 201);
     }
+    // Record every bulk activate/deactivate PUT (SHORTCOMINGS-FIX 4.4) —
+    // placed before the id-specific branches so ids 1/4/5 (which have
+    // their own handlers) are captured too; the response branches below
+    // still win for the body.
+    if (options.method == 'PUT' &&
+        options.path.startsWith('/inventory/items/')) {
+      final putId = int.tryParse(options.path.split('/').last);
+      if (putId != null) {
+        bulkItemUpdates[putId] = options.data as Map<String, dynamic>;
+      }
+    }
     if (options.path == '/inventory/items') {
       itemsFetchCount++;
       if (failItems) {
@@ -1799,7 +2424,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         ],
       });
     }
-    if (options.path == '/inventory/items/1') {
+    if (options.path == '/inventory/items/1' && options.method == 'GET') {
       // Bare detail object with the per-warehouse stock breakdown.
       return _json({
         'id': 1,
@@ -3212,6 +3837,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     if (options.path == '/payments/unified' && options.method == 'GET') {
       final q = options.queryParameters;
       lastPaymentsQuery = q;
+      paymentsQueries.add(q);
       final page = int.tryParse('${q['page']}') ?? 1;
       const all = [
         {
@@ -3254,10 +3880,14 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       });
     }
     if (options.path == '/payments' && options.method == 'GET') {
+      // Detail-tab requests scope by customerId/supplierId and (under an
+      // active page range) carry fromDate/toDate inclusive bounds (spec
+      // §6.3/§7.5); the module hub uses /payments/unified instead.
       final q = options.queryParameters;
       lastPaymentsQuery = q;
+      paymentsQueries.add(q);
       final page = int.tryParse('${q['page']}') ?? 1;
-      const all = [
+      var all = [
         {
           'id': 1,
           'payment_no': 'PAY-2026-0001',
@@ -3283,15 +3913,43 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'created_at': '2026-05-28 12:00:00',
         },
       ];
+      // Dio keeps int params as ints — stringify before comparing.
+      if ('${q['customerId']}' == '1') all = _customer1Payments();
+      if ('${q['supplierId']}' == '1') all = _supplier1Payments();
+      final fromDate = (q['fromDate'] as String?) ?? '';
+      final toDate = (q['toDate'] as String?) ?? '';
+      if (fromDate.isNotEmpty) {
+        all = all
+            .where(
+              (p) => (p['payment_date'] as String).compareTo(fromDate) >= 0,
+            )
+            .toList();
+      }
+      if (toDate.isNotEmpty) {
+        all = all
+            .where(
+              (p) => (p['payment_date'] as String).compareTo(toDate) <= 0,
+            )
+            .toList();
+      }
+      // Full-list consumers (no page param) get every row; only paged
+      // consumers slice.
+      if (q['page'] == null) {
+        return _json({'success': true, 'data': all});
+      }
+      final limit = int.tryParse('${q['limit']}') ?? 10;
+      final totalPages = (all.length + limit - 1) ~/ limit;
+      final start = (page - 1) * limit;
+      final pageRows = all.skip(start).take(limit).toList();
       return _json({
         'success': true,
-        'data': all,
+        'data': pageRows,
         'pagination': {
           'currentPage': page,
-          'totalPages': 1,
+          'totalPages': totalPages,
           'totalItems': all.length,
-          'hasNext': false,
-          'hasPrev': false,
+          'hasNext': start + limit < all.length,
+          'hasPrev': page > 1,
         },
       });
     }
@@ -3445,13 +4103,23 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'created_by_username': 'Fawad',
         },
       ];
+      // Customer 1 (Acme) carries the deterministic Phase-8 fixture set
+      // (19 invoices spanning Jan–Aug) — every consumer of this filter
+      // (the detail page Overview/header/grid and the Record Payment
+      // dialog's open-invoices fetch) sees the same list, as the real
+      // server would return. (Dio keeps int params as ints — stringify
+      // before comparing.)
+      var rows = '${q['customer_id']}' == '1'
+          ? (emptyCustomer1Invoices
+                ? <Map<String, dynamic>>[]
+                : _customer1Invoices())
+          : all;
       // Server-side filters (status CSV, search, date range) mirror the
       // real getInvoices behavior.
       final statuses = (q['status'] as String?)?.split(',') ?? const [];
       final search = (q['search'] as String?) ?? '';
       final startDate = (q['start_date'] as String?) ?? '';
       final endDate = (q['end_date'] as String?) ?? '';
-      var rows = all;
       if (statuses.isNotEmpty) {
         rows = rows.where((i) => statuses.contains(i['status'])).toList();
       }
@@ -3478,6 +4146,11 @@ class _AuthFakeAdapter implements HttpClientAdapter {
               (i) => (i['invoice_date'] as String).compareTo(endDate) <= 0,
             )
             .toList();
+      }
+      // Full-list consumers (no page param — e.g. the Overview cohort
+      // feed) get every row; only paged consumers slice.
+      if (q['page'] == null) {
+        return _json({'success': true, 'data': rows});
       }
       final page = int.tryParse('${q['page']}') ?? 1;
       final limit = int.tryParse('${q['limit']}') ?? 10;
@@ -3846,41 +4519,36 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         ],
       });
     }
+    if (options.path == '/dashboard/kpi-batch') {
+      // Batched KPI values (spec 7.3: the strip fetches every visible
+      // card's metric in one call). Same figures as the summary fixture
+      // above so the strip and panels agree.
+      final metrics =
+          (options.queryParameters['metrics'] ?? '')
+              .toString()
+              .split(',')
+              .where((m) => m.isNotEmpty)
+              .toList();
+      return _json({
+        'success': true,
+        'data': {
+          for (final m in metrics)
+            if (_kpiValues().containsKey(m)) m: _kpiData(m),
+        },
+      });
+    }
     if (options.path == '/dashboard/kpi') {
-      // Per-card KPI values (the layout-driven strip fetches each
-      // visible card via /dashboard/kpi?metric=). Same figures as the
-      // summary fixture above so the strip and panels agree.
+      // Per-card KPI values — kept for any test that still drives
+      // `/dashboard/kpi?metric=` directly.
       final metric = options.queryParameters['metric'] ?? '';
-      final values = <String, num>{
-        'total_active_items': 150,
-        'stock_value': 245000.50,
-        'sales_revenue': 890000.00,
-        'gross_profit': 330000.00,
-        'purchase_orders': 560000.00,
-        'warehouse_stock': 312,
-        'outstanding_receivables': 420000.00,
-        'inventory_turnover': 2.5,
-        'avg_days_to_pay': 14.0,
-        'stock_health': 85.0,
-        'monthly_revenue': 890000.00,
-      };
+      final values = _kpiValues();
       if (!values.containsKey(metric)) {
         return _json({
           'success': false,
           'error': {'code': 'UNKNOWN_METRIC', 'message': 'Unknown metric'},
         }, status: 404);
       }
-      return _json({
-        'success': true,
-        'data': {
-          'metric': metric,
-          'value': values[metric],
-          'unit': metric == 'warehouse_stock' || metric == 'total_active_items'
-              ? 'count'
-              : 'currency',
-          'label': metric,
-        },
-      });
+      return _json({'success': true, 'data': _kpiData(metric)});
     }
     if (options.path == '/dashboard/layout/active' && noDashboardLayout) {
       // No saved layout (404) → the dashboard renders the curated
@@ -5235,6 +5903,62 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         },
       });
     }
+    // Bulk operations (SHORTCOMINGS-FIX 4.4) — catch-alls placed after
+    // the id-specific branches above, so the single-record handlers keep
+    // winning for id 1.
+    if (options.method == 'PUT' &&
+        options.path.startsWith('/inventory/items/')) {
+      final id = int.tryParse(options.path.split('/').last);
+      if (id != null) {
+        final body = options.data as Map<String, dynamic>;
+        bulkItemUpdates[id] = body;
+        return _json({
+          'id': id,
+          'item_code': 'ITM$id',
+          'item_name': 'Item $id',
+          'unit_of_measure': 'pcs',
+          'current_stock': 0,
+          'reorder_level': 0,
+          'standard_cost': 0,
+          'standard_selling_price': 0,
+          'is_active': body['is_active'] ?? 1,
+        });
+      }
+    }
+    if (options.method == 'DELETE' &&
+        options.path.startsWith('/inventory/items/')) {
+      final id = int.tryParse(options.path.split('/').last);
+      if (id != null) {
+        bulkDeletedItemIds.add(id);
+        return _json({'success': true, 'message': 'Item deleted'});
+      }
+    }
+    if (options.method == 'POST' &&
+        options.path.startsWith('/inventory/items/') &&
+        options.path.endsWith('/restore')) {
+      final id = int.tryParse(options.path.split('/')[3]);
+      if (id != null) {
+        bulkRestoredItemIds.add(id);
+        return _json({'success': true, 'message': 'Item restored'});
+      }
+    }
+    if (options.method == 'DELETE' &&
+        options.path.startsWith('/invoices/')) {
+      final id = int.tryParse(options.path.split('/').last);
+      if (id != null) {
+        bulkDeletedInvoiceIds.add(id);
+        return _json({'message': 'Invoice deleted successfully'});
+      }
+    }
+    if (options.method == 'POST' &&
+        options.path.startsWith('/invoices/') &&
+        options.path.endsWith('/restore')) {
+      final id = int.tryParse(options.path.split('/')[2]);
+      if (id != null) {
+        bulkRestoredInvoiceIds.add(id);
+        return _json({'success': true, 'message': 'Invoice restored'});
+      }
+    }
     return _json({
       'success': false,
       'error': {'code': 'NOT_FOUND', 'message': 'Not found'},
@@ -5337,7 +6061,8 @@ void main() {
     addTearDown(tester.view.reset);
     final storage = _FakeTokenStorage();
     final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
-    dio.httpClientAdapter = _AuthFakeAdapter();
+    final adapter = _AuthFakeAdapter()..recordRequests = true;
+    dio.httpClientAdapter = adapter;
 
     await tester.pumpWidget(
       ProviderScope(
@@ -5352,15 +6077,25 @@ void main() {
 
     await tester.enterText(find.byType(TextField).at(0), 'admin');
     await tester.enterText(find.byType(TextField).at(1), 'admin123');
+    adapter.requestLog.clear(); // Keep only the post-login window.
     await tester.tap(find.widgetWithText(FilledButton, 'Login'));
     await tester.pumpAndSettle();
+    // ignore: avoid_print
+    print('BOOT CALLS (${adapter.requestLog.length}):');
+    for (final call in adapter.requestLog) {
+      // ignore: avoid_print
+      print('  $call');
+    }
 
     // authProvider flipped to authenticated → router redirects to the
     // authenticated shell ('/'), which loads the dashboard summary.
     expect(find.text('Dashboard'), findsWidgets); // rail item + app bar title
     expect(find.text('890,000.00'), findsOneWidget); // sales revenue KPI
     expect(find.text('Fawad'), findsOneWidget); // logged-in user shown
-    expect(find.byIcon(Icons.logout), findsOneWidget);
+    expect(
+      find.byIcon(Icons.account_circle_outlined),
+      findsOneWidget, // user menu (spec 3.3)
+    );
     expect(storage.token, 'test-token'); // JWT persisted
 
     // The layout-driven KPI strip (curated default: Stock Value, Sales
@@ -5383,6 +6118,46 @@ void main() {
     expect(find.text('Current'), findsOneWidget); // first aging bucket
     expect(find.text('1-30 Days'), findsOneWidget); // second aging bucket
   });
+
+  testWidgets(
+    'login only fetches the dashboard; modules load on first visit (7.1)',
+    (tester) async {
+      tester.view.physicalSize = const Size(2000, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final storage = _FakeTokenStorage();
+      final adapter = _AuthFakeAdapter();
+      final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+      dio.httpClientAdapter = adapter;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tokenStorageProvider.overrideWithValue(storage),
+            dioProvider.overrideWithValue(dio),
+          ],
+          child: const MiniErpApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(0), 'admin');
+      await tester.enterText(find.byType(TextField).at(1), 'admin123');
+      await tester.tap(find.widgetWithText(FilledButton, 'Login'));
+      await tester.pumpAndSettle();
+
+      // Lazy branches (spec 7.1): the indexed-stack shell no longer
+      // builds every module at boot, so no module fetches fire until
+      // their branch is first visited.
+      expect(find.text('Dashboard'), findsWidgets);
+      expect(adapter.itemsFetchCount, 0);
+
+      // First visit to the inventory tab triggers its fetch.
+      await tester.tap(find.text('Inventory'));
+      await tester.pumpAndSettle();
+      expect(adapter.itemsFetchCount, greaterThanOrEqualTo(1));
+      expect(find.text('Items'), findsWidgets); // grid rendered
+    },
+  );
 
   testWidgets('cash position card opens the balance breakdown dialog', (
     tester,
@@ -5733,7 +6508,10 @@ void main() {
     await tester.enterText(find.byType(TextField).at(1), 'admin123');
     await tester.tap(find.widgetWithText(FilledButton, 'Login'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.key_outlined));
+    // Change Password lives in the user menu (spec 3.3).
+    await tester.tap(find.byIcon(Icons.account_circle_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Change Password'));
     await tester.pumpAndSettle();
     expect(find.text('Change Password'), findsWidgets);
 
@@ -5767,7 +6545,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.key_outlined));
+      await tester.tap(find.byIcon(Icons.account_circle_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Change Password'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField).at(0), 'wrong');
       await tester.enterText(find.byType(TextFormField).at(1), 'newpass123');
@@ -5904,6 +6684,68 @@ void main() {
     // Only the below-reorder item remains (bare array endpoint).
     expect(find.text('FG001'), findsOneWidget);
     expect(find.text('Bolt'), findsNothing);
+  });
+
+  testWidgets('items screen bulk select-all shows the bar and deactivates', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    // The bulk checkbox column renders a header select-all plus one
+    // checkbox per row (5 fixture items) — SHORTCOMINGS-FIX 4.4.
+    expect(find.byType(Checkbox), findsNWidgets(6));
+
+    // Select-all (the header checkbox — PlutoGrid renders it after the
+    // body cells) → the bulk bar appears.
+    await tester.tap(find.byType(Checkbox).last);
+    await tester.pumpAndSettle();
+    expect(find.text('5 selected'), findsOneWidget);
+    expect(find.text('Delete selected'), findsOneWidget);
+    expect(find.text('Deactivate selected'), findsOneWidget);
+
+    // Deactivate selected flips is_active=0 for every item.
+    await tester.tap(find.text('Deactivate selected'));
+    await tester.pumpAndSettle();
+    expect(adapter.bulkItemUpdates.length, 5);
+    expect(
+      adapter.bulkItemUpdates.values.every((b) => b['is_active'] == 0),
+      isTrue,
+    );
+    // The action bar disappears once the selection resets on refresh.
+    expect(find.text('Delete selected'), findsNothing);
+  });
+
+  testWidgets('items screen bulk delete confirms and undoes with restore', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToItems(tester, adapter: adapter);
+
+    // Select the first data row (not the header select-all).
+    // Select the first data row (not the header select-all). The cell's
+    // double-tap recognizer holds the gesture arena for ~300ms, so
+    // advance fake time past it before asserting.
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.text('1 selected'), findsOneWidget);
+
+    // Delete selected → confirm dialog → soft delete fires for id 1.
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(adapter.bulkDeletedItemIds, [1]);
+
+    // The 4.2-style undo toast restores the deleted item in place.
+    expect(find.text('1 deleted'), findsOneWidget);
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(adapter.bulkRestoredItemIds, [1]);
   });
 
   testWidgets('items screen error shows a retry and recovers', (tester) async {
@@ -6509,8 +7351,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    // Settings is hideInRail: tap the AppBar settings icon instead.
-    await tester.tap(find.byIcon(Icons.settings_outlined));
+    // Settings is hideInRail: open the user menu and choose Settings
+    // (spec 3.3).
+    await tester.tap(find.byIcon(Icons.account_circle_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
   }
 
@@ -7377,6 +8222,116 @@ void main() {
     if (file.existsSync()) file.deleteSync();
   });
 
+  testWidgets('sales screen bulk export writes only the selected rows', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSales(tester, adapter);
+
+    // Stub the file_picker save channel (same pattern as the full-list
+    // export test above).
+    final target = '${Directory.systemTemp.path}/minierp-invoices-bulk.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    // Select the first two invoice rows → the bulk bar appears. The
+    // cell's double-tap recognizer holds the arena ~300ms, so advance
+    // fake time past it after each tap.
+    await tester.tap(find.byType(Checkbox).at(1));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Checkbox).at(2));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.text('2 selected'), findsOneWidget);
+    expect(find.text('Delete selected'), findsOneWidget);
+
+    // Export selected → real async file I/O via runAsync.
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Export selected'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    // The CSV contains the two selected rows (the 2nd and 3rd fixture
+    // invoices — checkbox order follows the grid rows) but not the first.
+    expect(find.text('Invoices exported'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('INV-2026-440956'));
+    expect(content, contains('INV-2026-440957'));
+    expect(content, isNot(contains('INV-2026-440955')));
+    if (file.existsSync()) file.deleteSync();
+  });
+
+  testWidgets('sales screen bulk delete confirms and soft-deletes selected', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSales(tester, adapter);
+
+    // Select one invoice row → bulk bar with the delete action (advance
+    // fake time past the cell's double-tap gesture window).
+    await tester.tap(find.byType(Checkbox).at(1));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.text('1 selected'), findsOneWidget);
+
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    // The server-side soft delete fired for the selected invoice (the
+    // 2nd fixture row, id 2).
+    expect(adapter.bulkDeletedInvoiceIds, [2]);
+    expect(find.text('1 deleted'), findsOneWidget);
+  });
+
+  testWidgets('sales screen bulk delete undo restores the invoices', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSales(tester, adapter);
+
+    // Select one invoice row → bulk delete it.
+    await tester.tap(find.byType(Checkbox).at(1));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(adapter.bulkDeletedInvoiceIds, [2]);
+
+    // The 4.2-style undo toast restores the deleted invoice in place.
+    expect(find.text('1 deleted'), findsOneWidget);
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(adapter.bulkRestoredInvoiceIds, [2]);
+  });
+
   testWidgets('sales screen search refetches from the server', (
     tester,
   ) async {
@@ -7548,7 +8503,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(PdfPreview), findsOneWidget);
-    expect(find.widgetWithText(TextButton, 'Print A4'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Print'), findsOneWidget);
     expect(find.widgetWithText(TextButton, 'Edit'), findsOneWidget);
 
     // Cancel: the back arrow pops back to the sales grid (the preview
@@ -8119,22 +9074,24 @@ void main() {
     await tester.tap(find.text('CUST001 — Acme Corp').last);
     await tester.pumpAndSettle();
 
-    // Open invoices load from /invoices (balance > 0 filtered client-
-    // side): INV-2026-440955 (1,500.00) + INV-2026-440957 (200.00).
-    expect(find.text('INV-2026-440955'), findsOneWidget);
-    expect(find.text('INV-2026-440957'), findsOneWidget);
-    expect(find.textContaining('1,500.00'), findsOneWidget); // balance
+    // Open invoices load from /invoices?customer_id=1 (balance > 0
+    // filtered client-side): customer 1's June fixtures render first in
+    // response order — INV-JUN-002 (200.00 balance) then INV-JUN-003
+    // (150.00 balance; INV-JUN-001 is Paid and filtered out).
+    expect(find.text('INV-JUN-002'), findsOneWidget);
+    expect(find.text('INV-JUN-003'), findsOneWidget);
+    expect(find.textContaining('200.00'), findsWidgets); // line balance
 
-    // Allocate 1000 to the first line, 200 to the second — the amount
+    // Allocate 200 to the first line, 150 to the second — the amount
     // fields are the first two TextFormFields in the dialog.
     final fields = find.descendant(
       of: find.byType(Dialog),
       matching: find.byType(TextFormField),
     );
-    await tester.enterText(fields.at(0), '1000');
-    await tester.enterText(fields.at(1), '200');
+    await tester.enterText(fields.at(0), '200');
+    await tester.enterText(fields.at(1), '150');
     await tester.pump();
-    expect(find.text('Total Allocated: 1,200.00'), findsOneWidget);
+    expect(find.text('Total Allocated: 350.00'), findsOneWidget);
 
     // The submit button sits at the bottom of the dialog's scrollable
     // body — bring it into view before tapping.
@@ -8150,14 +9107,14 @@ void main() {
     // carrying the invoice_id + amount.
     final body = adapter.lastPaymentPostBody!;
     expect(body['customer_id'], 1);
-    expect(body['amount'], 1200);
+    expect(body['amount'], 350);
     expect(body['payment_method'], 'Cash');
     expect((body['payment_date'] as String).length, 10); // yyyy-MM-dd
     final allocs = body['invoice_allocations'] as List;
-    expect((allocs[0] as Map)['invoice_id'], 1);
-    expect((allocs[0] as Map)['amount'], 1000);
-    expect((allocs[1] as Map)['invoice_id'], 3);
-    expect((allocs[1] as Map)['amount'], 200);
+    expect((allocs[0] as Map)['invoice_id'], 1002);
+    expect((allocs[0] as Map)['amount'], 200);
+    expect((allocs[1] as Map)['invoice_id'], 1003);
+    expect((allocs[1] as Map)['amount'], 150);
     // Toast with the recorded total; the dialog popped itself.
     expect(
       find.textContaining('Payment recorded successfully'),
@@ -8182,8 +9139,8 @@ void main() {
     await tester.tap(find.text('CUST001 — Acme Corp').last);
     await tester.pumpAndSettle();
 
-    // 2000 exceeds the 1,500.00 balance of the first invoice — the
-    // validator blocks the POST.
+    // 2000 exceeds the 200.00 balance of the first open invoice
+    // (INV-JUN-002) — the validator blocks the POST.
     final fields = find.descendant(
       of: find.byType(Dialog),
       matching: find.byType(TextFormField),
@@ -8199,7 +9156,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Payment exceeds the remaining balance of 1,500.00'),
+      find.text('Payment exceeds the remaining balance of 200.00'),
       findsOneWidget,
     );
     expect(adapter.lastPaymentPostBody, isNull);
@@ -8235,8 +9192,9 @@ void main() {
   // only paged endpoint), reusing the PlutoGrid scaffold.
   Future<void> bootToCustomers(
     WidgetTester tester,
-    _AuthFakeAdapter adapter,
-  ) async {
+    _AuthFakeAdapter adapter, {
+    List<Override> overrides = const [],
+  }) async {
     final storage = _FakeTokenStorage()..token = 'test-token';
     final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
     dio.httpClientAdapter = adapter;
@@ -8245,6 +9203,7 @@ void main() {
         overrides: [
           tokenStorageProvider.overrideWithValue(storage),
           dioProvider.overrideWithValue(dio),
+          ...overrides,
         ],
         child: const MiniErpApp(),
       ),
@@ -9026,8 +9985,9 @@ void main() {
 
   Future<void> bootToSuppliers(
     WidgetTester tester,
-    _AuthFakeAdapter adapter,
-  ) async {
+    _AuthFakeAdapter adapter, {
+    List<Override> overrides = const [],
+  }) async {
     final storage = _FakeTokenStorage()..token = 'test-token';
     final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
     dio.httpClientAdapter = adapter;
@@ -9036,6 +9996,7 @@ void main() {
         overrides: [
           tokenStorageProvider.overrideWithValue(storage),
           dioProvider.overrideWithValue(dio),
+          ...overrides,
         ],
         child: const MiniErpApp(),
       ),
@@ -9067,6 +10028,21 @@ void main() {
     // first in tree order (rail renders before the content area).
     await tester.tap(find.text('Purchases').first);
     await tester.pumpAndSettle();
+    // The PO grid's pill defaults to this-month (commit 7b5100b); the
+    // module tests assert the base fixtures (Jan 2026), so clear it like
+    // the expenses/sales-orders boots do. The shell's IndexedStack keeps
+    // the direct-purchases tab alive too, so clear its range as well or
+    // the January fixtures are filtered out of the purchases grid.
+    clearScreenDates(
+      tester,
+      [
+        purchaseOrdersFromDateProvider,
+        purchaseOrdersToDateProvider,
+        purchasesFromDateProvider,
+        purchasesToDateProvider,
+      ],
+    );
+    await tester.pumpAndSettle();
   }
 
   Future<void> bootToPurchaseReturns(
@@ -9076,6 +10052,16 @@ void main() {
     await bootToPurchaseOrders(tester, adapter);
     // Switch the purchasing shell to the returns tab (PO is the default).
     await tester.tap(find.text('Purchase Returns'));
+    await tester.pumpAndSettle();
+    // Same IndexedStack rationale — the returns grid (Feb fixtures) is
+    // also alive from the first module pump with a this-month default.
+    clearScreenDates(
+      tester,
+      [
+        purchaseReturnsFromDateProvider,
+        purchaseReturnsToDateProvider,
+      ],
+    );
     await tester.pumpAndSettle();
   }
 
@@ -9102,7 +10088,13 @@ void main() {
   });
 
   testWidgets('customers screen renders the server-paged grid', (tester) async {
-    useWideSurface(tester);
+    // Wider than [useWideSurface]: the full web-parity column set plus
+    // the bulk-selection checkbox column needs the extra width for the
+    // trailing status badges to stay in the viewport (same reasoning as
+    // the row-menu tests).
+    tester.view.physicalSize = const Size(2200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     final adapter = _AuthFakeAdapter();
     await bootToCustomers(tester, adapter);
 
@@ -9245,6 +10237,72 @@ void main() {
 
     // The soft-delete fired for the first row (Acme Corp, id 1).
     expect(adapter.lastCustomerDeleteId, 1);
+  });
+
+  testWidgets('customers screen bulk select exports only the chosen rows', (
+    tester,
+  ) async {
+    // Wide surface: the full web-parity column set plus the nav rail and
+    // the new checkbox column (same reasoning as the row-menu delete
+    // test).
+    tester.view.physicalSize = const Size(2200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final adapter = _AuthFakeAdapter();
+    await bootToCustomers(tester, adapter);
+
+    // Stub the file_picker save channel.
+    final target = '${Directory.systemTemp.path}/minierp-customers-bulk.csv';
+    final targetFile = File(target);
+    if (targetFile.existsSync()) targetFile.deleteSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+          (call) async {
+            if (call.method == 'save') return target;
+            return null;
+          },
+        );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('miguelruivo.flutter.plugins.filepicker'),
+            null,
+          ),
+    );
+
+    // The bulk checkbox column: header select-all + one per row (10
+    // customers on page 1 at the default limit).
+    expect(find.byType(Checkbox), findsNWidgets(11));
+
+    // Select the first data row → the bulk bar with the export action
+    // (advance fake time past the cell's double-tap gesture window).
+    await tester.tap(find.byType(Checkbox).at(1));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.text('1 selected'), findsOneWidget);
+    expect(find.text('Export selected'), findsOneWidget);
+
+    // Export selected → real async file I/O via runAsync.
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Export selected'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+
+    // The CSV contains the selected customer (the 2nd fixture row,
+    // CUST002 / Beta Ltd — checkbox order follows the grid rows) and the
+    // header row, but not the first customer.
+    expect(find.text('Export successful'), findsOneWidget);
+    final file = File(target);
+    expect(file.existsSync(), isTrue);
+    final content = file.readAsStringSync();
+    expect(content, contains('Customer Code'));
+    expect(content, contains('CUST002'));
+    expect(content, contains('Beta Ltd'));
+    expect(content, isNot(contains('CUST001')));
+    if (file.existsSync()) file.deleteSync();
   });
 
   testWidgets('customers screen row menu View opens the detail page with '
@@ -9489,6 +10547,11 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
     await tester.pumpAndSettle();
 
+    // The tab is ranged by the seeded (this-month) page range, whose
+    // window excludes the January fixtures — select All dates through the
+    // header pill so the full-history ledger rows render (the unified
+    // range, spec §6.4).
+    await _pillAllDates(tester);
     await tester.tap(find.text('Ledger').first);
     await tester.pumpAndSettle();
 
@@ -9662,14 +10725,38 @@ void main() {
     expect(find.text('SUP001 — Alpha Traders'), findsOneWidget);
     expect(find.text('PO-2026-001'), findsOneWidget);
 
-    // Amount + add the PO allocation.
+    // Amount + add the PO allocation. The supplier's expanded fixture set
+    // lists every open PO (each with its own + Add) — scroll the modal's
+    // body to PO-2026-001's row and scope the tap to it.
     await tester.enterText(find.byType(TextFormField).at(1), '1000');
     await tester.pump();
-    await tester.tap(find.text('+ Add'));
+    final addInPoRow = find.descendant(
+      of: find
+          .ancestor(
+            of: find.text('PO-2026-001'),
+            matching: find.byType(Row),
+          )
+          .first,
+      matching: find.text('+ Add'),
+    );
+    await tester.tap(addInPoRow);
     await tester.pump();
 
-    // Submit posts the supplier-shaped body with po_allocations.
-    await tester.tap(find.widgetWithText(FilledButton, 'Record Payment').last);
+    // Submit posts the supplier-shaped body with po_allocations — the
+    // submit button sits below the modal's fold, so scroll to it.
+    final dialogScrollable = find
+        .descendant(
+          of: find.byType(Dialog),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    final submitBtn = find.widgetWithText(FilledButton, 'Record Payment').last;
+    await tester.scrollUntilVisible(
+      submitBtn,
+      200,
+      scrollable: dialogScrollable,
+    );
+    await tester.tap(submitBtn);
     await tester.pumpAndSettle();
 
     final body = adapter.lastPaymentPostBody!;
@@ -9699,6 +10786,10 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
     await tester.pumpAndSettle();
 
+    // The tab is ranged by the seeded (this-month) page range, whose
+    // window excludes the January fixtures — select All dates through the
+    // header pill so the full-history ledger rows render (spec §7.4).
+    await _pillAllDates(tester);
     await tester.tap(find.text('Ledger').first);
     await tester.pumpAndSettle();
 
@@ -9738,6 +10829,10 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.f2);
     await tester.pumpAndSettle();
 
+    // The tab is ranged by the seeded (this-month) page range — select
+    // All dates through the header pill so the full-history statement
+    // framing (opening 100 / closing 400) renders (spec §7.6).
+    await _pillAllDates(tester);
     await tester.tap(find.text('Statement').first);
     await tester.pumpAndSettle();
 
@@ -9753,6 +10848,520 @@ void main() {
     expect(find.text('500.00'), findsNWidgets(2));
     expect(find.text('200.00'), findsNWidgets(2));
     expect(find.text('400.00'), findsNWidgets(3));
+  });
+
+  // ── Unified detail-page date range — Phase 8 acceptance tests ──────
+  //
+  // Acceptance criteria from unified-detail-date-picker-spec §16/§18: the
+  // header pill seeds from the global range and drives every data tab's
+  // fetch (endpoint-specific param names, §14 Rule 4), All dates stays
+  // page-local and refetches full history, paged tabs reset to page 1 on
+  // any range change, Overview cohort math reacts while standing metrics
+  // stay lifetime, and filtered-empty vs true-no-data copies stay distinct.
+  //
+  // All tests seed the app-wide range to a fixed June 2026 window so the
+  // fake fixtures (dates/amounts in the builders above) make every sum
+  // deterministic regardless of the machine's clock.
+  List<Override> juneRangeOverrides() => [
+    globalReportFromDateProvider.overrideWith((ref) => DateTime(2026, 6, 1)),
+    globalReportToDateProvider.overrideWith((ref) => DateTime(2026, 6, 30)),
+  ];
+
+  testWidgets(
+      'customer detail pill seeds from the global range and drives every tab',
+      (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToCustomers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+
+    // The pill bar shows the seeded global range (snapshot-on-open, §3.2);
+    // the Overview cards add their own "Jun 1, 2026 – Jun 30, 2026"
+    // period annotations, so assert the pill's exact compact text.
+    expect(find.byType(DateRangeFilter), findsOneWidget);
+    expect(find.text('Jun 1–30, 2026'), findsOneWidget);
+
+    // Overview's feeds are deliberately unfiltered (standing metrics, §6.1).
+    expect(adapter.lastInvoicesQuery?['start_date'], isNull);
+    expect(adapter.lastCustomerLedgerQuery?['fromDate'], isNull);
+
+    // Invoices tab — the endpoint's own param names (start_date/end_date)
+    // carry the page range; 14 June fixtures → two pages.
+    await _tapDetailTab(tester, 'Invoices');
+    expect(adapter.lastInvoicesQuery?['start_date'], '2026-06-01');
+    expect(adapter.lastInvoicesQuery?['end_date'], '2026-06-30');
+    expect(find.text('INV-JUN-001'), findsOneWidget);
+    expect(find.text('Page 1 of 2'), findsOneWidget);
+
+    // Ledger tab — fromDate/toDate on the ranged feed.
+    await _tapDetailTab(tester, 'Ledger');
+    expect(adapter.lastCustomerLedgerQuery?['fromDate'], '2026-06-01');
+    expect(adapter.lastCustomerLedgerQuery?['toDate'], '2026-06-30');
+
+    // Payments tab — fromDate/toDate.
+    await _tapDetailTab(tester, 'Payments');
+    expect(adapter.lastPaymentsQuery?['fromDate'], '2026-06-01');
+    expect(adapter.lastPaymentsQuery?['toDate'], '2026-06-30');
+
+    // Statement tab — fromDate/toDate; June has no statement rows so the
+    // filtered-empty copy shows, and the header pill is the only picker
+    // on the page (no tab-local picker, §14 Rule 1).
+    await _tapDetailTab(tester, 'Statement');
+    expect(adapter.lastCustomerStatementQuery?['fromDate'], '2026-06-01');
+    expect(adapter.lastCustomerStatementQuery?['toDate'], '2026-06-30');
+    expect(find.text('No records in the selected period'), findsOneWidget);
+    expect(find.byType(DateRangeFilter), findsOneWidget);
+  });
+
+  testWidgets('customer detail All dates is page-local and refetches full history',
+      (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToCustomers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(DateRangeFilter)),
+    );
+
+    await _pillAllDates(tester);
+    expect(find.text('All dates'), findsOneWidget); // pill bar
+
+    // Page-local only: the global range keeps its June value (D5).
+    expect(container.read(globalReportFromDateProvider), DateTime(2026, 6, 1));
+    expect(container.read(globalReportToDateProvider), DateTime(2026, 6, 30));
+
+    // Statement = full-history framing with both date parameters omitted
+    // (opening row + tiles + both transactions, §6.5).
+    await _tapDetailTab(tester, 'Statement');
+    expect(adapter.lastCustomerStatementQuery?['fromDate'], isNull);
+    expect(adapter.lastCustomerStatementQuery?['toDate'], isNull);
+    // The customer statement shows the label 3×: summary tile row +
+    // opening row's reference cell + its description cell.
+    expect(find.text('Opening Balance'), findsNWidgets(3));
+    expect(find.text('Closing Balance'), findsNWidgets(3));
+    // The transaction rows sit below the viewport fold inside the
+    // statement's scroll view, so assert with skipOffstage: false.
+    expect(
+      find.text('Invoice for goods', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Payment received', skipOffstage: false),
+      findsOneWidget,
+    );
+
+    // Ledger also omits the date parameters and shows full history — the
+    // January invoice renders as a group header carrying its reference.
+    await _tapDetailTab(tester, 'Ledger');
+    expect(adapter.lastCustomerLedgerQuery?['fromDate'], isNull);
+    expect(adapter.lastCustomerLedgerQuery?['toDate'], isNull);
+    expect(find.text('INV-2026-001'), findsOneWidget);
+
+    // Invoices omit the date parameters and page through ALL rows.
+    await _tapDetailTab(tester, 'Invoices');
+    expect(adapter.lastInvoicesQuery?['start_date'], isNull);
+    expect(adapter.lastInvoicesQuery?['end_date'], isNull);
+    expect(find.text('Page 1 of 2'), findsOneWidget); // 19 fixtures
+    await tester.tap(find.byTooltip('Next'));
+    await tester.pumpAndSettle();
+    expect(find.text('INV-JAN-001'), findsOneWidget); // off-month row
+  });
+
+  testWidgets('customer detail pill custom range and preset commit page and global',
+      (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToCustomers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(DateRangeFilter)),
+    );
+
+    // Custom range through the calendar: start Jun 5, end Jun 8 (the
+    // picker's instant-apply two-click state machine).
+    await _openPill(tester);
+    await tester.tap(find.byKey(const ValueKey('drp-day-2026-06-05')));
+    await tester.pumpAndSettle();
+    expect(find.text('Pick an end date'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('drp-day-2026-06-08')));
+    await tester.pumpAndSettle();
+
+    // The commit reaches the global range (D4) and the Overview cohort
+    // reacts: Jun 6 + Jun 8 invoices → 300+400 / 150+400.
+    expect(container.read(globalReportFromDateProvider), DateTime(2026, 6, 5));
+    expect(container.read(globalReportToDateProvider), DateTime(2026, 6, 8));
+    expect(find.text('700.00'), findsOneWidget);
+    expect(find.text('550.00'), findsOneWidget);
+
+    // The ledger refetches with the committed range.
+    await _tapDetailTab(tester, 'Ledger');
+    expect(adapter.lastCustomerLedgerQuery?['fromDate'], '2026-06-05');
+    expect(adapter.lastCustomerLedgerQuery?['toDate'], '2026-06-08');
+
+    // A preset commit (This month, relative to the machine's clock) also
+    // lands on the page + global pairs.
+    await _tapDetailTab(tester, 'Overview');
+    await _openPill(tester);
+    await tester.tap(find.text('This month').last);
+    await tester.pumpAndSettle();
+    final today = DateTime.now();
+    final expected = presetRange(
+      DatePreset.thisMonth,
+      DateTime(today.year, today.month, today.day),
+      WeekStart.monday,
+    );
+    expect(container.read(globalReportFromDateProvider), expected.from);
+    expect(container.read(globalReportToDateProvider), expected.to);
+  });
+
+  testWidgets('customer detail Overview cohort math keeps standing metrics lifetime',
+      (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToCustomers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(DateRangeFilter)),
+    );
+
+    // June cohort: Total Invoiced 10,500 / Total Received 4,150; the
+    // standing figures (Outstanding 7,475, Avg. Days 0.0) are lifetime.
+    expect(find.text('10,500.00'), findsOneWidget);
+    expect(find.text('4,150.00'), findsOneWidget);
+    expect(find.text('7,475.00'), findsOneWidget);
+    expect(find.text('0.0'), findsOneWidget);
+
+    // ‹ shifts the custom 30-day range back 30 days → May 2–31 (custom
+    // ranges shift by their own length): only the May 5 invoice is in the
+    // cohort (450 / 225) and the global range follows.
+    await _pillShiftPrev(tester);
+    expect(find.text('450.00'), findsOneWidget);
+    expect(find.text('225.00'), findsOneWidget);
+    expect(find.text('7,475.00'), findsOneWidget); // standing unchanged
+    expect(container.read(globalReportFromDateProvider), DateTime(2026, 5, 2));
+    expect(container.read(globalReportToDateProvider), DateTime(2026, 5, 31));
+
+    // Second ‹ → Apr 2–May 1: empty cohort → both cards 0.00 + the
+    // compact filtered-empty line (title only — no hint, §10.2).
+    await _pillShiftPrev(tester);
+    expect(find.text('0.00'), findsNWidgets(2));
+    expect(find.text('No records in the selected period'), findsOneWidget);
+    expect(
+      find.text('Try a wider date range or choose All dates'),
+      findsNothing,
+    );
+    expect(find.text('7,475.00'), findsOneWidget);
+
+    // All dates → full-history cohort: 12,750 / 5,275; standing unchanged.
+    await _pillAllDates(tester);
+    expect(find.text('12,750.00'), findsOneWidget);
+    expect(find.text('5,275.00'), findsOneWidget);
+    expect(find.text('7,475.00'), findsOneWidget);
+  });
+
+  testWidgets('customer detail paged tabs reset to page 1 on range change',
+      (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToCustomers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+
+    // Invoices: 14 June rows → 2 pages; page 2, then All dates re-keys
+    // the provider and the tab must reset to page 1 (§9 pagination rule).
+    await _tapDetailTab(tester, 'Invoices');
+    expect(find.text('Page 1 of 2'), findsOneWidget);
+    await tester.tap(find.byTooltip('Next'));
+    await tester.pumpAndSettle();
+    expect(find.text('Page 2 of 2'), findsOneWidget);
+    expect(adapter.lastInvoicesQuery?['page'], 2);
+    await _pillAllDates(tester);
+    expect(adapter.lastInvoicesQuery?['page'], 1);
+    expect(adapter.lastInvoicesQuery?['start_date'], isNull);
+    expect(adapter.lastInvoicesQuery?['end_date'], isNull);
+  });
+
+  testWidgets('customer detail Payments tab resets to page 1 when the range shifts',
+      (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToCustomers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+
+    // Payments: 12 June rows → 2 pages; page 2, then the ‹ arrow commits
+    // May 2–31 and the tab must refetch page 1 with the new dates.
+    await _tapDetailTab(tester, 'Payments');
+    expect(find.text('Page 1 of 2'), findsOneWidget);
+    await tester.tap(find.byTooltip('Next'));
+    await tester.pumpAndSettle();
+    expect(adapter.lastPaymentsQuery?['page'], 2);
+    await _pillShiftPrev(tester);
+    expect(adapter.lastPaymentsQuery?['page'], 1);
+    expect(adapter.lastPaymentsQuery?['fromDate'], '2026-05-02');
+    expect(adapter.lastPaymentsQuery?['toDate'], '2026-05-31');
+  });
+
+  testWidgets('customer detail empty states split filtered-empty from true-no-data',
+      (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..emptyCustomer1Invoices = true;
+    await bootToCustomers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+
+    // All dates + genuinely no invoices → the module's true-no-data copy,
+    // never the filtered-period message (§10.1).
+    await _pillAllDates(tester);
+    await _tapDetailTab(tester, 'Invoices');
+    expect(find.text('No invoices found'), findsOneWidget);
+    expect(find.text('No records in the selected period'), findsNothing);
+  });
+
+  testWidgets('customer detail header places the date pill right of Record Payment',
+      (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()
+      ..customer1NameOverride =
+          'Acme Corporation International Trading Company Limited';
+    await bootToCustomers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+
+    // Geometry: the pill sits strictly right of Record Payment (D2) and
+    // both controls stay fully on-screen.
+    final pillRect = tester.getRect(find.byType(DateRangeFilter));
+    final buttonRect = tester.getRect(
+      find.widgetWithText(FilledButton, 'Record Payment'),
+    );
+    expect(pillRect.left, greaterThanOrEqualTo(buttonRect.right));
+    expect(pillRect.right, lessThanOrEqualTo(1600));
+    expect(buttonRect.right, lessThanOrEqualTo(1600));
+
+    // The long identity truncates with ellipsis instead of overflowing.
+    final nameText = tester.widget<Text>(
+      find.text('Acme Corporation International Trading Company Limited'),
+    );
+    expect(nameText.overflow, TextOverflow.ellipsis);
+  });
+
+  testWidgets('supplier detail pill drives every tab fetch params', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSuppliers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+
+    // Overview's PO summary is range-scoped (start_date/end_date, §7.1):
+    // June cohort = 12 POs / 7,800.
+    expect(adapter.lastSupplierPoSummaryQuery?['start_date'], '2026-06-01');
+    expect(adapter.lastSupplierPoSummaryQuery?['end_date'], '2026-06-30');
+    expect(find.text('7,800.00'), findsOneWidget);
+
+    // POs tab — the PO convention (start_date/end_date); 12 June rows.
+    await _tapDetailTab(tester, 'POs');
+    expect(adapter.lastSupplierPoListQuery?['start_date'], '2026-06-01');
+    expect(adapter.lastSupplierPoListQuery?['end_date'], '2026-06-30');
+    expect(find.text('PO-JUN-001'), findsOneWidget);
+    expect(find.text('Page 1 of 2'), findsOneWidget);
+
+    // Purchases tab.
+    await _tapDetailTab(tester, 'Purchases');
+    expect(adapter.lastSupplierPurchasesQuery?['start_date'], '2026-06-01');
+    expect(adapter.lastSupplierPurchasesQuery?['end_date'], '2026-06-30');
+
+    // Ledger tab.
+    await _tapDetailTab(tester, 'Ledger');
+    expect(adapter.lastSupplierLedgerQuery?['fromDate'], '2026-06-01');
+    expect(adapter.lastSupplierLedgerQuery?['toDate'], '2026-06-30');
+
+    // Payments tab.
+    await _tapDetailTab(tester, 'Payments');
+    expect(adapter.lastPaymentsQuery?['fromDate'], '2026-06-01');
+    expect(adapter.lastPaymentsQuery?['toDate'], '2026-06-30');
+
+    // Statement tab — June has no statement rows → filtered-empty copy;
+    // the header pill remains the only picker on the page.
+    await _tapDetailTab(tester, 'Statement');
+    expect(adapter.lastSupplierStatementQuery?['fromDate'], '2026-06-01');
+    expect(adapter.lastSupplierStatementQuery?['toDate'], '2026-06-30');
+    expect(find.text('No records in the selected period'), findsOneWidget);
+    expect(find.byType(DateRangeFilter), findsOneWidget);
+  });
+
+  testWidgets('supplier detail Overview filters PO metrics but keeps Current Balance',
+      (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSuppliers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+
+    // June cohort: 12 POs / 7,800; Current Balance stays 250 (as-of-now,
+    // §7.1).
+    expect(find.text('7,800.00'), findsOneWidget);
+    expect(find.text('250.00'), findsWidgets);
+
+    // Two ‹ shifts → Apr 2–May 1: zero-PO period — PO values zeroed,
+    // Current Balance unchanged, §10.3 line without the hint.
+    await _pillShiftPrev(tester);
+    await _pillShiftPrev(tester);
+    expect(find.text('0.00'), findsOneWidget); // Total PO Value
+    expect(find.text('No records in the selected period'), findsOneWidget);
+    expect(
+      find.text('Try a wider date range or choose All dates'),
+      findsNothing,
+    );
+    expect(find.text('250.00'), findsWidgets); // Current Balance unchanged
+
+    // All dates → lifetime summary: 16 POs / 16,800 (9,000 Jan + 7,800
+    // June — the pre-existing 4-PO/9,000 summary preserved, §7.1).
+    await _pillAllDates(tester);
+    expect(find.text('16,800.00'), findsOneWidget);
+    expect(find.text('250.00'), findsWidgets);
+  });
+
+  testWidgets('supplier detail POs tab resets to page 1 on All dates', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSuppliers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+
+    // POs: 12 June rows → 2 pages; page 2, then All dates resets to 1.
+    await _tapDetailTab(tester, 'POs');
+    expect(find.text('Page 1 of 2'), findsOneWidget);
+    await tester.tap(find.byTooltip('Next'));
+    await tester.pumpAndSettle();
+    expect(adapter.lastSupplierPoListQuery?['page'], 2);
+    await _pillAllDates(tester);
+    expect(adapter.lastSupplierPoListQuery?['page'], 1);
+    expect(adapter.lastSupplierPoListQuery?['start_date'], isNull);
+    expect(adapter.lastSupplierPoListQuery?['end_date'], isNull);
+  });
+
+  testWidgets('supplier detail Purchases tab resets to page 1 when the range shifts',
+      (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSuppliers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+
+    // Purchases: 12 June rows → 2 pages; page 2, then ‹ commits May 2–31
+    // and the tab refetches page 1 with the new range.
+    await _tapDetailTab(tester, 'Purchases');
+    expect(find.text('Page 1 of 2'), findsOneWidget);
+    await tester.tap(find.byTooltip('Next'));
+    await tester.pumpAndSettle();
+    expect(adapter.lastSupplierPurchasesQuery?['page'], 2);
+    await _pillShiftPrev(tester);
+    expect(adapter.lastSupplierPurchasesQuery?['page'], 1);
+    expect(adapter.lastSupplierPurchasesQuery?['start_date'], '2026-05-02');
+    expect(adapter.lastSupplierPurchasesQuery?['end_date'], '2026-05-31');
+  });
+
+  testWidgets('supplier detail empty states split filtered-empty from true-no-data',
+      (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..emptySupplier1Pos = true;
+    await bootToSuppliers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+
+    // All dates + genuinely no POs → the module's true-no-data copy.
+    await _pillAllDates(tester);
+    await _tapDetailTab(tester, 'POs');
+    expect(find.text('No purchase orders found'), findsOneWidget);
+    expect(find.text('No records in the selected period'), findsNothing);
+  });
+
+  testWidgets('supplier detail Urdu RTL keeps Record Payment and the pill intact',
+      (tester) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToSuppliers(
+      tester,
+      adapter,
+      overrides: juneRangeOverrides(),
+    );
+    await _openFirstRowDetail(tester);
+
+    // Switch the app language through the real user menu (spec 3.3).
+    await tester.tap(find.byIcon(Icons.account_circle_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Language'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('اردو'));
+    await tester.pumpAndSettle();
+
+    // Urdu labels render and the whole tree is RTL.
+    expect(find.text('ادائیگی ریکارڈ کریں'), findsOneWidget);
+    expect(
+      Directionality.of(tester.element(find.byType(DateRangeFilter))),
+      TextDirection.rtl,
+    );
+
+    // RTL mirrors the header row (the pill renders LEFT of the button);
+    // both controls stay on-screen and never overlap.
+    final pillRect = tester.getRect(find.byType(DateRangeFilter));
+    final buttonRect = tester.getRect(
+      find.widgetWithText(FilledButton, 'ادائیگی ریکارڈ کریں'),
+    );
+    expect(pillRect.overlaps(buttonRect), isFalse);
+    expect(pillRect.left, greaterThanOrEqualTo(0));
+    expect(buttonRect.left, greaterThanOrEqualTo(0));
+
+    // The locale choice persists to the (in-file shared) SharedPreferences
+    // mock — reset it so later tests boot back into English.
+    addTearDown(() => SharedPreferences.setMockInitialValues({}));
   });
 
   testWidgets('supplier form: create posts the schema-shaped body', (
@@ -10143,6 +11752,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    // The screen's pill defaults to this-month; the fixtures are Feb
+    // 2026, so drop the range (same pattern as bootToPurchaseReturns).
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(PurchaseReturnsScreen)),
+    );
+    container.read(purchaseReturnsFromDateProvider.notifier).state = null;
+    container.read(purchaseReturnsToDateProvider.notifier).state = null;
+    await tester.pumpAndSettle();
 
     // Cards (no Pluto grid) render both fixture headers with their
     // badges, reference docs, stats and row 1's reason.
@@ -10251,6 +11868,15 @@ void main() {
     expect(find.text('PR-2026-0001'), findsNothing);
 
     await tester.tap(find.text('Purchase Returns'));
+    await tester.pumpAndSettle();
+    // The returns grid's range defaults to this-month (the shell keeps
+    // the tab alive from the first module pump) — drop it so the Feb
+    // fixtures show, as bootToPurchaseReturns does.
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(PurchaseReturnsScreen)),
+    );
+    container.read(purchaseReturnsFromDateProvider.notifier).state = null;
+    container.read(purchaseReturnsToDateProvider.notifier).state = null;
     await tester.pumpAndSettle();
 
     expect(find.text('PR-2026-0001'), findsOneWidget);
@@ -10763,9 +12389,56 @@ void main() {
     );
   });
 
-  testWidgets('purchase order: receive goods posts the receipt and shows history', (
+  testWidgets('purchase order: bulk set status submits the selected orders', (
     tester,
   ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter();
+    await bootToPurchaseOrders(tester, adapter);
+
+    // The bulk checkbox column: header select-all + one per row (2 base
+    // fixture POs) — SHORTCOMINGS-FIX 4.4.
+    expect(find.byType(Checkbox), findsNWidgets(3));
+
+    // Select-all (the header checkbox — PlutoGrid renders it after the
+    // body cells) → the bulk bar appears with the Set status action.
+    await tester.tap(find.byType(Checkbox).last);
+    await tester.pumpAndSettle();
+    expect(find.text('2 selected'), findsOneWidget);
+    expect(find.text('Set status'), findsOneWidget);
+
+    // Set status → popup menu → Submitted → confirm dialog warns about
+    // the supplier-ledger side effect.
+    await tester.tap(find.text('Set status'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Submitted').last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
+    expect(find.textContaining('supplier ledger'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('confirm_dialog')),
+        matching: find.widgetWithText(FilledButton, 'Confirm'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Both selected POs went through the per-PO status endpoint; PO 2 is
+    // Completed (terminal) and the transition guard 400s it — skipped,
+    // not fatal.
+    expect(adapter.poStatusCalls.length, 2);
+    expect(adapter.poStatusCalls, contains((1, 'Submitted')));
+    expect(adapter.poStatusCalls, contains((2, 'Submitted')));
+    expect(adapter.po1Status, 'Submitted');
+    // The mixed-outcome toast + the refreshed grid (PO 1 badge flipped).
+    expect(find.text('Some items could not be updated'), findsOneWidget);
+    expect(find.text('Submitted'), findsWidgets);
+    // The action bar disappears once the selection resets on refresh.
+    expect(find.text('Set status'), findsNothing);
+  });
+
+  testWidgets('purchase order: receive goods posts the receipt and shows history',
+    (tester) async {
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
     await bootToPurchaseOrders(tester, adapter);

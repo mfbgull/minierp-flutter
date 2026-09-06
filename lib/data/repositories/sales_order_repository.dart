@@ -13,7 +13,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/sales_order.dart' show SalesOrder, SalesOrderDetail;
 import 'api_result.dart';
@@ -87,5 +86,5 @@ class SalesOrderRepository {
 }
 
 final salesOrderRepositoryProvider = Provider<SalesOrderRepository>(
-  (ref) => SalesOrderRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => SalesOrderRepository(ref.watch(repositoryClientProvider)),
 );

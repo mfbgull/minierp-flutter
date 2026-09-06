@@ -23,12 +23,21 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/client_paged_grid.dart';
 import '../../widgets/detail_error.dart';
+import '../../widgets/filtered_empty_state.dart';
 import 'supplier_providers.dart';
 
 class SupplierLedgerTab extends ConsumerStatefulWidget {
-  const SupplierLedgerTab({super.key, required this.supplierId});
+  const SupplierLedgerTab({
+    super.key,
+    required this.supplierId,
+    required this.sessionId,
+  });
 
   final int supplierId;
+
+  /// The detail-page instance's range-session id — this tab derives its
+  /// fetch args from the header pill's pair (spec §3.1/§9).
+  final int sessionId;
 
   @override
   ConsumerState<SupplierLedgerTab> createState() => _SupplierLedgerTabState();
@@ -52,23 +61,33 @@ class _SupplierLedgerTabState extends ConsumerState<SupplierLedgerTab> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final ledger = ref.watch(supplierLedgerProvider(widget.supplierId));
+    // The page's unified range — part of the fetch identity (§9); null =
+    // All dates = the full-history ledger.
+    final range = supplierDetailRangeIso(ref, widget.sessionId);
+    final args = SupplierLedgerArgs(
+      supplierId: widget.supplierId,
+      fromDate: range.from,
+      toDate: range.to,
+    );
+    final ledger = ref.watch(supplierLedgerRangedProvider(args));
 
     return switch (ledger) {
       AsyncData(:final value) => value.isEmpty
-          ? Center(
-              child: Text(
-                l10n.suppliersLedgerNoentries,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            )
+          ? (range.from != null
+                ? const FilteredEmptyState()
+                : Center(
+                    child: Text(
+                      l10n.suppliersLedgerNoentries,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ))
           : _buildBody(context, l10n, value),
       AsyncError(:final error) => DetailError(
         message: error is ApiError ? error.message : '$error',
         onRetry: () =>
-            ref.invalidate(supplierLedgerProvider(widget.supplierId)),
+            ref.invalidate(supplierLedgerRangedProvider(args)),
       ),
       _ => const Center(child: CircularProgressIndicator()),
     };

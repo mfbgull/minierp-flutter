@@ -432,3 +432,17 @@ void applyGlobalReportRange(WidgetRef ref, DateTime from, DateTime to) {
     ref.read(toProvider.notifier).state = to;
   }
 }
+
+/// Commits [from]..[to] as the app-wide range: writes the dashboard's
+/// global pair AND propagates it to every report page pair.
+///
+/// The dashboard's own pill is bound to the global pair, so its writes
+/// reach the dashboard state directly; detail-page ranged commits
+/// (unified-detail-date-picker-spec §3.3/§4) use this because their pill
+/// is bound to a page-local pair — without this the write would never
+/// reach the dashboard or the report screens.
+void setGlobalReportRange(WidgetRef ref, DateTime from, DateTime to) {
+  ref.read(globalReportFromDateProvider.notifier).state = from;
+  ref.read(globalReportToDateProvider.notifier).state = to;
+  applyGlobalReportRange(ref, from, to);
+}

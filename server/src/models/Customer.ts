@@ -98,7 +98,7 @@ class CustomerModel {
         END as credit_utilization_percent,
         is_active, created_at, updated_at
       FROM customers
-      WHERE 1=1
+      WHERE deleted_at IS NULL
     `;
     const params: unknown[] = [];
 
@@ -120,7 +120,7 @@ class CustomerModel {
 
     const data = db.prepare(query).all(...params) as Customer[];
 
-    let countQuery = `SELECT COUNT(*) as total FROM customers WHERE 1=1`;
+    let countQuery = `SELECT COUNT(*) as total FROM customers WHERE deleted_at IS NULL`;
     const countParams: unknown[] = [];
     if (filters.search) {
       countQuery += ` AND (customer_name LIKE ? OR customer_code LIKE ? OR email LIKE ? OR phone LIKE ?)`;
@@ -200,6 +200,26 @@ class CustomerModel {
     db.prepare('UPDATE customers SET is_active = 0 WHERE id = ?').run(id);
   }
 
+  /// Soft-delete (SHORTCOMINGS-FIX 4.2): stamps `deleted_at`/`deleted_by`
+  /// and deactivates instead of removing the row, so an accidental delete
+  /// can be undone via [restore].
+  static softDelete(id: string | string[] | number, deletedBy: number, db: Database.Database): void {
+    db.prepare(`
+      UPDATE customers
+      SET is_active = 0, deleted_at = datetime('now'), deleted_by = ?
+      WHERE id = ?
+    `).run(deletedBy, id);
+  }
+
+  /// Reverts [softDelete]: clears the delete stamp and reactivates.
+  static restore(id: string | string[] | number, db: Database.Database): void {
+    db.prepare(`
+      UPDATE customers
+      SET is_active = 1, deleted_at = NULL, deleted_by = NULL
+      WHERE id = ?
+    `).run(id);
+  }
+
   static countInvoices(id: string | string[] | number, db: Database.Database): number {
     const result = db.prepare('SELECT COUNT(*) as count FROM invoices WHERE customer_id = ?').get(id) as { count: number };
     return result.count;
@@ -228,8 +248,24 @@ class CustomerModel {
     );
   }
 
-  static getLedger(id: string | string[] | number, sortBy: string, sortOrder: string, db: Database.Database, page = 1, limit = 0): { rows: LedgerEntry[]; total: number } {
+  static getLedger(id: string | string[] | number, sortBy: string, sortOrder: string, db: Database.Database, page = 1, limit = 0, fromDate?: string, toDate?: string): { rows: LedgerEntry[]; total: number } {
     const { sortBy: safeBy, sortOrder: safeOrder } = safeSortBy(sortBy, sortOrder);
+    // Optional inclusive date bounds (unified detail date picker) — same
+    // convention as getStatement (transaction_date >= from AND <= to). The
+    // bound is applied to BOTH the count and the page query so the
+    // pagination envelope stays consistent with the filtered rows.
+    const dateConditions: string[] = [];
+    const dateParams: string[] = [];
+    const dateCol = (col: string) => `transaction_date ${col} ?`;
+    if (fromDate) {
+      dateConditions.push(dateCol('>='));
+      dateParams.push(fromDate);
+    }
+    if (toDate) {
+      dateConditions.push(dateCol('<='));
+      dateParams.push(toDate);
+    }
+    const dateSql = dateConditions.length ? ` AND ${dateConditions.join(' AND ')}` : '';
     // `linked_invoice_no` is resolved with scalar subqueries instead of
     // LEFT JOINs so every ledger entry yields exactly ONE row: joining
     // payments → payment_allocations → invoices directly duplicated any
@@ -246,12 +282,12 @@ class CustomerModel {
     // listings and totals count active rows exclusively (same active set as
     // rebuildLedgerBalances / recalcCustomerBalanceFromLedger).
     const countRow = db.prepare(
-      'SELECT COUNT(*) AS c FROM customer_ledger WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL'
-    ).get(id) as { c: number };
+      'SELECT COUNT(*) AS c FROM customer_ledger WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL' + dateSql
+    ).get(id, ...dateParams) as { c: number };
     const total = countRow.c;
 
     let pageSql = '';
-    const params: Array<string | string[] | number> = [id];
+    const params: Array<string | string[] | number> = [id, ...dateParams];
     if (limit > 0) {
       pageSql = ' LIMIT ? OFFSET ?';
       params.push(limit, (Math.max(1, page) - 1) * limit);
@@ -282,7 +318,7 @@ class CustomerModel {
           )
         END as linked_invoice_no
       FROM customer_ledger cl
-      WHERE cl.customer_id = ? AND cl.voided = 0 AND cl.reversed_by IS NULL
+      WHERE cl.customer_id = ? AND cl.voided = 0 AND cl.reversed_by IS NULL${dateSql}
       ORDER BY cl.${safeBy} ${safeOrder}${pageSql}
     `).all(...params) as LedgerEntry[];
     return { rows, total };
@@ -332,20 +368,21 @@ class CustomerModel {
 
     // Active rows only (ACC-14): the stored running balance of a voided or
     // reversal row is stale by definition and must never seed a statement.
-    let openingBalanceQuery = 'SELECT balance FROM customer_ledger WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL';
-    const openingBalanceParams: unknown[] = [id];
+    // Full-history statements (fromDate omitted) start from zero — the
+    // stored running balance of the LATEST row is the closing position, not
+    // an opening one, and seeding a statement with it double-counts once the
+    // controller adds the in-window net.
+    let openingBalance = 0;
     if (fromDate) {
       // `, id DESC` tiebreaker (report-query-integrity): same-day rows must
       // resolve deterministically to the last inserted one, matching the
       // rebuild ordering (transaction_date ASC, id ASC).
-      openingBalanceQuery += ' AND transaction_date < ? ORDER BY transaction_date DESC, id DESC LIMIT 1';
-      openingBalanceParams.push(fromDate);
-    } else {
-      openingBalanceQuery += ' ORDER BY transaction_date DESC, id DESC LIMIT 1';
+      const openingBalanceResult = db.prepare(
+        'SELECT balance FROM customer_ledger WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL AND transaction_date < ? ORDER BY transaction_date DESC, id DESC LIMIT 1'
+      ).get(id, fromDate) as { balance: number } | undefined;
+      openingBalance = openingBalanceResult ? openingBalanceResult.balance : 0;
     }
-
-    const openingBalanceResult = db.prepare(openingBalanceQuery).get(...openingBalanceParams) as { balance: number } | undefined;
-    return { transactions, openingBalance: openingBalanceResult ? openingBalanceResult.balance : 0 };
+    return { transactions, openingBalance };
   }
 
   static getBalance(id: string | string[] | number, db: Database.Database): { id: number; customer_name: string; current_balance: number } | undefined {

@@ -42,8 +42,6 @@ import '../preferences/preference_providers.dart'
         saveDefaultRange,
         saveWeekStart,
         weekStartProvider;
-import '../reports/report_providers.dart'
-    show globalReportFromDateProvider, globalReportToDateProvider;
 import 'settings_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
@@ -494,11 +492,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _dateRangeSection(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     final currentWeekStart = ref.watch(weekStartProvider);
-    // Read the *current active* range from the global report providers —
-    // this is what the user sees on the dashboard / reports right now.
-    final fromDate = ref.watch(globalReportFromDateProvider);
-    final toDate = ref.watch(globalReportToDateProvider);
-    final hasActiveRange = fromDate != null && toDate != null;
 
     return Card(
       elevation: 1,

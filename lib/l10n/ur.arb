@@ -754,6 +754,7 @@
   "commonSelectoption": "ایک آپشن انتخاب کریں",
   "commonEntervalue": "قدر درج کریں",
   "commonNoresults": "کوئی نتیجہ نہیں ملی",
+  "posItemNotFound": "آئٹم نہیں ملا",
   "commonEntries": "اندراجات",
   "commonRequired": "ضروری",
   "commonOptional": "اختیاری",
@@ -764,6 +765,7 @@
   "commonSettings": "سیٹینگز",
   "commonLanguage": "زبان",
   "commonThemeMode": "ڈارک موڈ",
+  "commonUserMenu": "صارف مینو",
   "commonCurrency": "کرنسی",
   "commonLogout": "لاگ آوٹ",
   "commonLogin": "لاگ ان",
@@ -781,6 +783,7 @@
   "commonCancel": "رڈ",
   "commonDelete": "حذف",
   "commonEdit": "ترمیم",
+  "commonUndo": "واپس",
   "commonSearch": "تلاش",
   "commonFilter": "فلٹر",
   "commonExport": "ایکسپورٹ",
@@ -800,6 +803,8 @@
   "commonBack": "واپس",
   "commonNodata": "کوئی ڈیٹا نہیں",
   "commonLoading": "لوڈ ہو رہا ہے...",
+  "commonNoRecordsInPeriod": "منتخب مدت میں کوئی ریکارڈ نہیں ملا",
+  "commonNoRecordsInPeriodHint": "براہ کرم تاریخ کی حد وسیع کریں یا تمام تاریخیں منتخب کریں",
   "commonSales": "فروخت",
   "commonReceiptprinting": "رسید پرنٹ ہو رہی ہے...",
   "commonPurchases": "خریداری",
@@ -1146,6 +1151,7 @@
   "customersErrorNumber": "درست نمبر درج کریں",
   "customersErrorPhoneRequired": "فون نمبر ضروری ہے",
   "customersExportcsv": "CSV برآمد کریں",
+  "customersExportfailed": "کسٹمرز برآمد کرنے میں ناکامی",
   "customersExportimage": "تصویر",
   "customersExportpdf": "PDF برآمد کریں",
   "customersExportsuccess": "برآمد کامیاب",
@@ -1744,6 +1750,31 @@
   "expiryDate": "مونثی کی تاریخ",
   "expirySelectDateOptional": "تاریخ منتخب کریں (اختیاری)",
   "batchManagement": "بیچ مینجمنٹ",
+  "bulkSelectedCount": "{count} منتخب",
+  "bulkExportSelected": "منتخب ایکسپورٹ کریں",
+  "bulkDeleteSelected": "منتخب حذف کریں",
+  "bulkActivateSelected": "منتخب فعال کریں",
+  "bulkDeactivateSelected": "منتخب غیر فعال کریں",
+  "bulkDeleted": "{count} حذف ہو گئے",
+  "bulkDeleteFailed": "کچھ آئٹمز حذف نہ ہو سکے",
+  "bulkActivated": "{count} فعال ہو گئے",
+  "bulkDeactivated": "{count} غیر فعال ہو گئے",
+  "bulkUpdateFailed": "کچھ آئٹمز اپڈیٹ نہ ہو سکے",
+  "bulkSetStatus": "حالت مقرر کریں",
+  "bulkSetStatusTo": "حالت مقرر کریں: {status}",
+  "@bulkSetStatusTo": {
+    "placeholders": {
+      "status": {}
+    }
+  },
+  "bulkStatusSubmitWarning": "انٹری سپلائر لیجر میں درج ہو جائے گی۔ جن آرڈرز کی حالت تبدیل نہیں ہو سکتی وہ چھوڑ دیے جائیں گے۔",
+  "bulkStatusCancelled": "{count} خرید کے آرڈرز {status} ہو گئے",
+  "@bulkStatusCancelled": {
+    "placeholders": {
+      "count": {},
+      "status": {}
+    }
+  },
   "expiryStatus": "مونثی کی حیثیت",
   "statusNormal": "عام",
   "statusNearExpiry": "قریبی مونثی",

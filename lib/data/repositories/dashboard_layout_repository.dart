@@ -5,7 +5,6 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../models/dashboard_layout.dart' show DashboardBlock, DashboardLayout;
 import 'api_result.dart' show ApiFailure, ApiResult, ApiSuccess;
@@ -72,5 +71,5 @@ class DashboardLayoutRepository {
 }
 
 final dashboardLayoutRepositoryProvider = Provider<DashboardLayoutRepository>(
-  (ref) => DashboardLayoutRepository(RepositoryClient(ref.watch(dioProvider))),
+  (ref) => DashboardLayoutRepository(ref.watch(repositoryClientProvider)),
 );

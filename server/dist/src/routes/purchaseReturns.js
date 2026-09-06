@@ -11,8 +11,8 @@ const rateLimiter_1 = require("../middleware/rateLimiter");
 const purchaseReturnController_1 = __importDefault(require("../controllers/purchaseReturnController"));
 router.use(auth_1.authenticateToken);
 // Purchase Returns — the redesigned first-class return documents.
-router.get('/purchase-returns', (0, requirePermission_1.requirePermission)('purchase_returns', 'read'), purchaseReturnController_1.default.getPurchaseReturns);
-router.get('/purchase-returns/:id', (0, requirePermission_1.requirePermission)('purchase_returns', 'read'), purchaseReturnController_1.default.getPurchaseReturn);
-router.post('/purchase-returns', (0, requirePermission_1.requirePermission)('purchase_returns', 'create'), rateLimiter_1.sensitiveOperationLimiter, purchaseReturnController_1.default.createPurchaseReturn);
-router.post('/purchase-returns/:id/void', (0, requirePermission_1.requirePermission)('purchase_returns', 'void'), rateLimiter_1.sensitiveOperationLimiter, purchaseReturnController_1.default.voidPurchaseReturn);
+router.get('/', (0, requirePermission_1.requirePermission)('purchase_returns', 'read'), purchaseReturnController_1.default.getPurchaseReturns);
+router.get('/:id', (0, requirePermission_1.requirePermission)('purchase_returns', 'read'), purchaseReturnController_1.default.getPurchaseReturn);
+router.post('/', (0, requirePermission_1.requirePermission)('purchase_returns', 'create'), rateLimiter_1.sensitiveOperationLimiter, purchaseReturnController_1.default.createPurchaseReturn);
+router.post('/:id/void', (0, requirePermission_1.requirePermission)('purchase_returns', 'void'), rateLimiter_1.sensitiveOperationLimiter, purchaseReturnController_1.default.voidPurchaseReturn);
 exports.default = router;

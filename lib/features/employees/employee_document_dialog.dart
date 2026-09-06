@@ -185,7 +185,11 @@ class _EmployeeDocumentDialogState
     return MovableDialog(
       dialogId: 'employee_document',
       maxWidth: 480,
-        child: Form(
+      // The form (4 text rows + dates + notes + file row) is ~680px tall;
+      // MovableDialog's 480 default clips it so the footer overlaps the
+      // file row. Match the other form dialogs (supplier_form etc.).
+      maxHeight: 680,
+      child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -200,7 +204,12 @@ class _EmployeeDocumentDialogState
               ),
               const Divider(height: 1),
               Flexible(
+                // primary: false so this view owns its scroll position
+                // instead of attaching to the app-wide PrimaryScrollController
+                // (shared with the screen/detail dialog behind it) — that
+                // sharing made ensureVisible/scrolls act on the wrong list.
                 child: SingleChildScrollView(
+                  primary: false,
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,

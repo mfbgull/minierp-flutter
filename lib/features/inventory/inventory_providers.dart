@@ -224,7 +224,7 @@ final stockMovementsProvider =
             sortBy: sort?.column,
             sortOrder: sort?.order ?? 'ASC',
             extra: {
-              if (type != null) 'movement_type': type,
+              'movement_type': ?type,
               if (fromDate != null) 'date_from': isoDate(fromDate),
               if (toDate != null) 'date_to': isoDate(toDate),
             },

@@ -138,6 +138,7 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
         if (_loanDeduction > 0) {
           await _recordLoanDeduction();
         }
+        if (!mounted) return;
         ref.invalidate(employeesProvider);
         ref.invalidate(employeeDetailProvider(widget.employee.id));
         ref.invalidate(employeeSalaryHistoryProvider(widget.employee.id));

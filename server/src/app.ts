@@ -18,7 +18,7 @@ import inventoryRoutes from './routes/inventory';
 import purchaseRoutes from './routes/purchases';
 import purchaseOrderRoutes from './routes/purchaseOrders';
 import purchaseReturnRoutes from './routes/purchaseReturns';
-import saleRoutes from './routes/sales';
+import saleRoutes, { salesOrderRouter, salesRouter } from './routes/sales';
 import productionRoutes from './routes/production';
 import bomRoutes from './routes/bom';
 import settingsRoutes from './routes/settings';
@@ -228,11 +228,17 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/pos', posRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/employees', employeeRoutes);
-app.use('/api', purchaseOrderRoutes);
-app.use('/api', purchaseRoutes);
-app.use('/api', purchaseReturnRoutes);
-app.use('/api', saleRoutes);
-app.use('/api', productionRoutes);
+app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/purchases', purchaseRoutes);
+app.use('/api/purchase-returns', purchaseReturnRoutes);
+app.use('/api/quotations', saleRoutes);
+app.use('/api/sales-orders', salesOrderRouter);
+app.use('/api/sales', salesRouter);
+// Legacy exact GET /api/dashboard (sales summary) — must come before the
+// dashboard module so the bare path resolves here while /api/dashboard/*
+// still falls through to dashboardRoutes.
+app.use('/api/dashboard', salesRouter);
+app.use('/api/productions', productionRoutes);
 app.use('/api/mobile-invoices', mobileInvoiceRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
