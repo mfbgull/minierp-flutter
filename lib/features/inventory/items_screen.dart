@@ -19,11 +19,13 @@ import 'package:minierp_app/core/theme/status_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/item.dart' show Item;
 import '../../data/repositories/inventory_repository.dart' show inventoryRepositoryProvider;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bulk_operations.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
@@ -56,6 +58,18 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
     with PlutoGridScreen<Item, ItemsScreen> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
+
+  /// Set while a bulk operation is in flight (D13) — the bulk bar
+  /// disables its actions and shows a spinner; a second op cannot start.
+  bool _bulkBusy = false;
+
+  /// id → Item of the current page, for bulk-action labels and the
+  /// selection-intersected export.
+  Map<int, Item> get _itemsById => {
+    for (final item
+        in ref.read(itemsProvider).valueOrNull?.items ?? const <Item>[])
+      item.id: item,
+  };
 
   @override
   void openRowDetail(int itemId) {
@@ -171,36 +185,33 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
 
   /// Bulk activate/deactivate of the selected items (SHORTCOMINGS-FIX
   /// 4.4). Each item's `is_active` flag flips via the standard update
-  /// endpoint; a failed item doesn't stop the rest.
+  /// endpoint — routed through the shared serial executor (D22) with the
+  /// D11 failure dialog on partial failure.
   Future<void> _bulkSetActive(Set<int> ids, bool active) async {
     final l10n = AppLocalizations.of(context)!;
     final repo = ref.read(inventoryRepositoryProvider);
-    var ok = 0;
-    var failed = 0;
-    for (final id in ids) {
-      final result = await repo.update(id, {'is_active': active ? 1 : 0});
-      if (!mounted) return;
-      result.fold(
-        onSuccess: (_) => ok++,
-        onFailure: (_) => failed++,
-      );
-    }
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _itemsById[id]?.itemName ?? '#$id',
+      operation: (id) => repo.update(id, {'is_active': active ? 1 : 0}),
+    );
     if (!mounted) return;
-    bulkSelection.clear();
-    if (failed == 0) {
-      showAppToast(
-        context,
-        active ? l10n.bulkActivated(ok) : l10n.bulkDeactivated(ok),
-      );
-    } else {
-      showAppToast(context, l10n.bulkUpdateFailed, isError: true);
-    }
-    ref.invalidate(itemsProvider);
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: (n) =>
+          active ? l10n.bulkActivated(n) : l10n.bulkDeactivated(n),
+      onComplete: () => ref.invalidate(itemsProvider),
+    );
   }
 
   /// Bulk soft-delete of the selected items with the 4.2 undo pattern —
   /// one 10s toast with a single Undo action that restores every deleted
-  /// item in place.
+  /// item in place. Partial failures render the D11 dialog; Undo restores
+  /// only the ids the server accepted (spec edge case 2).
   Future<void> _bulkDelete(Set<int> ids) async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showConfirmDialog(
@@ -214,44 +225,53 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
     if (!confirmed || !mounted) return;
 
     final repo = ref.read(inventoryRepositoryProvider);
-    var ok = 0;
-    var failed = 0;
-    for (final id in ids) {
-      final result = await repo.delete(id);
-      if (!mounted) return;
-      result.fold(
-        onSuccess: (_) => ok++,
-        onFailure: (_) => failed++,
-      );
-    }
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _itemsById[id]?.itemName ?? '#$id',
+      operation: repo.delete,
+    );
     if (!mounted) return;
-    bulkSelection.clear();
-    if (failed == 0) {
-      showAppToast(
-        context,
-        l10n.bulkDeleted(ok),
-        duration: const Duration(seconds: 10),
-        action: SnackBarAction(
-          label: l10n.commonUndo,
-          onPressed: () async {
-            for (final id in ids) {
-              final undo = await repo.restore(id);
-              if (!mounted) return;
-              undo.fold(
-                onSuccess: (_) {},
-                onFailure: (err) =>
-                    showAppToast(context, err.message, isError: true),
-              );
-            }
-            if (!mounted) return;
-            ref.invalidate(itemsProvider);
-          },
-        ),
-      );
-    } else {
-      showAppToast(context, l10n.bulkDeleteFailed, isError: true);
-    }
-    ref.invalidate(itemsProvider);
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: l10n.bulkDeleted,
+      undoMessage: l10n.bulkDeleted,
+      onUndo: () async {
+        for (final id in result.succeeded) {
+          final undo = await repo.restore(id);
+          if (!mounted) return;
+          undo.fold(
+            onSuccess: (_) {},
+            onFailure: (err) =>
+                showAppToast(context, err.message, isError: true),
+          );
+        }
+        if (!mounted) return;
+        ref.invalidate(itemsProvider);
+      },
+      onComplete: () => ref.invalidate(itemsProvider),
+    );
+  }
+
+  /// Bulk CSV export — the selected items' rows only, mirroring the grid
+  /// columns via [buildItemsCsv] (spec D10).
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = [
+      for (final item in _itemsById.values)
+        if (ids.contains(item.id)) item,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('items'),
+      csv: buildItemsCsv(l10n, selected),
+      successMessage: l10n.inventoryItemsexported,
+      errorMessage: l10n.inventoryItemsExportfailed,
+    );
   }
 
   Future<void> _deleteItem(Item item) async {
@@ -353,7 +373,13 @@ class _ItemsScreenState extends ConsumerState<ItemsScreen>
             return BulkActionBar(
               count: sel.length,
               onClearSelection: bulkSelection.clear,
+              busy: _bulkBusy,
               actions: [
+                TextButton.icon(
+                  onPressed: () => _bulkExport(sel),
+                  icon: const Icon(Icons.file_download_outlined, size: 18),
+                  label: Text(l10n.bulkExportSelected),
+                ),
                 TextButton.icon(
                   onPressed: () => _bulkSetActive(sel, true),
                   icon: const Icon(Icons.check_circle_outline, size: 18),

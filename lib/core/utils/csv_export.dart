@@ -42,6 +42,7 @@ import '../../data/models/bom.dart' show Bom;
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/expense.dart' show Expense;
 import '../../data/models/invoice.dart' show Invoice;
+import '../../data/models/item.dart' show Item;
 import '../../data/models/owner_equity.dart'
     show OwnerCapitalEntry, OwnerWithdrawal;
 import '../../data/models/production.dart' show Production;
@@ -748,6 +749,40 @@ String buildCustomersCsv(AppLocalizations l10n, List<Customer> customers) {
       Formatters.number(c.creditUtilizationPercent ?? 0),
       Formatters.number(c.paymentTermsDays ?? 0),
       sanitizeCsvCell(c.isActive ? l10n.statusActive : l10n.statusInactive),
+    ],
+  );
+}
+
+/// Builds the CSV text for the items grid (Item Code | Name | Category
+/// | Unit | Current Stock | Reorder Level | Standard Cost | Selling
+/// Price | Status — mirroring the grid columns), used by the items bulk
+/// export action (spec D10).
+String buildItemsCsv(AppLocalizations l10n, List<Item> items) {
+  return _buildGridCsv(
+    [
+      l10n.inventoryItemcode,
+      l10n.inventoryItemname,
+      l10n.commonCategory,
+      l10n.fieldsUnit,
+      l10n.inventoryCurrentstock,
+      l10n.inventoryReorderlevel,
+      l10n.inventoryStandardcost,
+      l10n.inventorySellingprice,
+      l10n.commonStatus,
+    ],
+    items,
+    (i) => [
+      sanitizeCsvCell(i.itemCode.isEmpty ? '—' : i.itemCode),
+      sanitizeCsvCell(i.itemName.isEmpty ? '—' : i.itemName),
+      sanitizeCsvCell(i.category?.isEmpty ?? true ? '—' : i.category!),
+      sanitizeCsvCell(i.unitOfMeasure),
+      Formatters.number(i.currentStock),
+      i.reorderLevel == null ? '—' : Formatters.number(i.reorderLevel!),
+      i.standardCost == null ? '—' : Formatters.currency(i.standardCost!),
+      i.standardSellingPrice == null
+          ? '—'
+          : Formatters.currency(i.standardSellingPrice!),
+      sanitizeCsvCell(i.isActive ? l10n.statusActive : l10n.statusInactive),
     ],
   );
 }

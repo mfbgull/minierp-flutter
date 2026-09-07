@@ -27,13 +27,7 @@ import '../activity_log/activity_log_providers.dart'
 import '../admin/admin_providers.dart' show rolesProvider, usersProvider;
 import '../customers/customer_providers.dart' show customersProvider;
 import '../dashboard/dashboard_providers.dart'
-    show
-        dashboardArSummaryProvider,
-        dashboardCashOpeningBalancesProvider,
-        dashboardCashPositionProvider,
-        dashboardSummaryProvider,
-        dashboardTopCustomersProvider,
-        invalidateDashboardKpiCards;
+    show dashboardBootProvider, dashboardCashOpeningBalancesProvider;
 import '../employees/employee_providers.dart' show employeesProvider;
 import '../employees/loan_providers.dart' show dashboardActiveLoansProvider2;
 import '../expenses/expense_providers.dart'
@@ -142,15 +136,12 @@ typedef ModuleRefresh = void Function(WidgetRef ref);
 /// screen toolbar's refresh button.
 final Map<String, ModuleRefresh> moduleRefreshOnVisit = {
   '/': (ref) {
-    // KPI strip cards fetch per-card values and need their own
-    // invalidation (a new sale / invoice stays stale otherwise).
-    invalidateDashboardKpiCards(ref);
+    // Every dashboard block derives from the composite boot payload
+    // (spec 7.1) — invalidating it refetches the single
+    // GET /dashboard/boot and rebuilds all the derived providers.
     ref
-      ..invalidate(dashboardSummaryProvider)
-      ..invalidate(dashboardArSummaryProvider)
-      ..invalidate(dashboardCashPositionProvider)
+      ..invalidate(dashboardBootProvider)
       ..invalidate(dashboardCashOpeningBalancesProvider)
-      ..invalidate(dashboardTopCustomersProvider)
       ..invalidate(dashboardActiveLoansProvider2);
   },
   '/inventory': (ref) => ref

@@ -33,6 +33,7 @@ import '../../data/repositories/customer_repository.dart'
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/bulk_operations.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
@@ -180,12 +181,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
   /// FIX 4.4), mirroring the grid columns via [buildCustomersCsv].
   void _bulkExport(Set<int> ids) {
     final l10n = AppLocalizations.of(context)!;
-    final customers =
-        ref.read(customersProvider).valueOrNull?.items ?? const <Customer>[];
-    final selected = [
-      for (final c in customers)
-        if (ids.contains(c.id)) c,
-    ];
+    final selected = _selectedCustomers(ids);
     if (selected.isEmpty) return;
     saveCsv(
       context,
@@ -193,6 +189,94 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
       csv: buildCustomersCsv(l10n, selected),
       successMessage: l10n.customersExportsuccess,
       errorMessage: l10n.customersExportfailed,
+    );
+  }
+
+  /// The current page's customers, filtered to the selected ids.
+  List<Customer> _selectedCustomers(Set<int> ids) => [
+    for (final c in ref.read(customersProvider).valueOrNull?.items ??
+        const <Customer>[])
+      if (ids.contains(c.id)) c,
+  ];
+
+  /// id → Customer of the current page — bulk-action labels.
+  Map<int, Customer> get _customersById => {
+    for (final c in ref.read(customersProvider).valueOrNull?.items ??
+        const <Customer>[])
+      c.id: c,
+  };
+
+  /// Set while a bulk operation is in flight (D13).
+  bool _bulkBusy = false;
+
+  /// Bulk activate/deactivate of the selected customers via
+  /// `PUT /customers/:id` `is_active` (spec: customers scope).
+  Future<void> _bulkSetActive(Set<int> ids, bool active) async {
+    final l10n = AppLocalizations.of(context)!;
+    final repo = ref.read(customerRepositoryProvider);
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _customersById[id]?.customerName ?? '#$id',
+      operation: (id) => repo.update(id, {'is_active': active ? 1 : 0}),
+    );
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: (n) =>
+          active ? l10n.bulkActivated(n) : l10n.bulkDeactivated(n),
+      onComplete: () => ref.invalidate(customersProvider),
+    );
+  }
+
+  /// Bulk soft-delete of the selected customers with the 4.2 undo
+  /// pattern (restore endpoint exists — D3). The server rejects customers
+  /// with invoices/payments; partial failures render the D11 dialog and
+  /// Undo restores only the succeeded ids.
+  Future<void> _bulkDelete(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonDelete,
+      message: '${l10n.bulkDeleteSelected} (${ids.length})?',
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final repo = ref.read(customerRepositoryProvider);
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _customersById[id]?.customerName ?? '#$id',
+      operation: repo.delete,
+    );
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: l10n.bulkDeleted,
+      undoMessage: l10n.bulkDeleted,
+      onUndo: () async {
+        for (final id in result.succeeded) {
+          final undo = await repo.restore(id);
+          if (!mounted) return;
+          undo.fold(
+            onSuccess: (_) {},
+            onFailure: (err) =>
+                showAppToast(context, err.message, isError: true),
+          );
+        }
+        if (!mounted) return;
+        ref.invalidate(customersProvider);
+      },
+      onComplete: () => ref.invalidate(customersProvider),
     );
   }
 
@@ -317,11 +401,30 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
             return BulkActionBar(
               count: sel.length,
               onClearSelection: bulkSelection.clear,
+              busy: _bulkBusy,
               actions: [
                 TextButton.icon(
                   onPressed: () => _bulkExport(sel),
                   icon: const Icon(Icons.file_download_outlined, size: 18),
                   label: Text(l10n.bulkExportSelected),
+                ),
+                TextButton.icon(
+                  onPressed: () => _bulkSetActive(sel, true),
+                  icon: const Icon(Icons.check_circle_outline, size: 18),
+                  label: Text(l10n.bulkActivateSelected),
+                ),
+                TextButton.icon(
+                  onPressed: () => _bulkSetActive(sel, false),
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: Text(l10n.bulkDeactivateSelected),
+                ),
+                TextButton.icon(
+                  onPressed: () => _bulkDelete(sel),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                  label: Text(l10n.bulkDeleteSelected),
                 ),
               ],
             );
