@@ -1724,6 +1724,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get inventoryItemsexported => 'مصنوعات کامیابی سے ایکسپورٹ ہوگئیں!';
 
   @override
+  String get inventoryItemsExportfailed => 'آئٹمز ایکسپورٹ نہ ہو سکے';
+
+  @override
   String get inventoryNoitemsexport => 'ایکسپورٹ کرنے کے لیے کوئی مصنوعات نہیں';
 
   @override
@@ -5599,6 +5602,14 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get bulkUpdateFailed => 'کچھ آئٹمز اپڈیٹ نہ ہو سکے';
+
+  @override
+  String bulkPartialFailureTitle(Object succeeded, Object failed) {
+    return '$succeeded مکمل، $failed ناکام';
+  }
+
+  @override
+  String get bulkWorking => 'کام جاری ہے…';
 
   @override
   String get bulkSetStatus => 'حالت مقرر کریں';

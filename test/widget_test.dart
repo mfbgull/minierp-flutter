@@ -54,6 +54,7 @@ import 'package:minierp_app/features/admin/admin_models.dart' show Role;
 import 'package:minierp_app/features/reports/report_providers.dart'
     show globalReportFromDateProvider, globalReportToDateProvider;
 import 'package:minierp_app/features/reports/reports_dashboard_screen.dart';
+import 'package:minierp_app/widgets/bulk_operations.dart' show BulkPacing;
 import 'package:minierp_app/widgets/date_range_picker.dart' show DateRangeFilter;
 import 'package:minierp_app/core/utils/date_range_math.dart'
     show DatePreset, WeekStart, presetRange;
@@ -674,6 +675,26 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   /// Last customer id the row-menu Delete flow DELETEed.
   int? lastCustomerDeleteId;
 
+  /// Ids the customers bulk delete DELETEed + restored, and the is_active
+  /// flips from the customers bulk activate/deactivate (spec Phase 0).
+  final List<int> bulkDeletedCustomerIds = [];
+  final List<int> bulkRestoredCustomerIds = [];
+  final Map<int, Map<String, dynamic>> bulkCustomerUpdates = {};
+
+  /// Ids whose bulk delete 400s — the mixed-eligibility failure-dialog
+  /// fixtures (D11/D18).
+  final Set<int> failInvoiceDeleteFor = {};
+  final Set<int> failItemDeleteFor = {};
+
+  /// When true, the first DELETE /inventory/items/:id per test returns
+  /// 429 (the D22 rate-limit retry path).
+  bool rateLimitItemDeletes = false;
+  bool _itemDeleteRateLimited = false;
+
+  /// Ids the PO bulk delete DELETEed (the /purchase-orders/1 branch keeps
+  /// poDeleteCount; other ids 400 — non-Draft).
+  final List<int> bulkDeletedPoIds = [];
+
   /// Ids the items bulk delete DELETEed (SHORTCOMINGS-FIX 4.4).
   final List<int> bulkDeletedItemIds = [];
 
@@ -893,12 +914,17 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   final List<Map<String, dynamic>> poListQueries = [];
   Map<String, dynamic>? lastSupplierPurchasesQuery;
 
-  /// Captured dashboard/report state: summary request count (refresh
-  /// button) and the last summary/sales-summary query params (global
-  /// date range).
+  /// Captured dashboard/report state: boot/summary request counts
+  /// (refresh button) and the last summary/sales-summary query params
+  /// (global date range).
   int dashboardSummaryCalls = 0;
+  int dashboardBootCalls = 0;
   Map<String, dynamic>? lastDashboardSummaryQuery;
+  Map<String, dynamic>? lastBootQuery;
   Map<String, dynamic>? lastSalesSummaryQuery;
+
+  /// When true, `GET /dashboard/boot` 500s (dashboard failure-path).
+  bool failDashboardBoot = false;
 
   /// Captured PUT body of the last /dashboard/cash-opening-balances
   /// save (opening-balance editor test).
@@ -1007,6 +1033,64 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       'label': metric,
     };
   }
+
+  /// A saved dashboard layout with every block visible — embedded by
+  /// the `/dashboard/boot` composite handler and served directly by
+  /// `GET /dashboard/layout/active` (tests that drive that endpoint).
+  List<Map<String, Object>> allDashboardBlocks() => [
+    for (final (i, id) in [
+      'kpi_total_items',
+      'kpi_stock_value',
+      'kpi_sales_revenue',
+      'kpi_gross_profit',
+      'kpi_purchase_orders',
+      'kpi_wh_stock',
+      'kpi_ar',
+    ].indexed)
+      {
+        'id': id,
+        'type': 'kpi',
+        'title': 'dashboardcard$id',
+        'x': i,
+        'y': 0,
+        'width': 188,
+        'height': 84,
+        'visible': true,
+        'version': 1,
+        'config': {'metric': id},
+      },
+    for (final (i, id) in [
+      'panel_sales_purchases',
+      'panel_ar_aging',
+      'panel_stock_by_category',
+      'panel_top_customers',
+      'panel_low_stock',
+    ].indexed)
+      {
+        'id': id,
+        'type': 'panel',
+        'title': 'dashboardcard$id',
+        'x': i,
+        'y': i < 2 ? 1 : 2,
+        'width': 2,
+        'height': 1,
+        'visible': true,
+        'version': 1,
+        'config': <String, Object>{},
+      },
+    {
+      'id': 'cash_strip',
+      'type': 'cash',
+      'title': 'dashboardcardCashstrip',
+      'x': 0,
+      'y': 1,
+      'width': 1,
+      'height': 1,
+      'visible': true,
+      'version': 1,
+      'config': <String, Object>{},
+    },
+  ];
 
   @override
   Future<ResponseBody> fetch(
@@ -1222,15 +1306,47 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     }
     // Row-menu Delete — enveloped success, mirrors the real soft-delete.
     if (options.method == 'DELETE' && options.path.startsWith('/customers/')) {
-      lastCustomerDeleteId = int.tryParse(options.path.split('/').last);
+      final id = int.tryParse(options.path.split('/').last);
+      if (id != null) {
+        lastCustomerDeleteId = id;
+        bulkDeletedCustomerIds.add(id);
+      }
       return _json({
         'success': true,
         'message': 'Customer deactivated successfully',
       });
     }
+    if (options.method == 'POST' &&
+        options.path.startsWith('/customers/') &&
+        options.path.endsWith('/restore')) {
+      final id = int.tryParse(options.path.split('/')[2]);
+      if (id != null) bulkRestoredCustomerIds.add(id);
+      return _json({
+        'success': true,
+        'message': 'Customer restored successfully',
+      });
+    }
+    if (options.method == 'PUT' &&
+        RegExp(r'^/customers/\d+$').hasMatch(options.path)) {
+      final id = int.tryParse(options.path.split('/').last);
+      final body = options.data as Map<String, dynamic>;
+      if (id != null) bulkCustomerUpdates[id] = body;
+      lastCustomerPutBody = body;
+      return _json({
+        'success': true,
+        'data': {
+          'id': id ?? 1,
+          'customer_code': 'CUST${id ?? 1}',
+          'customer_name': body['customer_name'] ?? 'Customer $id',
+          'is_active': body['is_active'] ?? 1,
+        },
+        'message': 'Customer updated successfully',
+      });
+    }
     if (options.path == '/customers/1' && options.method == 'PUT') {
       final body = options.data as Map<String, dynamic>;
       lastCustomerPutBody = body;
+      bulkCustomerUpdates[1] = body;
       return _json({
         'success': true,
         'data': {
@@ -1765,10 +1881,27 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     }
     if (options.path == '/purchase-orders/1' && options.method == 'DELETE') {
       poDeleteCount++;
+      bulkDeletedPoIds.add(1);
       return _json({
         'success': true,
         'message': 'Purchase order deleted successfully',
       });
+    }
+    if (options.method == 'DELETE' &&
+        RegExp(r'^/purchase-orders/\d+$').hasMatch(options.path)) {
+      final id = int.tryParse(options.path.split('/').last);
+      if (id != null) {
+        if (id == 1) {
+          poDeleteCount++;
+          bulkDeletedPoIds.add(1);
+          return _json({
+            'success': true,
+            'message': 'Purchase order deleted successfully',
+          });
+        }
+        // PO 2 is Completed — the Draft-only guard 400s it (D18).
+        return _json({'error': 'Only Draft Purchase Orders can be deleted'}, status: 400);
+      }
     }
     if (options.path == '/purchase-orders/1/items' &&
         options.method == 'POST') {
@@ -2380,7 +2513,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         ],
       });
     }
-    if (options.path == '/inventory/items/4') {
+    if (options.path == '/inventory/items/4' && options.method == 'GET') {
       // Bare detail for the purchase-form fixtures' line items — stock
       // held in the receipt warehouse (WH-MAIN, id 1) so the return
       // entry form keeps the warehouse locked unless a test shifts it.
@@ -2408,7 +2541,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
               ],
       });
     }
-    if (options.path == '/inventory/items/5') {
+    if (options.path == '/inventory/items/5' && options.method == 'GET') {
       return _json({
         'id': 5,
         'item_code': 'FG002',
@@ -4519,6 +4652,132 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         ],
       });
     }
+    if (options.path == '/dashboard/boot') {
+      // Composite boot payload (spec 7.1) — the exact fixtures the
+      // per-endpoint dashboard handlers below serve, combined into the
+      // one round trip the dashboard providers derive from.
+      dashboardBootCalls++;
+      lastBootQuery = options.queryParameters;
+      if (failDashboardBoot) {
+        return _json({'error': 'Failed to fetch dashboard boot data'}, status: 500);
+      }
+      final metrics =
+          (options.queryParameters['metrics'] ?? '')
+              .toString()
+              .split(',')
+              .where((m) => m.isNotEmpty)
+              .toList();
+      return _json({
+        'success': true,
+        'data': {
+          'summary': {
+            'totalItems': 150,
+            'totalStockValue': 245000.50,
+            'totalSalesRevenue': 890000.00,
+            'totalPurchases': 560000.00,
+            'totalProfit': 330000.00,
+            'warehouseStockCount': 312,
+            'lowStockItems': [
+              {
+                'id': 1,
+                'item_code': 'ITM001',
+                'item_name': 'Widget',
+                'current_stock': 5,
+                'reorder_level': 10,
+                'category': 'Parts',
+              },
+            ],
+            'stockByCategory': [
+              {'category': 'Parts', 'total_stock': 500},
+            ],
+            'salesByDay': [
+              {'date': '2026-08-01', 'total': 15000},
+            ],
+            'purchasesByDay': [
+              {'date': '2026-08-01', 'total': 8000},
+            ],
+            'recentProductions': 12,
+          },
+          'layout': noDashboardLayout
+              ? null
+              : {
+                  'id': 1,
+                  'user_id': 1,
+                  'layout_name': 'Default',
+                  'is_active': true,
+                  'blocks': allDashboardBlocks(),
+                },
+          'kpis': {
+            for (final m in metrics)
+              if (_kpiValues().containsKey(m)) m: _kpiData(m),
+          },
+          'cash': {
+            'date': '2026-08-12',
+            'accounts': [
+              {
+                'key': 'cash',
+                'name': 'Cash',
+                'balance': 25000.0,
+                'opening': 20000.0,
+                'inflow': 12000.0,
+                'outflow': 4000.0,
+                'net': 8000.0,
+                'transactions': [
+                  {
+                    'date': '2026-08-12',
+                    'type': 'payment_received',
+                    'reference': 'PAY002',
+                    'description': 'Invoice INV-2026-152278',
+                    'amount': 12000.0,
+                  },
+                  {
+                    'date': '2026-08-12',
+                    'type': 'supplier_payment',
+                    'reference': 'PAY001',
+                    'description': 'Supplier payment',
+                    'amount': -4000.0,
+                  },
+                  {
+                    'date': '2026-08-13',
+                    'type': 'refund',
+                    'reference': 'PAY004',
+                    'description': 'Refund for return on INV-2026-152278',
+                    'amount': -700.0,
+                  },
+                ],
+              },
+              {'key': 'bank', 'name': 'Bank', 'balance': 180000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
+              {'key': 'easypaisa', 'name': 'Easypaisa', 'balance': 45000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
+              {'key': 'jazzcash', 'name': 'JazzCash', 'balance': 15000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
+              {'key': 'upaisa', 'name': 'UPaisa', 'balance': 8000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
+            ],
+            'total': 273000.0,
+          },
+          'ar': {
+            'total_ar': 420000.0,
+            'current_amount': 120000.0,
+            'amount_1_30': 90000.0,
+            'amount_31_60': 80000.0,
+            'amount_61_90': 60000.0,
+            'amount_over_90': 70000.0,
+            'customer_count': 25,
+          },
+          'expiryAlerts': <Map<String, dynamic>>[],
+          'topCustomers': [
+            {
+              'customer_name': 'Acme Corp',
+              'total_revenue': 120000.0,
+              'invoice_count': 12,
+            },
+            {
+              'customer_name': 'Beta Ltd',
+              'total_revenue': 80000.0,
+              'invoice_count': 8,
+            },
+          ],
+        },
+      });
+    }
     if (options.path == '/dashboard/kpi-batch') {
       // Batched KPI values (spec 7.3: the strip fetches every visible
       // card's metric in one call). Same figures as the summary fixture
@@ -4558,61 +4817,8 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     if (options.path == '/dashboard/layout/active') {
       // A saved layout with every block visible — exercises the full
       // layout-driven dashboard (KPI strip + all 5 panels + cash strip)
-      // in one shell test.
-      List<Map<String, Object>> allBlocks() => [
-        for (final (i, id) in [
-          'kpi_total_items',
-          'kpi_stock_value',
-          'kpi_sales_revenue',
-          'kpi_gross_profit',
-          'kpi_purchase_orders',
-          'kpi_wh_stock',
-          'kpi_ar',
-        ].indexed)
-          {
-            'id': id,
-            'type': 'kpi',
-            'title': 'dashboardcard$id',
-            'x': i,
-            'y': 0,
-            'width': 188,
-            'height': 84,
-            'visible': true,
-            'version': 1,
-            'config': {'metric': id},
-          },
-        for (final (i, id) in [
-          'panel_sales_purchases',
-          'panel_ar_aging',
-          'panel_stock_by_category',
-          'panel_top_customers',
-          'panel_low_stock',
-        ].indexed)
-          {
-            'id': id,
-            'type': 'panel',
-            'title': 'dashboardcard$id',
-            'x': i,
-            'y': i < 2 ? 1 : 2,
-            'width': 2,
-            'height': 1,
-            'visible': true,
-            'version': 1,
-            'config': <String, Object>{},
-          },
-        {
-          'id': 'cash_strip',
-          'type': 'cash',
-          'title': 'dashboardcardCashstrip',
-          'x': 0,
-          'y': 1,
-          'width': 1,
-          'height': 1,
-          'visible': true,
-          'version': 1,
-          'config': <String, Object>{},
-        },
-      ];
+      // in one shell test. Same fixture the /dashboard/boot handler
+      // embeds in its composite payload.
       return _json({
         'success': true,
         'data': {
@@ -4620,7 +4826,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'user_id': 1,
           'layout_name': 'Default',
           'is_active': true,
-          'blocks': allBlocks(),
+          'blocks': allDashboardBlocks(),
         },
       });
     }
@@ -5929,6 +6135,18 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         options.path.startsWith('/inventory/items/')) {
       final id = int.tryParse(options.path.split('/').last);
       if (id != null) {
+        if (rateLimitItemDeletes && !_itemDeleteRateLimited) {
+          _itemDeleteRateLimited = true;
+          return _json({
+            'error': 'Too many requests for this operation.',
+            'retryAfter': 60,
+          }, status: 429);
+        }
+        if (failItemDeleteFor.contains(id)) {
+          return _json({
+            'error': 'Item has stock movements and cannot be deleted',
+          }, status: 400);
+        }
         bulkDeletedItemIds.add(id);
         return _json({'success': true, 'message': 'Item deleted'});
       }
@@ -5946,6 +6164,12 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         options.path.startsWith('/invoices/')) {
       final id = int.tryParse(options.path.split('/').last);
       if (id != null) {
+        if (failInvoiceDeleteFor.contains(id)) {
+          return _json({
+            'error': 'Cannot delete this invoice. Only unpaid/draft invoices '
+                'with no payments or returns can be deleted.',
+          }, status: 400);
+        }
         bulkDeletedInvoiceIds.add(id);
         return _json({'message': 'Invoice deleted successfully'});
       }
@@ -6365,6 +6589,11 @@ void main() {
     expect(cashEntry['amount'], 25000);
     expect(find.byKey(const Key('confirm_dialog')), findsNothing);
     expect(find.text('Opening balances saved'), findsOneWidget);
+
+    // The save refreshes through the composite boot (spec 7.1): the
+    // cash strip derives from the boot payload, so a second boot GET
+    // must have fired to rebuild it.
+    expect(adapter.dashboardBootCalls, 2);
   });
 
   testWidgets('dashboard shows the global date range picker and hint', (
@@ -6419,11 +6648,54 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(adapter.dashboardSummaryCalls, 1);
+    // The whole dashboard derives from the single composite boot fetch.
+    expect(adapter.dashboardBootCalls, 1);
+    expect(adapter.dashboardSummaryCalls, 0);
 
     await tester.tap(find.byIcon(Icons.refresh));
     await tester.pumpAndSettle();
-    expect(adapter.dashboardSummaryCalls, greaterThanOrEqualTo(2));
+    // Refresh invalidates the boot provider — one more boot round trip,
+    // still no per-block GETs.
+    expect(adapter.dashboardBootCalls, 2);
+    expect(adapter.dashboardSummaryCalls, 0);
+  });
+
+  testWidgets('dashboard boot failure shows the error panel with retry',
+      (tester) async {
+    tester.view.physicalSize = const Size(2000, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    final adapter = _AuthFakeAdapter()..failDashboardBoot = true;
+    final storage = _FakeTokenStorage()..token = 'test-token';
+    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+    dio.httpClientAdapter = adapter;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          tokenStorageProvider.overrideWithValue(storage),
+          dioProvider.overrideWithValue(dio),
+        ],
+        child: const MiniErpApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(adapter.dashboardBootCalls, 1);
+    expect(find.text('Failed to fetch dashboard boot data'), findsOneWidget);
+    expect(find.byIcon(Icons.cloud_off_outlined), findsOneWidget);
+
+    // Retry heals: clear the failure and invalidate via the button.
+    adapter.failDashboardBoot = false;
+    await tester.tap(
+      find.descendant(
+        of: find.byType(FilledButton),
+        matching: find.text('Refresh'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(adapter.dashboardBootCalls, 2);
+    expect(find.text('890,000.00'), findsOneWidget); // sales revenue KPI
   });
 
   testWidgets('stored token + valid /auth/me restores the session at boot', (
@@ -6746,6 +7018,77 @@ void main() {
     await tester.tap(find.text('Undo'));
     await tester.pumpAndSettle();
     expect(adapter.bulkRestoredItemIds, [1]);
+  });
+
+  testWidgets('items screen bulk delete with failures shows the D11 dialog and undo restores only succeeded', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    BulkPacing.disableForTests();
+    addTearDown(() {
+      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+    });
+    final adapter = _AuthFakeAdapter()..failItemDeleteFor.add(2);
+    await bootToItems(tester, adapter: adapter);
+
+    // Select all → delete: item 2 fails (fixture), the rest succeed.
+    await tester.tap(find.byType(Checkbox).last);
+    await tester.pumpAndSettle();
+    expect(find.text('5 selected'), findsOneWidget);
+
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    // 4 deleted, 1 failed with the server's reason.
+    expect(adapter.bulkDeletedItemIds.length, 4);
+    expect(adapter.bulkDeletedItemIds, isNot(contains(2)));
+    expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
+    expect(find.text('4 done, 1 failed'), findsOneWidget);
+    expect(
+      find.textContaining('Item has stock movements'),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('bulk_failure_dialog')),
+        matching: find.widgetWithText(FilledButton, 'Close'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The undo toast covers only the succeeded ids — Undo restores 4,
+    // not the failed one.
+    expect(find.text('4 deleted'), findsOneWidget);
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(adapter.bulkRestoredItemIds.length, 4);
+    expect(adapter.bulkRestoredItemIds, isNot(contains(2)));
+  });
+
+  testWidgets('items screen bulk delete retries a 429 rate-limited record once', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    final adapter = _AuthFakeAdapter()..rateLimitItemDeletes = true;
+    await bootToItems(tester, adapter: adapter);
+
+    // Select the first row → delete: the first DELETE 429s, the executor
+    // waits and retries (D22) — the delete still lands.
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.text('1 selected'), findsOneWidget);
+
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(adapter.bulkDeletedItemIds, [1]);
+    expect(find.text('1 deleted'), findsOneWidget);
   });
 
   testWidgets('items screen error shows a retry and recovers', (tester) async {
@@ -12430,8 +12773,18 @@ void main() {
     expect(adapter.poStatusCalls, contains((1, 'Submitted')));
     expect(adapter.poStatusCalls, contains((2, 'Submitted')));
     expect(adapter.po1Status, 'Submitted');
-    // The mixed-outcome toast + the refreshed grid (PO 1 badge flipped).
-    expect(find.text('Some items could not be updated'), findsOneWidget);
+    // The D11 failure dialog renders the per-record reason; the grid
+    // refreshed underneath (PO 1 badge flipped).
+    expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
+    expect(find.text('1 done, 1 failed'), findsOneWidget);
+    expect(find.textContaining('Cannot transition from Completed'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('bulk_failure_dialog')),
+        matching: find.widgetWithText(FilledButton, 'Close'),
+      ),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Submitted'), findsWidgets);
     // The action bar disappears once the selection resets on refresh.
     expect(find.text('Set status'), findsNothing);

@@ -3428,6 +3428,12 @@ abstract class AppLocalizations {
   /// **'Items exported successfully!'**
   String get inventoryItemsexported;
 
+  /// No description provided for @inventoryItemsExportfailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export items'**
+  String get inventoryItemsExportfailed;
+
   /// No description provided for @inventoryNoitemsexport.
   ///
   /// In en, this message translates to:
@@ -10975,6 +10981,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Some items could not be updated'**
   String get bulkUpdateFailed;
+
+  /// No description provided for @bulkPartialFailureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{succeeded} done, {failed} failed'**
+  String bulkPartialFailureTitle(Object succeeded, Object failed);
+
+  /// No description provided for @bulkWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'Working…'**
+  String get bulkWorking;
 
   /// No description provided for @bulkSetStatus.
   ///

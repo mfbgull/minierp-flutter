@@ -557,6 +557,7 @@
   "inventoryItemdeleted": "مصنوعات کامیابی سے حذف ہوگیا!",
   "inventoryConfirmdelete": "کیا آپ واقعی حذف کرنا چاہتے ہیں",
   "inventoryItemsexported": "مصنوعات کامیابی سے ایکسپورٹ ہوگئیں!",
+  "inventoryItemsExportfailed": "آئٹمز ایکسپورٹ نہ ہو سکے",
   "inventoryNoitemsexport": "ایکسپورٹ کرنے کے لیے کوئی مصنوعات نہیں",
   "inventoryImportcomplete": "امپورٹ مکمل",
   "inventoryFailed": "ناکام",
@@ -1760,6 +1761,14 @@
   "bulkActivated": "{count} فعال ہو گئے",
   "bulkDeactivated": "{count} غیر فعال ہو گئے",
   "bulkUpdateFailed": "کچھ آئٹمز اپڈیٹ نہ ہو سکے",
+  "bulkPartialFailureTitle": "{succeeded} مکمل، {failed} ناکام",
+  "@bulkPartialFailureTitle": {
+    "placeholders": {
+      "succeeded": {},
+      "failed": {}
+    }
+  },
+  "bulkWorking": "کام جاری ہے…",
   "bulkSetStatus": "حالت مقرر کریں",
   "bulkSetStatusTo": "حالت مقرر کریں: {status}",
   "@bulkSetStatusTo": {

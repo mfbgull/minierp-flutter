@@ -21,6 +21,7 @@ import '../../data/repositories/dashboard_layout_repository.dart'
 import 'dashboard_kpi_catalog.dart' show kpiCardCatalog, kpiCardById;
 import 'dashboard_panel_catalog.dart'
     show cashStripDefinition, panelById, panelCatalog;
+import 'dashboard_providers.dart' show dashboardBootProvider;
 
 /// A block's horizontal position in the strip — the layout system is
 /// grid-oriented (x/y/width/height), but the KPI strip is a horizontal
@@ -95,12 +96,30 @@ class DashboardLayoutState {
 /// across devices (spec: per-user on server).
 class DashboardLayoutController
     extends StateNotifier<DashboardLayoutState> {
-  DashboardLayoutController(this._repo)
+  /// [_ref] is the boot provider's read access — omitted by the unit
+  /// tests, which exercise the standalone `GET /dashboard/layout/active`
+  /// load path instead of the boot seed.
+  ///
+  /// With a Ref the layout comes exclusively from the composite boot
+  /// payload (spec 7.1) — `GET /dashboard/layout/active` never fires;
+  /// without one (unit harness), the standalone endpoint is the only
+  /// source. Racing both would double-fire the layout at boot.
+  DashboardLayoutController(this._repo, [this._ref])
     : super(DashboardLayoutState(blocks: _curatedDefault())) {
-    _load();
+    if (_ref == null) {
+      _load();
+    } else {
+      _seedFromBootAfterBuild();
+    }
   }
 
   final DashboardLayoutRepository _repo;
+  final Ref? _ref;
+
+  /// Whether the initial load has consumed its source (the boot payload
+  /// or the standalone endpoint). After this, later boot invalidations
+  /// must not clobber the user's live customizer edits.
+  bool _loaded = false;
 
   /// The curated default layout (§3) — 4 KPI cards + 3 panels + the
   /// cash strip visible, everything else available but off.
@@ -180,9 +199,15 @@ class DashboardLayoutController
 
   /// Fetches the user's active layout; falls back to the curated
   /// default when none exists (404 → repository returns `null`).
+  /// Fallback path only — the boot flow seeds via
+  /// [_seedFromBootAfterBuild]; this runs when the controller is built
+  /// before the boot payload exists (deep link / unit tests without a
+  /// Ref).
   Future<void> _load() async {
+    if (_loaded) return;
     final result = await _repo.activeLayout();
-    if (!mounted) return;
+    if (!mounted || _loaded) return;
+    _loaded = true;
     state = switch (result) {
       ApiSuccess(:final data) when data != null =>
         DashboardLayoutState(
@@ -192,6 +217,40 @@ class DashboardLayoutController
         ),
       _ => DashboardLayoutState(blocks: _curatedDefault()),
     };
+  }
+
+  /// Seeds the working layout from the composite boot payload (spec
+  /// 7.1): `GET /dashboard/boot` already carries the user's active
+  /// layout, so no separate `GET /dashboard/layout/active` is fired at
+  /// boot. Awaits the boot future (already in flight for the screen's
+  /// own watch — one shared GET) and writes after the current build —
+  /// a [StateNotifier] must not be written while its provider is still
+  /// building. If the boot fetch itself fails, falls back to the
+  /// standalone endpoint so the dashboard still renders a layout.
+  Future<void> _seedFromBootAfterBuild() async {
+    final ref = _ref;
+    if (ref == null || _loaded) return;
+    try {
+      // Shared with the screen's boot watch — no extra round trip.
+      final snapshot = await ref.read(dashboardBootProvider.future);
+      if (!mounted || _loaded) return;
+      _loaded = true;
+      final layout = snapshot.layout;
+      state = layout == null
+          // No saved layout — keep the curated default.
+          ? DashboardLayoutState(blocks: _curatedDefault())
+          : DashboardLayoutState(
+              blocks: _mergeSaved(layout.blocks),
+              layoutId: layout.id,
+              saved: true,
+            );
+    } on Object {
+      // Boot failed — the screen shows the boot error panel; still
+      // try the standalone layout so the customizer works after a
+      // later recovery.
+      if (!mounted || _loaded) return;
+      await _load();
+    }
   }
 
   /// Merges a saved layout's blocks onto the catalog: known blocks keep
@@ -552,5 +611,6 @@ final dashboardLayoutControllerProvider =
     StateNotifierProvider<DashboardLayoutController, DashboardLayoutState>(
       (ref) => DashboardLayoutController(
         ref.watch(dashboardLayoutRepositoryProvider),
+        ref,
       ),
     );

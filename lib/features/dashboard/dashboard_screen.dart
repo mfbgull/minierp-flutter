@@ -27,7 +27,6 @@ import '../reports/report_providers.dart'
     show applyGlobalReportRange, globalReportFromDateProvider, globalReportToDateProvider;
 import '../inventory/batch_management_screen.dart'
     show showBatchManagementScreen;
-import '../reports/report_providers.dart' show expiryAlertsProvider;
 import 'cash_opening_balance_dialog.dart' show showCashOpeningBalanceDialog;
 import 'cash_position_detail_dialog.dart';
 import 'dashboard_customizer_dialog.dart' show showDashboardCustomizerDialog;
@@ -90,15 +89,10 @@ class DashboardScreen extends ConsumerWidget {
           ],
           actions: [const OfflineCacheBadge()],
           onRefresh: () {
-            // The KPI strip cards fetch per-card `/dashboard/kpi`
-            // values — they need their own invalidation or a new sale /
-            // invoice stays stale until hot restart.
-            invalidateDashboardKpiCards(ref);
-            ref
-              ..invalidate(dashboardSummaryProvider)
-              ..invalidate(dashboardArSummaryProvider)
-              ..invalidate(dashboardCashPositionProvider)
-              ..invalidate(dashboardTopCustomersProvider(5));
+            // Every dashboard block derives from the composite boot
+            // payload (spec 7.1) — one invalidation refetches the single
+            // GET /dashboard/boot and rebuilds all of them.
+            invalidateDashboardBlocks(ref);
           },
           // The "Customize" button (spec §6.1) — labeled, after the
           // refresh button, opens the KPI card customizer dialog.
@@ -131,7 +125,7 @@ class DashboardScreen extends ConsumerWidget {
             ),
             error: (error, _) => _DashboardError(
               message: error is ApiError ? error.message : error.toString(),
-              onRetry: () => ref.invalidate(dashboardSummaryProvider),
+              onRetry: () => invalidateDashboardBlocks(ref),
             ),
             data: (data) => _DashboardBody(summary: data),
           ),
@@ -1417,15 +1411,15 @@ class _ArSummaryBody extends StatelessWidget {
   }
 }
 
-/// Ranked list of top customers by revenue (`GET /dashboard/top-customers`,
-/// default limit 5; web visual spec: `TopCustomersBlock.tsx`).
+/// Ranked list of top customers by revenue — derived from the boot
+/// payload (the server's boot composite fetches the top 5).
 class _TopCustomersPanel extends ConsumerWidget {
   const _TopCustomersPanel();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
-    final customers = ref.watch(dashboardTopCustomersProvider(5));
+    final customers = ref.watch(dashboardTopCustomersProvider);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1443,7 +1437,7 @@ class _TopCustomersPanel extends ConsumerWidget {
                 error: (error, _) => _PanelError(
                   message: error is ApiError ? error.message : error.toString(),
                   onRetry: () =>
-                      ref.invalidate(dashboardTopCustomersProvider(5)),
+                      ref.invalidate(dashboardTopCustomersProvider),
                 ),
                 data: (data) => _TopCustomersBody(customers: data),
               ),
@@ -1659,7 +1653,7 @@ class _ExpiryAlertsPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
-    final alerts = ref.watch(expiryAlertsProvider);
+    final alerts = ref.watch(dashboardExpiryAlertsProvider);
 
     return Card(
       child: Padding(

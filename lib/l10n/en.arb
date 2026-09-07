@@ -555,6 +555,7 @@
   "inventoryItemdeleted": "Item deleted successfully!",
   "inventoryConfirmdelete": "Are you sure you want to delete item",
   "inventoryItemsexported": "Items exported successfully!",
+  "inventoryItemsExportfailed": "Failed to export items",
   "inventoryNoitemsexport": "No items to export",
   "inventoryImportcomplete": "Import complete",
   "inventoryFailed": "failed",
@@ -1813,6 +1814,14 @@
   "bulkActivated": "{count} activated",
   "bulkDeactivated": "{count} deactivated",
   "bulkUpdateFailed": "Some items could not be updated",
+  "bulkPartialFailureTitle": "{succeeded} done, {failed} failed",
+  "@bulkPartialFailureTitle": {
+    "placeholders": {
+      "succeeded": {},
+      "failed": {}
+    }
+  },
+  "bulkWorking": "Working…",
   "bulkSetStatus": "Set status",
   "bulkSetStatusTo": "Set status: {status}",
   "@bulkSetStatusTo": {

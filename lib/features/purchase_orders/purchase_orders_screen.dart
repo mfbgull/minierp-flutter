@@ -20,7 +20,7 @@ import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../data/repositories/purchase_order_repository.dart'
     show purchaseOrderRepositoryProvider;
-import '../../widgets/app_toast.dart';
+import '../../widgets/bulk_operations.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
@@ -55,6 +55,9 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
     with PlutoGridScreen<PurchaseOrder, PurchaseOrdersScreen> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
+
+  /// Set while a bulk operation is in flight (D13).
+  bool _bulkBusy = false;
 
   /// Row id → model for the row-menu return action — the grid rows are
   /// built from the page models, so the menu can pre-seed the return
@@ -131,7 +134,9 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
   /// the server enforces the transition table (Draft → Submitted /
   /// Cancelled, …) and posts the AP supplier-ledger entry on Submit, so
   /// an order that cannot make the transition is skipped, not fatal.
-  /// A confirmation dialog warns about the ledger side effect.
+  /// A confirmation dialog warns about the ledger side effect. Routed
+  /// through the shared serial executor (D22) with the D11 failure dialog
+  /// on partial failure.
   Future<void> _bulkSetStatus(Set<int> ids, String status) async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showConfirmDialog(
@@ -146,28 +151,79 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
     if (!confirmed || !mounted) return;
 
     final repo = ref.read(purchaseOrderRepositoryProvider);
-    var ok = 0;
-    var failed = 0;
-    for (final id in ids) {
-      final result = await repo.updateStatus(id, status);
-      if (!mounted) return;
-      result.fold(
-        onSuccess: (_) => ok++,
-        onFailure: (_) => failed++,
-      );
-    }
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _ordersById[id]?.poNo ?? '#$id',
+      operation: (id) => repo.updateStatus(id, status),
+    );
     if (!mounted) return;
-    bulkSelection.clear();
-    if (failed == 0) {
-      showAppToast(
-        context,
-        l10n.bulkStatusCancelled(ok, poStatusLabel(l10n, status)),
-      );
-    } else {
-      showAppToast(context, l10n.bulkUpdateFailed, isError: true);
-    }
-    ref.invalidate(purchaseOrdersProvider);
-    ref.invalidate(filteredPurchaseOrdersProvider);
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: (n) =>
+          l10n.bulkStatusCancelled(n, poStatusLabel(l10n, status)),
+      onComplete: () {
+        ref.invalidate(purchaseOrdersProvider);
+        ref.invalidate(filteredPurchaseOrdersProvider);
+      },
+    );
+  }
+
+  /// Bulk Draft-PO delete (spec: purchase orders scope). The server only
+  /// deletes Draft POs (cascading line items); other statuses fail
+  /// per-record and land in the D11 failure dialog. Hard delete — no undo.
+  Future<void> _bulkDelete(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonDelete,
+      message: '${l10n.bulkDeleteSelected} (${ids.length})?',
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final repo = ref.read(purchaseOrderRepositoryProvider);
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _ordersById[id]?.poNo ?? '#$id',
+      operation: repo.deletePo,
+    );
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: l10n.bulkDeleted,
+      onComplete: () {
+        ref.invalidate(purchaseOrdersProvider);
+        ref.invalidate(filteredPurchaseOrdersProvider);
+      },
+    );
+  }
+
+  /// Bulk CSV export — the selected POs' rows only (mirrors the toolbar
+  /// export, which runs over the full filtered list).
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = [
+      for (final po in _ordersById.values)
+        if (ids.contains(po.id)) po,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('purchase-orders'),
+      csv: buildPurchaseOrdersCsv(l10n, selected),
+      successMessage: l10n.purchaseordersExported,
+      errorMessage: l10n.purchaseordersExportfailed,
+    );
   }
 
   /// The status menu for the bulk "Set status" action — only targets the
@@ -324,12 +380,26 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
             return BulkActionBar(
               count: sel.length,
               onClearSelection: bulkSelection.clear,
+              busy: _bulkBusy,
               actions: [
+                TextButton.icon(
+                  onPressed: () => _bulkExport(sel),
+                  icon: const Icon(Icons.file_download_outlined, size: 18),
+                  label: Text(l10n.bulkExportSelected),
+                ),
                 TextButton.icon(
                   onPressed: () => _showBulkStatusMenu(sel),
                   icon: const Icon(Icons.published_with_changes_outlined,
                       size: 18),
                   label: Text(l10n.bulkSetStatus),
+                ),
+                TextButton.icon(
+                  onPressed: () => _bulkDelete(sel),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                  label: Text(l10n.bulkDeleteSelected),
                 ),
               ],
             );

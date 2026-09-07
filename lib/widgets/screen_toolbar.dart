@@ -191,6 +191,7 @@ class BulkActionBar extends StatelessWidget {
     required this.count,
     this.actions = const [],
     this.onClearSelection,
+    this.busy = false,
   });
 
   /// Number of currently selected rows.
@@ -203,6 +204,22 @@ class BulkActionBar extends StatelessWidget {
   /// Clears the selection (the strip's close button); the grid checkboxes
   /// uncheck as the selection notifier resets.
   final VoidCallback? onClearSelection;
+
+  /// While a bulk operation is in flight (D13) the bar shows a spinner,
+  /// disables every action and the close button, and stays visible —
+  /// selection is preserved so a second operation cannot start.
+  final bool busy;
+
+  /// Disables a bulk action button while an operation is in flight —
+  /// every screen passes `TextButton.icon`s, so wrapping in an
+  /// [IgnorePointer] + [Opacity] fade is enough and works for any widget
+  /// type (D13).
+  static Widget _disableWhenBusy(Widget action, bool busy) {
+    if (!busy) return action;
+    return IgnorePointer(
+      child: Opacity(opacity: 0.38, child: action),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +236,18 @@ class BulkActionBar extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(Icons.checklist, size: 18, color: scheme.onSecondaryContainer),
+            if (busy)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Icon(
+                Icons.checklist,
+                size: 18,
+                color: scheme.onSecondaryContainer,
+              ),
             const SizedBox(width: 8),
             Text(
               l10n.bulkSelectedCount(count),
@@ -229,8 +257,11 @@ class BulkActionBar extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            ...actions,
-            if (onClearSelection != null)
+            ...[
+              for (final action in actions)
+                _disableWhenBusy(action, busy),
+            ],
+            if (onClearSelection != null && !busy)
               IconButton(
                 icon: const Icon(Icons.close, size: 18),
                 tooltip: l10n.commonClear,

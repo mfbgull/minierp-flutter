@@ -1722,6 +1722,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get inventoryItemsexported => 'Items exported successfully!';
 
   @override
+  String get inventoryItemsExportfailed => 'Failed to export items';
+
+  @override
   String get inventoryNoitemsexport => 'No items to export';
 
   @override
@@ -5601,6 +5604,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bulkUpdateFailed => 'Some items could not be updated';
+
+  @override
+  String bulkPartialFailureTitle(Object succeeded, Object failed) {
+    return '$succeeded done, $failed failed';
+  }
+
+  @override
+  String get bulkWorking => 'Working…';
 
   @override
   String get bulkSetStatus => 'Set status';

@@ -28,6 +28,7 @@ import '../../data/repositories/invoice_repository.dart'
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/bulk_operations.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
@@ -193,8 +194,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
   /// Bulk soft-delete of the selected invoices (SHORTCOMINGS-FIX 4.4).
   /// Each delete runs the server's own soft-delete flow (voids GL,
   /// reverses stock, stamps `deleted_at`) and rejects paid/returned/
-  /// cancelled invoices with a clear message — so the confirm dialog
-  /// warns that only draft/unpaid invoices can be deleted.
+  /// cancelled invoices with a clear message — the server decides
+  /// eligibility (D18), partial failures render the D11 dialog, and Undo
+  /// restores only the ids the server accepted.
   Future<void> _bulkDelete(Set<int> ids) async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showConfirmDialog(
@@ -208,50 +210,48 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     if (!confirmed || !mounted) return;
 
     final repo = ref.read(invoiceRepositoryProvider);
-    var ok = 0;
-    var failed = 0;
-    for (final id in ids) {
-      final result = await repo.delete(id);
-      if (!mounted) return;
-      result.fold(
-        onSuccess: (_) => ok++,
-        onFailure: (_) => failed++,
-      );
-    }
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _invoicesById[id]?.invoiceNo ?? '#$id',
+      operation: repo.delete,
+    );
     if (!mounted) return;
-    _bulk.clear();
-    if (failed == 0) {
-      // The 4.2 undo pattern — one 10s toast with a single Undo action
-      // that restores every deleted invoice in place (server-side
-      // `POST /invoices/:id/restore`).
-      showAppToast(
-        context,
-        l10n.bulkDeleted(ok),
-        duration: const Duration(seconds: 10),
-        action: SnackBarAction(
-          label: l10n.commonUndo,
-          onPressed: () async {
-            for (final id in ids) {
-              final undo = await repo.restore(id);
-              if (!mounted) return;
-              undo.fold(
-                onSuccess: (_) {},
-                onFailure: (err) =>
-                    showAppToast(context, err.message, isError: true),
-              );
-            }
-            if (!mounted) return;
-            ref.invalidate(invoicesProvider);
-            ref.invalidate(filteredInvoicesProvider);
-          },
-        ),
-      );
-    } else {
-      showAppToast(context, l10n.bulkDeleteFailed, isError: true);
-    }
-    ref.invalidate(invoicesProvider);
-    ref.invalidate(filteredInvoicesProvider);
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: _bulk,
+      result: result,
+      successMessage: l10n.bulkDeleted,
+      undoMessage: l10n.bulkDeleted,
+      onUndo: () async {
+        for (final id in result.succeeded) {
+          final undo = await repo.restore(id);
+          if (!mounted) return;
+          undo.fold(
+            onSuccess: (_) {},
+            onFailure: (err) =>
+                showAppToast(context, err.message, isError: true),
+          );
+        }
+        if (!mounted) return;
+        ref.invalidate(invoicesProvider);
+        ref.invalidate(filteredInvoicesProvider);
+      },
+      onComplete: () {
+        ref.invalidate(invoicesProvider);
+        ref.invalidate(filteredInvoicesProvider);
+      },
+    );
   }
+
+  /// id → Invoice of the current page — bulk-action labels (invoice no)
+  /// and the selection-intersected export.
+  Map<int, Invoice> get _invoicesById => {
+    for (final inv
+        in ref.read(invoicesProvider).valueOrNull?.items ?? const <Invoice>[])
+      inv.id: inv,
+  };
 
   /// Bulk CSV export — the selected invoices' rows only (mirrors the
   /// toolbar export, which runs over the full filtered list).
@@ -272,6 +272,9 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
       errorMessage: l10n.salesExportfailed,
     );
   }
+
+  /// Set while a bulk operation is in flight (D13).
+  bool _bulkBusy = false;
 
   Widget _buildBody(AsyncValue<PagedResponse<Invoice>> invoices) {
     final errorMessage = switch (invoices) {
@@ -471,6 +474,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
             return BulkActionBar(
               count: sel.length,
               onClearSelection: _bulk.clear,
+              busy: _bulkBusy,
               actions: [
                 TextButton.icon(
                   onPressed: () => _bulkExport(sel),

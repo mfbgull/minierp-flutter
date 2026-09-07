@@ -13,9 +13,7 @@ import '../../data/repositories/dashboard_repository.dart'
     show dashboardRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import 'dashboard_providers.dart'
-    show
-        dashboardCashOpeningBalancesProvider,
-        dashboardCashPositionProvider;
+    show dashboardBootProvider, dashboardCashOpeningBalancesProvider;
 
 /// Opens the opening-balance editor. [ref] is used to load the current
 /// values, save, and refresh the cash-position strip afterwards.
@@ -78,8 +76,12 @@ class _CashOpeningBalanceDialogState
     setState(() => _saving = false);
     switch (result) {
       case ApiSuccess():
+        // The seed balances are fetched standalone; the cash strip
+        // derives from the composite boot payload (spec 7.1) — refresh
+        // through the boot so the strip actually refetches (spec §7.2:
+        // mutations invalidate the boot).
         ref.invalidate(dashboardCashOpeningBalancesProvider);
-        ref.invalidate(dashboardCashPositionProvider);
+        ref.invalidate(dashboardBootProvider);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppLocalizations.of(context)!.dashboardOpeningbalanceSaved)),
