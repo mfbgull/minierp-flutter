@@ -12,12 +12,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart' show authProvider;
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/quotation_status.dart';
 import '../../data/models/quotation.dart' show Quotation;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
+import '../../data/repositories/quotation_repository.dart'
+    show quotationRepositoryProvider;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bulk_operations.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
@@ -38,6 +43,24 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
     with PlutoGridScreen<Quotation, QuotationsScreen> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
+
+  /// Set while a bulk operation is in flight (D13).
+  bool _bulkBusy = false;
+
+  /// Bulk selection (spec: quotations scope) — checkbox column +
+  /// select-all header driving the bulk action bar. Selection survives
+  /// page changes within the same filter state (D9).
+  @override
+  bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final search = ref.read(quotationsSearchProvider);
+    final status = ref.read(quotationsStatusProvider);
+    final from = ref.read(quotationsFromDateProvider);
+    final to = ref.read(quotationsToDateProvider);
+    return '$search|$status|$from|$to';
+  }
 
   @override
   void openRowDetail(int quotationId) {
@@ -147,6 +170,71 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
     },
   );
 
+  /// The current page's quotations, filtered to the selected ids.
+  List<Quotation> _selectedQuotations(Set<int> ids) => [
+    for (final q in ref.read(quotationsProvider).valueOrNull?.items ??
+        const <Quotation>[])
+      if (ids.contains(q.id)) q,
+  ];
+
+  /// id → Quotation of the current page — bulk-action labels.
+  Map<int, Quotation> get _quotationsById => {
+    for (final q in ref.read(quotationsProvider).valueOrNull?.items ??
+        const <Quotation>[])
+      q.id: q,
+  };
+
+  /// Bulk CSV export — the selected rows only (spec D10), mirroring the
+  /// grid columns via [buildQuotationsCsv].
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = _selectedQuotations(ids);
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('quotations'),
+      csv: buildQuotationsCsv(l10n, selected),
+      successMessage: l10n.quotationsExported,
+      errorMessage: l10n.quotationsExportfailed,
+    );
+  }
+
+  /// Bulk hard-delete of the selected quotations (spec: hard delete, no
+  /// undo — the server rejects Converted quotations; partial failures
+  /// render the D11 dialog).
+  Future<void> _bulkDelete(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonDelete,
+      message: '${l10n.bulkDeleteSelected} (${ids.length})?',
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final repo = ref.read(quotationRepositoryProvider);
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _quotationsById[id]?.quotationNo ?? '#$id',
+      // D22: DELETE /quotations/:id sits behind the
+      // sensitiveOperationLimiter — runBulkOperation paces serially and
+      // honors the 429 retry window.
+      operation: repo.delete,
+    );
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: l10n.bulkDeleted,
+      onComplete: () => ref.invalidate(quotationsProvider),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final quotations = ref.watch(quotationsProvider);
@@ -248,6 +336,37 @@ class _QuotationsScreenState extends ConsumerState<QuotationsScreen>
               label: Text(l10n.quotationsNewquotation),
             ),
           ],
+        ),
+        // Bulk action bar (checkbox rows selected) — delete + export the
+        // selected quotations, permission-gated (D12).
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              busy: _bulkBusy,
+              actions: [
+                if (user?.hasPermission('quotations', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+                if (user?.hasPermission('quotations', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkDelete(sel),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(l10n.bulkDeleteSelected),
+                  ),
+              ],
+            );
+          },
         ),
         Expanded(
           child: gridScreenBody(quotations, provider: quotationsProvider),

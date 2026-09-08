@@ -1,4 +1,4 @@
-// Stock ledger + invoice/purchase returns + sales/purchase orders CSV
+// Stock ledger + invoice/purchase returns + sales/purchase orders + personal loans CSV
 // export.
 //
 // The builders are pure functions (no context, no plugins) so the row
@@ -45,6 +45,9 @@ import '../../data/models/invoice.dart' show Invoice;
 import '../../data/models/item.dart' show Item;
 import '../../data/models/owner_equity.dart'
     show OwnerCapitalEntry, OwnerWithdrawal;
+import '../../features/owner_equity/personal_loan_models.dart'
+    show PersonalLoan;
+import '../../data/models/physical_count.dart' show PhysicalCount;
 import '../../data/models/production.dart' show Production;
 import '../../data/models/purchase_order.dart' show PurchaseOrder;
 import '../../data/models/purchase_return.dart' show PurchaseReturn;
@@ -66,7 +69,14 @@ import '../../data/models/report.dart'
         TrialBalanceReport;
 import '../../data/models/sales_order.dart' show SalesOrder;
 import '../../data/models/sales_return.dart' show SalesReturn;
+import '../../data/models/stock_balance.dart' show StockBalance;
 import '../../data/models/stock_movement.dart' show StockMovement;
+import '../../data/models/supplier.dart' show Supplier;
+import '../../data/models/unified_payment.dart' show UnifiedPayment;
+import '../../data/models/warehouse.dart' show Warehouse;
+import '../../features/admin/admin_models.dart' show Role, User;
+import '../../features/employees/employee_models.dart' show Employee;
+import '../../features/forecasts/forecast_models.dart' show ForecastDemand;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import 'formatters.dart';
@@ -787,6 +797,294 @@ String buildItemsCsv(AppLocalizations l10n, List<Item> items) {
   );
 }
 
+/// Builds the CSV text for the employees grid (Code | Full Name |
+/// Department | Designation | Employment Type | Phone | Email | Salary |
+/// Status — mirroring the grid's columns).
+String buildEmployeesCsv(AppLocalizations l10n, List<Employee> employees) {
+  return _buildGridCsv(
+    [
+      'Code',
+      l10n.employeesFullname,
+      l10n.employeesFieldsDepartment,
+      l10n.employeesFieldsDesignation,
+      l10n.employeesEmploymenttype,
+      l10n.employeesFieldsPhone,
+      l10n.employeesFieldsEmail,
+      l10n.employeesFieldsSalary,
+      l10n.fieldsStatus,
+    ],
+    employees,
+    (e) => [
+      sanitizeCsvCell(e.employeeCode.isEmpty ? '—' : e.employeeCode),
+      sanitizeCsvCell(e.fullName),
+      sanitizeCsvCell(e.department ?? '—'),
+      sanitizeCsvCell(e.designation ?? '—'),
+      sanitizeCsvCell(e.employmentType ?? '—'),
+      sanitizeCsvCell(e.phone ?? '—'),
+      sanitizeCsvCell(e.email ?? '—'),
+      Formatters.currency(e.salary),
+      sanitizeCsvCell(e.isActive ? l10n.statusActive : l10n.statusInactive),
+    ],
+  );
+}
+
+/// Builds the CSV text for the users grid (Username | Full Name | Email |
+/// Role | Status — mirroring the grid's columns).
+String buildUsersCsv(AppLocalizations l10n, List<User> users) {
+  return _buildGridCsv(
+    [
+      l10n.usermanagementUsername,
+      l10n.usermanagementFullname,
+      l10n.usermanagementEmail,
+      l10n.usermanagementRole,
+      l10n.commonStatus,
+    ],
+    users,
+    (u) => [
+      sanitizeCsvCell(u.username.isEmpty ? '—' : u.username),
+      sanitizeCsvCell(u.displayName),
+      sanitizeCsvCell(u.email ?? '—'),
+      sanitizeCsvCell(u.role ?? '—'),
+      sanitizeCsvCell(u.isActive ? l10n.statusActive : l10n.statusInactive),
+    ],
+  );
+}
+
+/// Builds the CSV text for the roles grid (Role Name | Description |
+/// Permission Count | System Role | Status — mirroring the grid's
+/// columns).
+String buildRolesCsv(AppLocalizations l10n, List<Role> roles) {
+  return _buildGridCsv(
+    [
+      l10n.usermanagementRolename,
+      l10n.usermanagementDescription,
+      l10n.usermanagementPermissioncount,
+      l10n.usermanagementSystemrole,
+      l10n.commonStatus,
+    ],
+    roles,
+    (r) => [
+      sanitizeCsvCell(r.roleName.isEmpty ? '—' : r.roleName),
+      sanitizeCsvCell(r.description ?? '—'),
+      Formatters.number(r.permissionCount ?? 0),
+      r.isSystemRole ? l10n.usermanagementSystemrole : '—',
+      sanitizeCsvCell(r.isActive ? l10n.statusActive : l10n.statusInactive),
+    ],
+  );
+}
+
+/// Builds the CSV text for the suppliers grid (Code | Name | Contact
+/// Person | Phone | Email | Payment Terms | Balance | Status — mirroring
+/// the grid's columns), used by the suppliers bulk export action
+/// (spec D10).
+String buildSuppliersCsv(AppLocalizations l10n, List<Supplier> suppliers) {
+  return _buildGridCsv(
+    [
+      l10n.suppliersSuppliercode,
+      l10n.suppliersSuppliername,
+      l10n.suppliersContactperson,
+      l10n.suppliersContactinfo,
+      l10n.suppliersPaymentterms,
+      l10n.suppliersBalance,
+      l10n.commonStatus,
+    ],
+    suppliers,
+    (s) => [
+      sanitizeCsvCell(s.supplierCode.isEmpty ? '—' : s.supplierCode),
+      sanitizeCsvCell(s.supplierName.isEmpty ? '—' : s.supplierName),
+      sanitizeCsvCell(s.contactPerson ?? '—'),
+      sanitizeCsvCell([
+        ?s.phone,
+        if (s.phone != null && s.email != null) ' / ',
+        ?s.email,
+      ].join()),
+      sanitizeCsvCell(s.paymentTerms ?? '—'),
+      Formatters.currency(s.currentBalance ?? 0),
+      sanitizeCsvCell(s.isActive ? l10n.statusActive : l10n.statusInactive),
+    ],
+  );
+}
+
+/// Builds the CSV text for the warehouses grid (Code | Name | Location |
+/// Total Items | Unique Items | Status — mirroring the grid's columns).
+String buildWarehousesCsv(AppLocalizations l10n, List<Warehouse> warehouses) {
+  return _buildGridCsv(
+    [
+      'Code',
+      'Name',
+      'Location',
+      'Total Items',
+      'Unique Items',
+      l10n.commonStatus,
+    ],
+    warehouses,
+    (w) => [
+      sanitizeCsvCell(w.warehouseCode.isEmpty ? '—' : w.warehouseCode),
+      sanitizeCsvCell(w.warehouseName ?? '—'),
+      sanitizeCsvCell(w.location ?? '—'),
+      Formatters.number(w.totalItems),
+      Formatters.number(w.uniqueItems),
+      sanitizeCsvCell(w.isActive ? l10n.statusActive : l10n.statusInactive),
+    ],
+  );
+}
+
+/// Builds the CSV text for the physical counts grid (Count No | Date |
+/// Warehouse | Status | Total Items | Counted | Variance — mirroring
+/// the grid's columns).
+String buildPhysicalCountsCsv(
+  AppLocalizations l10n,
+  List<PhysicalCount> counts,
+) {
+  return _buildGridCsv(
+    [
+      'Count No',
+      l10n.commonDate,
+      l10n.fieldsWarehouse,
+      l10n.commonStatus,
+      'Total Items',
+      'Counted',
+      'Variance',
+    ],
+    counts,
+    (c) => [
+      sanitizeCsvCell(c.countNo.isEmpty ? '—' : c.countNo),
+      c.countDate.isEmpty ? '—' : Formatters.date(c.countDate),
+      sanitizeCsvCell(c.warehouseName ?? '—'),
+      sanitizeCsvCell(c.status),
+      Formatters.number(c.totalItems ?? 0),
+      Formatters.number(c.countedItems ?? 0),
+      Formatters.number(c.varianceItems ?? 0),
+    ],
+  );
+}
+
+/// Builds the CSV text for the unified payments grid (Type | Ref No |
+/// Date | Party | Amount | Method | Status | Description — mirroring
+/// the grid's columns).
+String buildPaymentsCsv(
+  AppLocalizations l10n,
+  List<UnifiedPayment> payments,
+) {
+  return _buildGridCsv(
+    [
+      l10n.fieldsType,
+      l10n.paymentsPaymentno,
+      l10n.fieldsDate,
+      l10n.paymentsParty,
+      l10n.fieldsAmount,
+      l10n.expensesPaymentmethod,
+      l10n.fieldsStatus,
+      l10n.fieldsNotes,
+    ],
+    payments,
+    (p) => [
+      sanitizeCsvCell(p.type.isEmpty ? '—' : p.type),
+      sanitizeCsvCell(p.refNo.isEmpty ? '—' : p.refNo),
+      p.date.isEmpty ? '—' : Formatters.date(p.date),
+      sanitizeCsvCell(p.party.isEmpty ? '—' : p.party),
+      Formatters.currency(p.amount),
+      sanitizeCsvCell(p.method.isEmpty ? '—' : p.method),
+      sanitizeCsvCell(p.status.isEmpty ? '—' : p.status),
+      sanitizeCsvCell(p.description ?? '—'),
+    ],
+  );
+}
+
+/// Builds the CSV text for the stock-movements grid (No | Date | Item |
+/// Warehouse | Type | Qty | Ref | Remarks — mirroring the grid's
+/// columns).
+String buildStockMovementsCsv(
+  AppLocalizations l10n,
+  List<StockMovement> movements,
+) {
+  return _buildGridCsv(
+    [
+      'No',
+      l10n.commonDate,
+      l10n.fieldsItem,
+      l10n.fieldsWarehouse,
+      l10n.fieldsType,
+      l10n.commonQuantity,
+      l10n.fieldsReference,
+      l10n.fieldsNotes,
+    ],
+    movements,
+    (m) => [
+      sanitizeCsvCell(m.movementNo.isEmpty ? '—' : m.movementNo),
+      m.movementDate.isEmpty ? '—' : Formatters.date(m.movementDate),
+      sanitizeCsvCell(m.itemName ?? m.itemCode ?? '—'),
+      sanitizeCsvCell(m.warehouseName ?? m.warehouseCode ?? '—'),
+      sanitizeCsvCell(movementTypeLabel(l10n, m.movementType)),
+      Formatters.number(m.quantity),
+      sanitizeCsvCell(m.referenceDocNo ?? '—'),
+      sanitizeCsvCell(m.remarks ?? '—'),
+    ],
+  );
+}
+
+/// Builds the CSV text for the stock-by-warehouse grid (Item Code | Item
+/// Name | Warehouse Code | Warehouse Name | Qty — mirroring the grid's
+/// columns).
+String buildStockByWarehouseCsv(
+  AppLocalizations l10n,
+  List<StockBalance> balances,
+) {
+  return _buildGridCsv(
+    [
+      l10n.inventoryItemcode,
+      l10n.inventoryItemname,
+      'Warehouse Code',
+      l10n.fieldsWarehouse,
+      l10n.commonQuantity,
+    ],
+    balances,
+    (b) => [
+      sanitizeCsvCell(b.itemCode.isEmpty ? '—' : b.itemCode),
+      sanitizeCsvCell(b.itemName.isEmpty ? '—' : b.itemName),
+      sanitizeCsvCell(b.warehouseCode.isEmpty ? '—' : b.warehouseCode),
+      sanitizeCsvCell(b.warehouseName.isEmpty ? '—' : b.warehouseName),
+      Formatters.number(b.quantity),
+    ],
+  );
+}
+
+/// Builds the CSV text for the demand-forecast grid (Item Code | Item
+/// Name | Category | Stock | Next Week | Next Month | Next Quarter |
+/// Trend | Confidence | Recommendation — mirroring the grid's columns).
+String buildDemandForecastCsv(
+  AppLocalizations l10n,
+  List<ForecastDemand> forecasts,
+) {
+  return _buildGridCsv(
+    [
+      l10n.inventoryItemcode,
+      l10n.inventoryItemname,
+      l10n.commonCategory,
+      l10n.inventoryCurrentstock,
+      'Next Week',
+      'Next Month',
+      'Next Quarter',
+      'Trend',
+      'Confidence',
+      'Recommendation',
+    ],
+    forecasts,
+    (f) => [
+      sanitizeCsvCell(f.itemCode.isEmpty ? '—' : f.itemCode),
+      sanitizeCsvCell(f.itemName.isEmpty ? '—' : f.itemName),
+      sanitizeCsvCell(f.category.isEmpty ? '—' : f.category),
+      Formatters.number(f.currentStock),
+      Formatters.number(f.nextWeek),
+      Formatters.number(f.nextMonth),
+      Formatters.number(f.nextQuarter),
+      sanitizeCsvCell(f.trend.isEmpty ? '—' : f.trend),
+      '${Formatters.number(f.confidence)}%',
+      sanitizeCsvCell(f.recommendation.isEmpty ? '—' : f.recommendation),
+    ],
+  );
+}
+
 String buildInvoicesCsv(AppLocalizations l10n, List<Invoice> invoices) {
   return _buildGridCsv(
     [
@@ -1055,3 +1353,37 @@ String buildExpiryReportCsv(
     ],
   );
 }
+
+/// Exports [loans] as a CSV for personal-loan row-action bulk export.
+String buildPersonalLoansCsv(
+  AppLocalizations l10n,
+  List<PersonalLoan> loans,
+) => _buildGridCsv(
+  [
+    'Loan No',
+    l10n.equityPersonalLoanBorrower,
+    l10n.equityPersonalLoanAmount,
+    'Currency',
+    'Balance',
+    'Repaid',
+    l10n.equityPersonalLoanDateGiven,
+    l10n.equityPersonalLoanDueDate,
+    l10n.equityPersonalLoanPurpose,
+    l10n.fieldsStatus,
+    l10n.expensesCreatedby,
+  ],
+  loans,
+  (PersonalLoan loan) => [
+    loan.loanNo,
+    sanitizeCsvCell(loan.borrowerName),
+    loan.amount,
+    loan.currency,
+    loan.balance,
+    loan.repaidAmount,
+    loan.loanDate,
+    loan.dueDate ?? '',
+    sanitizeCsvCell(loan.purpose ?? ''),
+    loan.status,
+    sanitizeCsvCell(loan.createdByName ?? ''),
+  ],
+);

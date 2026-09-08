@@ -22,6 +22,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart' show authProvider;
+import '../../core/utils/csv_export.dart';
 import '../../data/models/supplier.dart' show Supplier;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
@@ -29,6 +31,7 @@ import '../../data/repositories/supplier_repository.dart'
     show supplierRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/bulk_operations.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
@@ -55,6 +58,22 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen>
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
   bool _fixingBalances = false;
+
+  /// Set while a bulk operation is in flight (D13).
+  bool _bulkBusy = false;
+
+  /// Bulk selection (spec: suppliers scope) — checkbox column +
+  /// select-all header driving the bulk action bar. Selection survives
+  /// page changes within the same filter state (D9).
+  @override
+  bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final search = ref.read(suppliersSearchProvider);
+    final status = ref.read(suppliersStatusProvider);
+    return '$search|$status';
+  }
 
   @override
   void openRowDetail(int supplierId) {
@@ -154,6 +173,91 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen>
     if (ref.read(suppliersPageProvider) != 1) {
       ref.read(suppliersPageProvider.notifier).state = 1;
     }
+  }
+
+  /// The current page's suppliers, filtered to the selected ids.
+  List<Supplier> _selectedSuppliers(Set<int> ids) => [
+    for (final s in ref.read(suppliersProvider).valueOrNull?.items ??
+        const <Supplier>[])
+      if (ids.contains(s.id)) s,
+  ];
+
+  /// id → Supplier of the current page — bulk-action labels.
+  Map<int, Supplier> get _suppliersById => {
+    for (final s in ref.read(suppliersProvider).valueOrNull?.items ??
+        const <Supplier>[])
+      s.id: s,
+  };
+
+  /// Bulk CSV export — the selected suppliers' rows only (spec D10),
+  /// mirroring the grid columns via [buildSuppliersCsv].
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = _selectedSuppliers(ids);
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('suppliers'),
+      csv: buildSuppliersCsv(l10n, selected),
+      successMessage: l10n.suppliersExportsuccess,
+      errorMessage: l10n.bulkDeleteFailed,
+    );
+  }
+
+  /// Bulk activate/deactivate of the selected suppliers via
+  /// `PUT /suppliers/:id` `is_active` (spec: suppliers scope).
+  Future<void> _bulkSetActive(Set<int> ids, bool active) async {
+    final l10n = AppLocalizations.of(context)!;
+    final repo = ref.read(supplierRepositoryProvider);
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _suppliersById[id]?.supplierName ?? '#$id',
+      operation: (id) => repo.update(id, {'is_active': active ? 1 : 0}),
+    );
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: (n) =>
+          active ? l10n.bulkActivated(n) : l10n.bulkDeactivated(n),
+      onComplete: () => ref.invalidate(suppliersProvider),
+    );
+  }
+
+  /// Bulk soft-delete of the selected suppliers (spec: soft delete, no
+  /// restore endpoint — D3; the server rejects suppliers with purchase
+  /// orders; partial failures render the D11 dialog).
+  Future<void> _bulkDelete(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonDelete,
+      message: '${l10n.bulkDeleteSelected} (${ids.length})?',
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final repo = ref.read(supplierRepositoryProvider);
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _suppliersById[id]?.supplierName ?? '#$id',
+      operation: repo.delete,
+    );
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: l10n.bulkDeleted,
+      onComplete: () => ref.invalidate(suppliersProvider),
+    );
   }
 
   Future<void> _fixBalances() async {
@@ -262,6 +366,50 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen>
               label: Text(l10n.suppliersFixbalances),
             ),
           ],
+        ),
+        // Bulk action bar (checkbox rows selected) — delete +
+        // activate/deactivate + export the selected suppliers,
+        // permission-gated (D12).
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              busy: _bulkBusy,
+              actions: [
+                if (user?.hasPermission('suppliers', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+                if (user?.hasPermission('suppliers', 'update') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkSetActive(sel, true),
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: Text(l10n.bulkActivateSelected),
+                  ),
+                if (user?.hasPermission('suppliers', 'update') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkSetActive(sel, false),
+                    icon: const Icon(Icons.cancel_outlined, size: 18),
+                    label: Text(l10n.bulkDeactivateSelected),
+                  ),
+                if (user?.hasPermission('suppliers', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkDelete(sel),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(l10n.bulkDeleteSelected),
+                  ),
+              ],
+            );
+          },
         ),
         Expanded(child: gridScreenBody(suppliers, provider: suppliersProvider)),
         if (page != null)

@@ -1,9 +1,16 @@
 # Specification: Extend Bulk Operations to All PlutoGrid Screens
 
-> **Status: corrected after spec check + review round (2026-09-07).** Every
-> claim in the original draft was verified against the working tree, and
-> every **[re-verify]** mark has since been resolved from the server code
+> **Status: all phases implemented and verified.** Every claim in the
+> original draft was verified against the working tree, and every
+> **[re-verify]** mark has since been resolved from the server code
 > (see `spec-check-spec.md`). No unresolved fact marks remain.
+>
+> **Addendum (2026-09-08):** a working-tree audit found three screens
+> that the "all phases complete" status had silently skipped — sales
+> orders, quotations, and suppliers (they use the mixin but had no
+> `enableBulkSelection`). They are now implemented per the corrected
+> table below (Phase 1 scope), including the previously missing
+> `buildSuppliersCsv`.
 
 ## Repository Baseline
 
@@ -63,6 +70,8 @@ is `POST /:id/void` (GL reversal); stays one-at-a-time (D6).
 | `quotations/quotations_screen.dart` | delete + export | `DELETE /quotations/:id` (guard: Converted rejected) | ✗ |
 | `customers/customers_screen.dart` | delete + activate/deactivate + export (exists: export) | `DELETE` + `PUT /customers/:id` | ✓ restore |
 | `suppliers/suppliers_screen.dart` | delete + activate/deactivate + export | `DELETE /suppliers/:id` + `PUT /suppliers/:id` | ✗ (hard) |
+| `sales_orders/sales_orders_screen.dart` | delete + export | `DELETE /sales-orders/:id` (guard: Completed/Invoiced rejected — verified) | ✗ |
+| `quotations/quotations_screen.dart` | delete + export | `DELETE /quotations/:id` (guard: Converted rejected — verified) | ✗ |
 | `inventory/items_screen.dart` | activate/deactivate + delete + export (exists; add export) | existing + `PUT /inventory/items/:id` | ✓ restore |
 | `inventory/warehouses_screen.dart` | delete + export | `DELETE /inventory/warehouses/:id` (soft: `is_active=0`) | ✓ reactivate via extended `PUT /warehouses/:id` (D25) |
 | `inventory/physical_count_screen.dart` | delete + export | `DELETE /inventory/physical-counts/:id` (guard: Draft/Cancelled only — verified) | ✗ |
@@ -109,15 +118,17 @@ delete (D4); no purchases/returns changes (D6); no schema changes.
 ### CSV export (D10)
 
 - Existing builders reused verbatim for their screens.
-- **New builders required** (mirroring each grid's visible columns):
-  `buildEmployeesCsv`, `buildPaymentsCsv`, `buildSuppliersCsv`,
-  `buildUsersCsv`, `buildRolesCsv`, `buildWarehousesCsv`,
-  `buildPhysicalCountsCsv`, `buildStockMovementsCsv`.
+- **New builders added** (Phase 1 + Phase 3):
+  `buildEmployeesCsv`, `buildPaymentsCsv`, `buildUsersCsv`,
+  `buildRolesCsv`, `buildWarehousesCsv`, `buildPhysicalCountsCsv`,
+  `buildStockMovementsCsv`, `buildStockByWarehouseCsv`,
+  `buildDemandForecastCsv`, `buildPersonalLoansCsv`,
+  `buildSuppliersCsv` (added with the suppliers screen in the
+  2026-09-08 addendum).
 - Every bulk export runs over the **selected rows** (intersected with the
   current filtered set), not the whole filtered list.
-- Owner-equity personal loans: promote the tab's private `_buildCsv` into
-  `csv_export.dart` during Phase 3 (verified: capital and withdrawals
-  already use shared `buildOwnerCapitalCsv`/`buildOwnerWithdrawalsCsv`).
+- Owner-equity personal loans: private `_buildCsv` promoted to
+  `csv_export.dart` as `buildPersonalLoansCsv` during Phase 3.
 
 ## Business Rules and Invariants
 
@@ -239,22 +250,37 @@ delete (D4); no purchases/returns changes (D6); no schema changes.
 
 ## Phasing (D16 — per-screen increments)
 
-1. **Phase 0 (pattern alignment):** items, invoices, customers, purchase
-   orders — already have bulk ops; align them with these rules (undo
-   canonical form, failure dialog, permission gating, export over
-   selection) and treat them as the reference implementations.
-2. **Phase 1 (straightforward deletes + export):** employees, users,
-   roles, payments, warehouses, physical counts. Includes the new CSV
+1. **Phase 0 (pattern alignment): ✅ COMPLETE.** items, invoices, customers,
+   purchase orders — already have bulk ops; aligned with these rules (undo
+   canonical form, failure dialog, permission gating, export over selection).
+   Treated as the reference implementations.
+
+2. **Phase 1 (straightforward deletes + export): ✅ COMPLETE.** employees,
+   users, roles, payments, warehouses, physical counts. Includes the new CSV
    builders for these screens.
-3. **Phase 2 (export-only screens):** activity log, expenses, stock
-   movements, stock-by-warehouse, demand forecast, invoice returns.
+
+3. **Phase 2 (export-only screens): ✅ COMPLETE.** activity log, expenses,
+   stock movements, stock-by-warehouse, demand forecast, invoice returns.
    Includes `buildStockMovementsCsv` and the physical-counts builder.
-4. **Phase 3 (infrastructure-heavy):** cross-page selection, owner-equity
-   mixin migration, then their bulk ops + CSV promotion.
-5. **Phase 4 (permission map + server additions):** permission-map
-   payload, warehouse `is_active` reactivation (D25), client gating. Can
-   run in parallel with Phase 1; Phase 0 alignment may ship with coarse
-   role-check gating temporarily until the map lands.
+
+4. **Phase 3 (infrastructure-heavy): ✅ COMPLETE.** cross-page selection
+   (D9: additive `syncFromManager`, `resetIfFilterChanged`, `recheckRows`),
+   owner-equity mixin migration (D5: all 3 tabs migrated to PlutoGridScreen),
+   bulk void/delete + export for owner-equity tabs, CSV promotion for
+   personal loans (`buildPersonalLoansCsv`).
+
+5. **Phase 4 (permission map + server additions): ✅ COMPLETE.** permission-map
+   payload returned from `/auth/me` (D12: admin gets all permissions, non-admin
+   gets role-based permissions), warehouse `is_active` reactivation via
+   `PUT /warehouses/:id` (D25), client permission gating — all 19 screens with
+   bulk ops now hide buttons the user lacks permission for (export: `{module}:read`,
+   delete/void: `{module}:delete`, activate/deactivate/set-status: `{module}:update`).
+
+6. **Addendum phase (2026-09-08): ✅ COMPLETE.** sales orders, quotations, and
+   suppliers — the three Phase 1 screens the earlier passes skipped — now have
+   bulk selection + delete + bulk export (suppliers also activate/deactivate),
+   permission-gated, with `buildSuppliersCsv`, fake-adapter routes, and widget
+   tests (per-screen delete coverage + D11 failure-dialog tests).
 
 ## Migration & Backward Compatibility
 
