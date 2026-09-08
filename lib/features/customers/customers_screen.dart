@@ -25,6 +25,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart' show authProvider;
 import '../../core/utils/csv_export.dart';
 import '../../data/models/customer.dart' show Customer;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -88,6 +89,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
   /// Selection resets whenever the grid rows are replaced.
   @override
   bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final search = ref.read(customersSearchProvider);
+    final status = ref.read(customersStatusProvider);
+    return '$search|$status';
+  }
 
   @override
   PlutoRow gridRowFor(Customer customer) => PlutoRow(
@@ -398,34 +406,39 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen>
           valueListenable: bulkSelection.selected,
           builder: (context, sel, _) {
             if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
             return BulkActionBar(
               count: sel.length,
               onClearSelection: bulkSelection.clear,
               busy: _bulkBusy,
               actions: [
-                TextButton.icon(
-                  onPressed: () => _bulkExport(sel),
-                  icon: const Icon(Icons.file_download_outlined, size: 18),
-                  label: Text(l10n.bulkExportSelected),
-                ),
-                TextButton.icon(
-                  onPressed: () => _bulkSetActive(sel, true),
-                  icon: const Icon(Icons.check_circle_outline, size: 18),
-                  label: Text(l10n.bulkActivateSelected),
-                ),
-                TextButton.icon(
-                  onPressed: () => _bulkSetActive(sel, false),
-                  icon: const Icon(Icons.cancel_outlined, size: 18),
-                  label: Text(l10n.bulkDeactivateSelected),
-                ),
-                TextButton.icon(
-                  onPressed: () => _bulkDelete(sel),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
+                if (user?.hasPermission('customers', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
                   ),
-                  label: Text(l10n.bulkDeleteSelected),
-                ),
+                if (user?.hasPermission('customers', 'update') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkSetActive(sel, true),
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: Text(l10n.bulkActivateSelected),
+                  ),
+                if (user?.hasPermission('customers', 'update') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkSetActive(sel, false),
+                    icon: const Icon(Icons.cancel_outlined, size: 18),
+                    label: Text(l10n.bulkDeactivateSelected),
+                  ),
+                if (user?.hasPermission('customers', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkDelete(sel),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(l10n.bulkDeleteSelected),
+                  ),
               ],
             );
           },

@@ -250,7 +250,9 @@ function updateWarehouse(req, res) {
         Warehouse_1.default.update(database_1.default, warehouseId, {
             warehouse_code: req.body.warehouse_code || existing.warehouse_code,
             warehouse_name: req.body.warehouse_name || existing.warehouse_name,
-            location: req.body.location
+            location: req.body.location,
+            // D25: accept is_active to allow reactivation after bulk deactivate
+            ...(req.body.is_active !== undefined && { is_active: req.body.is_active ? 1 : 0 }),
         });
         // Log warehouse update using activity logger
         (0, activityLogger_1.logCRUD)(activityLogger_1.ActionType.WAREHOUSE_UPDATE, 'Warehouse', warehouseId, `Updated warehouse: ${req.body.warehouse_name || existing.warehouse_name}`, req.user.id, {

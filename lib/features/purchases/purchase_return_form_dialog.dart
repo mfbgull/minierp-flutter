@@ -134,6 +134,12 @@ class _PurchaseReturnFormDialogState
   DateTime _returnDate = DateTime.now();
   int? _warehouseId;
 
+  /// PRET-06 — required by the server when the return value exceeds the
+  /// purchase's unpaid balance. `refund_expected` marks the credit note
+  /// as cash-payout eligible; the actual payout is issued later from the
+  /// return detail (supplier refund), not at return time.
+  String _disposition = 'credit_on_account';
+
   /// Whether the receipt warehouse no longer holds the returned stock
   /// (transferred out since receipt) — only then is the warehouse
   /// selectable. Decided per quantity entry from live item-detail stock.
@@ -288,6 +294,7 @@ class _PurchaseReturnFormDialogState
       sourceId: widget.source.id,
       warehouseId: _warehouseId!,
       reason: _reasonController.text,
+      disposition: _disposition,
       items: items,
     );
     if (!mounted) return;
@@ -534,6 +541,36 @@ class _PurchaseReturnFormDialogState
                       ),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  FormFieldShell(
+                    label: l10n.purchasesReturndisposition,
+                    child: SearchableSelect<String>(
+                      items: const ['credit_on_account', 'refund_expected'],
+                      selected: _disposition,
+                      isDense: true,
+                      enabled: !_busy,
+                      labelBuilder: (value) => switch (value) {
+                        'credit_on_account' => l10n.purchasesDispositioncredit,
+                        'refund_expected' => l10n.purchasesDispositionrefund,
+                        _ => value,
+                      },
+                      decoration: formInputDecoration(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _disposition = value);
+                        }
+                      },
+                    ),
+                  ),
+                  if (_disposition == 'refund_expected') ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      l10n.purchasesDispositionrefundhint,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   Row(
                     children: [

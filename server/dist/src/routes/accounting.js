@@ -25,6 +25,7 @@ const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const requirePermission_1 = require("../middleware/requirePermission");
 const rateLimiter_1 = require("../middleware/rateLimiter");
+const validation_1 = require("../middleware/validation");
 const accountingController_1 = __importDefault(require("../controllers/accountingController"));
 const router = (0, express_1.Router)();
 // All endpoints require authentication.
@@ -50,7 +51,7 @@ router.get('/periods/current', (0, requirePermission_1.requirePermission)('accou
 // GET /api/accounting/periods/:id
 router.get('/periods/:id', (0, requirePermission_1.requirePermission)('accounting', 'read'), accountingController_1.default.getPeriod);
 // POST /api/accounting/periods  (sensitive operation; admin gated inside controller)
-router.post('/periods', (0, requirePermission_1.requirePermission)('accounting', 'update'), rateLimiter_1.sensitiveOperationLimiter, accountingController_1.default.openPeriod);
+router.post('/periods', (0, requirePermission_1.requirePermission)('accounting', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.periodOpen), rateLimiter_1.sensitiveOperationLimiter, accountingController_1.default.openPeriod);
 // POST /api/accounting/periods/:id/close  (sensitive operation)
-router.post('/periods/:id/close', (0, requirePermission_1.requirePermission)('accounting', 'update'), rateLimiter_1.sensitiveOperationLimiter, accountingController_1.default.closePeriod);
+router.post('/periods/:id/close', (0, requirePermission_1.requirePermission)('accounting', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), rateLimiter_1.sensitiveOperationLimiter, accountingController_1.default.closePeriod);
 exports.default = router;

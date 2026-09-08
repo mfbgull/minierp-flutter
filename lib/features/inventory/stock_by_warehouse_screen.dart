@@ -16,6 +16,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart';
+import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/stock_balance.dart' show StockBalance;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
@@ -49,6 +51,16 @@ class _StockByWarehouseScreenState extends ConsumerState<StockByWarehouseScreen>
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final search = ref.read(stockBalancesSearchProvider);
+    final warehouse = ref.read(stockBalancesWarehouseFilterProvider);
+    return '$search|$warehouse';
+  }
+
+  @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
@@ -65,6 +77,24 @@ class _StockByWarehouseScreenState extends ConsumerState<StockByWarehouseScreen>
         ref.read(stockBalancesPageProvider.notifier).state = 1;
       }
     });
+  }
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final rows = ref.read(stockBalancesProvider).valueOrNull?.items ??
+        const <StockBalance>[];
+    final selected = [
+      for (final b in rows)
+        if (ids.contains(b.itemId)) b,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('stock-by-warehouse'),
+      csv: buildStockByWarehouseCsv(l10n, selected),
+      successMessage: l10n.bulkExportSelected,
+      errorMessage: l10n.bulkDeleteFailed,
+    );
   }
 
   /// The stock-balances provider returns a `PagedResponse` envelope —
@@ -189,6 +219,25 @@ class _StockByWarehouseScreenState extends ConsumerState<StockByWarehouseScreen>
           searchHint: l10n.commonSearch,
           onSearchChanged: _onSearchChanged,
           onRefresh: () => ref.invalidate(stockBalancesProvider),
+        ),
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              actions: [
+                if (user?.hasPermission('inventory', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+              ],
+            );
+          },
         ),
         Expanded(
           child: gridScreenBody(balances, provider: stockBalancesProvider),

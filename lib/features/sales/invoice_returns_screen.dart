@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/sales_return.dart' show SalesReturn;
@@ -40,6 +41,18 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
     with PlutoGridScreen<SalesReturn, InvoiceReturnsScreen> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
+
+  @override
+  bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final search = ref.read(invoiceReturnsSearchProvider);
+    final warehouse = ref.read(invoiceReturnsWarehouseProvider);
+    final from = ref.read(invoiceReturnsFromDateProvider);
+    final to = ref.read(invoiceReturnsToDateProvider);
+    return '$search|$warehouse|$from|$to';
+  }
 
   /// Row id → model for the detail dialog — there is no per-row endpoint,
   /// so the dialog renders from the row the grid was built from.
@@ -87,6 +100,26 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
     if (ref.read(invoiceReturnsPageProvider) != 1) {
       ref.read(invoiceReturnsPageProvider.notifier).state = 1;
     }
+  }
+
+  List<SalesReturn> get _filteredRows =>
+      ref.read(filteredInvoiceReturnsProvider).valueOrNull ??
+      const <SalesReturn>[];
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = [
+      for (final r in _filteredRows)
+        if (ids.contains(r.id)) r,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('invoice-returns'),
+      csv: buildInvoiceReturnsCsv(l10n, selected),
+      successMessage: l10n.salesreturnsExported,
+      errorMessage: l10n.salesreturnsExportfailed,
+    );
   }
 
   /// The returns provider returns a `PagedResponse` envelope — unwrap the
@@ -267,6 +300,25 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
                   label: Text(l10n.salesreturnsProcessreturn),
                 ),
               ],
+            ),
+            ValueListenableBuilder<Set<int>>(
+              valueListenable: bulkSelection.selected,
+              builder: (context, sel, _) {
+                if (sel.isEmpty) return const SizedBox.shrink();
+                final user = ref.watch(authProvider).user;
+                return BulkActionBar(
+                  count: sel.length,
+                  onClearSelection: bulkSelection.clear,
+                  actions: [
+                    if (user?.hasPermission('sales', 'read') ?? false)
+                      TextButton.icon(
+                        onPressed: () => _bulkExport(sel),
+                        icon: const Icon(Icons.file_download_outlined, size: 18),
+                        label: Text(l10n.bulkExportSelected),
+                      ),
+                  ],
+                );
+              },
             ),
             Expanded(
               child: mobile

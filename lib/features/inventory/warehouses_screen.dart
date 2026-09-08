@@ -14,8 +14,13 @@ import '../../core/theme/status_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart' show authProvider;
+import '../../core/utils/csv_export.dart';
 import '../../data/models/warehouse.dart' show Warehouse;
+import '../../data/repositories/inventory_repository.dart' show inventoryRepositoryProvider;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bulk_operations.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import '../../widgets/status_badge.dart';
@@ -38,6 +43,15 @@ class _WarehousesScreenState extends ConsumerState<WarehousesScreen>
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
   List<Warehouse> _filtered = const [];
+  bool _bulkBusy = false;
+
+  Map<int, Warehouse> get _warehousesById => {
+    for (final w in ref.read(warehousesProvider).valueOrNull ?? const <Warehouse>[])
+      w.id: w,
+  };
+
+  @override
+  bool get enableBulkSelection => true;
 
   T? _firstWhereOrNull<T>(Iterable<T> items, bool Function(T) test) {
     for (final item in items) {
@@ -59,6 +73,54 @@ class _WarehousesScreenState extends ConsumerState<WarehousesScreen>
     if (saved == true && mounted) {
       ref.invalidate(warehousesProvider);
     }
+  }
+
+  /// Bulk soft-delete of selected warehouses (no undo until D25 extends
+  /// PUT with `is_active`).
+  Future<void> _bulkDelete(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonDelete,
+      message: '${l10n.bulkDeleteSelected} (${ids.length})?',
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final repo = ref.read(inventoryRepositoryProvider);
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _warehousesById[id]?.warehouseCode ?? '#$id',
+      operation: repo.deleteWarehouse,
+    );
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: l10n.bulkDeleted,
+      onComplete: () => ref.invalidate(warehousesProvider),
+    );
+  }
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = [
+      for (final w in _warehousesById.values)
+        if (ids.contains(w.id)) w,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('warehouses'),
+      csv: buildWarehousesCsv(l10n, selected),
+      successMessage: l10n.bulkExportSelected,
+      errorMessage: l10n.bulkDeleteFailed,
+    );
   }
 
   @override
@@ -150,6 +212,35 @@ class _WarehousesScreenState extends ConsumerState<WarehousesScreen>
               label: Text(l10n.warehousesNewwarehouse),
             ),
           ],
+        ),
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              busy: _bulkBusy,
+              actions: [
+                if (user?.hasPermission('inventory', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+                if (user?.hasPermission('inventory', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkDelete(sel),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(l10n.bulkDeleteSelected),
+                  ),
+              ],
+            );
+          },
         ),
         Expanded(
           child: gridScreenBody(warehouses, provider: warehousesProvider),

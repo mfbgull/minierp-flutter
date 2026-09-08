@@ -2828,6 +2828,90 @@ abstract class AppLocalizations {
   /// **'Enter reason for return...'**
   String get purchasesReturnreasonplaceholder;
 
+  /// No description provided for @purchasesReturndisposition.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement'**
+  String get purchasesReturndisposition;
+
+  /// No description provided for @purchasesDispositioncredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit on account'**
+  String get purchasesDispositioncredit;
+
+  /// No description provided for @purchasesDispositionrefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash refund from supplier'**
+  String get purchasesDispositionrefund;
+
+  /// No description provided for @purchasesDispositionrefundhint.
+  ///
+  /// In en, this message translates to:
+  /// **'The credit note becomes payable — issue the payout later from the return detail.'**
+  String get purchasesDispositionrefundhint;
+
+  /// No description provided for @purchasesRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Issue Refund'**
+  String get purchasesRefund;
+
+  /// No description provided for @purchasesRefundtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier Refund'**
+  String get purchasesRefundtitle;
+
+  /// No description provided for @purchasesRefundsubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay out the credit note in cash'**
+  String get purchasesRefundsubtitle;
+
+  /// No description provided for @purchasesRefundcreditnote.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit Note'**
+  String get purchasesRefundcreditnote;
+
+  /// No description provided for @purchasesRefundamount.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund Amount'**
+  String get purchasesRefundamount;
+
+  /// No description provided for @purchasesRefundmethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Method'**
+  String get purchasesRefundmethod;
+
+  /// No description provided for @purchasesRefundreference.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get purchasesRefundreference;
+
+  /// No description provided for @purchasesRefundprocessed.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund issued'**
+  String get purchasesRefundprocessed;
+
+  /// No description provided for @purchasesRefundrefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get purchasesRefundrefunded;
+
+  /// No description provided for @purchasesRefundnone.
+  ///
+  /// In en, this message translates to:
+  /// **'No refund issued yet'**
+  String get purchasesRefundnone;
+
   /// No description provided for @purchasesProcessreturn.
   ///
   /// In en, this message translates to:

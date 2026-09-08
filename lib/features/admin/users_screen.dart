@@ -13,9 +13,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/auth/auth_notifier.dart' show authProvider;
+import '../../core/utils/csv_export.dart';
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/bulk_operations.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
@@ -36,6 +38,15 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
     with PlutoGridScreen<User, UsersScreen> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
+  bool _bulkBusy = false;
+
+  Map<int, User> get _usersById => {
+    for (final u in ref.read(usersProvider).valueOrNull ?? const <User>[])
+      u.id: u,
+  };
+
+  @override
+  bool get enableBulkSelection => true;
 
   @override
   void openRowDetail(int userId) {
@@ -195,6 +206,67 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
     }
   }
 
+  /// Bulk delete (soft: `is_active=0`) with undo via toggle-status (D3).
+  Future<void> _bulkDelete(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonDelete,
+      message: '${l10n.bulkDeleteSelected} (${ids.length})?',
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final repo = ref.read(adminRepositoryProvider);
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _usersById[id]?.username ?? '#$id',
+      operation: repo.deleteUser,
+    );
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: l10n.bulkDeleted,
+      undoMessage: l10n.bulkDeleted,
+      onUndo: () async {
+        for (final id in result.succeeded) {
+          final undo = await repo.toggleUserStatus(id, true);
+          if (!mounted) return;
+          undo.fold(
+            onSuccess: (_) {},
+            onFailure: (err) =>
+                showAppToast(context, err.message, isError: true),
+          );
+        }
+        if (!mounted) return;
+        ref.invalidate(usersProvider);
+      },
+      onComplete: () => ref.invalidate(usersProvider),
+    );
+  }
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = [
+      for (final u in _usersById.values)
+        if (ids.contains(u.id)) u,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('users'),
+      csv: buildUsersCsv(l10n, selected),
+      successMessage: l10n.bulkExportSelected,
+      errorMessage: l10n.bulkDeleteFailed,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final users = ref.watch(usersProvider);
@@ -248,6 +320,35 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
               label: Text(l10n.usermanagementNewuser),
             ),
           ],
+        ),
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              busy: _bulkBusy,
+              actions: [
+                if (user?.hasPermission('users', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+                if (user?.hasPermission('users', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkDelete(sel),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(l10n.bulkDeleteSelected),
+                  ),
+              ],
+            );
+          },
         ),
         Expanded(child: gridScreenBody(users, provider: usersProvider)),
         const SizedBox(height: 16),

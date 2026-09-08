@@ -1419,6 +1419,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchasesReturnreasonplaceholder => 'Enter reason for return...';
 
   @override
+  String get purchasesReturndisposition => 'Settlement';
+
+  @override
+  String get purchasesDispositioncredit => 'Credit on account';
+
+  @override
+  String get purchasesDispositionrefund => 'Cash refund from supplier';
+
+  @override
+  String get purchasesDispositionrefundhint =>
+      'The credit note becomes payable — issue the payout later from the return detail.';
+
+  @override
+  String get purchasesRefund => 'Issue Refund';
+
+  @override
+  String get purchasesRefundtitle => 'Supplier Refund';
+
+  @override
+  String get purchasesRefundsubtitle => 'Pay out the credit note in cash';
+
+  @override
+  String get purchasesRefundcreditnote => 'Credit Note';
+
+  @override
+  String get purchasesRefundamount => 'Refund Amount';
+
+  @override
+  String get purchasesRefundmethod => 'Payment Method';
+
+  @override
+  String get purchasesRefundreference => 'Reference';
+
+  @override
+  String get purchasesRefundprocessed => 'Refund issued';
+
+  @override
+  String get purchasesRefundrefunded => 'Refunded';
+
+  @override
+  String get purchasesRefundnone => 'No refund issued yet';
+
+  @override
   String get purchasesProcessreturn => 'Process Return';
 
   @override

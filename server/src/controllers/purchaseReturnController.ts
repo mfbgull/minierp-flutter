@@ -76,6 +76,7 @@ function createPurchaseReturn(req: AuthRequest, res: Response): Response | void 
       source_id?: number;
       warehouse_id?: number;
       reason?: string;
+      disposition?: string;
       items?: Array<{ source_item_id: number; quantity: number }>;
     };
 
@@ -102,6 +103,7 @@ function createPurchaseReturn(req: AuthRequest, res: Response): Response | void 
         source_id: body.source_id,
         warehouse_id: body.warehouse_id,
         reason: body.reason,
+        disposition: body.disposition,
         items: body.items,
       },
       req.user!.id,

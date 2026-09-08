@@ -8,8 +8,14 @@ const dashboardController_1 = __importDefault(require("../controllers/dashboardC
 const dashboardLayoutController_1 = __importDefault(require("../controllers/dashboardLayoutController"));
 const auth_1 = require("../middleware/auth");
 const requirePermission_1 = require("../middleware/requirePermission");
+const validation_1 = require("../middleware/validation");
 const router = express_1.default.Router();
 router.use(auth_1.authenticateToken);
+// Composite boot payload (spec 7.1): summary + layout + KPI batch +
+// cash + AR + expiry + top-customers in one round trip. Registered
+// before the '/layout/...' siblings — not shadowed by them, but kept
+// first for readability.
+router.get('/boot', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardController_1.default.getBoot);
 // Existing summary endpoint
 router.get('/summary', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardController_1.default.getSummary);
 // ============ Dashboard Data Endpoints ============
@@ -24,15 +30,15 @@ router.get('/ar-summary', (0, requirePermission_1.requirePermission)('dashboard'
 router.get('/cash-position', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardController_1.default.getCashPosition);
 router.get('/expiry-alerts', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardController_1.default.getExpiryAlerts);
 router.get('/cash-opening-balances', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardController_1.default.getCashOpeningBalances);
-router.put('/cash-opening-balances', (0, requirePermission_1.requirePermission)('dashboard', 'update'), dashboardController_1.default.saveCashOpeningBalances);
+router.put('/cash-opening-balances', (0, requirePermission_1.requirePermission)('dashboard', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.cashOpeningBalances), dashboardController_1.default.saveCashOpeningBalances);
 router.get('/active-loans', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardController_1.default.getActiveLoans);
 // ============ Layout CRUD ============
 router.get('/layout/active', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardLayoutController_1.default.getActiveLayout);
-router.post('/layout', (0, requirePermission_1.requirePermission)('dashboard', 'create'), dashboardLayoutController_1.default.createLayout);
-router.put('/layout/:id', (0, requirePermission_1.requirePermission)('dashboard', 'update'), dashboardLayoutController_1.default.updateLayout);
-router.patch('/layout/:id/rename', (0, requirePermission_1.requirePermission)('dashboard', 'update'), dashboardLayoutController_1.default.renameLayout);
+router.post('/layout', (0, requirePermission_1.requirePermission)('dashboard', 'create'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.dashboardLayoutCreate), dashboardLayoutController_1.default.createLayout);
+router.put('/layout/:id', (0, requirePermission_1.requirePermission)('dashboard', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), dashboardLayoutController_1.default.updateLayout);
+router.patch('/layout/:id/rename', (0, requirePermission_1.requirePermission)('dashboard', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.dashboardLayoutRename), dashboardLayoutController_1.default.renameLayout);
 router.delete('/layout/:id', (0, requirePermission_1.requirePermission)('dashboard', 'delete'), dashboardLayoutController_1.default.deleteLayout);
 router.get('/layouts', (0, requirePermission_1.requirePermission)('dashboard', 'read'), dashboardLayoutController_1.default.listLayouts);
-router.put('/layout/:id/activate', (0, requirePermission_1.requirePermission)('dashboard', 'update'), dashboardLayoutController_1.default.setActiveLayout);
-router.post('/layout/duplicate', (0, requirePermission_1.requirePermission)('dashboard', 'create'), dashboardLayoutController_1.default.duplicateLayout);
+router.put('/layout/:id/activate', (0, requirePermission_1.requirePermission)('dashboard', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), dashboardLayoutController_1.default.setActiveLayout);
+router.post('/layout/duplicate', (0, requirePermission_1.requirePermission)('dashboard', 'create'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), dashboardLayoutController_1.default.duplicateLayout);
 exports.default = router;

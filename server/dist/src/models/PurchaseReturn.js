@@ -229,10 +229,10 @@ class PurchaseReturnModel {
             const headerResult = db.prepare(`
         INSERT INTO purchase_returns (
           return_no, return_date, return_type, source_type, source_id,
-          source_no, warehouse_id, reason, status, total_qty, total_amount,
+          source_no, warehouse_id, reason, disposition, status, total_qty, total_amount,
           created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'POSTED', ?, ?, ?)
-      `).run(returnNo, data.return_date, data.source_type === 'PURCHASE' ? 'PURCHASE_RETURN' : 'PO_RETURN', data.source_type, data.source_id, this.resolveSourceNo(data.source_type, data.source_id, db), data.warehouse_id, data.reason || null, totalQty, totalAmount, userId);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'POSTED', ?, ?, ?)
+      `).run(returnNo, data.return_date, data.source_type === 'PURCHASE' ? 'PURCHASE_RETURN' : 'PO_RETURN', data.source_type, data.source_id, this.resolveSourceNo(data.source_type, data.source_id, db), data.warehouse_id, data.reason || null, data.disposition || null, totalQty, totalAmount, userId);
             const returnId = headerResult.lastInsertRowid;
             const insertLine = db.prepare(`
         INSERT INTO purchase_return_items (
@@ -478,9 +478,9 @@ class PurchaseReturnModel {
         const result = db.prepare(`
       INSERT INTO credit_notes (
         credit_no, credit_date, supplier_id, source_type, source_id,
-        amount, status, posted_by
-      ) VALUES (?, ?, ?, 'PURCHASE_RETURN', ?, ?, 'POSTED', ?)
-    `).run(creditNo, creditDate, supplierId, returnId, totalAmount, userId);
+        amount, status, posted_by, disposition
+      ) VALUES (?, ?, ?, 'PURCHASE_RETURN', ?, ?, 'POSTED', ?, ?)
+    `).run(creditNo, creditDate, supplierId, returnId, totalAmount, userId, data.disposition || 'credit_on_account');
         const creditNoteId = result.lastInsertRowid;
         SupplierLedger_1.default.createEntry({
             supplier_id: supplierId,

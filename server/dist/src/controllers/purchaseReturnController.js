@@ -89,6 +89,7 @@ function createPurchaseReturn(req, res) {
             source_id: body.source_id,
             warehouse_id: body.warehouse_id,
             reason: body.reason,
+            disposition: body.disposition,
             items: body.items,
         }, req.user.id, database_1.default);
         res.status(201).json({

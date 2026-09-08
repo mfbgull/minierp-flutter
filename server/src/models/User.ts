@@ -64,6 +64,22 @@ class UserModel {
     return db.prepare('SELECT id, password_hash FROM users WHERE id = ?').get(id) as { id: number; password_hash: string } | undefined;
   }
 
+  /** Returns the granted (module, action) pairs for the user's role_id. */
+  static getPermissionsByRoleId(roleId: number | null, db: Database.Database): Array<{ module: string; action: string }> {
+    if (!roleId) return [];
+    return db.prepare(`
+      SELECT p.module, p.action
+      FROM permissions p
+      JOIN role_permissions rp ON rp.permission_id = p.id
+      WHERE rp.role_id = ?
+    `).all(roleId) as Array<{ module: string; action: string }>;
+  }
+
+  /** Returns ALL permissions (admin bypass — every module:action pair). */
+  static getAllPermissions(db: Database.Database): Array<{ module: string; action: string }> {
+    return db.prepare('SELECT module, action FROM permissions').all() as Array<{ module: string; action: string }>;
+  }
+
   static updatePassword(id: number, hash: string, db: Database.Database): void {
     db.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(hash, id);
   }

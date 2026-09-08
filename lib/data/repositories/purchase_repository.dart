@@ -167,6 +167,7 @@ class PurchaseRepository {
     required int sourceId,
     required int warehouseId,
     String? reason,
+    String? disposition,
     required List<({int sourceItemId, num quantity})> items,
   }) => _api.post(
     ApiEndpoints.purchaseReturns,
@@ -176,6 +177,7 @@ class PurchaseRepository {
       'source_id': sourceId,
       'warehouse_id': warehouseId,
       if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      'disposition': ?disposition,
       'items': [
         for (final line in items)
           {'source_item_id': line.sourceItemId, 'quantity': line.quantity},
@@ -203,6 +205,35 @@ class PurchaseRepository {
     body: {'reason': reason.trim()},
     parse: (Object? json) =>
         PurchaseReturn.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// Refundable balance of a credit note (`GET
+  /// /supplier-refunds/credit-notes/:id/refundable`) — what's left of the
+  /// note after already-issued refunds.
+  Future<ApiResult<num>> creditNoteRefundable(int creditNoteId) => _api.getRaw(
+    '${ApiEndpoints.supplierRefunds}/credit-notes/$creditNoteId/refundable',
+    parse: (Object? json) =>
+        (json! as Map<String, dynamic>)['refundable'] as num? ?? 0,
+  );
+
+  /// Issue a supplier refund (cash payout against a credit note,
+  /// `POST /supplier-refunds`) — enveloped `{success, message, data}`.
+  Future<ApiResult<Map<String, dynamic>>> createRefund({
+    required String refundDate,
+    required int creditNoteId,
+    required num amount,
+    String? paymentMethod,
+    String? referenceNo,
+  }) => _api.postEnvelope<Map<String, dynamic>>(
+    ApiEndpoints.supplierRefunds,
+    body: {
+      'refund_date': refundDate,
+      'credit_note_id': creditNoteId,
+      'amount': amount,
+      'payment_method': ?paymentMethod,
+      'reference_no': ?referenceNo,
+    },
+    parse: (json) => json,
   );
 
   /// Void a direct purchase (PUR-03) — enveloped `{success, message}` with

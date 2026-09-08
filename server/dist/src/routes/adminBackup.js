@@ -23,6 +23,7 @@ const path_1 = __importDefault(require("path"));
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const requirePermission_1 = require("../middleware/requirePermission");
+const validation_1 = require("../middleware/validation");
 const backupService_1 = require("../services/backupService");
 const activityLogger_1 = require("../services/activityLogger");
 const logger_1 = __importDefault(require("../utils/logger"));
@@ -63,7 +64,7 @@ router.get('/backup', (0, requirePermission_1.requirePermission)('admin', 'read'
  * activity trail. 202-style long jobs are unnecessary — VACUUM INTO on
  * this database size completes within a request.
  */
-router.post('/backup', (0, requirePermission_1.requirePermission)('admin', 'create'), (req, res) => {
+router.post('/backup', (0, requirePermission_1.requirePermission)('admin', 'create'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), (req, res) => {
     try {
         const target = (0, backupService_1.runBackup)({ trigger: 'manual', userId: req.user?.id ?? null });
         if (!target) {

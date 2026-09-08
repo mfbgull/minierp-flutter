@@ -200,6 +200,13 @@ export const zodBodySchemas = {
     warehouse_id: z.union([z.number(), z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
   }).passthrough(),
 
+  // Supplier refunds (cash payout against a credit note)
+  supplierRefundCreate: z.object({
+    refund_date: z.string().min(1),
+    credit_note_id: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+    amount: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+  }).passthrough(),
+
   // Mobile invoices (drafts are flexible; submit mirrors invoiceCreate).
   // Drafts POST/PUT may ship an empty body — optional like [object].
   mobileDraft: z.object({}).passthrough().optional(),

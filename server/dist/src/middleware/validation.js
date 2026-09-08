@@ -63,9 +63,12 @@ exports.zodSchemas = {
  * presence, status transitions) and their error messages.
  */
 exports.zodBodySchemas = {
-    // Shape-only: the body must be a JSON object. Used for complex/partial
-    // update bodies whose business validation lives in the controller.
-    object: zod_1.z.object({}).passthrough(),
+    // Shape-only: the body must be a JSON object when present. Used for
+    // complex/partial update bodies whose business validation lives in the
+    // controller. Bodies are OPTIONAL here — express.json() leaves
+    // `req.body` undefined on empty POST/PUTs (e.g. POST /admin/backup),
+    // and Zod would otherwise 400 every bodyless action.
+    object: zod_1.z.object({}).passthrough().optional(),
     login: zod_1.z.object({
         username: zod_1.z.string().min(1),
         password: zod_1.z.string().min(1),
@@ -114,6 +117,139 @@ exports.zodBodySchemas = {
         password: zod_1.z.string().min(1),
         full_name: zod_1.z.string().min(1),
         role_id: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]),
+    }).passthrough(),
+    // ------------------------------------------------------------------
+    // Secondary routers (spec 2.3 — phase-2 completion). Same policy as
+    // above: shape-only guards on identity fields; controllers keep the
+    // deep business rules (allocation math, transition tables, ledger
+    // side effects).
+    // ------------------------------------------------------------------
+    // Purchase orders
+    poCreate: zod_1.z.object({
+        supplier_id: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
+        po_date: zod_1.z.string().min(1),
+        items: zod_1.z.array(zod_1.z.any()).min(1),
+    }).passthrough(),
+    poStatus: zod_1.z.object({
+        status: zod_1.z.enum(['Draft', 'Submitted', 'Partially Received', 'Completed', 'Cancelled']),
+    }).passthrough(),
+    goodsReceipt: zod_1.z.object({
+        receipt_date: zod_1.z.string().min(1),
+        warehouse_id: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
+        items: zod_1.z.array(zod_1.z.any()).min(1),
+    }).passthrough(),
+    // BOM
+    bomCreate: zod_1.z.object({
+        finished_item_id: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
+        quantity: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+        bom_name: zod_1.z.string().min(1),
+        items: zod_1.z.array(zod_1.z.any()).min(1),
+    }).passthrough(),
+    // POS
+    posSale: zod_1.z.object({
+        warehouse_id: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
+        items: zod_1.z.array(zod_1.z.any()).min(1),
+    }).passthrough(),
+    // Production
+    productionCreate: zod_1.z.object({
+        output_item_id: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
+        output_quantity: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+        warehouse_id: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
+        production_date: zod_1.z.string().min(1),
+        input_items: zod_1.z.array(zod_1.z.any()).min(1),
+    }).passthrough(),
+    // Quotations / sales orders
+    quotationCreate: zod_1.z.object({
+        customer_id: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
+        quotation_date: zod_1.z.string().min(1),
+        items: zod_1.z.array(zod_1.z.any()).min(1),
+    }).passthrough(),
+    // Purchase returns
+    purchaseReturnCreate: zod_1.z.object({
+        return_date: zod_1.z.string().min(1),
+        source_type: zod_1.z.enum(['PURCHASE', 'PURCHASE_ORDER']),
+        source_id: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+        warehouse_id: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
+    }).passthrough(),
+    // Supplier refunds (cash payout against a credit note)
+    supplierRefundCreate: zod_1.z.object({
+        refund_date: zod_1.z.string().min(1),
+        credit_note_id: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+        amount: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+    }).passthrough(),
+    // Mobile invoices (drafts are flexible; submit mirrors invoiceCreate).
+    // Drafts POST/PUT may ship an empty body — optional like [object].
+    mobileDraft: zod_1.z.object({}).passthrough().optional(),
+    mobileSubmit: zod_1.z.object({
+        customer_id: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
+        invoice_date: zod_1.z.string().min(1),
+        items: zod_1.z.array(zod_1.z.any()).min(1),
+    }).passthrough(),
+    // Owner equity
+    ownerCapital: zod_1.z.object({
+        capital_date: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        amount: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+    }).passthrough(),
+    ownerWithdrawal: zod_1.z.object({
+        withdrawal_date: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        kind: zod_1.z.enum(['cash', 'goods']),
+    }).passthrough(),
+    // Quote may be called with an empty/absent items array — the
+    // controller's validateItemLines only errors for goods withdrawals.
+    ownerWithdrawalQuote: zod_1.z.object({
+        items: zod_1.z.array(zod_1.z.any()).optional(),
+    }).passthrough(),
+    personalLoanCreate: zod_1.z.object({
+        borrower_name: zod_1.z.string().min(1),
+        amount: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+        loan_date: zod_1.z.string().min(1),
+    }).passthrough(),
+    repaymentCreate: zod_1.z.object({
+        amount: zod_1.z.union([zod_1.z.number(), zod_1.z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+        payment_date: zod_1.z.string().min(1),
+    }).passthrough(),
+    // Dashboard
+    cashOpeningBalances: zod_1.z.object({
+        accounts: zod_1.z.array(zod_1.z.object({
+            key: zod_1.z.string().min(1),
+            amount: zod_1.z.number(),
+        })).min(1),
+    }).passthrough(),
+    dashboardLayoutCreate: zod_1.z.object({}).passthrough().optional(),
+    dashboardLayoutRename: zod_1.z.object({
+        layout_name: zod_1.z.string().min(1),
+    }).passthrough(),
+    // Custom reports
+    reportCreate: zod_1.z.object({
+        name: zod_1.z.string().min(1),
+    }).passthrough(),
+    // Settings / preferences / integrations
+    settingUpdate: zod_1.z.object({
+        value: zod_1.z.unknown().refine(v => v !== undefined && v !== null && v !== '', { message: 'Value is required' }),
+    }).passthrough(),
+    settingsBulk: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()),
+    preferencesUpdate: zod_1.z.object({}).passthrough().optional(),
+    integrationSettings: zod_1.z.object({}).passthrough().optional(),
+    // Forecasts
+    forecastOverride: zod_1.z.object({}).passthrough().optional(),
+    seasonalEvent: zod_1.z.object({}).passthrough().optional(),
+    modelConfig: zod_1.z.object({}).passthrough().optional(),
+    // Activity log cleanup
+    cleanupLogs: zod_1.z.object({
+        days: zod_1.z.union([zod_1.z.string().regex(/^\d+$/), zod_1.z.number()]).optional(),
+    }).passthrough(),
+    // Stock batches (partial PATCH bodies)
+    batchExpiry: zod_1.z.object({
+        expiry_date: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    }).passthrough(),
+    batchHalt: zod_1.z.object({
+        reason: zod_1.z.string().max(500).optional(),
+    }).passthrough(),
+    // Accounting periods
+    periodOpen: zod_1.z.object({
+        period_name: zod_1.z.string().min(1),
+        start_date: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        end_date: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     }).passthrough(),
 };
 /**

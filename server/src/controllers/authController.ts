@@ -88,7 +88,16 @@ function getCurrentUser(req: AuthRequest, res: Response): void {
   try {
     const user = UserModel.getById(req.user!.id, db);
     if (!user) { sendNotFound(res, 'User'); return; }
-    sendSuccess(res, user);
+
+    // D12: include the user's granted (module, action) pairs so the
+    // client can hide buttons it lacks permission for. Admin gets all.
+    const isAdmin = user.role === 'admin';
+    const roleId = UserModel.getRoleId(db, user.id);
+    const permissions = isAdmin
+      ? UserModel.getAllPermissions(db)
+      : UserModel.getPermissionsByRoleId(roleId, db);
+
+    sendSuccess(res, { ...user, permissions });
   } catch (error) {
     logger.error('Get current user error:', error);
     sendInternalError(res, 'Failed to get user info');

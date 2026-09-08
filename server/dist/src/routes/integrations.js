@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const requirePermission_1 = require("../middleware/requirePermission");
+const validation_1 = require("../middleware/validation");
 const settingsController_1 = __importDefault(require("../controllers/settingsController"));
 const logger_1 = __importDefault(require("../utils/logger"));
 const router = (0, express_1.Router)();
@@ -21,7 +22,7 @@ router.get('/settings', (0, requirePermission_1.requirePermission)('integrations
         res.status(500).json({ error: 'Failed to fetch integration settings' });
     }
 });
-router.put('/settings/:service', (0, requirePermission_1.requirePermission)('integrations', 'update'), (req, res) => {
+router.put('/settings/:service', (0, requirePermission_1.requirePermission)('integrations', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.integrationSettings), (req, res) => {
     try {
         const { service } = req.params;
         const serviceKey = typeof service === 'string' ? service : service[0];

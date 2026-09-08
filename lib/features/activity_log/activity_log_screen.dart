@@ -53,6 +53,20 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen>
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final search = ref.read(activityLogSearchProvider);
+    final entityType = ref.read(activityLogEntityTypeProvider);
+    final action = ref.read(activityLogActionProvider);
+    final userId = ref.read(activityLogUserIdProvider);
+    final from = ref.read(activityLogFromDateProvider);
+    final to = ref.read(activityLogToDateProvider);
+    return '$search|$entityType|$action|$userId|$from|$to';
+  }
+
+  @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
@@ -97,6 +111,20 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen>
     if (ref.read(activityLogPageProvider) != 1) {
       ref.read(activityLogPageProvider.notifier).state = 1;
     }
+  }
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final allLogs = _filteredRows;
+    final selected = [for (final log in allLogs) if (ids.contains(log.id)) log];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('activity-logs'),
+      csv: buildActivityLogCsv(l10n, selected),
+      successMessage: l10n.activitylogExported,
+      errorMessage: l10n.activitylogExportfailed,
+    );
   }
 
   /// The provider yields an `OffsetPagedResponse` envelope — unwrap the
@@ -265,6 +293,25 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen>
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: _toolbar(l10n, logs),
+        ),
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              actions: [
+                if (user?.hasPermission('activity_log', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+              ],
+            );
+          },
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),

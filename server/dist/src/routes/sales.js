@@ -9,6 +9,7 @@ const auth_1 = require("../middleware/auth");
 const requirePermission_1 = require("../middleware/requirePermission");
 const salesController_1 = __importDefault(require("../controllers/salesController"));
 const rateLimiter_1 = require("../middleware/rateLimiter");
+const validation_1 = require("../middleware/validation");
 // SHORTCOMINGS-FIX 2.4: this file was a single router embedding three
 // module prefixes (/quotations, /sales-orders, /sales). It is split into
 // one router per namespace, each mounted with an explicit `/api/<module>`
@@ -17,17 +18,17 @@ const router = express_1.default.Router();
 router.use(auth_1.authenticateToken);
 // ============ Quotations Routes (mounted at /api/quotations) ============
 // POST /api/quotations - Create new quotation
-router.post('/', (0, requirePermission_1.requirePermission)('quotations', 'create'), salesController_1.default.createQuotation);
+router.post('/', (0, requirePermission_1.requirePermission)('quotations', 'create'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.quotationCreate), salesController_1.default.createQuotation);
 // GET /api/quotations - Get all quotations with filters
 router.get('/', (0, requirePermission_1.requirePermission)('quotations', 'read'), salesController_1.default.getQuotations);
 // GET /api/quotations/:id - Get single quotation
 router.get('/:id', (0, requirePermission_1.requirePermission)('quotations', 'read'), salesController_1.default.getQuotation);
 // PUT /api/quotations/:id - Update quotation
-router.put('/:id', (0, requirePermission_1.requirePermission)('quotations', 'update'), salesController_1.default.updateQuotation);
+router.put('/:id', (0, requirePermission_1.requirePermission)('quotations', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), salesController_1.default.updateQuotation);
 // DELETE /api/quotations/:id - Delete quotation
 router.delete('/:id', (0, requirePermission_1.requirePermission)('quotations', 'delete'), rateLimiter_1.sensitiveOperationLimiter, salesController_1.default.deleteQuotation);
 // POST /api/quotations/:id/convert - Convert quotation to sales order
-router.post('/:id/convert', (0, requirePermission_1.requirePermission)('quotations', 'update'), salesController_1.default.convertQuotationToSalesOrder);
+router.post('/:id/convert', (0, requirePermission_1.requirePermission)('quotations', 'update'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), salesController_1.default.convertQuotationToSalesOrder);
 // GET /api/quotations/:id/cycle-chain - Get sales cycle chain for quotation
 router.get('/:id/cycle-chain', (0, requirePermission_1.requirePermission)('quotations', 'read'), salesController_1.default.getQuotationCycleChain);
 // GET /api/quotations/:id/invoices - Get invoices for quotation (via SO or direct)

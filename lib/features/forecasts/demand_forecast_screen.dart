@@ -16,11 +16,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart';
+import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
+import '../../widgets/screen_toolbar.dart';
 import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show allItemsProvider;
 import '../inventory/item_detail_dialog.dart' show showItemDetailDialog;
@@ -43,6 +46,16 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final search = ref.read(forecastDemandSearchProvider);
+    final filters = ref.read(forecastDemandFiltersProvider);
+    return '$search|${filters.category}|${filters.trend}|${filters.recommendation}';
+  }
+
+  @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
@@ -59,6 +72,24 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
         ref.read(forecastDemandPageProvider.notifier).state = 1;
       }
     });
+  }
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final rows = ref.read(forecastDemandProvider).valueOrNull?.items ??
+        const <ForecastDemand>[];
+    final selected = [
+      for (final f in rows)
+        if (ids.contains(f.itemId)) f,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('demand-forecast'),
+      csv: buildDemandForecastCsv(l10n, selected),
+      successMessage: l10n.bulkExportSelected,
+      errorMessage: l10n.bulkDeleteFailed,
+    );
   }
 
   /// The demand provider returns a `PagedResponse` envelope — unwrap the
@@ -280,6 +311,25 @@ class _DemandForecastScreenState extends ConsumerState<DemandForecastScreen>
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: _filterBar(l10n, filters, mobile),
+            ),
+            ValueListenableBuilder<Set<int>>(
+              valueListenable: bulkSelection.selected,
+              builder: (context, sel, _) {
+                if (sel.isEmpty) return const SizedBox.shrink();
+                final user = ref.watch(authProvider).user;
+                return BulkActionBar(
+                  count: sel.length,
+                  onClearSelection: bulkSelection.clear,
+                  actions: [
+                    if (user?.hasPermission('forecasts', 'read') ?? false)
+                      TextButton.icon(
+                        onPressed: () => _bulkExport(sel),
+                        icon: const Icon(Icons.file_download_outlined, size: 18),
+                        label: Text(l10n.bulkExportSelected),
+                      ),
+                  ],
+                );
+              },
             ),
             Expanded(
               child: mobile

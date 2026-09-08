@@ -47,11 +47,18 @@ class WarehouseModel {
     return result.lastInsertRowid as number;
   }
 
-  static update(db: Database.Database, id: number, data: { warehouse_code: string; warehouse_name: string; location?: string }): void {
-    db.prepare(`
-      UPDATE warehouses SET warehouse_code = ?, warehouse_name = ?, location = ?
-      WHERE id = ?
-    `).run(data.warehouse_code, data.warehouse_name, data.location || null, id);
+  static update(db: Database.Database, id: number, data: { warehouse_code: string; warehouse_name: string; location?: string; is_active?: number }): void {
+    if (data.is_active !== undefined) {
+      db.prepare(`
+        UPDATE warehouses SET warehouse_code = ?, warehouse_name = ?, location = ?, is_active = ?
+        WHERE id = ?
+      `).run(data.warehouse_code, data.warehouse_name, data.location || null, data.is_active, id);
+    } else {
+      db.prepare(`
+        UPDATE warehouses SET warehouse_code = ?, warehouse_name = ?, location = ?
+        WHERE id = ?
+      `).run(data.warehouse_code, data.warehouse_name, data.location || null, id);
+    }
   }
 
   static delete(db: Database.Database, id: number): void {

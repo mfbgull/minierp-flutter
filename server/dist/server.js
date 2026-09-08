@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -6,7 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const app_1 = __importDefault(require("./src/app"));
-const database_1 = __importDefault(require("./src/config/database"));
+const database_1 = __importStar(require("./src/config/database"));
 const settingsController_1 = __importDefault(require("./src/controllers/settingsController"));
 const logger_1 = __importDefault(require("./src/utils/logger"));
 const activityLogger_1 = require("./src/services/activityLogger");
@@ -39,7 +72,8 @@ function gracefulExit(exitCode) {
         database_1.default.close();
         process.exit(exitCode || 1);
     }, SHUTDOWN_TIMEOUT_MS);
-    server.close(() => {
+    // Server may not be bound yet if a signal lands before the seed gate opens.
+    server?.close(() => {
         if (timedOut)
             return;
         clearTimeout(forceTimer);
@@ -61,14 +95,19 @@ function gracefulExit(exitCode) {
         }
     });
 }
-const server = app_1.default.listen(PORT, HOST, () => {
-    console.log('\n=================================');
-    console.log('🚀 Mini ERP Server Started');
-    console.log('=================================');
-    console.log(`📍 Local:    http://localhost:${PORT}`);
-    console.log(`📍 Network:  http://${getLocalIP()}:${PORT}`);
-    console.log(`🗄️  Database: SQLite (./database/erp.db)`);
-    console.log('=================================\n');
+// Async seed gate (spec 2.1): the admin user is hashed off the event
+// loop — hold the bind until the row exists so early logins can't race it.
+let server;
+void database_1.dbSeedReady.then(() => {
+    server = app_1.default.listen(PORT, HOST, () => {
+        console.log('\n=================================');
+        console.log('🚀 Mini ERP Server Started');
+        console.log('=================================');
+        console.log(`📍 Local:    http://localhost:${PORT}`);
+        console.log(`📍 Network:  http://${getLocalIP()}:${PORT}`);
+        console.log(`🗄️  Database: SQLite (./database/erp.db)`);
+        console.log('=================================\n');
+    });
 });
 function getLocalIP() {
     const { networkInterfaces } = require('os');

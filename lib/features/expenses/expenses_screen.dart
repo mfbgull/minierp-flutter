@@ -11,6 +11,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart';
+import '../../core/utils/csv_export.dart';
 import '../../data/models/expense.dart' show Expense;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
@@ -20,6 +22,7 @@ import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart'
     show autoFitPlutoColumns, plutoGridConfigurationFor, withSerialCell;
 import '../../widgets/screen_error_panel.dart';
+import '../../widgets/screen_toolbar.dart';
 import 'expense_form_dialog.dart';
 import 'expenses_grid_columns.dart';
 import 'expenses_row_actions.dart';
@@ -40,6 +43,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   PlutoGridStateManager? _stateManager;
   late List<PlutoColumn> _columns;
   bool _columnsReady = false;
+  final ValueNotifier<Set<int>> _selectedIds = ValueNotifier(const {});
 
   @override
   void didChangeDependencies() {
@@ -79,6 +83,22 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     ref.read(expensesStatusProvider.notifier).state = null;
     ref.read(expensesFromDateProvider.notifier).state = null;
     ref.read(expensesToDateProvider.notifier).state = null;
+  }
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = [
+      for (final e in _filteredRows)
+        if (ids.contains(e.id)) e,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('expenses'),
+      csv: buildExpensesCsv(l10n, selected),
+      successMessage: l10n.expensesExported,
+      errorMessage: l10n.expensesExportfailed,
+    );
   }
 
   /// Pushes the provider state into the grid manager (clear + append,
@@ -158,6 +178,31 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
             hasActiveFilters: _hasActiveFilters,
           ),
         ),
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: _selectedIds,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: () {
+                _selectedIds.value = const {};
+                for (final row in _stateManager?.rows ?? const []) {
+                  row.checked = false;
+                }
+                _stateManager?.notifyListeners();
+              },
+              actions: [
+                if (user?.hasPermission('expenses', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+              ],
+            );
+          },
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
           child: ExpensesSummaryStrip(rows: _filteredRows),
@@ -228,6 +273,16 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
             stateManager: event.stateManager,
             screenKey: 'expenses',
           );
+        },
+        onRowChecked: (event) {
+          final ids = <int>{};
+          for (final row in _stateManager?.rows ?? const []) {
+            if (row.checked) {
+              final id = row.cells['id']?.value as int?;
+              if (id != null) ids.add(id);
+            }
+          }
+          _selectedIds.value = ids;
         },
         onRowDoubleTap: (event) {
           final id = event.row.cells['id']?.value as int?;

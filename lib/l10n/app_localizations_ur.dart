@@ -1421,6 +1421,49 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesReturnreasonplaceholder => 'واپسی کی وجہ درج کریں...';
 
   @override
+  String get purchasesReturndisposition => 'تصفیہ';
+
+  @override
+  String get purchasesDispositioncredit => 'کریڈٹ اکاؤنٹ پر';
+
+  @override
+  String get purchasesDispositionrefund => 'سپلائر سے نقد واپسی';
+
+  @override
+  String get purchasesDispositionrefundhint =>
+      'کریڈٹ نوٹ ادا کرنے کے قابل ہو جائے گا — بعد میں واپسی کی تفصیل سے رقم جاری کریں۔';
+
+  @override
+  String get purchasesRefund => 'رقم واپس کریں';
+
+  @override
+  String get purchasesRefundtitle => 'سپلائر ریفنڈ';
+
+  @override
+  String get purchasesRefundsubtitle => 'کریڈٹ نوٹ کی رقم نقد ادا کریں';
+
+  @override
+  String get purchasesRefundcreditnote => 'کریڈٹ نوٹ';
+
+  @override
+  String get purchasesRefundamount => 'واپسی کی رقم';
+
+  @override
+  String get purchasesRefundmethod => 'ادائیگی کا طریقہ';
+
+  @override
+  String get purchasesRefundreference => 'حوالہ';
+
+  @override
+  String get purchasesRefundprocessed => 'رفنڈ جاری کر دیا گیا';
+
+  @override
+  String get purchasesRefundrefunded => 'واپس کر دیا گیا';
+
+  @override
+  String get purchasesRefundnone => 'ابھی کوئی ریفنڈ نہیں ہوا';
+
+  @override
   String get purchasesProcessreturn => 'واپسی پراسیس کریں';
 
   @override

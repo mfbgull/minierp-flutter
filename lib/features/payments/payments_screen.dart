@@ -11,9 +11,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart' show authProvider;
 import '../../core/theme/status_colors.dart';
+import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/unified_payment.dart' show UnifiedPayment;
+import '../../data/repositories/api_result.dart' show ApiResult;
+import '../../features/employees/employee_repository.dart' show employeeRepositoryProvider;
+import '../../data/repositories/invoice_repository.dart' show invoiceRepositoryProvider;
+import '../../data/repositories/owner_equity_repository.dart' show ownerEquityRepositoryProvider;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../features/employees/salary_pay_dialog.dart'
     show showSalaryPayDialog;
@@ -26,6 +32,7 @@ import '../../features/owner_equity/owner_withdrawal_form_dialog.dart'
 import '../../features/suppliers/supplier_payment_modal.dart'
     show showSupplierPaymentModal;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bulk_operations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
@@ -85,6 +92,26 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
     with PlutoGridScreen<UnifiedPayment, PaymentsScreen> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
+  bool _bulkBusy = false;
+
+  Map<int, UnifiedPayment> get _paymentsById => {
+    for (final p
+        in ref.read(unifiedPaymentsProvider).valueOrNull?.items ??
+            const <UnifiedPayment>[])
+      _encodeId(p.source, p.sourceId): p,
+  };
+
+  @override
+  bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final search = ref.read(unifiedPaymentsSearchProvider);
+    final type = ref.read(unifiedPaymentsTypeFilterProvider);
+    final from = ref.read(unifiedPaymentsFromDateProvider);
+    final to = ref.read(unifiedPaymentsToDateProvider);
+    return '$search|$type|$from|$to';
+  }
 
   @override
   void openRowDetail(int rowId) {
@@ -164,6 +191,172 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
         ref.read(unifiedPaymentsPageProvider.notifier).state = 1;
       }
     });
+  }
+
+  /// Delete a single payment by routing to the correct source endpoint.
+  Future<ApiResult<void>> _deletePayment(UnifiedPayment p) async {
+    switch (p.source) {
+      case 'payment':
+        return ref.read(invoiceRepositoryProvider).deletePayment(p.sourceId);
+      case 'salary':
+        return ref
+            .read(employeeRepositoryProvider)
+            .deleteSalaryPayment(p.partyId ?? 0, p.sourceId);
+      case 'owner_capital':
+        return ref.read(ownerEquityRepositoryProvider).voidCapital(p.sourceId);
+      case 'owner_withdrawal':
+        return ref
+            .read(ownerEquityRepositoryProvider)
+            .voidWithdrawal(p.sourceId);
+      default:
+        // Expenses are immutable (D20) — should not reach here.
+        throw UnsupportedError('Cannot delete ${p.source} payments');
+    }
+  }
+
+  /// Bulk delete with typed `DELETE` confirm (D23) for the unified
+  /// payments view. Routes each payment to its source-specific endpoint.
+  /// Expenses are skipped (immutable, D20).
+  Future<void> _bulkDelete(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await _showTypedDeleteConfirm(
+      context,
+      count: ids.length,
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _bulkBusy = true);
+    final succeeded = <int>[];
+    final failures = <BulkFailure>[];
+    for (final encodedId in ids) {
+      final payment = _paymentsById[encodedId];
+      if (payment == null) {
+        failures.add(BulkFailure(label: '#$encodedId', reason: 'Not found'));
+        continue;
+      }
+      if (payment.source == 'expense') {
+        failures.add(
+          BulkFailure(
+            label: payment.refNo.isNotEmpty ? payment.refNo : '#${payment.sourceId}',
+            reason: 'Expenses are immutable',
+          ),
+        );
+        continue;
+      }
+      try {
+        final result = await _deletePayment(payment);
+        result.fold(
+          onSuccess: (_) => succeeded.add(encodedId),
+          onFailure: (error) => failures.add(
+            BulkFailure(
+              label: payment.refNo.isNotEmpty ? payment.refNo : '#${payment.sourceId}',
+              reason: error.message,
+            ),
+          ),
+        );
+      } catch (e) {
+        failures.add(
+          BulkFailure(
+            label: payment.refNo.isNotEmpty ? payment.refNo : '#${payment.sourceId}',
+            reason: e.toString(),
+          ),
+        );
+      }
+    }
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+
+    final result = BulkOperationResult(
+      succeeded: succeeded,
+      failures: failures,
+    );
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: l10n.bulkDeleted,
+      onComplete: () => ref.invalidate(unifiedPaymentsProvider),
+    );
+  }
+
+  /// D23 typed confirm — the user must type `DELETE` before the button
+  /// enables. Expenses are also listed as excluded in the message.
+  Future<bool> _showTypedDeleteConfirm(
+    BuildContext context, {
+    required int count,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    final controller = TextEditingController();
+    var typed = false;
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(l10n.commonDelete),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${l10n.bulkDeleteSelected} ($count)?'),
+              const SizedBox(height: 4),
+              Text(
+                'Expenses are immutable and will be skipped.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Type DELETE to confirm',
+                ),
+                onChanged: (v) {
+                  final matches = v == 'DELETE';
+                  if (matches != typed) {
+                    typed = matches;
+                    setDialogState(() {});
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l10n.commonCancel),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              ),
+              onPressed: typed
+                  ? () => Navigator.of(dialogContext).pop(true)
+                  : null,
+              child: Text(l10n.commonDelete),
+            ),
+          ],
+        ),
+      ),
+    ).then((v) => v ?? false);
+  }
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = [
+      for (final p in _paymentsById.values)
+        if (ids.contains(_encodeId(p.source, p.sourceId))) p,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('payments'),
+      csv: buildPaymentsCsv(l10n, selected),
+      successMessage: l10n.bulkExportSelected,
+      errorMessage: l10n.bulkDeleteFailed,
+    );
   }
 
   /// Grid field → server sort column (whitelist in
@@ -290,6 +483,35 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
               ),
             ),
           ],
+        ),
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              busy: _bulkBusy,
+              actions: [
+                if (user?.hasPermission('payments', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+                if (user?.hasPermission('payments', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkDelete(sel),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(l10n.bulkDeleteSelected),
+                  ),
+              ],
+            );
+          },
         ),
         _TypeFilterChips(l10n: l10n, ref: ref),
         Expanded(child: gridScreenBody(payments, provider: unifiedPaymentsProvider)),

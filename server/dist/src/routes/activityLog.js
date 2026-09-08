@@ -10,6 +10,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const requirePermission_1 = require("../middleware/requirePermission");
+const validation_1 = require("../middleware/validation");
 const activityLogController_1 = __importDefault(require("../controllers/activityLogController"));
 const router = (0, express_1.Router)();
 // All routes require authentication
@@ -33,5 +34,5 @@ router.get('/entity/:type/:id', (0, requirePermission_1.requirePermission)('acti
 // Export activity logs to CSV
 router.get('/export', (0, requirePermission_1.requirePermission)('activity_log', 'read'), activityLogController_1.default.exportLogs);
 // Cleanup old logs (admin only)
-router.post('/cleanup', (0, requirePermission_1.requirePermission)('activity_log', 'purge'), activityLogController_1.default.cleanupLogs);
+router.post('/cleanup', (0, requirePermission_1.requirePermission)('activity_log', 'purge'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.cleanupLogs), activityLogController_1.default.cleanupLogs);
 exports.default = router;
