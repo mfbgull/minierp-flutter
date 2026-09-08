@@ -16,6 +16,21 @@ class UserModel {
     static getPasswordHash(id, db) {
         return db.prepare('SELECT id, password_hash FROM users WHERE id = ?').get(id);
     }
+    /** Returns the granted (module, action) pairs for the user's role_id. */
+    static getPermissionsByRoleId(roleId, db) {
+        if (!roleId)
+            return [];
+        return db.prepare(`
+      SELECT p.module, p.action
+      FROM permissions p
+      JOIN role_permissions rp ON rp.permission_id = p.id
+      WHERE rp.role_id = ?
+    `).all(roleId);
+    }
+    /** Returns ALL permissions (admin bypass — every module:action pair). */
+    static getAllPermissions(db) {
+        return db.prepare('SELECT module, action FROM permissions').all();
+    }
     static updatePassword(id, hash, db) {
         db.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(hash, id);
     }

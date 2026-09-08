@@ -92,7 +92,14 @@ function getCurrentUser(req, res) {
             (0, apiResponse_1.sendNotFound)(res, 'User');
             return;
         }
-        (0, apiResponse_1.sendSuccess)(res, user);
+        // D12: include the user's granted (module, action) pairs so the
+        // client can hide buttons it lacks permission for. Admin gets all.
+        const isAdmin = user.role === 'admin';
+        const roleId = User_1.default.getRoleId(database_1.default, user.id);
+        const permissions = isAdmin
+            ? User_1.default.getAllPermissions(database_1.default)
+            : User_1.default.getPermissionsByRoleId(roleId, database_1.default);
+        (0, apiResponse_1.sendSuccess)(res, { ...user, permissions });
     }
     catch (error) {
         logger_1.default.error('Get current user error:', error);

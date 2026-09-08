@@ -34,7 +34,7 @@ function getUser(req, res) {
         res.status(500).json({ error: 'Failed to fetch user' });
     }
 }
-function createUser(req, res) {
+async function createUser(req, res) {
     try {
         const { username, email, password, full_name, role_id, is_active = true } = req.body;
         if (!username || !email || !password || !full_name || !role_id) {
@@ -57,7 +57,8 @@ function createUser(req, res) {
             res.status(400).json({ error: 'Password must be at least 6 characters long' });
             return;
         }
-        const passwordHash = bcrypt_1.default.hashSync(password, 12);
+        // Async bcrypt (spec 2.1) — hashSync blocked the event loop ~300ms.
+        const passwordHash = await bcrypt_1.default.hash(password, 12);
         const userId = User_1.default.create(database_1.default, { username, email, password_hash: passwordHash, full_name, role_id, is_active });
         (0, activityLogger_1.log)({ userId: req.user.id, action: 'USER_CREATE', entityType: 'User', description: `User ${username} created by ${req.user.username}`, metadata: { username, email, role_id }, ipAddress: String(req.ip || '') });
         req.activityLogged = true;
@@ -143,7 +144,7 @@ function deleteUser(req, res) {
         res.status(500).json({ error: 'Failed to delete user' });
     }
 }
-function resetPassword(req, res) {
+async function resetPassword(req, res) {
     try {
         const userId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
         const { newPassword } = req.body;
@@ -160,7 +161,8 @@ function resetPassword(req, res) {
             res.status(404).json({ error: 'User not found' });
             return;
         }
-        const passwordHash = bcrypt_1.default.hashSync(newPassword, 12);
+        // Async bcrypt (spec 2.1) — hashSync blocked the event loop ~300ms.
+        const passwordHash = await bcrypt_1.default.hash(newPassword, 12);
         User_1.default.updatePassword(userId, passwordHash, database_1.default);
         (0, activityLogger_1.logAuth)(activityLogger_1.ActionType.PASSWORD_CHANGE, req.user.id, `Password reset for user ${existingUser.username} by ${req.user.username}`, { userId, username: existingUser.username }, String(req.ip || ''));
         req.activityLogged = true;

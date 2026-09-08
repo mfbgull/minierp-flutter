@@ -1561,6 +1561,11 @@ runLedgered('fn.backfillPaymentsPurchaseOrderId', backfillPaymentsPurchaseOrderI
 // (PUR-03) — voided_at/by/reason, no more hard deletes.
 runLedgered('add-purchase-void-columns.sql');
 runLedgered('add-purchase-return-batches.sql');
+// refund-expected-cash: disposition columns + supplier_refunds table.
+// Guarded ALTERs — only applies the SQL when the columns/table are missing
+// (the runLedgered checksum covers first-time databases; this keeps partial
+// states repairable like the runPurchaseReturnsTablesMigration recovery).
+runLedgered('fn.runDispositionAndSupplierRefundsMigration', runDispositionAndSupplierRefundsMigration);
 runLedgered('seed-expense-sequence.sql');
 // One-time data backfills (audit-remediation 3.2/3.3) — ledgered so they run
 // exactly once per database, never again on reboot.
@@ -1611,6 +1616,11 @@ runLedgered('fn.verifyOwnerEquityAccounts', () => {
   }
 });
 
+// Ensure dbSeedReady resolves on every boot — createDefaultUser() is
+// only called from initializeDatabase(), which runLedgered() skips on
+// existing databases (already recorded in schema_migrations).
+createDefaultUser();
+
 // Rollback support: run if --rollback flag is passed
 if (process.argv.includes('--rollback')) {
   const targetMigration = process.argv.find(arg => arg.startsWith('--rollback='));
@@ -1623,6 +1633,28 @@ if (process.argv.includes('--rollback')) {
 }
 
 export default db;
+
+// refund-expected-cash: apply the disposition + supplier_refunds migration.
+// The SQL file's ALTERs are not idempotent on partial DBs, so apply it only
+// when the disposition column is missing (mirrors runGLFoundationMigration's
+// read-file pattern with a table/column guard).
+function runDispositionAndSupplierRefundsMigration(): void {
+  try {
+    const hasDisposition = db.prepare(
+      `SELECT COUNT(*) as count FROM pragma_table_info('purchase_returns') WHERE name='disposition'`
+    ).get() as { count: number };
+    if (hasDisposition.count > 0) return; // already applied
+
+    const migrationSQL = fs.readFileSync(
+      path.join(MIGRATIONS_DIR, 'add-disposition-and-supplier-refunds.sql'),
+      'utf8'
+    );
+    db.exec(migrationSQL);
+    logger.info('✅ disposition + supplier_refunds migration applied');
+  } catch (error: any) {
+    throw new Error('disposition + supplier_refunds migration error:: ' + error.message, { cause: error });
+  }
+}
 
 function runProductionBOMIdMigration(): void {
   try {
@@ -1764,6 +1796,11 @@ function seedDefaultPermissions(): void {
       { name: 'purchase_returns:read', module: 'purchase_returns', action: 'read', description: 'View purchase returns' },
       { name: 'purchase_returns:create', module: 'purchase_returns', action: 'create', description: 'Create purchase returns' },
       { name: 'purchase_returns:void', module: 'purchase_returns', action: 'void', description: 'Void purchase returns' },
+
+      // Supplier Refunds
+      { name: 'supplier_refunds:read', module: 'supplier_refunds', action: 'read', description: 'View supplier refunds' },
+      { name: 'supplier_refunds:create', module: 'supplier_refunds', action: 'create', description: 'Issue supplier refunds' },
+      { name: 'supplier_refunds:void', module: 'supplier_refunds', action: 'void', description: 'Void supplier refunds' },
 
       // Expenses
       { name: 'expenses:read', module: 'expenses', action: 'read', description: 'View expenses' },

@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart' show authProvider;
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/po_status.dart';
@@ -128,6 +129,14 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
   /// (SHORTCOMINGS-FIX 4.4): bulk status change over the selected POs.
   @override
   bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final search = ref.read(purchaseOrdersSearchProvider);
+    final from = ref.read(purchaseOrdersFromDateProvider);
+    final to = ref.read(purchaseOrdersToDateProvider);
+    return '$search|$from|$to';
+  }
 
   /// Bulk workflow-status change (SHORTCOMINGS-FIX 4.4). Runs the
   /// per-PO `POST /purchase-orders/:id/status` for every selected row —
@@ -377,30 +386,34 @@ class _PurchaseOrdersScreenState extends ConsumerState<PurchaseOrdersScreen>
           valueListenable: bulkSelection.selected,
           builder: (context, sel, _) {
             if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
             return BulkActionBar(
               count: sel.length,
               onClearSelection: bulkSelection.clear,
               busy: _bulkBusy,
               actions: [
-                TextButton.icon(
-                  onPressed: () => _bulkExport(sel),
-                  icon: const Icon(Icons.file_download_outlined, size: 18),
-                  label: Text(l10n.bulkExportSelected),
-                ),
-                TextButton.icon(
-                  onPressed: () => _showBulkStatusMenu(sel),
-                  icon: const Icon(Icons.published_with_changes_outlined,
-                      size: 18),
-                  label: Text(l10n.bulkSetStatus),
-                ),
-                TextButton.icon(
-                  onPressed: () => _bulkDelete(sel),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
+                if (user?.hasPermission('purchase_orders', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
                   ),
-                  label: Text(l10n.bulkDeleteSelected),
-                ),
+                if (user?.hasPermission('purchase_orders', 'update') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _showBulkStatusMenu(sel),
+                    icon: const Icon(Icons.published_with_changes_outlined,
+                        size: 18),
+                    label: Text(l10n.bulkSetStatus),
+                  ),
+                if (user?.hasPermission('purchase_orders', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkDelete(sel),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(l10n.bulkDeleteSelected),
+                  ),
               ],
             );
           },

@@ -27,6 +27,7 @@ function createFixture(): Database.Database {
     'add-purchase-supplier-payment.sql',
     'add-purchase-returns-tables.sql',
     'add-purchase-return-batches.sql',
+    'add-disposition-and-supplier-refunds.sql',
     'create-customer-ledger.sql',
     'add-gl-void-attribution.sql',
   ];

@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import StockMovementModel from './StockMovement';
 import SupplierLedgerModel from './SupplierLedger';
+import SupplierRefundModel from './SupplierRefund';
 import AccountingService from '../services/accountingService';
 import logger from '../utils/logger';
 import { generateDocNo } from '../utils/sequence';
@@ -377,9 +378,9 @@ class PurchaseReturnModel {
       const headerResult = db.prepare(`
         INSERT INTO purchase_returns (
           return_no, return_date, return_type, source_type, source_id,
-          source_no, warehouse_id, reason, status, total_qty, total_amount,
+          source_no, warehouse_id, reason, disposition, status, total_qty, total_amount,
           created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'POSTED', ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'POSTED', ?, ?, ?)
       `).run(
         returnNo,
         data.return_date,
@@ -389,6 +390,7 @@ class PurchaseReturnModel {
         this.resolveSourceNo(data.source_type, data.source_id, db),
         data.warehouse_id,
         data.reason || null,
+        data.disposition || null,
         totalQty,
         totalAmount,
         userId
@@ -510,6 +512,24 @@ class PurchaseReturnModel {
       );
 
       db.prepare('UPDATE purchase_returns SET credit_note_id = ? WHERE id = ?').run(creditNoteId, returnId);
+
+      // refund_expected: settle immediately — pay the full credit note out
+      // in cash inside the same transaction (no orphan credit-note window).
+      // The funds guard inside SupplierRefundModel.create rolls the whole
+      // return back when cash can't cover the payout.
+      if (data.disposition === 'refund_expected') {
+        SupplierRefundModel.create(
+          {
+            refund_date: data.return_date,
+            credit_note_id: creditNoteId,
+            amount: totalAmount,
+            payment_method: 'cash',
+            reference_no: returnNo,
+          },
+          userId,
+          db
+        );
+      }
 
       // Audit
       db.prepare(`
@@ -717,9 +737,9 @@ class PurchaseReturnModel {
     const result = db.prepare(`
       INSERT INTO credit_notes (
         credit_no, credit_date, supplier_id, source_type, source_id,
-        amount, status, posted_by
-      ) VALUES (?, ?, ?, 'PURCHASE_RETURN', ?, ?, 'POSTED', ?)
-    `).run(creditNo, creditDate, supplierId, returnId, totalAmount, userId);
+        amount, status, posted_by, disposition
+      ) VALUES (?, ?, ?, 'PURCHASE_RETURN', ?, ?, 'POSTED', ?, ?)
+    `).run(creditNo, creditDate, supplierId, returnId, totalAmount, userId, data.disposition || 'credit_on_account');
     const creditNoteId = result.lastInsertRowid as number;
 
     SupplierLedgerModel.createEntry({

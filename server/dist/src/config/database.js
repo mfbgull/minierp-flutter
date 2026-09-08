@@ -36,6 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.dbSeedReady = void 0;
 exports.getStockDiscrepancies = getStockDiscrepancies;
 const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const path_1 = __importDefault(require("path"));
@@ -185,6 +186,15 @@ function initializeDatabase() {
     runInvoiceMigration();
     runCustomerARMigrations();
 }
+// Async bcrypt (spec 2.1): the seed hash no longer blocks the event loop
+// ~300ms at import time. Boot code that needs the admin user (server.ts
+// before `listen`, jest setup before suites run) awaits [dbSeedReady].
+// [initializeDatabase] itself stays synchronous — it runs from the boot
+// sequence below, which is sync by design (better-sqlite3).
+let seedAdminUserResolve;
+exports.dbSeedReady = new Promise((resolve) => {
+    seedAdminUserResolve = resolve;
+});
 function createDefaultUser() {
     const existingUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
     if (!existingUser) {
@@ -196,16 +206,31 @@ function createDefaultUser() {
             defaultPassword = 'admin123';
         }
         if (!defaultPassword) {
+            // Nothing to seed — release any awaiter so it doesn't hang forever.
+            seedAdminUserResolve?.();
             throw new Error('FATAL: DEFAULT_ADMIN_PASSWORD environment variable must be set');
         }
-        const passwordHash = bcrypt.hashSync(defaultPassword, 12);
-        const stmt = db.prepare(`
+        // Fire-and-forget: the boot sequence below is synchronous; [dbSeedReady]
+        // gates consumers on the seeded row instead.
+        void bcrypt
+            .hash(defaultPassword, 12)
+            .then((passwordHash) => {
+            const stmt = db.prepare(`
       INSERT INTO users (username, email, password_hash, full_name, role, is_active)
       VALUES (?, ?, ?, ?, ?, ?)
     `);
-        stmt.run('admin', 'admin@minierp.local', passwordHash, 'Administrator', 'admin', 1);
-        logger_1.default.info('✅ Default admin user created');
+            stmt.run('admin', 'admin@minierp.local', passwordHash, 'Administrator', 'admin', 1);
+            logger_1.default.info('✅ Default admin user created');
+        })
+            .catch((err) => {
+            logger_1.default.error('FATAL: default admin seed failed:', err);
+            process.exit(1);
+        })
+            .finally(() => seedAdminUserResolve?.());
+        return;
     }
+    // Admin already exists — nothing to await.
+    seedAdminUserResolve?.();
 }
 function createDefaultWarehouse() {
     const existingWarehouse = db.prepare('SELECT id FROM warehouses WHERE warehouse_code = ?').get('WH-001');
@@ -1370,6 +1395,11 @@ runLedgered('fn.backfillPaymentsPurchaseOrderId', backfillPaymentsPurchaseOrderI
 // (PUR-03) — voided_at/by/reason, no more hard deletes.
 runLedgered('add-purchase-void-columns.sql');
 runLedgered('add-purchase-return-batches.sql');
+// refund-expected-cash: disposition columns + supplier_refunds table.
+// Guarded ALTERs — only applies the SQL when the columns/table are missing
+// (the runLedgered checksum covers first-time databases; this keeps partial
+// states repairable like the runPurchaseReturnsTablesMigration recovery).
+runLedgered('fn.runDispositionAndSupplierRefundsMigration', runDispositionAndSupplierRefundsMigration);
 runLedgered('seed-expense-sequence.sql');
 // One-time data backfills (audit-remediation 3.2/3.3) — ledgered so they run
 // exactly once per database, never again on reboot.
@@ -1413,6 +1443,10 @@ runLedgered('fn.verifyOwnerEquityAccounts', () => {
         }
     }
 });
+// Ensure dbSeedReady resolves on every boot — createDefaultUser() is
+// only called from initializeDatabase(), which runLedgered() skips on
+// existing databases (already recorded in schema_migrations).
+createDefaultUser();
 // Rollback support: run if --rollback flag is passed
 if (process.argv.includes('--rollback')) {
     const targetMigration = process.argv.find(arg => arg.startsWith('--rollback='));
@@ -1425,6 +1459,23 @@ if (process.argv.includes('--rollback')) {
     }
 }
 exports.default = db;
+// refund-expected-cash: apply the disposition + supplier_refunds migration.
+// The SQL file's ALTERs are not idempotent on partial DBs, so apply it only
+// when the disposition column is missing (mirrors runGLFoundationMigration's
+// read-file pattern with a table/column guard).
+function runDispositionAndSupplierRefundsMigration() {
+    try {
+        const hasDisposition = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('purchase_returns') WHERE name='disposition'`).get();
+        if (hasDisposition.count > 0)
+            return; // already applied
+        const migrationSQL = fs_1.default.readFileSync(path_1.default.join(MIGRATIONS_DIR, 'add-disposition-and-supplier-refunds.sql'), 'utf8');
+        db.exec(migrationSQL);
+        logger_1.default.info('✅ disposition + supplier_refunds migration applied');
+    }
+    catch (error) {
+        throw new Error('disposition + supplier_refunds migration error:: ' + error.message, { cause: error });
+    }
+}
 function runProductionBOMIdMigration() {
     try {
         const hasBOMId = db.prepare(`SELECT COUNT(*) as count FROM pragma_table_info('productions') WHERE name='bom_id'`).get();
@@ -1540,6 +1591,10 @@ function seedDefaultPermissions() {
             { name: 'purchase_returns:read', module: 'purchase_returns', action: 'read', description: 'View purchase returns' },
             { name: 'purchase_returns:create', module: 'purchase_returns', action: 'create', description: 'Create purchase returns' },
             { name: 'purchase_returns:void', module: 'purchase_returns', action: 'void', description: 'Void purchase returns' },
+            // Supplier Refunds
+            { name: 'supplier_refunds:read', module: 'supplier_refunds', action: 'read', description: 'View supplier refunds' },
+            { name: 'supplier_refunds:create', module: 'supplier_refunds', action: 'create', description: 'Issue supplier refunds' },
+            { name: 'supplier_refunds:void', module: 'supplier_refunds', action: 'void', description: 'Void supplier refunds' },
             // Expenses
             { name: 'expenses:read', module: 'expenses', action: 'read', description: 'View expenses' },
             { name: 'expenses:create', module: 'expenses', action: 'create', description: 'Create expenses' },

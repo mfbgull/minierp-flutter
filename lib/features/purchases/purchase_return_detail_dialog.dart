@@ -14,11 +14,14 @@ import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/purchase_repository.dart'
     show purchaseRepositoryProvider;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/app_toast.dart';
 import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
 import '../../widgets/status_badge.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:minierp_app/widgets/movable_dialog.dart';
+
+import 'supplier_refund_dialog.dart' show showSupplierRefundDialog;
 
 /// Provider that fetches the full return detail (header + items).
 final _returnDetailProvider =
@@ -142,8 +145,11 @@ class _PurchaseReturnDetailDialog extends ConsumerWidget {
               (l10n.fieldsReference, pr.sourceNo),
               (l10n.fieldsWarehouse, pr.warehouseName),
               (l10n.fieldsStatus, pr.status),
-              if (pr.creditNo != null && pr.creditNo!.isNotEmpty)
+              if (pr.creditNo != null && pr.creditNo!.isNotEmpty) ...[
                 (l10n.suppliersLedgerCredit, pr.creditNo!),
+                if (pr.disposition != null)
+                  (l10n.purchasesReturndisposition, pr.disposition!),
+              ],
               if (pr.reason != null && pr.reason!.isNotEmpty)
                 (l10n.fieldsNotes, pr.reason!),
             ],
@@ -163,15 +169,74 @@ class _PurchaseReturnDetailDialog extends ConsumerWidget {
           ],
 
           const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(l10n.commonClose),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              // Cash refund action — only for posted returns with a credit
+              // note that still has refundable balance. The dialog validates
+              // against the server's refundable figure too.
+              if (pr.isPosted && pr.creditNoteId != null)
+                _RefundButton(purchaseReturn: pr),
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(l10n.commonClose),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The "Issue Refund" action — fetches the credit note's refundable
+/// balance, then opens the refund dialog. Hidden (no-op) when nothing is
+/// refundable.
+class _RefundButton extends ConsumerStatefulWidget {
+  const _RefundButton({required this.purchaseReturn});
+
+  final PurchaseReturn purchaseReturn;
+
+  @override
+  ConsumerState<_RefundButton> createState() => _RefundButtonState();
+}
+
+class _RefundButtonState extends ConsumerState<_RefundButton> {
+  bool _busy = false;
+
+  Future<void> _open() async {
+    final l10n = AppLocalizations.of(context)!;
+    setState(() => _busy = true);
+    final result = await ref
+        .read(purchaseRepositoryProvider)
+        .creditNoteRefundable(widget.purchaseReturn.creditNoteId!);
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    switch (result) {
+      case ApiSuccess(:final data):
+        if (data <= 0) {
+          showAppToast(context, l10n.purchasesRefundnone);
+          return;
+        }
+        await showSupplierRefundDialog(
+          context,
+          purchaseReturn: widget.purchaseReturn,
+          refundable: data,
+        );
+      case ApiFailure(:final error):
+        showAppToast(context, error.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return FilledButton.tonalIcon(
+      onPressed: _busy ? null : _open,
+      icon: const Icon(Icons.payments_outlined, size: 18),
+      label: Text(l10n.purchasesRefund),
     );
   }
 }

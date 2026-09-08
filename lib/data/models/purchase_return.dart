@@ -71,6 +71,7 @@ class PurchaseReturn {
     this.totalAmount = 0,
     this.creditNoteId,
     this.creditNo,
+    this.disposition,
     this.voidedAt,
     this.voidedReason,
     this.createdByUsername,
@@ -96,6 +97,7 @@ class PurchaseReturn {
     totalAmount: asNum(json['total_amount']) ?? 0,
     creditNoteId: asInt(json['credit_note_id']),
     creditNo: asString(json['credit_no']),
+    disposition: asString(json['disposition']),
     voidedAt: asString(json['voided_at']),
     voidedReason: asString(json['voided_reason']),
     createdByUsername: asString(json['created_by_username']),
@@ -139,6 +141,11 @@ class PurchaseReturn {
   /// The supplier credit-note document, when this return was posted.
   final int? creditNoteId;
   final String? creditNo;
+
+  /// `credit_on_account` | `refund_expected` — the settlement declared
+  /// at return time (PRET-06). `refund_expected` notes are eligible for
+  /// a supplier cash refund from the detail dialog.
+  final String? disposition;
   final String? voidedAt;
   final String? voidedReason;
   final String? createdByUsername;

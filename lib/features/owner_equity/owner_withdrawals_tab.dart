@@ -10,18 +10,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/owner_equity.dart' show OwnerWithdrawal;
-import '../../data/repositories/api_result.dart' show ApiError;
+import '../../data/repositories/owner_equity_repository.dart'
+    show ownerEquityRepositoryProvider;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bulk_operations.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
-import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
-import '../../widgets/pluto_grid_screen.dart'
-    show autoFitPlutoColumns, plutoGridConfigurationFor, serialGridColumn, withSerialCell;
-import '../../widgets/screen_error_panel.dart';
+import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import 'owner_equity_providers.dart';
 import 'owner_withdrawal_detail_dialog.dart';
@@ -35,27 +36,16 @@ class OwnerWithdrawalsTab extends ConsumerStatefulWidget {
       _OwnerWithdrawalsTabState();
 }
 
-class _OwnerWithdrawalsTabState extends ConsumerState<OwnerWithdrawalsTab> {
+class _OwnerWithdrawalsTabState extends ConsumerState<OwnerWithdrawalsTab>
+    with PlutoGridScreen<OwnerWithdrawal, OwnerWithdrawalsTab> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
-  PlutoGridStateManager? _stateManager;
-  late List<PlutoColumn> _columns;
-  bool _columnsReady = false;
+  bool _bulkBusy = false;
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_columnsReady) {
-      _columns = _buildColumns(AppLocalizations.of(context)!);
-      _columnsReady = true;
-    }
-  }
-
-  GridColumnWidths? _widthTracker;
+  final Map<int, OwnerWithdrawal> _withdrawalsById = {};
 
   @override
   void dispose() {
-    _widthTracker?.dispose();
     _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
@@ -80,30 +70,14 @@ class _OwnerWithdrawalsTabState extends ConsumerState<OwnerWithdrawalsTab> {
     ref.read(withdrawalsToDateProvider.notifier).state = null;
   }
 
-  void _applyRows(AsyncValue<PagedResponse<OwnerWithdrawal>> value) {
-    final manager = _stateManager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, row) in (value.value!.items).indexed)
-          _rowFor(row, index),
-      ]);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !identical(_stateManager, manager)) return;
-        final tracker = _widthTracker;
-        if (tracker != null) {
-          tracker.programmaticPass(() => autoFitPlutoColumns(manager));
-        } else {
-          autoFitPlutoColumns(manager);
-        }
-      });
-    }
-  }
+  @override
+  Iterable<OwnerWithdrawal> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<OwnerWithdrawal>).items;
 
-  PlutoRow _rowFor(OwnerWithdrawal row, int index) => withSerialCell(
-    PlutoRow(
+  @override
+  PlutoRow gridRowFor(OwnerWithdrawal row) {
+    _withdrawalsById[row.id] = row;
+    return PlutoRow(
       cells: {
         'data': PlutoCell(value: row),
         'id': PlutoCell(value: row.id),
@@ -119,9 +93,136 @@ class _OwnerWithdrawalsTabState extends ConsumerState<OwnerWithdrawalsTab> {
         'status': PlutoCell(value: row.status),
         'created_by': PlutoCell(value: row.createdByName ?? ''),
       },
-    ),
-    index,
-  );
+    );
+  }
+
+  @override
+  void openRowDetail(int rowId) {
+    if (!mounted) return;
+    final row = _withdrawalsById[rowId];
+    if (row == null) return;
+    if (row.kind == 'goods') {
+      showOwnerWithdrawalDetailDialog(context, row.id);
+    } else {
+      showOwnerWithdrawalFormDialog(context, entry: row);
+    }
+  }
+
+  @override
+  bool get enableBulkSelection => true;
+
+  @override
+  bool get hasRowActions => true;
+
+  @override
+  List<String> get hiddenGridColumnFields => const ['id'];
+
+  @override
+  String get filterSignature {
+    final search = ref.read(withdrawalsSearchProvider);
+    final kind = ref.read(withdrawalsKindProvider);
+    final from = ref.read(withdrawalsFromDateProvider);
+    final to = ref.read(withdrawalsToDateProvider);
+    return '$search|$kind|$from|$to';
+  }
+
+  String? _sortColumnFor(String field) => switch (field) {
+    'withdrawal_no' => 'ow.withdrawal_no',
+    'withdrawal_date' => 'ow.withdrawal_date',
+    'kind' => 'ow.kind',
+    'amount' => 'ow.amount',
+    'status' => 'ow.status',
+    'created_by' => 'ow.created_at',
+    _ => null,
+  };
+
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    final order = sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC';
+    ref.read(withdrawalsSortProvider.notifier).state =
+        EquitySort(sortBy, order);
+    if (ref.read(withdrawalsPageProvider) != 1) {
+      ref.read(withdrawalsPageProvider.notifier).state = 1;
+    }
+  }
+
+  @override
+  List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
+    final id = row.cells['id']?.value as int?;
+    if (id == null || id <= 0) return null;
+    final l10n = AppLocalizations.of(context)!;
+    final withdrawal = _withdrawalsById[id];
+    return [
+      GridRowAction(
+        icon: Icons.visibility_outlined,
+        label: l10n.commonView,
+        onTap: () {
+          if (withdrawal?.kind == 'goods') {
+            showOwnerWithdrawalDetailDialog(context, id);
+          } else {
+            showOwnerWithdrawalFormDialog(context, entry: withdrawal);
+          }
+        },
+      ),
+      GridRowAction(
+        icon: Icons.edit_outlined,
+        label: l10n.commonEdit,
+        onTap: () => showOwnerWithdrawalFormDialog(context, entry: withdrawal),
+      ),
+    ];
+  }
+
+  Future<void> _bulkVoid(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.equityVoided,
+      message: '${l10n.equityDeleteconfirmdesc}\n\n(${ids.length})',
+      confirmLabel: l10n.commonConfirm,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final repo = ref.read(ownerEquityRepositoryProvider);
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _withdrawalsById[id]?.withdrawalNo ?? '#$id',
+      operation: repo.voidWithdrawal,
+    );
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: (n) => l10n.bulkDeleted(n),
+      onComplete: () {
+        ref.invalidate(ownerWithdrawalsProvider);
+        ref.invalidate(equitySummaryProvider);
+      },
+    );
+  }
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = [
+      for (final w in _withdrawalsById.values)
+        if (ids.contains(w.id)) w,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('owner-withdrawals'),
+      csv: buildOwnerWithdrawalsCsv(l10n, selected),
+      successMessage: l10n.equityExported,
+      errorMessage: l10n.equityExportfailed,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +230,7 @@ class _OwnerWithdrawalsTabState extends ConsumerState<OwnerWithdrawalsTab> {
     final page = withdrawals.valueOrNull;
     final l10n = AppLocalizations.of(context)!;
 
-    ref.listen(ownerWithdrawalsProvider, (previous, next) => _applyRows(next));
+    watchGridProvider(ownerWithdrawalsProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -142,7 +243,41 @@ class _OwnerWithdrawalsTabState extends ConsumerState<OwnerWithdrawalsTab> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: _toolbar(l10n),
         ),
-        Expanded(child: _buildBody(withdrawals)),
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              busy: _bulkBusy,
+              actions: [
+                if (user?.hasPermission('accounting', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+                if (user?.hasPermission('accounting', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkVoid(sel),
+                    icon: const Icon(Icons.block_outlined, size: 18),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(l10n.equityVoided),
+                  ),
+              ],
+            );
+          },
+        ),
+        Expanded(
+          child: gridScreenBody(
+            withdrawals,
+            provider: ownerWithdrawalsProvider,
+          ),
+        ),
         if (page != null)
           ServerPaginationBar(
             page: page.currentPage,
@@ -272,105 +407,8 @@ class _OwnerWithdrawalsTabState extends ConsumerState<OwnerWithdrawalsTab> {
     );
   }
 
-  Widget _buildBody(AsyncValue<PagedResponse<OwnerWithdrawal>> withdrawals) {
-    final errorMessage = switch (withdrawals) {
-      AsyncError(:final error) => error is ApiError ? error.message : null,
-      _ => null,
-    };
-    if (errorMessage != null) {
-      _stateManager = null;
-      return ScreenErrorPanel(
-        message: errorMessage,
-        onRetry: () => ref.invalidate(ownerWithdrawalsProvider),
-      );
-    }
-    return _grid();
-  }
-
-  Widget _grid() {
-    final l10n = AppLocalizations.of(context)!;
-    final scheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-      child: PlutoGrid(
-        configuration: plutoGridConfigurationFor(context, compact: true),
-        columns: _columns,
-        rows: <PlutoRow>[],
-        onLoaded: (event) {
-          _stateManager = event.stateManager;
-          _stateManager?.hideColumn(
-            _columns.firstWhere((c) => c.field == 'id'),
-            true,
-            notify: false,
-          );
-          _applyRows(ref.read(ownerWithdrawalsProvider));
-          _widthTracker?.dispose();
-          _widthTracker = GridColumnWidths.attach(
-            stateManager: event.stateManager,
-            screenKey: 'owner_withdrawals',
-          );
-        },
-        onRowDoubleTap: (event) {
-          final id = event.row.cells['id']?.value as int?;
-          if (id == null || id <= 0) return;
-          final rows =
-              ref.read(ownerWithdrawalsProvider).valueOrNull?.items ??
-              const <OwnerWithdrawal>[];
-          for (final row in rows) {
-            if (row.id == id) {
-              if (row.kind == 'goods') {
-                showOwnerWithdrawalDetailDialog(context, row.id);
-              } else {
-                showOwnerWithdrawalFormDialog(context, entry: row);
-              }
-              break;
-            }
-          }
-        },
-        onSorted: _onGridSorted,
-        noRowsWidget: Center(
-          child: Text(
-            l10n.commonNoresults,
-            style: TextStyle(color: scheme.outline),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String? _sortColumnFor(String field) {
-    switch (field) {
-      case 'withdrawal_no':
-        return 'ow.withdrawal_no';
-      case 'withdrawal_date':
-        return 'ow.withdrawal_date';
-      case 'kind':
-        return 'ow.kind';
-      case 'amount':
-        return 'ow.amount';
-      case 'status':
-        return 'ow.status';
-      case 'created_by':
-        return 'ow.created_at';
-      default:
-        return null;
-    }
-  }
-
-  void _onGridSorted(PlutoGridOnSortedEvent event) {
-    final sortBy = _sortColumnFor(event.column.field);
-    if (sortBy == null) return;
-    final sort = event.column.sort;
-    final order = sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC';
-    ref.read(withdrawalsSortProvider.notifier).state =
-        EquitySort(sortBy, order);
-    if (ref.read(withdrawalsPageProvider) != 1) {
-      ref.read(withdrawalsPageProvider.notifier).state = 1;
-    }
-  }
-
-  List<PlutoColumn> _buildColumns(AppLocalizations l10n) {
+  @override
+  List<PlutoColumn> buildGridColumns(AppLocalizations l10n) {
     PlutoColumn textColumn(String field, String title, double width) =>
         PlutoColumn(
           title: title,
@@ -382,7 +420,6 @@ class _OwnerWithdrawalsTabState extends ConsumerState<OwnerWithdrawalsTab> {
         );
 
     return [
-      serialGridColumn(),
       PlutoColumn(
         title: '',
         field: 'id',
@@ -485,38 +522,6 @@ class _OwnerWithdrawalsTabState extends ConsumerState<OwnerWithdrawalsTab> {
       textColumn('note', l10n.fieldsNote, 220),
       textColumn('status', l10n.fieldsStatus, 100),
       textColumn('created_by', l10n.expensesCreatedby, 130),
-      PlutoColumn(
-        title: l10n.commonActions,
-        field: 'actions',
-        frozen: PlutoColumnFrozen.end,
-        type: PlutoColumnType.text(),
-        width: 64,
-        readOnly: true,
-        enableContextMenu: false,
-        enableFilterMenuItem: false,
-        enableHideColumnMenuItem: false,
-        enableSetColumnsMenuItem: false,
-        renderer: (ctx) {
-          final row = ctx.cell.row.cells['data']?.value as OwnerWithdrawal?;
-          return Builder(
-            builder: (cellContext) => Listener(
-              behavior: HitTestBehavior.opaque,
-              onPointerDown: (_) {
-                if (row != null && mounted) {
-                  showOwnerWithdrawalFormDialog(context, entry: row);
-                }
-              },
-              child: Center(
-                child: Icon(
-                  Icons.more_vert,
-                  size: 18,
-                  color: Theme.of(cellContext).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
     ];
   }
 
@@ -576,7 +581,6 @@ class _OwnerWithdrawalsTabState extends ConsumerState<OwnerWithdrawalsTab> {
     height: 36,
     color: scheme.outlineVariant,
   );
-
 }
 
 class _EquityStat extends StatelessWidget {

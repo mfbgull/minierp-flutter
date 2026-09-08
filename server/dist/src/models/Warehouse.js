@@ -33,10 +33,18 @@ class WarehouseModel {
         return result.lastInsertRowid;
     }
     static update(db, id, data) {
-        db.prepare(`
-      UPDATE warehouses SET warehouse_code = ?, warehouse_name = ?, location = ?
-      WHERE id = ?
-    `).run(data.warehouse_code, data.warehouse_name, data.location || null, id);
+        if (data.is_active !== undefined) {
+            db.prepare(`
+        UPDATE warehouses SET warehouse_code = ?, warehouse_name = ?, location = ?, is_active = ?
+        WHERE id = ?
+      `).run(data.warehouse_code, data.warehouse_name, data.location || null, data.is_active, id);
+        }
+        else {
+            db.prepare(`
+        UPDATE warehouses SET warehouse_code = ?, warehouse_name = ?, location = ?
+        WHERE id = ?
+      `).run(data.warehouse_code, data.warehouse_name, data.location || null, id);
+        }
     }
     static delete(db, id) {
         db.prepare('UPDATE warehouses SET is_active = 0 WHERE id = ?').run(id);

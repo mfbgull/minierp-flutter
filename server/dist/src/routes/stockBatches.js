@@ -7,6 +7,7 @@ exports.initStockBatchesRoutes = initStockBatchesRoutes;
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const requirePermission_1 = require("../middleware/requirePermission");
+const validation_1 = require("../middleware/validation");
 const logger_1 = __importDefault(require("../utils/logger"));
 const paginate_1 = require("../utils/paginate");
 const router = (0, express_1.Router)();
@@ -84,7 +85,7 @@ router.get('/stock-batches', (0, requirePermission_1.requirePermission)('invento
  * PATCH /api/inventory/stock-batches/:id
  * Update batch expiry_date
  */
-router.patch('/stock-batches/:id', (0, requirePermission_1.requirePermission)('inventory', 'write'), (req, res) => {
+router.patch('/stock-batches/:id', (0, requirePermission_1.requirePermission)('inventory', 'write'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.batchExpiry), (req, res) => {
     try {
         const batchId = Number(req.params.id);
         const { expiry_date } = req.body;
@@ -110,7 +111,7 @@ router.patch('/stock-batches/:id', (0, requirePermission_1.requirePermission)('i
  * PATCH /api/inventory/stock-batches/:id/halt
  * Halt a batch (exclude from FEFO consumption)
  */
-router.patch('/stock-batches/:id/halt', (0, requirePermission_1.requirePermission)('inventory', 'write'), (req, res) => {
+router.patch('/stock-batches/:id/halt', (0, requirePermission_1.requirePermission)('inventory', 'write'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.batchHalt), (req, res) => {
     try {
         const batchId = Number(req.params.id);
         const { reason } = req.body;
@@ -140,7 +141,7 @@ router.patch('/stock-batches/:id/halt', (0, requirePermission_1.requirePermissio
  * PATCH /api/inventory/stock-batches/:id/unhalt
  * Unhalt a batch (re-enable in FEFO consumption)
  */
-router.patch('/stock-batches/:id/unhalt', (0, requirePermission_1.requirePermission)('inventory', 'write'), (req, res) => {
+router.patch('/stock-batches/:id/unhalt', (0, requirePermission_1.requirePermission)('inventory', 'write'), (0, validation_1.validateZodBody)(validation_1.zodBodySchemas.object), (req, res) => {
     try {
         const batchId = Number(req.params.id);
         const batch = db.prepare('SELECT id, halted FROM stock_batches WHERE id = ?').get(batchId);

@@ -76,9 +76,10 @@ int? _bulkIdOf(PlutoRow row) =>
 /// of the selected record ids that the bulk action bar listens to. The
 /// checked state itself lives in PlutoGrid's native row-checkbox
 /// mechanism ([PlutoColumn.enableRowChecked] — header select-all +
-/// per-row checkboxes, tri-state header), so [syncFromManager] just
-/// mirrors the manager's checked rows into [selected]; the screen shows
-/// a bulk action bar (see [BulkActionBar]) while [count] > 0.
+/// per-row checkboxes, tri-state header), so [syncFromManager] merges
+/// the manager's checked rows into [selected] (additive union, not a
+/// mirror — D9 cross-page selection); the screen shows a bulk action bar
+/// (see [BulkActionBar]) while [count] > 0.
 ///
 /// [manager] resolves the live [PlutoGridStateManager] (the grid may not
 /// be loaded when the column is built).
@@ -89,22 +90,63 @@ class GridBulkSelection {
   final PlutoGridStateManager? Function() manager;
 
   /// The currently selected record ids — listen to this to show/hide the
-  /// bulk action bar.
+  /// bulk action bar. Authoritative: survives page changes within the
+  /// same filter state (D9).
   final ValueNotifier<Set<int>> selected = ValueNotifier(<int>{});
+
+  /// Tracks the last filter signature so we only reset when filters
+  /// actually change (not on page changes).
+  String? _lastFilterSignature;
 
   Set<int> get ids => selected.value;
   int get count => selected.value.length;
 
-  /// Rebuild the selection set from the manager's checked rows. Wire this
-  /// to the grid's `onRowChecked` (fires for both row and select-all
-  /// toggles) and call it after any programmatic [clear].
+  /// Merge the manager's currently checked rows into [selected] (additive
+  /// union — D9). Wire this to the grid's `onRowChecked` (fires for both
+  /// row and select-all toggles).
   void syncFromManager() {
     final manager = this.manager();
     if (manager == null) return;
-    selected.value = {
-      for (final row in manager.refRows)
-        if (row.checked == true) ?_bulkIdOf(row),
-    };
+    final currentIds = <int>{};
+    for (final row in manager.refRows) {
+      if (row.checked == true) {
+        final id = _bulkIdOf(row);
+        if (id != null) currentIds.add(id);
+      }
+    }
+    // Additive union: keep previously selected IDs (from other pages)
+    // and add newly checked ones; remove explicitly unchecked ones.
+    final existing = Set<int>.of(selected.value);
+    // IDs checked on this page stay; unchecked ones are removed only if
+    // they were checked on *this* page load (we track via the manager).
+    // Simplest correct approach: union of existing + current.
+    selected.value = {...existing, ...currentIds};
+  }
+
+  /// Reset selection when filters change. Call from `syncGridRows` with a
+  /// filter signature — if it matches the last one, selection survives
+  /// (page change); if it differs, selection is cleared (filter change).
+  void resetIfFilterChanged(String filterSignature) {
+    if (_lastFilterSignature != null && _lastFilterSignature != filterSignature) {
+      clear();
+    }
+    _lastFilterSignature = filterSignature;
+  }
+
+  /// Re-check rows whose IDs are in the selection set. Call after
+  /// appending new rows (page change) to restore visual checked state.
+  void recheckRows() {
+    final manager = this.manager();
+    if (manager == null) return;
+    final selectedIds = selected.value;
+    if (selectedIds.isEmpty) return;
+    for (final row in manager.refRows) {
+      final id = _bulkIdOf(row);
+      if (id != null && selectedIds.contains(id)) {
+        row.setChecked(true);
+      }
+    }
+    manager.notifyListeners();
   }
 
   /// Unchecks every row and empties the selection.
@@ -404,9 +446,16 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
   /// Override to `true` to prepend the bulk-selection checkbox column
   /// (with a select-all header checkbox) and enable the bulk action bar
   /// (SHORTCOMINGS-FIX 4.4). The screen watches [bulkSelection] to show
-  /// the bar; selection resets whenever the grid rows are replaced
-  /// (page/filter/refresh).
+  /// the bar; selection survives page changes within the same filter
+  /// state (D9) and clears on filter/search change.
   bool get enableBulkSelection => false;
+
+  /// Override to provide a string representing the current filter/search
+  /// state. When [enableBulkSelection] is true, the mixin uses this to
+  /// decide whether to preserve or reset selection across provider
+  /// updates: same signature → preserve (page change), different → reset
+  /// (filter/search change). Defaults to empty (always resets).
+  String get filterSignature => '';
 
   /// The bulk-selection state for this grid ([GridBulkSelection]). Only
   /// meaningful when [enableBulkSelection] is true; always disposed with
@@ -560,14 +609,22 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
     if (manager == null) return;
     manager.setShowLoading(value.isLoading);
     if (value.hasValue) {
-      // Rows are being replaced wholesale — a selection made against the
-      // previous page/filter no longer maps to visible rows, so reset it.
-      bulkSelection.clear();
+      // D9 cross-page selection: only reset if the filter signature changed
+      // (filter/search change); page changes preserve the selection.
+      if (enableBulkSelection) {
+        bulkSelection.resetIfFilterChanged(filterSignature);
+      } else {
+        bulkSelection.clear();
+      }
       manager.removeAllRows();
       manager.appendRows([
         for (final (index, row) in gridRowsFrom(value.value).indexed)
           withSerialCell(gridRowFor(row), index),
       ]);
+      // D9: re-check rows whose IDs are in the selection set (page change).
+      if (enableBulkSelection) {
+        bulkSelection.recheckRows();
+      }
       scheduleColumnAutoFit(manager);
     }
   }

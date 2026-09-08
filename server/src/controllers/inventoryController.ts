@@ -280,7 +280,9 @@ function updateWarehouse(req: AuthRequest, res: Response): void {
     WarehouseModel.update(db, warehouseId, {
       warehouse_code: req.body.warehouse_code || existing.warehouse_code,
       warehouse_name: req.body.warehouse_name || existing.warehouse_name,
-      location: req.body.location
+      location: req.body.location,
+      // D25: accept is_active to allow reactivation after bulk deactivate
+      ...(req.body.is_active !== undefined && { is_active: req.body.is_active ? 1 : 0 }),
     });
 
     // Log warehouse update using activity logger

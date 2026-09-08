@@ -9,7 +9,9 @@
 // filters — only type is exposed so far).
 
 import 'package:flutter/material.dart';
+import '../../core/auth/auth_notifier.dart';
 import '../../core/theme/status_colors.dart';
+import '../../core/utils/csv_export.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
@@ -46,6 +48,17 @@ class StockMovementScreen extends ConsumerStatefulWidget {
 class _StockMovementScreenState extends ConsumerState<StockMovementScreen>
     with PlutoGridScreen<StockMovement, StockMovementScreen> {
   List<StockMovement> _movements = const [];
+
+  @override
+  bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final filter = ref.read(movementTypeFilterProvider);
+    final from = ref.read(stockMovementsFromDateProvider);
+    final to = ref.read(stockMovementsToDateProvider);
+    return '$filter|$from|$to';
+  }
 
   T? _firstWhereOrNull<T>(Iterable<T> items, bool Function(T) test) {
     for (final item in items) {
@@ -99,6 +112,22 @@ class _StockMovementScreenState extends ConsumerState<StockMovementScreen>
     if (ref.read(stockMovementsPageProvider) != 1) {
       ref.read(stockMovementsPageProvider.notifier).state = 1;
     }
+  }
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = [
+      for (final m in _movements)
+        if (ids.contains(m.id)) m,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('stock-movements'),
+      csv: buildStockMovementsCsv(l10n, selected),
+      successMessage: l10n.bulkExportSelected,
+      errorMessage: l10n.bulkDeleteFailed,
+    );
   }
 
   @override
@@ -210,6 +239,25 @@ class _StockMovementScreenState extends ConsumerState<StockMovementScreen>
               label: Text(l10n.stockmovementsNewadjustment),
             ),
           ],
+        ),
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              actions: [
+                if (user?.hasPermission('inventory', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+              ],
+            );
+          },
         ),
         Expanded(
           child: gridScreenBody(

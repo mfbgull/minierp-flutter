@@ -1,5 +1,6 @@
 // Personal Loans tab — shows summary cards, loan list with search/filter/sort,
-// and CSV export. Purely record-keeping — no GL impact.
+// and CSV export. Purely record-keeping — no GL impact. Migrated to
+// PlutoGridScreen mixin with bulk delete + export (D5, D9).
 
 import 'dart:async';
 
@@ -7,22 +8,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart' show authProvider;
 import '../../core/theme/app_border_radius.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
-import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
+import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bulk_operations.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
-import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
-import '../../widgets/pluto_grid_screen.dart'
-    show
-        autoFitPlutoColumns,
-        plutoGridConfigurationFor,
-        serialGridColumn,
-        withSerialCell;
-import '../../widgets/screen_error_panel.dart';
+import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import 'personal_loan_models.dart';
 import 'personal_loan_providers.dart';
@@ -38,27 +35,199 @@ class PersonalLoansTab extends ConsumerStatefulWidget {
   ConsumerState<PersonalLoansTab> createState() => _PersonalLoansTabState();
 }
 
-class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab> {
+class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab>
+    with PlutoGridScreen<PersonalLoan, PersonalLoansTab> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
-  PlutoGridStateManager? _stateManager;
-  late List<PlutoColumn> _columns;
-  bool _columnsReady = false;
+  bool _bulkBusy = false;
+
+  final Map<int, PersonalLoan> _loansById = {};
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_columnsReady) {
-      _columns = _buildColumns(AppLocalizations.of(context)!);
-      _columnsReady = true;
+  bool get enableBulkSelection => true;
+
+  @override
+  bool get hasRowActions => true;
+
+  @override
+  List<String> get hiddenGridColumnFields => const ['id'];
+
+  @override
+  String get filterSignature {
+    final search = ref.read(personalLoansSearchProvider);
+    final status = ref.read(personalLoansStatusProvider);
+    final from = ref.read(personalLoansFromDateProvider);
+    final to = ref.read(personalLoansToDateProvider);
+    return '$search|$status|$from|$to';
+  }
+
+  @override
+  Iterable<PersonalLoan> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<PersonalLoan>).items;
+
+  @override
+  PlutoRow gridRowFor(PersonalLoan row) {
+    _loansById[row.id] = row;
+    return PlutoRow(
+      cells: {
+        'id': PlutoCell(value: row.id),
+        'loan_no': PlutoCell(value: row.loanNo),
+        'borrower_name': PlutoCell(value: row.borrowerName),
+        'borrower_type': PlutoCell(value: row.borrowerType ?? ''),
+        'amount': PlutoCell(value: row.amount),
+        'balance': PlutoCell(value: row.balance),
+        'currency': PlutoCell(value: row.currency),
+        'loan_date': PlutoCell(value: row.loanDate),
+        'due_date': PlutoCell(value: row.dueDate ?? ''),
+        'purpose': PlutoCell(value: row.purpose ?? ''),
+        'status': PlutoCell(value: row.status),
+        'repayment_count': PlutoCell(value: row.repaymentCount),
+        'created_by': PlutoCell(value: row.createdByName ?? ''),
+      },
+    );
+  }
+
+  @override
+  void openRowDetail(int rowId) {
+    if (!mounted) return;
+    final loan = _loansById[rowId];
+    if (loan == null) return;
+    _viewDetail(context, loan);
+  }
+
+  @override
+  List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
+    final id = row.cells['id']?.value as int?;
+    if (id == null || id <= 0) return null;
+    final loan = _loansById[id];
+    if (loan == null) return null;
+    final l10n = AppLocalizations.of(context)!;
+    final isSettled = loan.status == 'settled';
+    final isWrittenOff = loan.status == 'written_off';
+    final canEdit = !isSettled && !isWrittenOff;
+    final canDelete = !loan.hasRepayments;
+    final canWriteOff = loan.status == 'pending' || loan.status == 'partial';
+    return [
+      GridRowAction(
+        icon: Icons.visibility_outlined,
+        label: l10n.commonView,
+        onTap: () => _viewDetail(context, loan),
+      ),
+      if (canEdit)
+        GridRowAction(
+          icon: Icons.edit_outlined,
+          label: l10n.equityPersonalLoanEdit,
+          onTap: () async {
+            final result = await showPersonalLoanCreateDialog(
+              context,
+              loan: loan,
+            );
+            if (result == true && context.mounted) {
+              ref.invalidate(personalLoansProvider);
+              ref.invalidate(personalLoanSummaryProvider);
+            }
+          },
+        ),
+      if (canWriteOff)
+        GridRowAction(
+          icon: Icons.cancel_outlined,
+          label: l10n.equityPersonalLoanStatusWrittenOff,
+          color: Theme.of(context).colorScheme.error,
+          onTap: () => _writeOff(context, loan),
+        ),
+      if (canDelete)
+        GridRowAction(
+          icon: Icons.delete_outline,
+          label: l10n.commonDelete,
+          color: Theme.of(context).colorScheme.error,
+          onTap: () => _deleteLoan(context, loan),
+        ),
+    ];
+  }
+
+  String? _sortColumnFor(String field) {
+    switch (field) {
+      case 'loan_no':
+        return 'loan_no';
+      case 'loan_date':
+        return 'loan_date';
+      case 'borrower_name':
+        return 'borrower_name';
+      case 'amount':
+        return 'amount';
+      case 'balance':
+        return 'balance';
+      case 'status':
+        return 'status';
+      default:
+        return null;
     }
   }
 
-  GridColumnWidths? _widthTracker;
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    final order = sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC';
+    ref.read(personalLoansSortProvider.notifier).state =
+        PersonalLoansSort(sortBy, order);
+    if (ref.read(personalLoansPageProvider) != 1) {
+      ref.read(personalLoansPageProvider.notifier).state = 1;
+    }
+  }
+
+  Future<void> _bulkDelete(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonDelete,
+      message: '${l10n.equityPersonalLoanDeleteConfirm}\n\n(${ids.length})',
+      confirmLabel: l10n.commonConfirm,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final repo = ref.read(personalLoanRepositoryProvider);
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _loansById[id]?.loanNo ?? '#$id',
+      operation: (id) => repo.deleteLoan(id),
+    );
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: (n) => l10n.bulkDeleted(n),
+      onComplete: () {
+        ref.invalidate(personalLoansProvider);
+        ref.invalidate(personalLoanSummaryProvider);
+      },
+    );
+  }
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = [
+      for (final loan in _loansById.values)
+        if (ids.contains(loan.id)) loan,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('personal-loans'),
+      csv: buildPersonalLoansCsv(l10n, selected),
+      successMessage: l10n.equityPersonalLoanExported,
+      errorMessage: l10n.equityPersonalLoanExportFailed,
+    );
+  }
 
   @override
   void dispose() {
-    _widthTracker?.dispose();
     _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
@@ -81,65 +250,13 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab> {
     ref.read(personalLoansToDateProvider.notifier).state = null;
   }
 
-  void _applyRows(AsyncValue<PagedResponse<PersonalLoan>> value) {
-    final manager = _stateManager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, row) in (value.value!.items).indexed)
-          _rowFor(row, index),
-      ]);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !identical(_stateManager, manager)) return;
-        final tracker = _widthTracker;
-        if (tracker != null) {
-          tracker.programmaticPass(() => autoFitPlutoColumns(manager));
-        } else {
-          autoFitPlutoColumns(manager);
-        }
-      });
-    }
-  }
-
-  PlutoRow _rowFor(PersonalLoan row, int index) => withSerialCell(
-        PlutoRow(
-          cells: {
-            'data': PlutoCell(value: row),
-            'id': PlutoCell(value: row.id),
-            'loan_no': PlutoCell(value: row.loanNo),
-            'borrower_name': PlutoCell(value: row.borrowerName),
-            'borrower_type': PlutoCell(value: row.borrowerType ?? ''),
-            'amount': PlutoCell(value: row.amount),
-            'balance': PlutoCell(value: row.balance),
-            'currency': PlutoCell(value: row.currency),
-            'loan_date': PlutoCell(value: row.loanDate),
-            'due_date': PlutoCell(value: row.dueDate ?? ''),
-            'purpose': PlutoCell(value: row.purpose ?? ''),
-            'status': PlutoCell(value: row.status),
-            'repayment_count': PlutoCell(value: row.repaymentCount),
-            'created_by': PlutoCell(value: row.createdByName ?? ''),
-          },
-        ),
-        index,
-      );
-
   @override
   Widget build(BuildContext context) {
     final loans = ref.watch(personalLoansProvider);
     final page = loans.valueOrNull;
     final l10n = AppLocalizations.of(context)!;
 
-    ref.listen(personalLoansProvider, (previous, next) => _applyRows(next));
-
-    // Also apply rows directly on build — covers the case where the
-    // provider resolved between the previous build and this one.
-    if (_stateManager != null && loans.hasValue) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _applyRows(ref.read(personalLoansProvider));
-      });
-    }
+    watchGridProvider(personalLoansProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -152,7 +269,36 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: _toolbar(l10n),
         ),
-        Expanded(child: _buildBody(loans)),
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              busy: _bulkBusy,
+              actions: [
+                if (user?.hasPermission('accounting', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+                if (user?.hasPermission('accounting', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkDelete(sel),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(l10n.commonDelete),
+                  ),
+              ],
+            );
+          },
+        ),
+        Expanded(child: gridScreenBody(loans, provider: personalLoansProvider)),
         if (page != null)
           ServerPaginationBar(
             page: page.currentPage,
@@ -322,7 +468,7 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab> {
             saveCsv(
               context,
               suggestedName: csvSuggestedName('personal-loans'),
-              csv: _buildCsv(l10n, rows),
+              csv: buildPersonalLoansCsv(l10n, rows),
               successMessage: l10n.equityPersonalLoanExported,
               errorMessage: l10n.equityPersonalLoanExportFailed,
             );
@@ -346,105 +492,8 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab> {
     );
   }
 
-  Widget _buildBody(AsyncValue<PagedResponse<PersonalLoan>> loans) {
-    final errorMessage = switch (loans) {
-      AsyncError(:final error) => error is ApiError ? error.message : null,
-      _ => null,
-    };
-    if (errorMessage != null) {
-      _stateManager = null;
-      return ScreenErrorPanel(
-        message: errorMessage,
-        onRetry: () => ref.invalidate(personalLoansProvider),
-      );
-    }
-    return _grid();
-  }
-
-  Widget _grid() {
-    final l10n = AppLocalizations.of(context)!;
-    final scheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-      child: PlutoGrid(
-        configuration: plutoGridConfigurationFor(context, compact: true),
-        columns: _columns,
-        rows: <PlutoRow>[],
-        onLoaded: (event) {
-          _stateManager = event.stateManager;
-          _stateManager?.hideColumn(
-            _columns.firstWhere((c) => c.field == 'id'),
-            true,
-            notify: false,
-          );
-          _applyRows(ref.read(personalLoansProvider));
-          // Safety net: re-apply after the current frame in case the
-          // provider resolved before onLoaded fired.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _applyRows(ref.read(personalLoansProvider));
-          });
-          _widthTracker?.dispose();
-          _widthTracker = GridColumnWidths.attach(
-            stateManager: event.stateManager,
-            screenKey: 'personal_loans',
-          );
-        },
-        onRowDoubleTap: (event) {
-          final id = event.row.cells['id']?.value as int?;
-          if (id == null || id <= 0) return;
-          final rows = ref.read(personalLoansProvider).valueOrNull?.items ??
-              const <PersonalLoan>[];
-          for (final row in rows) {
-            if (row.id == id) {
-              _viewDetail(context, row);
-              break;
-            }
-          }
-        },
-        onSorted: _onGridSorted,
-        noRowsWidget: Center(
-          child: Text(
-            l10n.equityPersonalLoanNoLoans,
-            style: TextStyle(color: scheme.outline),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String? _sortColumnFor(String field) {
-    switch (field) {
-      case 'loan_no':
-        return 'loan_no';
-      case 'loan_date':
-        return 'loan_date';
-      case 'borrower_name':
-        return 'borrower_name';
-      case 'amount':
-        return 'amount';
-      case 'balance':
-        return 'balance';
-      case 'status':
-        return 'status';
-      default:
-        return null;
-    }
-  }
-
-  void _onGridSorted(PlutoGridOnSortedEvent event) {
-    final sortBy = _sortColumnFor(event.column.field);
-    if (sortBy == null) return;
-    final sort = event.column.sort;
-    final order = sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC';
-    ref.read(personalLoansSortProvider.notifier).state =
-        PersonalLoansSort(sortBy, order);
-    if (ref.read(personalLoansPageProvider) != 1) {
-      ref.read(personalLoansPageProvider.notifier).state = 1;
-    }
-  }
-
-  List<PlutoColumn> _buildColumns(AppLocalizations l10n) {
+  @override
+  List<PlutoColumn> buildGridColumns(AppLocalizations l10n) {
     PlutoColumn textColumn(String field, String title, double width) =>
         PlutoColumn(
           title: title,
@@ -456,7 +505,6 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab> {
         );
 
     return [
-      serialGridColumn(),
       PlutoColumn(
         title: '',
         field: 'id',
@@ -530,8 +578,9 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab> {
         enableContextMenu: false,
         renderer: (ctx) {
           final balance = ctx.cell.value as num? ?? 0;
-          final row = ctx.cell.row.cells['data']?.value as PersonalLoan?;
-          final isSettled = row?.status == 'settled';
+          final id = ctx.row.cells['id']?.value as int?;
+          final loan = id != null ? _loansById[id] : null;
+          final isSettled = loan?.status == 'settled';
           return Align(
             alignment: Alignment.centerRight,
             child: Text(
@@ -622,38 +671,6 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab> {
         },
       ),
       textColumn('created_by', l10n.expensesCreatedby, 130),
-      PlutoColumn(
-        title: l10n.commonActions,
-        field: 'actions',
-        frozen: PlutoColumnFrozen.end,
-        type: PlutoColumnType.text(),
-        width: 64,
-        readOnly: true,
-        enableContextMenu: false,
-        enableFilterMenuItem: false,
-        enableHideColumnMenuItem: false,
-        enableSetColumnsMenuItem: false,
-        renderer: (ctx) {
-          final row = ctx.cell.row.cells['data']?.value as PersonalLoan?;
-          return Builder(
-            builder: (cellContext) => Listener(
-              behavior: HitTestBehavior.opaque,
-              onPointerDown: (_) {
-                if (row != null && mounted) {
-                  _showRowActions(context, row);
-                }
-              },
-              child: Center(
-                child: Icon(
-                  Icons.more_vert,
-                  size: 18,
-                  color: Theme.of(cellContext).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
     ];
   }
 
@@ -683,75 +700,6 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab> {
     if (result == true && context.mounted) {
       ref.invalidate(borrowersProvider);
     }
-  }
-
-  void _showRowActions(BuildContext context, PersonalLoan loan) {
-    final l10n = AppLocalizations.of(context)!;
-    final scheme = Theme.of(context).colorScheme;
-    final isSettled = loan.status == 'settled';
-    final isWrittenOff = loan.status == 'written_off';
-    final canEdit = !isSettled && !isWrittenOff;
-    final canDelete = !loan.hasRepayments;
-    final canWriteOff = loan.status == 'pending' || loan.status == 'partial';
-
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.visibility_outlined),
-              title: Text(l10n.commonView),
-              onTap: () {
-                Navigator.pop(ctx);
-                _viewDetail(context, loan);
-              },
-            ),
-            if (canEdit)
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: Text(l10n.equityPersonalLoanEdit),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final result = await showPersonalLoanCreateDialog(
-                    context,
-                    loan: loan,
-                  );
-                  if (result == true && context.mounted) {
-                    ref.invalidate(personalLoansProvider);
-                    ref.invalidate(personalLoanSummaryProvider);
-                  }
-                },
-              ),
-            if (canWriteOff)
-              ListTile(
-                leading: Icon(Icons.cancel_outlined, color: scheme.error),
-                title: Text(
-                  l10n.equityPersonalLoanStatusWrittenOff,
-                  style: TextStyle(color: scheme.error),
-                ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _writeOff(context, loan);
-                },
-              ),
-            if (canDelete)
-              ListTile(
-                leading: Icon(Icons.delete_outline, color: scheme.error),
-                title: Text(
-                  l10n.commonDelete,
-                  style: TextStyle(color: scheme.error),
-                ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _deleteLoan(context, loan);
-                },
-              ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _writeOff(BuildContext context, PersonalLoan loan) async {
@@ -834,40 +782,6 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab> {
           SnackBar(content: Text(error.message)),
         );
     }
-  }
-
-  String _buildCsv(AppLocalizations l10n, List<PersonalLoan> loans) {
-    final buffer = StringBuffer();
-    buffer.writeln([
-      'Loan No',
-      l10n.equityPersonalLoanBorrower,
-      l10n.equityPersonalLoanAmount,
-      'Currency',
-      'Balance',
-      'Repaid',
-      l10n.equityPersonalLoanDateGiven,
-      l10n.equityPersonalLoanDueDate,
-      l10n.equityPersonalLoanPurpose,
-      l10n.fieldsStatus,
-      l10n.expensesCreatedby,
-    ].join(','));
-
-    for (final loan in loans) {
-      buffer.writeln([
-        loan.loanNo,
-        '"${loan.borrowerName.replaceAll('"', '""')}"',
-        loan.amount,
-        loan.currency,
-        loan.balance,
-        loan.repaidAmount,
-        loan.loanDate,
-        loan.dueDate ?? '',
-        '"${(loan.purpose ?? '').replaceAll('"', '""')}"',
-        loan.status,
-        '"${(loan.createdByName ?? '').replaceAll('"', '""')}"',
-      ].join(','));
-    }
-    return buffer.toString();
   }
 }
 

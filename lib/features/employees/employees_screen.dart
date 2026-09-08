@@ -19,11 +19,15 @@ import 'package:minierp_app/core/theme/status_colors.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart';
+import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
+import '../../widgets/bulk_operations.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/pagination_bar.dart';
 import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
@@ -47,6 +51,24 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen>
     with PlutoGridScreen<Employee, EmployeesScreen> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
+  bool _bulkBusy = false;
+
+  Map<int, Employee> get _employeesById => {
+    for (final e
+        in ref.read(employeesProvider).valueOrNull?.items ?? const <Employee>[])
+      e.id: e,
+  };
+
+  @override
+  bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final search = ref.read(employeesSearchProvider);
+    final dept = ref.read(employeesDepartmentProvider);
+    final status = ref.read(employeesStatusProvider);
+    return '$search|$dept|$status';
+  }
 
   @override
   void openRowDetail(int employeeId) {
@@ -121,6 +143,67 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen>
     }
   }
 
+  /// Bulk delete (soft: `is_active=0`) with undo via reactivation (D3).
+  Future<void> _bulkDelete(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonDelete,
+      message: '${l10n.bulkDeleteSelected} (${ids.length})?',
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final repo = ref.read(employeeRepositoryProvider);
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _employeesById[id]?.fullName ?? '#$id',
+      operation: repo.delete,
+    );
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: l10n.bulkDeleted,
+      undoMessage: l10n.bulkDeleted,
+      onUndo: () async {
+        for (final id in result.succeeded) {
+          final undo = await repo.update(id, {'is_active': 1});
+          if (!mounted) return;
+          undo.fold(
+            onSuccess: (_) {},
+            onFailure: (err) =>
+                showAppToast(context, err.message, isError: true),
+          );
+        }
+        if (!mounted) return;
+        ref.invalidate(employeesProvider);
+      },
+      onComplete: () => ref.invalidate(employeesProvider),
+    );
+  }
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = [
+      for (final e in _employeesById.values)
+        if (ids.contains(e.id)) e,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('employees'),
+      csv: buildEmployeesCsv(l10n, selected),
+      successMessage: l10n.bulkExportSelected,
+      errorMessage: l10n.bulkDeleteFailed,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final employees = ref.watch(employeesProvider);
@@ -135,6 +218,35 @@ class _EmployeesScreenState extends ConsumerState<EmployeesScreen>
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: _toolbar(l10n),
+        ),
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              busy: _bulkBusy,
+              actions: [
+                if (user?.hasPermission('employees', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+                if (user?.hasPermission('employees', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkDelete(sel),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(l10n.bulkDeleteSelected),
+                  ),
+              ],
+            );
+          },
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),

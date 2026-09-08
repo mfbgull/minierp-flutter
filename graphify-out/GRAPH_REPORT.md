@@ -1,12 +1,12 @@
-# Graph Report - /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter  (2026-09-07)
+# Graph Report - /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter  (2026-09-08)
 
 ## Corpus Check
-- 569 files · ~686,190 words
+- 569 files · ~692,629 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5440 nodes · 8928 edges · 136 communities detected
-- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 1148 edges (avg confidence: 0.8)
+- 5493 nodes · 9046 edges · 135 communities detected
+- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 1152 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -145,14 +145,13 @@
 - [[_COMMUNITY_Community 132|Community 132]]
 - [[_COMMUNITY_Community 133|Community 133]]
 - [[_COMMUNITY_Community 134|Community 134]]
-- [[_COMMUNITY_Community 135|Community 135]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `package:flutter/material.dart` - 219 edges
 2. `package:flutter_riverpod/flutter_riverpod.dart` - 200 edges
 3. `run()` - 193 edges
 4. `../l10n/app_localizations.dart` - 176 edges
-5. `../data/repositories/api_result.dart` - 138 edges
+5. `../data/repositories/api_result.dart` - 137 edges
 6. `number` - 111 edges
 7. `../core/utils/formatters.dart` - 99 edges
 8. `package:minierp_app/core/theme/app_border_radius.dart` - 73 edges
@@ -160,130 +159,130 @@
 10. `logCRUD()` - 62 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `number` --calls--> `getStockMovementSummary()`  [INFERRED]
-  /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/lib/core/utils/formatters.dart → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/controllers/dashboardController.ts
+- `repairUnbatchedStock()` --calls--> `run()`  [INFERRED]
+  /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/scripts/repair-stock.ts → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/__tests__/glPoCommitment.test.ts
+- `repairOrphanedBatches()` --calls--> `run()`  [INFERRED]
+  /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/scripts/repair-stock.ts → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/__tests__/glPoCommitment.test.ts
+- `getStockMovementSummary()` --calls--> `number`  [INFERRED]
+  /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/controllers/dashboardController.ts → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/lib/core/utils/formatters.dart
 - `deleteDraft()` --calls--> `getRouteParam()`  [INFERRED]
   /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/controllers/mobileInvoiceController.ts → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/utils/queryUtils.ts
 - `searchItems()` --calls--> `getQueryParam()`  [INFERRED]
   /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/controllers/mobileInvoiceController.ts → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/utils/queryUtils.ts
-- `searchCustomers()` --calls--> `getQueryParam()`  [INFERRED]
-  /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/controllers/mobileInvoiceController.ts → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/utils/queryUtils.ts
-- `getWithdrawalById()` --calls--> `getMovements()`  [INFERRED]
-  /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/controllers/ownerEquityController.ts → /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter/server/src/models/OwnerWithdrawal.ts
 
 ## Communities
 
 ### Community 0 - "Community 0"
 Cohesion: 0.0
-Nodes (580): calculations/production_calculations.dart, ../core/utils/date_utils.dart, ../../data/models/activity_log.dart, ../../data/models/backup.dart, ../../data/models/bom.dart, ../../data/models/customer.dart, ../../data/models/expense.dart, ../../data/models/item.dart (+572 more)
+Nodes (638): ../activity_log/activity_log_providers.dart, activity_log_presenters.dart, ../admin/admin_providers.dart, calculations/production_calculations.dart, ../core/utils/date_utils.dart, ../core/utils/formatters.dart, ../../core/utils/purchase_return_type.dart, ../customers/customer_providers.dart (+630 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.01
-Nodes (463): activity_log_cleanup_dialog.dart, activity_log_detail_dialog.dart, bom_detail_dialog.dart, bom_form_dialog.dart, ../../core/utils/csv_export.dart, ../../core/utils/expense_status.dart, ../../core/utils/movement_type_label.dart, ../../core/utils/po_status.dart (+455 more)
+Nodes (516): activity_log_cleanup_dialog.dart, activity_log_detail_dialog.dart, bom_detail_dialog.dart, bom_form_dialog.dart, ../../core/auth/auth_notifier.dart, ../../core/utils/csv_export.dart, ../../core/utils/expense_status.dart, ../../core/utils/po_status.dart (+508 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.01
-Nodes (264): activityLogBackstop(), newCorrelationId(), logCRUD(), newCorrelationId(), BOMModel, createBOM(), deleteBOM(), getAllBOMs() (+256 more)
+Nodes (373): activity_log_providers.dart, activity_log_screen.dart, admin_shell.dart, app_border_radius.dart, bom_screen.dart, change_password_screen.dart, ../../core/router/module_routes.dart, ../core/theme/app_border_radius.dart (+365 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.01
-Nodes (160): ActivityLoggerService, capSnapshot(), cleanupLogs(), disposeLogger(), flushLogs(), getEntityLogs(), getRecentLogs(), getUserLogs() (+152 more)
+Nodes (257): activityLogBackstop(), newCorrelationId(), logCRUD(), newCorrelationId(), BOMModel, createBOM(), deleteBOM(), getAllBOMs() (+249 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.01
-Nodes (298): activity_log_screen.dart, admin_shell.dart, app_border_radius.dart, bom_screen.dart, change_password_screen.dart, ../../core/router/module_routes.dart, ../core/theme/app_border_radius.dart, ../../core/theme/status_colors.dart (+290 more)
+Nodes (116): createFixture(), addCurrency(), computeInvoiceGrandTotal(), computeInvoiceTotal(), computeLineAmount(), decomposeLineAmount(), multiplyCurrency(), parseCurrency() (+108 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.01
-Nodes (325): activity_log_presenters.dart, batch_management_screen.dart, ../core/utils/formatters.dart, ../../core/utils/invoice_status.dart, ../../core/utils/purchase_return_type.dart, ../../data/models/stock_movement.dart, ../../data/models/supplier.dart, edit_payment_dialog.dart (+317 more)
+Nodes (235): calculations/customer_calculations.dart, calculations/ledger_grouping.dart, ../../core/utils/ledger_export.dart, ../core/utils/print_utils.dart, customer_invoices_tab.dart, customer_ledger_tab.dart, customer_overview_tab.dart, customer_payment_modal.dart (+227 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.02
-Nodes (138): ../api/api_client.dart, api_result.dart, ../auth/session_events.dart, ../auth/token_storage.dart, cache_manager.dart, ../../core/api/api_client.dart, ../../core/api/endpoints.dart, ../../core/cache/cache_manager.dart (+130 more)
+Cohesion: 0.01
+Nodes (198): app.dart, app_localizations_en.dart, app_localizations_ur.dart, core/auth/session_events.dart, ../../core/i18n/locale_provider.dart, ../../core/router/module_registry.dart, ../../core/router/shell_destination.dart, core/theme/app_theme.dart (+190 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.01
-Nodes (128): json_helpers.dart, ledger_entry.dart, ActivityCount, ActivityLog, ActivityLogUser, ActivityStats, AuthUser, BackupFile (+120 more)
+Nodes (171): admin_models.dart, admin_providers.dart, admin_repository.dart, ../api/api_client.dart, api_result.dart, ../auth/session_events.dart, ../auth/token_storage.dart, cache_manager.dart (+163 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.02
-Nodes (141): cash_movement_labels.dart, csv_export.dart, dart:io, dart:typed_data, dart:ui, ../data/models/invoice.dart, ../data/models/payment.dart, ../../data/models/purchase_order.dart (+133 more)
+Nodes (154): cash_movement_labels.dart, csv_export.dart, dart:typed_data, dart:ui, ../data/models/invoice.dart, ../data/models/payment.dart, ../../data/models/purchase_order.dart, ../../data/models/sales_order.dart (+146 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.01
-Nodes (142): employee_detail_dialog.dart, employee_document_dialog.dart, employee_form_dialog.dart, employee_models.dart, employee_providers.dart, employee_repository.dart, loan_create_dialog.dart, loan_detail_dialog.dart (+134 more)
+Nodes (130): json_helpers.dart, ledger_entry.dart, ActivityCount, ActivityLog, ActivityLogUser, ActivityStats, AuthUser, hasPermission (+122 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.01
-Nodes (139): activity_log_providers.dart, ../../data/models/owner_equity.dart, ../data/models/statement.dart, detail_error.dart, detail_labels.dart, detail_rows.dart, ledger_table.dart, AlertDialog (+131 more)
+Nodes (147): batch_management_screen.dart, ../../core/utils/movement_type_label.dart, ../../data/models/sales_return.dart, ../../data/models/stock_batch.dart, ../../data/models/stock_movement.dart, ../../data/repositories/inventory_repository.dart, edit_payment_dialog.dart, inventory_providers.dart (+139 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.01
-Nodes (127): app.dart, app_localizations_en.dart, app_localizations_ur.dart, ../../core/auth/auth_notifier.dart, core/auth/session_events.dart, ../../core/i18n/locale_provider.dart, ../../core/router/module_registry.dart, ../../core/router/shell_destination.dart (+119 more)
+Cohesion: 0.02
+Nodes (133): dart:math, demand_forecast_screen.dart, forecast_accuracy_screen.dart, forecast_dashboard_screen.dart, forecast_models.dart, forecast_providers.dart, forecast_repository.dart, forecast_trends_screen.dart (+125 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.02
-Nodes (131): dart:math, demand_forecast_screen.dart, forecast_accuracy_screen.dart, forecast_dashboard_screen.dart, forecast_models.dart, forecast_providers.dart, forecast_repository.dart, forecast_trends_screen.dart (+123 more)
+Cohesion: 0.03
+Nodes (69): AccountingService, collectFlows(), getCashAccountTotals(), getCashAccountTransactions(), getGlBalances(), getOpeningBalances(), isValidPaymentMethod(), normalizeCashMethod() (+61 more)
 
 ### Community 13 - "Community 13"
 Cohesion: 0.02
-Nodes (123): cash_opening_balance_dialog.dart, cash_position_detail_dialog.dart, dashboard_customizer_dialog.dart, dashboard_kpi_catalog.dart, dashboard_layout_controller.dart, dashboard_panel_catalog.dart, dashboard_providers.dart, ../../data/models/dashboard_boot.dart (+115 more)
+Nodes (122): cash_opening_balance_dialog.dart, cash_position_detail_dialog.dart, dashboard_customizer_dialog.dart, dashboard_kpi_catalog.dart, dashboard_layout_controller.dart, dashboard_panel_catalog.dart, dashboard_providers.dart, ../../data/models/dashboard_boot.dart (+114 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.02
-Nodes (109): calculations/customer_calculations.dart, calculations/ledger_grouping.dart, ../../core/utils/ledger_export.dart, ../core/utils/print_utils.dart, customer_invoices_tab.dart, customer_ledger_tab.dart, customer_overview_tab.dart, customer_payment_modal.dart (+101 more)
+Cohesion: 0.03
+Nodes (78): getUserActivity(), create(), createTemplate(), duplicate(), findById(), findByUser(), getTemplates(), markRun() (+70 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.02
-Nodes (109): app_localizations.dart, exportToPDF(), formatCurrencyForExport(), exportToCSV(), exportToPDF(), handlePrint(), prepareExportData(), sanitizeCustomerName() (+101 more)
+Nodes (108): app_localizations.dart, dart:io, ../../data/models/backup.dart, ../../data/models/setting.dart, ../../data/repositories/backup_repository.dart, ../../data/repositories/settings_repository.dart, bytes, compactRange (+100 more)
 
 ### Community 16 - "Community 16"
 Cohesion: 0.02
-Nodes (91): app_toast.dart, grid_column_widths.dart, BulkFailure, BulkOperationResult, BulkPacing, disableForTests, Function, _isRateLimited (+83 more)
+Nodes (101): loan_create_dialog.dart, loan_detail_dialog.dart, loan_providers.dart, loan_repay_dialog.dart, build, Column, Divider, ListTile (+93 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.04
-Nodes (69): getUserActivity(), create(), createTemplate(), duplicate(), findById(), findByUser(), getTemplates(), markRun() (+61 more)
+Cohesion: 0.02
+Nodes (97): calculations/invoice_rules.dart, ../../core/utils/invoice_status.dart, ../../data/models/price_history.dart, invoice_payment_dialog.dart, invoice_providers.dart, invoice_return_dialog.dart, line_cells.dart, build (+89 more)
 
 ### Community 18 - "Community 18"
 Cohesion: 0.02
-Nodes (93): calculations/invoice_rules.dart, ../../data/models/price_history.dart, invoice_payment_dialog.dart, invoice_providers.dart, invoice_return_dialog.dart, invoice_return_providers.dart, line_cells.dart, build (+85 more)
-
-### Community 19 - "Community 19"
-Cohesion: 0.02
 Nodes (92): calculations/invoice_calculations.dart, calculations/invoice_line_calc.dart, line_items_grid.dart, _assertEditorFocus, build, _buildAmount, _closeOverlay, Column (+84 more)
 
-### Community 20 - "Community 20"
-Cohesion: 0.03
-Nodes (56): collectFlows(), getCashAccountTotals(), getCashAccountTransactions(), getOpeningBalances(), isValidPaymentMethod(), normalizeCashMethod(), saveOpeningBalance(), getCashPosition() (+48 more)
-
-### Community 21 - "Community 21"
-Cohesion: 0.02
-Nodes (81): admin_models.dart, admin_providers.dart, admin_repository.dart, AdminRepository, UserFilters, AdminShell, _AdminShellState, build (+73 more)
-
-### Community 22 - "Community 22"
+### Community 19 - "Community 19"
 Cohesion: 0.03
 Nodes (32): ActivityLogModel, localDateToUtcBound(), cleanupLogs(), exportLogs(), getActivityLogs(), getActivityStats(), getEntityActivity(), getRecentActivity() (+24 more)
 
+### Community 20 - "Community 20"
+Cohesion: 0.03
+Nodes (71): app_toast.dart, grid_column_widths.dart, BulkFailure, BulkOperationResult, BulkPacing, disableForTests, Function, _isRateLimited (+63 more)
+
+### Community 21 - "Community 21"
+Cohesion: 0.06
+Nodes (49): closePeriod(), getAccount(), getAccountBalance(), getCurrentPeriod(), getPeriod(), getReconciliation(), isValidIsoDate(), listAccountBalances() (+41 more)
+
+### Community 22 - "Community 22"
+Cohesion: 0.06
+Nodes (49): ActivityLoggerService, capSnapshot(), cleanupLogs(), disposeLogger(), flushLogs(), getEntityLogs(), getRecentLogs(), getUserLogs() (+41 more)
+
 ### Community 23 - "Community 23"
 Cohesion: 0.03
-Nodes (71): ApiFailure, ApiSuccess, _BorrowerFormDialog, _BorrowerFormDialogState, build, _decoration, dispose, Divider (+63 more)
+Nodes (65): ApiFailure, ApiSuccess, build, Column, Container, _DetailBody, Divider, _HeaderRow (+57 more)
 
 ### Community 24 - "Community 24"
 Cohesion: 0.03
-Nodes (70): ../core/utils/date_range_math.dart, ../data/models/user_preferences.dart, ../../data/repositories/preferences_repository.dart, _parseWeekStart, UserPreferences, UserPreset, _adopt, ApiFailure (+62 more)
+Nodes (61): ../../data/models/expense.dart, expense_form_dialog.dart, expense_providers.dart, expenses_grid_columns.dart, expenses_row_actions.dart, expenses_summary_strip.dart, expenses_toolbar.dart, ApiFailure (+53 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.06
-Nodes (46): closePeriod(), getAccount(), getAccountBalance(), getCurrentPeriod(), getPeriod(), getReconciliation(), isValidIsoDate(), listAccountBalances() (+38 more)
-
-### Community 26 - "Community 26"
 Cohesion: 0.07
 Nodes (52): deleteSeasonalEventHandler(), generateForecasts(), getAccuracyData(), getAccuracyDetail(), getDashboard(), getDemand(), getExport(), getModelConfigHandler() (+44 more)
 
+### Community 26 - "Community 26"
+Cohesion: 0.05
+Nodes (46): exportToPDF(), formatCurrencyForExport(), exportToCSV(), exportToPDF(), handlePrint(), prepareExportData(), sanitizeCustomerName(), todayStr() (+38 more)
+
 ### Community 27 - "Community 27"
-Cohesion: 0.09
-Nodes (8): AccountingService, getGlBalances(), getById(), getSummaryTotals(), softVoid(), update(), getBalanceSheet(), getTrialBalance()
+Cohesion: 0.04
+Nodes (45): ../data/models/statement.dart, detail_error.dart, detail_labels.dart, detail_rows.dart, ledger_table.dart, build, Column, DetailInfoRows (+37 more)
 
 ### Community 28 - "Community 28"
 Cohesion: 0.05
@@ -291,11 +290,11 @@ Nodes (36): ../../data/models/json_helpers.dart, Permission, Role, User, Employe
 
 ### Community 29 - "Community 29"
 Cohesion: 0.05
-Nodes (38): ../activity_log/activity_log_providers.dart, ../admin/admin_providers.dart, ../customers/customer_providers.dart, ../dashboard/dashboard_providers.dart, ../../employees/employee_detail_dialog.dart, ../employees/employee_providers.dart, ../../employees/loan_models.dart, ../employees/loan_providers.dart (+30 more)
+Nodes (38): ../../features/activity_log/activity_log_routes.dart, ../../features/admin/admin_routes.dart, ../../features/auth/auth_routes.dart, ../../features/customers/customers_routes.dart, ../../features/dashboard/dashboard_routes.dart, ../../features/employees/employees_routes.dart, ../../features/expenses/expenses_routes.dart, ../../features/forecasts/forecast_routes.dart (+30 more)
 
 ### Community 30 - "Community 30"
 Cohesion: 0.05
-Nodes (38): ../../features/activity_log/activity_log_routes.dart, ../../features/admin/admin_routes.dart, ../../features/auth/auth_routes.dart, ../../features/customers/customers_routes.dart, ../../features/dashboard/dashboard_routes.dart, ../../features/employees/employees_routes.dart, ../../features/expenses/expenses_routes.dart, ../../features/forecasts/forecast_routes.dart (+30 more)
+Nodes (37): employee_document_dialog.dart, loans_tab.dart, _AdvanceSummary, ApiFailure, ApiSuccess, build, Card, Center (+29 more)
 
 ### Community 31 - "Community 31"
 Cohesion: 0.18
@@ -303,43 +302,43 @@ Nodes (17): getSearch(), resolvePermissionContext(), search(), searchBOMs(), sea
 
 ### Community 32 - "Community 32"
 Cohesion: 0.16
-Nodes (15): create(), deleteRole(), getAllPermissions(), getById(), getByName(), getPermissionsForRole(), update(), updatePermissions() (+7 more)
-
-### Community 33 - "Community 33"
-Cohesion: 0.16
 Nodes (12): buildIntegrationStatus(), getByKey(), getIntegrationKeys(), updateBulk(), updateIntegrationSetting(), upsert(), getIntegrationSettings(), getSetting() (+4 more)
 
-### Community 34 - "Community 34"
+### Community 33 - "Community 33"
 Cohesion: 0.17
 Nodes (11): addDays, dateOnly, daysInRange, endOfWeek, mondayBasedIndex, presetRange, presetType, shiftRange (+3 more)
 
-### Community 35 - "Community 35"
+### Community 34 - "Community 34"
 Cohesion: 0.31
 Nodes (9): deleteBackupFile(), ensureBackupDir(), lastBackupAgeMs(), lastBackupAt(), listBackups(), pruneRetention(), resolveBackupFilePath(), runBackup() (+1 more)
 
-### Community 36 - "Community 36"
+### Community 35 - "Community 35"
 Cohesion: 0.29
 Nodes (6): ApiError, ApiFailure, ApiResult, ApiSuccess, Function, toString
 
-### Community 37 - "Community 37"
+### Community 36 - "Community 36"
 Cohesion: 0.29
 Nodes (6): PosCartItem, PosItem, PosSale, PosSaleLine, PosTransaction, PosWarehouse
 
-### Community 38 - "Community 38"
+### Community 37 - "Community 37"
 Cohesion: 0.33
 Nodes (0): 
 
-### Community 39 - "Community 39"
+### Community 38 - "Community 38"
 Cohesion: 0.33
 Nodes (3): AppDelegate, FlutterAppDelegate, FlutterImplicitEngineDelegate
 
-### Community 40 - "Community 40"
+### Community 39 - "Community 39"
 Cohesion: 0.7
 Nodes (4): validateZod(), validateZodBody(), validateZodParams(), validateZodQuery()
 
-### Community 41 - "Community 41"
+### Community 40 - "Community 40"
 Cohesion: 0.4
 Nodes (4): dashboard_layout.dart, dashboard_summary.dart, DashboardBoot, report.dart
+
+### Community 41 - "Community 41"
+Cohesion: 0.5
+Nodes (2): shutdownRateLimiters(), globalTeardown()
 
 ### Community 42 - "Community 42"
 Cohesion: 0.5
@@ -347,27 +346,27 @@ Nodes (0):
 
 ### Community 43 - "Community 43"
 Cohesion: 0.5
-Nodes (2): shutdownRateLimiters(), globalTeardown()
+Nodes (0): 
 
 ### Community 44 - "Community 44"
 Cohesion: 0.5
-Nodes (0): 
+Nodes (2): handle_new_rx_page(), Intercept NOTIFY_DEBUGGER_ABOUT_RX_PAGES and touch the pages.
 
 ### Community 45 - "Community 45"
 Cohesion: 0.5
-Nodes (2): handle_new_rx_page(), Intercept NOTIFY_DEBUGGER_ABOUT_RX_PAGES and touch the pages.
+Nodes (2): RunnerTests, XCTestCase
 
 ### Community 46 - "Community 46"
 Cohesion: 0.5
-Nodes (2): RunnerTests, XCTestCase
+Nodes (3): SearchAction, SearchResponse, SearchResult
 
 ### Community 47 - "Community 47"
 Cohesion: 0.5
-Nodes (3): SearchAction, SearchResponse, SearchResult
+Nodes (3): OffsetPagedResponse, PagedRequest, PagedResponse
 
 ### Community 48 - "Community 48"
-Cohesion: 0.5
-Nodes (3): OffsetPagedResponse, PagedRequest, PagedResponse
+Cohesion: 0.67
+Nodes (0): 
 
 ### Community 49 - "Community 49"
 Cohesion: 0.67
@@ -395,19 +394,19 @@ Nodes (0):
 
 ### Community 55 - "Community 55"
 Cohesion: 0.67
-Nodes (0): 
+Nodes (2): GeneratedPluginRegistrant, -registerWithRegistry
 
 ### Community 56 - "Community 56"
 Cohesion: 0.67
-Nodes (2): GeneratedPluginRegistrant, -registerWithRegistry
+Nodes (2): FlutterSceneDelegate, SceneDelegate
 
 ### Community 57 - "Community 57"
 Cohesion: 0.67
-Nodes (2): FlutterSceneDelegate, SceneDelegate
+Nodes (2): ItemPriceHistory, _num
 
 ### Community 58 - "Community 58"
-Cohesion: 0.67
-Nodes (2): ItemPriceHistory, _num
+Cohesion: 1.0
+Nodes (0): 
 
 ### Community 59 - "Community 59"
 Cohesion: 1.0
@@ -439,19 +438,19 @@ Nodes (0):
 
 ### Community 66 - "Community 66"
 Cohesion: 1.0
-Nodes (0): 
+Nodes (1): Breakpoints
 
 ### Community 67 - "Community 67"
 Cohesion: 1.0
-Nodes (1): Breakpoints
+Nodes (1): isoDate
 
 ### Community 68 - "Community 68"
 Cohesion: 1.0
-Nodes (1): isoDate
+Nodes (1): asBool
 
 ### Community 69 - "Community 69"
 Cohesion: 1.0
-Nodes (1): asBool
+Nodes (0): 
 
 ### Community 70 - "Community 70"
 Cohesion: 1.0
@@ -691,203 +690,199 @@ Nodes (0):
 
 ### Community 129 - "Community 129"
 Cohesion: 1.0
-Nodes (0): 
+Nodes (1): Click the first semantics node whose aria-label contains needle.
 
 ### Community 130 - "Community 130"
 Cohesion: 1.0
-Nodes (1): Click the first semantics node whose aria-label contains needle.
+Nodes (1): Click a navigation rail item by its semantics label.
 
 ### Community 131 - "Community 131"
 Cohesion: 1.0
-Nodes (1): Click a navigation rail item by its semantics label.
+Nodes (1): Scan screenshots for Flutter's yellow/black overflow stripes.
 
 ### Community 132 - "Community 132"
 Cohesion: 1.0
-Nodes (1): Scan screenshots for Flutter's yellow/black overflow stripes.
+Nodes (1): Print up to 40 visible aria-labels — helps diagnose the DOM state.
 
 ### Community 133 - "Community 133"
 Cohesion: 1.0
-Nodes (1): Print up to 40 visible aria-labels — helps diagnose the DOM state.
-
-### Community 134 - "Community 134"
-Cohesion: 1.0
 Nodes (1): Force-click the first flt-semantics node whose label contains needle.
 
-### Community 135 - "Community 135"
+### Community 134 - "Community 134"
 Cohesion: 1.0
 Nodes (1): Open the popover by clicking the pill's date label.
 
 ## Knowledge Gaps
-- **3373 isolated node(s):** `Intercept NOTIFY_DEBUGGER_ABOUT_RX_PAGES and touch the pages.`, `-registerWithRegistry`, `MiniErpApp`, `GoRouter`, `build` (+3368 more)
+- **3421 isolated node(s):** `Intercept NOTIFY_DEBUGGER_ABOUT_RX_PAGES and touch the pages.`, `-registerWithRegistry`, `MiniErpApp`, `GoRouter`, `build` (+3416 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Community 59`** (2 nodes): `requirePermission.ts`, `requirePermission()`
+- **Thin community `Community 58`** (2 nodes): `requirePermission.ts`, `requirePermission()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 60`** (2 nodes): `upload.ts`, `documentFilter()`
+- **Thin community `Community 59`** (2 nodes): `upload.ts`, `documentFilter()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 61`** (2 nodes): `paramName()`, `adminBackup.ts`
+- **Thin community `Community 60`** (2 nodes): `paramName()`, `adminBackup.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 62`** (2 nodes): `toLocalDate()`, `activityLog.test.ts`
+- **Thin community `Community 61`** (2 nodes): `toLocalDate()`, `activityLog.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 63`** (2 nodes): `fingerprint()`, `bootIdempotency.test.ts`
+- **Thin community `Community 62`** (2 nodes): `fingerprint()`, `bootIdempotency.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 64`** (2 nodes): `search.test.ts`, `createFixture()`
+- **Thin community `Community 63`** (2 nodes): `search.test.ts`, `createFixture()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 65`** (2 nodes): `setup.ts`, `cleanupTestDb()`
+- **Thin community `Community 64`** (2 nodes): `setup.ts`, `cleanupTestDb()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 66`** (2 nodes): `SkeletonCard()`, `ForecastTrends.tsx`
+- **Thin community `Community 65`** (2 nodes): `SkeletonCard()`, `ForecastTrends.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 67`** (2 nodes): `breakpoints.dart`, `Breakpoints`
+- **Thin community `Community 66`** (2 nodes): `breakpoints.dart`, `Breakpoints`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 68`** (2 nodes): `date_utils.dart`, `isoDate`
+- **Thin community `Community 67`** (2 nodes): `date_utils.dart`, `isoDate`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 69`** (2 nodes): `json_helpers.dart`, `asBool`
+- **Thin community `Community 68`** (2 nodes): `json_helpers.dart`, `asBool`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 70`** (1 nodes): `validation-schemas.ts`
+- **Thin community `Community 69`** (1 nodes): `validation-schemas.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 71`** (1 nodes): `dbg-flush.ts`
+- **Thin community `Community 70`** (1 nodes): `dbg-flush.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 72`** (1 nodes): `dbg-pay01.ts`
+- **Thin community `Community 71`** (1 nodes): `dbg-pay01.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 73`** (1 nodes): `eslint.config.js`
+- **Thin community `Community 72`** (1 nodes): `eslint.config.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 74`** (1 nodes): `jest.config.js`
+- **Thin community `Community 73`** (1 nodes): `jest.config.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 75`** (1 nodes): `cleanup-e2e-test-data.js`
+- **Thin community `Community 74`** (1 nodes): `cleanup-e2e-test-data.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 76`** (1 nodes): `repair-orphaned-ledger.ts`
+- **Thin community `Community 75`** (1 nodes): `repair-orphaned-ledger.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 77`** (1 nodes): `accounting.ts`
+- **Thin community `Community 76`** (1 nodes): `accounting.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 78`** (1 nodes): `activityLog.ts`
+- **Thin community `Community 77`** (1 nodes): `activityLog.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 79`** (1 nodes): `adminHealth.ts`
+- **Thin community `Community 78`** (1 nodes): `adminHealth.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 80`** (1 nodes): `auth.ts`
+- **Thin community `Community 79`** (1 nodes): `auth.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 81`** (1 nodes): `bom.ts`
+- **Thin community `Community 80`** (1 nodes): `bom.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 82`** (1 nodes): `customers.ts`
+- **Thin community `Community 81`** (1 nodes): `customers.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 83`** (1 nodes): `customReports.ts`
+- **Thin community `Community 82`** (1 nodes): `customReports.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 84`** (1 nodes): `dashboard.ts`
+- **Thin community `Community 83`** (1 nodes): `dashboard.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 85`** (1 nodes): `employees.ts`
+- **Thin community `Community 84`** (1 nodes): `employees.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 86`** (1 nodes): `expenses.ts`
+- **Thin community `Community 85`** (1 nodes): `expenses.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 87`** (1 nodes): `forecasts.ts`
+- **Thin community `Community 86`** (1 nodes): `forecasts.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 88`** (1 nodes): `integrations.ts`
+- **Thin community `Community 87`** (1 nodes): `integrations.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 89`** (1 nodes): `inventory.ts`
+- **Thin community `Community 88`** (1 nodes): `inventory.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 90`** (1 nodes): `invoices.ts`
+- **Thin community `Community 89`** (1 nodes): `invoices.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 91`** (1 nodes): `mobileInvoices.ts`
+- **Thin community `Community 90`** (1 nodes): `mobileInvoices.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 92`** (1 nodes): `ownerEquity.ts`
+- **Thin community `Community 91`** (1 nodes): `ownerEquity.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 93`** (1 nodes): `payments.ts`
+- **Thin community `Community 92`** (1 nodes): `payments.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 94`** (1 nodes): `pos.ts`
+- **Thin community `Community 93`** (1 nodes): `pos.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 95`** (1 nodes): `preferences.ts`
+- **Thin community `Community 94`** (1 nodes): `preferences.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 96`** (1 nodes): `production.ts`
+- **Thin community `Community 95`** (1 nodes): `production.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 97`** (1 nodes): `purchaseOrders.ts`
+- **Thin community `Community 96`** (1 nodes): `purchaseOrders.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 98`** (1 nodes): `purchaseReturns.ts`
+- **Thin community `Community 97`** (1 nodes): `purchaseReturns.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 99`** (1 nodes): `purchases.ts`
+- **Thin community `Community 98`** (1 nodes): `purchases.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 100`** (1 nodes): `reports.ts`
+- **Thin community `Community 99`** (1 nodes): `reports.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 101`** (1 nodes): `roles.ts`
+- **Thin community `Community 100`** (1 nodes): `roles.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 102`** (1 nodes): `sales.ts`
+- **Thin community `Community 101`** (1 nodes): `sales.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 103`** (1 nodes): `search.ts`
+- **Thin community `Community 102`** (1 nodes): `search.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 104`** (1 nodes): `settings.ts`
+- **Thin community `Community 103`** (1 nodes): `settings.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 105`** (1 nodes): `suppliers.ts`
+- **Thin community `Community 104`** (1 nodes): `suppliers.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 106`** (1 nodes): `users.ts`
+- **Thin community `Community 105`** (1 nodes): `users.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 107`** (1 nodes): `fix-duplicate-purchase.ts`
+- **Thin community `Community 106`** (1 nodes): `fix-duplicate-purchase.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 108`** (1 nodes): `express.d.ts`
+- **Thin community `Community 107`** (1 nodes): `express.d.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 109`** (1 nodes): `index.ts`
+- **Thin community `Community 108`** (1 nodes): `index.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 110`** (1 nodes): `search.ts`
+- **Thin community `Community 109`** (1 nodes): `search.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 111`** (1 nodes): `logger.ts`
+- **Thin community `Community 110`** (1 nodes): `logger.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 112`** (1 nodes): `authAsync.test.ts`
+- **Thin community `Community 111`** (1 nodes): `authAsync.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 113`** (1 nodes): `backupWal.test.ts`
+- **Thin community `Community 112`** (1 nodes): `backupWal.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 114`** (1 nodes): `cashTruth.test.ts`
+- **Thin community `Community 113`** (1 nodes): `cashTruth.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 115`** (1 nodes): `envHardening.test.ts`
+- **Thin community `Community 114`** (1 nodes): `envHardening.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 116`** (1 nodes): `models.test.ts`
+- **Thin community `Community 115`** (1 nodes): `models.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 117`** (1 nodes): `softDelete.test.ts`
+- **Thin community `Community 116`** (1 nodes): `softDelete.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 118`** (1 nodes): `userPreferences.test.ts`
+- **Thin community `Community 117`** (1 nodes): `userPreferences.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 119`** (1 nodes): `validation.test.ts`
+- **Thin community `Community 118`** (1 nodes): `validation.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 120`** (1 nodes): `weekMath.test.ts`
+- **Thin community `Community 119`** (1 nodes): `weekMath.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 121`** (1 nodes): `client-types.ts`
+- **Thin community `Community 120`** (1 nodes): `client-types.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 122`** (1 nodes): `invoiceV2.ts`
+- **Thin community `Community 121`** (1 nodes): `invoiceV2.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 123`** (1 nodes): `server-types.ts`
+- **Thin community `Community 122`** (1 nodes): `server-types.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 124`** (1 nodes): `dashboardConstants.ts`
+- **Thin community `Community 123`** (1 nodes): `dashboardConstants.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 125`** (1 nodes): `Package.swift`
+- **Thin community `Community 124`** (1 nodes): `Package.swift`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 126`** (1 nodes): `FlutterGeneratedPluginSwiftPackage.swift`
+- **Thin community `Community 125`** (1 nodes): `FlutterGeneratedPluginSwiftPackage.swift`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 127`** (1 nodes): `GeneratedPluginRegistrant.h`
+- **Thin community `Community 126`** (1 nodes): `GeneratedPluginRegistrant.h`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 128`** (1 nodes): `Runner-Bridging-Header.h`
+- **Thin community `Community 127`** (1 nodes): `Runner-Bridging-Header.h`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 129`** (1 nodes): `endpoints.dart`
+- **Thin community `Community 128`** (1 nodes): `endpoints.dart`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 130`** (1 nodes): `Click the first semantics node whose aria-label contains needle.`
+- **Thin community `Community 129`** (1 nodes): `Click the first semantics node whose aria-label contains needle.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 131`** (1 nodes): `Click a navigation rail item by its semantics label.`
+- **Thin community `Community 130`** (1 nodes): `Click a navigation rail item by its semantics label.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 132`** (1 nodes): `Scan screenshots for Flutter's yellow/black overflow stripes.`
+- **Thin community `Community 131`** (1 nodes): `Scan screenshots for Flutter's yellow/black overflow stripes.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 133`** (1 nodes): `Print up to 40 visible aria-labels — helps diagnose the DOM state.`
+- **Thin community `Community 132`** (1 nodes): `Print up to 40 visible aria-labels — helps diagnose the DOM state.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 134`** (1 nodes): `Force-click the first flt-semantics node whose label contains needle.`
+- **Thin community `Community 133`** (1 nodes): `Force-click the first flt-semantics node whose label contains needle.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 135`** (1 nodes): `Open the popover by clicking the pill's date label.`
+- **Thin community `Community 134`** (1 nodes): `Open the popover by clicking the pill's date label.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `package:flutter_riverpod/flutter_riverpod.dart` connect `Community 6` to `Community 0`, `Community 1`, `Community 4`, `Community 5`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 18`, `Community 21`, `Community 23`, `Community 24`, `Community 29`?**
-  _High betweenness centrality (0.260) - this node is a cross-community bridge._
-- **Why does `package:flutter/material.dart` connect `Community 4` to `Community 0`, `Community 1`, `Community 5`, `Community 6`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 18`, `Community 19`, `Community 21`, `Community 23`, `Community 24`, `Community 29`?**
-  _High betweenness centrality (0.154) - this node is a cross-community bridge._
-- **Why does `run()` connect `Community 3` to `Community 32`, `Community 33`, `Community 2`, `Community 35`, `Community 17`, `Community 20`, `Community 22`, `Community 25`, `Community 26`, `Community 27`?**
-  _High betweenness centrality (0.140) - this node is a cross-community bridge._
+- **Why does `package:flutter_riverpod/flutter_riverpod.dart` connect `Community 7` to `Community 0`, `Community 1`, `Community 2`, `Community 5`, `Community 6`, `Community 8`, `Community 10`, `Community 11`, `Community 13`, `Community 15`, `Community 16`, `Community 17`, `Community 20`, `Community 23`, `Community 24`, `Community 26`, `Community 27`, `Community 30`?**
+  _High betweenness centrality (0.258) - this node is a cross-community bridge._
+- **Why does `package:flutter/material.dart` connect `Community 2` to `Community 0`, `Community 1`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 10`, `Community 11`, `Community 13`, `Community 15`, `Community 16`, `Community 17`, `Community 18`, `Community 20`, `Community 23`, `Community 24`, `Community 26`, `Community 27`, `Community 30`?**
+  _High betweenness centrality (0.167) - this node is a cross-community bridge._
+- **Why does `number` connect `Community 3` to `Community 4`, `Community 12`, `Community 14`, `Community 15`, `Community 21`, `Community 22`, `Community 25`, `Community 31`?**
+  _High betweenness centrality (0.125) - this node is a cross-community bridge._
 - **Are the 192 inferred relationships involving `run()` (e.g. with `repairUnbatchedStock()` and `repairOrphanedBatches()`) actually correct?**
   _`run()` has 192 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `Intercept NOTIFY_DEBUGGER_ABOUT_RX_PAGES and touch the pages.`, `-registerWithRegistry`, `MiniErpApp` to the rest of the system?**
-  _3373 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _3421 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.0 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**

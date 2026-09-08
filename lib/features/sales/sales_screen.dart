@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart' show authProvider;
 import '../../core/utils/csv_export.dart';
 import '../../data/models/invoice.dart' show Invoice;
 import '../../data/repositories/api_result.dart' show ApiError;
@@ -471,24 +472,27 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
           valueListenable: _bulk.selected,
           builder: (context, sel, _) {
             if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
             return BulkActionBar(
               count: sel.length,
               onClearSelection: _bulk.clear,
               busy: _bulkBusy,
               actions: [
-                TextButton.icon(
-                  onPressed: () => _bulkExport(sel),
-                  icon: const Icon(Icons.file_download_outlined, size: 18),
-                  label: Text(l10n.bulkExportSelected),
-                ),
-                TextButton.icon(
-                  onPressed: () => _bulkDelete(sel),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
+                if (user?.hasPermission('invoices', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
                   ),
-                  label: Text(l10n.bulkDeleteSelected),
-                ),
+                if (user?.hasPermission('invoices', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkDelete(sel),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(l10n.bulkDeleteSelected),
+                  ),
               ],
             );
           },

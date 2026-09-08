@@ -56,6 +56,7 @@ abstract final class ApiEndpoints {
   static const suppliers = '/suppliers';
   static const purchaseOrders = '/purchase-orders';
   static const purchaseReturns = '/purchase-returns';
+  static const supplierRefunds = '/supplier-refunds';
 
   // Reports (§11) — first batch; add each endpoint as its report screen
   // is ported. Declared-but-unrouted report endpoints were removed

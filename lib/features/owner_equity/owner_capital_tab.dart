@@ -1,7 +1,8 @@
 // Owner capital list tab — read-only PlutoGrid over
 // `GET /owner-equity/capital` with server-side paging + search + date
 // filters (`PagedResponse<OwnerCapitalEntry>` + `ServerPaginationBar`,
-// same shape as the expenses screen).
+// same shape as the expenses screen). Migrated to PlutoGridScreen mixin
+// with bulk void + export (D5, D9).
 
 import 'dart:async';
 
@@ -10,21 +11,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/owner_equity.dart' show OwnerCapitalEntry;
-import '../../data/repositories/api_result.dart' show ApiError;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bulk_operations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
-import '../../widgets/grid_column_widths.dart';
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
-import '../../widgets/pluto_grid_screen.dart'
-    show autoFitPlutoColumns, plutoGridConfigurationFor, serialGridColumn, withSerialCell;
-import '../../widgets/screen_error_panel.dart';
+import '../../widgets/pluto_grid_screen.dart';
 import '../../widgets/screen_toolbar.dart';
 import 'owner_capital_form_dialog.dart';
 import 'owner_equity_providers.dart';
+import '../../data/repositories/owner_equity_repository.dart' show ownerEquityRepositoryProvider;
 
 class OwnerCapitalTab extends ConsumerStatefulWidget {
   const OwnerCapitalTab({super.key});
@@ -33,27 +33,161 @@ class OwnerCapitalTab extends ConsumerStatefulWidget {
   ConsumerState<OwnerCapitalTab> createState() => _OwnerCapitalTabState();
 }
 
-class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab> {
+class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab>
+    with PlutoGridScreen<OwnerCapitalEntry, OwnerCapitalTab> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
-  PlutoGridStateManager? _stateManager;
-  late List<PlutoColumn> _columns;
-  bool _columnsReady = false;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_columnsReady) {
-      _columns = _buildColumns(AppLocalizations.of(context)!);
-      _columnsReady = true;
+  bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final search = ref.read(capitalSearchProvider);
+    final from = ref.read(capitalFromDateProvider);
+    final to = ref.read(capitalToDateProvider);
+    return '$search|$from|$to';
+  }
+
+  @override
+  bool get hasRowActions => true;
+
+  @override
+  List<GridRowAction>? gridRowActionsFor(PlutoRow row, BuildContext context) {
+    final id = row.cells['id']?.value as int?;
+    if (id == null || id <= 0) return null;
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      GridRowAction(
+        icon: Icons.visibility_outlined,
+        label: l10n.commonView,
+        onTap: () => _openEntry(id),
+      ),
+      GridRowAction(
+        icon: Icons.edit_outlined,
+        label: l10n.commonEdit,
+        onTap: () => _openEntry(id),
+      ),
+    ];
+  }
+
+  void _openEntry(int id) {
+    final entries =
+        ref.read(ownerCapitalProvider).valueOrNull?.items ??
+        const <OwnerCapitalEntry>[];
+    for (final entry in entries) {
+      if (entry.id == id) {
+        showOwnerCapitalFormDialog(context, entry: entry);
+        return;
+      }
     }
   }
 
-  GridColumnWidths? _widthTracker;
+  @override
+  void openRowDetail(int rowId) => _openEntry(rowId);
+
+  @override
+  Iterable<OwnerCapitalEntry> gridRowsFrom(Object? value) =>
+      (value as PagedResponse<OwnerCapitalEntry>).items;
+
+  @override
+  PlutoRow gridRowFor(OwnerCapitalEntry entry) => PlutoRow(
+    cells: {
+      'id': PlutoCell(value: entry.id),
+      'capital_no': PlutoCell(value: entry.capitalNo),
+      'capital_date': PlutoCell(value: entry.capitalDate),
+      'payment_method': PlutoCell(value: entry.paymentMethod ?? ''),
+      'note': PlutoCell(value: entry.note ?? ''),
+      'amount': PlutoCell(value: entry.amount),
+      'status': PlutoCell(value: entry.status),
+      'created_by': PlutoCell(value: entry.createdByName ?? ''),
+    },
+  );
+
+  String? _sortColumnFor(String field) {
+    switch (field) {
+      case 'capital_no':
+        return 'oc.capital_no';
+      case 'capital_date':
+        return 'oc.capital_date';
+      case 'payment_method':
+        return 'oc.payment_method';
+      case 'amount':
+        return 'oc.amount';
+      case 'status':
+        return 'oc.status';
+      case 'created_by':
+        return 'oc.created_at';
+      default:
+        return null;
+    }
+  }
+
+  @override
+  void onGridSorted(PlutoGridOnSortedEvent event) {
+    final sortBy = _sortColumnFor(event.column.field);
+    if (sortBy == null) return;
+    final sort = event.column.sort;
+    final order = sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC';
+    ref.read(capitalSortProvider.notifier).state = EquitySort(sortBy, order);
+    if (ref.read(capitalPageProvider) != 1) {
+      ref.read(capitalPageProvider.notifier).state = 1;
+    }
+  }
+
+  void _bulkVoid(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final entries =
+        ref.read(ownerCapitalProvider).valueOrNull?.items ??
+        const <OwnerCapitalEntry>[];
+    final selected = [
+      for (final e in entries)
+        if (ids.contains(e.id)) e,
+    ];
+    if (selected.isEmpty) return;
+    final repo = ref.read(ownerEquityRepositoryProvider);
+    final result = await runBulkOperation(
+      ids: selected.map((e) => e.id).toList(),
+      labelFor: (id) {
+        final e = selected.firstWhere((e) => e.id == id);
+        return e.capitalNo;
+      },
+      operation: (id) => repo.voidCapital(id),
+    );
+    if (!mounted) return;
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: (count) => l10n.equityVoided,
+      onComplete: () {
+        ref.invalidate(ownerCapitalProvider);
+        ref.invalidate(equitySummaryProvider);
+      },
+    );
+  }
+
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final entries =
+        ref.read(ownerCapitalProvider).valueOrNull?.items ??
+        const <OwnerCapitalEntry>[];
+    final selected = [
+      for (final e in entries)
+        if (ids.contains(e.id)) e,
+    ];
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('owner-capital'),
+      csv: buildOwnerCapitalCsv(l10n, selected),
+      successMessage: l10n.equityExported,
+      errorMessage: l10n.equityExportfailed,
+    );
+  }
 
   @override
   void dispose() {
-    _widthTracker?.dispose();
     _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
@@ -76,62 +210,13 @@ class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab> {
     ref.read(capitalToDateProvider.notifier).state = null;
   }
 
-  /// Pushes the provider state into the grid manager (clear + append,
-  /// with the loading overlay toggled). No-op until `onLoaded`.
-  void _applyRows(AsyncValue<PagedResponse<OwnerCapitalEntry>> value) {
-    final manager = _stateManager;
-    if (manager == null) return;
-    manager.setShowLoading(value.isLoading);
-    if (value.hasValue) {
-      manager.removeAllRows();
-      manager.appendRows([
-        for (final (index, entry) in (value.value!.items).indexed)
-          _rowFor(entry, index),
-      ]);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !identical(_stateManager, manager)) return;
-        final tracker = _widthTracker;
-        if (tracker != null) {
-          tracker.programmaticPass(() => autoFitPlutoColumns(manager));
-        } else {
-          autoFitPlutoColumns(manager);
-        }
-      });
-    }
-  }
-
-  Future<void> _openRowMenu(
-    BuildContext cellContext,
-    OwnerCapitalEntry? entry,
-  ) async {
-    if (entry == null || !mounted) return;
-    showOwnerCapitalFormDialog(context, entry: entry);
-  }
-
-  PlutoRow _rowFor(OwnerCapitalEntry entry, int index) => withSerialCell(
-    PlutoRow(
-      cells: {
-        'data': PlutoCell(value: entry),
-        'id': PlutoCell(value: entry.id),
-        'capital_no': PlutoCell(value: entry.capitalNo),
-        'capital_date': PlutoCell(value: entry.capitalDate),
-        'payment_method': PlutoCell(value: entry.paymentMethod ?? ''),
-        'note': PlutoCell(value: entry.note ?? ''),
-        'amount': PlutoCell(value: entry.amount),
-        'status': PlutoCell(value: entry.status),
-        'created_by': PlutoCell(value: entry.createdByName ?? ''),
-      },
-    ),
-    index,
-  );
-
   @override
   Widget build(BuildContext context) {
     final capital = ref.watch(ownerCapitalProvider);
     final page = capital.valueOrNull;
     final l10n = AppLocalizations.of(context)!;
 
-    ref.listen(ownerCapitalProvider, (previous, next) => _applyRows(next));
+    watchGridProvider(ownerCapitalProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -144,7 +229,32 @@ class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: _toolbar(l10n),
         ),
-        Expanded(child: _buildBody(capital)),
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              actions: [
+                if (user?.hasPermission('accounting', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkVoid(sel),
+                    icon: const Icon(Icons.block_outlined, size: 18),
+                    label: Text(l10n.purchasesVoid),
+                  ),
+                if (user?.hasPermission('accounting', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+              ],
+            );
+          },
+        ),
+        Expanded(child: gridScreenBody(capital, provider: ownerCapitalProvider)),
         if (page != null)
           ServerPaginationBar(
             page: page.currentPage,
@@ -255,100 +365,8 @@ class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab> {
     );
   }
 
-  Widget _buildBody(AsyncValue<PagedResponse<OwnerCapitalEntry>> capital) {
-    final errorMessage = switch (capital) {
-      AsyncError(:final error) => error is ApiError ? error.message : null,
-      _ => null,
-    };
-    if (errorMessage != null) {
-      _stateManager = null;
-      return ScreenErrorPanel(
-        message: errorMessage,
-        onRetry: () => ref.invalidate(ownerCapitalProvider),
-      );
-    }
-    return _grid();
-  }
-
-  Widget _grid() {
-    final l10n = AppLocalizations.of(context)!;
-    final scheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-      child: PlutoGrid(
-        configuration: plutoGridConfigurationFor(context, compact: true),
-        columns: _columns,
-        rows: <PlutoRow>[],
-        onLoaded: (event) {
-          _stateManager = event.stateManager;
-          _stateManager?.hideColumn(
-            _columns.firstWhere((c) => c.field == 'id'),
-            true,
-            notify: false,
-          );
-          _applyRows(ref.read(ownerCapitalProvider));
-          _widthTracker?.dispose();
-          _widthTracker = GridColumnWidths.attach(
-            stateManager: event.stateManager,
-            screenKey: 'owner_capital',
-          );
-        },
-        onRowDoubleTap: (event) {
-          final id = event.row.cells['id']?.value as int?;
-          if (id == null || id <= 0) return;
-          final rows =
-              ref.read(ownerCapitalProvider).valueOrNull?.items ??
-              const <OwnerCapitalEntry>[];
-          for (final entry in rows) {
-            if (entry.id == id) {
-              showOwnerCapitalFormDialog(context, entry: entry);
-              break;
-            }
-          }
-        },
-        onSorted: _onGridSorted,
-        noRowsWidget: Center(
-          child: Text(
-            l10n.commonNoresults,
-            style: TextStyle(color: scheme.outline),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String? _sortColumnFor(String field) {
-    switch (field) {
-      case 'capital_no':
-        return 'oc.capital_no';
-      case 'capital_date':
-        return 'oc.capital_date';
-      case 'payment_method':
-        return 'oc.payment_method';
-      case 'amount':
-        return 'oc.amount';
-      case 'status':
-        return 'oc.status';
-      case 'created_by':
-        return 'oc.created_at';
-      default:
-        return null;
-    }
-  }
-
-  void _onGridSorted(PlutoGridOnSortedEvent event) {
-    final sortBy = _sortColumnFor(event.column.field);
-    if (sortBy == null) return;
-    final sort = event.column.sort;
-    final order = sort == PlutoColumnSort.ascending ? 'ASC' : 'DESC';
-    ref.read(capitalSortProvider.notifier).state = EquitySort(sortBy, order);
-    if (ref.read(capitalPageProvider) != 1) {
-      ref.read(capitalPageProvider.notifier).state = 1;
-    }
-  }
-
-  List<PlutoColumn> _buildColumns(AppLocalizations l10n) {
+  @override
+  List<PlutoColumn> buildGridColumns(AppLocalizations l10n) {
     PlutoColumn textColumn(String field, String title, double width) =>
         PlutoColumn(
           title: title,
@@ -360,7 +378,6 @@ class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab> {
         );
 
     return [
-      serialGridColumn(),
       PlutoColumn(
         title: '',
         field: 'id',
@@ -407,34 +424,6 @@ class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab> {
       ),
       textColumn('status', l10n.fieldsStatus, 100),
       textColumn('created_by', l10n.expensesCreatedby, 130),
-      PlutoColumn(
-        title: l10n.commonActions,
-        field: 'actions',
-        frozen: PlutoColumnFrozen.end,
-        type: PlutoColumnType.text(),
-        width: 64,
-        readOnly: true,
-        enableContextMenu: false,
-        enableFilterMenuItem: false,
-        enableHideColumnMenuItem: false,
-        enableSetColumnsMenuItem: false,
-        renderer: (ctx) {
-          final entry = ctx.cell.row.cells['data']?.value as OwnerCapitalEntry?;
-          return Builder(
-            builder: (cellContext) => Listener(
-              behavior: HitTestBehavior.opaque,
-              onPointerDown: (_) => _openRowMenu(cellContext, entry),
-              child: Center(
-                child: Icon(
-                  Icons.more_vert,
-                  size: 18,
-                  color: Theme.of(cellContext).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
     ];
   }
 
@@ -494,7 +483,6 @@ class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab> {
     height: 36,
     color: scheme.outlineVariant,
   );
-
 }
 
 class _EquityStat extends StatelessWidget {

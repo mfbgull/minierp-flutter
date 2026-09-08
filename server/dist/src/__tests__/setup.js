@@ -44,7 +44,13 @@ process.on('SIGTERM', () => {
     cleanupTestDb();
     process.exit(143);
 });
-// 5. Clean up rate limiter intervals and logger after all tests in this worker
+// 5. Async seed gate (spec 2.1): the admin user is bcrypt-hashed off the
+// event loop now, so hold the suites until the seeded row is committed.
+const database_1 = require("../config/database");
+beforeAll(async () => {
+    await database_1.dbSeedReady;
+}, 15000);
+// 6. Clean up rate limiter intervals and logger after all tests in this worker
 const rateLimiter_1 = require("../middleware/rateLimiter");
 const logger_1 = __importDefault(require("../utils/logger"));
 afterAll(async () => {
