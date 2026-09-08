@@ -19,6 +19,7 @@ import 'package:minierp_app/data/models/production.dart' show Production;
 import 'package:minierp_app/data/models/report.dart';
 import 'package:minierp_app/data/models/sales_return.dart';
 import 'package:minierp_app/data/models/stock_movement.dart';
+import 'package:minierp_app/data/models/supplier.dart';
 import 'package:minierp_app/l10n/app_localizations.dart';
 
 StockMovement _movement({
@@ -573,6 +574,55 @@ void main() {
     expect(csv, contains('HYPERLINK'));
     expect(csv, isNot(contains('+Beta Ltd')));
     expect(csv, contains('Beta Ltd'));
+    expect(csv, contains('Inactive'));
+  });
+
+  test('buildSuppliersCsv emits the grid columns and sanitizes cells', () {
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    final csv = buildSuppliersCsv(l10n, [
+      const Supplier(
+        id: 1,
+        supplierCode: 'SUP001',
+        supplierName: 'Alpha Traders',
+        contactPerson: 'Ali Raza',
+        phone: '555-0201',
+        email: 'a@alpha.com',
+        paymentTerms: 'Net 30',
+        currentBalance: 250.0,
+        isActive: true,
+      ),
+      Supplier(
+        id: 2,
+        supplierCode: '=HYPERLINK("x")', // sanitized
+        supplierName: '+Beta Supplies', // sanitized
+        phone: '555-0202',
+        currentBalance: 0,
+        isActive: false,
+      ),
+    ]);
+    final lines = csv.trim().split('\r\n');
+
+    expect(lines.length, 3);
+    expect(lines.first, contains('Supplier Code'));
+    expect(lines.first, contains('Supplier Name'));
+    expect(lines.first, contains('Contact Person'));
+    expect(lines.first, contains('Contact Info'));
+    expect(lines.first, contains('Payment Terms'));
+    expect(lines.first, contains('Balance'));
+    expect(lines.first, contains('Status'));
+
+    expect(csv, contains('SUP001'));
+    expect(csv, contains('Alpha Traders'));
+    expect(csv, contains('Ali Raza'));
+    expect(csv, contains('555-0201 / a@alpha.com')); // contact info joined
+    expect(csv, contains('Net 30'));
+    expect(csv, contains('250.00'));
+    expect(csv, contains('Active')); // localized status label
+    // Formula characters stripped from user-controlled string cells.
+    expect(csv, isNot(contains('=Hyperlink')));
+    expect(csv, contains('HYPERLINK'));
+    expect(csv, isNot(contains('+Beta Supplies')));
+    expect(csv, contains('Beta Supplies'));
     expect(csv, contains('Inactive'));
   });
 

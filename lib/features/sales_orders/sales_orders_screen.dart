@@ -12,12 +12,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/auth/auth_notifier.dart' show authProvider;
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/so_status.dart';
 import '../../data/models/sales_order.dart' show SalesOrder;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
+import '../../data/repositories/sales_order_repository.dart'
+    show salesOrderRepositoryProvider;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bulk_operations.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/pagination_bar.dart' show ServerPaginationBar;
 import '../../widgets/pluto_grid_screen.dart';
@@ -38,6 +43,24 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
     with PlutoGridScreen<SalesOrder, SalesOrdersScreen> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
+
+  /// Set while a bulk operation is in flight (D13).
+  bool _bulkBusy = false;
+
+  /// Bulk selection (spec: sales orders scope) — checkbox column +
+  /// select-all header driving the bulk action bar. Selection survives
+  /// page changes within the same filter state (D9).
+  @override
+  bool get enableBulkSelection => true;
+
+  @override
+  String get filterSignature {
+    final search = ref.read(salesOrdersSearchProvider);
+    final status = ref.read(salesOrdersStatusProvider);
+    final from = ref.read(salesOrdersFromDateProvider);
+    final to = ref.read(salesOrdersToDateProvider);
+    return '$search|$status|$from|$to';
+  }
 
   @override
   void openRowDetail(int soId) {
@@ -147,6 +170,71 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
     },
   );
 
+  /// The current page's sales orders, filtered to the selected ids.
+  List<SalesOrder> _selectedOrders(Set<int> ids) => [
+    for (final so in ref.read(salesOrdersProvider).valueOrNull?.items ??
+        const <SalesOrder>[])
+      if (ids.contains(so.id)) so,
+  ];
+
+  /// id → SalesOrder of the current page — bulk-action labels.
+  Map<int, SalesOrder> get _ordersById => {
+    for (final so in ref.read(salesOrdersProvider).valueOrNull?.items ??
+        const <SalesOrder>[])
+      so.id: so,
+  };
+
+  /// Bulk CSV export — the selected rows only (spec D10), mirroring the
+  /// grid columns via [buildSalesOrdersCsv].
+  void _bulkExport(Set<int> ids) {
+    final l10n = AppLocalizations.of(context)!;
+    final selected = _selectedOrders(ids);
+    if (selected.isEmpty) return;
+    saveCsv(
+      context,
+      suggestedName: csvSuggestedName('sales-orders'),
+      csv: buildSalesOrdersCsv(l10n, selected),
+      successMessage: l10n.salesordersExported,
+      errorMessage: l10n.salesordersExportfailed,
+    );
+  }
+
+  /// Bulk hard-delete of the selected sales orders (spec: hard delete,
+  /// no undo — the server rejects Completed/Invoiced orders; partial
+  /// failures render the D11 dialog).
+  Future<void> _bulkDelete(Set<int> ids) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: l10n.commonDelete,
+      message: '${l10n.bulkDeleteSelected} (${ids.length})?',
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final repo = ref.read(salesOrderRepositoryProvider);
+    setState(() => _bulkBusy = true);
+    final result = await runBulkOperation(
+      ids: ids.toList(),
+      labelFor: (id) => _ordersById[id]?.soNo ?? '#$id',
+      // D22: DELETE /sales-orders/:id sits behind the
+      // sensitiveOperationLimiter — runBulkOperation paces serially and
+      // honors the 429 retry window.
+      operation: repo.delete,
+    );
+    if (!mounted) return;
+    setState(() => _bulkBusy = false);
+    await finishBulkOperation(
+      context,
+      bulk: bulkSelection,
+      result: result,
+      successMessage: l10n.bulkDeleted,
+      onComplete: () => ref.invalidate(salesOrdersProvider),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final orders = ref.watch(salesOrdersProvider);
@@ -248,6 +336,37 @@ class _SalesOrdersScreenState extends ConsumerState<SalesOrdersScreen>
               label: Text(l10n.salesordersNewsalesorder),
             ),
           ],
+        ),
+        // Bulk action bar (checkbox rows selected) — delete + export the
+        // selected sales orders, permission-gated (D12).
+        ValueListenableBuilder<Set<int>>(
+          valueListenable: bulkSelection.selected,
+          builder: (context, sel, _) {
+            if (sel.isEmpty) return const SizedBox.shrink();
+            final user = ref.watch(authProvider).user;
+            return BulkActionBar(
+              count: sel.length,
+              onClearSelection: bulkSelection.clear,
+              busy: _bulkBusy,
+              actions: [
+                if (user?.hasPermission('sales_orders', 'read') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkExport(sel),
+                    icon: const Icon(Icons.file_download_outlined, size: 18),
+                    label: Text(l10n.bulkExportSelected),
+                  ),
+                if (user?.hasPermission('sales_orders', 'delete') ?? false)
+                  TextButton.icon(
+                    onPressed: () => _bulkDelete(sel),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(l10n.bulkDeleteSelected),
+                  ),
+              ],
+            );
+          },
         ),
         Expanded(child: gridScreenBody(orders, provider: salesOrdersProvider)),
         if (orders.valueOrNull case final page?)

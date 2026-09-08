@@ -721,6 +721,29 @@ class _AuthFakeAdapter implements HttpClientAdapter {
   Map<String, dynamic>? lastSupplierPutBody;
   int supplierDeleteCount = 0;
 
+  /// Ids the suppliers bulk delete DELETEed and the is_active flips from
+  /// the suppliers bulk activate/deactivate (spec Phase 1: suppliers
+  /// scope) — captured per-id before the /suppliers/1 branches.
+  final List<int> bulkDeletedSupplierIds = [];
+  final Map<int, Map<String, dynamic>> bulkSupplierUpdates = {};
+
+  /// Ids whose supplier bulk delete 400s (the D11 failure-dialog test).
+  final Set<int> failSupplierDeleteFor = {};
+
+  /// Ids the sales-orders bulk delete DELETEed (spec Phase 1: sales
+  /// orders scope) — captured per-id before the /sales-orders/1 branch.
+  final List<int> bulkDeletedSoIds = [];
+
+  /// Ids whose SO bulk delete 400s — Completed/Invoiced guard fixture.
+  final Set<int> failSoDeleteFor = {};
+
+  /// Ids the quotations bulk delete DELETEed (spec Phase 1: quotations
+  /// scope) — captured per-id before the /quotations/1 branch.
+  final List<int> bulkDeletedQuotationIds = [];
+
+  /// Ids whose quotation bulk delete 400s — Converted guard fixture.
+  final Set<int> failQuotationDeleteFor = {};
+
   /// Captured create/update bodies for the expense form tests.
   Map<String, dynamic>? lastExpensePostBody;
   Map<String, dynamic>? lastExpensePutBody;
@@ -2311,12 +2334,52 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'message': 'Supplier created successfully',
       }, status: 201);
     }
+    if (options.path.startsWith('/suppliers/') &&
+        options.method == 'DELETE') {
+      final deleteId = int.tryParse(options.path.split('/').last);
+      if (deleteId != null) {
+        if (failSupplierDeleteFor.contains(deleteId)) {
+          return _json(
+            {'error': 'Supplier has purchase orders and cannot be deleted'},
+            status: 400,
+          );
+        }
+        bulkDeletedSupplierIds.add(deleteId);
+        // The legacy row-menu tests assert on supplierDeleteCount for
+        // id 1 — keep it counting here (this branch serves both flows).
+        if (deleteId == 1) supplierDeleteCount++;
+        return _json({
+          'success': true,
+          'message': 'Supplier deleted successfully',
+        });
+      }
+    }
     if (options.path == '/suppliers/1' && options.method == 'DELETE') {
       supplierDeleteCount++;
       return _json({
         'success': true,
         'message': 'Supplier deleted successfully',
       });
+    }
+    if (options.method == 'PUT' && options.path.startsWith('/suppliers/')) {
+      final putId = int.tryParse(options.path.split('/').last);
+      if (putId != null) {
+        bulkSupplierUpdates[putId] = options.data as Map<String, dynamic>;
+        // Bulk activate/deactivate on ids other than 1 — succeed (the
+        // id-1 branch below keeps serving the form-edit tests).
+        if (putId != 1) {
+          return _json({
+            'success': true,
+            'data': {
+              'id': putId,
+              'supplier_code': 'SUP${putId.toString().padLeft(3, '0')}',
+              'supplier_name': 'Supplier $putId',
+              'is_active': (options.data as Map<String, dynamic>)['is_active'],
+            },
+            'message': 'Supplier updated successfully',
+          });
+        }
+      }
     }
     if (options.path == '/suppliers/1' && options.method == 'PUT') {
       final body = options.data as Map<String, dynamic>;
@@ -4458,6 +4521,24 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'total_amount': 0,
       });
     }
+    if (options.method == 'DELETE' &&
+        options.path.startsWith('/quotations/')) {
+      final deleteId = int.tryParse(options.path.split('/').last);
+      if (deleteId != null) {
+        // Server guard fixture (D18): Converted quotations 400.
+        if (failQuotationDeleteFor.contains(deleteId)) {
+          return _json(
+            {'error': 'Cannot delete a converted quotation'},
+            status: 400,
+          );
+        }
+        bulkDeletedQuotationIds.add(deleteId);
+        return _json({
+          'success': true,
+          'message': 'Quotation deleted successfully',
+        });
+      }
+    }
     if (options.path == '/quotations/1' && options.method == 'DELETE') {
       quotationDeleteCount++;
       return _json({
@@ -4591,6 +4672,21 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'status': body['status'] ?? so1Status,
         'total_amount': 0,
       });
+    }
+    if (options.method == 'DELETE' &&
+        options.path.startsWith('/sales-orders/')) {
+      final deleteId = int.tryParse(options.path.split('/').last);
+      if (deleteId != null) {
+        // Server guard fixture (D18): Completed/Invoiced orders 400.
+        if (failSoDeleteFor.contains(deleteId)) {
+          return _json(
+            {'error': 'Cannot delete a sales order that has been invoiced'},
+            status: 400,
+          );
+        }
+        bulkDeletedSoIds.add(deleteId);
+        return _json({'message': 'Sales order deleted successfully'});
+      }
     }
     if (options.path == '/sales-orders/1' && options.method == 'DELETE') {
       salesOrderDeleteCount++;
@@ -9697,6 +9793,71 @@ void main() {
     if (file.existsSync()) file.deleteSync();
   });
 
+  testWidgets('sales orders screen bulk delete confirms and calls DELETE per id', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    BulkPacing.disableForTests();
+    addTearDown(() {
+      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+    });
+    final adapter = _AuthFakeAdapter();
+    await bootToSalesOrders(tester, adapter);
+
+    // Select the first data row (not the header select-all). The cell's
+    // double-tap recognizer holds the gesture arena for ~300ms, so
+    // advance fake time past it before asserting.
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.text('1 selected'), findsOneWidget);
+
+    // Delete selected → confirm dialog → hard delete fires for id 1.
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
+    await tester.pumpAndSettle();
+    expect(adapter.bulkDeletedSoIds, [1]);
+    // Hard delete — no undo (D3).
+    expect(find.text('1 deleted'), findsOneWidget);
+  });
+
+  testWidgets('sales orders screen bulk delete with failures shows the D11 dialog', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    BulkPacing.disableForTests();
+    addTearDown(() {
+      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+    });
+    // Server guard fixture (D18): Completed (2) and Invoiced (3) orders
+    // are rejected; Confirmed (1) deletes.
+    final adapter = _AuthFakeAdapter()
+      ..failSoDeleteFor.addAll([2, 3]);
+    await bootToSalesOrders(tester, adapter);
+
+    // Select all → delete: SO 1 succeeds, SOs 2/3 fail with reasons.
+    await tester.tap(find.byType(Checkbox).last);
+    await tester.pumpAndSettle();
+    expect(find.text('3 selected'), findsOneWidget);
+
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
+    await tester.pumpAndSettle();
+
+    expect(adapter.bulkDeletedSoIds, [1]);
+    expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
+    expect(find.text('1 done, 2 failed'), findsOneWidget);
+    expect(
+      find.textContaining('Cannot delete a sales order'),
+      findsNWidgets(2),
+    );
+  });
+
   testWidgets('sales orders screen F2 opens the SO detail dialog', (
     tester,
   ) async {
@@ -10071,6 +10232,70 @@ void main() {
     if (file.existsSync()) file.deleteSync();
   });
 
+  testWidgets('quotations screen bulk delete confirms and calls DELETE per id', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    BulkPacing.disableForTests();
+    addTearDown(() {
+      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+    });
+    final adapter = _AuthFakeAdapter();
+    await bootToQuotations(tester, adapter);
+
+    // Select the first data row (not the header select-all). The cell's
+    // double-tap recognizer holds the gesture arena for ~300ms, so
+    // advance fake time past it before asserting.
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.text('1 selected'), findsOneWidget);
+
+    // Delete selected → confirm dialog → hard delete fires for id 1.
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
+    await tester.pumpAndSettle();
+    expect(adapter.bulkDeletedQuotationIds, [1]);
+    // Hard delete — no undo (D3).
+    expect(find.text('1 deleted'), findsOneWidget);
+  });
+
+  testWidgets('quotations screen bulk delete with failures shows the D11 dialog', (
+    tester,
+  ) async {
+    useWideSurface(tester);
+    BulkPacing.disableForTests();
+    addTearDown(() {
+      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+    });
+    final adapter = _AuthFakeAdapter()..failQuotationDeleteFor.add(2);
+    await bootToQuotations(tester, adapter);
+
+    // Select all → delete: quotation 2 fails (fixture), the rest succeed.
+    await tester.tap(find.byType(Checkbox).last);
+    await tester.pumpAndSettle();
+    expect(find.text('3 selected'), findsOneWidget);
+
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
+    await tester.pumpAndSettle();
+
+    // 2 deleted, 1 failed with the server's reason.
+    expect(adapter.bulkDeletedQuotationIds.length, 2);
+    expect(adapter.bulkDeletedQuotationIds, isNot(contains(2)));
+    expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
+    expect(find.text('2 done, 1 failed'), findsOneWidget);
+    expect(
+      find.textContaining('Cannot delete a converted quotation'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('quotations screen F2 opens the quotation detail dialog', (
     tester,
   ) async {
@@ -10428,6 +10653,111 @@ void main() {
     // Server pagination block → bar (25 suppliers at limit 10 = 3 pages).
     expect(find.text('Page 1 of 3'), findsOneWidget);
     expect(find.text('· 25 Suppliers'), findsOneWidget);
+  });
+
+  testWidgets('suppliers screen bulk delete confirms and calls DELETE per id', (
+    tester,
+  ) async {
+    // Wide surface: the bulk bar carries 4 actions (export +
+    // activate/deactivate + delete) — same width the customers bulk
+    // tests use.
+    tester.view.physicalSize = const Size(2200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    BulkPacing.disableForTests();
+    addTearDown(() {
+      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+    });
+    final adapter = _AuthFakeAdapter();
+    await bootToSuppliers(tester, adapter);
+
+    // Select the first data row (not the header select-all). The cell's
+    // double-tap recognizer holds the gesture arena for ~300ms, so
+    // advance fake time past it before asserting.
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.text('1 selected'), findsOneWidget);
+
+    // Delete selected → confirm dialog → soft delete fires for id 1.
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
+    await tester.pumpAndSettle();
+    expect(adapter.bulkDeletedSupplierIds, [1]);
+    // Soft delete — no undo (D3: no restore endpoint for suppliers).
+    expect(find.text('1 deleted'), findsOneWidget);
+  });
+
+  testWidgets('suppliers screen bulk delete with failures shows the D11 dialog', (
+    tester,
+  ) async {
+    // Wide surface: 4-action bulk bar (same as the customers bulk tests).
+    tester.view.physicalSize = const Size(2200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    BulkPacing.disableForTests();
+    addTearDown(() {
+      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+    });
+    final adapter = _AuthFakeAdapter()..failSupplierDeleteFor.add(2);
+    await bootToSuppliers(tester, adapter);
+
+    // Select all → delete: supplier 2 fails (fixture), the rest of the
+    // page-1 rows (10 at the default limit) succeed.
+    await tester.tap(find.byType(Checkbox).last);
+    await tester.pumpAndSettle();
+    expect(find.text('10 selected'), findsOneWidget);
+
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
+    await tester.pumpAndSettle();
+
+    // 9 deleted, 1 failed with the server's reason.
+    expect(adapter.bulkDeletedSupplierIds.length, 9);
+    expect(adapter.bulkDeletedSupplierIds, isNot(contains(2)));
+    expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
+    expect(find.text('9 done, 1 failed'), findsOneWidget);
+    expect(
+      find.textContaining('Supplier has purchase orders'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('suppliers screen bulk activate/deactivate PUTs is_active', (
+    tester,
+  ) async {
+    // Wide surface: 4-action bulk bar (same as the customers bulk tests).
+    tester.view.physicalSize = const Size(2200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    BulkPacing.disableForTests();
+    addTearDown(() {
+      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+    });
+    final adapter = _AuthFakeAdapter();
+    await bootToSuppliers(tester, adapter);
+
+    // Select all → deactivate selected flips is_active=0 for every
+    // page-1 supplier (10 at the default limit).
+    await tester.tap(find.byType(Checkbox).last);
+    await tester.pumpAndSettle();
+    expect(find.text('10 selected'), findsOneWidget);
+
+    await tester.tap(find.text('Deactivate selected'));
+    await tester.pumpAndSettle();
+    expect(adapter.bulkSupplierUpdates.length, 10);
+    expect(
+      adapter.bulkSupplierUpdates.values.every((b) => b['is_active'] == 0),
+      isTrue,
+    );
+    // The action bar disappears once the selection resets on refresh.
+    expect(find.text('Delete selected'), findsNothing);
   });
 
   testWidgets('customers screen renders the server-paged grid', (tester) async {

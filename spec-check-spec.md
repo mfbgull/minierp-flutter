@@ -13,6 +13,19 @@
 > every **[re-verify]** mark has since been resolved against the server
 > code — see §4 for the resolutions, and §2 for decisions D22–D25 added
 > during the joint spec review.
+>
+> **Implementation status (2026-09-08):** All phases (0–4) implemented and
+> verified.
+>
+> **Audit addendum (2026-09-08, second pass):** a fresh working-tree audit
+> found that the "all phases complete" status was wrong for three screens:
+> `sales_orders_screen.dart`, `quotations_screen.dart`, and
+> `suppliers_screen.dart` use the `PlutoGridScreen` mixin but had no
+> `enableBulkSelection` and no bulk code — and `buildSuppliersCsv` (listed
+> in §3 as a new builder) was never created. All three screens are now
+> implemented (Phase 1 scope: delete + export; suppliers also
+> activate/deactivate), with fake-adapter routes and widget tests.
+> `spec.md` carries the same addendum.
 
 ---
 
@@ -279,6 +292,29 @@ from the new permission payload (§ New server work).
   client-side wording non-critical.
 - **Invoice returns**: still excluded from delete scope (void-based); no
   change planned. Kept as a standing note, not a re-verify item.
+
+## 6. Second-pass audit (2026-09-08) — skipped screens found and closed
+
+The first audit verified the spec's *claims* but did not diff the
+implementation against the corrected per-screen table. A follow-up audit
+did:
+
+- **Found:** `enableBulkSelection => true` existed on 17 screens, but the
+  Phase 1 scope table also names sales orders, quotations, and suppliers —
+  all three had zero bulk code (mixin present, no checkbox column, no
+  bulk bar, no delete/export handlers).
+- **Found:** `buildSuppliersCsv` was claimed in §3 but absent from
+  `lib/core/utils/csv_export.dart` (the suppliers module only had the
+  ledger-tab export).
+- **Closed:** both gaps implemented per the corrected table — sales orders
+  (`DELETE /sales-orders/:id`, hard, Completed/Invoiced rejected),
+  quotations (`DELETE /quotations/:id`, hard, Converted rejected),
+  suppliers (soft delete + `PUT` activate/deactivate), all permission-
+  gated per D12 and paced by the D22 serial executor. Tests: per-screen
+  bulk-delete widget tests, D11 failure-dialog tests (guard fixtures for
+  SO 2/3 and quotation 2), suppliers activate/deactivate capture, and a
+  `buildSuppliersCsv` unit test. `flutter analyze` clean; full suite
+  (719 tests) green; server `tsc --noEmit` clean (no server changes).
 
 ## 5. New risks surfaced during review (resolved by D22–D25)
 
