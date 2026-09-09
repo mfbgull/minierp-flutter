@@ -1,5 +1,5 @@
-// Supplier refund dialog — issues a cash payout against a purchase
-// return's credit note (`POST /supplier-refunds`). Opened from the
+// Supplier refund dialog — records the cash the supplier pays back
+// against a purchase return's credit note (`POST /supplier-refunds`). Opened from the
 // return detail dialog when the return has a POSTED credit note with
 // refundable balance remaining. Mirrors the void dialog's structure:
 // optimistic busy state, error banner, server re-validation.

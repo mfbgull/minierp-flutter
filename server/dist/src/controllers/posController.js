@@ -155,8 +155,10 @@ function createPOSSale(req, res) {
             // received. Any overpayment (change) is returned to the customer
             // and must NOT be recorded in the customer ledger, otherwise the
             // walk-in accumulates a spurious Cr balance.
+            let posPaymentNo = null;
             if (paymentAmount > 0) {
                 const paymentNo = Invoice_1.default.generatePaymentNoAtomic(database_1.default);
+                posPaymentNo = paymentNo;
                 const paymentId = Invoice_1.default.createPayment(database_1.default, paymentNo, walkinCustomerId, sale_date, paymentAmount, 'Cash', null, `POS Transaction ${transactionNo}`);
                 Invoice_1.default.createPaymentAllocation(database_1.default, paymentId, invoiceId, paymentAmount);
                 // Create ledger entry for payment
@@ -199,10 +201,10 @@ function createPOSSale(req, res) {
             }
             if (paymentAmount > 0) {
                 const posPayment = database_1.default.prepare('SELECT id FROM payments WHERE notes = ? ORDER BY id DESC LIMIT 1').get(`POS Transaction ${transactionNo}`);
-                if (posPayment) {
+                if (posPayment && posPaymentNo) {
                     accountingService_1.default.postPaymentEntry(database_1.default, {
                         paymentId: posPayment.id,
-                        paymentNo: `POS-${transactionNo}`,
+                        paymentNo: posPaymentNo,
                         amount: paymentAmount,
                         paymentDate: sale_date,
                         paymentMethod: 'cash',

@@ -27,6 +27,17 @@ class TotalMismatchError extends Error {
   }
 }
 
+/**
+ * Inline payment carried a payment_method outside the accepted
+ * whitelist — a client error (400), not a server fault.
+ */
+class InvalidPaymentMethodError extends Error {
+  constructor(method?: string | null) {
+    super(`Invalid payment_method "${method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
+    this.name = 'InvalidPaymentMethodError';
+  }
+}
+
 const {
   createLedgerEntry,
   recalcCustomerBalanceFromLedger,
@@ -223,7 +234,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
     // Same whitelist as PaymentModel — inline payments reached the GL
     // before this even when their method was unrecognized.
     if (record_payment && payment && paymentAmountNum > 0 && !isValidPaymentMethod(payment.payment_method)) {
-      throw new Error(`Invalid payment_method "${payment.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
+      throw new InvalidPaymentMethodError(payment.payment_method);
     }
 
     let initialStatus: InvoiceStatus;
@@ -414,6 +425,11 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       res.status(400).json({ error: 'total_amount disagrees with line items' });
       return;
     }
+    if (error instanceof InvalidPaymentMethodError) {
+      logger.warn('Create invoice rejected:', { error: error.message });
+      res.status(400).json({ error: error.message });
+      return;
+    }
     // FIX #7: Generic error message, log detail server-side
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorCode = (error as { code?: string }).code;
@@ -563,7 +579,7 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
             newPaymentAmount = parseCurrency(payment.amount);
 
             if (!isValidPaymentMethod(payment.payment_method)) {
-                throw new Error(`Invalid payment_method "${payment.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
+                throw new InvalidPaymentMethodError(payment.payment_method);
             }
 
             // FIX #5: Atomic payment number generation
@@ -756,6 +772,11 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
     if (error instanceof TotalMismatchError) {
       logger.warn('Update invoice rejected:', { error: error.message });
       res.status(400).json({ error: 'total_amount disagrees with line items' });
+      return;
+    }
+    if (error instanceof InvalidPaymentMethodError) {
+      logger.warn('Update invoice rejected:', { error: error.message });
+      res.status(400).json({ error: error.message });
       return;
     }
 

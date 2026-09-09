@@ -186,15 +186,15 @@ export function collectFlows(
     add(row.payment_method, row.inflow, 0);
   }
 
-  // Supplier refunds (pre-floor fold): POSTED rows paid a supplier back.
+  // Supplier refunds (pre-floor fold): POSTED rows are money back in.
   const refundPreFloor = db.prepare(`
-    SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
+    SELECT payment_method, COALESCE(SUM(amount), 0) as inflow
     FROM supplier_refunds
     WHERE status = 'POSTED' AND refund_date < ? AND refund_date <= ?
     GROUP BY payment_method
-  `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
+  `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number }>;
   for (const row of refundPreFloor) {
-    add(row.payment_method, 0, row.outflow);
+    add(row.payment_method, row.inflow, 0);
   }
 
 
@@ -292,15 +292,15 @@ export function collectFlows(
     add(row.payment_method, row.inflow, 0);
   }
 
-  // Supplier refunds: money out once POSTED (voided rows paid nothing).
+  // Supplier refunds: money in once POSTED (voided rows collected nothing).
   const supplierRefunds = db.prepare(`
-    SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
+    SELECT payment_method, COALESCE(SUM(amount), 0) as inflow
     FROM supplier_refunds
     WHERE status = 'POSTED' AND refund_date > ? AND refund_date <= ?
     GROUP BY payment_method
-  `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
+  `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number }>;
   for (const row of supplierRefunds) {
-    add(row.payment_method, 0, row.outflow);
+    add(row.payment_method, row.inflow, 0);
   }
 
   // CASH-01 (financial-audit-p0-remediation 1.1): direct purchases are NOT
@@ -392,8 +392,9 @@ export function syncOpeningBalancesToGl(db: Database.Database, userId?: number):
   AccountingService.voidJournalLinesByReference(db, 'OPENING_BALANCE', 0);
   if (lines.length === 0) return; // zeroed seed → GL openings zeroed too
 
-  // Date the entry at the earliest transaction so every later as-of
-  // balance includes the seed; local today on completely empty books.
+  // Date the entry one day before the earliest transaction so the seed
+  // lands in the opening balance of the first transaction day instead of
+  // double-counting with that day's flows; local today on empty books.
   const earliest = db.prepare(`
     SELECT MIN(d) as d FROM (
       SELECT MIN(payment_date) as d FROM payments
@@ -406,7 +407,9 @@ export function syncOpeningBalancesToGl(db: Database.Database, userId?: number):
       UNION ALL SELECT MIN(refund_date) FROM supplier_refunds
     )
   `).get() as { d: string | null };
-  const entryDate = earliest.d ?? (db.prepare(`SELECT date('now', 'localtime') as d`).get() as { d: string }).d;
+  const entryDate = earliest.d
+    ? (db.prepare(`SELECT date(?, '-1 day') as d`).get(earliest.d) as { d: string }).d
+    : (db.prepare(`SELECT date('now', 'localtime') as d`).get() as { d: string }).d;
 
   AccountingService.postEntry(db, {
     entry_date: entryDate,
@@ -637,7 +640,7 @@ export function getCashAccountTransactions(
     });
   }
 
-  // Supplier refunds (money out once POSTED — voided rows paid nothing).
+  // Supplier refunds (money in once POSTED — voided rows collected nothing).
   for (const r of db.prepare(`
     SELECT refund_date as date, payment_method as method, refund_no as reference,
            reference_no as description, amount
@@ -649,7 +652,7 @@ export function getCashAccountTransactions(
       date: r.date as string,
       reference: r.reference as string | null,
       description: r.description as string | null,
-      amount: -(Number(r.amount) || 0),
+      amount: Number(r.amount) || 0,
       type: 'supplier_refund',
     });
   }

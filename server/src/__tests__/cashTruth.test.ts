@@ -122,7 +122,7 @@ describe('employee loans and supplier refunds appear in the till walk', () => {
     const totals = collectFlows(db, '2026-08-31');
     expect(totals.get('cash').outflow).toBe(1000); // disbursement only
     expect(totals.get('cash').inflow).toBe(400);   // direct repayment only
-    expect(totals.get('bank').outflow).toBe(100); // supplier refund
+    expect(totals.get('bank').inflow).toBe(100); // supplier refund (money back in)
 
     const txns = getCashAccountTransactions(db, 'cash', '2026-08-31');
     expect(txns.some(t => t.type === 'loan_disbursement' && t.amount === -1000)).toBe(true);
@@ -178,7 +178,7 @@ describe('opening balances sync to the GL (dashboard seed)', () => {
     expect(byRef.get('OPENING_BALANCE')).toBe(2);          // fresh Dr cash / Cr equity
 
     const line = db.prepare(`SELECT line_date, debit FROM journal_lines WHERE reference_type = 'OPENING_BALANCE' AND voided = 0 AND debit > 0`).get() as { line_date: string; debit: number };
-    expect(line.line_date).toBe('2026-03-05'); // earliest transaction date
+    expect(line.line_date).toBe('2026-03-04'); // one day before the earliest transaction
     expect(line.debit).toBe(1000);
     db.close();
   });

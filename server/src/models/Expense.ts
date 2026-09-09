@@ -157,13 +157,13 @@ function update(db: Database.Database, id: number, data: UpdateExpenseDTO, opts?
 
   const newStatus = data.status !== undefined ? data.status : String(existing.status);
   const newCategory = data.expense_category || existing.expense_category;
-  const newDescription = data.description || existing.description;
+  const newDescription = data.description ?? existing.description;
   const newAmount = data.amount !== undefined ? data.amount : Number(existing.amount);
   const newDate = String(data.expense_date || existing.expense_date);
   const newMethod = String(data.payment_method || existing.payment_method || '');
-  const newReference = data.reference_no || existing.reference_no;
-  const newVendor = data.vendor_name || existing.vendor_name;
-  const newProject = data.project || existing.project;
+  const newReference = data.reference_no ?? existing.reference_no;
+  const newVendor = data.vendor_name ?? existing.vendor_name;
+  const newProject = data.project ?? existing.project;
   const willBeGlWorthy = glWorthy(newStatus);
 
   const moneyChanged =

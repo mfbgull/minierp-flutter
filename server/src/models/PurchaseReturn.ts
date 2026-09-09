@@ -513,10 +513,8 @@ class PurchaseReturnModel {
 
       db.prepare('UPDATE purchase_returns SET credit_note_id = ? WHERE id = ?').run(creditNoteId, returnId);
 
-      // refund_expected: settle immediately — pay the full credit note out
-      // in cash inside the same transaction (no orphan credit-note window).
-      // The funds guard inside SupplierRefundModel.create rolls the whole
-      // return back when cash can't cover the payout.
+      // refund_expected: settle immediately — collect the full credit note
+      // back in cash inside the same transaction (no orphan credit-note window).
       if (data.disposition === 'refund_expected') {
         SupplierRefundModel.create(
           {

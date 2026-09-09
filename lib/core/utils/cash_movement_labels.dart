@@ -26,5 +26,6 @@ String cashMovementLabel(AppLocalizations l10n, String type) => switch (type) {
 /// Badge color for a cash-movement type — inflow green, outflow error.
 Color cashMovementColor(BuildContext context, String type) =>
     type == 'payment_received' || type == 'owner_capital' || type == 'loan_repayment'
+        || type == 'supplier_refund'
         ? StatusColors.of(context).success
         : StatusColors.of(context).error;
