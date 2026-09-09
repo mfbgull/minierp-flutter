@@ -14,6 +14,7 @@ import {
   subtractCurrency,
   computeInvoiceGrandTotal,
 } from '../utils/currency';
+import { isValidPaymentMethod } from '../services/cashService';
 
 /**
  * ACC-18 interim: thrown when a client-supplied invoice total disagrees
@@ -217,6 +218,12 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
     // Guard: payment cannot exceed the invoice total
     if (record_payment && payment && paymentAmountNum > totalAmountNum) {
       throw new Error(`Payment amount (${paymentAmountNum.toFixed(2)}) exceeds invoice total (${totalAmountNum.toFixed(2)})`);
+    }
+
+    // Same whitelist as PaymentModel — inline payments reached the GL
+    // before this even when their method was unrecognized.
+    if (record_payment && payment && paymentAmountNum > 0 && !isValidPaymentMethod(payment.payment_method)) {
+      throw new Error(`Invalid payment_method "${payment.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
     }
 
     let initialStatus: InvoiceStatus;
@@ -554,6 +561,10 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         let newPaymentAmount: number;
         if (record_payment && payment && parseCurrency(payment.amount) > 0) {
             newPaymentAmount = parseCurrency(payment.amount);
+
+            if (!isValidPaymentMethod(payment.payment_method)) {
+                throw new Error(`Invalid payment_method "${payment.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
+            }
 
             // FIX #5: Atomic payment number generation
             const newPaymentNo = InvoiceModel.generatePaymentNoAtomic(db);

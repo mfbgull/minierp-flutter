@@ -3583,6 +3583,15 @@ class AppLocalizationsUr extends AppLocalizations {
   String get cashposOwnerwithdrawal => 'مالک کی وانٹھ';
 
   @override
+  String get cashposLoandisbursement => 'ملازم قرض';
+
+  @override
+  String get cashposLoanrepayment => 'قرض کی واپسی';
+
+  @override
+  String get cashposSupplierrefund => 'سپلائر واپسی';
+
+  @override
   String get cashposSupplierpayment => 'سپلائر ادائیگی';
 
   @override

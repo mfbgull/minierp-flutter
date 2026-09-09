@@ -195,7 +195,7 @@ function seedReturn(db, opts = {}) {
         source_type: 'PURCHASE',
         source_id: purchaseId,
         warehouse_id: 1,
-        disposition: 'refund_expected',
+        disposition: opts.disposition ?? 'refund_expected',
         items: [{ source_item_id: purchaseId, quantity: qty }],
     }, 1, db);
     const note = db.prepare(`SELECT id FROM credit_notes WHERE source_id = ?`)
@@ -205,7 +205,7 @@ function seedReturn(db, opts = {}) {
 describe('SupplierRefundModel', () => {
     test('create pays out a credit note: ledger debit, GL posting, refundable drops', () => {
         const db = setupDb();
-        const { creditNoteId, total } = seedReturn(db, { cash: 1000 });
+        const { creditNoteId, total } = seedReturn(db, { cash: 1000, disposition: 'credit_on_account' });
         expect((0, SupplierRefund_1.creditNoteRefundable)(creditNoteId, db)).toBe(total);
         const refund = SupplierRefund_1.default.create({
             refund_date: '2026-07-03',
@@ -233,17 +233,43 @@ describe('SupplierRefundModel', () => {
     });
     test('rejects a refund exceeding the refundable balance', () => {
         const db = setupDb();
-        const { creditNoteId, total } = seedReturn(db, { cash: 1000 });
+        const { creditNoteId, total } = seedReturn(db, { cash: 1000, disposition: 'credit_on_account' });
         expect(() => SupplierRefund_1.default.create({ refund_date: '2026-07-03', credit_note_id: creditNoteId, amount: total + 1 }, 1, db)).toThrow(/exceeds the refundable/);
+    });
+    test('refund_expected return auto-issues the cash payout in the same transaction', () => {
+        const db = setupDb();
+        const { creditNoteId, total } = seedReturn(db, { cash: 1000 });
+        // The return itself triggered the payout — refundable already 0.
+        expect((0, SupplierRefund_1.creditNoteRefundable)(creditNoteId, db)).toBe(0);
+        const refunds = db.prepare(`SELECT * FROM supplier_refunds WHERE credit_note_id = ? AND status = 'POSTED'
+    `).all(creditNoteId);
+        expect(refunds).toHaveLength(1);
+        expect(refunds[0].amount).toBe(total);
+        // Ledger: CREDIT_NOTE credit + SUPPLIER_REFUND debit → balance ~0.
+        const balance = db.prepare(`SELECT balance FROM supplier_ledger WHERE supplier_id = 1 ORDER BY id DESC LIMIT 1`).get();
+        expect(Math.abs(balance.balance)).toBeLessThan(0.01);
+    });
+    test('refund_expected return with insufficient cash rolls the whole return back', () => {
+        const db = setupDb();
+        // seedReturn creates the return with disposition 'refund_expected';
+        // with zero cash the auto-payout fails the funds guard and the whole
+        // return transaction rolls back — nothing persists.
+        expect(() => seedReturn(db, { cash: 0 })).toThrow(/Insufficient funds/);
+        const returns = db.prepare(`SELECT COUNT(*) AS n FROM purchase_returns`).get();
+        const notes = db.prepare(`SELECT COUNT(*) AS n FROM credit_notes`).get();
+        const refunds = db.prepare(`SELECT COUNT(*) AS n FROM supplier_refunds`).get();
+        expect(returns.n).toBe(0);
+        expect(notes.n).toBe(0);
+        expect(refunds.n).toBe(0);
     });
     test('funds guard: insufficient cash rejects the payout', () => {
         const db = setupDb();
-        const { creditNoteId, total } = seedReturn(db, { cash: 0 });
+        const { creditNoteId, total } = seedReturn(db, { cash: 0, disposition: 'credit_on_account' });
         expect(() => SupplierRefund_1.default.create({ refund_date: '2026-07-03', credit_note_id: creditNoteId, amount: total }, 1, db)).toThrow(/Insufficient funds/);
     });
     test('void reverses ledger + GL and restores the refundable balance', () => {
         const db = setupDb();
-        const { creditNoteId, total } = seedReturn(db, { cash: 1000 });
+        const { creditNoteId, total } = seedReturn(db, { cash: 1000, disposition: 'credit_on_account' });
         const refund = SupplierRefund_1.default.create({ refund_date: '2026-07-03', credit_note_id: creditNoteId, amount: total }, 1, db);
         const voided = SupplierRefund_1.default.void(refund.id, 1, 'wrong amount', db);
         expect(voided.status).toBe('VOIDED');

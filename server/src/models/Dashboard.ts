@@ -240,6 +240,8 @@ function getCashPosition(db: Database.Database): {
     inflow: number;
     outflow: number;
     net: number;
+    /** net − (inflow − outflow): classified flows vs the GL. */
+    flow_variance: number;
     transactions: Array<{
       date: string;
       type: string;
@@ -265,6 +267,7 @@ function getCashPosition(db: Database.Database): {
     inflow: a.inflow,
     outflow: a.outflow,
     net: a.net,
+    flow_variance: a.flow_variance,
     // The individual movements behind the balance — the drill-down for
     // the dashboard card, so users can see why the position is what it is.
     transactions: getCashAccountTransactions(db, a.key, today.d),

@@ -240,7 +240,7 @@ Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
   }
 }
 
-enum _UserMenuAction { changePassword, settings, logout }
+enum _UserMenuAction { changePassword, settings, users, integrations, logout }
 
 /// User menu (spec 3.3) — avatar + display-name anchor in the app bar;
 /// Change Password, Language, theme toggle, Settings and Logout all live
@@ -305,6 +305,15 @@ class _UserMenu extends ConsumerWidget {
             context.push('/change-password');
           case _UserMenuAction.settings:
             context.go('/settings');
+          case _UserMenuAction.users:
+            // The rail normally triggers refresh-on-visit; with the
+            // module moved into this menu, do the same invalidation
+            // here so its providers don't serve cached results.
+            moduleRefreshOnVisit['/admin']?.call(ref);
+            context.go('/admin');
+          case _UserMenuAction.integrations:
+            moduleRefreshOnVisit['/integrations']?.call(ref);
+            context.go('/integrations');
           case _UserMenuAction.logout:
             _confirmLogout(context, ref);
         }
@@ -356,6 +365,28 @@ class _UserMenu extends ConsumerWidget {
             ],
           ),
         ),
+        if (user.isAdmin)
+          PopupMenuItem(
+            value: _UserMenuAction.users,
+            child: Row(
+              children: [
+                const Icon(Icons.admin_panel_settings_outlined),
+                const SizedBox(width: 12),
+                Text(l10n.navUsers),
+              ],
+            ),
+          ),
+        if (user.isAdmin)
+          PopupMenuItem(
+            value: _UserMenuAction.integrations,
+            child: Row(
+              children: [
+                const Icon(Icons.extension_outlined),
+                const SizedBox(width: 12),
+                Text(l10n.navIntegrations),
+              ],
+            ),
+          ),
         const PopupMenuDivider(),
         PopupMenuItem(
           value: _UserMenuAction.logout,

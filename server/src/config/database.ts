@@ -175,8 +175,10 @@ let seedAdminUserResolve: (() => void) | undefined;
 export const dbSeedReady: Promise<void> = new Promise((resolve) => {
   seedAdminUserResolve = resolve;
 });
+let seedInFlight = false;
 
 function createDefaultUser(): void {
+  if (seedInFlight) return; // concurrent boot calls share the one async seed
   const existingUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
 
   if (!existingUser) {
@@ -192,6 +194,7 @@ function createDefaultUser(): void {
       seedAdminUserResolve?.();
       throw new Error('FATAL: DEFAULT_ADMIN_PASSWORD environment variable must be set');
     }
+    seedInFlight = true;
     // Fire-and-forget: the boot sequence below is synchronous; [dbSeedReady]
     // gates consumers on the seeded row instead.
     void bcrypt

@@ -6,6 +6,7 @@ import db from '../config/database';
 import logger from '../utils/logger';
 import { sanitizeSortParams, EXPENSE_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import ExpenseModel from '../models/Expense';
+import { isValidPaymentMethod } from '../services/cashService';
 
 function createExpense(req: AuthRequest, res: Response): void {
   try {
@@ -20,6 +21,13 @@ function createExpense(req: AuthRequest, res: Response): void {
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       res.status(400).json({ success: false, error: 'Amount must be a positive number' });
+      return;
+    }
+    if (payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
+      res.status(400).json({
+        success: false,
+        error: `Invalid payment_method "${payment_method}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`,
+      });
       return;
     }
 
@@ -146,6 +154,13 @@ function updateExpense(req: AuthRequest, res: Response): void {
     const id = parseInt(getRouteParam(req.params.id), 10);
     const { expense_category, description, amount, expense_date, payment_method, reference_no, vendor_name, project } = req.body;
     const targetStatus = req.body.status as string | undefined;
+    if (payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
+      res.status(400).json({
+        success: false,
+        error: `Invalid payment_method "${payment_method}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`,
+      });
+      return;
+    }
 
     const existing = ExpenseModel.getById(db, id) as Record<string, unknown> | undefined;
     if (!existing) { res.status(404).json({ success: false, error: 'Expense not found' }); return; }
@@ -216,7 +231,7 @@ function updateExpense(req: AuthRequest, res: Response): void {
       vendor_name: isLocked && targetStatus !== 'Cancelled' ? undefined : vendor_name,
       project: isLocked && targetStatus !== 'Cancelled' ? undefined : project,
       status: targetStatus,
-    });
+    }, { userId: req.user!.id });
 
     logCRUD(ActionType.EXPENSE_UPDATE, 'Expense', id, `Updated expense: ${existing.expense_no}${targetStatus ? ` → ${targetStatus}` : ''}`, req.user!.id, { expense_no: existing.expense_no, changes: Object.keys(req.body).filter(k => req.body[k] !== undefined), from_status: currentStatus, to_status: targetStatus });
     req.activityLogged = true;
@@ -350,7 +365,10 @@ function getExpenseStatusOptions(req: Request, res: Response): void {
 }
 
 function getExpensePaymentMethodOptions(req: Request, res: Response): void {
-  res.json({ success: true, data: ExpenseModel.getPaymentMethodOptions() });
+  // 'Other' removed: it normalized to 'unclassified' in the cash flows
+  // while the GL mapped it to 1010 Bank, guaranteeing a variance.
+  const options = ExpenseModel.getPaymentMethodOptions().filter((o) => o.value !== 'Other');
+  res.json({ success: true, data: options });
 }
 
 export default {

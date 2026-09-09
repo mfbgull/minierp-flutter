@@ -226,7 +226,8 @@ class CashPositionTransaction {
   final String date;
 
   /// 'payment_received' | 'supplier_payment' | 'expense' | 'salary' |
-  /// 'refund' | 'owner_capital' | 'owner_withdrawal'.
+  /// 'refund' | 'owner_capital' | 'owner_withdrawal' |
+  /// 'loan_disbursement' | 'loan_repayment' | 'supplier_refund'.
   final String type;
   final String? reference;
   final String? description;
@@ -245,6 +246,7 @@ class CashAccountPosition {
     required this.inflow,
     required this.outflow,
     required this.net,
+    required this.flowVariance,
     required this.transactions,
   });
 
@@ -257,6 +259,7 @@ class CashAccountPosition {
         inflow: asNum(json['inflow']) ?? 0,
         outflow: asNum(json['outflow']) ?? 0,
         net: asNum(json['net']) ?? 0,
+        flowVariance: asNum(json['flow_variance']) ?? 0,
         transactions: [
           for (final row in json['transactions'] as List? ?? const [])
             CashPositionTransaction.fromJson(row as Map<String, dynamic>),
@@ -270,6 +273,7 @@ class CashAccountPosition {
   final num inflow;
   final num outflow;
   final num net;
+  final num flowVariance;
   final List<CashPositionTransaction> transactions;
 }
 

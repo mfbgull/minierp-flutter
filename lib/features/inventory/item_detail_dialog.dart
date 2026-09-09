@@ -45,7 +45,7 @@ class _ItemDetailDialog extends ConsumerWidget {
     final detail = ref.watch(itemDetailProvider(itemId));
     return MovableDialog(
       dialogId: 'item_detail',
-      maxWidth: 560,
+      maxWidth: 720,
       maxHeight: 640,
       child: switch (detail) {
           AsyncData(:final value) => _DetailBody(detail: value),

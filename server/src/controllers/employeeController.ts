@@ -7,6 +7,7 @@ import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/seque
 import EmployeeModel from '../models/Employee';
 import { EmployeeLoanModel } from '../models/EmployeeLoan';
 import { AccountingService } from '../services/accountingService';
+import { isValidPaymentMethod } from '../services/cashService';
 import fs from 'fs';
 import path from 'path';
 
@@ -216,6 +217,17 @@ function paySalary(req: Request, res: Response): void {
 
     const safeType = ['full', 'advance', 'partial'].includes(payment_type) ? payment_type : 'full';
 
+    // Same default the row stores — before this the GL posted to 1000 Cash
+    // (method undefined) while the row and cash flows said 'bank' (1010).
+    const method = payment_method || 'bank';
+    if (payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
+      res.status(422).json({
+        success: false,
+        error: `Invalid payment_method "${payment_method}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`,
+      });
+      return;
+    }
+
     // Duplicate guard: reject a 'full' payment if one already exists for the month.
     // Advance and partial payments are always allowed.
     if (safeType === 'full') {
@@ -238,7 +250,7 @@ function paySalary(req: Request, res: Response): void {
         employee_id: employeeId,
         amount,
         payment_date,
-        payment_method: payment_method || 'bank',
+        payment_method: method,
         reference_no,
         notes,
         paid_by: authReq.user?.id,
@@ -253,7 +265,7 @@ function paySalary(req: Request, res: Response): void {
           employeeCode: employee.employee_code,
           amount,
           paymentDate: payment_date,
-          paymentMethod: payment_method,
+          paymentMethod: method,
           userId: authReq.user?.id,
         });
         if (result) journalEntryId = result.journal_entry_id;
@@ -286,7 +298,7 @@ function paySalary(req: Request, res: Response): void {
             employee_id: employeeId,
             amount: excess,
             payment_date: nextPaymentDate,
-            payment_method: payment_method || 'bank',
+            payment_method: method,
             reference_no: `ADV-${payPeriod}`,
             notes: `Auto-advance from overpayment in ${payPeriod}`,
             paid_by: authReq.user?.id,
@@ -301,7 +313,7 @@ function paySalary(req: Request, res: Response): void {
               employeeCode: employee.employee_code,
               amount: excess,
               paymentDate: nextPaymentDate,
-              paymentMethod: payment_method,
+              paymentMethod: method,
               userId: authReq.user?.id,
             });
             if (advResult) {
@@ -556,6 +568,13 @@ function createLoan(req: Request, res: Response): void {
       res.status(422).json({ success: false, error: 'Valid amount is required' });
       return;
     }
+    if (payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
+      res.status(422).json({
+        success: false,
+        error: `Invalid payment_method "${payment_method}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`,
+      });
+      return;
+    }
     if (!disbursement_date) {
       res.status(422).json({ success: false, error: 'Disbursement date is required' });
       return;
@@ -649,6 +668,13 @@ function repayLoan(req: Request, res: Response): void {
     const { amount, payment_date, payment_method, reference_no, notes, salary_payment_id } = req.body;
     if (!amount || amount <= 0) {
       res.status(422).json({ success: false, error: 'Valid amount is required' });
+      return;
+    }
+    if (payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
+      res.status(422).json({
+        success: false,
+        error: `Invalid payment_method "${payment_method}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`,
+      });
       return;
     }
     if (amount > loan.balance) {

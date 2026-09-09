@@ -13,6 +13,8 @@ class AdminRoutes extends ModuleRoutes {
     label: (l) => l.navUsers,
     icon: Icons.admin_panel_settings_outlined,
     adminOnly: true,
+    // Reachable from the app bar user menu instead of the sidebar.
+    hideInRail: true,
   );
 
   @override

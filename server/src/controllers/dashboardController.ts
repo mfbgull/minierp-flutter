@@ -11,6 +11,7 @@ import {
   CASH_ACCOUNTS,
   getOpeningBalances,
   saveOpeningBalance,
+  syncOpeningBalancesToGl,
 } from '../services/cashService';
 
 // ═══════════════════════════════════════════════════════════════
@@ -314,8 +315,16 @@ function saveCashOpeningBalances(req: AuthRequest, res: Response): void {
         res.status(400).json({ error: `Unknown account key: ${entry.key}` });
         return;
       }
-      saveOpeningBalance(db, entry.key, Number(entry.amount) || 0);
     }
+    db.transaction(() => {
+      for (const entry of accounts) {
+        saveOpeningBalance(db, entry.key, Number(entry.amount) || 0);
+      }
+      // Keep the GL's opening capital in step with the seed; before this
+      // hook, edits to the seed never reached the journal and every as-of
+      // cash balance was wrong by the delta.
+      syncOpeningBalancesToGl(db, req.user?.id);
+    })();
     const opening = getOpeningBalances(db);
     const data = CASH_ACCOUNTS.map((a) => ({
       key: a.key,

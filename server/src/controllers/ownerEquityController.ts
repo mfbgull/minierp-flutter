@@ -19,6 +19,7 @@ import OwnerWithdrawalModel, {
   type WithdrawalItemInput,
 } from '../models/OwnerWithdrawal';
 import ExpenseModel from '../models/Expense';
+import { isValidPaymentMethod } from '../services/cashService';
 
 /**
  * Business-rule violations (funds guard, stock guard, closed periods,
@@ -85,6 +86,10 @@ function createCapital(req: AuthRequest, res: Response): void {
     const parsedAmount = Number(amount);
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       res.status(400).json({ success: false, error: 'Amount must be a positive number' });
+      return;
+    }
+    if (payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
+      res.status(400).json({ success: false, error: 'Invalid payment_method — use Cash, Bank, Easypaisa, JazzCash or Upaisa' });
       return;
     }
 
@@ -170,6 +175,10 @@ function updateCapital(req: AuthRequest, res: Response): void {
     }
     if (amount !== undefined && (!Number.isFinite(Number(amount)) || Number(amount) <= 0)) {
       res.status(400).json({ success: false, error: 'Amount must be a positive number' });
+      return;
+    }
+    if (payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
+      res.status(400).json({ success: false, error: 'Invalid payment_method — use Cash, Bank, Easypaisa, JazzCash or Upaisa' });
       return;
     }
     const existing = OwnerCapitalModel.getById(db, id);
@@ -267,6 +276,10 @@ function createWithdrawal(req: AuthRequest, res: Response): void {
       const parsedAmount = Number(amount);
       if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
         res.status(400).json({ success: false, error: 'Cash withdrawal amount must be a positive number' });
+        return;
+      }
+      if (payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
+        res.status(400).json({ success: false, error: 'Invalid payment_method — use Cash, Bank, Easypaisa, JazzCash or Upaisa' });
         return;
       }
     } else if (amount !== undefined) {
@@ -410,6 +423,10 @@ function updateWithdrawal(req: AuthRequest, res: Response): void {
     }
     if (existing.kind === 'goods' && amount !== undefined) {
       res.status(400).json({ success: false, error: 'Goods withdrawal amount is system-calculated and cannot be supplied' });
+      return;
+    }
+    if (existing.kind === 'cash' && payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
+      res.status(400).json({ success: false, error: 'Invalid payment_method — use Cash, Bank, Easypaisa, JazzCash or Upaisa' });
       return;
     }
 

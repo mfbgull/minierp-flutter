@@ -7064,6 +7064,24 @@ abstract class AppLocalizations {
   /// **'Owner Withdrawal'**
   String get cashposOwnerwithdrawal;
 
+  /// No description provided for @cashposLoandisbursement.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan Disbursement'**
+  String get cashposLoandisbursement;
+
+  /// No description provided for @cashposLoanrepayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan Repayment'**
+  String get cashposLoanrepayment;
+
+  /// No description provided for @cashposSupplierrefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier Refund'**
+  String get cashposSupplierrefund;
+
   /// No description provided for @cashposSupplierpayment.
   ///
   /// In en, this message translates to:

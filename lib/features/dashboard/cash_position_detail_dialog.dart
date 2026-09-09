@@ -65,6 +65,13 @@ class _CashPositionDetailDialog extends StatelessWidget {
               bold: true,
               color: account.balance < 0 ? scheme.error : const Color(0xFF16A34A),
             ),
+            if (account.flowVariance != 0)
+              _summaryRow(
+                context,
+                l10n.cashreconVariance,
+                Formatters.currency(account.flowVariance),
+                color: scheme.error,
+              ),
             const SizedBox(height: 12),
             Text(
               l10n.cashposTransactions,
@@ -156,6 +163,9 @@ class _CashPositionDetailDialog extends StatelessWidget {
       'purchase' => l10n.cashposPurchase,
       'owner_capital' => l10n.cashposOwnercapital,
       'owner_withdrawal' => l10n.cashposOwnerwithdrawal,
+      'loan_disbursement' => l10n.cashposLoandisbursement,
+      'loan_repayment' => l10n.cashposLoanrepayment,
+      'supplier_refund' => l10n.cashposSupplierrefund,
       _ => t.type,
     };
     final detail = [
