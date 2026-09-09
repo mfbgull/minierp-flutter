@@ -203,9 +203,10 @@ function createPOSSale(req: AuthRequest, res: Response): void {
       // received. Any overpayment (change) is returned to the customer
       // and must NOT be recorded in the customer ledger, otherwise the
       // walk-in accumulates a spurious Cr balance.
+      let paymentId: number | null = null;
       if (paymentAmount > 0) {
         const paymentNo = InvoiceModel.generatePaymentNoAtomic(db);
-        const paymentId = InvoiceModel.createPayment(db, paymentNo, walkinCustomerId, sale_date, paymentAmount, 'Cash', null, `POS Transaction ${transactionNo}`);
+        paymentId = InvoiceModel.createPayment(db, paymentNo, walkinCustomerId, sale_date, paymentAmount, 'Cash', null, `POS Transaction ${transactionNo}`);
         InvoiceModel.createPaymentAllocation(db, paymentId, invoiceId, paymentAmount);
         // Create ledger entry for payment
         InvoiceModel.createLedgerEntry(db, walkinCustomerId, 'PAYMENT', paymentNo, sale_date, 0, paymentAmount, `Payment ${paymentNo} for POS ${transactionNo}`);
@@ -251,20 +252,16 @@ function createPOSSale(req: AuthRequest, res: Response): void {
       }
 
       if (paymentAmount > 0) {
-        const posPayment = db.prepare(
-          'SELECT id FROM payments WHERE notes = ? ORDER BY id DESC LIMIT 1'
-        ).get(`POS Transaction ${transactionNo}`) as { id: number } | undefined;
-        if (posPayment) {
-          AccountingService.postPaymentEntry(db, {
-            paymentId: posPayment.id,
-            paymentNo: `POS-${transactionNo}`,
-            amount: paymentAmount,
-            paymentDate: sale_date,
-            paymentMethod: 'cash',
-            customerId: walkinCustomerId,
-            userId,
-          });
-        }
+        if (paymentId === null) throw new Error('POS payment was not recorded');
+        AccountingService.postPaymentEntry(db, {
+          paymentId,
+          paymentNo: `POS-${transactionNo}`,
+          amount: paymentAmount,
+          paymentDate: sale_date,
+          paymentMethod: 'cash',
+          customerId: walkinCustomerId,
+          userId,
+        });
       }
 
       // Activity log — task 4.5: attribute POS sales to the INVOICE entity,

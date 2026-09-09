@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const StockMovement_1 = __importDefault(require("./StockMovement"));
 const SupplierLedger_1 = __importDefault(require("./SupplierLedger"));
+const SupplierRefund_1 = __importDefault(require("./SupplierRefund"));
 const accountingService_1 = __importDefault(require("../services/accountingService"));
 const sequence_1 = require("../utils/sequence");
 const sqlSanitizer_1 = require("../utils/sqlSanitizer");
@@ -319,6 +320,19 @@ class PurchaseReturnModel {
             // Supplier credit note + ledger entry.
             const creditNoteId = this.postCreditNote(db, returnId, returnNo, data, totalAmount, data.return_date, userId);
             db.prepare('UPDATE purchase_returns SET credit_note_id = ? WHERE id = ?').run(creditNoteId, returnId);
+            // refund_expected: settle immediately — pay the full credit note out
+            // in cash inside the same transaction (no orphan credit-note window).
+            // The funds guard inside SupplierRefundModel.create rolls the whole
+            // return back when cash can't cover the payout.
+            if (data.disposition === 'refund_expected') {
+                SupplierRefund_1.default.create({
+                    refund_date: data.return_date,
+                    credit_note_id: creditNoteId,
+                    amount: totalAmount,
+                    payment_method: 'cash',
+                    reference_no: returnNo,
+                }, userId, db);
+            }
             // Audit
             db.prepare(`
         INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)

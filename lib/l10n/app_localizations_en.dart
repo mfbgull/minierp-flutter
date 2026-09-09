@@ -3582,6 +3582,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cashposOwnerwithdrawal => 'Owner Withdrawal';
 
   @override
+  String get cashposLoandisbursement => 'Loan Disbursement';
+
+  @override
+  String get cashposLoanrepayment => 'Loan Repayment';
+
+  @override
+  String get cashposSupplierrefund => 'Supplier Refund';
+
+  @override
   String get cashposSupplierpayment => 'Supplier Payment';
 
   @override

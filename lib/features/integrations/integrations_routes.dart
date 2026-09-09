@@ -13,6 +13,8 @@ class IntegrationsRoutes extends ModuleRoutes {
     label: (l) => l.navIntegrations,
     icon: Icons.extension_outlined,
     adminOnly: true,
+    // Reachable from the app bar user menu instead of the sidebar.
+    hideInRail: true,
   );
 
   @override

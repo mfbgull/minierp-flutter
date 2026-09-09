@@ -4,6 +4,7 @@ import { AuthRequest } from '../types';
 import SupplierRefundModel, { creditNoteRefundable } from '../models/SupplierRefund';
 import db from '../config/database';
 import logger from '../utils/logger';
+import { isValidPaymentMethod } from '../services/cashService';
 
 function getSupplierRefunds(req: Request, res: Response): void {
   try {
@@ -71,6 +72,11 @@ function createSupplierRefund(req: AuthRequest, res: Response): Response | void 
     if (!body.refund_date) return res.status(400).json({ error: 'refund_date is required' });
     if (!body.credit_note_id || body.credit_note_id <= 0) {
       return res.status(400).json({ error: 'A valid credit_note_id is required' });
+    }
+    if (body.payment_method !== undefined && !isValidPaymentMethod(body.payment_method)) {
+      return res.status(400).json({
+        error: `Invalid payment_method "${body.payment_method}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`,
+      });
     }
 
     const created = SupplierRefundModel.create(

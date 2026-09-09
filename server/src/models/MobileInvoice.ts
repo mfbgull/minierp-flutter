@@ -4,6 +4,7 @@ import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/seque
 import ledgerUtils from '../utils/ledgerUtils';
 import AccountingService from '../services/accountingService';
 import { parseCurrency, computeInvoiceTotal, decomposeLineAmount } from '../utils/currency';
+import { isValidPaymentMethod } from '../services/cashService';
 
 interface DraftRecord {
   id: number;
@@ -267,6 +268,9 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
 
     if (data.record_payment && data.payment) {
       const paymentAmount = data.payment.amount || 0;
+      if (paymentAmount > 0 && !isValidPaymentMethod(data.payment.payment_method || 'Cash')) {
+        throw new Error(`Invalid payment_method "${data.payment.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
+      }
       initializeSequenceFromMax(db, 'PAY_last_no', 'payments', 'payment_no', 'PAY');
       const nextPaymentNo = getNextSequenceNumber(db, 'PAY_last_no');
       const paymentNo = `PAY${String(nextPaymentNo).padStart(3, '0')}`;

@@ -205,8 +205,13 @@ export function runBackfillGlPreposting(db: Database.Database): void {
     }
 
     // ── 6. Opening capital from operational opening_balances ─────────
+    // OPENING_BALANCE is the live-synced seed (dashboardController);
+    // a non-voided row under either reference means the opening capital
+    // is already represented, so a re-boot must not re-post it.
     const openingPosted = db.prepare(`
-      SELECT 1 FROM journal_lines WHERE reference_type = 'BACKFILL_OPENING' AND voided = 0 LIMIT 1
+      SELECT 1 FROM journal_lines
+      WHERE reference_type IN ('BACKFILL_OPENING', 'OPENING_BALANCE') AND voided = 0
+      LIMIT 1
     `).get();
     if (!openingPosted) {
       const openings = db.prepare(

@@ -163,6 +163,40 @@ export function collectFlows(
     add(row.payment_method, 0, row.outflow);
   }
 
+  // Employee loans (pre-floor fold): the disbursement moved cash out
+  // regardless of later status (written-off loans were still paid out);
+  // direct repayments move cash back in (salary deductions are already
+  // counted via salary_payments).
+  const loanPreFloor = db.prepare(`
+    SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
+    FROM employee_loans
+    WHERE disbursement_date < ? AND disbursement_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
+  const loanRepayPreFloor = db.prepare(`
+    SELECT payment_method, COALESCE(SUM(amount), 0) as inflow
+    FROM employee_loan_repayments
+    WHERE repayment_type = 'direct' AND payment_date < ? AND payment_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number }>;
+  for (const row of loanPreFloor) {
+    add(row.payment_method, 0, row.outflow);
+  }
+  for (const row of loanRepayPreFloor) {
+    add(row.payment_method, row.inflow, 0);
+  }
+
+  // Supplier refunds (pre-floor fold): POSTED rows paid a supplier back.
+  const refundPreFloor = db.prepare(`
+    SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
+    FROM supplier_refunds
+    WHERE status = 'POSTED' AND refund_date < ? AND refund_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
+  for (const row of refundPreFloor) {
+    add(row.payment_method, 0, row.outflow);
+  }
+
 
   // Customer payments: positive amounts are money in; negative amounts
   // (refunds paid out to customers) are money out.
@@ -234,6 +268,41 @@ export function collectFlows(
     add(row.payment_method, 0, row.outflow);
   }
 
+  // Employee loans: disbursements are money out (all statuses — the cash
+  // left the till even when the loan is later written off); direct
+  // repayments are money in. Salary-deduction repayments never touch
+  // cash directly (the salary payment already carries the outflow).
+  const loans = db.prepare(`
+    SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
+    FROM employee_loans
+    WHERE disbursement_date > ? AND disbursement_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
+  for (const row of loans) {
+    add(row.payment_method, 0, row.outflow);
+  }
+
+  const loanRepayments = db.prepare(`
+    SELECT payment_method, COALESCE(SUM(amount), 0) as inflow
+    FROM employee_loan_repayments
+    WHERE repayment_type = 'direct' AND payment_date > ? AND payment_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number }>;
+  for (const row of loanRepayments) {
+    add(row.payment_method, row.inflow, 0);
+  }
+
+  // Supplier refunds: money out once POSTED (voided rows paid nothing).
+  const supplierRefunds = db.prepare(`
+    SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
+    FROM supplier_refunds
+    WHERE status = 'POSTED' AND refund_date > ? AND refund_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
+  for (const row of supplierRefunds) {
+    add(row.payment_method, 0, row.outflow);
+  }
+
   // CASH-01 (financial-audit-p0-remediation 1.1): direct purchases are NOT
   // an extra cash outflow — paid purchases already appear here via supplier
   // payments (purchase_allocations). Counting them again made the till
@@ -297,6 +366,60 @@ export function saveOpeningBalance(
       updated_at = CURRENT_TIMESTAMP
   `).run(accountKey, Math.round(amount * 100) / 100);
   return getOpeningBalances(db);
+}
+
+/** Push the dashboard opening_balances seed into the GL: void any
+ * existing opening-capital postings and post a fresh balanced entry
+ * dated the earliest transaction in the system (so as-of balances for
+ * every later date are correct). Runs inside the caller's transaction. */
+export function syncOpeningBalancesToGl(db: Database.Database, userId?: number): void {
+  const opening = getOpeningBalances(db);
+  const lines: Array<{ code: string; debit: number; credit: number; label: string }> = [];
+  for (const a of CASH_ACCOUNTS) {
+    const amount = Math.round((opening.get(a.key) ?? 0) * 100) / 100;
+    if (amount === 0) continue;
+    const code = CASH_GL_CODES[a.key];
+    if (amount > 0) {
+      lines.push({ code, debit: amount, credit: 0, label: `Opening balance ${a.name}` });
+      lines.push({ code: '3000', debit: 0, credit: amount, label: `Opening capital ${a.name}` });
+    } else {
+      lines.push({ code: '3000', debit: -amount, credit: 0, label: `Opening capital adjustment ${a.name}` });
+      lines.push({ code, debit: 0, credit: -amount, label: `Opening balance ${a.name}` });
+    }
+  }
+
+  AccountingService.voidJournalLinesByReference(db, 'BACKFILL_OPENING', 0);
+  AccountingService.voidJournalLinesByReference(db, 'OPENING_BALANCE', 0);
+  if (lines.length === 0) return; // zeroed seed → GL openings zeroed too
+
+  // Date the entry at the earliest transaction so every later as-of
+  // balance includes the seed; local today on completely empty books.
+  const earliest = db.prepare(`
+    SELECT MIN(d) as d FROM (
+      SELECT MIN(payment_date) as d FROM payments
+      UNION ALL SELECT MIN(expense_date) FROM expenses
+      UNION ALL SELECT MIN(payment_date) FROM salary_payments
+      UNION ALL SELECT MIN(capital_date) FROM owner_capital
+      UNION ALL SELECT MIN(withdrawal_date) FROM owner_withdrawals
+      UNION ALL SELECT MIN(disbursement_date) FROM employee_loans
+      UNION ALL SELECT MIN(payment_date) FROM employee_loan_repayments
+      UNION ALL SELECT MIN(refund_date) FROM supplier_refunds
+    )
+  `).get() as { d: string | null };
+  const entryDate = earliest.d ?? (db.prepare(`SELECT date('now', 'localtime') as d`).get() as { d: string }).d;
+
+  AccountingService.postEntry(db, {
+    entry_date: entryDate,
+    description: 'Opening cash balances from dashboard seed',
+    reference_type: 'OPENING_BALANCE',
+    reference_id: 0,
+    created_by: userId,
+    lines: lines.map((l) => {
+      const account = AccountingService.getAccountByCode(db, l.code);
+      if (!account) throw new Error(`Chart of accounts is missing required account: ${l.code}`);
+      return { account_id: account.id, debit: l.debit, credit: l.credit, description: l.label };
+    }),
+  });
 }
 
 /** Per-account opening/day-flow/closing figures for `asOfDate`.
@@ -477,6 +600,57 @@ export function getCashAccountTransactions(
       description: r.description as string | null,
       amount: -(Number(r.amount) || 0),
       type: 'owner_withdrawal',
+    });
+  }
+
+  // Employee loan disbursements (money out) and direct repayments
+  // (money in); salary deductions move no cash directly — they are
+  // already inside the salary payment's outflow.
+  for (const r of db.prepare(`
+    SELECT id, disbursement_date as date, payment_method as method, purpose as description, amount
+    FROM employee_loans
+    WHERE disbursement_date <= ?
+  `).all(uptoDate) as Array<Record<string, unknown>>) {
+    push({
+      method: r.method as string | null,
+      date: r.date as string,
+      reference: `#${r.id}`,
+      description: r.description as string | null,
+      amount: -(Number(r.amount) || 0),
+      type: 'loan_disbursement',
+    });
+  }
+
+  for (const r of db.prepare(`
+    SELECT payment_date as date, payment_method as method, reference_no as reference,
+           notes as description, amount
+    FROM employee_loan_repayments
+    WHERE repayment_type = 'direct' AND payment_date <= ?
+  `).all(uptoDate) as Array<Record<string, unknown>>) {
+    push({
+      method: r.method as string | null,
+      date: r.date as string,
+      reference: r.reference as string | null,
+      description: r.description as string | null,
+      amount: Number(r.amount) || 0,
+      type: 'loan_repayment',
+    });
+  }
+
+  // Supplier refunds (money out once POSTED — voided rows paid nothing).
+  for (const r of db.prepare(`
+    SELECT refund_date as date, payment_method as method, refund_no as reference,
+           reference_no as description, amount
+    FROM supplier_refunds
+    WHERE status = 'POSTED' AND refund_date <= ?
+  `).all(uptoDate) as Array<Record<string, unknown>>) {
+    push({
+      method: r.method as string | null,
+      date: r.date as string,
+      reference: r.reference as string | null,
+      description: r.description as string | null,
+      amount: -(Number(r.amount) || 0),
+      type: 'supplier_refund',
     });
   }
 

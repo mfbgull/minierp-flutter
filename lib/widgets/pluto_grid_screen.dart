@@ -62,7 +62,10 @@ PlutoRow withSerialCell(PlutoRow row, int index) => row
   // `row.cells[column.field]!` for ALL columns, hidden or not) — the
   // bulk-selection checkbox column is opt-in via [GridBulkSelection],
   // so the cell is only guaranteed on rows built through this helper.
-  ..cells[kBulkSelectField] ??= PlutoCell(value: false);
+  // An empty value (not `false`) — the checkbox column's cell renders its
+  // value as text after the checkbox, and a `false` value would print the
+  // literal "false" next to every checkbox.
+  ..cells[kBulkSelectField] ??= PlutoCell(value: '');
 
 /// The bulk-selection checkbox column's field name.
 const String kBulkSelectField = '_bulk';
@@ -236,6 +239,11 @@ PlutoGridConfiguration plutoGridConfigurationFor(
       activatedBorderColor: scheme.primary,
       inactivatedBorderColor: scheme.outlineVariant,
       iconColor: scheme.onSurfaceVariant,
+      // Hide the `<>` drag-resize handle PlutoGrid paints on every
+      // unsorted header (default Icons.code_sharp). A space glyph renders
+      // nothing but keeps the handle's layout box and drag gesture alive,
+      // so [GridColumnWidths] still records dragged widths.
+      columnResizeIcon: const IconData(0x20),
       disabledIconColor: scheme.onSurface.withValues(alpha: 0.12),
       iconSize: compact ? 16 : 18,
       rowHeight:

@@ -171,7 +171,17 @@ describe('GL posting matrix', () => {
     expect(res.status).toBe(201);
 
     const expenseId = res.body?.data?.id ?? res.body?.id;
-    const lines = linesFor('EXPENSE', expenseId);
+    // Draft rows carry no GL lines — the posting happens when the
+    // expense leaves Draft (matching the cash-flow filter).
+    let lines = linesFor('EXPENSE', expenseId);
+    expect(lines.length).toBe(0);
+
+    const submitted = await request(app).put(`/api/expenses/${expenseId}`)
+      .set('Cookie', authCookie)
+      .send({ status: 'Submitted' });
+    expect(submitted.status).toBe(200);
+
+    lines = linesFor('EXPENSE', expenseId);
     expectBalanced(lines);
 
     const opexId = accountId('6000');
