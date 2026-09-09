@@ -879,7 +879,7 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
     push({ ...r, reference: String(r.reference), type: 'loan_repayment', amount: r.amount });
   }
 
-  // Supplier refunds (money out once POSTED).
+  // Supplier refunds (money in once POSTED).
   const refundRows = db.prepare(`
     SELECT sr.refund_date as date, sr.refund_no as reference,
            s.supplier_name as party, sr.payment_method as method,
@@ -890,7 +890,7 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
     ORDER BY sr.refund_date DESC
   `).all(startDate, endDate) as Array<{ date: string; reference: string; party: string | null; method: string | null; description: string | null; amount: number }>;
   for (const r of refundRows) {
-    push({ ...r, type: 'supplier_refund', amount: -r.amount });
+    push({ ...r, type: 'supplier_refund', amount: r.amount });
   }
 
   out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));

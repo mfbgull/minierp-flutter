@@ -204,8 +204,9 @@ function createPOSSale(req: AuthRequest, res: Response): void {
       // and must NOT be recorded in the customer ledger, otherwise the
       // walk-in accumulates a spurious Cr balance.
       let paymentId: number | null = null;
+      let paymentNo: string | null = null;
       if (paymentAmount > 0) {
-        const paymentNo = InvoiceModel.generatePaymentNoAtomic(db);
+        paymentNo = InvoiceModel.generatePaymentNoAtomic(db);
         paymentId = InvoiceModel.createPayment(db, paymentNo, walkinCustomerId, sale_date, paymentAmount, 'Cash', null, `POS Transaction ${transactionNo}`);
         InvoiceModel.createPaymentAllocation(db, paymentId, invoiceId, paymentAmount);
         // Create ledger entry for payment
@@ -252,10 +253,10 @@ function createPOSSale(req: AuthRequest, res: Response): void {
       }
 
       if (paymentAmount > 0) {
-        if (paymentId === null) throw new Error('POS payment was not recorded');
+        if (paymentId === null || paymentNo === null) throw new Error('POS payment was not recorded');
         AccountingService.postPaymentEntry(db, {
           paymentId,
-          paymentNo: `POS-${transactionNo}`,
+          paymentNo,
           amount: paymentAmount,
           paymentDate: sale_date,
           paymentMethod: 'cash',

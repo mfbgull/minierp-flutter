@@ -146,7 +146,7 @@ function update(db, id, data) {
       expense_category = ?, description = ?, amount = ?, expense_date = ?,
       payment_method = ?, reference_no = ?, vendor_name = ?, project = ?,
       status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-  `).run(data.expense_category || existing.expense_category, data.description || existing.description, data.amount !== undefined ? data.amount : existing.amount, data.expense_date || existing.expense_date, data.payment_method || existing.payment_method, data.reference_no || existing.reference_no, data.vendor_name || existing.vendor_name, data.project || existing.project, data.status || existing.status, id);
+  `).run(data.expense_category || existing.expense_category, data.description ?? existing.description, data.amount !== undefined ? data.amount : existing.amount, data.expense_date || existing.expense_date, data.payment_method || existing.payment_method, data.reference_no ?? existing.reference_no, data.vendor_name ?? existing.vendor_name, data.project ?? existing.project, data.status || existing.status, id);
 }
 function deleteExpense(db, id) {
     const existing = getById(db, id);

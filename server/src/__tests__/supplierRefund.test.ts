@@ -1,6 +1,6 @@
 /**
- * SupplierRefundModel — cash payout against a supplier credit note.
- * Covers: create (ledger + GL + funds guard), refundable cap, void reversal.
+ * SupplierRefundModel — cash receipt against a supplier credit note.
+ * Covers: create (ledger + GL), refundable cap, void reversal.
  */
 import fs from 'fs';
 import path from 'path';
@@ -37,7 +37,7 @@ function setupDb(): Database.Database {
     db.exec(sql);
   }
 
-  // Boot-time rebuild: make payments.customer_id nullable (supplier payouts).
+  // Boot-time rebuild: make payments.customer_id nullable.
   const notNull = db.prepare(`
     SELECT COUNT(*) as count FROM pragma_table_info('payments')
     WHERE name='customer_id' AND "notnull"=1
@@ -150,7 +150,7 @@ function seedReturn(db: Database.Database, opts: { cash?: number; disposition?: 
   `).run(payResult.lastInsertRowid as number, purchaseId, total);
 
   if (opts.cash !== undefined && opts.cash > 0) {
-    // Seed cash so the funds guard passes: Dr cash against opening equity.
+    // Seed opening cash (Dr cash against opening equity) for GL context.
     const cash = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1000'`).get() as { id: number };
     const equity = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '3000'`).get() as { id: number } | undefined;
     if (equity) {
@@ -185,7 +185,7 @@ function seedReturn(db: Database.Database, opts: { cash?: number; disposition?: 
 }
 
 describe('SupplierRefundModel', () => {
-  test('create pays out a credit note: ledger debit, GL posting, refundable drops', () => {
+  test('create collects a credit-note refund: ledger debit, GL posting, refundable drops', () => {
     const db = setupDb();
     const { creditNoteId, total } = seedReturn(db, { cash: 1000, disposition: 'credit_on_account' });
 
@@ -212,7 +212,7 @@ describe('SupplierRefundModel', () => {
     ).get() as { balance: number };
     expect(Math.abs(balance.balance)).toBeLessThan(0.01);
 
-    // GL: Dr AP / Cr Cash posted by reference.
+    // GL: Dr Cash / Cr AP posted by reference.
     const gl = db.prepare(`
       SELECT SUM(jl.debit) AS dr, SUM(jl.credit) AS cr
       FROM journal_lines jl
@@ -238,11 +238,11 @@ describe('SupplierRefundModel', () => {
     ).toThrow(/exceeds the refundable/);
   });
 
-  test('refund_expected return auto-issues the cash payout in the same transaction', () => {
+  test('refund_expected return auto-issues the cash refund collection in the same transaction', () => {
     const db = setupDb();
     const { creditNoteId, total } = seedReturn(db, { cash: 1000 });
 
-    // The return itself triggered the payout — refundable already 0.
+    // The return itself collected the refund — refundable already 0.
     expect(creditNoteRefundable(creditNoteId, db)).toBe(0);
 
     const refunds = db.prepare(
@@ -258,32 +258,21 @@ describe('SupplierRefundModel', () => {
     expect(Math.abs(balance.balance)).toBeLessThan(0.01);
   });
 
-  test('refund_expected return with insufficient cash rolls the whole return back', () => {
+  test('refund_expected return collects the refund even with zero opening cash', () => {
     const db = setupDb();
 
-    // seedReturn creates the return with disposition 'refund_expected';
-    // with zero cash the auto-payout fails the funds guard and the whole
-    // return transaction rolls back — nothing persists.
-    expect(() => seedReturn(db, { cash: 0 })).toThrow(/Insufficient funds/);
+    // The refund is money IN from the supplier — no funds guard applies,
+    // so zero opening cash must not block the return or the collection.
+    const { creditNoteId, total } = seedReturn(db, { cash: 0 });
 
     const returns = db.prepare(`SELECT COUNT(*) AS n FROM purchase_returns`).get() as { n: number };
     const notes = db.prepare(`SELECT COUNT(*) AS n FROM credit_notes`).get() as { n: number };
     const refunds = db.prepare(`SELECT COUNT(*) AS n FROM supplier_refunds`).get() as { n: number };
-    expect(returns.n).toBe(0);
-    expect(notes.n).toBe(0);
-    expect(refunds.n).toBe(0);
-  });
-
-  test('funds guard: insufficient cash rejects the payout', () => {
-    const db = setupDb();
-    const { creditNoteId, total } = seedReturn(db, { cash: 0, disposition: 'credit_on_account' });
-
-    expect(() =>
-      SupplierRefundModel.create(
-        { refund_date: '2026-07-03', credit_note_id: creditNoteId, amount: total },
-        1, db
-      )
-    ).toThrow(/Insufficient funds/);
+    expect(returns.n).toBe(1);
+    expect(notes.n).toBe(1);
+    expect(refunds.n).toBe(1);
+    expect(creditNoteRefundable(creditNoteId, db)).toBe(0);
+    expect(total).toBeGreaterThan(0);
   });
 
   test('void reverses ledger + GL and restores the refundable balance', () => {

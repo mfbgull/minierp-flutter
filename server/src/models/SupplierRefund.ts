@@ -5,16 +5,15 @@ import logger from '../utils/logger';
 import { generateDocNo } from '../utils/sequence';
 
 /**
- * SupplierRefundModel — cash payout against a supplier credit note.
+ * SupplierRefundModel — cash receipt against a supplier credit note.
  *
  * `refund_expected` on a purchase return means the supplier owes the
  * company money (the credit note drove the balance negative). This
- * model settles that receivable with real money out:
+ * model settles that receivable when the supplier pays the money back:
  *
  *   - supplier_ledger SUPPLIER_REFUND debit  (reduces the credit)
- *   - GL  Dr AP (2000) / Cr Cash-per-method  (mirrors postRefundEntry
- *     but on the AP side — the CN already posted Dr AP / Cr Inventory)
- *   - cash funds guard (no negative cash)
+ *   - GL  Dr Cash-per-method / Cr AP (2000)  (the CN already posted
+ *     Dr AP / Cr Inventory, so this collects the refund in cash)
  *   - void lifecycle: reverses ledger + GL, restores the credit note
  *
  * Runs inside the caller's transaction where one exists.
@@ -146,18 +145,12 @@ class SupplierRefundModel {
     const paymentMethod = data.payment_method || 'cash';
     const refundNo = generateDocNo(db, 'SR');
 
-    // Funds guard — refunds are cash-out, same primitive expenses use.
+    // Cash account for the method the supplier pays back on.
     const cashCode = AccountingService._cashOrBankAccountCode(paymentMethod);
     const cashAccount = AccountingService.getAccountByCode(db, cashCode);
     if (!cashAccount) {
       throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
     }
-    AccountingService.assertSufficientFunds(db, {
-      accountId: cashAccount.id,
-      amount,
-      asOfDate: data.refund_date,
-      label: `supplier refund ${refundNo}`,
-    });
 
     const result = db.prepare(`
       INSERT INTO supplier_refunds (
@@ -189,7 +182,7 @@ class SupplierRefundModel {
     }, db);
     SupplierLedgerModel.rebuildBalances(note.supplier_id, db);
 
-    // GL: Dr AP (settles the CN's Dr AP leg with cash) / Cr Cash.
+    // GL: Dr Cash (refund collected) / Cr AP (clears the credit balance).
     const ap = AccountingService.getAccountByCode(db, '2000');
     if (!ap) {
       throw new Error('Chart of accounts is missing required account: 2000 (AP)');
@@ -201,8 +194,8 @@ class SupplierRefundModel {
       reference_id: refundId,
       created_by: userId,
       lines: [
-        { account_id: ap.id, debit: amount, description: `AP settled by refund ${refundNo}` },
-        { account_id: cashAccount.id, credit: amount, description: `Cash paid via refund ${refundNo}` },
+        { account_id: cashAccount.id, debit: amount, description: `Cash received via refund ${refundNo}` },
+        { account_id: ap.id, credit: amount, description: `AP settled by refund ${refundNo}` },
       ],
     });
 

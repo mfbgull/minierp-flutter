@@ -249,23 +249,18 @@ describe('SupplierRefundModel', () => {
         const balance = db.prepare(`SELECT balance FROM supplier_ledger WHERE supplier_id = 1 ORDER BY id DESC LIMIT 1`).get();
         expect(Math.abs(balance.balance)).toBeLessThan(0.01);
     });
-    test('refund_expected return with insufficient cash rolls the whole return back', () => {
+    test('refund_expected return collects the refund even with zero opening cash', () => {
         const db = setupDb();
-        // seedReturn creates the return with disposition 'refund_expected';
-        // with zero cash the auto-payout fails the funds guard and the whole
-        // return transaction rolls back — nothing persists.
-        expect(() => seedReturn(db, { cash: 0 })).toThrow(/Insufficient funds/);
+        // The refund is money IN from the supplier — no funds guard applies,
+        // so zero opening cash must not block the return or the collection.
+        const { creditNoteId } = seedReturn(db, { cash: 0 });
         const returns = db.prepare(`SELECT COUNT(*) AS n FROM purchase_returns`).get();
         const notes = db.prepare(`SELECT COUNT(*) AS n FROM credit_notes`).get();
         const refunds = db.prepare(`SELECT COUNT(*) AS n FROM supplier_refunds`).get();
-        expect(returns.n).toBe(0);
-        expect(notes.n).toBe(0);
-        expect(refunds.n).toBe(0);
-    });
-    test('funds guard: insufficient cash rejects the payout', () => {
-        const db = setupDb();
-        const { creditNoteId, total } = seedReturn(db, { cash: 0, disposition: 'credit_on_account' });
-        expect(() => SupplierRefund_1.default.create({ refund_date: '2026-07-03', credit_note_id: creditNoteId, amount: total }, 1, db)).toThrow(/Insufficient funds/);
+        expect(returns.n).toBe(1);
+        expect(notes.n).toBe(1);
+        expect(refunds.n).toBe(1);
+        expect((0, SupplierRefund_1.creditNoteRefundable)(creditNoteId, db)).toBe(0);
     });
     test('void reverses ledger + GL and restores the refundable balance', () => {
         const db = setupDb();

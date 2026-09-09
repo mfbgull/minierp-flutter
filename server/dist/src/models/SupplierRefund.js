@@ -67,18 +67,12 @@ class SupplierRefundModel {
         }
         const paymentMethod = data.payment_method || 'cash';
         const refundNo = (0, sequence_1.generateDocNo)(db, 'SR');
-        // Funds guard — refunds are cash-out, same primitive expenses use.
+        // Cash account for the method the supplier pays back on.
         const cashCode = accountingService_1.default._cashOrBankAccountCode(paymentMethod);
         const cashAccount = accountingService_1.default.getAccountByCode(db, cashCode);
         if (!cashAccount) {
             throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
         }
-        accountingService_1.default.assertSufficientFunds(db, {
-            accountId: cashAccount.id,
-            amount,
-            asOfDate: data.refund_date,
-            label: `supplier refund ${refundNo}`,
-        });
         const result = db.prepare(`
       INSERT INTO supplier_refunds (
         refund_no, refund_date, supplier_id, credit_note_id, return_id,
@@ -97,7 +91,7 @@ class SupplierRefundModel {
             description: `Supplier refund ${refundNo} against credit note ${note.credit_no}`,
         }, db);
         SupplierLedger_1.default.rebuildBalances(note.supplier_id, db);
-        // GL: Dr AP (settles the CN's Dr AP leg with cash) / Cr Cash.
+        // GL: Dr Cash (refund collected) / Cr AP (clears the credit balance).
         const ap = accountingService_1.default.getAccountByCode(db, '2000');
         if (!ap) {
             throw new Error('Chart of accounts is missing required account: 2000 (AP)');
@@ -109,8 +103,8 @@ class SupplierRefundModel {
             reference_id: refundId,
             created_by: userId,
             lines: [
-                { account_id: ap.id, debit: amount, description: `AP settled by refund ${refundNo}` },
-                { account_id: cashAccount.id, credit: amount, description: `Cash paid via refund ${refundNo}` },
+                { account_id: cashAccount.id, debit: amount, description: `Cash received via refund ${refundNo}` },
+                { account_id: ap.id, credit: amount, description: `AP settled by refund ${refundNo}` },
             ],
         });
         db.prepare(`
