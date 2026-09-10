@@ -24,7 +24,7 @@ class SupplierModel {
       SELECT
         id, supplier_code, supplier_name, contact_person,
         email, phone, address, payment_terms, is_active,
-        created_at, updated_at
+        created_at, updated_at, current_balance
       FROM suppliers
       WHERE 1=1
     `;
@@ -120,7 +120,7 @@ class SupplierModel {
       SELECT id, supplier_id, transaction_date, transaction_type, reference_no,
         debit, credit, balance, description, created_at
       FROM supplier_ledger${activeSql}${dateSql}
-      ORDER BY ${safeBy} ${safeOrder}${pageSql}
+      ORDER BY ${safeBy} ${safeOrder}, id ${safeOrder}${pageSql}
     `).all(...params);
         return { rows, total };
     }
@@ -162,10 +162,13 @@ class SupplierModel {
     }
     static getBalance(id, db) {
         const result = db.prepare(`
-      SELECT s.id, s.supplier_name, COALESCE(sl.balance, 0) as current_balance
+      SELECT s.id, s.supplier_name, COALESCE(sl.balance, s.current_balance, 0) as current_balance
       FROM suppliers s
       LEFT JOIN supplier_ledger sl ON s.id = sl.supplier_id AND sl.id = (
-        SELECT MAX(id) FROM supplier_ledger WHERE supplier_id = s.id
+        SELECT id FROM supplier_ledger
+        WHERE supplier_id = s.id AND voided = 0 AND reversed_by IS NULL
+        ORDER BY transaction_date DESC, id DESC
+        LIMIT 1
       )
       WHERE s.id = ?
     `).get(id);

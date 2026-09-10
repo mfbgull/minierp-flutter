@@ -374,6 +374,10 @@ class PurchaseOrderModel {
                     credit: 0,
                     description: `Purchase Order ${po.po_no}`
                 }, db);
+                // Keep suppliers.current_balance in lockstep with the new tail —
+                // createEntry alone never touches the header balance (same as
+                // every other createEntry site).
+                SupplierLedger_1.default.rebuildBalances(po.supplier_id, db);
             }
             db.prepare(`
         INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
