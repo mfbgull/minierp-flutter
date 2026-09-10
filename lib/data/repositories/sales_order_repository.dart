@@ -24,17 +24,6 @@ class SalesOrderRepository {
 
   final RepositoryClient _api;
 
-  /// All sales orders — full list (the grid now uses [listPaged]; this
-  /// stays for any consumer that needs the whole list in one fetch).
-  Future<ApiResult<List<SalesOrder>>> list({
-    Map<String, dynamic>? queryParameters,
-  }) => _api.getRawList(
-    ApiEndpoints.salesOrders,
-    queryParameters: queryParameters,
-    parseItem: (Object? json) =>
-        SalesOrder.fromJson(json as Map<String, dynamic>),
-  );
-
   /// One page of sales orders (`GET /sales-orders`) — server-paginated
   /// like the other converted lists. `status` rides in `extra`.
   Future<ApiResult<PagedResponse<SalesOrder>>> listPaged(

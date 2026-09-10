@@ -25,17 +25,6 @@ class QuotationRepository {
 
   final RepositoryClient _api;
 
-  /// All quotations — full list (the grid now uses [listPaged]; this
-  /// stays for any consumer that needs the whole list in one fetch).
-  Future<ApiResult<List<Quotation>>> list({
-    Map<String, dynamic>? queryParameters,
-  }) => _api.getRawList(
-    ApiEndpoints.quotations,
-    queryParameters: queryParameters,
-    parseItem: (Object? json) =>
-        Quotation.fromJson(json as Map<String, dynamic>),
-  );
-
   /// One page of quotations (`GET /quotations`) — server-paginated like
   /// the other converted lists. `status` rides in `extra`.
   Future<ApiResult<PagedResponse<Quotation>>> listPaged(

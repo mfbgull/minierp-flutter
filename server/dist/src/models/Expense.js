@@ -26,30 +26,10 @@ function create(db, data) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(data.expense_no, data.expense_category, data.description, data.amount, data.expense_date, data.payment_method || null, data.reference_no || null, data.vendor_name || null, data.project || null, data.status, data.created_by);
         const newId = result.lastInsertRowid;
-        // GL posting (ACC-04): Dr 6000 Operating Expenses /
-        // Cr cash-per-method. Expenses default to Approved on entry, so
-        // posting at creation matches when the cash effect occurs.
-        // Funds guard: reject payouts that would overdraw the selected
-        // account as of the expense date (same primitive reports use).
-        const fundsCashCode = accountingService_1.default._cashOrBankAccountCode(data.payment_method || 'cash');
-        const fundsAccount = accountingService_1.default.getAccountByCode(db, fundsCashCode);
-        if (!fundsAccount) {
-            throw new Error(`Chart of accounts is missing required account: ${fundsCashCode}`);
-        }
-        accountingService_1.default.assertSufficientFunds(db, {
-            accountId: fundsAccount.id,
-            amount: data.amount,
-            asOfDate: data.expense_date,
-            label: `expense ${data.expense_no}`,
-        });
-        accountingService_1.default.postExpenseEntry(db, {
-            expenseId: newId,
-            expenseNo: data.expense_no,
-            amount: data.amount,
-            expenseDate: data.expense_date,
-            paymentMethod: data.payment_method || 'cash',
-            userId: data.created_by,
-        });
+        // GL posting happens in update(): Draft rows carry no GL lines
+        // (the cash/reconciliation flows exclude Draft too), and the entry
+        // is posted only when the expense leaves Draft, matching when the
+        // cash effect actually occurs.
         return newId;
     })();
     return expenseId;
@@ -137,22 +117,85 @@ function getById(db, id) {
     FROM expenses e LEFT JOIN users u ON e.created_by = u.id WHERE e.id = ?
   `).get(id);
 }
-function update(db, id, data) {
+function update(db, id, data, opts) {
     const existing = getById(db, id);
     if (!existing)
         throw new Error('Expense not found');
-    db.prepare(`
-    UPDATE expenses SET
-      expense_category = ?, description = ?, amount = ?, expense_date = ?,
-      payment_method = ?, reference_no = ?, vendor_name = ?, project = ?,
-      status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-  `).run(data.expense_category || existing.expense_category, data.description ?? existing.description, data.amount !== undefined ? data.amount : existing.amount, data.expense_date || existing.expense_date, data.payment_method || existing.payment_method, data.reference_no ?? existing.reference_no, data.vendor_name ?? existing.vendor_name, data.project ?? existing.project, data.status || existing.status, id);
+    const glWorthy = (status) => status !== 'Cancelled' && status !== 'Draft';
+    const wasGlWorthy = glWorthy(existing.status);
+    const newStatus = data.status !== undefined ? data.status : String(existing.status);
+    const newCategory = data.expense_category || existing.expense_category;
+    const newDescription = data.description ?? existing.description;
+    const newAmount = data.amount !== undefined ? data.amount : Number(existing.amount);
+    const newDate = String(data.expense_date || existing.expense_date);
+    const newMethod = String(data.payment_method || existing.payment_method || '');
+    const newReference = data.reference_no ?? existing.reference_no;
+    const newVendor = data.vendor_name ?? existing.vendor_name;
+    const newProject = data.project ?? existing.project;
+    const willBeGlWorthy = glWorthy(newStatus);
+    const moneyChanged = newAmount !== Number(existing.amount) ||
+        String(newDate) !== String(existing.expense_date) ||
+        newMethod !== String(existing.payment_method ?? '');
+    db.transaction(() => {
+        // GL lifecycle: the flows treat every non-Draft/Cancelled expense as a
+        // cash outflow, so the GL must mirror that exactly. Void active EXPENSE
+        // lines whenever the row leaves (or never reaches) GL-worthiness, and
+        // (re)post on status transitions and money-field edits. The void-then-
+        // repost also cleans up lines legacy Draft rows may already carry.
+        if (!willBeGlWorthy) {
+            accountingService_1.default.voidJournalLinesByReference(db, 'EXPENSE', id, {
+                voidedBy: opts?.userId ?? null,
+                voidReason: `Expense ${existing.expense_no} moved to ${newStatus}`,
+            });
+        }
+        else {
+            const needsPosting = (!wasGlWorthy && willBeGlWorthy) || // Draft → Submitted/Approved/Paid
+                (wasGlWorthy && willBeGlWorthy && moneyChanged); // edit while GL-worthy
+            if (needsPosting) {
+                accountingService_1.default.voidJournalLinesByReference(db, 'EXPENSE', id, {
+                    voidedBy: opts?.userId ?? null,
+                    voidReason: 'Re-posted after edit',
+                });
+            }
+        }
+        db.prepare(`
+      UPDATE expenses SET
+        expense_category = ?, description = ?, amount = ?, expense_date = ?,
+        payment_method = ?, reference_no = ?, vendor_name = ?, project = ?,
+        status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).run(newCategory, newDescription, newAmount, newDate, newMethod, newReference, newVendor, newProject, newStatus, id);
+        if (willBeGlWorthy && ((!wasGlWorthy && willBeGlWorthy) || (wasGlWorthy && moneyChanged))) {
+            const cashCode = accountingService_1.default._cashOrBankAccountCode(newMethod || 'cash');
+            const fundsAccount = accountingService_1.default.getAccountByCode(db, cashCode);
+            if (!fundsAccount) {
+                throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
+            }
+            accountingService_1.default.assertSufficientFunds(db, {
+                accountId: fundsAccount.id,
+                amount: newAmount,
+                asOfDate: newDate,
+                label: `expense ${existing.expense_no}`,
+            });
+            accountingService_1.default.postExpenseEntry(db, {
+                expenseId: id,
+                expenseNo: String(existing.expense_no),
+                amount: newAmount,
+                expenseDate: newDate,
+                paymentMethod: newMethod || undefined,
+                userId: opts?.userId,
+            });
+        }
+    })();
 }
 function deleteExpense(db, id) {
     const existing = getById(db, id);
     if (!existing)
         throw new Error('Expense not found');
-    db.prepare('DELETE FROM expenses WHERE id = ?').run(id);
+    db.transaction(() => {
+        // Defensive: remove any active EXPENSE GL lines before the row goes.
+        accountingService_1.default.voidJournalLinesByReference(db, 'EXPENSE', id);
+        db.prepare('DELETE FROM expenses WHERE id = ?').run(id);
+    })();
 }
 function getByDateRange(db, from_date, to_date) {
     const expenses = db.prepare(`

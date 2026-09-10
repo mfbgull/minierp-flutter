@@ -159,6 +159,7 @@ function getCashPosition(db) {
         inflow: a.inflow,
         outflow: a.outflow,
         net: a.net,
+        flow_variance: a.flow_variance,
         // The individual movements behind the balance — the drill-down for
         // the dashboard card, so users can see why the position is what it is.
         transactions: (0, cashService_1.getCashAccountTransactions)(db, a.key, today.d),

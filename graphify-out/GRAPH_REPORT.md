@@ -1,7 +1,7 @@
 # Graph Report - /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter  (2026-09-09)
 
 ## Corpus Check
-- 560 files · ~631,573 words
+- 560 files · ~631,410 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -829,11 +829,11 @@ Nodes (1): Open the popover by clicking the pill's date label.
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `package:flutter_riverpod/flutter_riverpod.dart` connect `Community 0` to `Community 32`, `Community 1`, `Community 2`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 10`, `Community 13`, `Community 14`, `Community 16`, `Community 17`, `Community 20`, `Community 21`, `Community 24`, `Community 25`, `Community 27`?**
-  _High betweenness centrality (0.260) - this node is a cross-community bridge._
+  _High betweenness centrality (0.273) - this node is a cross-community bridge._
 - **Why does `package:flutter/material.dart` connect `Community 2` to `Community 0`, `Community 1`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 10`, `Community 12`, `Community 13`, `Community 14`, `Community 16`, `Community 17`, `Community 20`, `Community 21`, `Community 24`, `Community 25`, `Community 27`, `Community 29`, `Community 30`, `Community 32`?**
-  _High betweenness centrality (0.189) - this node is a cross-community bridge._
-- **Why does `package:intl/intl.dart` connect `Community 16` to `Community 0`, `Community 8`, `Community 20`?**
-  _High betweenness centrality (0.132) - this node is a cross-community bridge._
+  _High betweenness centrality (0.167) - this node is a cross-community bridge._
+- **Why does `run()` connect `Community 4` to `Community 33`, `Community 3`, `Community 36`, `Community 11`, `Community 15`, `Community 18`, `Community 19`, `Community 22`, `Community 23`?**
+  _High betweenness centrality (0.154) - this node is a cross-community bridge._
 - **Are the 196 inferred relationships involving `run()` (e.g. with `repairUnbatchedStock()` and `repairOrphanedBatches()`) actually correct?**
   _`run()` has 196 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `Intercept NOTIFY_DEBUGGER_ABOUT_RX_PAGES and touch the pages.`, `-registerWithRegistry`, `MiniErpApp` to the rest of the system?**

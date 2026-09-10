@@ -21,6 +21,7 @@ import 'package:minierp_app/data/repositories/expense_repository.dart';
 import 'package:minierp_app/data/repositories/inventory_repository.dart';
 import 'package:minierp_app/data/repositories/invoice_repository.dart';
 import 'package:minierp_app/data/repositories/production_repository.dart';
+import 'package:minierp_app/data/repositories/purchase_order_repository.dart';
 import 'package:minierp_app/data/repositories/paged_request.dart';
 import 'package:minierp_app/core/cache/cache_manager.dart' show CacheManager;
 import 'package:minierp_app/core/cache/cached_repository.dart'
@@ -806,7 +807,7 @@ void main() {
     };
 
     test(
-      'invoices parses rows and forwards status as CSV query param',
+      'invoices parses rows, forwards filters and fetches one big page',
       () async {
         Map<String, dynamic>? seenQuery;
         handler = (o) {
@@ -814,6 +815,13 @@ void main() {
           return jsonBody({
             'success': true,
             'data': [row(1, 'INV-2026-440955'), row(2, 'INV-2026-440956')],
+            'pagination': {
+              'currentPage': 1,
+              'totalPages': 1,
+              'totalItems': 2,
+              'hasNext': false,
+              'hasPrev': false,
+            },
           });
         };
         final result = await repo.invoices(
@@ -828,6 +836,10 @@ void main() {
         expect(result.requireData.first.balanceAmount, 1500);
         expect(result.requireData.first.createdByUsername, 'Fawad');
         expect(seenQuery!['status'], 'Paid,Overdue');
+        expect(seenQuery!['page'], 1);
+        expect(seenQuery!['limit'], 1000);
+        expect(seenQuery!['sortBy'], 'invoice_date');
+        expect(seenQuery!['sortOrder'], 'DESC');
       },
     );
 
@@ -838,8 +850,16 @@ void main() {
         return jsonBody({
           'success': true,
           'data': [row(1, 'INV-2026-440955')],
+          'pagination': {
+            'currentPage': 1,
+            'totalPages': 1,
+            'totalItems': 1,
+            'hasNext': false,
+            'hasPrev': false,
+          },
         });
       };
+
       final result = await repo.invoices();
 
       expect(result.requireData, hasLength(1));
@@ -972,6 +992,58 @@ void main() {
         final result = await repo.cancel(7);
         expect(seenPath, '/invoices/7/cancel');
         expect(result.requireData.status, 'Cancelled');
+      },
+    );
+  });
+
+  group('PurchaseOrderRepository', () {
+    late PurchaseOrderRepository repo;
+
+    setUp(() => repo = PurchaseOrderRepository(api));
+
+    Map<String, dynamic> poRow(int id, String poNo, num balance) => {
+      'id': id,
+      'po_no': poNo,
+      'po_date': '2026-08-01',
+      'supplier_id': 7,
+      'supplier_name': 'Alpha Traders',
+      'warehouse_name': 'Main Warehouse',
+      'total_amount': 1500,
+      'paid_amount': 1500 - balance,
+      'balance_amount': balance,
+      'status': 'Submitted',
+    };
+
+    test(
+      'list parses the paged envelope and forwards supplier_id',
+      () async {
+        // Regression: `GET /purchase-orders` is server-paginated
+        // ({success, data, pagination}); the old bare-array helper
+        // failed to parse it and the payment modal's PO list spun
+        // forever.
+        Map<String, dynamic>? seenQuery;
+        handler = (o) {
+          seenQuery = o.queryParameters;
+          return jsonBody({
+            'success': true,
+            'data': [poRow(1, 'PO-2026-001', 1000), poRow(2, 'PO-2026-002', 0)],
+            'pagination': {
+              'currentPage': 1,
+              'totalPages': 1,
+              'totalItems': 2,
+              'hasNext': false,
+              'hasPrev': false,
+            },
+          });
+        };
+        final result = await repo.list(supplierId: 7);
+
+        expect(result.requireData, hasLength(2));
+        expect(result.requireData.first.poNo, 'PO-2026-001');
+        expect(result.requireData.first.balanceAmount, 1000);
+        expect(seenQuery!['supplier_id'], 7);
+        expect(seenQuery!['page'], 1);
+        expect(seenQuery!['limit'], 1000);
       },
     );
   });

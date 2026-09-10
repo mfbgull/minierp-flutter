@@ -25,19 +25,20 @@ class PurchaseOrderRepository {
 
   final RepositoryClient _api;
 
-  /// All purchase orders — full list (the grid now uses [listPaged]; this
-  /// stays for consumers that need the whole list in one fetch — the
-  /// supplier detail POs tab / payment modal's allocation source, which
-  /// filter by `supplier_id`).
-  Future<ApiResult<List<PurchaseOrder>>> list({int? supplierId}) =>
-      _api.getRawList(
-        ApiEndpoints.purchaseOrders,
-        queryParameters: supplierId == null
-            ? null
-            : {'supplier_id': supplierId},
-        parseItem: (Object? json) =>
-            PurchaseOrder.fromJson(json as Map<String, dynamic>),
-      );
+  /// All purchase orders for one supplier — the server-paginated list
+  /// fetched as one large page (the endpoint caps nothing server-side,
+  /// so a high `limit` is the full list; rows ordered oldest-first).
+  /// The payment modal's allocation source filters by `supplier_id`.
+  Future<ApiResult<List<PurchaseOrder>>> list({int? supplierId}) async {
+    final result = await listPaged(
+      PagedRequest(
+        page: 1,
+        limit: 1000,
+        extra: supplierId == null ? null : {'supplier_id': supplierId},
+      ),
+    );
+    return result.map((page) => page.items);
+  }
 
   /// One page of purchase orders (`GET /purchase-orders`) —
   /// server-paginated like the other converted lists. `status` rides in

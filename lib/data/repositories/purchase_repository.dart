@@ -35,14 +35,6 @@ class PurchaseRepository {
 
   final RepositoryClient _api;
 
-  /// Direct purchases — full list (the grid now uses [listPaged]; this
-  /// stays for consumers that need the whole list in one fetch).
-  Future<ApiResult<List<Purchase>>> list() => _api.getRawList(
-    ApiEndpoints.purchases,
-    parseItem: (Object? json) =>
-        Purchase.fromJson(json as Map<String, dynamic>),
-  );
-
   /// One page of direct purchases (`GET /purchases`) — server-paginated
   /// like the other converted lists. `supplier_name` rides in `extra`.
   Future<ApiResult<PagedResponse<Purchase>>> listPaged(PagedRequest request) =>

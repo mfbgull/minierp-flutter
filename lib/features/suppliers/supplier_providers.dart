@@ -174,20 +174,6 @@ final supplierBalanceProvider = FutureProvider.autoDispose
       };
     });
 
-/// The supplier's purchase orders (`GET /purchase-orders?supplier_id=<id>`,
-/// bare array) — the payment modal's allocation source. autoDispose:
-/// owned by the detail page.
-final supplierPurchaseOrdersProvider = FutureProvider.autoDispose
-    .family<List<PurchaseOrder>, int>((ref, supplierId) async {
-      final result = await ref
-          .watch(purchaseOrderRepositoryProvider)
-          .list(supplierId: supplierId);
-      return switch (result) {
-        ApiSuccess(:final data) => data,
-        ApiFailure(:final error) => throw error,
-      };
-    });
-
 /// Paged fetch args for [supplierPurchaseOrdersPagedProvider].
 class SupplierPurchaseOrdersArgs {
   const SupplierPurchaseOrdersArgs({
@@ -551,8 +537,6 @@ void invalidateSupplierQueries(WidgetRef ref, int supplierId) {
   ref.invalidate(supplierDetailProvider(supplierId));
   ref.invalidate(supplierLedgerProvider(supplierId));
   ref.invalidate(supplierBalanceProvider(supplierId));
-  ref.invalidate(supplierPurchaseOrdersProvider(supplierId));
-  ref.invalidate(supplierPaymentsProvider(supplierId));
   // The paged tab + ranged-ledger + statement + PO-summary providers
   // watch these versions, so the range the user is currently on refetches
   // after any mutation (the ranged keys — page/dates — are invisible to

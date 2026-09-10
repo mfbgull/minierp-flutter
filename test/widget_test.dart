@@ -1811,12 +1811,10 @@ class _AuthFakeAdapter implements HttpClientAdapter {
             .where((po) => (po['po_date'] as String).compareTo(endDate) <= 0)
             .toList();
       }
-      // Bare array for the full-list consumers (`.list(supplierId:)` —
-      // the supplier POs tab / payment modal's getRawList); paged
-      // envelope for the grid's listPaged (page param present).
-      if (q['page'] == null) {
-        return _json(rows);
-      }
+      // Every /purchase-orders consumer is server-paginated now (the
+      // grid's listPaged and the full-list `.list(supplierId:)` helper
+      // both send page/limit), so the response is always the paged
+      // envelope.
       final search = (q['search'] as String?) ?? '';
       if (search.isNotEmpty) {
         final term = search.toLowerCase();
@@ -4343,11 +4341,10 @@ class _AuthFakeAdapter implements HttpClientAdapter {
             )
             .toList();
       }
-      // Full-list consumers (no page param — e.g. the Overview cohort
-      // feed) get every row; only paged consumers slice.
-      if (q['page'] == null) {
-        return _json({'success': true, 'data': rows});
-      }
+      // Every /invoices consumer is server-paginated now (the grid's
+      // invoicesPaged and the full-list `invoices()` helper both send
+      // page/limit), so the response is always the paged envelope —
+      // high-limit full-list fetches just get every row on page 1.
       final page = int.tryParse('${q['page']}') ?? 1;
       final limit = int.tryParse('${q['limit']}') ?? 10;
       final start = (page - 1) * limit;

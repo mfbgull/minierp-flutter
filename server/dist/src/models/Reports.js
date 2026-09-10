@@ -671,6 +671,66 @@ function getCashMovements(startDate, endDate, db) {
     for (const r of salaryRows) {
         push({ ...r, type: 'salary', amount: -r.amount });
     }
+    // Owner equity: capital contributions are money in.
+    const capitalRows = db.prepare(`
+    SELECT capital_date as date, capital_no as reference, 'Owner' as party,
+           payment_method as method, note as description, amount
+    FROM owner_capital
+    WHERE status = 'posted' AND capital_date BETWEEN ? AND ?
+    ORDER BY capital_date DESC
+  `).all(startDate, endDate);
+    for (const r of capitalRows) {
+        push({ ...r, type: 'owner_capital', amount: r.amount });
+    }
+    // Cash-kind owner withdrawals are money out (goods move no cash).
+    const withdrawalRows = db.prepare(`
+    SELECT withdrawal_date as date, withdrawal_no as reference, 'Owner' as party,
+           payment_method as method, note as description, amount
+    FROM owner_withdrawals
+    WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date BETWEEN ? AND ?
+    ORDER BY withdrawal_date DESC
+  `).all(startDate, endDate);
+    for (const r of withdrawalRows) {
+        push({ ...r, type: 'owner_withdrawal', amount: -r.amount });
+    }
+    // Employee loan disbursements (money out) and direct repayments
+    // (money in); salary deductions are already inside the salary rows.
+    const loanRows = db.prepare(`
+    SELECT l.disbursement_date as date, l.id as reference,
+           TRIM(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')) as party,
+           l.payment_method as method, l.purpose as description, l.amount
+    FROM employee_loans l LEFT JOIN employees e ON e.id = l.employee_id
+    WHERE l.disbursement_date BETWEEN ? AND ?
+    ORDER BY l.disbursement_date DESC
+  `).all(startDate, endDate);
+    for (const r of loanRows) {
+        push({ ...r, reference: `#${r.reference}`, type: 'loan_disbursement', amount: -r.amount });
+    }
+    const loanRepayRows = db.prepare(`
+    SELECT lr.payment_date as date, COALESCE(NULLIF(lr.reference_no, ''), lr.id) as reference,
+           TRIM(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')) as party,
+           lr.payment_method as method, lr.notes as description, lr.amount
+    FROM employee_loan_repayments lr
+    LEFT JOIN employees e ON e.id = lr.employee_id
+    WHERE lr.repayment_type = 'direct' AND lr.payment_date BETWEEN ? AND ?
+    ORDER BY lr.payment_date DESC
+  `).all(startDate, endDate);
+    for (const r of loanRepayRows) {
+        push({ ...r, reference: String(r.reference), type: 'loan_repayment', amount: r.amount });
+    }
+    // Supplier refunds (money in once POSTED).
+    const refundRows = db.prepare(`
+    SELECT sr.refund_date as date, sr.refund_no as reference,
+           s.supplier_name as party, sr.payment_method as method,
+           sr.reference_no as description, sr.amount
+    FROM supplier_refunds sr
+    LEFT JOIN suppliers s ON s.id = sr.supplier_id
+    WHERE sr.status = 'POSTED' AND sr.refund_date BETWEEN ? AND ?
+    ORDER BY sr.refund_date DESC
+  `).all(startDate, endDate);
+    for (const r of refundRows) {
+        push({ ...r, type: 'supplier_refund', amount: r.amount });
+    }
     out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     return out;
 }
