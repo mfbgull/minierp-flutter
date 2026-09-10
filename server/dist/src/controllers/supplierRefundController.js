@@ -40,6 +40,7 @@ const queryUtils_1 = require("../utils/queryUtils");
 const SupplierRefund_1 = __importStar(require("../models/SupplierRefund"));
 const database_1 = __importDefault(require("../config/database"));
 const logger_1 = __importDefault(require("../utils/logger"));
+const cashService_1 = require("../services/cashService");
 function getSupplierRefunds(req, res) {
     try {
         const page = (0, queryUtils_1.getQueryInteger)(req.query.page, 1);
@@ -95,6 +96,11 @@ function createSupplierRefund(req, res) {
             return res.status(400).json({ error: 'refund_date is required' });
         if (!body.credit_note_id || body.credit_note_id <= 0) {
             return res.status(400).json({ error: 'A valid credit_note_id is required' });
+        }
+        if (body.payment_method !== undefined && !(0, cashService_1.isValidPaymentMethod)(body.payment_method)) {
+            return res.status(400).json({
+                error: `Invalid payment_method "${body.payment_method}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`,
+            });
         }
         const created = SupplierRefund_1.default.create({
             refund_date: body.refund_date,

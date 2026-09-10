@@ -8,6 +8,7 @@ const sequence_1 = require("../utils/sequence");
 const ledgerUtils_1 = __importDefault(require("../utils/ledgerUtils"));
 const accountingService_1 = __importDefault(require("../services/accountingService"));
 const currency_1 = require("../utils/currency");
+const cashService_1 = require("../services/cashService");
 function getDraftById(db, id) {
     return db.prepare('SELECT * FROM invoice_drafts WHERE id = ?').get(id);
 }
@@ -158,6 +159,9 @@ function submitInvoice(db, data) {
         }
         if (data.record_payment && data.payment) {
             const paymentAmount = data.payment.amount || 0;
+            if (paymentAmount > 0 && !(0, cashService_1.isValidPaymentMethod)(data.payment.payment_method || 'Cash')) {
+                throw new Error(`Invalid payment_method "${data.payment.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
+            }
             (0, sequence_1.initializeSequenceFromMax)(db, 'PAY_last_no', 'payments', 'payment_no', 'PAY');
             const nextPaymentNo = (0, sequence_1.getNextSequenceNumber)(db, 'PAY_last_no');
             const paymentNo = `PAY${String(nextPaymentNo).padStart(3, '0')}`;

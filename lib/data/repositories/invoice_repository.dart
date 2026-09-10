@@ -36,17 +36,22 @@ class InvoiceRepository {
 
   final RepositoryClient _api;
 
-  /// All invoices — the full-list `GET /invoices` response (the grid now
-  /// uses [invoicesPaged]; this stays for pickers/dialogs that need the
-  /// whole list in one fetch, e.g. the Record Payment allocation list
-  /// and the Process Return picker).
-  Future<ApiResult<List<Invoice>>> invoices({InvoiceFilters? filters}) =>
-      _api.getList(
-        ApiEndpoints.invoices,
-        queryParameters: filters?.toQuery(),
-        parseItem: (Object? json) =>
-            Invoice.fromJson(json as Map<String, dynamic>),
-      );
+  /// All invoices for [filters] — the server-paginated list fetched as
+  /// one large page (rows ordered `invoice_date DESC` like the grid).
+  /// The Record Payment allocation lists, the customer metrics and the
+  /// Process Return picker need the whole list in one fetch.
+  Future<ApiResult<List<Invoice>>> invoices({InvoiceFilters? filters}) async {
+    final result = await invoicesPaged(
+      PagedRequest(
+        page: 1,
+        limit: 1000,
+        sortBy: 'invoice_date',
+        sortOrder: 'DESC',
+        extra: filters?.toQuery(),
+      ),
+    );
+    return result.map((page) => page.items);
+  }
 
   /// One page of invoices (`GET /invoices`) — server-paginated like
   /// customers/suppliers (enveloped + `pagination` block). `search`,

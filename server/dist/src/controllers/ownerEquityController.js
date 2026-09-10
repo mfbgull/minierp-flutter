@@ -44,6 +44,7 @@ const sqlSanitizer_1 = require("../utils/sqlSanitizer");
 const OwnerCapital_1 = __importStar(require("../models/OwnerCapital"));
 const OwnerWithdrawal_1 = __importStar(require("../models/OwnerWithdrawal"));
 const Expense_1 = __importDefault(require("../models/Expense"));
+const cashService_1 = require("../services/cashService");
 /**
  * Business-rule violations (funds guard, stock guard, closed periods,
  * double-posting, validation) are client errors; anything else is a
@@ -104,6 +105,10 @@ function createCapital(req, res) {
         const parsedAmount = Number(amount);
         if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
             res.status(400).json({ success: false, error: 'Amount must be a positive number' });
+            return;
+        }
+        if (payment_method !== undefined && !(0, cashService_1.isValidPaymentMethod)(payment_method)) {
+            res.status(400).json({ success: false, error: 'Invalid payment_method — use Cash, Bank, Easypaisa, JazzCash or Upaisa' });
             return;
         }
         let capitalId;
@@ -177,6 +182,10 @@ function updateCapital(req, res) {
         }
         if (amount !== undefined && (!Number.isFinite(Number(amount)) || Number(amount) <= 0)) {
             res.status(400).json({ success: false, error: 'Amount must be a positive number' });
+            return;
+        }
+        if (payment_method !== undefined && !(0, cashService_1.isValidPaymentMethod)(payment_method)) {
+            res.status(400).json({ success: false, error: 'Invalid payment_method — use Cash, Bank, Easypaisa, JazzCash or Upaisa' });
             return;
         }
         const existing = OwnerCapital_1.default.getById(database_1.default, id);
@@ -265,6 +274,10 @@ function createWithdrawal(req, res) {
             const parsedAmount = Number(amount);
             if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
                 res.status(400).json({ success: false, error: 'Cash withdrawal amount must be a positive number' });
+                return;
+            }
+            if (payment_method !== undefined && !(0, cashService_1.isValidPaymentMethod)(payment_method)) {
+                res.status(400).json({ success: false, error: 'Invalid payment_method — use Cash, Bank, Easypaisa, JazzCash or Upaisa' });
                 return;
             }
         }
@@ -396,6 +409,10 @@ function updateWithdrawal(req, res) {
         }
         if (existing.kind === 'goods' && amount !== undefined) {
             res.status(400).json({ success: false, error: 'Goods withdrawal amount is system-calculated and cannot be supplied' });
+            return;
+        }
+        if (existing.kind === 'cash' && payment_method !== undefined && !(0, cashService_1.isValidPaymentMethod)(payment_method)) {
+            res.status(400).json({ success: false, error: 'Invalid payment_method — use Cash, Bank, Easypaisa, JazzCash or Upaisa' });
             return;
         }
         let lines;

@@ -302,8 +302,16 @@ function saveCashOpeningBalances(req, res) {
                 res.status(400).json({ error: `Unknown account key: ${entry.key}` });
                 return;
             }
-            (0, cashService_1.saveOpeningBalance)(database_1.default, entry.key, Number(entry.amount) || 0);
         }
+        database_1.default.transaction(() => {
+            for (const entry of accounts) {
+                (0, cashService_1.saveOpeningBalance)(database_1.default, entry.key, Number(entry.amount) || 0);
+            }
+            // Keep the GL's opening capital in step with the seed; before this
+            // hook, edits to the seed never reached the journal and every as-of
+            // cash balance was wrong by the delta.
+            (0, cashService_1.syncOpeningBalancesToGl)(database_1.default, req.user?.id);
+        })();
         const opening = (0, cashService_1.getOpeningBalances)(database_1.default);
         const data = cashService_1.CASH_ACCOUNTS.map((a) => ({
             key: a.key,

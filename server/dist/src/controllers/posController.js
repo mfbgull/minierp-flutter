@@ -155,11 +155,11 @@ function createPOSSale(req, res) {
             // received. Any overpayment (change) is returned to the customer
             // and must NOT be recorded in the customer ledger, otherwise the
             // walk-in accumulates a spurious Cr balance.
-            let posPaymentNo = null;
+            let paymentId = null;
+            let paymentNo = null;
             if (paymentAmount > 0) {
-                const paymentNo = Invoice_1.default.generatePaymentNoAtomic(database_1.default);
-                posPaymentNo = paymentNo;
-                const paymentId = Invoice_1.default.createPayment(database_1.default, paymentNo, walkinCustomerId, sale_date, paymentAmount, 'Cash', null, `POS Transaction ${transactionNo}`);
+                paymentNo = Invoice_1.default.generatePaymentNoAtomic(database_1.default);
+                paymentId = Invoice_1.default.createPayment(database_1.default, paymentNo, walkinCustomerId, sale_date, paymentAmount, 'Cash', null, `POS Transaction ${transactionNo}`);
                 Invoice_1.default.createPaymentAllocation(database_1.default, paymentId, invoiceId, paymentAmount);
                 // Create ledger entry for payment
                 Invoice_1.default.createLedgerEntry(database_1.default, walkinCustomerId, 'PAYMENT', paymentNo, sale_date, 0, paymentAmount, `Payment ${paymentNo} for POS ${transactionNo}`);
@@ -200,18 +200,17 @@ function createPOSSale(req, res) {
                 });
             }
             if (paymentAmount > 0) {
-                const posPayment = database_1.default.prepare('SELECT id FROM payments WHERE notes = ? ORDER BY id DESC LIMIT 1').get(`POS Transaction ${transactionNo}`);
-                if (posPayment && posPaymentNo) {
-                    accountingService_1.default.postPaymentEntry(database_1.default, {
-                        paymentId: posPayment.id,
-                        paymentNo: posPaymentNo,
-                        amount: paymentAmount,
-                        paymentDate: sale_date,
-                        paymentMethod: 'cash',
-                        customerId: walkinCustomerId,
-                        userId,
-                    });
-                }
+                if (paymentId === null || paymentNo === null)
+                    throw new Error('POS payment was not recorded');
+                accountingService_1.default.postPaymentEntry(database_1.default, {
+                    paymentId,
+                    paymentNo,
+                    amount: paymentAmount,
+                    paymentDate: sale_date,
+                    paymentMethod: 'cash',
+                    customerId: walkinCustomerId,
+                    userId,
+                });
             }
             // Activity log — task 4.5: attribute POS sales to the INVOICE entity,
             // written transactionally via the shared helper.

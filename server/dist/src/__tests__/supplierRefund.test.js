@@ -37,8 +37,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 /**
- * SupplierRefundModel — cash payout against a supplier credit note.
- * Covers: create (ledger + GL + funds guard), refundable cap, void reversal.
+ * SupplierRefundModel — cash receipt against a supplier credit note.
+ * Covers: create (ledger + GL), refundable cap, void reversal.
  */
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -71,7 +71,7 @@ function setupDb() {
         const sql = fs_1.default.readFileSync(path_1.default.join(__dirname, '..', 'migrations', file), 'utf8');
         db.exec(sql);
     }
-    // Boot-time rebuild: make payments.customer_id nullable (supplier payouts).
+    // Boot-time rebuild: make payments.customer_id nullable.
     const notNull = db.prepare(`
     SELECT COUNT(*) as count FROM pragma_table_info('payments')
     WHERE name='customer_id' AND "notnull"=1
@@ -176,7 +176,7 @@ function seedReturn(db, opts = {}) {
     VALUES (?, ?, ?)
   `).run(payResult.lastInsertRowid, purchaseId, total);
     if (opts.cash !== undefined && opts.cash > 0) {
-        // Seed cash so the funds guard passes: Dr cash against opening equity.
+        // Seed opening cash (Dr cash against opening equity) for GL context.
         const cash = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1000'`).get();
         const equity = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '3000'`).get();
         if (equity) {
@@ -203,7 +203,7 @@ function seedReturn(db, opts = {}) {
     return { returnId: created.id, creditNoteId: note.id, total };
 }
 describe('SupplierRefundModel', () => {
-    test('create pays out a credit note: ledger debit, GL posting, refundable drops', () => {
+    test('create collects a credit-note refund: ledger debit, GL posting, refundable drops', () => {
         const db = setupDb();
         const { creditNoteId, total } = seedReturn(db, { cash: 1000, disposition: 'credit_on_account' });
         expect((0, SupplierRefund_1.creditNoteRefundable)(creditNoteId, db)).toBe(total);
@@ -219,7 +219,7 @@ describe('SupplierRefundModel', () => {
         // Ledger: SUPPLIER_REFUND debit restores the supplier balance to ~0.
         const balance = db.prepare(`SELECT balance FROM supplier_ledger WHERE supplier_id = 1 ORDER BY id DESC LIMIT 1`).get();
         expect(Math.abs(balance.balance)).toBeLessThan(0.01);
-        // GL: Dr AP / Cr Cash posted by reference.
+        // GL: Dr Cash / Cr AP posted by reference.
         const gl = db.prepare(`
       SELECT SUM(jl.debit) AS dr, SUM(jl.credit) AS cr
       FROM journal_lines jl
@@ -236,10 +236,10 @@ describe('SupplierRefundModel', () => {
         const { creditNoteId, total } = seedReturn(db, { cash: 1000, disposition: 'credit_on_account' });
         expect(() => SupplierRefund_1.default.create({ refund_date: '2026-07-03', credit_note_id: creditNoteId, amount: total + 1 }, 1, db)).toThrow(/exceeds the refundable/);
     });
-    test('refund_expected return auto-issues the cash payout in the same transaction', () => {
+    test('refund_expected return auto-issues the cash refund collection in the same transaction', () => {
         const db = setupDb();
         const { creditNoteId, total } = seedReturn(db, { cash: 1000 });
-        // The return itself triggered the payout — refundable already 0.
+        // The return itself collected the refund — refundable already 0.
         expect((0, SupplierRefund_1.creditNoteRefundable)(creditNoteId, db)).toBe(0);
         const refunds = db.prepare(`SELECT * FROM supplier_refunds WHERE credit_note_id = ? AND status = 'POSTED'
     `).all(creditNoteId);
@@ -253,7 +253,7 @@ describe('SupplierRefundModel', () => {
         const db = setupDb();
         // The refund is money IN from the supplier — no funds guard applies,
         // so zero opening cash must not block the return or the collection.
-        const { creditNoteId } = seedReturn(db, { cash: 0 });
+        const { creditNoteId, total } = seedReturn(db, { cash: 0 });
         const returns = db.prepare(`SELECT COUNT(*) AS n FROM purchase_returns`).get();
         const notes = db.prepare(`SELECT COUNT(*) AS n FROM credit_notes`).get();
         const refunds = db.prepare(`SELECT COUNT(*) AS n FROM supplier_refunds`).get();
@@ -261,6 +261,7 @@ describe('SupplierRefundModel', () => {
         expect(notes.n).toBe(1);
         expect(refunds.n).toBe(1);
         expect((0, SupplierRefund_1.creditNoteRefundable)(creditNoteId, db)).toBe(0);
+        expect(total).toBeGreaterThan(0);
     });
     test('void reverses ledger + GL and restores the refundable balance', () => {
         const db = setupDb();

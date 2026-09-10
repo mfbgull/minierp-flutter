@@ -23,6 +23,7 @@ const logger_1 = __importDefault(require("../utils/logger"));
 const activityLogger_1 = require("../services/activityLogger");
 const queryUtils_1 = require("../utils/queryUtils");
 const currency_1 = require("../utils/currency");
+const cashService_1 = require("../services/cashService");
 /**
  * ACC-18 interim: thrown when a client-supplied invoice total disagrees
  * with the server-computed sum of line items beyond the 0.01 tolerance.
@@ -31,6 +32,16 @@ class TotalMismatchError extends Error {
     constructor(clientTotal, computedTotal) {
         super(`total_amount disagrees with line items (client ${clientTotal.toFixed(2)} vs computed ${computedTotal.toFixed(2)})`);
         this.name = 'TotalMismatchError';
+    }
+}
+/**
+ * Inline payment carried a payment_method outside the accepted
+ * whitelist — a client error (400), not a server fault.
+ */
+class InvalidPaymentMethodError extends Error {
+    constructor(method) {
+        super(`Invalid payment_method "${method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
+        this.name = 'InvalidPaymentMethodError';
     }
 }
 const { createLedgerEntry, recalcCustomerBalanceFromLedger, calculateInvoiceBalance, updateInvoiceStatus, } = ledgerUtils_1.default;
@@ -140,6 +151,11 @@ function createInvoice(req, res) {
             // Guard: payment cannot exceed the invoice total
             if (record_payment && payment && paymentAmountNum > totalAmountNum) {
                 throw new Error(`Payment amount (${paymentAmountNum.toFixed(2)}) exceeds invoice total (${totalAmountNum.toFixed(2)})`);
+            }
+            // Same whitelist as PaymentModel — inline payments reached the GL
+            // before this even when their method was unrecognized.
+            if (record_payment && payment && paymentAmountNum > 0 && !(0, cashService_1.isValidPaymentMethod)(payment.payment_method)) {
+                throw new InvalidPaymentMethodError(payment.payment_method);
             }
             let initialStatus;
             if (record_payment && payment && paymentAmountNum > 0) {
@@ -287,6 +303,11 @@ function createInvoice(req, res) {
             res.status(400).json({ error: 'total_amount disagrees with line items' });
             return;
         }
+        if (error instanceof InvalidPaymentMethodError) {
+            logger_1.default.warn('Create invoice rejected:', { error: error.message });
+            res.status(400).json({ error: error.message });
+            return;
+        }
         // FIX #7: Generic error message, log detail server-side
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         const errorCode = error.code;
@@ -385,6 +406,9 @@ function updateInvoice(req, res) {
             let newPaymentAmount;
             if (record_payment && payment && (0, currency_1.parseCurrency)(payment.amount) > 0) {
                 newPaymentAmount = (0, currency_1.parseCurrency)(payment.amount);
+                if (!(0, cashService_1.isValidPaymentMethod)(payment.payment_method)) {
+                    throw new InvalidPaymentMethodError(payment.payment_method);
+                }
                 // FIX #5: Atomic payment number generation
                 const newPaymentNo = Invoice_1.default.generatePaymentNoAtomic(database_1.default);
                 const newPaymentId = Invoice_1.default.createPayment(database_1.default, newPaymentNo, parsedCustomerId, payment.payment_date, newPaymentAmount, payment.payment_method, payment.reference_no, payment.notes);
@@ -538,6 +562,11 @@ function updateInvoice(req, res) {
         if (error instanceof TotalMismatchError) {
             logger_1.default.warn('Update invoice rejected:', { error: error.message });
             res.status(400).json({ error: 'total_amount disagrees with line items' });
+            return;
+        }
+        if (error instanceof InvalidPaymentMethodError) {
+            logger_1.default.warn('Update invoice rejected:', { error: error.message });
+            res.status(400).json({ error: error.message });
             return;
         }
         logger_1.default.error('Update invoice error:', { error: errorMessage, name: errorName, stack: error instanceof Error ? error.stack : undefined });
