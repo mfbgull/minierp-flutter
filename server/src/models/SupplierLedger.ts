@@ -126,7 +126,10 @@ class SupplierLedgerModel {
       LEFT JOIN supplier_ledger sl
         ON s.id = sl.supplier_id
         AND sl.id = (
-          SELECT MAX(id) FROM supplier_ledger WHERE supplier_id = s.id
+          SELECT id FROM supplier_ledger
+          WHERE supplier_id = s.id AND voided = 0 AND reversed_by IS NULL
+          ORDER BY transaction_date DESC, id DESC
+          LIMIT 1
         )
       WHERE s.is_active = 1
       ORDER BY balance DESC

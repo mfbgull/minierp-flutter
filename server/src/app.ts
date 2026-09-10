@@ -58,7 +58,6 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-eval'", "https://www.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:"],
       connectSrc: ["'self'", "https://www.gstatic.com", "https://fonts.gstatic.com"],
-      fontSrc: ["'self'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],

@@ -202,10 +202,12 @@ class _SupplierLedgerTabState extends ConsumerState<SupplierLedgerTab> {
     );
   }
 
-  /// Web supplier LedgerTab totals: summed debit/credit; balance = the
-  /// last entry's running balance (the ledger is newest-first, so the
-  /// first row's balance is the closing balance in that orientation — the
-  /// web takes `ledger[ledger.length - 1].balance`).
+  /// Totals: summed debit/credit over the loaded entries; balance = the
+  /// closing running balance. The server returns the ledger newest-first
+  /// (transaction_date DESC), so the first row's stored balance is the
+  /// closing position (of the whole history, or of the active date
+  /// range). The last row is the OLDEST entry — its balance is not the
+  /// footer's number.
   ({num debit, num credit, num balance}) _totals(List<LedgerEntry> ledger) {
     var debit = 0.0;
     var credit = 0.0;
@@ -213,7 +215,7 @@ class _SupplierLedgerTabState extends ConsumerState<SupplierLedgerTab> {
       debit += entry.debit;
       credit += entry.credit;
     }
-    final balance = ledger.isEmpty ? 0 : ledger.last.balance;
+    final balance = ledger.isEmpty ? 0 : ledger.first.balance;
     return (debit: debit, credit: credit, balance: balance);
   }
 
