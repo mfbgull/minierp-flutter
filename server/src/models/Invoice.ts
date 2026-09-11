@@ -5,6 +5,20 @@ import { sanitizeSortParams, INVOICE_SORT_COLUMNS, INVOICE_RETURN_SORT_COLUMNS }
 import Database from 'better-sqlite3';
 import logger from '../utils/logger';
 import StockMovementModel from './StockMovement';
+import AccountingService from '../services/accountingService';
+
+/**
+ * Reversal-rules guard rejection (rule 4/5: paid + returned documents
+ * lock). Thrown by cancelInvoiceInternal for states the API caller can
+ * correct (payments/returns present) — the controller maps it to HTTP
+ * 400 rather than a 500 server fault.
+ */
+export class InvoiceCancellationGuardError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvoiceCancellationGuardError';
+  }
+}
 
 export interface Invoice {
   id: number;
@@ -825,7 +839,7 @@ class InvoiceModel {
     const result = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total_paid
       FROM payment_allocations
-      WHERE invoice_id = ?
+      WHERE invoice_id = ? AND voided_at IS NULL
     `).get(invoiceId) as { total_paid: number };
     return result.total_paid;
   }
@@ -906,6 +920,96 @@ class InvoiceModel {
     for (const row of rows) {
       ledgerUtils.reverseLedgerEntry('customer_ledger', row.id, `document ${referenceNo} updated/deleted`);
     }
+  }
+
+  /**
+   * Shared invoice-cancellation primitive (reversal-rules rule 2).
+   *
+   * Called by BOTH cancelInvoice (POST /api/invoices/:id/cancel) and
+   * SalesOrder.cancel (POST /api/sales/:id/cancel) so the two paths can
+   * never diverge again. Performs the full reversal inside the caller's
+   * transaction:
+   *
+   *   1. guards: not already Cancelled, no payments, no returns
+   *   2. stock reversal (exact-batch restore + ADJUSTMENT movements,
+   *      reference_doctype INVOICE_CANCEL)
+   *   3. GL void by reference: INVOICE + INVOICE_RETURN journal_lines
+   *      (COGS lines share reference_type INVOICE)
+   *   4. customer ledger: append-only CANCELLATION credit
+   *   5. rebuild ledger + customer balance (throw on failure)
+   *
+   * The caller MUST wrap this in db.transaction — every step must
+   * commit or roll back together (all-or-nothing rule).
+   */
+  static cancelInvoiceInternal(
+    db: Database.Database,
+    invoice: Invoice,
+    userId: number
+  ): void {
+    // ---- Guards (rule 4/5: paid + returned documents lock) ----
+    if (invoice.status === 'Cancelled') {
+      throw new Error('Invoice is already cancelled');
+    }
+    const paid = parseCurrency(invoice.paid_amount);
+    if (paid > 0) {
+      throw new InvoiceCancellationGuardError(
+        `Cannot cancel invoice ${invoice.invoice_no} with recorded payments (${paid.toFixed(2)}). Reverse or delete the payments first.`
+      );
+    }
+    const returned = parseCurrency(invoice.returned_amount);
+    if (returned > 0) {
+      throw new InvoiceCancellationGuardError(
+        `Cannot cancel invoice ${invoice.invoice_no} with returned items (${returned.toFixed(2)}). Void the returns first.`
+      );
+    }
+
+    // ---- 1. Stock reversal ----
+    const items = InvoiceModel.getInvoiceItemsForStockReverse(db, invoice.id);
+    if (items.length > 0) {
+      InvoiceModel.reverseStockForItems(db, items, invoice.invoice_no, userId, 'INVOICE_CANCEL');
+    }
+
+    // ---- 2. GL void (canonical journal_lines) ----
+    // INVOICE lines carry AR / Sales Revenue / Tax Payable / COGS.
+    // INVOICE_RETURN lines carry return contra-entries; they are also
+    // dead once the invoice is cancelled, so void them too.
+    const voidedInvoice = AccountingService.voidJournalLinesByReference(
+      db, 'INVOICE', invoice.id,
+      { voidedBy: userId, voidReason: `Invoice ${invoice.invoice_no} cancelled` }
+    );
+    const voidedReturn = AccountingService.voidJournalLinesByReference(
+      db, 'INVOICE_RETURN', invoice.id,
+      { voidedBy: userId, voidReason: `Invoice ${invoice.invoice_no} cancelled` }
+    );
+    if ((voidedInvoice ?? 0) + (voidedReturn ?? 0) === 0 && parseCurrency(invoice.total_amount) > 0) {
+      throw new Error(
+        `Refusing to cancel invoice ${invoice.invoice_no}: no journal lines were voided — GL state unexpected`
+      );
+    }
+
+    // ---- 3. Customer ledger: append-only CANCELLATION credit ----
+    // ACC-12: date the reversal at the invoice's own date so the chain
+    // treats the pair as net-zero at the original position.
+    InvoiceModel.createLedgerEntry(
+      db,
+      invoice.customer_id,
+      'CANCELLATION',
+      invoice.invoice_no,
+      invoice.invoice_date.slice(0, 10),
+      0,
+      invoice.total_amount,
+      `Invoice ${invoice.invoice_no} cancelled`
+    );
+
+    // ---- 4. Rebuilds throw on failure (rule 9) ----
+    ledgerUtils.rebuildLedgerBalances(invoice.customer_id);
+    ledgerUtils.recalcCustomerBalanceFromLedger(invoice.customer_id);
+
+    // ---- 5. Status stamp ----
+    db.prepare(`
+      UPDATE invoices SET status = 'Cancelled', updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(invoice.id);
   }
 
   /**
@@ -1047,7 +1151,7 @@ class InvoiceModel {
       SELECT p.id, p.payment_no, p.payment_date, p.payment_method,
              p.reference_no, p.notes, pa.amount
       FROM payment_allocations pa JOIN payments p ON pa.payment_id = p.id
-      WHERE pa.invoice_id = ? ORDER BY p.payment_date DESC
+      WHERE pa.invoice_id = ? AND pa.voided_at IS NULL ORDER BY p.payment_date DESC
     `).all(invoiceId);
   }
 

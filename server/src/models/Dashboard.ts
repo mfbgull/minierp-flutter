@@ -143,7 +143,7 @@ function getSummary(db: Database.Database, fromDate?: string, toDate?: string): 
       AND (
         sm.movement_type = 'SALE'
         OR (sm.movement_type = 'ADJUSTMENT'
-            AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE'))
+            AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE', 'INVOICE_CANCEL', 'SO_CANCEL'))
       )
   `).get(from, to) as { total: number };
 
@@ -500,7 +500,7 @@ function getKPI(
           AND (
             sm.movement_type = 'SALE'
             OR (sm.movement_type = 'ADJUSTMENT'
-                AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE'))
+                AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE', 'INVOICE_CANCEL', 'SO_CANCEL'))
           )
       `).get(from, to) as { total: number };
       return { metric, value: revenue.total - cogs.total, unit: 'currency', label: 'Gross Profit' };
@@ -616,7 +616,7 @@ function getKPI(
           AND (
             sm.movement_type = 'SALE'
             OR (sm.movement_type = 'ADJUSTMENT'
-                AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE'))
+                AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE', 'INVOICE_CANCEL', 'SO_CANCEL'))
           )
       `).get(from, to) as { total: number };
       const expenseRow = db.prepare(`
@@ -668,7 +668,7 @@ function getKPI(
       const result = db.prepare(`
         SELECT COALESCE(SUM(balance), 0) as total
         FROM employee_loans
-        WHERE status IN ('active', 'overdue')
+        WHERE status IN ('active', 'overdue') AND voided_at IS NULL
       `).get() as { total: number };
       return { metric, value: result.total, unit: 'currency', label: 'Outstanding Loans' };
     }

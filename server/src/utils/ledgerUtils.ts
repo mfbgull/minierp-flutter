@@ -150,7 +150,7 @@ function calculateInvoiceBalance(invoiceId: number): number {
   const paidResult = db.prepare(`
     SELECT COALESCE(SUM(amount), 0) as total_paid
     FROM payment_allocations
-    WHERE invoice_id = ?
+    WHERE invoice_id = ? AND voided_at IS NULL
   `).get(invoiceId) as { total_paid: number };
 
   const totalPaid = parseCurrency(paidResult?.total_paid);

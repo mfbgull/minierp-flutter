@@ -30,6 +30,8 @@ function createFixture(): Database.Database {
     'add-disposition-and-supplier-refunds.sql',
     'create-customer-ledger.sql',
     'add-gl-void-attribution.sql',
+    'add-salary-payments.sql',
+    'add-payment-salary-void-columns.sql',
   ];
 
   for (const file of migrations) {
@@ -655,7 +657,8 @@ describe('PurchaseReturnModel', () => {
         invoice_id INTEGER,
         payment_date DATE NOT NULL,
         amount DECIMAL(15,2) NOT NULL,
-        payment_method VARCHAR(50)
+        payment_method VARCHAR(50),
+        voided_at TEXT
       )`);
       db.exec(`INSERT INTO payments (id, payment_no, customer_id, invoice_id, payment_date, amount)
         SELECT id, payment_no, customer_id, invoice_id, payment_date, amount FROM payments_old`);
@@ -674,7 +677,8 @@ describe('PurchaseReturnModel', () => {
         payment_id INTEGER NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
         purchase_id INTEGER NOT NULL REFERENCES purchases(id),
         amount DECIMAL(15,2) NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        voided_at TEXT
       )`);
       db.prepare(`
         INSERT INTO purchase_allocations (payment_id, purchase_id, amount) VALUES (?, ?, ?)

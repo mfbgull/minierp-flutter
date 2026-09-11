@@ -27,6 +27,7 @@ const MIGRATIONS = [
   'add-opening-balances.sql',
   'add-purchase-void-columns.sql',
   'add-purchase-return-batches.sql',
+  'add-payment-salary-void-columns.sql',
 ];
 
 function createFixture(): Database.Database {

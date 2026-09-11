@@ -330,7 +330,7 @@ class EmployeeModel {
         MIN(payment_date) AS first_payment_date,
         MAX(payment_date) AS last_payment_date
       FROM salary_payments
-      WHERE employee_id = ?
+      WHERE employee_id = ? AND voided_at IS NULL
       GROUP BY pay_period
       ORDER BY pay_period DESC
     `).all(employeeId) as Array<{
@@ -386,7 +386,7 @@ class EmployeeModel {
     const salary = employee?.salary ?? 0;
 
     const payments = db.prepare(
-      `SELECT * FROM salary_payments WHERE employee_id = ? AND pay_period = ? ORDER BY payment_date ASC`
+      `SELECT * FROM salary_payments WHERE employee_id = ? AND pay_period = ? AND voided_at IS NULL ORDER BY payment_date ASC`
     ).all(employeeId, payPeriod);
 
     const totalPaid = (payments as Array<{ amount: number }>).reduce((sum, p) => sum + p.amount, 0);
@@ -418,7 +418,7 @@ class EmployeeModel {
              SUM(CASE WHEN payment_type = 'full' THEN amount ELSE 0 END) AS full_amount,
              SUM(CASE WHEN payment_type IN ('advance', 'partial') THEN amount ELSE 0 END) AS non_full_amount
       FROM salary_payments
-      WHERE employee_id = ? AND pay_period < ?
+      WHERE employee_id = ? AND pay_period < ? AND voided_at IS NULL
       GROUP BY pay_period
       ORDER BY pay_period
     `).all(employeeId, beforePayPeriod) as Array<{
@@ -456,8 +456,12 @@ class EmployeeModel {
     ).get(paymentId);
   }
 
-  static deleteSalaryPayment(paymentId: number, db: Database.Database): void {
-    db.prepare('DELETE FROM salary_payments WHERE id = ?').run(paymentId);
+  static deleteSalaryPayment(paymentId: number, db: Database.Database, voidedBy: number | null, voidReason: string): void {
+    // C6 (reversal-rules): salary payments moved money (GL + cash) so
+    // they are voided with attribution, never hard-deleted.
+    db.prepare(
+      'UPDATE salary_payments SET voided_at = CURRENT_TIMESTAMP, voided_by = ?, void_reason = ?, status = ? WHERE id = ? AND voided_at IS NULL'
+    ).run(voidedBy, voidReason, 'cancelled', paymentId);
   }
 
   static addSalaryPayment(data: {

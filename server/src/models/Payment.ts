@@ -3,7 +3,6 @@ import { getNextSequenceNumber } from '../utils/sequence';
 import ledgerUtils from '../utils/ledgerUtils';
 import AccountingService from '../services/accountingService';
 import { parseCurrency, subtractCurrency } from '../utils/currency';
-import logger from '../utils/logger';
 import SupplierLedgerModel from './SupplierLedger';
 import { isValidPaymentMethod } from '../services/cashService';
 
@@ -91,6 +90,7 @@ export class PaymentModel {
     const payment = db.prepare(`
       SELECT p.id, p.payment_no, p.customer_id, c.customer_name, p.supplier_id, p.invoice_id, i.invoice_no,
              p.payment_date, p.amount, p.payment_method, p.reference_no, p.notes, p.created_at,
+             p.voided_at,
              GROUP_CONCAT(pa.invoice_id, ',') as allocated_invoices,
              GROUP_CONCAT(pa.amount, ',') as allocation_amounts,
              GROUP_CONCAT(pa.id, ',') as allocation_ids
@@ -99,7 +99,7 @@ export class PaymentModel {
       LEFT JOIN payment_allocations pa ON p.id = pa.payment_id
       WHERE p.id = ? GROUP BY p.id
     `).get(id) as {
-      id: number; payment_no: string; customer_id: number; customer_name: string; supplier_id: number | null;
+      id: number; payment_no: string; customer_id: number; customer_name: string; supplier_id: number | null; voided_at: string | null;
       invoice_id: number | null;
       invoice_no: string | null; payment_date: string; amount: number; payment_method: string;
       reference_no: string; notes: string; created_at: string; allocated_invoices: string | null;
@@ -110,7 +110,7 @@ export class PaymentModel {
       payment.allocations = db.prepare(`
         SELECT pa.id, pa.payment_id, pa.invoice_id, i.invoice_no, pa.amount
         FROM payment_allocations pa LEFT JOIN invoices i ON pa.invoice_id = i.id
-        WHERE pa.payment_id = ? ORDER BY pa.id
+        WHERE pa.payment_id = ? AND pa.voided_at IS NULL ORDER BY pa.id
       `).all(id) as Array<{ id: number; payment_id: number; invoice_id: number; invoice_no: string; amount: number }>;
     } else if (payment) {
       payment.allocations = [];
@@ -137,7 +137,7 @@ export class PaymentModel {
       LEFT JOIN suppliers s ON p.supplier_id = s.id
       LEFT JOIN invoices i ON p.invoice_id = i.id
       LEFT JOIN payment_allocations pa ON p.id = pa.payment_id
-      WHERE 1=1
+      WHERE p.voided_at IS NULL
     `;
     const params: (string | number)[] = [];
 
@@ -163,7 +163,7 @@ export class PaymentModel {
       SELECT COUNT(DISTINCT p.id) as total FROM payments p
       LEFT JOIN customers c ON p.customer_id = c.id
       LEFT JOIN suppliers s ON p.supplier_id = s.id
-      WHERE 1=1
+      WHERE p.voided_at IS NULL
     `;
     const countParams: (string | number)[] = [];
     if (filters.search) {
@@ -246,6 +246,7 @@ export class PaymentModel {
       FROM payments p
       LEFT JOIN customers c ON p.customer_id = c.id
       LEFT JOIN suppliers s ON p.supplier_id = s.id
+      WHERE p.voided_at IS NULL
       UNION ALL
       SELECT 'expense', e.id, e.expense_no, e.expense_date, ABS(e.amount),
              ${PaymentModel.unifiedMethodSql('e.payment_method')}, 'expense',
@@ -260,6 +261,7 @@ export class PaymentModel {
              sp.status, sp.notes,
              COALESCE(sp.created_at, sp.payment_date)
       FROM salary_payments sp LEFT JOIN employees sp_emp ON sp_emp.id = sp.employee_id
+      WHERE sp.voided_at IS NULL
       UNION ALL
       SELECT 'owner_capital', oc.id, oc.capital_no, oc.capital_date, ABS(oc.amount),
              ${PaymentModel.unifiedMethodSql('oc.payment_method')}, 'owner_capital',
@@ -435,7 +437,7 @@ export class PaymentModel {
         const po = db.prepare(`
           SELECT po.id, po.supplier_id, po.total_amount, COALESCE(SUM(pa.amount), 0) as paid_amount
           FROM purchase_orders po
-          LEFT JOIN po_allocations pa ON pa.po_id = po.id
+          LEFT JOIN po_allocations pa ON pa.po_id = po.id AND pa.voided_at IS NULL
           WHERE po.id = ? GROUP BY po.id
         `).get(poId) as { id: number; supplier_id: number; total_amount: number; paid_amount: number } | undefined;
         if (!po) {
@@ -460,7 +462,7 @@ export class PaymentModel {
         const purchase = db.prepare(`
           SELECT p.id, p.supplier_id, p.total_cost, COALESCE(SUM(pa.amount), 0) as paid_amount
           FROM purchases p
-          LEFT JOIN purchase_allocations pa ON pa.purchase_id = p.id
+          LEFT JOIN purchase_allocations pa ON pa.purchase_id = p.id AND pa.voided_at IS NULL
           WHERE p.id = ? GROUP BY p.id
         `).get(purchaseId) as { id: number; supplier_id: number | null; total_cost: number; paid_amount: number } | undefined;
         if (!purchase) {
@@ -622,20 +624,35 @@ export class PaymentModel {
   /**
    * Delete payment
    */
-  static delete(db: Database.Database, id: number): void {
+  static delete(db: Database.Database, id: number, attribution?: { voidedBy?: number | null; voidReason?: string }): void {
     const existing = this.getById(db, id);
     if (!existing) throw new Error('Payment not found');
+    if (existing.voided_at) throw new Error('Payment is already voided');
 
     db.transaction(() => {
       // GL consistency (ACC-09): the payment's journal lines (Dr Cash /
       // Cr AR, or supplier-side) must not survive as active orphans once
-      // the payment row is gone.
+      // the payment is voided.
       AccountingService.voidJournalLinesByReference(db, 'PAYMENT', id);
 
-      const allocations = db.prepare('SELECT * FROM payment_allocations WHERE payment_id = ?').all(id) as Array<{ invoice_id: number }>;
-      db.prepare('DELETE FROM payment_allocations WHERE payment_id = ?').run(id);
-      db.prepare('DELETE FROM purchase_allocations WHERE payment_id = ?').run(id);
-      db.prepare('DELETE FROM payments WHERE id = ?').run(id);
+      // C6 (reversal-rules): a payment moved money, so it is never
+      // hard-deleted. Void the row and its allocations with attribution;
+      // the audit history stays queryable and no ON DELETE CASCADE fires.
+      const allocations = db.prepare(
+        'SELECT * FROM payment_allocations WHERE payment_id = ? AND voided_at IS NULL'
+      ).all(id) as Array<{ invoice_id: number }>;
+      db.prepare(
+        'UPDATE payment_allocations SET voided_at = CURRENT_TIMESTAMP WHERE payment_id = ? AND voided_at IS NULL'
+      ).run(id);
+      db.prepare(
+        'UPDATE purchase_allocations SET voided_at = CURRENT_TIMESTAMP WHERE payment_id = ? AND voided_at IS NULL'
+      ).run(id);
+      db.prepare(
+         'UPDATE po_allocations SET voided_at = CURRENT_TIMESTAMP WHERE payment_id = ? AND voided_at IS NULL'
+      ).run(id);
+      db.prepare(
+        'UPDATE payments SET voided_at = CURRENT_TIMESTAMP, voided_by = ?, void_reason = ? WHERE id = ? AND voided_at IS NULL'
+      ).run(attribution?.voidedBy ?? null, attribution?.voidReason ?? null, id);
       // ACC-14: reverse the payment's subledger rows (append-only) instead
       // of deleting them. Scoped by reference_no AND transaction_type so a
       // colliding reference cannot touch another party's rows.
@@ -658,23 +675,27 @@ export class PaymentModel {
         SupplierLedgerModel.rebuildBalances(existing.supplier_id, db);
       }
 
+      // Rule 9: rebuild failures roll back the whole reversal. A warn-only
+      // rebuild can leave an invoice showing paid amounts whose payment
+      // is voided.
       for (const alloc of allocations) {
-        try {
-          ledgerUtils.calculateInvoiceBalance(alloc.invoice_id);
-          ledgerUtils.updateInvoiceStatus(alloc.invoice_id);
-        } catch (err) {
-          logger.warn('Payment.delete: failed to update invoice balance', { invoice_id: alloc.invoice_id, error: err instanceof Error ? err.message : err });
-        }
+        ledgerUtils.calculateInvoiceBalance(alloc.invoice_id);
+        ledgerUtils.updateInvoiceStatus(alloc.invoice_id);
       }
 
-      try { ledgerUtils.recalcCustomerBalanceFromLedger(existing.customer_id); } catch (err) {
-        logger.warn('Payment.delete: failed to update customer balance', { customer_id: existing.customer_id, error: err instanceof Error ? err.message : err });
-      }
+      ledgerUtils.recalcCustomerBalanceFromLedger(existing.customer_id);
 
-      try { ledgerUtils.rebuildLedgerBalances(existing.customer_id); } catch (err) {
-        logger.warn('Payment.delete: failed to rebuild ledger balances', { customer_id: existing.customer_id, error: err instanceof Error ? err.message : err });
-      }
+      ledgerUtils.rebuildLedgerBalances(existing.customer_id);
     })();
+  }
+
+  /**
+   * C6 (reversal-rules): explicit business name for voiding a payment.
+   * Same transactional body as delete(); kept so destructive call sites
+   * read as reversals, not row removals.
+   */
+  static void(db: Database.Database, id: number, voidedBy: number | null, voidReason: string): void {
+    this.delete(db, id, { voidedBy, voidReason });
   }
 
   /**
@@ -697,14 +718,19 @@ export class PaymentModel {
    * Delete payment allocations by payment ID
    */
   static deleteAllocationsByPaymentId(db: Database.Database, paymentId: number): void {
-    db.prepare('DELETE FROM payment_allocations WHERE payment_id = ?').run(paymentId);
+    // C6 (reversal-rules): allocation rows die with the payment reversal,
+    // never with a row DELETE. Voided allocation rows are excluded from
+    // balance math by voided_at IS NULL.
+    db.prepare('UPDATE payment_allocations SET voided_at = CURRENT_TIMESTAMP WHERE payment_id = ? AND voided_at IS NULL').run(paymentId);
   }
 
   /**
    * Delete payment allocations by invoice ID
    */
   static deleteAllocationsByInvoiceId(db: Database.Database, invoiceId: number): void {
-    db.prepare('DELETE FROM payment_allocations WHERE invoice_id = ?').run(invoiceId);
+    // C6 (reversal-rules): void, never delete — allocation history must
+    // survive every reversal for auditability.
+    db.prepare('UPDATE payment_allocations SET voided_at = CURRENT_TIMESTAMP WHERE invoice_id = ? AND voided_at IS NULL').run(invoiceId);
   }
 
   /**
@@ -714,7 +740,7 @@ export class PaymentModel {
     const result = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total_paid
       FROM payment_allocations
-      WHERE invoice_id = ?
+      WHERE invoice_id = ? AND voided_at IS NULL
     `).get(invoiceId) as { total_paid: number };
     return result.total_paid;
   }

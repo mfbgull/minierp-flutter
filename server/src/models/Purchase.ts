@@ -397,7 +397,7 @@ class PurchaseModel {
       JOIN users u ON p.created_by = u.id
       LEFT JOIN (
         SELECT purchase_id, SUM(amount) as paid_amount
-        FROM purchase_allocations GROUP BY purchase_id
+        FROM purchase_allocations WHERE voided_at IS NULL GROUP BY purchase_id
       ) pa ON pa.purchase_id = p.id
       WHERE 1=1
     `;
@@ -495,7 +495,7 @@ class PurchaseModel {
       JOIN users u ON p.created_by = u.id
       LEFT JOIN (
         SELECT purchase_id, SUM(amount) as paid_amount
-        FROM purchase_allocations GROUP BY purchase_id
+        FROM purchase_allocations WHERE voided_at IS NULL GROUP BY purchase_id
       ) pa ON pa.purchase_id = p.id
       WHERE p.id = ?
     `).get(id) as Purchase | undefined;
@@ -515,7 +515,7 @@ class PurchaseModel {
       SELECT p.id, p.payment_no, p.payment_date, p.payment_method,
              p.reference_no, p.notes, pa.amount
       FROM purchase_allocations pa JOIN payments p ON pa.payment_id = p.id
-      WHERE pa.purchase_id = ? ORDER BY p.payment_date DESC, p.id DESC
+      WHERE pa.purchase_id = ? AND pa.voided_at IS NULL ORDER BY p.payment_date DESC, p.id DESC
     `).all(purchaseId) as Array<{
       id: number; payment_no: string; payment_date: string;
       payment_method: string; reference_no: string; notes: string; amount: number;
@@ -591,7 +591,7 @@ class PurchaseModel {
       // Guard: a purchase with recorded payments cannot be voided —
       // the allocations/ledger would be orphaned. Reverse payments first.
       const paymentAlloc = db.prepare(
-        'SELECT id FROM purchase_allocations WHERE purchase_id = ? LIMIT 1'
+        'SELECT id FROM purchase_allocations WHERE purchase_id = ? AND voided_at IS NULL LIMIT 1'
       ).get(id) as { id: number } | undefined;
       if (paymentAlloc) {
         throw new Error(

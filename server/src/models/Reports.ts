@@ -782,7 +782,7 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
     SELECT p.payment_date as date, p.payment_no as reference,
            c.customer_name as party, p.payment_method as method, p.notes as description, p.amount
     FROM payments p LEFT JOIN customers c ON c.id = p.customer_id
-    WHERE p.customer_id IS NOT NULL AND p.payment_date BETWEEN ? AND ?
+    WHERE p.customer_id IS NOT NULL AND p.voided_at IS NULL AND p.payment_date BETWEEN ? AND ?
     ORDER BY p.payment_date DESC
   `).all(startDate, endDate) as Array<{ date: string; reference: string; party: string | null; method: string | null; description: string | null; amount: number }>;
   for (const r of customerRows) {
@@ -795,7 +795,7 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
     SELECT p.payment_date as date, p.payment_no as reference,
            s.supplier_name as party, p.payment_method as method, p.notes as description, p.amount
     FROM payments p LEFT JOIN suppliers s ON s.id = p.supplier_id
-    WHERE p.supplier_id IS NOT NULL AND p.amount > 0 AND p.payment_date BETWEEN ? AND ?
+    WHERE p.supplier_id IS NOT NULL AND p.voided_at IS NULL AND p.amount > 0 AND p.payment_date BETWEEN ? AND ?
     ORDER BY p.payment_date DESC
   `).all(startDate, endDate) as Array<{ date: string; reference: string; party: string | null; method: string | null; description: string | null; amount: number }>;
   for (const r of supplierRows) {
@@ -821,7 +821,7 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
            TRIM(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')) as party,
            sp.payment_method as method, sp.notes as description, sp.amount
     FROM salary_payments sp LEFT JOIN employees e ON e.id = sp.employee_id
-    WHERE sp.status != 'cancelled' AND sp.payment_date BETWEEN ? AND ?
+    WHERE sp.status != 'cancelled' AND sp.voided_at IS NULL AND sp.payment_date BETWEEN ? AND ?
     ORDER BY sp.payment_date DESC
   `).all(startDate, endDate) as Array<{ date: string; reference: string; party: string | null; method: string | null; description: string | null; amount: number }>;
   for (const r of salaryRows) {
@@ -859,7 +859,7 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
            TRIM(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')) as party,
            l.payment_method as method, l.purpose as description, l.amount
     FROM employee_loans l LEFT JOIN employees e ON e.id = l.employee_id
-    WHERE l.disbursement_date BETWEEN ? AND ?
+    WHERE l.disbursement_date BETWEEN ? AND ? AND l.voided_at IS NULL
     ORDER BY l.disbursement_date DESC
   `).all(startDate, endDate) as Array<{ date: string; reference: number; party: string | null; method: string | null; description: string | null; amount: number }>;
   for (const r of loanRows) {
@@ -872,7 +872,7 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
            lr.payment_method as method, lr.notes as description, lr.amount
     FROM employee_loan_repayments lr
     LEFT JOIN employees e ON e.id = lr.employee_id
-    WHERE lr.repayment_type = 'direct' AND lr.payment_date BETWEEN ? AND ?
+    WHERE lr.repayment_type = 'direct' AND lr.payment_date BETWEEN ? AND ? AND lr.voided_at IS NULL
     ORDER BY lr.payment_date DESC
   `).all(startDate, endDate) as Array<{ date: string; reference: string | number; party: string | null; method: string | null; description: string | null; amount: number }>;
   for (const r of loanRepayRows) {

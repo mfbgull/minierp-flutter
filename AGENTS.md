@@ -325,23 +325,3 @@ rule DONE:
 
 ---
 
-# 18. GRAPH SYSTEM
-
-rule GRAPHIFY:
-  type: knowledge_dependency
-
-  sources:
-    - graphify-out/graph.html
-    - graphify-out/graph.json
-    - graphify-out/GRAPH_REPORT.md
-
-  behavior:
-    before_architecture_question:
-      - read_graph_report
-
-    after_code_change:
-      - run: graphify update .
-
----
-
-END_RULESET

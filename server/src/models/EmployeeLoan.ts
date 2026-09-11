@@ -14,6 +14,7 @@ export interface EmployeeLoan {
   written_off_amount: number;
   notes: string | null;
   journal_entry_id: number | null;
+  voided_at: string | null;
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -43,6 +44,7 @@ export interface LoanRepayment {
   repayment_type: 'direct' | 'salary_deduction';
   journal_entry_id: number | null;
   salary_payment_id: number | null;
+  voided_at: string | null;
   created_by: number | null;
   created_at: string;
 }
@@ -98,20 +100,20 @@ export class EmployeeLoanModel {
 
   static getByEmployee(employeeId: number, db: Database.Database): EmployeeLoan[] {
     return db.prepare(
-      'SELECT * FROM employee_loans WHERE employee_id = ? ORDER BY disbursement_date DESC'
+      'SELECT * FROM employee_loans WHERE employee_id = ? AND voided_at IS NULL ORDER BY disbursement_date DESC'
     ).all(employeeId) as EmployeeLoan[];
   }
 
   static getActiveByEmployee(employeeId: number, db: Database.Database): EmployeeLoan[] {
     return db.prepare(
-      `SELECT * FROM employee_loans WHERE employee_id = ? AND status IN ('active', 'overdue')
+      `SELECT * FROM employee_loans WHERE employee_id = ? AND status IN ('active', 'overdue') AND voided_at IS NULL
        ORDER BY due_date ASC`
     ).all(employeeId) as EmployeeLoan[];
   }
 
   static getRepayments(loanId: number, db: Database.Database): LoanRepayment[] {
     return db.prepare(
-      'SELECT * FROM employee_loan_repayments WHERE loan_id = ? ORDER BY payment_date ASC'
+      'SELECT * FROM employee_loan_repayments WHERE loan_id = ? AND voided_at IS NULL ORDER BY payment_date ASC'
     ).all(loanId) as LoanRepayment[];
   }
 
@@ -127,13 +129,13 @@ export class EmployeeLoanModel {
         COALESCE(SUM(CASE WHEN status IN ('active', 'overdue') THEN balance ELSE 0 END), 0) as total_outstanding,
         COALESCE(SUM(CASE WHEN status IN ('active', 'overdue') THEN amount - balance ELSE 0 END), 0) as total_repaid,
         SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END) as overdue_loans
-      FROM employee_loans WHERE employee_id = ?
+      FROM employee_loans WHERE employee_id = ? AND voided_at IS NULL
     `).get(employeeId) as LoanSummary;
     return row;
   }
 
   static hasRepayments(loanId: number, db: Database.Database): boolean {
-    const row = db.prepare('SELECT COUNT(*) as cnt FROM employee_loan_repayments WHERE loan_id = ?').get(loanId) as { cnt: number };
+    const row = db.prepare('SELECT COUNT(*) as cnt FROM employee_loan_repayments WHERE loan_id = ? AND voided_at IS NULL').get(loanId) as { cnt: number };
     return row.cnt > 0;
   }
 
@@ -237,12 +239,20 @@ export class EmployeeLoanModel {
     `).run(loanId);
   }
 
-  static deleteRepayment(repaymentId: number, db: Database.Database): void {
-    db.prepare('DELETE FROM employee_loan_repayments WHERE id = ?').run(repaymentId);
+  static deleteRepayment(repaymentId: number, db: Database.Database, voidedBy: number | null, voidReason: string): void {
+    // C5 (reversal-rules): a direct repayment moved cash and posted GL,
+    // so it is voided with attribution, never hard-deleted.
+    db.prepare(
+      'UPDATE employee_loan_repayments SET voided_at = CURRENT_TIMESTAMP, voided_by = ?, void_reason = ? WHERE id = ? AND voided_at IS NULL'
+    ).run(voidedBy, voidReason, repaymentId);
   }
 
-  static delete(loanId: number, db: Database.Database): void {
-    db.prepare('DELETE FROM employee_loans WHERE id = ?').run(loanId);
+  static delete(loanId: number, db: Database.Database, voidedBy: number | null, voidReason: string): void {
+    // C5 (reversal-rules): a disbursed loan moved cash and posted GL, so
+    // it is voided with attribution, never hard-deleted.
+    db.prepare(
+      'UPDATE employee_loans SET voided_at = CURRENT_TIMESTAMP, voided_by = ?, void_reason = ? WHERE id = ? AND voided_at IS NULL'
+    ).run(voidedBy, voidReason, loanId);
   }
 
   // ── Auto-update overdue status ───────────────────────────────
@@ -276,7 +286,7 @@ export class EmployeeLoanModel {
         CAST(julianday(el.due_date) - julianday('now') AS INTEGER) as days_until_due
       FROM employee_loans el
       JOIN employees e ON e.id = el.employee_id
-      WHERE el.status IN ('active', 'overdue')
+      WHERE el.status IN ('active', 'overdue') AND el.voided_at IS NULL
       ORDER BY el.due_date ASC
     `).all() as any[];
   }
@@ -290,7 +300,7 @@ export class EmployeeLoanModel {
         COUNT(*) as total_loans,
         SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END) as overdue_count
       FROM employee_loans
-      WHERE status IN ('active', 'overdue')
+      WHERE status IN ('active', 'overdue') AND voided_at IS NULL
     `).get() as any;
   }
 }

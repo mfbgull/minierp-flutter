@@ -233,7 +233,7 @@ function paySalary(req: Request, res: Response): void {
     if (safeType === 'full') {
       const payPeriod = payment_date.substring(0, 7); // YYYY-MM
       const existingFull = db.prepare(
-        `SELECT id FROM salary_payments WHERE employee_id = ? AND pay_period = ? AND payment_type = 'full'`
+        `SELECT id FROM salary_payments WHERE employee_id = ? AND pay_period = ? AND payment_type = 'full' AND voided_at IS NULL`
       ).get(employeeId, payPeriod) as { id: number } | undefined;
       if (existingFull) {
         const monthName = new Date(payPeriod + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' });
@@ -283,7 +283,7 @@ function paySalary(req: Request, res: Response): void {
       if (employee.salary > 0) {
         const payPeriod = payment_date.substring(0, 7);
         const totalRow = db.prepare(
-          `SELECT SUM(amount) AS total_paid FROM salary_payments WHERE employee_id = ? AND pay_period = ?`
+          `SELECT SUM(amount) AS total_paid FROM salary_payments WHERE employee_id = ? AND pay_period = ? AND voided_at IS NULL`
         ).get(employeeId, payPeriod) as { total_paid: number } | undefined;
         const totalPaid = totalRow?.total_paid ?? 0;
         if (totalPaid > employee.salary) {
@@ -305,23 +305,23 @@ function paySalary(req: Request, res: Response): void {
             payment_type: 'advance',
           }, db);
 
-          // Post GL entry for the advance
-          try {
-            const advResult = AccountingService.postSalaryEntry(db, {
-              salaryPaymentId: advanceCreated,
-              employeeName: `${employee.first_name} ${employee.last_name}`,
-              employeeCode: employee.employee_code,
-              amount: excess,
-              paymentDate: nextPaymentDate,
-              paymentMethod: method,
-              userId: authReq.user?.id,
-            });
-            if (advResult) {
-              db.prepare(`UPDATE salary_payments SET journal_entry_id = ? WHERE id = ?`)
-                .run(advResult.journal_entry_id, advanceCreated);
-            }
-          } catch (glError: any) {
-            logger.error('Failed to post GL for advance:', glError);
+          // C7 (reversal-rules): the advance GL posting is not optional.
+          // The old catch-then-log let the advance salary row commit with
+          // no GL posting — a silent partial commit inside the outer
+          // transaction. Any GL failure now throws and rolls back the
+          // whole payment, mirroring the primary posting above.
+          const advResult = AccountingService.postSalaryEntry(db, {
+            salaryPaymentId: advanceCreated,
+            employeeName: `${employee.first_name} ${employee.last_name}`,
+            employeeCode: employee.employee_code,
+            amount: excess,
+            paymentDate: nextPaymentDate,
+            paymentMethod: method,
+            userId: authReq.user?.id,
+          });
+          if (advResult) {
+            db.prepare(`UPDATE salary_payments SET journal_entry_id = ? WHERE id = ?`)
+              .run(advResult.journal_entry_id, advanceCreated);
           }
         }
       }
@@ -397,28 +397,50 @@ function deleteSalaryPayment(req: Request, res: Response): void {
       return;
     }
 
-    const payment = EmployeeModel.getSalaryPayment(salaryPaymentId, db) as { employee_id: number; journal_entry_id?: number | null; amount: number; payment_date: string } | undefined;
+    const payment = EmployeeModel.getSalaryPayment(salaryPaymentId, db) as { employee_id: number; journal_entry_id?: number | null; amount: number; payment_date: string; voided_at?: string | null } | undefined;
     if (!payment || payment.employee_id !== employeeId) {
       res.status(404).json({ success: false, error: 'Salary payment not found' });
       return;
     }
+    if (payment.voided_at) {
+      res.status(409).json({ success: false, error: 'Salary payment is already voided' });
+      return;
+    }
 
-    // Void GL lines by reference — unconditionally. Older payment rows
+    // C6 (reversal-rules): one transaction wraps GL void, soft-void and
+    // activity log so a failure at any step rolls back everything. GL
+    // lines are voided by reference — unconditionally. Older payment rows
     // (pre-GL-link backfill) carry journal_entry_id NULL, but their GL
     // lines still exist keyed by reference_type/reference_id; skipping
     // the void on a NULL link orphans those lines forever and corrupts
     // the cash/bank GL balances.
-    AccountingService.voidJournalLinesByReference(db, 'SALARY_PAYMENT', salaryPaymentId, {
-      voidedBy: authReq.user?.id,
-      voidReason: `Salary payment deleted for ${employee.first_name} ${employee.last_name}`,
+    const trx = db.transaction(() => {
+      AccountingService.voidJournalLinesByReference(db, 'SALARY_PAYMENT', salaryPaymentId, {
+        voidedBy: authReq.user?.id,
+        voidReason: `Salary payment voided for ${employee.first_name} ${employee.last_name}`,
+      });
+
+      // Salary-deduction repayments linked to this payment must be
+      // voided with it — otherwise the loan stays 'repaid' while the
+      // salary cash is reversed. Restore each loan balance first.
+      const linkedRepayments = db.prepare(
+        'SELECT id, loan_id, amount FROM employee_loan_repayments WHERE salary_payment_id = ? AND voided_at IS NULL'
+      ).all(salaryPaymentId) as Array<{ id: number; loan_id: number; amount: number }>;
+      for (const repayment of linkedRepayments) {
+        EmployeeLoanModel.restoreBalance(repayment.loan_id, repayment.amount, db);
+        EmployeeLoanModel.deleteRepayment(repayment.id, db, authReq.user?.id ?? null,
+          `Salary payment ${salaryPaymentId} voided`);
+      }
+
+      EmployeeModel.deleteSalaryPayment(salaryPaymentId, db, authReq.user?.id ?? null,
+        `Salary payment voided for ${employee.first_name} ${employee.last_name}`);
+
+      logCRUD(ActionType.EMPLOYEE_UPDATE, 'Employee', employeeId,
+        `Salary payment voided: ${employee.first_name} ${employee.last_name} (amount: ${payment.amount})`, authReq.user?.id);
+      req.activityLogged = true;
     });
 
-    EmployeeModel.deleteSalaryPayment(salaryPaymentId, db);
-
-    logCRUD(ActionType.EMPLOYEE_UPDATE, 'Employee', employeeId,
-      `Salary payment deleted: ${employee.first_name} ${employee.last_name} (amount: ${payment.amount})`, authReq.user?.id);
-    req.activityLogged = true;
-
+    trx();
     res.status(204).send();
   } catch (error: any) {
     logger.error('Error deleting salary payment:', error);
@@ -830,21 +852,26 @@ function deleteLoan(req: Request, res: Response): void {
       res.status(404).json({ success: false, error: 'Loan not found' });
       return;
     }
+    if (loan.voided_at) {
+      res.status(409).json({ success: false, error: 'Loan is already voided' });
+      return;
+    }
     if (EmployeeLoanModel.hasRepayments(parsedLoanId, db)) {
       res.status(409).json({ success: false, error: 'Cannot delete loan with repayment history' });
       return;
     }
 
     const trx = db.transaction(() => {
-      // Void GL lines
-      if (loan.journal_entry_id) {
-        AccountingService.voidJournalLinesByReference(db, 'LOAN_DISBURSEMENT', parsedLoanId, {
-          voidedBy: authReq.user?.id,
-          voidReason: 'Loan deleted',
-        });
-      }
+      // C5 (reversal-rules): void by reference unconditionally. Legacy
+      // loans created before the journal_entry_id link-backfill carry a
+      // NULL link, but their GL lines exist keyed by reference; gating on
+      // the link orphans those lines forever.
+      AccountingService.voidJournalLinesByReference(db, 'LOAN_DISBURSEMENT', parsedLoanId, {
+        voidedBy: authReq.user?.id,
+        voidReason: 'Loan deleted',
+      });
 
-      EmployeeLoanModel.delete(parsedLoanId, db);
+      EmployeeLoanModel.delete(parsedLoanId, db, authReq.user?.id ?? null, 'Loan deleted');
       res.json({ success: true });
     });
 
@@ -867,10 +894,17 @@ function voidLoanRepayment(req: Request, res: Response): void {
       res.status(404).json({ success: false, error: 'Repayment not found' });
       return;
     }
+    if (repayment.voided_at) {
+      res.status(409).json({ success: false, error: 'Repayment is already voided' });
+      return;
+    }
 
     const trx = db.transaction(() => {
-      // Void GL lines for direct repayments
-      if (repayment.repayment_type === 'direct' && repayment.journal_entry_id) {
+      // C5 (reversal-rules): void by reference unconditionally for direct
+      // repayments — legacy rows can carry a NULL journal link while their
+      // GL lines exist keyed by reference. Salary-deduction repayments
+      // never posted their own GL (the salary payment carries it).
+      if (repayment.repayment_type === 'direct') {
         AccountingService.voidJournalLinesByReference(db, 'LOAN_REPAYMENT', parsedRepaymentId, {
           voidedBy: authReq.user?.id,
           voidReason: 'Repayment voided',
@@ -880,8 +914,8 @@ function voidLoanRepayment(req: Request, res: Response): void {
       // Restore loan balance
       EmployeeLoanModel.restoreBalance(parsedLoanId, repayment.amount, db);
 
-      // Delete repayment record
-      EmployeeLoanModel.deleteRepayment(parsedRepaymentId, db);
+      // Void repayment record (never hard-delete)
+      EmployeeLoanModel.deleteRepayment(parsedRepaymentId, db, authReq.user?.id ?? null, 'Repayment voided');
 
       const updatedLoan = EmployeeLoanModel.getById(parsedLoanId, db);
       res.json({

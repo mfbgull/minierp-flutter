@@ -675,7 +675,10 @@ describe('StockMovementModel', () => {
       // payments.supplier_id FK — clear supplier-linked payments before the supplier.
       db.prepare(`DELETE FROM purchase_allocations WHERE payment_id IN (SELECT id FROM payments WHERE supplier_id = ?)`).run(supplierId);
       db.prepare(`DELETE FROM po_allocations WHERE payment_id IN (SELECT id FROM payments WHERE supplier_id = ?)`).run(supplierId);
-      db.prepare(`UPDATE payments SET supplier_id = NULL WHERE supplier_id = ?`).run(supplierId);
+      // Voided payments are retained by design (reversal-rules C6); fixture
+      // teardown hard-deletes the leftover rows to satisfy the counterparty
+      // CHECK and supplier FK. Test-DB cleanup only — never production data.
+      db.prepare(`DELETE FROM payments WHERE supplier_id = ?`).run(supplierId);
       // credit_notes / purchases also carry supplier FKs.
       db.prepare(`DELETE FROM credit_notes WHERE supplier_id = ?`).run(supplierId);
       db.prepare(`DELETE FROM purchase_returns WHERE source_type = 'PURCHASE' AND source_id IN (SELECT id FROM purchases WHERE supplier_id = ?)`).run(supplierId);
@@ -822,9 +825,14 @@ describe('StockMovementModel', () => {
     });
 
     afterAll(() => {
-      PaymentModel.delete(db, (db.prepare(
+      const poPaymentId = (db.prepare(
         'SELECT payment_id FROM po_allocations WHERE po_id = ? LIMIT 1'
-      ).get(poId) as { payment_id: number }).payment_id);
+      ).get(poId) as { payment_id: number }).payment_id;
+      PaymentModel.delete(db, poPaymentId);
+      // Fixture cleanup: remove the retained voided allocation + payment rows
+      // so the PO/supplier hard-deletes below satisfy their FKs.
+      db.prepare('DELETE FROM po_allocations WHERE payment_id = ?').run(poPaymentId);
+      db.prepare('DELETE FROM payments WHERE id = ?').run(poPaymentId);
       PurchaseOrderModel.delete(poId, 1, db);
       db.prepare(`DELETE FROM supplier_ledger WHERE supplier_id = ?`).run(poSupplierId);
       db.prepare(`DELETE FROM suppliers WHERE id = ?`).run(poSupplierId);
@@ -883,6 +891,11 @@ describe('StockMovementModel', () => {
     afterAll(() => {
       const pids = db.prepare('SELECT id FROM payments WHERE supplier_id = ?').all(supId) as { id: number }[];
       for (const p of pids) PaymentModel.delete(db, p.id);
+      // Fixture cleanup: hard-delete the retained voided rows (see C6) so the
+      // purchase/PO/supplier deletes below satisfy their FKs. Test-only.
+      db.prepare('DELETE FROM po_allocations WHERE payment_id IN (SELECT id FROM payments WHERE supplier_id = ?)').run(supId);
+      db.prepare('DELETE FROM purchase_allocations WHERE payment_id IN (SELECT id FROM payments WHERE supplier_id = ?)').run(supId);
+      db.prepare('DELETE FROM payments WHERE supplier_id = ?').run(supId);
       if (purchaseId) db.prepare('DELETE FROM purchases WHERE id = ?').run(purchaseId);
       PurchaseOrderModel.delete(poId, 1, db);
       PurchaseOrderModel.delete(poId2, 1, db);

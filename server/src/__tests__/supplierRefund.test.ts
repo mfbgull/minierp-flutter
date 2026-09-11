@@ -26,6 +26,8 @@ const MIGRATIONS = [
   'add-disposition-and-supplier-refunds.sql',
   'create-customer-ledger.sql',
   'add-gl-void-attribution.sql',
+  'add-salary-payments.sql',
+  'add-payment-salary-void-columns.sql',
 ];
 
 function setupDb(): Database.Database {

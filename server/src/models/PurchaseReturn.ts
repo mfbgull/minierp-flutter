@@ -769,7 +769,7 @@ class PurchaseReturnModel {
     if (sourceType === 'PURCHASE') {
       const row = db.prepare(`
         SELECT p.total_cost,
-          COALESCE((SELECT SUM(amount) FROM purchase_allocations WHERE purchase_id = p.id), 0) AS paid
+          COALESCE((SELECT SUM(amount) FROM purchase_allocations WHERE purchase_id = p.id AND voided_at IS NULL), 0) AS paid
         FROM purchases p WHERE p.id = ?
       `).get(sourceId) as { total_cost: number; paid: number } | undefined;
       if (!row) throw new Error('Purchase not found');
@@ -777,7 +777,7 @@ class PurchaseReturnModel {
     }
     const row = db.prepare(`
       SELECT po.total_amount,
-        COALESCE((SELECT SUM(amount) FROM po_allocations WHERE po_id = po.id), 0) AS paid
+        COALESCE((SELECT SUM(amount) FROM po_allocations WHERE po_id = po.id AND voided_at IS NULL), 0) AS paid
       FROM purchase_orders po WHERE po.id = ?
     `).get(sourceId) as { total_amount: number; paid: number } | undefined;
     if (!row) throw new Error('Purchase Order not found');
