@@ -403,13 +403,15 @@ function deleteSalaryPayment(req: Request, res: Response): void {
       return;
     }
 
-    // Void GL journal entry if one was posted
-    if (payment.journal_entry_id) {
-      AccountingService.voidJournalLinesByReference(db, 'SALARY_PAYMENT', salaryPaymentId, {
-        voidedBy: authReq.user?.id,
-        voidReason: `Salary payment deleted for ${employee.first_name} ${employee.last_name}`,
-      });
-    }
+    // Void GL lines by reference — unconditionally. Older payment rows
+    // (pre-GL-link backfill) carry journal_entry_id NULL, but their GL
+    // lines still exist keyed by reference_type/reference_id; skipping
+    // the void on a NULL link orphans those lines forever and corrupts
+    // the cash/bank GL balances.
+    AccountingService.voidJournalLinesByReference(db, 'SALARY_PAYMENT', salaryPaymentId, {
+      voidedBy: authReq.user?.id,
+      voidReason: `Salary payment deleted for ${employee.first_name} ${employee.last_name}`,
+    });
 
     EmployeeModel.deleteSalaryPayment(salaryPaymentId, db);
 

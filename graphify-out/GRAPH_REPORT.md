@@ -1,11 +1,11 @@
 # Graph Report - /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter  (2026-09-11)
 
 ## Corpus Check
-- 561 files · ~633,000 words
+- 562 files · ~633,719 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5492 nodes · 9114 edges · 125 communities detected
+- 5493 nodes · 9114 edges · 126 communities detected
 - Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 1178 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
@@ -135,6 +135,7 @@
 - [[_COMMUNITY_Community 122|Community 122]]
 - [[_COMMUNITY_Community 123|Community 123]]
 - [[_COMMUNITY_Community 124|Community 124]]
+- [[_COMMUNITY_Community 125|Community 125]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `package:flutter/material.dart` - 221 edges
@@ -640,25 +641,29 @@ Nodes (0):
 
 ### Community 119 - "Community 119"
 Cohesion: 1.0
-Nodes (1): Click the first semantics node whose aria-label contains needle.
+Nodes (0): 
 
 ### Community 120 - "Community 120"
 Cohesion: 1.0
-Nodes (1): Click a navigation rail item by its semantics label.
+Nodes (1): Click the first semantics node whose aria-label contains needle.
 
 ### Community 121 - "Community 121"
 Cohesion: 1.0
-Nodes (1): Scan screenshots for Flutter's yellow/black overflow stripes.
+Nodes (1): Click a navigation rail item by its semantics label.
 
 ### Community 122 - "Community 122"
 Cohesion: 1.0
-Nodes (1): Print up to 40 visible aria-labels — helps diagnose the DOM state.
+Nodes (1): Scan screenshots for Flutter's yellow/black overflow stripes.
 
 ### Community 123 - "Community 123"
 Cohesion: 1.0
-Nodes (1): Force-click the first flt-semantics node whose label contains needle.
+Nodes (1): Print up to 40 visible aria-labels — helps diagnose the DOM state.
 
 ### Community 124 - "Community 124"
+Cohesion: 1.0
+Nodes (1): Force-click the first flt-semantics node whose label contains needle.
+
+### Community 125 - "Community 125"
 Cohesion: 1.0
 Nodes (1): Open the popover by clicking the pill's date label.
 
@@ -709,116 +714,118 @@ Nodes (1): Open the popover by clicking the pill's date label.
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 74`** (1 nodes): `repair-orphaned-ledger.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 75`** (1 nodes): `accounting.ts`
+- **Thin community `Community 75`** (1 nodes): `void-orphaned-salary-gl.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 76`** (1 nodes): `activityLog.ts`
+- **Thin community `Community 76`** (1 nodes): `accounting.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 77`** (1 nodes): `adminHealth.ts`
+- **Thin community `Community 77`** (1 nodes): `activityLog.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 78`** (1 nodes): `auth.ts`
+- **Thin community `Community 78`** (1 nodes): `adminHealth.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 79`** (1 nodes): `bom.ts`
+- **Thin community `Community 79`** (1 nodes): `auth.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 80`** (1 nodes): `customers.ts`
+- **Thin community `Community 80`** (1 nodes): `bom.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 81`** (1 nodes): `customReports.ts`
+- **Thin community `Community 81`** (1 nodes): `customers.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 82`** (1 nodes): `dashboard.ts`
+- **Thin community `Community 82`** (1 nodes): `customReports.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 83`** (1 nodes): `employees.ts`
+- **Thin community `Community 83`** (1 nodes): `dashboard.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 84`** (1 nodes): `expenses.ts`
+- **Thin community `Community 84`** (1 nodes): `employees.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 85`** (1 nodes): `forecasts.ts`
+- **Thin community `Community 85`** (1 nodes): `expenses.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 86`** (1 nodes): `integrations.ts`
+- **Thin community `Community 86`** (1 nodes): `forecasts.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 87`** (1 nodes): `inventory.ts`
+- **Thin community `Community 87`** (1 nodes): `integrations.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 88`** (1 nodes): `invoices.ts`
+- **Thin community `Community 88`** (1 nodes): `inventory.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 89`** (1 nodes): `mobileInvoices.ts`
+- **Thin community `Community 89`** (1 nodes): `invoices.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 90`** (1 nodes): `ownerEquity.ts`
+- **Thin community `Community 90`** (1 nodes): `mobileInvoices.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 91`** (1 nodes): `payments.ts`
+- **Thin community `Community 91`** (1 nodes): `ownerEquity.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 92`** (1 nodes): `pos.ts`
+- **Thin community `Community 92`** (1 nodes): `payments.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 93`** (1 nodes): `preferences.ts`
+- **Thin community `Community 93`** (1 nodes): `pos.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 94`** (1 nodes): `production.ts`
+- **Thin community `Community 94`** (1 nodes): `preferences.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 95`** (1 nodes): `purchaseOrders.ts`
+- **Thin community `Community 95`** (1 nodes): `production.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 96`** (1 nodes): `purchaseReturns.ts`
+- **Thin community `Community 96`** (1 nodes): `purchaseOrders.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 97`** (1 nodes): `purchases.ts`
+- **Thin community `Community 97`** (1 nodes): `purchaseReturns.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 98`** (1 nodes): `reports.ts`
+- **Thin community `Community 98`** (1 nodes): `purchases.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 99`** (1 nodes): `roles.ts`
+- **Thin community `Community 99`** (1 nodes): `reports.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 100`** (1 nodes): `sales.ts`
+- **Thin community `Community 100`** (1 nodes): `roles.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 101`** (1 nodes): `search.ts`
+- **Thin community `Community 101`** (1 nodes): `sales.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 102`** (1 nodes): `settings.ts`
+- **Thin community `Community 102`** (1 nodes): `search.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 103`** (1 nodes): `supplierRefunds.ts`
+- **Thin community `Community 103`** (1 nodes): `settings.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 104`** (1 nodes): `suppliers.ts`
+- **Thin community `Community 104`** (1 nodes): `supplierRefunds.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 105`** (1 nodes): `users.ts`
+- **Thin community `Community 105`** (1 nodes): `suppliers.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 106`** (1 nodes): `fix-duplicate-purchase.ts`
+- **Thin community `Community 106`** (1 nodes): `users.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 107`** (1 nodes): `express.d.ts`
+- **Thin community `Community 107`** (1 nodes): `fix-duplicate-purchase.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 108`** (1 nodes): `index.ts`
+- **Thin community `Community 108`** (1 nodes): `express.d.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 109`** (1 nodes): `search.ts`
+- **Thin community `Community 109`** (1 nodes): `index.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 110`** (1 nodes): `logger.ts`
+- **Thin community `Community 110`** (1 nodes): `search.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 111`** (1 nodes): `authAsync.test.ts`
+- **Thin community `Community 111`** (1 nodes): `logger.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 112`** (1 nodes): `backupWal.test.ts`
+- **Thin community `Community 112`** (1 nodes): `authAsync.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 113`** (1 nodes): `envHardening.test.ts`
+- **Thin community `Community 113`** (1 nodes): `backupWal.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 114`** (1 nodes): `models.test.ts`
+- **Thin community `Community 114`** (1 nodes): `envHardening.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 115`** (1 nodes): `softDelete.test.ts`
+- **Thin community `Community 115`** (1 nodes): `models.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 116`** (1 nodes): `userPreferences.test.ts`
+- **Thin community `Community 116`** (1 nodes): `softDelete.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 117`** (1 nodes): `validation.test.ts`
+- **Thin community `Community 117`** (1 nodes): `userPreferences.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 118`** (1 nodes): `weekMath.test.ts`
+- **Thin community `Community 118`** (1 nodes): `validation.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 119`** (1 nodes): `Click the first semantics node whose aria-label contains needle.`
+- **Thin community `Community 119`** (1 nodes): `weekMath.test.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 120`** (1 nodes): `Click a navigation rail item by its semantics label.`
+- **Thin community `Community 120`** (1 nodes): `Click the first semantics node whose aria-label contains needle.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 121`** (1 nodes): `Scan screenshots for Flutter's yellow/black overflow stripes.`
+- **Thin community `Community 121`** (1 nodes): `Click a navigation rail item by its semantics label.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 122`** (1 nodes): `Print up to 40 visible aria-labels — helps diagnose the DOM state.`
+- **Thin community `Community 122`** (1 nodes): `Scan screenshots for Flutter's yellow/black overflow stripes.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 123`** (1 nodes): `Force-click the first flt-semantics node whose label contains needle.`
+- **Thin community `Community 123`** (1 nodes): `Print up to 40 visible aria-labels — helps diagnose the DOM state.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 124`** (1 nodes): `Open the popover by clicking the pill's date label.`
+- **Thin community `Community 124`** (1 nodes): `Force-click the first flt-semantics node whose label contains needle.`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 125`** (1 nodes): `Open the popover by clicking the pill's date label.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `package:flutter_riverpod/flutter_riverpod.dart` connect `Community 6` to `Community 0`, `Community 1`, `Community 2`, `Community 5`, `Community 7`, `Community 8`, `Community 12`, `Community 13`, `Community 15`, `Community 16`, `Community 17`, `Community 18`, `Community 19`, `Community 20`, `Community 24`, `Community 26`?**
-  _High betweenness centrality (0.264) - this node is a cross-community bridge._
-- **Why does `package:flutter/material.dart` connect `Community 2` to `Community 0`, `Community 1`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 11`, `Community 12`, `Community 13`, `Community 15`, `Community 16`, `Community 17`, `Community 18`, `Community 19`, `Community 20`, `Community 24`, `Community 26`, `Community 29`?**
+  _High betweenness centrality (0.280) - this node is a cross-community bridge._
+- **Why does `run()` connect `Community 4` to `Community 33`, `Community 3`, `Community 10`, `Community 14`, `Community 21`, `Community 22`, `Community 23`, `Community 25`, `Community 31`?**
   _High betweenness centrality (0.174) - this node is a cross-community bridge._
-- **Why does `toString` connect `Community 3` to `Community 12`?**
-  _High betweenness centrality (0.133) - this node is a cross-community bridge._
+- **Why does `package:flutter/material.dart` connect `Community 2` to `Community 0`, `Community 1`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 11`, `Community 12`, `Community 13`, `Community 15`, `Community 16`, `Community 17`, `Community 18`, `Community 19`, `Community 20`, `Community 24`, `Community 26`, `Community 29`?**
+  _High betweenness centrality (0.147) - this node is a cross-community bridge._
 - **Are the 196 inferred relationships involving `run()` (e.g. with `repairUnbatchedStock()` and `repairOrphanedBatches()`) actually correct?**
   _`run()` has 196 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `Intercept NOTIFY_DEBUGGER_ABOUT_RX_PAGES and touch the pages.`, `-registerWithRegistry`, `MiniErpApp` to the rest of the system?**
