@@ -410,6 +410,7 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
   PlutoGridConfiguration _gridConfiguration = const PlutoGridConfiguration();
   Brightness? _configurationBrightness;
   GridColumnWidths? _widthTracker;
+  ProviderSubscription<bool>? _tintToggleSubscription;
 
   /// The hidden id column field carrying the row's record id.
   static const _idField = 'id';
@@ -659,6 +660,7 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
   void dispose() {
     bulkSelection.dispose();
     _widthTracker?.dispose();
+    _tintToggleSubscription?.close();
     super.dispose();
   }
 
@@ -704,11 +706,22 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
     // re-invoke them the moment the global toggle flips. Screens
     // without a rowColorCallback never reach a tinted state, so the
     // notify is harmless there.
-    ref.listen(moneyDirectionTintProvider, (previous, next) {
-      if (previous != next && rowColorCallback != null) {
-        gridStateManager?.notifyListeners();
-      }
-    });
+    //
+    // listenManual, not ref.listen: several screens build the grid
+    // pane inside a LayoutBuilder, whose builder runs during layout —
+    // outside this element's build phase — and ref.listen asserts
+    // ("can only be used within the build method"). listenManual has
+    // no such assert. Re-open the subscription on each call so
+    // repeated builds never accumulate stale listeners.
+    _tintToggleSubscription?.close();
+    _tintToggleSubscription = ref.listenManual(
+      moneyDirectionTintProvider,
+      (previous, next) {
+        if (previous != next && rowColorCallback != null) {
+          gridStateManager?.notifyListeners();
+        }
+      },
+    );
 
     // The grid fills the space. The error-panel path in gridScreenBody
     // returns before this.
