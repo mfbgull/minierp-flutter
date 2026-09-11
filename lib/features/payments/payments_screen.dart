@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/auth/auth_notifier.dart' show authProvider;
+import '../../core/theme/money_direction.dart';
 import '../../core/theme/status_colors.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
@@ -446,6 +447,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
                 }
               },
             ),
+            moneyTintFilterChip(context, ref, l10n: l10n),
           ],
           primaryActions: [
             MenuAnchor(
@@ -514,7 +516,30 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
           },
         ),
         _TypeFilterChips(l10n: l10n, ref: ref),
-        Expanded(child: gridScreenBody(payments, provider: unifiedPaymentsProvider)),
+        Expanded(
+          child: gridScreenBody(
+            payments,
+            provider: unifiedPaymentsProvider,
+            rowColorCallback: moneyRowColorCallback(
+              context,
+              ref,
+              // Money in when direction == 'in' (customer payment /
+              // refund to us); money out when 'out' (we pay a supplier,
+              // expense or salary). Unknown directions stay neutral.
+              (row) {
+                final direction =
+                    (row.cells['data']?.value as UnifiedPayment?)
+                        ?.direction ??
+                    'unknown';
+                return switch (direction) {
+                  'in' => MoneyDirection.inflow,
+                  'out' => MoneyDirection.outflow,
+                  _ => MoneyDirection.neutral,
+                };
+              },
+            ),
+          ),
+        ),
         if (page != null)
           ServerPaginationBar(
             page: page.currentPage,

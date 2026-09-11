@@ -16,6 +16,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/purchase_return_status.dart';
 import '../../core/utils/purchase_return_type.dart';
+import '../../core/theme/money_direction.dart';
 import '../../data/models/purchase_return.dart' show PurchaseReturn;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../l10n/app_localizations.dart';
@@ -240,6 +241,7 @@ class _PurchaseReturnsScreenState extends ConsumerState<PurchaseReturnsScreen>
                   onClear: _clearFilters,
                   showClear: () => _hasActiveFilters,
                 ),
+                moneyTintFilterChip(context, ref, l10n: l10n),
               ],
               onRefresh: () => ref.invalidate(purchaseReturnsProvider),
               primaryActions: [
@@ -276,7 +278,20 @@ class _PurchaseReturnsScreenState extends ConsumerState<PurchaseReturnsScreen>
             Expanded(
               child: mobile
                   ? _mobileList(l10n)
-                  : gridScreenBody(returns, provider: purchaseReturnsProvider),
+                  : gridScreenBody(
+                      returns,
+                      provider: purchaseReturnsProvider,
+                      rowColorCallback: moneyRowColorCallback(
+                        context,
+                        ref,
+                        // Money in — a purchase return sends goods back
+                        // to the supplier for cash/credit back. Voided
+                        // returns are neutral (never realized).
+                        (row) => row.cells['status']?.value == 'VOIDED'
+                            ? MoneyDirection.neutral
+                            : MoneyDirection.inflow,
+                      ),
+                    ),
             ),
             if (!mobile)
               if (returns.valueOrNull case final page?)
@@ -341,6 +356,14 @@ class _PurchaseReturnsScreenState extends ConsumerState<PurchaseReturnsScreen>
                 return _CompactReturnCard(
                   purchaseReturn: purchaseReturn,
                   l10n: l10n,
+                  tint: moneyRowTint(
+                    context,
+                    ref.watch(moneyDirectionTintProvider)
+                        ? (purchaseReturn.isVoided
+                              ? MoneyDirection.neutral
+                              : MoneyDirection.inflow)
+                        : MoneyDirection.neutral,
+                  ),
                   onView: () => showPurchaseReturnDetailDialog(
                     context,
                     purchaseReturn: purchaseReturn,
@@ -495,12 +518,14 @@ class _CompactReturnCard extends StatelessWidget {
   const _CompactReturnCard({
     required this.purchaseReturn,
     required this.l10n,
+    required this.tint,
     required this.onView,
     required this.onVoid,
   });
 
   final PurchaseReturn purchaseReturn;
   final AppLocalizations l10n;
+  final Color tint;
   final VoidCallback onView;
   final VoidCallback onVoid;
 
@@ -517,6 +542,7 @@ class _CompactReturnCard extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
+      color: tint == Colors.transparent ? null : tint,
       child: InkWell(
         onTap: onView,
         child: Padding(

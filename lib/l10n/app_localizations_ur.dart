@@ -2720,6 +2720,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get commonTo => 'تک';
 
   @override
+  String get commonBenefitColors => 'فائدے کے رنگ';
+
+  @override
   String get shortcutsQuickactions => 'فوری ایکشنز';
 
   @override

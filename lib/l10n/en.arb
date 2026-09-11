@@ -882,6 +882,7 @@
   "commonUnits": "units",
   "commonFrom": "From",
   "commonTo": "To",
+  "commonBenefitColors": "Benefit colors",
   "shortcutsQuickactions": "Quick actions",
   "shortcutsDismissbar": "Hide shortcut bar",
   "shortcutsNoshortcuts": "No shortcuts",

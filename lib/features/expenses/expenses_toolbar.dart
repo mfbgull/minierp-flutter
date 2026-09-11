@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/expense_status.dart';
+import '../../core/theme/money_direction.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_toolbar.dart';
@@ -136,6 +137,7 @@ class ExpensesToolbar extends ConsumerWidget {
           onClear: onClearFilters,
           showClear: () => hasActiveFilters,
         ),
+        moneyTintFilterChip(context, ref, l10n: l10n),
       ],
       onRefresh: () => ref.invalidate(expensesProvider),
       actions: [

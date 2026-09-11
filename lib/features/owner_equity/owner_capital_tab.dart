@@ -12,6 +12,7 @@ import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/auth/auth_notifier.dart';
+import '../../core/theme/money_direction.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/owner_equity.dart' show OwnerCapitalEntry;
@@ -254,7 +255,21 @@ class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab>
             );
           },
         ),
-        Expanded(child: gridScreenBody(capital, provider: ownerCapitalProvider)),
+        Expanded(
+          child: gridScreenBody(
+            capital,
+            provider: ownerCapitalProvider,
+            rowColorCallback: moneyRowColorCallback(
+              context,
+              ref,
+              // Money in — the owner injects capital into the business.
+              // Voided entries are neutral (never realized).
+              (row) => row.cells['status']?.value == 'voided'
+                  ? MoneyDirection.neutral
+                  : MoneyDirection.inflow,
+            ),
+          ),
+        ),
         if (page != null)
           ServerPaginationBar(
             page: page.currentPage,
@@ -336,6 +351,7 @@ class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab>
           onClear: _clearFilters,
           showClear: () => _hasActiveFilters,
         ),
+        moneyTintFilterChip(context, ref, l10n: l10n),
       ],
       onRefresh: () => ref.invalidate(ownerCapitalProvider),
       actions: [

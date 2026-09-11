@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/theme/money_direction.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/print_service.dart' show PrintService;
 import '../../data/models/payment.dart' show Payment;
@@ -125,6 +126,13 @@ class _SupplierPaymentsTabState extends ConsumerState<SupplierPaymentsTab> {
                     gridRowFor: _gridRowFor,
                     hiddenFields: const ['data'],
                     widthKey: 'supplier_payments',
+                    rowColorCallback: moneyRowColorCallback(
+                      context,
+                      ref,
+                      // Money out — a supplier payment sends cash out
+                      // of the business.
+                      (_) => MoneyDirection.outflow,
+                    ),
                   ),
                 ),
                 ServerPaginationBar(

@@ -11,6 +11,7 @@ import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/auth/auth_notifier.dart';
+import '../../core/theme/money_direction.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/owner_equity.dart' show OwnerWithdrawal;
@@ -276,6 +277,15 @@ class _OwnerWithdrawalsTabState extends ConsumerState<OwnerWithdrawalsTab>
           child: gridScreenBody(
             withdrawals,
             provider: ownerWithdrawalsProvider,
+            rowColorCallback: moneyRowColorCallback(
+              context,
+              ref,
+              // Money out — the owner draws value out of the business.
+              // Voided entries are neutral (never realized).
+              (row) => row.cells['status']?.value == 'voided'
+                  ? MoneyDirection.neutral
+                  : MoneyDirection.outflow,
+            ),
           ),
         ),
         if (page != null)
@@ -378,6 +388,7 @@ class _OwnerWithdrawalsTabState extends ConsumerState<OwnerWithdrawalsTab>
           onClear: _clearFilters,
           showClear: () => _hasActiveFilters,
         ),
+        moneyTintFilterChip(context, ref, l10n: l10n),
       ],
       onRefresh: () => ref.invalidate(ownerWithdrawalsProvider),
       actions: [

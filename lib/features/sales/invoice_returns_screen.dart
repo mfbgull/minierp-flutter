@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/auth/auth_notifier.dart';
+import '../../core/theme/money_direction.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/sales_return.dart' show SalesReturn;
@@ -271,6 +272,7 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
                     }
                   },
                 ),
+                moneyTintFilterChip(context, ref, l10n: l10n),
               ],
               onRefresh: () => ref.invalidate(invoiceReturnsProvider),
               onClearAll: _clearFilters,
@@ -323,7 +325,18 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
             Expanded(
               child: mobile
                   ? _mobileList(l10n)
-                  : gridScreenBody(returns, provider: invoiceReturnsProvider),
+                  : gridScreenBody(
+                      returns,
+                      provider: invoiceReturnsProvider,
+                      rowColorCallback: moneyRowColorCallback(
+                        context,
+                        ref,
+                        // Money out — a sales return sends goods/value
+                        // back to the customer. SalesReturn carries no
+                        // status field, so every posted row is outflow.
+                        (_) => MoneyDirection.outflow,
+                      ),
+                    ),
             ),
             if (!mobile)
               if (returns.valueOrNull case final page?)
@@ -387,6 +400,12 @@ class _InvoiceReturnsScreenState extends ConsumerState<InvoiceReturnsScreen>
                 return _CompactInvoiceReturnCard(
                   salesReturn: salesReturn,
                   l10n: l10n,
+                  tint: moneyRowTint(
+                    context,
+                    ref.watch(moneyDirectionTintProvider)
+                        ? MoneyDirection.outflow
+                        : MoneyDirection.neutral,
+                  ),
                   onTap: () => showInvoiceReturnDetailDialog(
                     context,
                     salesReturn: salesReturn,
@@ -502,11 +521,13 @@ class _CompactInvoiceReturnCard extends StatelessWidget {
   const _CompactInvoiceReturnCard({
     required this.salesReturn,
     required this.l10n,
+    required this.tint,
     required this.onTap,
   });
 
   final SalesReturn salesReturn;
   final AppLocalizations l10n;
+  final Color tint;
   final VoidCallback onTap;
 
   @override
@@ -519,6 +540,7 @@ class _CompactInvoiceReturnCard extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
+      color: tint == Colors.transparent ? null : tint,
       child: InkWell(
         onTap: onTap,
         child: Padding(

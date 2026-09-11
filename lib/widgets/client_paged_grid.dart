@@ -19,8 +19,10 @@
 // report drops pages).
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../core/theme/money_direction.dart';
 import '../l10n/app_localizations.dart';
 import 'grid_column_widths.dart';
 import 'pagination_bar.dart' show ServerPaginationBar;
@@ -28,7 +30,7 @@ import 'pluto_grid_screen.dart'
     show autoFitPlutoColumns, plutoGridConfigurationFor, withSerialCell;
 
 /// A read-only, client-paginated PlutoGrid over [data].
-class ClientPagedGrid<T> extends StatefulWidget {
+class ClientPagedGrid<T> extends ConsumerStatefulWidget {
   const ClientPagedGrid({
     super.key,
     required this.data,
@@ -95,10 +97,10 @@ class ClientPagedGrid<T> extends StatefulWidget {
   final String? widthKey;
 
   @override
-  State<ClientPagedGrid<T>> createState() => _ClientPagedGridState<T>();
+  ConsumerState<ClientPagedGrid<T>> createState() => _ClientPagedGridState<T>();
 }
 
-class _ClientPagedGridState<T> extends State<ClientPagedGrid<T>> {
+class _ClientPagedGridState<T> extends ConsumerState<ClientPagedGrid<T>> {
   PlutoGridStateManager? _manager;
   int _page = 1;
   int _limit = 10;
@@ -173,6 +175,15 @@ class _ClientPagedGridState<T> extends State<ClientPagedGrid<T>> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
+
+    // Same repaint nudge as PlutoGridScreen._gridPane: PlutoGrid
+    // captures rowColorCallback at mount, so a live global-tint toggle
+    // needs an explicit notifyListeners to re-invoke it.
+    ref.listen(moneyDirectionTintProvider, (previous, next) {
+      if (previous != next && widget.rowColorCallback != null) {
+        _manager?.notifyListeners();
+      }
+    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

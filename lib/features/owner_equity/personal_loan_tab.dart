@@ -10,6 +10,7 @@ import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/auth/auth_notifier.dart' show authProvider;
 import '../../core/theme/app_border_radius.dart';
+import '../../core/theme/money_direction.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -298,7 +299,26 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab>
             );
           },
         ),
-        Expanded(child: gridScreenBody(loans, provider: personalLoansProvider)),
+        Expanded(
+          child: gridScreenBody(
+            loans,
+            provider: personalLoansProvider,
+            rowColorCallback: moneyRowColorCallback(
+              context,
+              ref,
+              // An outstanding personal loan is value the business has
+              // lent out (money out, matching the cash-flow report's
+              // loan_disbursement semantics). Fully settled/written-off
+              // loans are neutral — nothing is still outstanding.
+              (row) {
+                final status = row.cells['status']?.value?.toString() ?? '';
+                return status == 'settled' || status == 'written_off'
+                    ? MoneyDirection.neutral
+                    : MoneyDirection.outflow;
+              },
+            ),
+          ),
+        ),
         if (page != null)
           ServerPaginationBar(
             page: page.currentPage,
@@ -458,6 +478,7 @@ class _PersonalLoansTabState extends ConsumerState<PersonalLoansTab>
           onClear: _clearFilters,
           showClear: () => _hasActiveFilters,
         ),
+        moneyTintFilterChip(context, ref, l10n: l10n),
       ],
       onRefresh: () => ref.invalidate(personalLoansProvider),
       actions: [

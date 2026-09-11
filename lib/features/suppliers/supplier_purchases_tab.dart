@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/theme/money_direction.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/purchase.dart' show Purchase;
 import '../../data/repositories/api_result.dart' show ApiError;
@@ -119,6 +120,18 @@ class _SupplierPurchasesTabState extends ConsumerState<SupplierPurchasesTab> {
                       gridRowFor: _gridRowFor,
                       hiddenFields: const ['data'],
                       widthKey: 'supplier_purchases',
+                      rowColorCallback: moneyRowColorCallback(
+                        context,
+                        ref,
+                        // Money out — a purchase sends cash/stock
+                        // value out to the supplier. Voided
+                        // purchases are neutral (never realized).
+                        (row) =>
+                            (row.cells['data']?.value as Purchase?)?.isVoided ==
+                                true
+                            ? MoneyDirection.neutral
+                            : MoneyDirection.outflow,
+                      ),
                     ),
                   ),
                   ServerPaginationBar(

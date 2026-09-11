@@ -5390,6 +5390,12 @@ abstract class AppLocalizations {
   /// **'To'**
   String get commonTo;
 
+  /// No description provided for @commonBenefitColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Benefit colors'**
+  String get commonBenefitColors;
+
   /// No description provided for @shortcutsQuickactions.
   ///
   /// In en, this message translates to:

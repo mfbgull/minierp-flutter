@@ -2719,6 +2719,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonTo => 'To';
 
   @override
+  String get commonBenefitColors => 'Benefit colors';
+
+  @override
   String get shortcutsQuickactions => 'Quick actions';
 
   @override
