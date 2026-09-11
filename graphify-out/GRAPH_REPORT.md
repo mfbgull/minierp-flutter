@@ -1,7 +1,7 @@
 # Graph Report - /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter  (2026-09-11)
 
 ## Corpus Check
-- 561 files · ~632,932 words
+- 561 files · ~633,000 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -814,11 +814,11 @@ Nodes (1): Open the popover by clicking the pill's date label.
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `package:flutter_riverpod/flutter_riverpod.dart` connect `Community 6` to `Community 0`, `Community 1`, `Community 2`, `Community 5`, `Community 7`, `Community 8`, `Community 12`, `Community 13`, `Community 15`, `Community 16`, `Community 17`, `Community 18`, `Community 19`, `Community 20`, `Community 24`, `Community 26`?**
-  _High betweenness centrality (0.275) - this node is a cross-community bridge._
+  _High betweenness centrality (0.264) - this node is a cross-community bridge._
 - **Why does `package:flutter/material.dart` connect `Community 2` to `Community 0`, `Community 1`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 11`, `Community 12`, `Community 13`, `Community 15`, `Community 16`, `Community 17`, `Community 18`, `Community 19`, `Community 20`, `Community 24`, `Community 26`, `Community 29`?**
-  _High betweenness centrality (0.165) - this node is a cross-community bridge._
+  _High betweenness centrality (0.174) - this node is a cross-community bridge._
 - **Why does `toString` connect `Community 3` to `Community 12`?**
-  _High betweenness centrality (0.124) - this node is a cross-community bridge._
+  _High betweenness centrality (0.133) - this node is a cross-community bridge._
 - **Are the 196 inferred relationships involving `run()` (e.g. with `repairUnbatchedStock()` and `repairOrphanedBatches()`) actually correct?**
   _`run()` has 196 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `Intercept NOTIFY_DEBUGGER_ABOUT_RX_PAGES and touch the pages.`, `-registerWithRegistry`, `MiniErpApp` to the rest of the system?**
