@@ -241,12 +241,14 @@ function deletePayment(req: AuthRequest, res: Response): void {
     const existing = PaymentModel.getById(db, id);
     if (!existing) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
 
-    PaymentModel.delete(db, id);
+    // C6 (reversal-rules): void with attribution — payments are never
+    // hard-deleted once they have moved money.
+    PaymentModel.void(db, id, req.user?.id ?? null, `Payment voided: ${existing.payment_no}`);
 
-    logCRUD(ActionType.PAYMENT_DELETE, 'Payment', id, `Deleted payment: ${existing.payment_no} - $${existing.amount}`, req.user!.id, { payment_no: existing.payment_no, amount: existing.amount });
+    logCRUD(ActionType.PAYMENT_DELETE, 'Payment', id, `Voided payment: ${existing.payment_no} - $${existing.amount}`, req.user!.id, { payment_no: existing.payment_no, amount: existing.amount });
     req.activityLogged = true;
 
-    res.json({ success: true, message: 'Payment deleted successfully' });
+    res.json({ success: true, message: 'Payment voided successfully' });
   } catch (error) {
     logger.error('Error deleting payment:', error);
     res.status(500).json({ success: false, error: 'Failed to delete payment' });
@@ -300,7 +302,7 @@ function getPaymentReceipt(req: Request, res: Response): void {
         SELECT pa.invoice_id, i.invoice_no, pa.amount
         FROM payment_allocations pa
         LEFT JOIN invoices i ON pa.invoice_id = i.id
-        WHERE pa.payment_id = ?
+        WHERE pa.payment_id = ? AND pa.voided_at IS NULL
         ORDER BY pa.id
       `).all(id) as { invoice_id: number; invoice_no: string; amount: number }[];
     } else if (payment.supplier_id) {
@@ -335,14 +337,14 @@ function getPaymentReceipt(req: Request, res: Response): void {
         SELECT pa.po_id as invoice_id, po.po_no as invoice_no, pa.amount
         FROM po_allocations pa
         LEFT JOIN purchase_orders po ON pa.po_id = po.id
-        WHERE pa.payment_id = ?
+        WHERE pa.payment_id = ? AND pa.voided_at IS NULL
         ORDER BY pa.id
       `).all(id) as { invoice_id: number; invoice_no: string; amount: number }[];
       const purchaseRows = db.prepare(`
         SELECT pa.purchase_id as invoice_id, p.purchase_no as invoice_no, pa.amount
         FROM purchase_allocations pa
         LEFT JOIN purchases p ON pa.purchase_id = p.id
-        WHERE pa.payment_id = ?
+        WHERE pa.payment_id = ? AND pa.voided_at IS NULL
         ORDER BY pa.id
       `).all(id) as { invoice_id: number; invoice_no: string; amount: number }[];
       allocations = [...poRows, ...purchaseRows];
@@ -418,7 +420,7 @@ function allocatePaymentToInvoice(req: AuthRequest, res: Response): void {
 
     // Currently allocated total for THIS payment.
     const currentRows = db.prepare(
-      'SELECT COALESCE(SUM(amount), 0) AS total FROM payment_allocations WHERE payment_id = ?'
+      'SELECT COALESCE(SUM(amount), 0) AS total FROM payment_allocations WHERE payment_id = ? AND voided_at IS NULL'
     ).get(id) as { total: number };
     const currentlyAllocated = parseCurrency(currentRows.total);
     const unallocated = paymentAmount - currentlyAllocated;
@@ -488,4 +490,3 @@ function allocatePaymentToInvoice(req: AuthRequest, res: Response): void {
 export default {
   getPayments, getUnifiedPayments, getPayment, createPayment, updatePayment, deletePayment, getPaymentReceipt, allocatePaymentToInvoice,
 };
-

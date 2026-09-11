@@ -1619,6 +1619,11 @@ runLedgered('fn.verifyOwnerEquityAccounts', () => {
   }
 });
 
+// C5/C6 (reversal-rules): financially-touched money rows are voided with
+// attribution, never hard-deleted. Additive columns only.
+runLedgered('add-payment-salary-void-columns.sql');
+runLedgered('add-employee-loan-void-columns.sql');
+
 // Ensure dbSeedReady resolves on every boot — createDefaultUser() is
 // only called from initializeDatabase(), which runLedgered() skips on
 // existing databases (already recorded in schema_migrations).

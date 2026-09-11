@@ -305,6 +305,7 @@ class CustomerModel {
               JOIN invoices i ON i.id = pra.invoice_id
               WHERE pr.customer_id = cl.customer_id
                 AND pr.amount <= 0
+                AND pra.voided_at IS NULL
                 AND pr.notes LIKE '%' || cl.reference_no || '%'
             ),
             cl.reference_no
@@ -315,6 +316,7 @@ class CustomerModel {
             JOIN payment_allocations pa ON pa.payment_id = p.id
             JOIN invoices i ON i.id = pa.invoice_id
             WHERE p.payment_no = cl.reference_no
+              AND pa.voided_at IS NULL
           )
         END as linked_invoice_no
       FROM customer_ledger cl
@@ -337,6 +339,7 @@ class CustomerModel {
               JOIN invoices i ON i.id = pra.invoice_id
               WHERE pr.customer_id = cl.customer_id
                 AND pr.amount <= 0
+                AND pra.voided_at IS NULL
                 AND pr.notes LIKE '%' || cl.reference_no || '%'
             ),
             cl.reference_no
@@ -347,6 +350,7 @@ class CustomerModel {
             JOIN payment_allocations pa ON pa.payment_id = p.id
             JOIN invoices i ON i.id = pa.invoice_id
             WHERE p.payment_no = cl.reference_no
+              AND pa.voided_at IS NULL
           )
         END as linked_invoice_no
       FROM customer_ledger cl

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../types';
 import QuotationModel from '../models/Quotation';
 import SalesOrderModel from '../models/SalesOrder';
+import { InvoiceCancellationGuardError } from '../models/Invoice';
 import InvoiceModel from '../models/Invoice';
 import db from '../config/database';
 import logger from '../utils/logger';
@@ -347,6 +348,10 @@ function cancelSalesOrder(req: AuthRequest, res: Response): void {
     const result = SalesOrderModel.cancel(id, req.user!.id, db);
     res.json({ success: true, message: 'Sales order cancelled successfully', ...result });
   } catch (error: any) {
+    if (error instanceof InvoiceCancellationGuardError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
     logger.error('Cancel sales order error:', error);
     res.status(500).json({ error: error.message || 'Failed to cancel sales order' });
   }

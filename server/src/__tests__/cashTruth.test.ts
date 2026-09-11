@@ -47,7 +47,7 @@ describe('supplier payment is the only purchase-side outflow (CASH-01)', () => {
   it('a paid purchase appears once via its supplier payment', () => {
     const db = new Database(':memory:');
     db.pragma('foreign_keys = ON');
-    for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'add-gl-foundation.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql', 'add-employee-loans.sql', 'add-purchase-returns-tables.sql', 'add-disposition-and-supplier-refunds.sql']) {
+    for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'add-gl-foundation.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql', 'add-employee-loans.sql', 'add-purchase-returns-tables.sql', 'add-disposition-and-supplier-refunds.sql', 'add-purchase-supplier-payment.sql', 'add-payment-salary-void-columns.sql', 'add-employee-loan-void-columns.sql']) {
       db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
     }
     db.prepare(`INSERT INTO users (username, email, password_hash, full_name, role, is_active)
@@ -69,7 +69,10 @@ describe('supplier payment is the only purchase-side outflow (CASH-01)', () => {
         notes TEXT,
         purchase_order_id INTEGER REFERENCES purchase_orders(id),
         created_by INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        voided_at TEXT,
+        voided_by INTEGER,
+        void_reason TEXT
       );
       DROP TABLE payments;
       ALTER TABLE payments_new RENAME TO payments;
@@ -99,7 +102,7 @@ describe('unclassified methods surface in reconciliation (CASH-02/03)', () => {
 describe('employee loans and supplier refunds appear in the till walk', () => {
   it('loan disbursement is outflow, direct repayment is inflow, salary deduction is not', () => {
     const db = new Database(':memory:');
-    for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'add-gl-foundation.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql', 'add-employee-loans.sql', 'add-purchase-returns-tables.sql', 'add-disposition-and-supplier-refunds.sql']) {
+    for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'add-gl-foundation.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql', 'add-employee-loans.sql', 'add-purchase-returns-tables.sql', 'add-disposition-and-supplier-refunds.sql', 'add-purchase-supplier-payment.sql', 'add-payment-salary-void-columns.sql', 'add-employee-loan-void-columns.sql']) {
       db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
     }
     db.prepare(`INSERT INTO users (username, email, password_hash, full_name, role, is_active)
@@ -135,7 +138,7 @@ describe('employee loans and supplier refunds appear in the till walk', () => {
 describe('opening balances sync to the GL (dashboard seed)', () => {
   it('sync voids stale openings and posts dated at the earliest transaction', () => {
     const db = new Database(':memory:');
-    for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'create-customer-ledger.sql', 'create-supplier-ledger.sql', 'add-gl-foundation.sql', 'add-gl-void-attribution.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql', 'add-employee-loans.sql', 'add-purchase-returns-tables.sql', 'add-disposition-and-supplier-refunds.sql']) {
+    for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'create-customer-ledger.sql', 'create-supplier-ledger.sql', 'add-gl-foundation.sql', 'add-gl-void-attribution.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql', 'add-employee-loans.sql', 'add-purchase-returns-tables.sql', 'add-disposition-and-supplier-refunds.sql', 'add-purchase-supplier-payment.sql', 'add-payment-salary-void-columns.sql', 'add-employee-loan-void-columns.sql']) {
       db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
     }
     // getAccountBalance also reads the legacy journal_entries table when the
@@ -187,7 +190,7 @@ describe('opening balances sync to the GL (dashboard seed)', () => {
 describe('expense GL lifecycle (draft → submit → cancel)', () => {
   it('draft carries no GL; submit posts; cancel voids; edit while live re-posts', () => {
     const db = new Database(':memory:');
-    for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'create-customer-ledger.sql', 'create-supplier-ledger.sql', 'add-gl-foundation.sql', 'add-gl-void-attribution.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql', 'add-employee-loans.sql', 'add-purchase-returns-tables.sql', 'add-disposition-and-supplier-refunds.sql']) {
+    for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'create-customer-ledger.sql', 'create-supplier-ledger.sql', 'add-gl-foundation.sql', 'add-gl-void-attribution.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql', 'add-employee-loans.sql', 'add-purchase-returns-tables.sql', 'add-disposition-and-supplier-refunds.sql', 'add-purchase-supplier-payment.sql', 'add-payment-salary-void-columns.sql', 'add-employee-loan-void-columns.sql']) {
       db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
     }
     // getAccountBalance also reads the legacy journal_entries table when the
@@ -244,7 +247,7 @@ describe('expense GL lifecycle (draft → submit → cancel)', () => {
 describe('owner equity appears in the cash till walk', () => {
   it('capital is inflow; cash-kind withdrawal is outflow; goods never touch cash', () => {
     const db = new Database(':memory:');
-    for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'add-gl-foundation.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql', 'add-employee-loans.sql', 'add-purchase-returns-tables.sql', 'add-disposition-and-supplier-refunds.sql']) {
+    for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'add-gl-foundation.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql', 'add-employee-loans.sql', 'add-purchase-returns-tables.sql', 'add-disposition-and-supplier-refunds.sql', 'add-purchase-supplier-payment.sql', 'add-payment-salary-void-columns.sql', 'add-employee-loan-void-columns.sql']) {
       db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
     }
     db.prepare(`INSERT INTO users (username, email, password_hash, full_name, role, is_active)

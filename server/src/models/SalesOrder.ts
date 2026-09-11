@@ -550,34 +550,26 @@ class SalesOrderModel {
         ).get(id) as { id: number; invoice_no: string; status: string } | undefined;
 
         if (linkedInvoice && linkedInvoice.status !== 'Cancelled') {
-          // Get items for stock reversal
-          const invoiceItems = InvoiceModel.getInvoiceItemsForStockReverse(db, linkedInvoice.id);
+          // Reversal-rules C4: defer to the SAME shared cancellation
+          // primitive as the dedicated endpoint (InvoiceModel.
+          // cancelInvoiceInternal). The old inline path reversed stock
+          // but left AR, GL, and payment effects live.
+          const fullInvoice = InvoiceModel.getById(linkedInvoice.id, db);
+          if (fullInvoice) {
+            InvoiceModel.cancelInvoiceInternal(db, fullInvoice, userId);
 
-          // Reverse stock — restores batch quantity_remaining and creates ADJUSTMENT movement
-          InvoiceModel.reverseStockForItems(
-            db,
-            invoiceItems,
-            linkedInvoice.invoice_no,
-            userId,
-            'SO_CANCEL'
-          );
-
-          // Cancel the invoice
-          db.prepare(`
-            UPDATE invoices SET status = 'Cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?
-          `).run(linkedInvoice.id);
-
-          // Log activity for invoice cancellation
-          db.prepare(`
-            INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
-            VALUES (?, ?, ?, ?, ?)
-          `).run(
-            userId,
-            'CANCEL',
-            'Invoice',
-            linkedInvoice.id,
-            `Invoice ${linkedInvoice.invoice_no} cancelled due to Sales Order ${salesOrder.so_no} cancellation`
-          );
+            // Log activity for invoice cancellation
+            db.prepare(`
+              INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
+              VALUES (?, ?, ?, ?, ?)
+            `).run(
+              userId,
+              'CANCEL',
+              'Invoice',
+              linkedInvoice.id,
+              `Invoice ${linkedInvoice.invoice_no} cancelled due to Sales Order ${salesOrder.so_no} cancellation`
+            );
+          }
         }
       }
 

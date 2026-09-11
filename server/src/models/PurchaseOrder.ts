@@ -230,7 +230,7 @@ class PurchaseOrderModel {
       JOIN users u ON po.created_by = u.id
       LEFT JOIN (
         SELECT po_id, SUM(amount) as total_paid
-        FROM po_allocations
+        FROM po_allocations WHERE voided_at IS NULL
         GROUP BY po_id
       ) pa ON po.id = pa.po_id
       WHERE 1=1
@@ -309,7 +309,7 @@ class PurchaseOrderModel {
         JOIN users u ON po.created_by = u.id
         LEFT JOIN (
           SELECT po_id, SUM(amount) as total_paid
-          FROM po_allocations
+          FROM po_allocations WHERE voided_at IS NULL
           GROUP BY po_id
         ) pa ON po.id = pa.po_id
         WHERE po.id = ?
@@ -585,6 +585,26 @@ class PurchaseOrderModel {
         SupplierLedgerModel.rebuildBalances(po.supplier_id, db);
       }
 
+      // Reversal-rules C3: cancelling a Submitted/Partially Received
+      // PO must reverse the AP ledger entry that submission posted,
+      // or supplier balances (and AP Aging, which reads supplier_ledger
+      // directly) stay inflated forever. Append an equal-and-opposite
+      // credit inside this same transaction, then rebuild the chain.
+      // Draft POs never posted a ledger entry, so only POs arriving at
+      // Cancelled from Submitted/Partially Received need the reversal.
+      if (status === 'Cancelled' && (po.status === 'Submitted' || po.status === 'Partially Received')) {
+        SupplierLedgerModel.createEntry({
+          supplier_id: po.supplier_id,
+          transaction_date: po.po_date,
+          transaction_type: 'PURCHASE_ORDER_CANCEL',
+          reference_no: po.po_no,
+          debit: 0,
+          credit: po.total_amount,
+          description: `Purchase Order ${po.po_no} cancelled — reverses submission debit`,
+        }, db);
+        SupplierLedgerModel.rebuildBalances(po.supplier_id, db);
+      }
+
       db.prepare(`
         INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
         VALUES (?, ?, ?, ?, ?)
@@ -665,7 +685,7 @@ class PurchaseOrderModel {
       SELECT p.id, p.payment_no, p.payment_date, p.payment_method,
              p.reference_no, p.notes, pa.amount
       FROM po_allocations pa JOIN payments p ON pa.payment_id = p.id
-      WHERE pa.po_id = ? ORDER BY p.payment_date DESC, p.id DESC
+      WHERE pa.po_id = ? AND pa.voided_at IS NULL ORDER BY p.payment_date DESC, p.id DESC
     `).all(poId) as Array<{
       id: number; payment_no: string; payment_date: string;
       payment_method: string; reference_no: string; notes: string; amount: number;

@@ -3,6 +3,7 @@ import db from '../config/database';
 import { AuthRequest, Invoice, InvoiceItemDTO, PaymentDTO, InvoiceStatus } from '../types';
 import StockMovementModel from '../models/StockMovement';
 import InvoiceModel from '../models/Invoice';
+import { InvoiceCancellationGuardError } from '../models/Invoice';
 import PaymentModel from '../models/Payment';
 import AccountingService from '../services/accountingService';
 import ledgerUtils from '../utils/ledgerUtils';
@@ -558,8 +559,10 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
 
                 const allocations = PaymentModel.getAllocationsByPaymentId(db, deletedPaymentId);
 
-                PaymentModel.deleteAllocationsByPaymentId(db, deletedPaymentId);
-                PaymentModel.delete(db, deletedPaymentId);
+                PaymentModel.delete(db, deletedPaymentId, {
+                    voidedBy: userId,
+                    voidReason: `Payment removed from invoice ${invoiceId} during update`,
+                });
 
                     // Recalculate balance for each affected invoice using
                     // the common helper (which accounts for returned_amount)
@@ -845,7 +848,10 @@ function deleteInvoice(req: AuthRequest, res: Response): Response | void {
           AccountingService.voidJournalLinesByReference(db, 'PAYMENT', alloc.payment_id);
           InvoiceModel.deleteLedgerEntryByReference(db,
             (PaymentModel.getById(db, alloc.payment_id))?.payment_no || '', freshInvoice.customer_id);
-          PaymentModel.delete(db, alloc.payment_id);
+          PaymentModel.delete(db, alloc.payment_id, {
+            voidedBy: userId,
+            voidReason: `Payment voided with deleted invoice ${freshInvoice.invoice_no}`,
+          });
         }
       }
 
@@ -1031,32 +1037,15 @@ function cancelInvoice(req: AuthRequest, res: Response): Response | void {
     }
 
     const transaction = db.transaction(() => {
-      // Update status to Cancelled
-      db.prepare(`
-        UPDATE invoices SET status = 'Cancelled', updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(invoiceId);
+      // Reversal-rules C1/C4: one shared primitive for every cancel
+      // path (dedicated endpoint + SO.cancel). Guards: payments lock,
+      // returns lock. Effects: stock reversal, GL void (INVOICE +
+      // INVOICE_RETURN), append-only CANCELLATION ledger credit,
+      // balance rebuilds, status stamp. Throws on any inconsistency
+      // so the whole transaction rolls back.
+      InvoiceModel.cancelInvoiceInternal(db, invoice, userId);
 
-      // Void the invoice's GL journal_lines (Dr AR / Cr Sales Revenue / Cr Tax Payable).
-      // This also covers COGS entries since they use reference_type 'INVOICE'.
-      // Do NOT void PAYMENT or INVOICE_RETURN lines — those are still valid
-      // adjustments. The CANCELLATION ledger entry below handles the AR offset.
-      AccountingService.voidJournalLinesByReference(db, 'INVOICE', invoiceId);
-
-      // Add a CANCELLED ledger entry (credit to offset the original debit)
-      // This neutralizes the AR impact without deleting history
-      createLedgerEntry(
-        invoice.customer_id,
-        invoice.invoice_date.slice(0, 10),
-        'CANCELLATION',
-        invoice.invoice_no,
-        0,
-        invoice.total_amount,
-        `Invoice ${invoice.invoice_no} cancelled`
-      );
-      // Recalculate customer balance
-      ledgerUtils.rebuildLedgerBalances(invoice.customer_id);
-      ledgerUtils.recalcCustomerBalanceFromLedger(invoice.customer_id);
+      // (legacy inline body removed — see InvoiceModel.cancelInvoiceInternal)
 
       const corrCancel = newCorrelationId();
       logCRUD(ActionType.INVOICE_CANCEL, 'Invoice', invoiceId,
@@ -1075,6 +1064,11 @@ function cancelInvoice(req: AuthRequest, res: Response): Response | void {
     const updatedInvoice = InvoiceModel.getWithCustomer(invoiceId, db);
     res.json({ success: true, message: 'Invoice cancelled successfully', data: updatedInvoice });
   } catch (error: unknown) {
+    // Guard rejections (payments/returns lock) are caller-correctable
+    // states — 400 with the reason, not a 500 server fault.
+    if (error instanceof InvoiceCancellationGuardError) {
+      return res.status(400).json({ error: error.message });
+    }
     logger.error('Cancel invoice error:', { error });
     res.status(500).json({ error: 'Failed to cancel invoice' });
   }

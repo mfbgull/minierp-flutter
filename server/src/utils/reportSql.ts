@@ -54,7 +54,7 @@ export function cogsCondition(alias = 'sm'): string {
   return `(
     ${p}movement_type = 'SALE'
     OR (${p}movement_type = 'ADJUSTMENT'
-        AND ${p}reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE'))
+        AND ${p}reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE', 'INVOICE_CANCEL', 'SO_CANCEL'))
   )`;
 }
 
