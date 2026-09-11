@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/theme/status_colors.dart';
+import '../../core/theme/money_direction.dart';
 import '../../core/utils/cash_movement_labels.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
@@ -120,6 +121,7 @@ class _CashFlowReportScreenState extends ConsumerState<CashFlowReportScreen> {
               toProvider: reportCashFlowToDateProvider,
               showAllDates: false,
             ),
+            moneyTintFilterChip(context, ref, l10n: l10n),
           ],
           onRefresh: () => ref.invalidate(cashFlowReportProvider),
           actions: [
@@ -312,15 +314,15 @@ class _CashFlowReportScreenState extends ConsumerState<CashFlowReportScreen> {
 /// newest first. The server filters to the same tracked accounts the
 /// cards sum over, so inflow/outflow rows reconcile with the totals
 /// above by construction; search/pagination slice that loaded set.
-class _MovementsGrid extends StatefulWidget {
+class _MovementsGrid extends ConsumerStatefulWidget {
   const _MovementsGrid({super.key, required this.movements});
   final List<CashFlowMovement> movements;
 
   @override
-  State<_MovementsGrid> createState() => _MovementsGridState();
+  ConsumerState<_MovementsGrid> createState() => _MovementsGridState();
 }
 
-class _MovementsGridState extends State<_MovementsGrid> {
+class _MovementsGridState extends ConsumerState<_MovementsGrid> {
   late final PlutoGridStateManager stateManager;
   GridColumnWidths? _widthTracker;
 
@@ -334,6 +336,11 @@ class _MovementsGridState extends State<_MovementsGrid> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    // Repaint nudge for the money-direction tint toggle (PlutoGrid
+    // captures rowColorCallback at mount; see money_direction.dart).
+    ref.listen(moneyDirectionTintProvider, (previous, next) {
+      if (previous != next) stateManager.notifyListeners();
+    });
     return PlutoGrid(
       configuration: plutoGridConfigurationFor(context, compact: true),
       columns: [
@@ -394,6 +401,21 @@ class _MovementsGridState extends State<_MovementsGrid> {
           },
         ),
       ],
+      rowColorCallback: moneyRowColorCallback(
+        context,
+        ref,
+        // Same type→direction mapping as cashMovementColor above, so
+        // badges and row backgrounds never disagree.
+        (row) {
+          final type = row.cells['type']?.value?.toString() ?? '';
+          return type == 'payment_received' ||
+                  type == 'owner_capital' ||
+                  type == 'loan_repayment' ||
+                  type == 'supplier_refund'
+              ? MoneyDirection.inflow
+              : MoneyDirection.outflow;
+        },
+      ),
       rows: [
         for (final m in widget.movements)
           PlutoRow(cells: {

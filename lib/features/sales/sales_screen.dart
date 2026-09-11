@@ -21,6 +21,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/auth/auth_notifier.dart' show authProvider;
+import '../../core/theme/money_direction.dart';
 import '../../core/utils/csv_export.dart';
 import '../../data/models/invoice.dart' show Invoice;
 import '../../data/repositories/api_result.dart' show ApiError;
@@ -304,6 +305,23 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         // Must be a modifiable list — FilteredList appends into it (a
         // const list throws "Cannot add to an unmodifiable list").
         rows: <PlutoRow>[],
+        rowColorCallback: moneyRowColorCallback(
+          context,
+          ref,
+          // Money in — an invoice brings receivable value into the
+          // business. Draft (nothing realized yet) and Cancelled rows
+          // stay neutral. Returned/Partially Returned stay green: the
+          // original sale was still realized.
+          (row) {
+            final status =
+                (row.cells['data']?.value as Invoice?)?.status ??
+                row.cells['status']?.value?.toString() ??
+                '';
+            return status == 'Draft' || status == 'Cancelled'
+                ? MoneyDirection.neutral
+                : MoneyDirection.inflow;
+          },
+        ),
         onLoaded: (event) {
           _stateManager = event.stateManager;
           _stateManager?.hideColumn(
@@ -386,6 +404,11 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
     // Keep the grid in sync with provider changes after first load
     // (loading flags, page/filter refetches) — same as ExpensesScreen.
     ref.listen(invoicesProvider, (previous, next) => _applyInvoices(next));
+    // Repaint nudge for the money-direction tint toggle (PlutoGrid
+    // captures rowColorCallback at mount; see money_direction.dart).
+    ref.listen(moneyDirectionTintProvider, (previous, next) {
+      if (previous != next) _stateManager?.notifyListeners();
+    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -426,6 +449,7 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
                 }
               },
             ),
+            moneyTintFilterChip(context, ref, l10n: l10n),
           ],
           onRefresh: _refresh,
           onClearAll: _clearFilters,

@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/auth/auth_notifier.dart';
+import '../../core/theme/money_direction.dart';
 import '../../core/utils/csv_export.dart';
 import '../../data/models/expense.dart' show Expense;
 import '../../data/repositories/api_result.dart' show ApiError;
@@ -165,6 +166,11 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     ref.listen(expensesProvider, (previous, next) => _applyExpenses(next));
+    // Repaint nudge for the money-direction tint toggle (PlutoGrid
+    // captures rowColorCallback at mount; see money_direction.dart).
+    ref.listen(moneyDirectionTintProvider, (previous, next) {
+      if (previous != next) _stateManager?.notifyListeners();
+    });
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -260,6 +266,21 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         configuration: plutoGridConfigurationFor(context, compact: true),
         columns: _columns,
         rows: <PlutoRow>[],
+        rowColorCallback: moneyRowColorCallback(
+          context,
+          ref,
+          // Money out — an expense sends cash out of the business.
+          // Draft (not yet incurred) and Cancelled stay neutral.
+          (row) {
+            final status =
+                (row.cells['data']?.value as Expense?)?.status ??
+                row.cells['status']?.value?.toString() ??
+                '';
+            return status == 'Draft' || status == 'Cancelled'
+                ? MoneyDirection.neutral
+                : MoneyDirection.outflow;
+          },
+        ),
         onLoaded: (event) {
           _stateManager = event.stateManager;
           _stateManager?.hideColumn(

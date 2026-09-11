@@ -11,8 +11,10 @@
 // rebuilds that reuse the same provider value never touch the grid.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../core/theme/money_direction.dart';
 import '../l10n/app_localizations.dart';
 import 'grid_column_widths.dart';
 import 'pluto_grid_screen.dart'
@@ -23,7 +25,7 @@ import 'pluto_grid_screen.dart'
         withSerialCell;
 
 /// A read-only PlutoGrid over [data] for the detail tabs.
-class DetailTabGrid<T> extends StatefulWidget {
+class DetailTabGrid<T> extends ConsumerStatefulWidget {
   const DetailTabGrid({
     super.key,
     required this.data,
@@ -60,10 +62,10 @@ class DetailTabGrid<T> extends StatefulWidget {
   final String? widthKey;
 
   @override
-  State<DetailTabGrid<T>> createState() => _DetailTabGridState<T>();
+  ConsumerState<DetailTabGrid<T>> createState() => _DetailTabGridState<T>();
 }
 
-class _DetailTabGridState<T> extends State<DetailTabGrid<T>> {
+class _DetailTabGridState<T> extends ConsumerState<DetailTabGrid<T>> {
   PlutoGridStateManager? _manager;
   late List<PlutoColumn> _columns;
   PlutoGridConfiguration _configuration = const PlutoGridConfiguration();
@@ -128,6 +130,14 @@ class _DetailTabGridState<T> extends State<DetailTabGrid<T>> {
 
   @override
   Widget build(BuildContext context) {
+    // Same repaint nudge as PlutoGridScreen._gridPane: PlutoGrid
+    // captures rowColorCallback at mount, so a live global-tint toggle
+    // needs an explicit notifyListeners to re-invoke it.
+    ref.listen(moneyDirectionTintProvider, (previous, next) {
+      if (previous != next && widget.rowColorCallback != null) {
+        _manager?.notifyListeners();
+      }
+    });
     return PlutoGrid(
       columns: _columns,
       configuration: _configuration,

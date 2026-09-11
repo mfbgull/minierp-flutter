@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
+import '../../core/theme/money_direction.dart';
 import '../../data/models/purchase.dart' show Purchase;
 import '../../data/models/supplier.dart' show Supplier;
 import '../../core/utils/formatters.dart';
@@ -269,6 +270,7 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
                 }
               },
             ),
+            moneyTintFilterChip(context, ref, l10n: l10n),
           ],
           primaryActions: [
             FilledButton.icon(
@@ -278,7 +280,21 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen>
             ),
           ],
         ),
-        Expanded(child: gridScreenBody(purchases, provider: purchasesProvider)),
+        Expanded(
+          child: gridScreenBody(
+            purchases,
+            provider: purchasesProvider,
+            rowColorCallback: moneyRowColorCallback(
+              context,
+              ref,
+              // Money out — a purchase sends cash/stock value out to a
+              // supplier. Voided purchases are neutral (never realized).
+              (row) => (row.cells['isVoided']?.value ?? false) == true
+                  ? MoneyDirection.neutral
+                  : MoneyDirection.outflow,
+            ),
+          ),
+        ),
         if (purchases.valueOrNull case final page?)
           ServerPaginationBar(
             page: page.currentPage,

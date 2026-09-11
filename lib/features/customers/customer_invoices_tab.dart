@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
+import '../../core/theme/money_direction.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/invoice_status.dart' show invoiceStatusColor, invoiceStatusLabel;
 import '../../data/models/invoice.dart' show Invoice;
@@ -132,6 +133,20 @@ class _CustomerInvoicesTabState extends ConsumerState<CustomerInvoicesTab> {
                     gridRowFor: _gridRowFor,
                     hiddenFields: const ['data'],
                     widthKey: 'customer_invoices',
+                    rowColorCallback: moneyRowColorCallback(
+                      context,
+                      ref,
+                      // Money in — Draft/Cancelled invoice rows are
+                      // neutral (nothing realized yet).
+                      (row) {
+                        final status =
+                            (row.cells['data']?.value as Invoice?)?.status ??
+                            '';
+                        return status == 'Draft' || status == 'Cancelled'
+                            ? MoneyDirection.neutral
+                            : MoneyDirection.inflow;
+                      },
+                    ),
                   ),
                 ),
                 ServerPaginationBar(

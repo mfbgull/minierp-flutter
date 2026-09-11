@@ -28,6 +28,7 @@ import 'grid_column_widths.dart';
 import 'pluto_grid_shortcuts.dart';
 import 'screen_error_panel.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import '../core/theme/money_direction.dart';
 
 /// The shared `#` serial-number column prepended to every grid (the
 /// invoice line grid's `#` column is the in-app convention). The renderer
@@ -695,6 +696,19 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
   }) {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
+
+    // PlutoGrid captures rowColorCallback into its state manager at
+    // mount and never re-reads the widget field, so a live toggle
+    // needs an explicit repaint nudge. The callback closures read the
+    // tint provider at invocation time; this listener makes PlutoGrid
+    // re-invoke them the moment the global toggle flips. Screens
+    // without a rowColorCallback never reach a tinted state, so the
+    // notify is harmless there.
+    ref.listen(moneyDirectionTintProvider, (previous, next) {
+      if (previous != next && rowColorCallback != null) {
+        gridStateManager?.notifyListeners();
+      }
+    });
 
     // The grid fills the space. The error-panel path in gridScreenBody
     // returns before this.
