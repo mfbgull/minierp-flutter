@@ -4,6 +4,7 @@ import ItemModel from '../models/Item';
 import WarehouseModel from '../models/Warehouse';
 import StockMovementModel from '../models/StockMovement';
 import PhysicalCountModel from '../models/PhysicalCount';
+import { StockReservationModel } from '../models/StockReservation';
 import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
 import db from '../config/database';
@@ -889,5 +890,271 @@ export default {
   completePhysicalCount,
   cancelPhysicalCount,
   correctPhysicalCount,
-  deletePhysicalCount
+  deletePhysicalCount,
+  getBatchReconciliation,
+  correctBatchReconciliation,
+  updateBatchStatus,
+  createReservation,
+  releaseReservation,
+  getReservations
 };
+
+// ============================================
+// Batch Location & Reconciliation (new)
+// ============================================
+
+export function getBatchReconciliation(req: AuthRequest, res: Response): Response | void {
+  try {
+    const db = req.app.get('db');
+    const { item_id, warehouse_id } = req.query as any;
+
+    let where = 'WHERE 1=1';
+    const params: any[] = [];
+
+    if (item_id) {
+      where += ' AND sb.item_id = ?';
+      params.push(item_id);
+    }
+    if (warehouse_id) {
+      where += ' AND l.warehouse_id = ?';
+      params.push(warehouse_id);
+    }
+
+    const drifts = db.prepare(`
+      SELECT sb.id as batch_id, sb.batch_no, sb.item_id, i.item_code, i.item_name,
+             l.warehouse_id, w.warehouse_code, l.id as location_id, l.location_code,
+             sb.quantity_remaining as master_qty,
+             bsl.quantity_physical, bsl.quantity_reserved, bsl.quantity_available,
+             bsl.status_override,
+             (sb.quantity_remaining - bsl.quantity_physical) as drift
+      FROM stock_batches sb
+      JOIN items i ON sb.item_id = i.id
+      JOIN batch_stock_by_location bsl ON sb.id = bsl.batch_id
+      JOIN locations l ON bsl.location_id = l.id
+      JOIN warehouses w ON l.warehouse_id = w.id
+      ${where}
+      AND ABS(sb.quantity_remaining - bsl.quantity_physical) > 0.001
+      ORDER BY sb.id ASC
+    `).all(...params);
+
+    return res.json({ drifts });
+  } catch (error: any) {
+    logger.error('[BatchReconciliation] get failed:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+export function correctBatchReconciliation(req: AuthRequest, res: Response): Response | void {
+  try {
+    const db = req.app.get('db');
+    const { batch_id, location_id, new_quantity_physical } = req.body as any;
+    const userId = req.user!.id;
+
+    if (!batch_id || location_id === undefined || new_quantity_physical === undefined) {
+      return res.status(400).json({ error: 'batch_id, location_id, and new_quantity_physical are required' });
+    }
+
+    const locRow = db.prepare(`SELECT warehouse_id FROM locations WHERE id = ?`).get(location_id) as { warehouse_id: number } | undefined;
+    if (!locRow) {
+      return res.status(404).json({ error: 'Location not found' });
+    }
+
+    const batch = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id = ?`).get(batch_id) as { quantity_remaining: number } | undefined;
+    if (!batch) {
+      return res.status(404).json({ error: 'Batch not found' });
+    }
+
+    const newQty = parseFloat(String(new_quantity_physical));
+    if (!Number.isFinite(newQty) || newQty < 0) {
+      return res.status(400).json({ error: 'new_quantity_physical must be a non-negative number' });
+    }
+
+    const run = db.transaction(() => {
+      // Update batch_stock_by_location
+      db.prepare(`
+        UPDATE batch_stock_by_location
+        SET quantity_physical = ?, quantity_available = MAX(0, ? - quantity_reserved), updated_at = CURRENT_TIMESTAMP
+        WHERE batch_id = ? AND location_id = ?
+      `).run(newQty, newQty, batch_id, location_id);
+
+      // Adjust master batch quantity_remaining to match total across locations
+      const totalPhysical = db.prepare(`
+        SELECT COALESCE(SUM(quantity_physical), 0) as total
+        FROM batch_stock_by_location
+        WHERE batch_id = ?
+      `).get(batch_id) as { total: number };
+
+      db.prepare(`
+        UPDATE stock_batches SET quantity_remaining = ? WHERE id = ?
+      `).run(totalPhysical.total, batch_id);
+
+      // Record correction movement
+      const diff = newQty - (db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id = ? AND location_id = ?`).get(batch_id, location_id) as any).quantity_physical;
+      // Actually we already updated it, so let's get the old value from a subquery or just use the diff
+      const oldRow = db.prepare(`
+        SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id = ? AND location_id = ?
+      `).get(batch_id, location_id) as { quantity_physical: number };
+
+      // Recalculate diff properly: we need old value. Let's do it before update.
+    });
+
+    // Re-implement with proper old value capture
+    const oldRow = db.prepare(`
+      SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id = ? AND location_id = ?
+    `).get(batch_id, location_id) as { quantity_physical: number } | undefined;
+    const oldQty = oldRow?.quantity_physical ?? 0;
+    const diff = newQty - oldQty;
+
+    db.transaction(() => {
+      db.prepare(`
+        UPDATE batch_stock_by_location
+        SET quantity_physical = ?, quantity_available = MAX(0, ? - quantity_reserved), updated_at = CURRENT_TIMESTAMP
+        WHERE batch_id = ? AND location_id = ?
+      `).run(newQty, newQty, batch_id, location_id);
+
+      const totalPhysical = db.prepare(`
+        SELECT COALESCE(SUM(quantity_physical), 0) as total
+        FROM batch_stock_by_location
+        WHERE batch_id = ?
+      `).get(batch_id) as { total: number };
+
+      db.prepare(`UPDATE stock_batches SET quantity_remaining = ? WHERE id = ?`).run(totalPhysical.total, batch_id);
+
+      const movementNo = StockMovementModel.generateMovementNo(db);
+      db.prepare(`
+        INSERT INTO stock_movements (
+          movement_no, item_id, warehouse_id, movement_type,
+          quantity, unit_cost, reference_doctype, reference_docno,
+          remarks, movement_date, created_by, batch_id
+        ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, 0, 'BATCH_RECONCILIATION', ?, ?, ?, ?)
+      `).run(
+        movementNo,
+        (db.prepare(`SELECT item_id FROM stock_batches WHERE id = ?`).get(batch_id) as any).item_id,
+        locRow.warehouse_id,
+        diff,
+        `RECON-${batch_id}`,
+        `Batch reconciliation correction: ${oldQty} -> ${newQty}`,
+        new Date().toISOString().split('T')[0],
+        userId,
+        batch_id
+      );
+    })();
+
+    return res.json({ success: true, batch_id, location_id, old_quantity: oldQty, new_quantity: newQty, diff });
+  } catch (error: any) {
+    logger.error('[BatchReconciliation] correct failed:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+export function updateBatchStatus(req: AuthRequest, res: Response): Response | void {
+  try {
+    const db = req.app.get('db');
+    const { id } = req.params;
+    const body = req.body as { location_id?: number; status_override?: string };
+    const statusOverride = body.status_override as string;
+
+    const batchId = parseInt(id as string, 10);
+    const locationId = Number(body.location_id);
+    if (!locationId || !statusOverride) {
+      return res.status(400).json({ error: 'location_id and status_override are required' });
+    }
+
+    if (!['ACTIVE', 'BLOCKED', 'QUARANTINED', 'DAMAGED', 'REJECTED'].includes(statusOverride)) {
+      return res.status(400).json({ error: 'Invalid status_override' });
+    }
+
+    db.prepare(`
+      UPDATE batch_stock_by_location
+      SET status_override = ?
+      WHERE batch_id = ? AND location_id = ?
+    `).run(statusOverride, batchId, locationId);
+
+    return res.json({ success: true, batch_id: batchId, location_id: locationId, status_override: statusOverride });
+  } catch (error: any) {
+    logger.error('[BatchStatus] update failed:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+export function createReservation(req: AuthRequest, res: Response): Response | void {
+  try {
+    const db = req.app.get('db');
+    const { item_id, warehouse_id, location_id, batch_id, quantity_reserved, reference_doctype, reference_docno, reference_line_id } = req.body as any;
+    const userId = req.user!.id;
+
+    const reservation = StockReservationModel.create(
+      { item_id, warehouse_id, location_id, batch_id, quantity_reserved, reference_doctype, reference_docno, reference_line_id },
+      db
+    );
+
+    // Decrement quantity_available in batch_stock_by_location
+    if (location_id && batch_id) {
+      db.prepare(`
+        UPDATE batch_stock_by_location
+        SET quantity_reserved = quantity_reserved + ?, quantity_available = quantity_physical - (quantity_reserved + ?)
+        WHERE batch_id = ? AND location_id = ?
+      `).run(quantity_reserved, quantity_reserved, batch_id, location_id);
+    }
+
+    return res.status(201).json(reservation);
+  } catch (error: any) {
+    logger.error('[Reservation] create failed:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+export function releaseReservation(req: AuthRequest, res: Response): Response | void {
+  try {
+    const db = req.app.get('db');
+    const { id } = req.params;
+    const reservationId = parseInt(id as string, 10);
+
+    const reservation = StockReservationModel.getById(reservationId, db);
+    if (!reservation) {
+      return res.status(404).json({ error: 'Reservation not found' });
+    }
+
+    const released = StockReservationModel.release(
+      { reference_doctype: reservation.reference_doctype, reference_docno: reservation.reference_docno, reference_line_id: reservation.reference_line_id },
+      db
+    );
+
+    if (!released) {
+      return res.status(400).json({ error: 'Reservation is not active' });
+    }
+
+    // Restore quantity_available
+    if (reservation.batch_id && reservation.location_id) {
+      db.prepare(`
+        UPDATE batch_stock_by_location
+        SET quantity_reserved = MAX(0, quantity_reserved - ?), quantity_available = quantity_physical - quantity_reserved
+        WHERE batch_id = ? AND location_id = ?
+      `).run(reservation.quantity_reserved, reservation.batch_id, reservation.location_id);
+    }
+
+    return res.json(released);
+  } catch (error: any) {
+    logger.error('[Reservation] release failed:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+export function getReservations(req: AuthRequest, res: Response): Response | void {
+  try {
+    const db = req.app.get('db');
+    const { doctype, docno } = req.query as any;
+
+    let reservations: any[];
+    if (doctype && docno) {
+      reservations = StockReservationModel.getByReference(doctype as string, docno as string, db);
+    } else {
+      reservations = StockReservationModel.getAll(db);
+    }
+
+    return res.json({ reservations });
+  } catch (error: any) {
+    logger.error('[Reservation] list failed:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}

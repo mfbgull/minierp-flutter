@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import logger from '../utils/logger';
 import AccountingService from '../services/accountingService';
 import { sanitizeSortParams, STOCK_BALANCE_SORT_COLUMNS, STOCK_MOVEMENT_SORT_COLUMNS } from '../utils/sqlSanitizer';
+import { isFeatureEnabled } from '../utils/featureFlags';
 
 interface StockMovement {
   id: number;
@@ -142,6 +143,11 @@ class StockMovementModel {
           INSERT INTO stock_balances (item_id, warehouse_id, quantity)
           VALUES (?, ?, ?)
         `).run(data.item_id, data.warehouse_id, data.quantity);
+      }
+
+      // New path: keep extension columns in sync with batch_stock_by_location
+      if (isFeatureEnabled(db, 'feature_batch_locations')) {
+        this.syncStockBalancesExtension(data.item_id, data.warehouse_id, db);
       }
 
       db.prepare(`
@@ -565,6 +571,40 @@ class StockMovementModel {
    *     this case implies a partial migration or a stale batch, neither
    *     of which should be silently papered over.
    */
+  static syncBatchStockByLocationForNewBatch(batchId: number, warehouseId: number, quantity: number, db: Database.Database): void {
+    if (!isFeatureEnabled(db, 'feature_batch_locations')) return;
+    const locRow = db.prepare(`
+      SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+    `).get(warehouseId) as { id: number } | undefined;
+    if (!locRow) return;
+    db.prepare(`
+      INSERT OR IGNORE INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+      VALUES (?, ?, ?, 0, ?)
+    `).run(batchId, locRow.id, quantity, quantity);
+  }
+
+  private static syncStockBalancesExtension(itemId: number, warehouseId: number, db: Database.Database): void {
+    if (!isFeatureEnabled(db, 'feature_batch_locations')) return;
+    const sums = db.prepare(`
+      SELECT COALESCE(SUM(bsl.quantity_physical), 0) as physical,
+             COALESCE(SUM(bsl.quantity_reserved), 0) as reserved,
+             COALESCE(SUM(bsl.quantity_available), 0) as available
+      FROM batch_stock_by_location bsl
+      JOIN locations l ON bsl.location_id = l.id
+      WHERE l.warehouse_id = ?
+        AND EXISTS (
+          SELECT 1 FROM stock_batches sb
+          WHERE sb.id = bsl.batch_id AND sb.item_id = ?
+        )
+    `).get(warehouseId, itemId) as { physical: number; reserved: number; available: number };
+
+    db.prepare(`
+      UPDATE stock_balances
+      SET quantity_physical = ?, quantity_reserved = ?, quantity_available = ?, last_updated = CURRENT_TIMESTAMP
+      WHERE item_id = ? AND warehouse_id = ?
+    `).run(sums.physical, sums.reserved, sums.available, itemId, warehouseId);
+  }
+
   static consumeFromOldestBatches(
     itemId: number,
     warehouseId: number,
@@ -575,12 +615,16 @@ class StockMovementModel {
       throw new Error(`consumeFromOldestBatches: quantity must be positive, got ${quantity}`);
     }
 
+    const featureOn = isFeatureEnabled(db, 'feature_batch_locations');
+
     // Authoritative check: stock_balances is the source of truth.
     const balanceRow = db.prepare(`
-      SELECT quantity FROM stock_balances
+      SELECT quantity, quantity_available FROM stock_balances
       WHERE item_id = ? AND warehouse_id = ?
-    `).get(itemId, warehouseId) as { quantity: number } | undefined;
-    const availableQty = balanceRow ? parseFloat(String(balanceRow.quantity)) : 0;
+    `).get(itemId, warehouseId) as { quantity: number; quantity_available: number } | undefined;
+    const availableQty = featureOn
+      ? (balanceRow ? parseFloat(String(balanceRow.quantity_available)) : 0)
+      : (balanceRow ? parseFloat(String(balanceRow.quantity)) : 0);
 
     if (availableQty < quantity) {
       const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
@@ -594,12 +638,131 @@ class StockMovementModel {
     const itemRow = db.prepare('SELECT has_expiry, standard_cost, item_name FROM items WHERE id = ?').get(itemId) as { has_expiry: number; standard_cost: number; item_name: string } | undefined;
     const useFEFO = itemRow?.has_expiry === 1;
 
+    if (featureOn) {
+      // New path: read from batch_stock_by_location, filtered by warehouse via locations.
+      // Aggregate quantity_available per batch across locations in this warehouse,
+      // respecting per-location status_override (skip non-ACTIVE locations).
+      const locationFilter = useFEFO
+        ? `AND sb.halted = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'
+           AND (sb.expiry_date IS NULL OR sb.expiry_date >= date('now'))`
+        : `AND sb.halted = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'`;
+
+      const batchRows = db.prepare(`
+        SELECT sb.id, sb.unit_cost, sb.received_date, sb.expiry_date,
+               SUM(bsl.quantity_available) as qty_avail
+        FROM stock_batches sb
+        JOIN batch_stock_by_location bsl ON sb.id = bsl.batch_id
+        JOIN locations l ON bsl.location_id = l.id
+        WHERE sb.item_id = ? AND l.warehouse_id = ?
+          AND bsl.quantity_available > 0
+          ${locationFilter}
+        GROUP BY sb.id
+        ORDER BY
+          CASE WHEN sb.expiry_date IS NULL THEN 1 ELSE 0 END,
+          sb.expiry_date ASC,
+          sb.received_date ASC,
+          sb.id ASC
+      `).all(itemId, warehouseId) as Array<{
+        id: number;
+        unit_cost: number;
+        received_date: string;
+        expiry_date: string | null;
+        qty_avail: number;
+      }>;
+
+      // Check if stock exists but all batches/locations are blocked/expired.
+      if (batchRows.length === 0 && availableQty > 0) {
+        const allBatchStock = db.prepare(`
+          SELECT SUM(bsl.quantity_available) as total
+          FROM batch_stock_by_location bsl
+          JOIN locations l ON bsl.location_id = l.id
+          WHERE l.warehouse_id = ?
+            AND EXISTS (
+              SELECT 1 FROM stock_batches sb
+              WHERE sb.id = bsl.batch_id AND sb.item_id = ?
+            )
+        `).get(warehouseId, itemId) as { total: number } | undefined;
+        const totalBlocked = allBatchStock?.total ?? 0;
+        if (totalBlocked > 0) {
+          const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
+          throw new Error(
+            `All batches for ${item?.item_name || `item ${itemId}`} in warehouse ${warehouseId} ` +
+            `are either halted, expired, or location-blocked. Available in stock_balances: ${availableQty}, ` +
+            `but none are available for consumption. Unblock batches or locations, or adjust stock.`
+          );
+        }
+      }
+
+      // Legacy case: positive warehouse stock but no batch_stock_by_location rows.
+      if (batchRows.length === 0) {
+        const fallbackCost = itemRow?.standard_cost ?? 0;
+        logger.warn(
+          `[BatchCosting] No batch_stock_by_location rows for ${itemRow?.item_name || 'item'} in warehouse. ` +
+          `Using standard_cost (${fallbackCost}) for the entire ${quantity} units (legacy stock).`
+        );
+        return [{ batchId: null, consumed: quantity, unitCost: fallbackCost }];
+      }
+
+      // Consume from oldest batches first, respecting per-batch available.
+      let remaining = quantity;
+      const consumption: Array<{ batchId: number | null; consumed: number; unitCost: number }> = [];
+
+      for (const batch of batchRows) {
+        if (remaining <= 0) break;
+        const consumeFromThis = Math.min(remaining, batch.qty_avail);
+
+        // Decrement batch_stock_by_location rows for this batch within the warehouse.
+        // We consume from locations with the oldest created_at first to maintain FIFO/FEFO.
+        const locRows = db.prepare(`
+          SELECT bsl.id, bsl.quantity_available, l.created_at
+          FROM batch_stock_by_location bsl
+          JOIN locations l ON bsl.location_id = l.id
+          WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+            AND bsl.quantity_available > 0
+            ${useFEFO ? "AND (bsl.status_override IS NULL OR bsl.status_override = 'ACTIVE') AND (sb.expiry_date IS NULL OR sb.expiry_date >= date('now'))" : ''}
+          ORDER BY l.created_at ASC, bsl.id ASC
+        `).all(batch.id, warehouseId) as Array<{ id: number; quantity_available: number; created_at: string }>;
+
+        let batchRemaining = consumeFromThis;
+        for (const loc of locRows) {
+          if (batchRemaining <= 0) break;
+          const take = Math.min(batchRemaining, loc.quantity_available);
+          db.prepare(`
+            UPDATE batch_stock_by_location
+            SET quantity_physical = quantity_physical - ?, quantity_reserved = quantity_reserved
+            WHERE id = ?
+          `).run(take, loc.id);
+          batchRemaining -= take;
+        }
+
+        // Also decrement master batch for backward compatibility
+        db.prepare(`
+          UPDATE stock_batches
+          SET quantity_remaining = quantity_remaining - ?
+          WHERE id = ?
+        `).run(consumeFromThis, batch.id);
+
+        consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost });
+        remaining -= consumeFromThis;
+      }
+
+      if (remaining > 0.001) {
+        const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
+        throw new Error(
+          `Batch coverage shortfall for ${item?.item_name || `item ${itemId}`} in warehouse ${warehouseId}: ` +
+          `stock_balances shows ${availableQty} but batch_stock_by_location only covers ${(quantity - remaining).toFixed(3)}. ` +
+          `Run a batch reconciliation.`
+        );
+      }
+
+      return consumption;
+    }
+
+    // Legacy path (feature flag off): original behavior unchanged.
     let batches: Array<{ id: number; quantity_remaining: number; unit_cost: number }>;
     let totalBatchTrackedQty = 0;
 
     if (useFEFO) {
-      // FEFO path: skip halted batches, exclude expired batches,
-      // sort by expiry_date ASC (NULLs last), then received_date ASC
       batches = db.prepare(`
         SELECT id, quantity_remaining, unit_cost
         FROM stock_batches
@@ -617,9 +780,6 @@ class StockMovementModel {
         unit_cost: number;
       }>;
 
-      // Check if stock exists but all batches are halted/expired.
-      // Count ALL non-zero batches (including halted/expired) to distinguish
-      // legacy stock from real batch-tracked stock that's all blocked.
       if (batches.length === 0 && availableQty > 0) {
         const allBatches = db.prepare(`
           SELECT SUM(quantity_remaining) as total
@@ -629,7 +789,6 @@ class StockMovementModel {
         totalBatchTrackedQty = allBatches?.total ?? 0;
       }
     } else {
-      // FIFO path: original behavior, no expiry/halt filtering
       batches = db.prepare(`
         SELECT id, quantity_remaining, unit_cost
         FROM stock_batches
@@ -642,12 +801,7 @@ class StockMovementModel {
       }>;
     }
 
-    // Legacy case: positive warehouse stock but no batch rows. This is
-    // stock that was added before batch costing was enabled. Use
-    // standard_cost for the entire consumption; do not throw.
     if (batches.length === 0) {
-      // FEFO edge case: stock exists in batches but ALL are halted/expired.
-      // Do not fall through to legacy fallback — throw with a clear message.
       if (useFEFO && totalBatchTrackedQty > 0) {
         throw new Error(
           `All batches for ${itemRow?.item_name || `item ${itemId}`} in warehouse ${warehouseId} ` +
@@ -665,7 +819,6 @@ class StockMovementModel {
       return [{ batchId: null, consumed: quantity, unitCost: fallbackCost }];
     }
 
-    // Normal FIFO path.
     let remaining = quantity;
     const consumption: Array<{ batchId: number | null; consumed: number; unitCost: number }> = [];
 
@@ -684,10 +837,6 @@ class StockMovementModel {
     }
 
     if (remaining > 0.001) {
-      // Defensive: stock_balances said we have enough, but the batches
-      // we found don't cover the request. This means the batch table is
-      // out of sync with the balance. Throw rather than silently using
-      // a different cost basis (which would mis-cost COGS).
       const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
       throw new Error(
         `Batch coverage shortfall for ${item?.item_name || `item ${itemId}`} in warehouse ${warehouseId}: ` +
@@ -767,6 +916,9 @@ class StockMovementModel {
         ) VALUES (?, ?, ?, 'TRANSFER', ?, ?, ?, ?, ?)
       `).run(batchNo, data.item_id, data.to_warehouse_id, out.id, qty, qty, avgCost, today);
       const mirrorBatchId = mirrorBatch.lastInsertRowid as number;
+
+      // New path: seed batch_stock_by_location for the mirrored batch at destination
+      this.syncBatchStockByLocationForNewBatch(mirrorBatchId, data.to_warehouse_id, qty, db);
 
       // IN leg (positive), linked to the mirrored layer and back-referencing
       // the OUT movement number.
@@ -866,9 +1018,6 @@ class StockMovementModel {
       }
 
       // 1. Restore the source batch quantity consumed by the OUT leg.
-      // The OUT leg carries its consumed batch_id directly (its
-      // reference_docno is NULL — only the IN leg references the OUT's
-      // movement_no), so restore by movement_no.
       const outConsumptions = db.prepare(`
         SELECT id, quantity, batch_id FROM stock_movements
         WHERE movement_no = ? AND movement_type = 'TRANSFER' AND quantity < 0
@@ -880,6 +1029,21 @@ class StockMovementModel {
           db.prepare(`
             UPDATE stock_batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?
           `).run(Math.abs(leg.quantity), leg.batch_id);
+          // New path: restore to default location of source warehouse
+          if (isFeatureEnabled(db, 'feature_batch_locations')) {
+            const srcLoc = db.prepare(`
+              SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+            `).get(outLeg.warehouse_id) as { id: number } | undefined;
+            if (srcLoc) {
+              db.prepare(`
+                INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+                VALUES (?, ?, ?, 0, ?)
+                ON CONFLICT(batch_id, location_id) DO UPDATE SET
+                  quantity_physical = quantity_physical + excluded.quantity_physical,
+                  quantity_available = quantity_available + excluded.quantity_available
+              `).run(leg.batch_id, srcLoc.id, Math.abs(leg.quantity), Math.abs(leg.quantity));
+            }
+          }
         }
       }
 
@@ -888,6 +1052,19 @@ class StockMovementModel {
         db.prepare(`
           UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?
         `).run(qty, inLeg.batch_id);
+        // New path: subtract from default location of destination warehouse
+        if (isFeatureEnabled(db, 'feature_batch_locations')) {
+          const dstLoc = db.prepare(`
+            SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+          `).get(inLeg.warehouse_id) as { id: number } | undefined;
+          if (dstLoc) {
+            db.prepare(`
+              UPDATE batch_stock_by_location
+              SET quantity_physical = quantity_physical - ?, quantity_available = quantity_available - ?
+              WHERE batch_id = ? AND location_id = ?
+            `).run(qty, qty, inLeg.batch_id, dstLoc.id);
+          }
+        }
       }
 
       // 3. Equal-and-opposite ADJUSTMENT legs (no GL: adjustments post their

@@ -1,9 +1,14 @@
 import '../models/json_helpers.dart';
 
 enum BatchStatus {
-  normal('normal'),
+  active('ACTIVE'),
+  blocked('BLOCKED'),
+  quarantined('QUARANTINED'),
+  expired('EXPIRED'),
+  damaged('DAMAGED'),
+  rejected('REJECTED'),
   nearExpiry('near_expiry'),
-  expired('expired'),
+  normal('normal'),
   halted('halted');
 
   const BatchStatus(this.value);
@@ -33,6 +38,8 @@ class StockBatch {
     this.warehouseCode,
     this.warehouseName,
     this.sourceNo,
+    this.locations,
+    this.effectiveStatus,
   });
 
   factory StockBatch.fromJson(Map<String, dynamic> json) => StockBatch(
@@ -54,6 +61,10 @@ class StockBatch {
     warehouseCode: asString(json['warehouse_code']),
     warehouseName: asString(json['warehouse_name']),
     sourceNo: asString(json['source_no']),
+    locations: json['locations'] is List
+        ? (json['locations'] as List).map((e) => BatchLocation.fromJson(e as Map<String, dynamic>)).toList()
+        : null,
+    effectiveStatus: asString(json['effective_status']),
   );
 
   // Computed status — requires knowing today's date and a threshold
@@ -94,4 +105,73 @@ class StockBatch {
   final String? warehouseCode;
   final String? warehouseName;
   final String? sourceNo;
+  final List<BatchLocation>? locations;
+  final String? effectiveStatus;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'batch_no': batchNo,
+    'item_id': itemId,
+    'warehouse_id': warehouseId,
+    'source_type': sourceType,
+    'source_id': sourceId,
+    'quantity_original': quantityOriginal,
+    'quantity_remaining': quantityRemaining,
+    'unit_cost': unitCost,
+    'received_date': receivedDate,
+    if (expiryDate != null) 'expiry_date': expiryDate,
+    'halted': halted,
+    if (haltedReason != null) 'halted_reason': haltedReason,
+    if (itemCode != null) 'item_code': itemCode,
+    if (itemName != null) 'item_name': itemName,
+    if (warehouseCode != null) 'warehouse_code': warehouseCode,
+    if (warehouseName != null) 'warehouse_name': warehouseName,
+    if (sourceNo != null) 'source_no': sourceNo,
+    if (locations != null) 'locations': locations!.map((e) => e.toJson()).toList(),
+    if (effectiveStatus != null) 'effective_status': effectiveStatus,
+  };
+}
+
+class BatchLocation {
+  const BatchLocation({
+    required this.locationId,
+    required this.locationCode,
+    this.locationName,
+    required this.quantityPhysical,
+    required this.quantityReserved,
+    required this.quantityAvailable,
+    this.statusOverride,
+    this.effectiveStatus,
+  });
+
+  factory BatchLocation.fromJson(Map<String, dynamic> json) => BatchLocation(
+    locationId: asInt(json['location_id']) ?? 0,
+    locationCode: asString(json['location_code']) ?? '',
+    locationName: asString(json['location_name']),
+    quantityPhysical: asNum(json['quantity_physical']) ?? 0,
+    quantityReserved: asNum(json['quantity_reserved']) ?? 0,
+    quantityAvailable: asNum(json['quantity_available']) ?? 0,
+    statusOverride: asString(json['status_override']),
+    effectiveStatus: asString(json['effective_status']),
+  );
+
+  final int locationId;
+  final String locationCode;
+  final String? locationName;
+  final num quantityPhysical;
+  final num quantityReserved;
+  final num quantityAvailable;
+  final String? statusOverride;
+  final String? effectiveStatus;
+
+  Map<String, dynamic> toJson() => {
+    'location_id': locationId,
+    'location_code': locationCode,
+    if (locationName != null) 'location_name': locationName,
+    'quantity_physical': quantityPhysical,
+    'quantity_reserved': quantityReserved,
+    'quantity_available': quantityAvailable,
+    if (statusOverride != null) 'status_override': statusOverride,
+    if (effectiveStatus != null) 'effective_status': effectiveStatus,
+  };
 }

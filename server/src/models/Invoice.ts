@@ -6,6 +6,7 @@ import Database from 'better-sqlite3';
 import logger from '../utils/logger';
 import StockMovementModel from './StockMovement';
 import AccountingService from '../services/accountingService';
+import { isFeatureEnabled } from '../utils/featureFlags';
 
 /**
  * Reversal-rules guard rejection (rule 4/5: paid + returned documents
@@ -642,15 +643,41 @@ class InvoiceModel {
       // Ratio based on remaining-to-return vs total sold
       const ratio = Math.abs(totalSold) < 0.001 ? 1 : Math.min(remainingToReturn / totalSold, 1);
 
-      // Restore quantity_remaining on each consumed batch (except legacy/fallback entries)
+      // Restore quantity on each consumed batch (new path: batch_stock_by_location)
       for (const movement of saleMovements) {
         if (movement.batch_id !== null) {
           const restoreQty = Math.abs(movement.quantity) * ratio;
-          db.prepare(`
-            UPDATE stock_batches
-            SET quantity_remaining = quantity_remaining + ?
-            WHERE id = ?
-          `).run(restoreQty, movement.batch_id);
+          if (isFeatureEnabled(db, 'feature_batch_locations')) {
+            // Restore to target warehouse default location (explicit or original)
+            const targetWarehouseId = explicitWarehouseId ?? movement.warehouse_id;
+            const locRow = db.prepare(`
+              SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+            `).get(targetWarehouseId) as { id: number } | undefined;
+            if (locRow) {
+              db.prepare(`
+                INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+                VALUES (?, ?, ?, 0, ?)
+                ON CONFLICT(batch_id, location_id) DO UPDATE SET
+                  quantity_physical = quantity_physical + excluded.quantity_physical,
+                  quantity_available = quantity_available + excluded.quantity_available
+              `).run(movement.batch_id, locRow.id, restoreQty, restoreQty);
+
+              // Record the restoration for audit
+              db.prepare(`
+                INSERT INTO invoice_return_batches (invoice_return_id, invoice_item_id, batch_id, location_id, quantity)
+                VALUES (
+                  (SELECT COALESCE(MAX(id), 0) FROM invoice_returns WHERE invoice_id = ? AND reference_doctype = 'RETURN'),
+                  ?, ?, ?, ?
+                )
+              `).run(invoiceNo.includes('RET-') ? 0 : invoiceNo, item.item_id, movement.batch_id, locRow.id, restoreQty);
+            }
+          } else {
+            db.prepare(`
+              UPDATE stock_batches
+              SET quantity_remaining = quantity_remaining + ?
+              WHERE id = ?
+            `).run(restoreQty, movement.batch_id);
+          }
         }
       }
 

@@ -6,6 +6,7 @@ import AccountingService from '../services/accountingService';
 import logger from '../utils/logger';
 import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, PURCHASE_RETURN_HEADER_SORT_COLUMNS } from '../utils/sqlSanitizer';
+import { isFeatureEnabled } from '../utils/featureFlags';
 
 /**
  * PurchaseReturnModel — the redesigned, first-class purchase return document.
@@ -470,9 +471,38 @@ class PurchaseReturnModel {
           );
         }
 
-        db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')
-          .run(line.quantity, sourceBatch.id);
+        // New path: consume from batch_stock_by_location for the source batch
+        if (isFeatureEnabled(db, 'feature_batch_locations')) {
+          const locRows = db.prepare(`
+            SELECT bsl.id, bsl.quantity_available, bsl.location_id
+            FROM batch_stock_by_location bsl
+            JOIN locations l ON bsl.location_id = l.id
+            WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+              AND bsl.quantity_available > 0
+            ORDER BY l.created_at ASC, bsl.id ASC
+          `).all(sourceBatch.id, data.warehouse_id) as Array<{ id: number; quantity_available: number; location_id: number }>;
 
+          let remaining = line.quantity;
+          for (const loc of locRows) {
+            if (remaining <= 0) break;
+            const take = Math.min(remaining, loc.quantity_available);
+            db.prepare(`
+              UPDATE batch_stock_by_location
+              SET quantity_physical = quantity_physical - ?
+              WHERE id = ?
+            `).run(take, loc.id);
+            remaining -= take;
+          }
+          if (remaining > 0.001) {
+            throw new Error(
+              `Insufficient batch_stock_by_location for ${line.item_name}: ` +
+              `required ${line.quantity}, only ${(line.quantity - remaining).toFixed(3)} available in source batch locations`
+            );
+          }
+        } else {
+          db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')
+            .run(line.quantity, sourceBatch.id);
+        }
 
         insertLine.run(
           returnId,
@@ -483,15 +513,25 @@ class PurchaseReturnModel {
           line.quantity,
           line.amount
         );
+
         // Persist per-line batch consumption so void restores exactly
-        // these batches (PRET-05, task 4.4) — create-then-void is a
-        // value-identity operation.
+        // these batches (PRET-05, task 4.4).
+        // New path: also record location_id
+        const consumedLoc = isFeatureEnabled(db, 'feature_batch_locations')
+          ? db.prepare(`
+              SELECT bsl.location_id FROM batch_stock_by_location bsl
+              JOIN locations l ON bsl.location_id = l.id
+              WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+              ORDER BY l.created_at ASC LIMIT 1
+            `).get(sourceBatch.id, data.warehouse_id) as { location_id: number } | undefined
+          : null;
+
         db.prepare(`
-          INSERT INTO purchase_return_batches (return_line_id, batch_id, quantity)
-          SELECT id, ?, ? FROM purchase_return_items
+          INSERT INTO purchase_return_batches (return_line_id, batch_id, quantity, location_id)
+          SELECT id, ?, ?, ? FROM purchase_return_items
           WHERE purchase_return_id = ? AND source_item_id = ?
           ORDER BY id DESC LIMIT 1
-        `).run(sourceBatch.id, line.quantity, returnId, line.source_item_id);
+        `).run(sourceBatch.id, line.quantity, consumedLoc?.location_id ?? null, returnId, line.source_item_id);
       }
 
       // GL reversal — Dr AP / Cr Inventory at actual return cost, keyed to
@@ -601,6 +641,23 @@ class PurchaseReturnModel {
           for (const c of consumed) {
             db.prepare(`UPDATE stock_batches SET quantity_remaining = MAX(0, quantity_remaining + ?) WHERE id = ?`)
               .run(c.quantity, c.batch_id);
+            // New path: restore to batch_stock_by_location using recorded location
+            if (isFeatureEnabled(db, 'feature_batch_locations')) {
+              const prb = db.prepare(`
+                SELECT location_id FROM purchase_return_batches
+                WHERE return_line_id = ? AND batch_id = ?
+                LIMIT 1
+              `).get(line.id, c.batch_id) as { location_id: number } | undefined;
+              if (prb?.location_id) {
+                db.prepare(`
+                  INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+                  VALUES (?, ?, ?, 0, ?)
+                  ON CONFLICT(batch_id, location_id) DO UPDATE SET
+                    quantity_physical = quantity_physical + excluded.quantity_physical,
+                    quantity_available = quantity_available + excluded.quantity_available
+                `).run(c.batch_id, prb.location_id, c.quantity, c.quantity);
+              }
+            }
           }
         } else {
           const latest = db.prepare(`
@@ -612,6 +669,20 @@ class PurchaseReturnModel {
           if (latest) {
             db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?`)
               .run(line.quantity, latest.id);
+            if (isFeatureEnabled(db, 'feature_batch_locations')) {
+              const defLoc = db.prepare(`
+                SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+              `).get(header.warehouse_id) as { id: number } | undefined;
+              if (defLoc) {
+                db.prepare(`
+                  INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+                  VALUES (?, ?, ?, 0, ?)
+                  ON CONFLICT(batch_id, location_id) DO UPDATE SET
+                    quantity_physical = quantity_physical + excluded.quantity_physical,
+                    quantity_available = quantity_available + excluded.quantity_available
+                `).run(latest.id, defLoc.id, line.quantity, line.quantity);
+              }
+            }
           }
         }
       }

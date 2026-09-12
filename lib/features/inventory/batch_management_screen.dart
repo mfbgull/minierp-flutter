@@ -196,19 +196,25 @@ class _BatchManagementScreenState
   Color _statusColor(BuildContext context, BatchStatus status) {
     final scheme = Theme.of(context).colorScheme;
     return switch (status) {
-      BatchStatus.normal => const Color(0xff16a34a),
+      BatchStatus.normal || BatchStatus.active => const Color(0xff16a34a),
       BatchStatus.nearExpiry => const Color(0xffd97706),
       BatchStatus.expired => scheme.error,
       BatchStatus.halted => scheme.onSurfaceVariant,
+      BatchStatus.blocked || BatchStatus.quarantined => const Color(0xff7c3aed),
+      BatchStatus.damaged => scheme.error,
+      BatchStatus.rejected => scheme.onSurfaceVariant,
     };
   }
 
   String _statusLabel(AppLocalizations l10n, BatchStatus status) =>
       switch (status) {
-        BatchStatus.normal => l10n.statusNormal,
+        BatchStatus.normal || BatchStatus.active => l10n.statusNormal,
         BatchStatus.nearExpiry => l10n.statusNearExpiry,
         BatchStatus.expired => l10n.statusExpired,
         BatchStatus.halted => l10n.statusHalted,
+        BatchStatus.blocked || BatchStatus.quarantined => 'Blocked / Quarantined',
+        BatchStatus.damaged => 'Damaged',
+        BatchStatus.rejected => 'Rejected',
       };
 
   @override
@@ -387,6 +393,44 @@ class _BatchManagementScreenState
       },
     ),
     PlutoColumn(
+      title: 'Effective Status',
+      field: 'effectiveStatus',
+      type: PlutoColumnType.text(),
+      width: 130,
+      renderer: (ctx) {
+        final effective = ctx.cell.value as String?;
+        if (effective == null || effective.isEmpty) return const SizedBox.shrink();
+        final status = BatchStatus.fromString(effective);
+        return Container(
+          alignment: Alignment.centerLeft,
+          child: Chip(
+            visualDensity: VisualDensity.compact,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+            label: Text(
+              _statusLabel(l10n, status),
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: _statusColor(context, status)),
+            ),
+            backgroundColor:
+                _statusColor(context, status).withValues(alpha: 0.14),
+          ),
+        );
+      },
+    ),
+    PlutoColumn(
+      title: 'Locations',
+      field: 'locations',
+      type: PlutoColumnType.text(),
+      width: 100,
+      renderer: (ctx) {
+        final count = ctx.cell.value as int?;
+        if (count == null || count <= 0) return const SizedBox.shrink();
+        return Center(child: Text('$count'));
+      },
+    ),
+    PlutoColumn(
       title: l10n.commonActions,
       field: 'actions',
       type: PlutoColumnType.text(),
@@ -440,6 +484,8 @@ class _BatchManagementScreenState
         'status': PlutoCell(
           value: b.halted ? BatchStatus.halted.value : status.value,
         ),
+        'effectiveStatus': PlutoCell(value: b.effectiveStatus ?? ''),
+        'locations': PlutoCell(value: b.locations?.length ?? 0),
         'actions': PlutoCell(value: ''),
       },
     );

@@ -9,6 +9,7 @@ import { backfillPurchaseReturns } from '../utils/purchaseReturnBackfill';
 import { runBackfillGlPreposting } from '../migrations/backfillGlPreposting';
 import { runBackfillGlUnification } from '../migrations/backfillGlUnification';
 import { runBackfillInvoiceItemTax } from '../migrations/backfillInvoiceItemTax';
+import { runBackfillBatchLocations } from "../migrations/backfillBatchLocations";
 
 // Fail-closed: tests must never fall through to a shared dev DB by accident
 if (process.env.NODE_ENV === 'test' && !process.env.DATABASE_PATH) {
@@ -1602,6 +1603,8 @@ runLedgered('fn.runStockInvariantChecksRebuild', runStockInvariantChecksRebuild,
 // Repair: re-add stock_batches halted/halted_reason when an older rebuild
 // dropped them (FEFO consumption hard-fails without the column).
 runLedgered('fn.runBatchHaltColumnsRepairMigration', runBatchHaltColumnsRepairMigration);
+runLedgered("fn.backfillBatchLocations", () => runBackfillBatchLocations(db));
+runLedgered("add-batch-location-model.sql");
 
 // Salary payment duplicate guard: pay_period column + unique index
 runLedgered('add-salary-pay-period.sql');

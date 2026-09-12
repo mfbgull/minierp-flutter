@@ -46,6 +46,7 @@ import '../models/physical_count.dart' show PhysicalCount, PhysicalCountItem;
 import '../models/stock_batch.dart' show StockBatch;
 import '../models/stock_balance.dart' show StockBalance;
 import '../models/stock_movement.dart' show StockMovement;
+import '../models/stock_reservation.dart' show StockReservation;
 import '../models/warehouse.dart' show Warehouse;
 import 'api_result.dart';
 import 'paged_request.dart';
@@ -58,6 +59,10 @@ class StockByWarehouse {
     required this.warehouseCode,
     required this.warehouseName,
     required this.quantity,
+    this.quantityPhysical,
+    this.quantityReserved,
+    this.quantityAvailable,
+    this.locations,
   });
 
   factory StockByWarehouse.fromJson(Map<String, dynamic> json) =>
@@ -66,16 +71,54 @@ class StockByWarehouse {
         warehouseCode: json['warehouse_code'] as String? ?? '',
         warehouseName: json['warehouse_name'] as String? ?? '',
         quantity: (json['quantity'] as num?) ?? 0,
+        quantityPhysical: json['quantity_physical'] != null ? (json['quantity_physical'] as num) : null,
+        quantityReserved: json['quantity_reserved'] != null ? (json['quantity_reserved'] as num) : null,
+        quantityAvailable: json['quantity_available'] != null ? (json['quantity_available'] as num) : null,
+        locations: json['locations'] is List
+            ? (json['locations'] as List).map((e) => WarehouseLocation.fromJson(e as Map<String, dynamic>)).toList()
+            : null,
       );
 
   final int warehouseId;
   final String warehouseCode;
   final String warehouseName;
   final num quantity;
+  final num? quantityPhysical;
+  final num? quantityReserved;
+  final num? quantityAvailable;
+  final List<WarehouseLocation>? locations;
 }
 
 /// Item detail — the bare `GET /inventory/items/:id` response: the item
 /// plus its per-warehouse stock breakdown (the list `Item` has neither).
+
+class WarehouseLocation {
+  const WarehouseLocation({
+    required this.locationId,
+    required this.locationCode,
+    this.locationName,
+    this.quantityPhysical,
+    this.quantityReserved,
+    this.quantityAvailable,
+  });
+
+  factory WarehouseLocation.fromJson(Map<String, dynamic> json) => WarehouseLocation(
+    locationId: json['location_id'] as int? ?? 0,
+    locationCode: json['location_code'] as String? ?? '',
+    locationName: json['location_name'] as String?,
+    quantityPhysical: json['quantity_physical'] != null ? (json['quantity_physical'] as num) : null,
+    quantityReserved: json['quantity_reserved'] != null ? (json['quantity_reserved'] as num) : null,
+    quantityAvailable: json['quantity_available'] != null ? (json['quantity_available'] as num) : null,
+  );
+
+  final int locationId;
+  final String locationCode;
+  final String? locationName;
+  final num? quantityPhysical;
+  final num? quantityReserved;
+  final num? quantityAvailable;
+}
+
 class ItemDetail {
   const ItemDetail({required this.item, required this.stockByWarehouse});
 
@@ -407,6 +450,119 @@ class InventoryRepository {
   Future<ApiResult<void>> unhaltBatch(int batchId) => _api.patchRaw(
     '${ApiEndpoints.stockBatches}/$batchId/unhalt',
     parse: (_) {},
+  );
+
+  // ============================================
+  // Batch reconciliation (new)
+  // ============================================
+
+  Future<ApiResult<List<Map<String, dynamic>>>> getBatchReconciliation({
+    int? itemId,
+    int? warehouseId,
+  }) => _api.getRawList(
+    ApiEndpoints.batchReconciliation,
+    queryParameters: {
+      if (itemId != null) 'item_id': itemId.toString(),
+      if (warehouseId != null) 'warehouse_id': warehouseId.toString(),
+    },
+    parseItem: (json) => Map<String, dynamic>.from(json as Map),
+  );
+
+  Future<ApiResult<void>> correctBatchReconciliation({
+    required int batchId,
+    required int locationId,
+    required num newQuantityPhysical,
+  }) => _api.postRaw(
+    ApiEndpoints.batchReconciliationCorrect,
+    body: {
+      'batch_id': batchId,
+      'location_id': locationId,
+      'new_quantity_physical': newQuantityPhysical,
+    },
+    parse: (_) {},
+  );
+
+  Future<ApiResult<void>> updateBatchStatus({
+    required int batchId,
+    required int locationId,
+    required String statusOverride,
+  }) => _api.putRaw(
+    '${ApiEndpoints.batchStatus}/$batchId/status',
+    body: {
+      'location_id': locationId,
+      'status_override': statusOverride,
+    },
+    parse: (_) {},
+  );
+
+  // ============================================
+  // Reservations (new)
+  // ============================================
+
+  Future<ApiResult<StockReservation>> createReservation({
+    required int itemId,
+    required int warehouseId,
+    int? locationId,
+    int? batchId,
+    required num quantityReserved,
+    required String referenceDocType,
+    required String referenceDocNo,
+    int? referenceLineId,
+  }) => _api.postRaw(
+    ApiEndpoints.reservations,
+    body: {
+      'item_id': itemId,
+      'warehouse_id': warehouseId,
+      if (locationId != null) 'location_id': locationId,
+      if (batchId != null) 'batch_id': batchId,
+      'quantity_reserved': quantityReserved,
+      'reference_doctype': referenceDocType,
+      'reference_docno': referenceDocNo,
+      if (referenceLineId != null) 'reference_line_id': referenceLineId,
+    },
+    parse: (json) => StockReservation.fromJson(json as Map<String, dynamic>),
+  );
+
+  Future<ApiResult<void>> releaseReservation(int reservationId) => _api.deleteRaw(
+    '${ApiEndpoints.reservations}/$reservationId/release',
+  );
+
+  Future<ApiResult<List<StockReservation>>> getReservations({
+    String? doctype,
+    String? docno,
+  }) => _api.getRawList(
+    ApiEndpoints.reservations,
+    queryParameters: {
+      if (doctype != null) 'doctype': doctype,
+      if (docno != null) 'docno': docno,
+    },
+    parseItem: (json) => StockReservation.fromJson(json as Map<String, dynamic>),
+  );
+
+  // ============================================
+  // Locations (new)
+  // ============================================
+
+  Future<ApiResult<List<Map<String, dynamic>>>> getLocations(int warehouseId) => _api.getRawList(
+    ApiEndpoints.locations,
+    queryParameters: {'warehouse_id': warehouseId.toString()},
+    parseItem: (json) => Map<String, dynamic>.from(json as Map),
+  );
+
+  Future<ApiResult<Map<String, dynamic>>> createLocation(Map<String, dynamic> body) => _api.postRaw(
+    ApiEndpoints.locations,
+    body: body,
+    parse: (json) => Map<String, dynamic>.from(json as Map),
+  );
+
+  Future<ApiResult<void>> updateLocation(int locationId, Map<String, dynamic> body) => _api.putRaw(
+    '${ApiEndpoints.locations}/$locationId',
+    body: body,
+    parse: (_) {},
+  );
+
+  Future<ApiResult<void>> deleteLocation(int locationId) => _api.deleteRaw(
+    '${ApiEndpoints.locations}/$locationId',
   );
 }
 

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { sanitizeSortParams, PHYSICAL_COUNT_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
 import AccountingService from '../services/accountingService';
+import { isFeatureEnabled } from '../utils/featureFlags';
 
 /** Next sequence number for ADJUSTMENT-sourced batch numbers. */
 function getNextBatchSequence(db: Database.Database): number {
@@ -542,8 +543,21 @@ class PhysicalCountModel {
               `Cannot correct count ${count.count_no}: surplus units of item ${item.item_id} were already consumed`
             );
           }
-          db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?`)
-            .run(originalVariance, adjBatch.id);
+          if (isFeatureEnabled(db, 'feature_batch_locations')) {
+            const locRow = db.prepare(`
+              SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+            `).get(count.warehouse_id) as { id: number } | undefined;
+            if (locRow) {
+              db.prepare(`
+                UPDATE batch_stock_by_location
+                SET quantity_physical = quantity_physical - ?, quantity_available = quantity_available - ?
+                WHERE batch_id = ? AND location_id = ?
+              `).run(originalVariance, originalVariance, adjBatch.id, locRow.id);
+            }
+          } else {
+            db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?`)
+              .run(originalVariance, adjBatch.id);
+          }
         } else {
           // Shortage: restore the layers consumed by the original
           // adjustment movement (its batch_id is the primary consumed
@@ -556,10 +570,25 @@ class PhysicalCountModel {
               SELECT batch_id, quantity FROM stock_movements WHERE id = ?
             `).get(item.adjustment_movement_id) as { batch_id: number | null; quantity: number } | undefined;
             if (origMovement?.batch_id != null) {
-              db.prepare(`
-                UPDATE stock_batches
-                SET quantity_remaining = quantity_remaining + ? WHERE id = ?
-              `).run(Math.abs(originalVariance), origMovement.batch_id);
+              if (isFeatureEnabled(db, 'feature_batch_locations')) {
+                const locRow = db.prepare(`
+                  SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+                `).get(count.warehouse_id) as { id: number } | undefined;
+                if (locRow) {
+                  db.prepare(`
+                    INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+                    VALUES (?, ?, ?, 0, ?)
+                    ON CONFLICT(batch_id, location_id) DO UPDATE SET
+                      quantity_physical = quantity_physical + excluded.quantity_physical,
+                      quantity_available = quantity_available + excluded.quantity_available
+                  `).run(origMovement.batch_id, locRow.id, Math.abs(originalVariance), Math.abs(originalVariance));
+                }
+              } else {
+                db.prepare(`
+                  UPDATE stock_batches
+                  SET quantity_remaining = quantity_remaining + ? WHERE id = ?
+                `).run(Math.abs(originalVariance), origMovement.batch_id);
+              }
             }
           }
         }
@@ -645,7 +674,7 @@ class PhysicalCountModel {
 
         if (correctedVariance > 0) {
           const nextBatchNo = getNextBatchSequence(db);
-          db.prepare(`
+          const batchResult = db.prepare(`
             INSERT INTO stock_batches (
               batch_no, item_id, warehouse_id, source_type,
               source_id, quantity_original, quantity_remaining,
@@ -661,6 +690,8 @@ class PhysicalCountModel {
             item.unit_cost,
             count.count_date
           );
+          const newBatchId = batchResult.lastInsertRowid as number;
+          StockMovementModel.syncBatchStockByLocationForNewBatch(newBatchId, count.warehouse_id, correctedVariance, db);
         }
 
         db.prepare(`

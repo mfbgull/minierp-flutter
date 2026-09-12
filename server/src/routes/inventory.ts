@@ -45,4 +45,16 @@ router.post('/physical-counts/:id/cancel', requirePermission('inventory', 'updat
 router.post('/physical-counts/:id/correct', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.correctPhysicalCount);
 router.delete('/physical-counts/:id', requirePermission('inventory', 'delete'), sensitiveOperationLimiter, inventoryController.deletePhysicalCount);
 
+// Batch reconciliation
+router.get('/batch-reconciliation', requirePermission('inventory', 'read'), inventoryController.getBatchReconciliation);
+router.post('/batch-reconciliation/correct', requirePermission('inventory', 'update'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), inventoryController.correctBatchReconciliation);
+
+// Batch status admin
+router.put('/batches/:id/status', requirePermission('inventory', 'update'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), inventoryController.updateBatchStatus);
+
+// Reservations
+router.post('/reservations', requirePermission('inventory', 'create'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), inventoryController.createReservation);
+router.delete('/reservations/:id/release', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.releaseReservation);
+router.get('/reservations', requirePermission('inventory', 'read'), inventoryController.getReservations);
+
 export default router;

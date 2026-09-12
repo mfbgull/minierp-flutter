@@ -227,16 +227,22 @@ class _BatchTraceabilityContentState extends State<_BatchTraceabilityContent> {
                           ctx.cell.value as String?,
                         );
                         final color = switch (status) {
-                          BatchStatus.normal => const Color(0xff16a34a),
+                          BatchStatus.normal || BatchStatus.active => const Color(0xff16a34a),
                           BatchStatus.nearExpiry => const Color(0xffd97706),
                           BatchStatus.expired => theme.colorScheme.error,
                           BatchStatus.halted => theme.colorScheme.onSurfaceVariant,
+                          BatchStatus.blocked || BatchStatus.quarantined => const Color(0xff7c3aed),
+                          BatchStatus.damaged => theme.colorScheme.error,
+                          BatchStatus.rejected => theme.colorScheme.onSurfaceVariant,
                         };
                         final label = switch (status) {
-                          BatchStatus.normal => l10n.statusNormal,
+                          BatchStatus.normal || BatchStatus.active => l10n.statusNormal,
                           BatchStatus.nearExpiry => l10n.statusNearExpiry,
                           BatchStatus.expired => l10n.statusExpired,
                           BatchStatus.halted => l10n.statusHalted,
+                          BatchStatus.blocked || BatchStatus.quarantined => 'Blocked / Quarantined',
+                          BatchStatus.damaged => 'Damaged',
+                          BatchStatus.rejected => 'Rejected',
                         };
                         return Container(
                           alignment: Alignment.centerLeft,
