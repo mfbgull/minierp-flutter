@@ -103,7 +103,54 @@ flutter run -d linux   # or -d windows, -d macos, -d chrome
 - SQLite with WAL mode
 - 59 tables, 153 indexes, 2 views
 - FIFO batch costing, stock movement ledger, double-entry GL posting
-- Nightly automated backups with retention (7 daily + 4 weekly)
+- Nightly automated backups with retention (7 daily + 4 weekly) — see [Backup & Restore](#backup--restore)
+
+## Backup & Restore
+
+Disaster-recovery procedures. DR-01 = take backups, DR-02 = prove they are restorable.
+
+### When backups happen
+
+| Trigger | Mechanism | Retention |
+|---------|-----------|-----------|
+| Server runtime | `backupService` in-process timer — nightly, and fires on boot if the last backup is > 24h old. Runs `wal_checkpoint(TRUNCATE)` then `VACUUM INTO` for a consistent snapshot, `integrity_check` on the copy. | 7 daily + 4 weekly |
+| Manual (admin UI / API) | `POST /api/admin/backup` (permission `admin:create`); list via `GET /api/admin/backup`, download `GET /api/admin/backup/:name/download`, delete `DELETE /api/admin/backup/:name`. Path-traversal-guarded. | managed by service |
+| Manual (CLI) | `npm run db:backup` from `server/` — `better-sqlite3` `db.backup()` page-by-page snapshot, safe while the server holds the DB open in WAL mode. Keeps newest 30. | 30 snapshots |
+| CI (scheduled) | `nightly-backup.yml` runs daily 03:00 UTC: fresh seeded DB → backup → restore verification. Fails loudly if backups stop being restorable. | — |
+
+Snapshots live in `<db-dir>/backups/` as `erp-backup-<timestamp>.db` (CLI) or `erp-<timestamp>.db` (service).
+
+### Verify a backup before relying on it (DR-02)
+
+```bash
+cd server
+node scripts/verify-backup.js database/backups/<snapshot>.db
+```
+
+Copies the snapshot to a temp path (the original is never touched) and checks: `PRAGMA integrity_check`, core schema tables present, GL balanced per reference group (`journal_lines` debit == credit), and `stock_balances` == Σ batch layers. Exit 0 = restorable and internally consistent.
+
+```bash
+node scripts/restore-smoke.js database/backups/<snapshot>.db
+```
+
+Opens a restored copy and reads core row counts — proves the snapshot opens as a working database with expected content (fails if `users` is empty).
+
+### Restore procedure
+
+1. **Stop the server** (or point `DATABASE_PATH` at a new directory for a side-by-side restore).
+2. **Verify the snapshot** you intend to restore (both scripts above — never restore an unverified backup).
+3. **Copy the snapshot over the live path** (default `server/database/erp.db`):
+   ```bash
+   cp <snapshot>.db server/database/erp.db
+   rm -f server/database/erp.db-wal server/database/erp.db-shm   # stale WAL sidecars
+   ```
+   If restoring side-by-side instead, set `DATABASE_PATH=/path/to/restore-dir` before starting.
+4. **Start the server.** Migrations auto-apply (idempotent), so an older snapshot is brought up to the current schema on boot.
+5. **Post-restore checks**: log in and confirm dashboard totals; spot-check a recent invoice in the ledger; re-run `node scripts/verify-backup.js server/database/erp.db` against the restored live file (read-only).
+
+**Recovery point**: worst case with default retention is ~24h of data loss (last nightly snapshot) — take a manual `POST /api/admin/backup` before risky operations such as migrations or bulk imports.
+
+**Testing your DR plan**: the nightly CI workflow exercises backup → verify → restore smoke against a fresh DB every day, so the chain is continuously proven — but you should still rehearse the full restore procedure on a non-production machine periodically.
 
 ## Remaining Work
 
