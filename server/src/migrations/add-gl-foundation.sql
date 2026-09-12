@@ -4,8 +4,9 @@
 -- new (real) trial balance and balance sheet possible.
 --
 -- Pre-existing single-debit-single-credit entries in journal_entries
--- (TEXT account codes) are kept untouched. New postings can use
--- either old or new style; the report code UNIONs the two sources.
+-- (TEXT account codes) are migrated into journal_lines by the
+-- backfillGlUnification migration on server start. journal_lines is
+-- the canonical GL; report code reads it only.
 --
 -- Idempotent: safe to re-run on every server start.
 
@@ -94,4 +95,3 @@ CREATE INDEX IF NOT EXISTS idx_periods_status ON accounting_periods(status);
 
 -- Period creation happens at posting time (AccountingService.postEntry) —
 -- never at boot (audit-remediation task 3.6 / accounting-period-rollover spec).
-

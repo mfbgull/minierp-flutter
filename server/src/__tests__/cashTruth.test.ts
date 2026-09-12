@@ -141,8 +141,9 @@ describe('opening balances sync to the GL (dashboard seed)', () => {
     for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'create-customer-ledger.sql', 'create-supplier-ledger.sql', 'add-gl-foundation.sql', 'add-gl-void-attribution.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql', 'add-employee-loans.sql', 'add-purchase-returns-tables.sql', 'add-disposition-and-supplier-refunds.sql', 'add-purchase-supplier-payment.sql', 'add-payment-salary-void-columns.sql', 'add-employee-loan-void-columns.sql']) {
       db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
     }
-    // getAccountBalance also reads the legacy journal_entries table when the
-    // account has a text_code — give it the legacy shape to sum over.
+    // postEntry now writes a journal_entries header first (the legacy
+    // table is retained as the header/audit copy) — create it for the
+    // header insert this fixture does not already cover.
     db.exec(`
       CREATE TABLE IF NOT EXISTS journal_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -193,8 +194,9 @@ describe('expense GL lifecycle (draft → submit → cancel)', () => {
     for (const f of ['init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql', 'add-expenses-table.sql', 'add-supplier-payment-support.sql', 'create-customer-ledger.sql', 'create-supplier-ledger.sql', 'add-gl-foundation.sql', 'add-gl-void-attribution.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql', 'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql', 'add-employee-loans.sql', 'add-purchase-returns-tables.sql', 'add-disposition-and-supplier-refunds.sql', 'add-purchase-supplier-payment.sql', 'add-payment-salary-void-columns.sql', 'add-employee-loan-void-columns.sql']) {
       db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
     }
-    // getAccountBalance also reads the legacy journal_entries table when the
-    // account has a text_code — give it the legacy shape to sum over.
+    // postEntry now writes a journal_entries header first (the legacy
+    // table is retained as the header/audit copy) — create it for the
+    // header insert this fixture does not already cover.
     db.exec(`
       CREATE TABLE IF NOT EXISTS journal_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -95,6 +95,8 @@ class SalesReturnResult {
     this.returnAmount = 0,
     this.netReturn = 0,
     this.deduction = 0,
+    this.refundAmount = 0,
+    this.retainedCredit = 0,
   });
 
   factory SalesReturnResult.fromJson(Map<String, dynamic> json) =>
@@ -110,6 +112,8 @@ class SalesReturnResult {
         returnAmount: asNum(json['returnAmount']) ?? 0,
         netReturn: asNum(json['netReturn']) ?? 0,
         deduction: asNum(json['deduction']) ?? 0,
+        refundAmount: asNum(json['refundAmount']) ?? 0,
+        retainedCredit: asNum(json['retainedCredit']) ?? 0,
       );
 
   final List<Map<String, dynamic>> returnedItems;
@@ -122,4 +126,12 @@ class SalesReturnResult {
   /// Gross minus any restocking-fee deduction.
   final num netReturn;
   final num deduction;
+
+  /// Cash actually refunded — capped at what the customer collected on
+  /// the invoice (server-side rule; may be less than [netReturn]).
+  final num refundAmount;
+
+  /// [netReturn] minus [refundAmount] — stays as a customer credit on
+  /// account, not cash out.
+  final num retainedCredit;
 }

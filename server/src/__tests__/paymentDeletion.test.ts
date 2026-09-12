@@ -152,7 +152,7 @@ describe('Payment deletion safety on invoice update (PAY-01)', () => {
     expect(paymentRow).toBeDefined();
   });
 
-  it('deletes an own-invoice payment inside the transaction and writes an audit row', async () => {
+  it('voids an own-invoice payment inside the transaction and writes an audit row', async () => {
     const { invoiceId } = await createInvoice(customerId);
     const ownPaymentId = await recordPayment(invoiceId);
     const paymentBefore = db.prepare(
@@ -162,11 +162,25 @@ describe('Payment deletion safety on invoice update (PAY-01)', () => {
     const res = await updateWithDeletedPayments(invoiceId, [ownPaymentId]);
     expect(res.status).toBe(200);
 
-    // Payment gone inside transaction
-    expect(db.prepare('SELECT id FROM payments WHERE id = ?').get(ownPaymentId)).toBeUndefined();
-    expect(db.prepare(
-      'SELECT id FROM payment_allocations WHERE payment_id = ?'
-    ).get(ownPaymentId)).toBeUndefined();
+    // C6 (reversal-rules): the payment is soft-voided, never hard-deleted —
+    // it moved money, so the row and its allocations stay for audit with
+    // voided_at stamped (paid-amount reads filter voided_at IS NULL).
+    const paymentAfter = db.prepare(
+      'SELECT id, voided_at FROM payments WHERE id = ?'
+    ).get(ownPaymentId) as { id: number; voided_at: string | null };
+    expect(paymentAfter).toBeDefined();
+    expect(paymentAfter.voided_at).not.toBeNull();
+    const allocsAfter = db.prepare(
+      'SELECT id, voided_at FROM payment_allocations WHERE payment_id = ?'
+    ).all(ownPaymentId) as Array<{ id: number; voided_at: string | null }>;
+    expect(allocsAfter.length).toBeGreaterThan(0);
+    for (const alloc of allocsAfter) {
+      expect(alloc.voided_at).not.toBeNull();
+    }
+    // The invoice no longer counts the voided allocation.
+    const invAfter = db.prepare('SELECT paid_amount, balance_amount FROM invoices WHERE id = ?').get(invoiceId) as { paid_amount: number; balance_amount: number };
+    expect(invAfter.paid_amount).toBe(0);
+    expect(invAfter.balance_amount).toBe(100);
 
     // The activity logger batches writes on a 1s interval and exposes no
     // completion signal, so a real delay is required to cover the flush

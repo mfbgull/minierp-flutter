@@ -9,22 +9,34 @@
  *   - period open/close
  *
  * Design notes
- *   - This service does NOT replace the old journal_entries table
- *     (single debit_account + single credit_account, TEXT). That table
- *     is still used by postFinancialEntryForAdjustment / production
- *     and by historical rows. New postings can go through either path.
- *   - The new journal_lines table is the canonical home for new
- *     multi-line entries. The reports UNION both sources so the
- *     historical data remains visible.
- *   - No data backfill is performed. The system starts clean from
- *     the moment the new code is in use; historical balances remain
- *     accessible via the non-journal sources used by the BS (AR from
- *     invoices, AP from supplier_ledger, inventory from stock_batches).
+ *   - journal_lines is the canonical general ledger. All balances and
+ *     reports read from journal_lines only.
+ *   - Every postEntry inserts a journal_entries header first and uses
+ *     its AUTOINCREMENT id for the lines, so the two tables never
+ *     diverge and no line can be orphaned by this service.
+ *   - Legacy journal_entries rows (single debit/credit TEXT accounts)
+ *     are migrated into journal_lines by the GL-unification boot
+ *     migration; afterwards the legacy table is a read-only audit copy.
+ *   - Stock-adjustment and production postings dual-write (legacy
+ *     journal_entries header for stock_movements.journal_entry_id
+ *     linkage + canonical journal_lines) via postLegacyStockEntry.
  */
 
 import Database from 'better-sqlite3';
 import logger from '../utils/logger';
 import activityLogger, { ActionType, LogLevel } from './activityLogger';
+
+/** First line with a positive debit — used for the legacy header's debit_account column. */
+function firstAccountIdWithDebit(lines: JournalLineInput[]): string {
+  const l = lines.find(x => Number(x.debit || 0) > 0);
+  return l ? String(l.account_id) : '';
+}
+
+/** First line with a positive credit — used for the legacy header's credit_account column. */
+function firstAccountIdWithCredit(lines: JournalLineInput[]): string {
+  const l = lines.find(x => Number(x.credit || 0) > 0);
+  return l ? String(l.account_id) : '';
+}
 
 export interface Account {
   id: number;
@@ -100,11 +112,10 @@ export class AccountingService {
 
   /**
    * Balance for a single chart-of-accounts account, as of asOfDate.
-   * Combines:
-   *   - journal_lines entries (new, multi-line, account_id-based)
-   *   - journal_entries rows where the TEXT account matches this
-   *     account's text_code (legacy single-line postings)
-   * Returns debit/credit totals and a signed balance. Convention:
+   * Reads only journal_lines — the canonical GL. (Legacy
+   * journal_entries rows are migrated into journal_lines by the GL-
+   * unification boot migration, so summing both tables would
+   * double-count.) Returns debit/credit totals and a signed balance. Convention:
    *   for debit-normal accounts (asset, expense) balance = debit - credit
    *   for credit-normal accounts (liability, equity, revenue) balance = credit - debit
    */
@@ -129,21 +140,8 @@ export class AccountingService {
         AND voided = 0
     `).get(accountId, asOfDate) as { total_debit: number; total_credit: number };
 
-    // Legacy postings: journal_entries matched by text_code
-    let legacyRow = { total_debit: 0, total_credit: 0 };
-    if (acct.text_code) {
-      legacyRow = db.prepare(`
-        SELECT
-          COALESCE(SUM(CASE WHEN debit_account = ?  THEN amount ELSE 0 END), 0) as total_debit,
-          COALESCE(SUM(CASE WHEN credit_account = ? THEN amount ELSE 0 END), 0) as total_credit
-        FROM journal_entries
-        WHERE entry_date <= ?
-          AND voided = 0
-      `).get(acct.text_code, acct.text_code, asOfDate) as { total_debit: number; total_credit: number };
-    }
-
-    const totalDebit = (newRow.total_debit || 0) + (legacyRow.total_debit || 0);
-    const totalCredit = (newRow.total_credit || 0) + (legacyRow.total_credit || 0);
+    const totalDebit = newRow.total_debit || 0;
+    const totalCredit = newRow.total_credit || 0;
     const balance = acct.normal_balance === 'debit'
       ? totalDebit - totalCredit
       : totalCredit - totalDebit;
@@ -274,24 +272,38 @@ export class AccountingService {
     }
 
 
-    // Insert. We use a single transaction so all lines commit or none.
-    const insertLine = db.prepare(`
-      INSERT INTO journal_lines (
-        journal_entry_id, account_id, debit, credit, description,
-        line_date, reference_type, reference_id, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    // Group id: a simple monotonic counter. We use the highest
-    // existing journal_entry_id + 1 to keep it stable across the
-    // whole install. For a fresh install with no journal_lines,
-    // this is 1. If journal_lines has been used, this is max+1.
-    const lastEntry = db.prepare(
-      `SELECT COALESCE(MAX(journal_entry_id), 0) as last_id FROM journal_lines`
-    ).get() as { last_id: number };
-    const entryId = lastEntry.last_id + 1;
+    // Insert header first, then lines. The header's AUTOINCREMENT id is
+    // the grouping key, so lines can never point at a nonexistent or
+    // wrong journal_entries row (the old MAX(journal_lines)+1 counter
+    // collided with existing legacy headers and orphaned lines).
+    const referenceType = input.reference_type || 'MANUAL_JOURNAL';
+    const referenceId = input.reference_id ?? 0;
+    let entryId = 0;
 
     const trx = db.transaction(() => {
+      const header = db.prepare(`
+        INSERT INTO journal_entries
+          (reference_type, reference_id, entry_date, description,
+           debit_account, credit_account, amount, created_by, voided)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+      `).run(
+        referenceType,
+        referenceId,
+        input.entry_date,
+        input.description,
+        firstAccountIdWithDebit(input.lines),
+        firstAccountIdWithCredit(input.lines),
+        totalDebit,
+        input.created_by || null
+      );
+      entryId = Number(header.lastInsertRowid);
+
+      const insertLine = db.prepare(`
+        INSERT INTO journal_lines (
+          journal_entry_id, account_id, debit, credit, description,
+          line_date, reference_type, reference_id, created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
       for (const line of input.lines) {
         insertLine.run(
           entryId,
@@ -300,8 +312,8 @@ export class AccountingService {
           Number(line.credit || 0),
           line.description || null,
           input.entry_date,
-          input.reference_type || null,
-          input.reference_id || null,
+          referenceType,
+          referenceId,
           input.created_by || null
         );
       }
@@ -323,6 +335,76 @@ export class AccountingService {
     return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
   }
 
+  /**
+   * Post a legacy single-debit/single-credit stock entry.
+   *
+   * Stock-adjustment and production flows historically wrote only a
+   * journal_entries row (TEXT account codes). This helper keeps that
+   * row — stock_movements.journal_entry_id links to it — while ALSO
+   * writing the two canonical journal_lines rows (resolved through
+   * chart_of_accounts.text_code), so the unified GL shows every
+   * posting and voidJournalLinesByReference can reverse it.
+   *
+   * Returns the legacy journal_entries id.
+   */
+  static postLegacyStockEntry(
+    db: Database.Database,
+    args: {
+      referenceType: string;
+      referenceId: number;
+      entryDate: string;
+      description: string;
+      debitTextCode: string;
+      creditTextCode: string;
+      amount: number;
+      createdBy?: number;
+    }
+  ): number {
+    if (!args.amount || args.amount <= 0) {
+      throw new Error('postLegacyStockEntry requires a positive amount');
+    }
+    const debitAcct = AccountingService.getAccountByTextCode(db, args.debitTextCode);
+    const creditAcct = AccountingService.getAccountByTextCode(db, args.creditTextCode);
+    if (!debitAcct || !creditAcct) {
+      throw new Error(
+        'Chart of accounts is missing required stock accounts: ' +
+        args.debitTextCode + ' or ' + args.creditTextCode
+      );
+    }
+
+    const header = db.prepare(`
+      INSERT INTO journal_entries
+        (reference_type, reference_id, entry_date, description,
+         debit_account, credit_account, amount, created_by, voided)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+    `).run(
+      args.referenceType,
+      args.referenceId,
+      args.entryDate,
+      args.description,
+      args.debitTextCode,
+      args.creditTextCode,
+      args.amount,
+      args.createdBy || null
+    );
+    const journalEntryId = Number(header.lastInsertRowid);
+
+    const insertLine = db.prepare(`
+      INSERT INTO journal_lines (
+        journal_entry_id, account_id, debit, credit, description,
+        line_date, reference_type, reference_id, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertLine.run(
+      journalEntryId, debitAcct.id, args.amount, 0,
+      args.description, args.entryDate, args.referenceType, args.referenceId, args.createdBy || null
+    );
+    insertLine.run(
+      journalEntryId, creditAcct.id, 0, args.amount,
+      args.description, args.entryDate, args.referenceType, args.referenceId, args.createdBy || null
+    );
+    return journalEntryId;
+  }
 
   // ------------------------------------------------------------------
   // Convenience helpers for transactional postings

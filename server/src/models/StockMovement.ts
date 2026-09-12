@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import logger from '../utils/logger';
+import AccountingService from '../services/accountingService';
 import { sanitizeSortParams, STOCK_BALANCE_SORT_COLUMNS, STOCK_MOVEMENT_SORT_COLUMNS } from '../utils/sqlSanitizer';
 
 interface StockMovement {
@@ -376,14 +377,16 @@ class StockMovementModel {
       ? `Stock removal: ${Math.abs(quantity)} units @ ${standardCost}`
       : `Stock addition: ${Math.abs(quantity)} units @ ${standardCost}`;
 
-    const jeResult = db.prepare(`
-      INSERT INTO journal_entries
-        (reference_type, reference_id, entry_date, description,
-         debit_account, credit_account, amount, created_by)
-      VALUES ('stock_adjustment', ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, movement_date, description, accounts.debit, accounts.credit, value, created_by);
-
-    const journalEntryId = jeResult.lastInsertRowid as number;
+    const journalEntryId = AccountingService.postLegacyStockEntry(db, {
+      referenceType: 'stock_adjustment',
+      referenceId: id,
+      entryDate: movement_date,
+      description,
+      debitTextCode: accounts.debit,
+      creditTextCode: accounts.credit,
+      amount: value,
+      createdBy: created_by
+    });
 
     db.prepare(`
       UPDATE stock_movements
@@ -440,20 +443,16 @@ class StockMovementModel {
 
     const value = total_batch_cost;
 
-    const jeResult = db.prepare(`
-      INSERT INTO journal_entries
-        (reference_type, reference_id, entry_date, description,
-         debit_account, credit_account, amount, created_by)
-      VALUES ('production', ?, ?, ?, 'inventory_asset', 'production_clearing', ?, ?)
-    `).run(
-      id,
-      movement_date,
-      `Production output: ${params.quantity} units (total cost ${value.toFixed(2)})`,
-      value,
-      created_by
-    );
-
-    const journalEntryId = jeResult.lastInsertRowid as number;
+    const journalEntryId = AccountingService.postLegacyStockEntry(db, {
+      referenceType: 'production',
+      referenceId: id,
+      entryDate: movement_date,
+      description: `Production output: ${params.quantity} units (total cost ${value.toFixed(2)})`,
+      debitTextCode: 'inventory_asset',
+      creditTextCode: 'production_clearing',
+      amount: value,
+      createdBy: created_by
+    });
 
     db.prepare(`
       UPDATE stock_movements

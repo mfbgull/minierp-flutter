@@ -13,7 +13,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
-import '../../data/models/invoice.dart' show InvoiceItem;
+import '../../data/models/invoice.dart'
+    show InvoiceItem, InvoicePaymentRecord;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/invoice_repository.dart'
     show invoiceRepositoryProvider;
@@ -67,6 +68,14 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
   String? _loadError;
   String? _error;
 
+  /// What the customer actually collected on this invoice (paid minus
+  /// prior refunds). The server caps any cash refund at this amount —
+  /// mirrored here so the preview matches what will actually happen.
+  double _refundable = 0;
+
+  /// Live per-line return totals (gross return value of filled lines).
+  double _grossReturn = 0;
+
   @override
   void initState() {
     super.initState();
@@ -89,8 +98,21 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
     if (!mounted) return;
     switch (result) {
       case ApiSuccess(:final data):
+        // Collected cash = Σ payment allocations (refund records carry
+        // negative amounts) — same math as the server's cap.
+        final paymentsResult = await ref
+            .read(invoiceRepositoryProvider)
+            .invoicePayments(widget.invoiceId);
+        var collected = 0.0;
+        if (paymentsResult is ApiSuccess<List<InvoicePaymentRecord>>) {
+          for (final p in paymentsResult.data) {
+            collected += p.amount;
+          }
+        }
+        if (!mounted) return;
         setState(() {
           _loading = false;
+          _refundable = collected.clamp(0.0, double.infinity);
           final items = data.items ?? const <InvoiceItem>[];
           _returnableItems = [
             for (final item in items)
@@ -114,6 +136,29 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
           _loadError = error.message;
         });
     }
+  }
+
+  /// Recompute the live return totals from the filled qty fields.
+  void _recalcTotals() {
+    var gross = 0.0;
+    for (var i = 0; i < _returnableItems.length; i++) {
+      final qty = double.tryParse(_qtyControllers[i].text.trim()) ?? 0;
+      if (qty > 0) {
+        gross += qty * _returnableItems[i].unitPrice;
+      }
+    }
+    setState(() => _grossReturn = gross);
+  }
+
+  /// Server mirrors this: refundAmount = min(netReturn, refundable).
+  /// Returns (refund, retainedCredit) for the disposition refund, else
+  /// the whole amount is a credit/adjustment.
+  (double, double) get _refundSplit {
+    if (_disposition != 'refund') return (0, _grossReturn);
+    final refund = _grossReturn <= 0
+        ? 0.0
+        : (_grossReturn <= _refundable ? _grossReturn : _refundable);
+    return (refund, _grossReturn - refund);
   }
 
   Future<void> _submit() async {
@@ -159,10 +204,16 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
       case ApiSuccess(:final data):
         ref.invalidate(invoicesProvider);
         ref.invalidate(invoiceReturnsProvider);
+        final refund = data.refundAmount;
+        final credit = data.retainedCredit;
+        final split = refund > 0 && credit > 0
+            ? ' — ${l10n.salesreturnsRefundsplit} '
+                '${Formatters.currency(refund)}, '
+                '${Formatters.currency(credit)} ${l10n.salesreturnsCreditonsplit}'
+            : ' — ${Formatters.currency(data.netReturn)}';
         showAppToast(
           context,
-          '${l10n.salesreturnsReturnprocessed} — '
-          '${Formatters.currency(data.netReturn)}',
+          '${l10n.salesreturnsReturnprocessed}$split',
         );
         Navigator.of(context).pop();
       case ApiFailure(:final error):
@@ -267,9 +318,20 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
                   controller: _qtyControllers[i],
                   autofocus: i == 0,
                   enabled: !_submitting,
+                  onChanged: _recalcTotals,
                   onSubmit: _submit,
                 ),
               ],
+            ],
+            if (_grossReturn > 0) ...[
+              const SizedBox(height: 10),
+              _RefundSplitSummary(
+                grossReturn: _grossReturn,
+                refund: _refundSplit.$1,
+                retainedCredit: _refundSplit.$2,
+                isCapped:
+                    _disposition == 'refund' && _grossReturn > _refundable,
+              ),
             ],
             const SizedBox(height: 12),
             FormFieldShell(
@@ -348,6 +410,7 @@ class _ReturnLineRow extends StatelessWidget {
     required this.controller,
     required this.autofocus,
     required this.enabled,
+    required this.onChanged,
     required this.onSubmit,
   });
 
@@ -358,6 +421,10 @@ class _ReturnLineRow extends StatelessWidget {
   /// dialog's primary input.
   final bool autofocus;
   final bool enabled;
+
+  /// Fired on every edit so the parent can recompute the refund/credit
+  /// split summary.
+  final VoidCallback onChanged;
 
   /// Enter-to-submit: pressing Enter on a filled line processes the
   /// return (same [submitOnEnter] contract as the other dialogs).
@@ -406,6 +473,7 @@ class _ReturnLineRow extends StatelessWidget {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              onChanged: (_) => onChanged(),
               onFieldSubmitted: submitOnEnter(onSubmit),
               decoration: formInputDecoration(
                 hintText: Formatters.number(available),
@@ -463,6 +531,79 @@ class _WarehousePicker extends ConsumerWidget {
       },
       decoration: formInputDecoration(),
       onChanged: onChanged,
+    );
+  }
+}
+
+/// Live refund/credit split preview for the return dialog — mirrors the
+/// server's cap (reversal-rules #11): cash refund is limited to what the
+/// customer actually collected; the remainder stays as customer credit.
+class _RefundSplitSummary extends StatelessWidget {
+  const _RefundSplitSummary({
+    required this.grossReturn,
+    required this.refund,
+    required this.retainedCredit,
+    required this.isCapped,
+  });
+
+  final double grossReturn;
+  final double refund;
+  final double retainedCredit;
+  final bool isCapped;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    final muted = Theme.of(context)
+        .textTheme
+        .bodySmall
+        ?.copyWith(color: scheme.onSurfaceVariant);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(l10n.salesreturnsReturnquantity, style: muted),
+              Text(Formatters.currency(grossReturn)),
+            ],
+          ),
+          if (refund > 0)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(l10n.salesreturnsRefundsplit, style: muted),
+                Text(Formatters.currency(refund)),
+              ],
+            ),
+          if (retainedCredit > 0)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(l10n.salesreturnsCreditonsplit, style: muted),
+                Text(Formatters.currency(retainedCredit)),
+              ],
+            ),
+          if (isCapped) ...[
+            const SizedBox(height: 4),
+            Text(
+              l10n.salesreturnsRefundcapnote,
+              style: muted?.copyWith(
+                fontStyle: FontStyle.italic,
+                color: scheme.tertiary,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

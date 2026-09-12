@@ -5034,6 +5034,16 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesreturnsReturnprocessed => 'واپسی کامیابی سے ہوگئی';
 
   @override
+  String get salesreturnsRefundsplit => 'ریفنڈ';
+
+  @override
+  String get salesreturnsCreditonsplit => 'کریڈٹ پر اکاؤنٹ';
+
+  @override
+  String get salesreturnsRefundcapnote =>
+      'ریفنڈ اصل میں ادائیگی گئی رقم تک محدود ہے';
+
+  @override
   String get salesreturnsReturnqtyexceeds =>
       'واپسی کی مقدار دستیاب مقدار سے زیادہ ہے';
 

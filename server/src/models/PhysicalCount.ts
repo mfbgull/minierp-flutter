@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { sanitizeSortParams, PHYSICAL_COUNT_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
+import AccountingService from '../services/accountingService';
 
 /** Next sequence number for ADJUSTMENT-sourced batch numbers. */
 function getNextBatchSequence(db: Database.Database): number {
@@ -408,26 +409,20 @@ class PhysicalCountModel {
             ? { debit: 'inventory_shrinkage', credit: 'inventory_asset' }
             : { debit: 'inventory_asset', credit: 'inventory_correction' };
 
-          const jeResult = db.prepare(`
-            INSERT INTO journal_entries
-              (reference_type, reference_id, entry_date, description,
-               debit_account, credit_account, amount, created_by)
-            VALUES ('stock_adjustment', ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            movementId,
-            count.count_date,
-            `Physical count: ${item.item_code} ${isRemoval ? 'shrinkage' : 'correction'} ${Math.abs(item.variance)} units @ ${consumedCost}`,
-            accounts.debit,
-            accounts.credit,
-            value,
-            userId
-          );
-
           db.prepare(`
             UPDATE stock_movements
             SET financial_value = ?, financial_posted = TRUE, journal_entry_id = ?
             WHERE id = ?
-          `).run(value, jeResult.lastInsertRowid, movementId);
+          `).run(value, AccountingService.postLegacyStockEntry(db, {
+            referenceType: 'stock_adjustment',
+            referenceId: movementId,
+            entryDate: count.count_date,
+            description: `Physical count: ${item.item_code} ${isRemoval ? 'shrinkage' : 'correction'} ${Math.abs(item.variance)} units @ ${consumedCost}`,
+            debitTextCode: accounts.debit,
+            creditTextCode: accounts.credit,
+            amount: value,
+            createdBy: userId
+          }), movementId);
         }
       }
 

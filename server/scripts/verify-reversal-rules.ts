@@ -237,16 +237,17 @@ function createPostedInvoice(invoiceNo: string, qty: number, unitPrice: number):
   ).get(poNo) as { c: number };
   assert(activePoRows.c === 1, 'exactly one active PURCHASE_ORDER row');
 
-  // ---------- C2 case 8: production delete voids legacy GL ----------
-  console.log('C2 case 8 — production delete voids legacy GL');
+  // ---------- C2 case 8: production delete voids canonical GL ----------
+  console.log('C2 case 8 — production delete voids canonical GL');
   const prod = ProductionModel.recordProduction({
     output_item_id: fgItemId, output_quantity: 4, warehouse_id: warehouseId,
     production_date: '2026-08-10', input_items: [{ item_id: rawItemId, quantity: 8 }],
     overhead_cost: 10,
   } as never, 1, db);
   const outputMovement = db.prepare(
-    "SELECT journal_entry_id FROM stock_movements WHERE reference_docno = ? AND movement_type = 'PRODUCTION' AND quantity > 0"
-  ).get(prod.production_no) as { journal_entry_id: number | null };
+    "SELECT id, journal_entry_id FROM stock_movements WHERE reference_docno = ? AND movement_type = 'PRODUCTION' AND quantity > 0"
+  ).get(prod.production_no) as { id: number; journal_entry_id: number | null };
+  const outputMovementId = outputMovement!.id;
   assert(Boolean(outputMovement?.journal_entry_id), 'output movement linked to legacy JE');
   const jeId = outputMovement!.journal_entry_id as number;
   const jeBefore = db.prepare('SELECT voided, amount FROM journal_entries WHERE id = ?').get(jeId) as { voided: number; amount: number };
@@ -258,6 +259,10 @@ function createPostedInvoice(invoiceNo: string, qty: number, unitPrice: number):
   ProductionModel.delete(prod.id, 1, db);
   const jeAfter = db.prepare('SELECT voided FROM journal_entries WHERE id = ?').get(jeId) as { voided: number };
   assert(Number(jeAfter.voided) === 1, 'JE voided after delete');
+  const activeProdLines = db.prepare(`
+    SELECT COUNT(*) AS c FROM journal_lines WHERE reference_type = ? AND reference_id = ? AND voided = 0
+  `).get('production', outputMovementId) as { c: number };
+  assert(activeProdLines.c === 0, 'canonical GL lines voided after delete');
   assertClose(stockOf(rawItemId) - rawBefore, 8, 'raw restored +8');
   assertClose(stockOf(fgItemId) - fgBefore, -4, 'output reversed -4');
 

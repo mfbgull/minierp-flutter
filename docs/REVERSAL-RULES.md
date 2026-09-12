@@ -1,6 +1,6 @@
 # Transaction Reversal Rules (Implementation Specification)
 
-Status: APPROVED - Phase 1 in progress. Scope: every destructive/reversal path.
+Status: Phases 1-3 implemented. Scope: every destructive/reversal path.
 
 This document is the single implementation specification for all delete/cancel/void/reverse operations. No destructive path may be changed without conforming to these rules. The reference implementation is Purchase.void (server/src/models/Purchase.ts).
 
@@ -16,6 +16,7 @@ This document is the single implementation specification for all delete/cancel/v
 8. **Idempotency is server-side.** Every destructive endpoint re-validates status/void markers inside the transaction (already-Cancelled means error, not a second reversal). UI hiding is never the guard.
 9. **Balance rebuilds throw.** rebuildLedgerBalances / recalcCustomerBalanceFromLedger / SupplierLedgerModel.rebuildBalances failures roll back the reversal. If a rebuild is currently warn-only in a path, fixing that path converts it to throw.
 10. **Reporting filters follow the doctype.** COGS reversal recognition for cancelled sales must include the reference_doctype the reversal actually wrote (INVOICE_CANCEL, plus legacy SO_CANCEL). Reports that read source tables must exclude voided/cancelled rows exactly as the grid listing does.
+11. **Refunds cap at collected cash.** A customer refund may never exceed what the customer actually paid on the invoice: `refundAmount = min(netReturn, PaymentModel.refundableOnInvoice(invoiceId))`. Because refundableOnInvoice sums allocations net of prior negative refund allocations, repeated partial returns cannot re-refund cash already paid out. The outstanding-AR portion of a return clears via the RETURN ledger entry + Cr AR in postInvoiceReturnEntry — it stays as a customer credit on account, never cash out. (Supplier-side mirror: SupplierRefundModel.create already rejects amounts above creditNoteRefundable.)
 
 ## 2. Reference pattern (Purchase.void shape)
 
@@ -94,8 +95,17 @@ Where: employeeController.paySalary (overpayment advance block).
 Fix:
 - The advance GL catch currently logs and continues, so an advance salary row can commit with no GL posting (silent partial commit, rule 3). Rework to the same throw-on-GL-failure shape as the primary posting: advance row insert + GL post + journal_entry_id link all inside the same transaction; any GL failure throws and rolls back the whole payment.
 
-## 5. Phase 3-5 outlines
+## 5. Phase 3 (implemented) - GL unification
 
-- Phase 3: GL unification (backfill-migrate legacy to journal_lines, forbid new legacy postings), SupplierRefund.void plus deleteSalaryPayment transaction wrappers, purchase summary voided_at filters, cash-flow cancelled-invoice payment exclusion.
+- journal_lines is the canonical GL. journal_entries stays as the legacy/audit header store, and rule 7 keeps voiding both stores on every reversal.
+- Migration backfillGlUnification (registered after fn.backfillGlPreposting in config/database.ts) runs two idempotent passes inside one transaction: re-link orphaned or mis-linked journal_lines groups to fresh journal_entries headers, then migrate line-less legacy journal_entries rows into balanced canonical journal_lines (accounts resolved via chart_of_accounts text_code). Post-conditions throw on orphaned/mis-linked lines or unbalanced totals.
+- AccountingService.postEntry now inserts the journal_entries header first and uses its AUTOINCREMENT id, so every new posting is represented in both stores.
+- New stock postings go through AccountingService.postLegacyStockEntry: StockMovement adjustments and production output, plus PhysicalCount.completeCount, write the journal_entries row and the paired journal_lines atomically.
+- Production.delete voids canonical lines by reference (reference_type production, reference_id = output stock_movement id) plus the legacy header when journal_entry_id is present, keeping rule 7 complete.
+- getAccountBalance/getAllAccountBalances (and every report flowing through them) read journal_lines only.
+- Earlier Phase 3 outline items shipped with their phases: SupplierRefund.void and the deleteSalaryPayment transaction (Phase 2), purchase grid/paid-amount voided_at filters (Phase 2), and cash-flow reads that exclude voided payments (Phase 2; C1 also blocks cancelling a paid invoice, so a cancelled invoice cannot keep active payments).
+
+## 6. Phase 4-5 outlines
+
 - Phase 4: goods-receipt reversal or documented count-correction workflow; stock-transfer reversal primitive; status-machine validation on all updateStatus endpoints; clean 400s for FK-blocked master-data deletes.
 - Phase 5: accounting-invariant regression suite (GL sum == subledger sum == source rows), double-fire concurrency tests for every destructive endpoint.
