@@ -49,6 +49,7 @@ app.*.map.json
 
 # Live ERP database & WAL — never tracked, never reverted by git (DR-05)
 server/database/*.db
+database/*.db
 *.db-shm
 *.db-wal
 server/database/backups/
