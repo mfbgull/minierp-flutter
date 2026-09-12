@@ -1565,6 +1565,13 @@ runLedgered('fn.backfillPaymentsPurchaseOrderId', backfillPaymentsPurchaseOrderI
 // (PUR-03) — voided_at/by/reason, no more hard deletes.
 runLedgered('add-purchase-void-columns.sql');
 runLedgered('add-purchase-return-batches.sql');
+// Phase 4 (reversal-rules): goods-receipt void attribution — GRNs move
+// stock, so they are voided (append-only), never hard-deleted.
+runLedgered('add-goods-receipt-void-columns.sql');
+// Phase 4 (reversal-rules): count-correction workflow — POSTED counts are
+// immutable; corrections are single-shot reversal + re-application, so the
+// count needs corrected_at/corrected_by markers.
+runLedgered('add-count-correction-columns.sql');
 // refund-expected-cash: disposition columns + supplier_refunds table.
 // Guarded ALTERs — only applies the SQL when the columns/table are missing
 // (the runLedgered checksum covers first-time databases; this keeps partial

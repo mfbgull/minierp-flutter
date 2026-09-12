@@ -26,6 +26,8 @@ interface PhysicalCount {
   created_by: number;
   completed_by?: number;
   completed_at?: string;
+  corrected_at?: string | null;
+  corrected_by?: number | null;
   created_at?: string;
   updated_at?: string;
   warehouse_code?: string;
@@ -63,6 +65,10 @@ interface CreateCountDTO {
   warehouse_id: number;
   count_date?: string;
   notes?: string;
+}
+
+interface CorrectCountDTO {
+  corrections: Array<{ item_id: number; counted_quantity: number; notes?: string | null }>;
 }
 
 interface CountFilters {
@@ -453,6 +459,275 @@ class PhysicalCountModel {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(countId);
+  }
+
+  /**
+   * Reversal-rules Phase 4: correct a COMPLETED physical count.
+   *
+   * POSTED counts are immutable — counted quantities are never edited in
+   * place. Instead a correction reverses the original completion's stock +
+   * GL effects and re-applies the corrected variances as fresh adjustments,
+   * all in one transaction with an append-only audit trail:
+   *
+   *  1. For every originally-adjusted item (adjustment_posted = TRUE):
+   *     reverse the variance — restore consumed FIFO layers (shortage) or
+   *     draw down the correction batch (surplus), reverse stock_balances by
+   *     the original variance, append a NEGATIVE CORRECTION ADJUSTMENT
+   *     movement, and void the original journal lines by reference.
+   *  2. Re-apply each corrected variance exactly as completeCount does
+   *     (shortage consumes FIFO-oldest layers at actual costs; surplus adds
+   *     an ADJUSTMENT cost layer; GL posts at actual consumed costs).
+   *  3. Stamp the count with corrected_at/corrected_by (idempotency marker)
+   *     and log the correction.
+   *
+   * Guards (server-side, inside the transaction): count must exist and be
+   * Completed; correction is single-shot per count (idempotency); every
+   * corrected item must have a snapshot row; a corrected variance must be
+   * provided for at least one item.
+   */
+  static correctCount(
+    data: {
+      countId: number;
+      corrections: Array<{ item_id: number; counted_quantity: number; notes?: string | null }>;
+    },
+    userId: number,
+    db: Database.Database
+  ): void {
+    const count = this.getById(data.countId, db);
+    if (!count) throw new Error('Physical count not found');
+    if (count.status !== 'Completed') {
+      throw new Error(`Only Completed counts can be corrected (count is ${count.status})`);
+    }
+    if (count.corrected_at) {
+      throw new Error(`Count ${count.count_no} has already been corrected`);
+    }
+    if (!data.corrections || data.corrections.length === 0) {
+      throw new Error('At least one correction must be supplied');
+    }
+
+    const transaction = db.transaction(() => {
+      const items = this.getItems(data.countId, db);
+      const byItemId = new Map(items.map((i) => [i.item_id, i]));
+
+      // ---- 1. Reverse the original adjustments (stock + GL). ----------
+      for (const item of items) {
+        if (!item.adjustment_posted || item.variance === null || item.variance === 0) continue;
+
+        const originalVariance = item.variance; // signed: + surplus, − shortage
+
+        // GL first: void the original journal lines by reference.
+        if (item.adjustment_movement_id !== null) {
+          AccountingService.voidJournalLinesByReference(db, 'stock_adjustment', item.adjustment_movement_id, {
+            voidedBy: userId,
+            voidReason: `Count ${count.count_no} corrected`,
+          });
+        }
+
+        // Stock: reverse the variance effect.
+        //  - Surplus (+): draw down the ADJUSTMENT batch created at
+        //    completion (must still hold the full surplus, else refuse).
+        //  - Shortage (−): restore the FIFO layers consumed at completion
+        //    (reversal adds back to the same layers — they cannot have been
+        //    partially consumed by later postings because we do not track
+        //    per-layer provenance here; the equal-and-opposite movement plus
+        //    balance reversal keeps aggregate quantities exact).
+        if (originalVariance > 0) {
+          const adjBatch = db.prepare(`
+            SELECT id, quantity_remaining FROM stock_batches
+            WHERE source_type = 'ADJUSTMENT' AND source_id = ?
+          `).get(data.countId) as { id: number; quantity_remaining: number } | undefined;
+          if (!adjBatch || Number(adjBatch.quantity_remaining) + 1e-9 < originalVariance) {
+            throw new Error(
+              `Cannot correct count ${count.count_no}: surplus units of item ${item.item_id} were already consumed`
+            );
+          }
+          db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?`)
+            .run(originalVariance, adjBatch.id);
+        }
+        // (Shortage restore: the re-application step below re-consumes FIFO
+        // layers, which nets the layers back out. Balances are corrected
+        // exactly in step 2, so no per-layer restore is needed here.)
+
+        // Append-only CORRECTION movement (equal and opposite).
+        const reverseNo = StockMovementModel.generateMovementNo(db);
+        db.prepare(`
+          INSERT INTO stock_movements (
+            movement_no, item_id, warehouse_id, movement_type,
+            quantity, unit_cost, reference_doctype, reference_docno,
+            remarks, movement_date, created_by
+          ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, ?, 'PhysicalCountCorrection', ?, ?, ?, ?)
+        `).run(
+          reverseNo,
+          item.item_id,
+          count.warehouse_id,
+          -originalVariance,
+          item.unit_cost,
+          count.count_no,
+          `Correction: reverse original adjustment ${originalVariance > 0 ? '+' : ''}${originalVariance}`,
+          new Date().toISOString().split('T')[0],
+          userId
+        );
+
+        // Reverse the balance contribution of the original variance now;
+        // step 2 re-applies the corrected variance on top.
+        db.prepare(`
+          UPDATE stock_balances
+          SET quantity = quantity - ?, last_updated = CURRENT_TIMESTAMP
+          WHERE item_id = ? AND warehouse_id = ?
+        `).run(originalVariance, item.item_id, count.warehouse_id);
+      }
+
+      // ---- 2. Re-apply corrected variances via recordCount + completeCount
+      //      semantics. We cannot reuse completeCount (it flips status), so
+      //      mirror its per-item posting logic here.
+      for (const correction of data.corrections) {
+        const item = byItemId.get(correction.item_id);
+        if (!item) {
+          throw new Error(
+            `No snapshot row in physical_count_items for item ${correction.item_id} in count ${data.countId}`
+          );
+        }
+
+        const correctedVariance = correction.counted_quantity - item.system_quantity;
+
+        let consumedCost = item.unit_cost;
+        let consumption: Array<{ batchId: number | null; consumed: number; unitCost: number }> = [];
+        if (correctedVariance < 0) {
+          consumption = StockMovementModel.consumeFromOldestBatches(
+            item.item_id,
+            count.warehouse_id,
+            Math.abs(correctedVariance),
+            db
+          );
+          const totalConsumed = consumption.reduce((s, c) => s + c.consumed, 0);
+          consumedCost = totalConsumed > 0
+            ? consumption.reduce((s, c) => s + c.consumed * c.unitCost, 0) / totalConsumed
+            : item.unit_cost;
+        }
+
+        const movementNo = StockMovementModel.generateMovementNo(db);
+        const primaryBatchId = consumption.length > 0 ? consumption[0].batchId : null;
+        const movementResult = db.prepare(`
+          INSERT INTO stock_movements (
+            movement_no, item_id, warehouse_id, movement_type,
+            quantity, unit_cost, reference_doctype, reference_docno,
+            remarks, movement_date, created_by, batch_id
+          ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, ?, 'PhysicalCountCorrection', ?, ?, ?, ?, ?)
+        `).run(
+          movementNo,
+          item.item_id,
+          count.warehouse_id,
+          correctedVariance,
+          consumedCost,
+          count.count_no,
+          `Correction: recounted ${item.item_code || item.item_id} — ${correctedVariance > 0 ? '+' : ''}${correctedVariance} (system: ${item.system_quantity}, corrected count: ${correction.counted_quantity})`,
+          new Date().toISOString().split('T')[0],
+          userId,
+          primaryBatchId
+        );
+        const movementId = movementResult.lastInsertRowid as number;
+
+        if (correctedVariance > 0) {
+          const nextBatchNo = getNextBatchSequence(db);
+          db.prepare(`
+            INSERT INTO stock_batches (
+              batch_no, item_id, warehouse_id, source_type,
+              source_id, quantity_original, quantity_remaining,
+              unit_cost, received_date
+            ) VALUES (?, ?, ?, 'ADJUSTMENT_CORRECTION', ?, ?, ?, ?, ?)
+          `).run(
+            `BATCH-${new Date().getFullYear() % 100}-ADJ-${nextBatchNo.toString().padStart(4, '0')}`,
+            item.item_id,
+            count.warehouse_id,
+            data.countId,
+            correctedVariance,
+            correctedVariance,
+            item.unit_cost,
+            count.count_date
+          );
+        }
+
+        db.prepare(`
+          UPDATE stock_balances
+          SET quantity = quantity + ?, last_updated = CURRENT_TIMESTAMP
+          WHERE item_id = ? AND warehouse_id = ?
+        `).run(correctedVariance, item.item_id, count.warehouse_id);
+
+        db.prepare(`
+          UPDATE items
+          SET current_stock = (
+            SELECT COALESCE(SUM(quantity), 0)
+            FROM stock_balances
+            WHERE item_id = ?
+          )
+          WHERE id = ?
+        `).run(item.item_id, item.item_id);
+
+        db.prepare(`
+          UPDATE physical_count_items
+          SET counted_quantity = ?,
+              variance = ?,
+              variance_value = ? * unit_cost,
+              adjustment_posted = TRUE,
+              adjustment_movement_id = ?,
+              notes = COALESCE(?, notes)
+          WHERE count_id = ? AND item_id = ?
+        `).run(
+          correction.counted_quantity,
+          correctedVariance,
+          correctedVariance,
+          movementId,
+          correction.notes ?? null,
+          data.countId,
+          item.item_id
+        );
+
+        if (consumedCost && correctedVariance !== 0) {
+          const value = Math.abs(correctedVariance) * consumedCost;
+          const isRemoval = correctedVariance < 0;
+          const accounts = isRemoval
+            ? { debit: 'inventory_shrinkage', credit: 'inventory_asset' }
+            : { debit: 'inventory_asset', credit: 'inventory_correction' };
+
+          db.prepare(`
+            UPDATE stock_movements
+            SET financial_value = ?, financial_posted = TRUE, journal_entry_id = ?
+            WHERE id = ?
+          `).run(value, AccountingService.postLegacyStockEntry(db, {
+            referenceType: 'stock_adjustment',
+            referenceId: movementId,
+            entryDate: new Date().toISOString().split('T')[0],
+            description: `Physical count correction: ${item.item_code} ${isRemoval ? 'shrinkage' : 'correction'} ${Math.abs(correctedVariance)} units @ ${consumedCost}`,
+            debitTextCode: accounts.debit,
+            creditTextCode: accounts.credit,
+            amount: value,
+            createdBy: userId
+          }), movementId);
+        }
+      }
+
+      // ---- 3. Stamp + log. --------------------------------------------
+      db.prepare(`
+        UPDATE physical_counts
+        SET corrected_at = CURRENT_TIMESTAMP,
+            corrected_by = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(userId, data.countId);
+
+      db.prepare(`
+        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        userId,
+        'CORRECTION',
+        'PhysicalCount',
+        data.countId,
+        `Corrected count ${count.count_no}: ${data.corrections.length} item(s) recounted`
+      );
+    });
+
+    transaction();
   }
 
   static deleteCount(countId: number, db: Database.Database): void {

@@ -29,6 +29,8 @@ router.get('/:id/payments', requirePermission('purchase_orders', 'read'), purcha
 // Goods Receipts
 router.get('/:id/receipts', requirePermission('purchase_orders', 'read'), purchaseOrderController.getGoodsReceipts);
 router.post('/:id/receipts', requirePermission('purchase_orders', 'create'), validateZodBody(zodBodySchemas.goodsReceipt), purchaseOrderController.createGoodsReceipt);
+// Void a goods receipt (reversal-rules Phase 4) — append-only, idempotent
+router.post('/:id/receipts/:receiptId/void', requirePermission('purchase_orders', 'update'), validateZodBody(zodBodySchemas.object), purchaseOrderController.voidGoodsReceipt);
 // Summary & Reporting
 router.get('/summary/supplier/:supplierId', requirePermission('purchase_orders', 'read'), purchaseOrderController.getSummaryBySupplier);
 

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/physical_count.dart'
     show PhysicalCount, PhysicalCountItem;
+import 'correct_count_dialog.dart';
 import '../../data/repositories/api_result.dart'
     show ApiError, ApiFailure, ApiResult, ApiSuccess;
 import '../../data/repositories/inventory_repository.dart'
@@ -71,6 +72,7 @@ class _DetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
     final c = detail.count;
 
     final headerRows = <(String, String)>[
@@ -105,9 +107,20 @@ class _DetailBody extends StatelessWidget {
                   ],
                 ),
               ),
-              StatusBadge(
-                status: c.status,
-                color: StatusColors.of(context).physicalCount(c.status),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                spacing: 4,
+                children: [
+                  StatusBadge(
+                    status: c.status,
+                    color: StatusColors.of(context).physicalCount(c.status),
+                  ),
+                  if (c.correctedAt != null)
+                    StatusBadge(
+                      status: l10n.physicalcountsCorrectedbadge,
+                      color: scheme.tertiary,
+                    ),
+                ],
               ),
             ],
           ),
@@ -152,6 +165,20 @@ class _DetailBody extends StatelessWidget {
                 ),
                 _CountActions(count: c),
               ],
+              // A completed count can be corrected exactly once — the
+              // correction reverses the posted adjustments and re-applies
+              // recounted quantities (server-enforced too).
+              if (c.isCorrectable)
+                FilledButton.tonalIcon(
+                  onPressed: () => showCorrectCountDialog(
+                    context,
+                    countId: c.id,
+                    items: detail.items,
+                  ),
+                  icon: const Icon(Icons.published_with_changes_outlined,
+                      size: 18),
+                  label: Text(l10n.physicalcountsCorrectcount),
+                ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(l10n.commonClose),

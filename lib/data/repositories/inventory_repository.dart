@@ -31,6 +31,9 @@
 // - `POST /inventory/physical-counts/:id/items` → `PhysicalCountItem`
 // - `POST /inventory/physical-counts/:id/complete` → `PhysicalCount`
 // - `POST /inventory/physical-counts/:id/cancel` → `PhysicalCount`
+// - `POST /inventory/physical-counts/:id/correct` → `PhysicalCount` (single-shot
+//   correction of a Completed count: reverses original adjustment + GL,
+//   re-applies corrected quantities; server rejects double correction)
 // - `DELETE /inventory/physical-counts/:id` → `{success, message}`
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -345,6 +348,19 @@ class InventoryRepository {
         parse: (Object? json) =>
             PhysicalCount.fromJson(json as Map<String, dynamic>),
       );
+
+  /// Correct a Completed count — `corrections` maps item ids to recounted
+  /// quantities. The server reverses the original adjustment (stock + GL)
+  /// and re-applies the corrected variances in one transaction.
+  Future<ApiResult<PhysicalCount>> correctPhysicalCount(
+    int countId,
+    List<Map<String, dynamic>> corrections,
+  ) => _api.postRaw(
+    '${ApiEndpoints.physicalCounts}/$countId/correct',
+    body: {'corrections': corrections},
+    parse: (Object? json) =>
+        PhysicalCount.fromJson(json as Map<String, dynamic>),
+  );
 
   Future<ApiResult<void>> deletePhysicalCount(int id) =>
       _api.delete('${ApiEndpoints.physicalCounts}/$id');

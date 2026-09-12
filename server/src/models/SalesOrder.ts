@@ -390,6 +390,25 @@ class SalesOrderModel {
       throw new Error(`Cannot update a ${salesOrder.status} sales order`);
     }
 
+    // Reversal-rules Phase 4: status-machine validation on status changes.
+    // The PO updateStatus endpoint has a transition matrix (C3); direct
+    // status edits through update() must obey the same discipline or a
+    // Draft SO can be hand-flipped to Invoiced, bypassing conversion and
+    // leaving GL/stock state that no reversal path expects.
+    const validTransitions: Record<string, string[]> = {
+      'Draft': ['Confirmed', 'Cancelled'],
+      'Confirmed': ['Delivered', 'Cancelled'],
+      'Delivered': ['Invoiced', 'Completed'],
+      'Invoiced': [],
+      'Completed': [],
+      'Cancelled': [],
+    };
+    if (data.status !== undefined && data.status !== salesOrder.status) {
+      if (!validTransitions[salesOrder.status]?.includes(data.status)) {
+        throw new Error(`Cannot transition sales order from ${salesOrder.status} to ${data.status}`);
+      }
+    }
+
     const transaction = db.transaction(() => {
       const { customer_id, customer_name, so_date, delivery_date, status, notes, warehouse_id, items } = data;
 

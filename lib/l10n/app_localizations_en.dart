@@ -4526,6 +4526,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get physicalcountsRecordsave => 'Save Counts';
 
   @override
+  String get physicalcountsCorrectcount => 'Correct Count';
+
+  @override
+  String get physicalcountsCorrecttitle => 'Correct Completed Count';
+
+  @override
+  String get physicalcountsCorrectconfirm =>
+      'Correcting this count reverses its posted stock adjustments and accounting entries, then re-applies the recounted quantities. The original entries stay in the audit trail. This can only be done once.';
+
+  @override
+  String get physicalcountsCorrectapply => 'Apply Correction';
+
+  @override
+  String get physicalcountsCorrectedmsg => 'Count corrected';
+
+  @override
+  String get physicalcountsCorrectedbadge => 'Corrected';
+
+  @override
+  String get physicalcountsCorrectnewqty => 'Recounted quantity';
+
+  @override
+  String get physicalcountsCorrectnone =>
+      'Enter at least one recounted quantity';
+
+  @override
+  String get physicalcountsCorrectorig => 'Originally counted';
+
+  @override
   String get productionAvailable => 'Available';
 
   @override

@@ -788,6 +788,141 @@ class StockMovementModel {
     return run();
   }
 
+  /**
+   * Reversal-rules Phase 4: void a stock transfer.
+   *
+   * A transfer moved quantity from A to B with no GL effect (inventory
+   * stays inventory), so the reversal is stock-only: restore the source
+   * batch quantity, reverse both legs with equal-and-opposite
+   * ADJUSTMENT movements, and rebuild balances. The original movements
+   * are never deleted — the reversal movements reference them by
+   * movement_no for the audit trail.
+   *
+   * Guards (all server-side, inside the transaction):
+   *  - transfer legs must exist and not already be voided (idempotency);
+   *  - the mirrored TRANSFER batch at the destination must still hold
+   *    enough quantity_remaining — if the transferred units were already
+   *    sold/consumed from the destination, voiding would drive stock
+   *    negative, so the void is refused.
+   */
+  static voidTransfer(
+    data: { outMovementNo: string },
+    userId: number,
+    db: Database.Database
+  ): { reversedOut: { id: number; movement_no: string }; reversedIn: { id: number; movement_no: string } } {
+    const run = db.transaction(() => {
+      const outLeg = db.prepare(`
+        SELECT id, movement_no, item_id, warehouse_id, quantity, unit_cost, remarks
+        FROM stock_movements
+        WHERE movement_no = ? AND movement_type = 'TRANSFER' AND quantity < 0
+      `).get(data.outMovementNo) as {
+        id: number; movement_no: string; item_id: number; warehouse_id: number;
+        quantity: number; unit_cost: number | null; remarks: string | null;
+      } | undefined;
+
+      if (!outLeg) {
+        throw new Error(`Transfer ${data.outMovementNo} not found`);
+      }
+
+      // Idempotency: a prior void already appended a reversal pair.
+      const alreadyVoided = db.prepare(`
+        SELECT COUNT(*) AS c FROM stock_movements
+        WHERE reference_doctype = 'TRANSFER_VOID' AND reference_docno = ?
+      `).get(outLeg.movement_no) as { c: number };
+      if (alreadyVoided.c > 0) {
+        throw new Error(`Transfer ${outLeg.movement_no} is already voided`);
+      }
+
+      const inLeg = db.prepare(`
+        SELECT id, movement_no, warehouse_id, quantity, batch_id
+        FROM stock_movements
+        WHERE reference_docno = ? AND movement_type = 'TRANSFER' AND quantity > 0
+      `).get(outLeg.movement_no) as {
+        id: number; movement_no: string; warehouse_id: number; quantity: number; batch_id: number | null;
+      } | undefined;
+
+      if (!inLeg) {
+        throw new Error(`Transfer ${outLeg.movement_no} is missing its destination leg — cannot void`);
+      }
+
+      const qty = Math.abs(outLeg.quantity);
+
+      // The mirrored TRANSFER batch at the destination must still hold the
+      // transferred quantity. If those units were consumed (sold/transferred
+      // onward), restoring them would create negative stock.
+      if (inLeg.batch_id !== null) {
+        const mirrorBatch = db.prepare(`
+          SELECT quantity_remaining FROM stock_batches WHERE id = ?
+        `).get(inLeg.batch_id) as { quantity_remaining: number } | undefined;
+        if (!mirrorBatch) {
+          throw new Error(`Transfer ${outLeg.movement_no} mirrored batch is missing — cannot void`);
+        }
+        if (Number(mirrorBatch.quantity_remaining) + 1e-9 < qty) {
+          throw new Error(
+            `Cannot void transfer ${outLeg.movement_no}: ${qty} unit(s) were already consumed from the destination ` +
+            `(only ${Number(mirrorBatch.quantity_remaining)} remaining in the transfer batch)`
+          );
+        }
+      }
+
+      // 1. Restore the source batch quantity consumed by the OUT leg.
+      // The OUT leg carries its consumed batch_id directly (its
+      // reference_docno is NULL — only the IN leg references the OUT's
+      // movement_no), so restore by movement_no.
+      const outConsumptions = db.prepare(`
+        SELECT id, quantity, batch_id FROM stock_movements
+        WHERE movement_no = ? AND movement_type = 'TRANSFER' AND quantity < 0
+      `).all(outLeg.movement_no) as Array<{
+        id: number; quantity: number; batch_id: number | null;
+      }>;
+      for (const leg of outConsumptions) {
+        if (leg.batch_id !== null) {
+          db.prepare(`
+            UPDATE stock_batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?
+          `).run(Math.abs(leg.quantity), leg.batch_id);
+        }
+      }
+
+      // 2. Draw down the mirrored TRANSFER batch at the destination.
+      if (inLeg.batch_id !== null) {
+        db.prepare(`
+          UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?
+        `).run(qty, inLeg.batch_id);
+      }
+
+      // 3. Equal-and-opposite ADJUSTMENT legs (no GL: adjustments post their
+      // own GL only when financial — these cancel existing layers, and the
+      // net inventory value change is zero because both legs share cost).
+      const reversedOut = this.recordMovement({
+        item_id: outLeg.item_id,
+        warehouse_id: outLeg.warehouse_id,
+        movement_type: 'ADJUSTMENT',
+        quantity: qty,
+        unit_cost: outLeg.unit_cost ?? undefined,
+        reference_doctype: 'TRANSFER_VOID',
+        reference_docno: outLeg.movement_no,
+        remarks: `Transfer ${outLeg.movement_no} voided — stock returned to source`,
+        movement_date: new Date().toISOString().split('T')[0],
+      }, userId, db);
+
+      const reversedIn = this.recordMovement({
+        item_id: outLeg.item_id,
+        warehouse_id: inLeg.warehouse_id,
+        movement_type: 'ADJUSTMENT',
+        quantity: -qty,
+        unit_cost: outLeg.unit_cost ?? undefined,
+        reference_doctype: 'TRANSFER_VOID',
+        reference_docno: outLeg.movement_no,
+        remarks: `Transfer ${outLeg.movement_no} voided — stock removed from destination`,
+        movement_date: new Date().toISOString().split('T')[0],
+      }, userId, db);
+
+      return { reversedOut, reversedIn };
+    });
+
+    return run();
+  }
+
 /**
    * Record a batch-aware outgoing stock movement that consumes from oldest batches.
    * Creates one stock_movement per batch consumed, with batch_id and unit_cost.

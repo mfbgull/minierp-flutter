@@ -31,6 +31,7 @@ class PhysicalCount {
     required this.createdBy,
     this.completedBy,
     this.completedAt,
+    this.correctedAt,
     this.createdAt,
     this.updatedAt,
     this.warehouseCode,
@@ -54,6 +55,7 @@ class PhysicalCount {
     createdBy: asInt(json['created_by']) ?? 0,
     completedBy: asInt(json['completed_by']),
     completedAt: asString(json['completed_at']),
+    correctedAt: asString(json['corrected_at']),
     createdAt: asString(json['created_at']),
     updatedAt: asString(json['updated_at']),
     warehouseCode: asString(json['warehouse_code']),
@@ -74,6 +76,10 @@ class PhysicalCount {
   final int createdBy;
   final int? completedBy;
   final String? completedAt;
+
+  /// Non-null once a correction has been applied to this completed count
+  /// (single-shot — the server rejects a second correction).
+  final String? correctedAt;
   final String? createdAt;
   final String? updatedAt;
   final String? warehouseCode;
@@ -88,6 +94,10 @@ class PhysicalCount {
   bool get isInProgress => status == PhysicalCountStatus.inProgress.value;
   bool get isCompleted => status == PhysicalCountStatus.completed.value;
   bool get isCancelled => status == PhysicalCountStatus.cancelled.value;
+
+  /// True when the count was completed and not yet corrected — the only
+  /// state in which the correct action is offered (server enforces too).
+  bool get isCorrectable => isCompleted && correctedAt == null;
 
   Map<String, dynamic> toJson() => {
     'id': id,
