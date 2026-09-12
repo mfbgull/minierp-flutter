@@ -22,6 +22,8 @@ jobs:
       - name: ESLint (zero errors gate)
         run: npx eslint . --quiet
       - run: npm test
+      - name: Reversal-rules verification (56-case gate)
+        run: npm run verify:reversal-rules
 
   flutter:
     runs-on: ubuntu-latest
