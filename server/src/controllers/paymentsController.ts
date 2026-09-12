@@ -250,6 +250,13 @@ function deletePayment(req: AuthRequest, res: Response): void {
 
     res.json({ success: true, message: 'Payment voided successfully' });
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Double-fire / stale-UI guard: an already-voided payment is a client
+    // state error, not a server failure (Phase 5).
+    if (message === 'Payment is already voided') {
+      res.status(400).json({ success: false, error: message });
+      return;
+    }
     logger.error('Error deleting payment:', error);
     res.status(500).json({ success: false, error: 'Failed to delete payment' });
   }

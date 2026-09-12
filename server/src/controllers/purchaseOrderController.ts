@@ -265,8 +265,19 @@ function updateStatus(req: AuthRequest, res: Response): void {
 
     res.json(po);
   } catch (error: any) {
+    const message = error?.message || String(error);
+    // Status-machine violations (illegal transition / terminal-state lock /
+    // unknown PO) are client errors — a double-fire or stale UI must get a
+    // 4xx, not a 500 (Phase 5).
+    if (
+      message.startsWith('Cannot transition from') ||
+      message === 'Purchase Order not found'
+    ) {
+      res.status(400).json({ error: message });
+      return;
+    }
     logger.error('Update PO status error:', error);
-    res.status(500).json({ error: error.message || 'Failed to update purchase order status' });
+    res.status(500).json({ error: message || 'Failed to update purchase order status' });
   }
 }
 
