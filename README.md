@@ -1,5 +1,7 @@
 # MiniERP
 
+[![CI](https://github.com/mfbgull/minierp-flutter/actions/workflows/ci.yml/badge.svg)](https://github.com/mfbgull/minierp-flutter/actions/workflows/ci.yml)
+
 Desktop ERP for small and medium businesses. Built with Flutter, running against a Node.js + Express + SQLite backend.
 
 ## Current State
@@ -90,7 +92,11 @@ flutter run -d linux   # or -d windows, -d macos, -d chrome
 
 - **494/494 tests passing** (calculations, widgets, features)
 - `dart analyze` clean (0 issues)
-- **CI**: GitHub Actions runs `flutter analyze`, `flutter test`, server `typecheck`, `eslint`, and `npm test` on every push
+- **CI**: GitHub Actions runs two jobs on every push:
+  - **flutter** — `flutter pub get`, `flutter analyze` (0-issue gate), `flutter test`
+  - **server** — `typecheck`, `eslint` (zero errors gate), `npm test` (jest), and the reversal-rules verification gate (`npm run verify:reversal-rules`, 56-case C1–C7 invariants)
+
+  Job outcomes appear as the CI badge above; failing job logs include the exact step that broke the gate.
 
 ## Data
 
