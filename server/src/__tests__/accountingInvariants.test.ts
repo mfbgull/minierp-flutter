@@ -28,7 +28,7 @@ import request from 'supertest';
 import bcrypt from 'bcrypt';
 import app from '../app';
 import db from '../config/database';
-import { parseCurrency } from '../utils/currency';
+import { expectAllInvariantsHold } from './helpers/accountingInvariants';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
@@ -60,119 +60,6 @@ beforeAll(async () => {
   if (!tokenCookie) throw new Error('Login did not return a token cookie');
   token = tokenCookie.split(';')[0];
 });
-
-// ---------------------------------------------------------------------
-// Invariant helpers
-// ---------------------------------------------------------------------
-
-interface GroupImbalance {
-  reference_type: string;
-  reference_id: number;
-  diff: number;
-}
-
-/** Invariant A: every reference group balances; the ledger balances. */
-function glImbalances(): { groups: GroupImbalance[]; totalDiff: number } {
-  const groups = db.prepare(`
-    SELECT reference_type, reference_id,
-           ABS(SUM(debit) - SUM(credit)) AS diff
-    FROM journal_lines WHERE voided = 0
-    GROUP BY reference_type, reference_id
-    HAVING diff > 0.005
-  `).all() as unknown as GroupImbalance[];
-  const total = db.prepare(`
-    SELECT ABS(COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0)) AS diff
-    FROM journal_lines WHERE voided = 0
-  `).get() as { diff: number };
-  return { groups, totalDiff: Number(total.diff) };
-}
-
-function expectGlBalanced(): void {
-  const { groups, totalDiff } = glImbalances();
-  expect(groups).toEqual([]);
-  expect(totalDiff).toBeCloseTo(0, 2);
-}
-
-/** Invariant B/C (customer side). */
-function customerArImbalances(): Array<{ label: string; diff: number }> {
-  const problems: Array<{ label: string; diff: number }> = [];
-
-  // customers.current_balance == ledger sum (non-voided, non-reversed)
-  const custDrift = db.prepare(`
-    SELECT c.id, c.customer_name,
-           c.current_balance - COALESCE(l.net, 0) AS diff
-    FROM customers c
-    LEFT JOIN (
-      SELECT customer_id, SUM(debit) - SUM(credit) AS net
-      FROM customer_ledger WHERE voided = 0 AND reversed_by IS NULL
-      GROUP BY customer_id
-    ) l ON l.customer_id = c.id
-    WHERE ABS(c.current_balance - COALESCE(l.net, 0)) > 0.005
-  `).all() as Array<{ id: number; customer_name: string; diff: number }>;
-  for (const r of custDrift) {
-    problems.push({ label: `customer ${r.id} (${r.customer_name}) balance vs ledger`, diff: r.diff });
-  }
-
-  // invoices.paid_amount == non-voided allocation sum
-  const paidDrift = db.prepare(`
-    SELECT i.id, i.invoice_no,
-           i.paid_amount - COALESCE(a.paid, 0) AS diff
-    FROM invoices i
-    LEFT JOIN (
-      SELECT invoice_id, SUM(amount) AS paid
-      FROM payment_allocations WHERE voided_at IS NULL
-      GROUP BY invoice_id
-    ) a ON a.invoice_id = i.id
-    WHERE ABS(i.paid_amount - COALESCE(a.paid, 0)) > 0.005
-  `).all() as Array<{ id: number; invoice_no: string; diff: number }>;
-  for (const r of paidDrift) {
-    problems.push({ label: `invoice ${r.id} (${r.invoice_no}) paid_amount vs allocations`, diff: r.diff });
-  }
-
-  return problems;
-}
-
-/** Invariant D (supplier side). */
-function supplierApImbalances(): Array<{ label: string; diff: number }> {
-  const problems: Array<{ label: string; diff: number }> = [];
-  const drift = db.prepare(`
-    SELECT s.id, s.supplier_name,
-           s.current_balance - COALESCE(l.net, 0) AS diff
-    FROM suppliers s
-    LEFT JOIN (
-      SELECT supplier_id, SUM(debit) - SUM(credit) AS net
-      FROM supplier_ledger WHERE voided = 0 AND reversed_by IS NULL
-      GROUP BY supplier_id
-    ) l ON l.supplier_id = s.id
-    WHERE ABS(s.current_balance - COALESCE(l.net, 0)) > 0.005
-  `).all() as Array<{ id: number; supplier_name: string; diff: number }>;
-  for (const r of drift) {
-    problems.push({ label: `supplier ${r.id} (${r.supplier_name}) balance vs ledger`, diff: r.diff });
-  }
-  return problems;
-}
-
-/** Invariant E: balances == remaining batch quantities. */
-function stockImbalances(): Array<{ label: string; diff: number }> {
-  return (db.prepare(`
-    SELECT b.item_id || '/' || b.warehouse_id AS label,
-           sb.quantity - COALESCE(b.total, 0) AS diff
-    FROM stock_balances sb
-    JOIN (
-      SELECT item_id, warehouse_id, SUM(quantity_remaining) AS total
-      FROM stock_batches GROUP BY item_id, warehouse_id
-    ) b ON b.item_id = sb.item_id AND b.warehouse_id = sb.warehouse_id
-    WHERE ABS(sb.quantity - COALESCE(b.total, 0)) > 0.005
-  `).all() as Array<{ label: string; diff: number }>);
-}
-
-function expectAllInvariantsHold(context: string): void {
-  expectGlBalanced();
-  expect(customerArImbalances()).toEqual([]);
-  expect(supplierApImbalances()).toEqual([]);
-  expect(stockImbalances()).toEqual([]);
-  void context; // context only aids debugging on failure
-}
 
 // ---------------------------------------------------------------------
 // Fixture helpers
@@ -506,5 +393,135 @@ describe('Double-fire rejection on destructive endpoints', () => {
     expect(second.status).toBeGreaterThanOrEqual(400);
     expect(second.status).toBeLessThan(500);
     expectAllInvariantsHold('after double PO cancel');
+  });
+
+  // Phase 5 expansion: GRN void, transfer void, count correction.
+
+  it('voiding a goods receipt twice: second attempt 4xx, invariants hold', async () => {
+    const supRes = await request(app).post('/api/suppliers').set('Cookie', token)
+      .send({ supplier_name: `GRN Sup ${seq}`, supplier_code: `GRN-S-${seq}` });
+    const supplier = supRes.body?.data ?? supRes.body;
+    const warehouseId = await getFirstWarehouseId();
+    const itemId = await createItemWithStock(0);
+
+    const poRes = await request(app).post('/api/purchase-orders').set('Cookie', token)
+      .send({ supplier_id: supplier.id, po_date: '2026-09-12',
+              items: [{ item_id: itemId, quantity: 8, unit_price: 6 }] });
+    const po = poRes.body?.data ?? poRes.body;
+    const poItem = db.prepare('SELECT id FROM purchase_order_items WHERE po_id = ?')
+      .get(po.id) as { id: number };
+    await request(app).post(`/api/purchase-orders/${po.id}/status`)
+      .set('Cookie', token).send({ status: 'Submitted' });
+
+    const recRes = await request(app)
+      .post(`/api/purchase-orders/${po.id}/receipts`)
+      .set('Cookie', token)
+      .send({ receipt_date: '2026-09-12', warehouse_id: warehouseId,
+              items: [{ po_item_id: poItem.id, received_quantity: 8 }] });
+    const receipt = recRes.body?.data ?? recRes.body;
+    expect(recRes.status === 201 || recRes.status === 200).toBe(true);
+    expectAllInvariantsHold('after goods receipt');
+
+    const first = await request(app)
+      .post(`/api/purchase-orders/${po.id}/receipts/${receipt.id}/void`)
+      .set('Cookie', token).send({ reason: 'test void' });
+    expect(first.status).toBe(200);
+    expectAllInvariantsHold('after GRN void 1');
+
+    const second = await request(app)
+      .post(`/api/purchase-orders/${po.id}/receipts/${receipt.id}/void`)
+      .set('Cookie', token).send({});
+    expect(second.status).toBeGreaterThanOrEqual(400);
+    expect(second.status).toBeLessThan(500);
+    expectAllInvariantsHold('after GRN void 2');
+  });
+
+  it('voiding a stock transfer twice: second attempt 4xx, invariants hold', async () => {
+    const warehouseId = await getFirstWarehouseId();
+    const whRes = await request(app).post('/api/inventory/warehouses')
+      .set('Cookie', token)
+      .send({ warehouse_name: `XFER WH ${seq}`, warehouse_code: `XFER-WH-${seq}` });
+    const destWh = whRes.body?.data ?? whRes.body;
+    const destId = destWh.id as number;
+    const itemId = await createItemWithStock(0);
+
+    // Seed 20 units in the source warehouse.
+    await seedStock(itemId, warehouseId, 20, 5);
+
+    const xferRes = await request(app)
+      .post('/api/inventory/stock-transfers')
+      .set('Cookie', token)
+      .send({
+        item_id: itemId,
+        from_warehouse_id: warehouseId,
+        to_warehouse_id: destId,
+        quantity: 5,
+        movement_date: '2026-09-12',
+      });
+    const xfer = xferRes.body?.data ?? xferRes.body;
+    if (xferRes.status !== 201 && xferRes.status !== 200) {
+      throw new Error(`transfer: ${xferRes.status} ${JSON.stringify(xferRes.body)}`);
+    }
+    expectAllInvariantsHold('after transfer');
+
+    // The transfer response carries the OUT movement number (movement_no);
+    // fall back to the latest TRANSFER OUT leg for this item.
+    let outMovementNo: string | undefined = xfer.movement_no ?? xfer.movementNo;
+    if (!outMovementNo) {
+      const leg = db.prepare(`
+        SELECT movement_no FROM stock_movements
+        WHERE movement_type = 'TRANSFER' AND quantity < 0 AND item_id = ?
+        ORDER BY id DESC LIMIT 1
+      `).get(itemId) as { movement_no: string } | undefined;
+      outMovementNo = leg?.movement_no;
+    }
+    if (!outMovementNo) throw new Error('No transfer OUT leg found after create');
+
+    const first = await request(app)
+      .post(`/api/inventory/stock-transfers/${encodeURIComponent(outMovementNo)}/void`)
+      .set('Cookie', token).send({});
+    expect(first.status).toBe(200);
+    expectAllInvariantsHold('after transfer void 1');
+
+    const second = await request(app)
+      .post(`/api/inventory/stock-transfers/${encodeURIComponent(outMovementNo)}/void`)
+      .set('Cookie', token).send({});
+    expect(second.status).toBeGreaterThanOrEqual(400);
+    expect(second.status).toBeLessThan(500);
+    expectAllInvariantsHold('after transfer void 2');
+  });
+
+  it('correcting a physical count twice: second attempt 4xx, invariants hold', async () => {
+    const warehouseId = await getFirstWarehouseId();
+    const itemId = await createItemWithStock(0);
+    await seedStock(itemId, warehouseId, 20, 10);
+
+    // Drive a count session through the model (same as countCorrection tests).
+    const PhysicalCountModel = (await import('../models/PhysicalCount')).default;
+    const countId = PhysicalCountModel.create({ warehouse_id: warehouseId }, 1, db);
+    PhysicalCountModel.recordCount(countId, itemId, 12, 1, null, db);
+    PhysicalCountModel.completeCount(countId, 1, db);
+    expectAllInvariantsHold('after count completion (shortage −8)');
+
+    const first = await request(app)
+      .post(`/api/inventory/physical-counts/${countId}/correct`)
+      .set('Cookie', token)
+      .send({ corrections: [{ item_id: itemId, counted_quantity: 18 }] });
+    expect(first.status).toBe(200);
+    expectAllInvariantsHold('after count correction 1');
+
+    const second = await request(app)
+      .post(`/api/inventory/physical-counts/${countId}/correct`)
+      .set('Cookie', token)
+      .send({ corrections: [{ item_id: itemId, counted_quantity: 20 }] });
+    expect(second.status).toBeGreaterThanOrEqual(400);
+    expect(second.status).toBeLessThan(500);
+    expectAllInvariantsHold('after count correction 2');
+
+    // Stock nets to the corrected quantity.
+    const bal = (db.prepare(
+      'SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?'
+    ).get(itemId, warehouseId) as { quantity: number }).quantity;
+    expect(bal).toBeCloseTo(18, 6);
   });
 });
