@@ -114,6 +114,11 @@ Fix:
 - ✅ **Count-correction workflow** — `PhysicalCountModel.correctCount` (POST /api/inventory/physical-counts/:id/correct). POSTED counts are immutable: counted quantities are never edited in place. A correction reverses the original completion's effects and re-applies the recounted quantities in one transaction: voids the original journal lines by reference (`voidJournalLinesByReference`), appends equal-and-opposite CORRECTION ADJUSTMENT movements, reverses the original balance contribution, re-applies each corrected variance exactly as completeCount does (shortage consumes FIFO-oldest layers at actual costs; surplus adds an ADJUSTMENT_CORRECTION cost layer; fresh GL posts at actual consumed costs), and stamps corrected_at/corrected_by on the count (single-shot idempotency). Guards: count must be Completed; every corrected item needs a snapshot row; refusal (400) when surplus units were already consumed. Migration: add-count-correction-columns.sql.
 - ⏳ Outstanding Phase 4 item: none — Phase 4 is complete.
 
-## 7. Phase 5 outline
+## 7. Phase 5 ✅
 
-- Accounting-invariant regression suite (GL sum == subledger sum == source rows), double-fire concurrency tests for every destructive endpoint.
+- ✅ **Accounting-invariant regression suite** — `accountingInvariants.test.ts` drives a full lifecycle through real endpoints (owner capital → invoice → payment → partial return with refund-cap → leftover-payment void → cancel; purchase order → supplier payment → cancel) and asserts five invariants after every step: (A) every journal_lines reference group sums debit == credit; (B) customers.current_balance == customer_ledger sum; (C) invoices.paid_amount == non-voided allocation sum; (D) suppliers.current_balance == supplier_ledger chain balance; (E) stock_balances.quantity == Σ stock_batches.quantity_remaining.
+- ✅ **Double-fire concurrency tests** — every destructive endpoint is called twice back-to-back (invoice cancel, payment delete, PO cancel): the second attempt must return 4xx and all invariants must still hold. Exposed and fixed two real mapping gaps: `deletePayment` on an already-voided payment now returns 400 (was 500), and PO status-machine violations (`Cannot transition from …`) now return 400 (was 500) with the stale poCancelReversal expectation updated.
+
+## 8. Audit completion status
+
+Phases 1–5 are all implemented and green. Remaining work is maintenance: new destructive endpoints must ship with (a) server-side idempotency guards, (b) 4xx (never 5xx) for double-fire and state-machine violations, (c) a case in the invariant suite.

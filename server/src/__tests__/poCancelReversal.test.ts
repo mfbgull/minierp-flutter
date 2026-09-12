@@ -130,7 +130,8 @@ describe('Purchase-order cancellation AP reversal (C3)', () => {
       .post(`/api/purchase-orders/${poId}/status`)
       .set('Cookie', authCookie)
       .send({ status: 'Submitted' });
-    expect(resubmit.status).toBe(500); // controller maps model throw to 500
+    // Phase 5: illegal transitions map to 400 (client error), not 500
+    expect(resubmit.status).toBe(400);
 
     // Still cancelled, still exactly one active debit + one credit
     const po = db.prepare('SELECT status FROM purchase_orders WHERE id = ?').get(poId) as { status: string };
