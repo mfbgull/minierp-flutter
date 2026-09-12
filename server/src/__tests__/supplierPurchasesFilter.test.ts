@@ -31,6 +31,9 @@ const MIGRATIONS = [
   'add-opening-balances.sql',
   'add-purchase-void-columns.sql',
   'add-purchase-return-batches.sql',
+  // C6 (reversal-rules): voided_at columns on payments + allocations —
+  // PurchaseModel.getAll's paid_amount subquery filters voided_at IS NULL.
+  'add-payment-salary-void-columns.sql',
 ];
 
 function createFixture(): Database.Database {

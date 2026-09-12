@@ -113,18 +113,19 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
   }
 
   it('case 1: cancelling an unpaid invoice reverses stock, voids GL, nets the ledger to 0', async () => {
+    // Customer balance BEFORE the invoice exists (used by the net-0 check below).
+    const balanceBefore = (db.prepare(
+      'SELECT current_balance FROM customers WHERE id = ?'
+    ).get(customerId) as { current_balance: number }).current_balance;
+
     const { invoiceId, invoiceNo } = await createInvoice();
 
     const stockBefore = (db.prepare(
       'SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?'
     ).get(itemId, warehouseId) as { quantity: number }).quantity;
 
-    const balanceBefore = (db.prepare(
-      'SELECT current_balance FROM customers WHERE id = ?'
-    ).get(customerId) as { current_balance: number }).current_balance;
-
     const res = await request(app)
-      .post(`/api/invoices/${invoiceId}/cancel`)
+      .put(`/api/invoices/${invoiceId}/cancel`)
       .set('Cookie', authCookie);
     expect(res.status).toBe(200);
 
@@ -153,6 +154,7 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
     ).all(invoiceNo) as Array<{ debit: number; credit: number }>;
     const debit = rows.filter(r => r.debit > 0).reduce((s, r) => s + Number(r.debit), 0);
     const credit = rows.filter(r => r.credit > 0).reduce((s, r) => s + Number(r.credit), 0);
+
     expect(debit).toBeCloseTo(100, 2);
     expect(credit).toBeCloseTo(100, 2);
 
@@ -177,7 +179,7 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
     expect(paidLines).toBeGreaterThan(0);
 
     const res = await request(app)
-      .post(`/api/invoices/${invoiceId}/cancel`)
+      .put(`/api/invoices/${invoiceId}/cancel`)
       .set('Cookie', authCookie);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/payments/i);
@@ -197,7 +199,7 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
     await recordPayment(invoiceId, 40);
 
     const res = await request(app)
-      .post(`/api/invoices/${invoiceId}/cancel`)
+      .put(`/api/invoices/${invoiceId}/cancel`)
       .set('Cookie', authCookie);
     expect(res.status).toBe(400);
 
@@ -235,7 +237,6 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
     expect(invoiceId).toBeDefined();
 
     await recordPayment(invoiceId, 100);
-
     const res = await request(app)
       .post(`/api/sales-orders/${soId}/cancel`)
       .set('Cookie', authCookie);
@@ -271,7 +272,7 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
       .send({ invoice_date: '2026-08-12', due_date: '2026-08-22' });
     expect(conv.status).toBe(201);
     const invoiceId = conv.body.invoiceId as number;
-    const invoiceNo = db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(invoiceId) as { invoice_no: string };
+    const invoiceNo = (db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(invoiceId) as { invoice_no: string }).invoice_no;
 
     const stockBefore = (db.prepare(
       'SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?'

@@ -744,6 +744,24 @@ export class PaymentModel {
     `).get(invoiceId) as { total_paid: number };
     return result.total_paid;
   }
+
+  /**
+   * ERP refund rule (reversal-rules): the cash refundable on an invoice
+   * return is capped at what the customer actually collected. Because
+   * getTotalPaidByInvoiceId sums allocations INCLUDING prior negative
+   * refund allocations, repeated partial returns can never re-refund
+   * cash already paid out.
+   *
+   *   collected = Σ allocations (voided_at IS NULL)   — net of refunds
+   *   refundable = max(0, collected)
+   *
+   * Callers apply: refundAmount = min(netReturn, refundableOnInvoice());
+   * any remainder stays as a customer credit on account, not cash out.
+   */
+  static refundableOnInvoice(db: Database.Database, invoiceId: number): number {
+    const collected = parseCurrency(this.getTotalPaidByInvoiceId(db, invoiceId));
+    return Math.max(0, collected);
+  }
 }
 
 export default PaymentModel;

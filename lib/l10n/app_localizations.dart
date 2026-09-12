@@ -9890,6 +9890,24 @@ abstract class AppLocalizations {
   /// **'Return processed successfully'**
   String get salesreturnsReturnprocessed;
 
+  /// No description provided for @salesreturnsRefundsplit.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund'**
+  String get salesreturnsRefundsplit;
+
+  /// No description provided for @salesreturnsCreditonsplit.
+  ///
+  /// In en, this message translates to:
+  /// **'credit on account'**
+  String get salesreturnsCreditonsplit;
+
+  /// No description provided for @salesreturnsRefundcapnote.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund is capped at what the customer actually paid'**
+  String get salesreturnsRefundcapnote;
+
   /// No description provided for @salesreturnsReturnqtyexceeds.
   ///
   /// In en, this message translates to:

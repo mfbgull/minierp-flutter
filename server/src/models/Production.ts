@@ -3,6 +3,7 @@ import { parseCurrency } from '../utils/currency';
 import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, PRODUCTION_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
+import AccountingService from '../services/accountingService';
 
 interface Production {
   id: number;
@@ -545,25 +546,29 @@ class ProductionModel {
     }
 
     const transaction = db.transaction(() => {
-      // Reversal-rules C2 (FIRST, before stock is touched): void the
-      // legacy journal_entries row that production creation posted
-      // (postFinancialEntryForProduction: Dr inventory_asset / Cr
-      // production_clearing). Without this, deleting a production
-      // removed the stock but left its GL entry active forever —
-      // inventory_asset + production_clearing inflated on the balance
-      // sheet and trial balance, with no way to trace it back.
       const outputMovement = db.prepare(`
-        SELECT id, journal_entry_id, unit_cost, quantity
+        SELECT id, journal_entry_id, unit_cost, quantity,
+          (SELECT COUNT(*) FROM journal_lines
+           WHERE reference_type = 'production' AND reference_id = stock_movements.id AND voided_at IS NULL) AS active_gl_lines
         FROM stock_movements
         WHERE movement_type = 'PRODUCTION' AND reference_docno = ? AND quantity > 0
         ORDER BY id DESC LIMIT 1
-      `).get(production.production_no) as { id: number; journal_entry_id: number | null; unit_cost: number; quantity: number } | undefined;
+      `).get(production.production_no) as { id: number; journal_entry_id: number | null; unit_cost: number; active_gl_lines: number; quantity: number } | undefined;
 
-      if (outputMovement?.journal_entry_id) {
-        StockMovementModel.voidJournalEntry(outputMovement.journal_entry_id, db);
+      // Reversal-rules C2 (FIRST, before stock is touched): void the
+      // canonical journal_lines posted for production output
+      // (postFinancialEntryForProduction: Dr inventory_asset / Cr
+      // production_clearing) and keep the legacy header consistent.
+      // Without this, deleting a production removed the stock but left
+      // its GL entry active forever.
+      if (outputMovement && (outputMovement.active_gl_lines > 0 || outputMovement.journal_entry_id)) {
+        AccountingService.voidJournalLinesByReference(db, 'production', outputMovement.id);
+        if (outputMovement.journal_entry_id) {
+          StockMovementModel.voidJournalEntry(outputMovement.journal_entry_id, db);
+        }
       } else if (parseCurrency(production.total_batch_cost) > 0) {
         // Must-void guard: a production with real cost but no linked
-        // GL row means GL state is unexpected — refuse rather than
+        // GL lines means GL state is unexpected — refuse rather than
         // silently orphan.
         throw new Error(
           `Refusing to delete production ${production.production_no}: its GL journal entry is missing — GL state unexpected`

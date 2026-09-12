@@ -3,7 +3,7 @@
  * must void the legacy journal_entries GL row).
  *
  * Audit case covered:
- *   8. DELETE /api/production/:id → journal_entries.voided = 1 for the
+ *   8. DELETE /api/productions/:id → journal_entries.voided = 1 for the
  *      linked row, raw batch restored, output movement reversed.
  */
 import request from 'supertest';
@@ -66,9 +66,9 @@ describe('Production deletion GL void (C2)', () => {
       });
   });
 
-  async function createProduction(): Promise<{ productionId: number; productionNo: string; journalEntryId: number }> {
+  async function createProduction(): Promise<{ productionId: number; productionNo: string; movementId: number; journalEntryId: number }> {
     const res = await request(app)
-      .post('/api/production')
+      .post('/api/productions')
       .set('Cookie', authCookie)
       .send({
         output_item_id: outputItemId,
@@ -84,14 +84,14 @@ describe('Production deletion GL void (C2)', () => {
 
     const productionNo = (db.prepare('SELECT production_no FROM productions WHERE id = ?').get(productionId) as { production_no: string }).production_no;
     const movement = db.prepare(
-      `SELECT journal_entry_id FROM stock_movements WHERE reference_docno = ? AND movement_type = 'PRODUCTION' AND quantity > 0`
-    ).get(productionNo) as { journal_entry_id: number | null };
+      `SELECT id, journal_entry_id FROM stock_movements WHERE reference_docno = ? AND movement_type = 'PRODUCTION' AND quantity > 0`
+    ).get(productionNo) as { id: number; journal_entry_id: number | null };
     expect(movement?.journal_entry_id).toBeTruthy();
-    return { productionId, productionNo, journalEntryId: movement.journal_entry_id as number };
+    return { productionId, productionNo, movementId: movement.id, journalEntryId: movement.journal_entry_id as number };
   }
 
-  it('case 8: deleting a production voids the linked legacy GL entry and restores stock', async () => {
-    const { productionId, productionNo, journalEntryId } = await createProduction();
+  it('case 8: deleting a production voids the linked canonical GL lines and restores stock', async () => {
+    const { productionId, productionNo, movementId, journalEntryId } = await createProduction();
 
     // GL row active before deletion
     const jeBefore = db.prepare(
@@ -108,15 +108,19 @@ describe('Production deletion GL void (C2)', () => {
     ).get(outputItemId, warehouseId) as { quantity: number }).quantity;
 
     const res = await request(app)
-      .delete(`/api/production/${productionId}`)
+      .delete(`/api/productions/${productionId}`)
       .set('Cookie', authCookie);
     expect(res.status).toBe(200);
 
-    // Legacy GL row voided, not deleted
+    // Legacy GL header voided, canonical lines voided — neither deleted
     const jeAfter = db.prepare(
       'SELECT voided FROM journal_entries WHERE id = ?'
     ).get(journalEntryId) as { voided: number };
     expect(Number(jeAfter.voided)).toBe(1);
+    const activeLines = db.prepare(
+      'SELECT COUNT(*) AS c FROM journal_lines WHERE reference_type = ? AND reference_id = ? AND voided = 0'
+    ).get('production', movementId) as { c: number };
+    expect(activeLines.c).toBe(0);
 
     // Raw material restored (+8), finished good reversed (−4)
     const rawStockAfter = (db.prepare(

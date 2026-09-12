@@ -1330,60 +1330,73 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
         // ----------------------------------------------------------------
         // REFUND: Create a refund payment (negative payment record),
         // reverse/fraction the original payment allocation, post GL entry
+        //
+        // ERP rule: never refund more than the customer actually paid.
+        //   refundAmount = min(netReturn, collected on this invoice)
+        // The remainder (the previously-outstanding AR portion of the
+        // return) is already cleared by the RETURN ledger entry + the
+        // Cr AR side of postInvoiceReturnEntry — it stays as a customer
+        // credit on account, not cash out.
         // ----------------------------------------------------------------
 
-        const refundPaymentNo = InvoiceModel.generatePaymentNoAtomic(db);
+        const paidOnInvoice = PaymentModel.refundableOnInvoice(db, invoiceId);
+        const refundAmount = Math.min(netReturn, Math.max(0, paidOnInvoice));
+        const retainedCredit = parseCurrency(subtractCurrency(netReturn, refundAmount));
 
-        // Create a refund payment (negative amount) — refund only the net
-        const refundPaymentId = InvoiceModel.createPayment(
-          db,
-          refundPaymentNo,
-          invoice.customer_id,
-          todayDate,
-          -netReturn,  // negative = money going out — only net is refunded
-          invoice.paid_amount > 0 ? 'Cash' : 'Cash',
-          null,
-          `Refund for return on ${invoice.invoice_no}${deduction > 0 ? ` (fee: $${deduction.toFixed(2)})` : ''}`
-        );
+        if (refundAmount > 0) {
+          const refundPaymentNo = InvoiceModel.generatePaymentNoAtomic(db);
 
-        // Record a refund allocation (negative allocation = reduction of original payment)
-        InvoiceModel.createPaymentAllocation(db, refundPaymentId, invoiceId, -netReturn);
-        // Ledger entry: Dr (debit) the refund payment no. to reflect cash out
-        createLedgerEntry(
-          invoice.customer_id,
-          todayDate,
-          'REFUND',
-          refundPaymentNo,
-          netReturn,   // debit = customer owes us more (contra)
-          0,
-          `Refund ${refundPaymentNo} for return on ${invoice.invoice_no}`
-        );
+          // Create a refund payment (negative amount = money going out)
+          const refundPaymentId = InvoiceModel.createPayment(
+            db,
+            refundPaymentNo,
+            invoice.customer_id,
+            todayDate,
+            -refundAmount,
+            'Cash',
+            null,
+            `Refund for return on ${invoice.invoice_no}${deduction > 0 ? ` (fee: $${deduction.toFixed(2)})` : ''}${retainedCredit > 0 ? ` — ${parseCurrency(retainedCredit).toFixed(2)} retained as credit on account` : ''}`
+          );
 
-        // Post GL entry for refund: Dr Sales Returns (already done above in postInvoiceReturnEntry),
-        // but also need to reverse the cash side: Dr AR (credit the original overpayment) / Cr Cash
-        // Since postInvoiceReturnEntry already credited AR, we need an additional entry
-        // that reverses the cash impact: Dr AR / Cr Cash (refund paid out)
-        // Funds guard: refunds are cash-out — block if Cash cannot cover it.
-        const refundCashCode = AccountingService._cashOrBankAccountCode('Cash');
-        const refundCashAccount = AccountingService.getAccountByCode(db, refundCashCode);
-        if (!refundCashAccount) {
-          throw new Error(`Chart of accounts is missing required account: ${refundCashCode}`);
+          // Record a refund allocation (negative allocation = reduction of original payment)
+          InvoiceModel.createPaymentAllocation(db, refundPaymentId, invoiceId, -refundAmount);
+          // Ledger entry: Dr (debit) the refund payment no. to reflect cash out
+          createLedgerEntry(
+            invoice.customer_id,
+            todayDate,
+            'REFUND',
+            refundPaymentNo,
+            refundAmount,   // debit = customer owes us more (contra)
+            0,
+            `Refund ${refundPaymentNo} for return on ${invoice.invoice_no}`
+          );
+
+          // Post GL entry for refund: Dr AR / Cr Cash (refund paid out).
+          // Funds guard: refunds are cash-out — block if Cash cannot cover it.
+          const refundCashCode = AccountingService._cashOrBankAccountCode('Cash');
+          const refundCashAccount = AccountingService.getAccountByCode(db, refundCashCode);
+          if (!refundCashAccount) {
+            throw new Error(`Chart of accounts is missing required account: ${refundCashCode}`);
+          }
+          AccountingService.assertSufficientFunds(db, {
+            accountId: refundCashAccount.id,
+            amount: refundAmount,
+            asOfDate: todayDate,
+            label: `refund ${refundPaymentNo}`,
+          });
+          AccountingService.postRefundEntry(db, {
+            refundPaymentId,
+            refundPaymentNo,
+            amount: refundAmount,
+            refundDate: todayDate,
+            paymentMethod: 'Cash',
+            customerId: invoice.customer_id,
+            userId,
+          });
         }
-        AccountingService.assertSufficientFunds(db, {
-          accountId: refundCashAccount.id,
-          amount: netReturn,
-          asOfDate: todayDate,
-          label: `refund ${refundPaymentNo}`,
-        });
-        AccountingService.postRefundEntry(db, {
-          refundPaymentId,
-          refundPaymentNo,
-          amount: netReturn,
-          refundDate: todayDate,
-          paymentMethod: invoice.paid_amount > 0 ? 'Cash' : 'Cash',
-          customerId: invoice.customer_id,
-          userId,
-        });
+        // When refundAmount < netReturn the difference (retainedCredit)
+        // remains as a net customer-ledger credit: the RETURN entry
+        // credited netReturn while only refundAmount was debited back.
       }
 
       else if (resolvedDisposition === 'credit') {
@@ -1526,6 +1539,15 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
         returnAmount,
         netReturn,
         deduction,
+        // Refund split (reversal-rules #11): cash refunded is capped at
+        // what the customer actually collected; the rest stays as a
+        // customer credit on account.
+        refundAmount: resolvedDisposition === 'refund'
+          ? Math.min(netReturn, PaymentModel.refundableOnInvoice(db, invoiceId))
+          : 0,
+        retainedCredit: resolvedDisposition === 'refund'
+          ? parseCurrency(subtractCurrency(netReturn, Math.min(netReturn, PaymentModel.refundableOnInvoice(db, invoiceId))))
+          : netReturn,
       };
     });
 

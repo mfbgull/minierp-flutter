@@ -5036,6 +5036,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get salesreturnsReturnprocessed => 'Return processed successfully';
 
   @override
+  String get salesreturnsRefundsplit => 'Refund';
+
+  @override
+  String get salesreturnsCreditonsplit => 'credit on account';
+
+  @override
+  String get salesreturnsRefundcapnote =>
+      'Refund is capped at what the customer actually paid';
+
+  @override
   String get salesreturnsReturnqtyexceeds =>
       'Return quantity exceeds the available quantity';
 

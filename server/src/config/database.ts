@@ -7,6 +7,7 @@ import logger from '../utils/logger';
 import { getNextSequenceNumber } from '../utils/sequence';
 import { backfillPurchaseReturns } from '../utils/purchaseReturnBackfill';
 import { runBackfillGlPreposting } from '../migrations/backfillGlPreposting';
+import { runBackfillGlUnification } from '../migrations/backfillGlUnification';
 import { runBackfillInvoiceItemTax } from '../migrations/backfillInvoiceItemTax';
 
 // Fail-closed: tests must never fall through to a shared dev DB by accident
@@ -1579,6 +1580,10 @@ runLedgered('fn.reconcileOrphanedJournalLines', reconcileOrphanedJournalLines);
 // GL backfill for documents created before live posting (reporting-search-remediation):
 // posts purchases/payments/expenses/salaries + opening capital; skips docs already posted.
 runLedgered('fn.backfillGlPreposting', () => runBackfillGlPreposting(db));
+// Phase 3 (GL unification): re-link orphaned/mis-linked journal_lines to
+// fresh headers and give line-less legacy journal_entries canonical lines,
+// so journal_lines is the single source of GL truth.
+runLedgered('fn.backfillGlUnification', () => runBackfillGlUnification(db));
 // Per-line tax decomposition (report-query-integrity): columns first, then the
 // one-time decomposition of stored amounts into net_amount + tax_amount.
 runLedgered('add-invoice-item-tax-columns.sql');
