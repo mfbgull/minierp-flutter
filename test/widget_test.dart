@@ -7855,6 +7855,15 @@ void main() {
     }
   }
 
+  /// Opens the app-bar user menu and taps [item]. Admin and Integrations
+  /// live here (they were moved off the nav rail by `hideInRail: true`).
+  Future<void> openUserMenuItem(WidgetTester tester, String item) async {
+    await tester.tap(find.byIcon(Icons.account_circle_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(item).last);
+    await tester.pumpAndSettle();
+  }
+
   Future<void> bootToIntegrations(
     WidgetTester tester, {
     _AuthFakeAdapter? adapter,
@@ -7872,7 +7881,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Integrations'));
+    await openUserMenuItem(tester, 'Integrations');
     await tester.pumpAndSettle();
   }
 
@@ -7915,7 +7924,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Users'));
+    await openUserMenuItem(tester, 'Users');
     await tester.pumpAndSettle();
     if (tab > 0) {
       final label = switch (tab) {
