@@ -43,6 +43,11 @@ abstract final class ApiEndpoints {
   static const physicalCountComplete = '/inventory/physical-counts';
   static const physicalCountItems = '/inventory/physical-counts';
   static const stockBatches = '/inventory/stock-batches';
+  static const batchReconciliation = '/inventory/batch-reconciliation';
+  static const batchReconciliationCorrect = '/inventory/batch-reconciliation/correct';
+  static const batchStatus = '/inventory/batches';
+  static const reservations = '/inventory/reservations';
+  static const locations = '/inventory/locations';
 
   // Sales
   static const invoices = '/invoices';

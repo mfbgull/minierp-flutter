@@ -160,7 +160,10 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
           BatchStatus.expired => const Color(0xFFFEE2E2),
           BatchStatus.nearExpiry => const Color(0xFFFFF1DC),
           BatchStatus.halted => const Color(0xFFEEEEEE),
-          BatchStatus.normal => Colors.transparent,
+          BatchStatus.normal || BatchStatus.active => Colors.transparent,
+          BatchStatus.blocked || BatchStatus.quarantined => const Color(0xFFF3E8FF),
+          BatchStatus.damaged => const Color(0xFFFEE2E2),
+          BatchStatus.rejected => const Color(0xFFEEEEEE),
         };
       },
     );
@@ -333,11 +336,14 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
       renderer: (ctx) {
         final status = BatchStatus.fromString(ctx.cell.value as String?);
         final (color, label) = switch (status) {
-          BatchStatus.normal => (const Color(0xff16a34a), l10n.statusNormal),
+          BatchStatus.normal || BatchStatus.active => (const Color(0xff16a34a), l10n.statusNormal),
           BatchStatus.nearExpiry =>
             (const Color(0xffd97706), l10n.statusNearExpiry),
           BatchStatus.expired => (Colors.red, l10n.statusExpired),
           BatchStatus.halted => (Colors.grey, l10n.statusHalted),
+          BatchStatus.blocked || BatchStatus.quarantined => (const Color(0xff7c3aed), 'Blocked / Quarantined'),
+          BatchStatus.damaged => (Colors.red, 'Damaged'),
+          BatchStatus.rejected => (Colors.grey, 'Rejected'),
         };
         return Container(
           alignment: Alignment.centerLeft,

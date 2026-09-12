@@ -41,6 +41,8 @@ class StockMovement {
     this.warehouseCode,
     this.warehouseName,
     this.createdByName,
+    this.locationId,
+    this.locationName,
   });
 
   factory StockMovement.fromJson(Map<String, dynamic> json) => StockMovement(
@@ -63,6 +65,8 @@ class StockMovement {
     warehouseCode: asString(json['warehouse_code']),
     warehouseName: asString(json['warehouse_name']),
     createdByName: asString(json['created_by_name']),
+    locationId: asInt(json['location_id']),
+    locationName: asString(json['location_name']),
   );
 
   final int id;
@@ -84,6 +88,8 @@ class StockMovement {
   final String? warehouseCode;
   final String? warehouseName;
   final String? createdByName;
+  final int? locationId;
+  final String? locationName;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -99,5 +105,7 @@ class StockMovement {
     'movement_date': movementDate,
     if (createdBy != null) 'created_by': createdBy,
     if (createdAt != null) 'created_at': createdAt,
+    if (locationId != null) 'location_id': locationId,
+    if (locationName != null) 'location_name': locationName,
   };
 }

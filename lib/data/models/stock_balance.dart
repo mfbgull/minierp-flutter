@@ -11,6 +11,10 @@ class StockBalance {
     required this.warehouseCode,
     required this.warehouseName,
     required this.quantity,
+    this.quantityPhysical,
+    this.quantityReserved,
+    this.quantityAvailable,
+    this.locations,
     this.lastUpdated,
   });
 
@@ -22,6 +26,12 @@ class StockBalance {
     warehouseCode: asString(json['warehouse_code']) ?? '',
     warehouseName: asString(json['warehouse_name']) ?? '',
     quantity: (json['quantity'] as num?) ?? 0,
+    quantityPhysical: asNum(json['quantity_physical']),
+    quantityReserved: asNum(json['quantity_reserved']),
+    quantityAvailable: asNum(json['quantity_available']),
+    locations: json['locations'] is List
+        ? (json['locations'] as List).map((e) => BalanceLocation.fromJson(e as Map<String, dynamic>)).toList()
+        : null,
     lastUpdated: asString(json['last_updated']),
   );
 
@@ -32,6 +42,10 @@ class StockBalance {
   final String warehouseCode;
   final String warehouseName;
   final num quantity;
+  final num? quantityPhysical;
+  final num? quantityReserved;
+  final num? quantityAvailable;
+  final List<BalanceLocation>? locations;
   final String? lastUpdated;
 
   Map<String, dynamic> toJson() => {
@@ -42,6 +56,46 @@ class StockBalance {
     'warehouse_code': warehouseCode,
     'warehouse_name': warehouseName,
     'quantity': quantity,
+    if (quantityPhysical != null) 'quantity_physical': quantityPhysical,
+    if (quantityReserved != null) 'quantity_reserved': quantityReserved,
+    if (quantityAvailable != null) 'quantity_available': quantityAvailable,
+    if (locations != null) 'locations': locations!.map((e) => e.toJson()).toList(),
     if (lastUpdated != null) 'last_updated': lastUpdated,
+  };
+}
+
+class BalanceLocation {
+  const BalanceLocation({
+    required this.locationId,
+    required this.locationCode,
+    this.locationName,
+    this.quantityPhysical,
+    this.quantityReserved,
+    this.quantityAvailable,
+  });
+
+  factory BalanceLocation.fromJson(Map<String, dynamic> json) => BalanceLocation(
+    locationId: asInt(json['location_id']) ?? 0,
+    locationCode: asString(json['location_code']) ?? '',
+    locationName: asString(json['location_name']),
+    quantityPhysical: asNum(json['quantity_physical']),
+    quantityReserved: asNum(json['quantity_reserved']),
+    quantityAvailable: asNum(json['quantity_available']),
+  );
+
+  final int locationId;
+  final String locationCode;
+  final String? locationName;
+  final num? quantityPhysical;
+  final num? quantityReserved;
+  final num? quantityAvailable;
+
+  Map<String, dynamic> toJson() => {
+    'location_id': locationId,
+    'location_code': locationCode,
+    if (locationName != null) 'location_name': locationName,
+    if (quantityPhysical != null) 'quantity_physical': quantityPhysical,
+    if (quantityReserved != null) 'quantity_reserved': quantityReserved,
+    if (quantityAvailable != null) 'quantity_available': quantityAvailable,
   };
 }

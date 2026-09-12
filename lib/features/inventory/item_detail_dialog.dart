@@ -381,13 +381,59 @@ class _DetailBody extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  Text(
-                    Formatters.number(rows[i].quantity),
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        Formatters.number(rows[i].quantity),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      if (rows[i].quantityPhysical != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Phys: ${Formatters.number(rows[i].quantityPhysical ?? 0)}',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant, fontSize: 11),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
             ),
+            if (rows[i].locations != null && rows[i].locations!.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                child: Column(
+                  children: [
+                    for (final loc in rows[i].locations!)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                loc.locationCode,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                            Text(
+                              Formatters.number(loc.quantityPhysical ?? 0),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(width: 16),
+                            Text(
+                              'Avail: ${Formatters.number(loc.quantityAvailable ?? 0)}',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ],
           const Divider(height: 1),
           Padding(
