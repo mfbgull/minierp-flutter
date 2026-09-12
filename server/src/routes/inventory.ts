@@ -29,6 +29,7 @@ router.get('/stock-movements', requirePermission('inventory', 'read'), inventory
 router.get('/stock-movements/:id', requirePermission('inventory', 'read'), inventoryController.getStockMovement);
 router.post('/stock-movements', requirePermission('inventory', 'create'), sensitiveOperationLimiter, inventoryController.createStockMovement);
 router.post('/stock-transfers', requirePermission('inventory', 'create'), sensitiveOperationLimiter, inventoryController.createStockTransfer);
+router.post('/stock-transfers/:movementNo/void', requirePermission('inventory', 'update'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), inventoryController.voidStockTransfer);
 
 router.get('/stock-summary', requirePermission('inventory', 'read'), inventoryController.getStockSummary);
 router.get('/stock-ledger/:itemId', requirePermission('inventory', 'read'), inventoryController.getItemLedger);
@@ -40,6 +41,8 @@ router.post('/physical-counts', requirePermission('inventory', 'create'), sensit
 router.post('/physical-counts/:id/items', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.recordPhysicalCountItem);
 router.post('/physical-counts/:id/complete', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.completePhysicalCount);
 router.post('/physical-counts/:id/cancel', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.cancelPhysicalCount);
+// Correct a COMPLETED count (reversal-rules Phase 4) — single-shot reversal + re-application
+router.post('/physical-counts/:id/correct', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.correctPhysicalCount);
 router.delete('/physical-counts/:id', requirePermission('inventory', 'delete'), sensitiveOperationLimiter, inventoryController.deletePhysicalCount);
 
 export default router;

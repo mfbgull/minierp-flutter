@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
+import { getQueryInteger, getQueryParam, getRouteParam } from '../utils/queryUtils';
 import ItemModel from '../models/Item';
 import WarehouseModel from '../models/Warehouse';
 import StockMovementModel from '../models/StockMovement';
@@ -334,6 +334,53 @@ function deleteWarehouse(req: AuthRequest, res: Response): void {
       return;
     }
 
+    // FK-delete 400s (reversal-rules Phase 4): many tables reference
+    // warehouses(id). Without these checks a hard DELETE surfaces as an
+    // opaque 500 FK violation (or, worse, cascades silently).
+    const refs: Array<string> = [];
+    const count = (sql: string): number =>
+      (db.prepare(sql).get(warehouseId) as { c: number }).c;
+
+    const stock = count(
+      `SELECT COUNT(*) AS c FROM stock_balances WHERE warehouse_id = ? AND quantity > 0`
+    );
+    if (stock > 0) refs.push(`${stock} item(s) still in stock`);
+
+    const movements = count(
+      `SELECT COUNT(*) AS c FROM stock_movements WHERE warehouse_id = ?`
+    );
+    if (movements > 0) refs.push(`${movements} stock movement(s)`);
+
+    const batches = count(
+      `SELECT COUNT(*) AS c FROM stock_batches WHERE warehouse_id = ? AND quantity_remaining > 0`
+    );
+    if (batches > 0) refs.push(`${batches} stock batch(es) with remaining units`);
+
+    const purchases = count(
+      `SELECT COUNT(*) AS c FROM purchases WHERE warehouse_id = ?`
+    );
+    if (purchases > 0) refs.push(`${purchases} purchase(s)`);
+
+    const counts = count(
+      `SELECT COUNT(*) AS c FROM physical_counts WHERE warehouse_id = ?`
+    );
+    if (counts > 0) refs.push(`${counts} physical count(s)`);
+
+    const receipts = count(
+      `SELECT COUNT(*) AS c FROM goods_receipts WHERE warehouse_id = ?`
+    );
+    if (receipts > 0) refs.push(`${receipts} goods receipt(s)`);
+
+    const productions = count(
+      `SELECT COUNT(*) AS c FROM productions WHERE warehouse_id = ?`
+    );
+    if (productions > 0) refs.push(`${productions} production(s)`);
+
+    if (refs.length > 0) {
+      res.status(400).json({ error: `Cannot delete warehouse with existing references: ${refs.join(', ')}` });
+      return;
+    }
+
     WarehouseModel.delete(db, warehouseId);
 
     logCRUD(ActionType.WAREHOUSE_DELETE, 'Warehouse', warehouseId, `Deleted warehouse: ${existing.warehouse_name}`, req.user!.id, {
@@ -507,6 +554,46 @@ function createStockTransfer(req: AuthRequest, res: Response): void {
     } else {
       logger.error('Stock transfer failed:', message);
       res.status(500).json({ error: 'Failed to record transfer' });
+    }
+  }
+}
+
+/**
+ * POST /api/inventory/stock-transfers/:movementNo/void
+ * Reversal-rules Phase 4: void a stock transfer. Stock-only reversal
+ * (transfers have no GL effect): restores the source batch, draws down
+ * the mirrored destination batch, and appends a TRANSFER_VOID reversal
+ * pair. Refuses when the transferred units were already consumed from
+ * the destination.
+ */
+function voidStockTransfer(req: AuthRequest, res: Response): void {
+  try {
+    const movementNo = getRouteParam(req.params.movementNo as string | string[]);
+    if (!movementNo) {
+      res.status(400).json({ error: 'Transfer movement number is required' });
+      return;
+    }
+
+    const result = StockMovementModel.voidTransfer(
+      { outMovementNo: movementNo },
+      req.user!.id,
+      db
+    );
+
+    res.json({
+      success: true,
+      message: `Transfer ${movementNo} voided`,
+      data: result,
+      error: null
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to void transfer';
+    const isClientError = /not found|already voided|cannot void|missing|consumed/i.test(message);
+    if (isClientError) {
+      res.status(400).json({ error: message });
+    } else {
+      logger.error('Stock transfer void failed:', message);
+      res.status(500).json({ error: 'Failed to void transfer' });
     }
   }
 }
@@ -707,6 +794,57 @@ function cancelPhysicalCount(req: AuthRequest, res: Response): void {
   }
 }
 
+/**
+ * Reversal-rules Phase 4: correct a COMPLETED physical count
+ * (POST /physical-counts/:id/correct). POSTED counts are immutable —
+ * corrections reverse the original adjustment (stock + GL) and re-apply
+ * the recounted quantities in one transaction.
+ */
+function correctPhysicalCount(req: AuthRequest, res: Response): void {
+  try {
+    const countId = Number(req.params.id);
+    const corrections = req.body?.corrections;
+
+    if (!Array.isArray(corrections) || corrections.length === 0) {
+      res.status(400).json({ error: 'corrections array with item_id and counted_quantity is required' });
+      return;
+    }
+    for (const c of corrections) {
+      if (typeof c.item_id !== 'number' || typeof c.counted_quantity !== 'number') {
+        res.status(400).json({ error: 'Each correction needs numeric item_id and counted_quantity' });
+        return;
+      }
+    }
+
+    PhysicalCountModel.correctCount(
+      { countId, corrections },
+      req.user!.id,
+      db
+    );
+
+    logCRUD(ActionType.ITEM_UPDATE, 'PhysicalCount', countId, `Corrected physical count (${corrections.length} item(s) recounted)`, req.user!.id);
+    req.activityLogged = true;
+
+    const count = PhysicalCountModel.getById(countId, db);
+    res.json(count);
+  } catch (error: any) {
+    const message = error?.message || String(error);
+    if (
+      message.includes('not found') ||
+      message.includes('Only Completed') ||
+      message.includes('already been corrected') ||
+      message.includes('Cannot correct') ||
+      message.includes('required') ||
+      message.includes('snapshot row')
+    ) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    logger.error('Correct physical count error:', error);
+    res.status(500).json({ error: message || 'Failed to correct count' });
+  }
+}
+
 function deletePhysicalCount(req: AuthRequest, res: Response): void {
   try {
     const countId = Number(req.params.id);
@@ -740,6 +878,7 @@ export default {
   getStockMovement,
   createStockMovement,
   createStockTransfer,
+  voidStockTransfer,
   getStockSummary,
   getItemLedger,
   getStockBalances,
@@ -749,5 +888,6 @@ export default {
   recordPhysicalCountItem,
   completePhysicalCount,
   cancelPhysicalCount,
+  correctPhysicalCount,
   deletePhysicalCount
 };

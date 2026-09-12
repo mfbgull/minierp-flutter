@@ -8912,6 +8912,60 @@ abstract class AppLocalizations {
   /// **'Save Counts'**
   String get physicalcountsRecordsave;
 
+  /// No description provided for @physicalcountsCorrectcount.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct Count'**
+  String get physicalcountsCorrectcount;
+
+  /// No description provided for @physicalcountsCorrecttitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct Completed Count'**
+  String get physicalcountsCorrecttitle;
+
+  /// No description provided for @physicalcountsCorrectconfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Correcting this count reverses its posted stock adjustments and accounting entries, then re-applies the recounted quantities. The original entries stay in the audit trail. This can only be done once.'**
+  String get physicalcountsCorrectconfirm;
+
+  /// No description provided for @physicalcountsCorrectapply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply Correction'**
+  String get physicalcountsCorrectapply;
+
+  /// No description provided for @physicalcountsCorrectedmsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Count corrected'**
+  String get physicalcountsCorrectedmsg;
+
+  /// No description provided for @physicalcountsCorrectedbadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Corrected'**
+  String get physicalcountsCorrectedbadge;
+
+  /// No description provided for @physicalcountsCorrectnewqty.
+  ///
+  /// In en, this message translates to:
+  /// **'Recounted quantity'**
+  String get physicalcountsCorrectnewqty;
+
+  /// No description provided for @physicalcountsCorrectnone.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter at least one recounted quantity'**
+  String get physicalcountsCorrectnone;
+
+  /// No description provided for @physicalcountsCorrectorig.
+  ///
+  /// In en, this message translates to:
+  /// **'Originally counted'**
+  String get physicalcountsCorrectorig;
+
   /// No description provided for @productionAvailable.
   ///
   /// In en, this message translates to:

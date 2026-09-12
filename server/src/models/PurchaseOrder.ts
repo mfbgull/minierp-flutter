@@ -57,6 +57,8 @@ interface GoodsReceipt {
   created_by_username?: string;
   total_quantity?: number;
   total_amount?: number;
+  voided_at?: string | null;
+  void_reason?: string | null;
 }
 
 interface CreatePurchaseOrderDTO {
@@ -650,6 +652,168 @@ class PurchaseOrderModel {
     })();
 
     return true;
+  }
+
+  /**
+   * Reversal-rules Phase 4: void a goods receipt.
+   *
+   * A receipt added stock (stock_balances), a FIFO cost layer
+   * (stock_batches, source_type='GOODS_RECEIPT') and a PURCHASE stock
+   * movement, and advanced the PO item received_quantity + status. The
+   * void reverses all of these:
+   *  - refuses if any batch units from this receipt were already consumed
+   *    (sold / transferred / returned) — voiding would corrupt costing;
+   *  - draws down stock_balances at the receipt warehouse;
+   *  - zeroes the receipt's batch layers (quantity_remaining = 0, retained
+   *    for audit — batches are never deleted);
+   *  - appends a PURCHASE_RETURN movement referencing the receipt no
+   *    (append-only trail; originals untouched);
+   *  - reduces received_quantity and recomputes PO status;
+   *  - stamps voided_at / voided_by / void_reason (idempotency guard).
+   *
+   * GL note: receipts post no GL of their own — the PO's financial posting
+   * happens at commit/payment — so no GL reversal is needed here.
+   */
+  static voidGoodsReceipt(
+    data: { receiptId: number; reason?: string },
+    userId: number,
+    db: Database.Database
+  ): GoodsReceipt {
+    const run = db.transaction(() => {
+      const receipt = db.prepare(`
+        SELECT gr.*, po.po_no
+        FROM goods_receipts gr
+        JOIN purchase_orders po ON gr.po_id = po.id
+        WHERE gr.id = ?
+      `).get(data.receiptId) as (GoodsReceipt & { po_no: string }) | undefined;
+
+      if (!receipt) {
+        throw new Error('Goods receipt not found');
+      }
+      if (receipt.voided_at) {
+        throw new Error(`Goods receipt ${receipt.receipt_no} is already voided`);
+      }
+
+      const items = db.prepare(`
+        SELECT gri.id, gri.po_item_id, gri.item_id, gri.received_quantity,
+               poi.unit_price
+        FROM goods_receipt_items gri
+        JOIN purchase_order_items poi ON gri.po_item_id = poi.id
+        WHERE gri.receipt_id = ?
+      `).all(data.receiptId) as Array<{
+        id: number; po_item_id: number; item_id: number;
+        received_quantity: number; unit_price: number;
+      }>;
+
+      if (items.length === 0) {
+        throw new Error(`Goods receipt ${receipt.receipt_no} has no items — cannot void`);
+      }
+
+      let totalQuantity = 0;
+      let totalAmount = 0;
+
+      for (const item of items) {
+        // Refuse if any of this receipt's batch layers were consumed.
+        const batches = db.prepare(`
+          SELECT id, quantity_original, quantity_remaining FROM stock_batches
+          WHERE source_type = 'GOODS_RECEIPT' AND source_id = ?
+        `).all(item.id) as Array<{ id: number; quantity_original: number; quantity_remaining: number }>;
+
+        for (const batch of batches) {
+          if (Number(batch.quantity_remaining) + 1e-9 < Number(batch.quantity_original)) {
+            throw new Error(
+              `Cannot void receipt ${receipt.receipt_no}: units from this receipt were already consumed ` +
+              `(batch ${batch.id} has ${Number(batch.quantity_remaining)} of ${Number(batch.quantity_original)} remaining)`
+            );
+          }
+        }
+
+        // Zero the batch layers (retained for audit).
+        for (const batch of batches) {
+          db.prepare(`UPDATE stock_batches SET quantity_remaining = 0 WHERE id = ?`).run(batch.id);
+        }
+
+        // Draw down stock balance at the receipt warehouse.
+        db.prepare(`
+          UPDATE stock_balances
+          SET quantity = quantity - ?, last_updated = CURRENT_TIMESTAMP
+          WHERE item_id = ? AND warehouse_id = ?
+        `).run(item.received_quantity, item.item_id, receipt.warehouse_id);
+
+        // Append-only reversal movement.
+        const movementNo = StockMovementModel.generateMovementNo(db);
+        db.prepare(`
+          INSERT INTO stock_movements (
+            movement_no, item_id, warehouse_id, movement_type,
+            quantity, unit_cost, reference_doctype, reference_docno,
+            remarks, movement_date, created_by
+          ) VALUES (?, ?, ?, 'PURCHASE_RETURN', ?, ?, 'GOODS_RECEIPT_VOID', ?, ?, ?, ?)
+        `).run(
+          movementNo,
+          item.item_id,
+          receipt.warehouse_id,
+          -item.received_quantity,
+          item.unit_price,
+          receipt.receipt_no,
+          `Receipt ${receipt.receipt_no} voided${data.reason ? `: ${data.reason}` : ''}`,
+          new Date().toISOString().split('T')[0],
+          userId
+        );
+
+        // Roll back the PO item's received_quantity.
+        db.prepare(`
+          UPDATE purchase_order_items
+          SET received_quantity = MAX(0, received_quantity - ?)
+          WHERE id = ?
+        `).run(item.received_quantity, item.po_item_id);
+
+        totalQuantity += item.received_quantity;
+        totalAmount += item.received_quantity * item.unit_price;
+      }
+
+      // Recompute PO status (mirrors addReceipt).
+      const newStatus = this.calculateStatus(receipt.po_id, db);
+      db.prepare(`
+        UPDATE purchase_orders
+        SET status = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(newStatus, receipt.po_id);
+
+      // Rebuild item current_stock from balances.
+      for (const item of items) {
+        db.prepare(`
+          UPDATE items
+          SET current_stock = (
+            SELECT COALESCE(SUM(quantity), 0)
+            FROM stock_balances
+            WHERE item_id = ?
+          )
+          WHERE id = ?
+        `).run(item.item_id, item.item_id);
+      }
+
+      // Stamp the void (idempotency marker) and log activity.
+      db.prepare(`
+        UPDATE goods_receipts
+        SET voided_at = CURRENT_TIMESTAMP, voided_by = ?, void_reason = ?
+        WHERE id = ?
+      `).run(userId, data.reason || null, data.receiptId);
+
+      db.prepare(`
+        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        userId,
+        'VOID',
+        'GoodsReceipt',
+        data.receiptId,
+        `Voided receipt ${receipt.receipt_no} against PO ${receipt.po_no}: ${totalQuantity} units, ${totalAmount.toFixed(2)} reversed`
+      );
+
+      return this.getReceipts(receipt.po_id, db).find((r) => r.id === data.receiptId) as GoodsReceipt;
+    });
+
+    return run();
   }
 
   static getReceipts(poId: number, db: Database.Database): GoodsReceipt[] {

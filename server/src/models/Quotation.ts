@@ -378,6 +378,24 @@ class QuotationModel {
       throw new Error('Cannot update a converted quotation');
     }
 
+    // Reversal-rules Phase 4: status-machine validation on status changes.
+    // Quotations have no stock/GL side effects until conversion, but the
+    // conversion guard keys off status === 'Converted' — a hand-flipped
+    // status could double-convert or revive an expired quote.
+    const validTransitions: Record<string, string[]> = {
+      'Draft': ['Sent', 'Accepted', 'Rejected'],
+      'Sent': ['Accepted', 'Rejected', 'Expired'],
+      'Accepted': ['Converted'],
+      'Expired': ['Sent'],
+      'Rejected': [],
+      'Converted': [],
+    };
+    if (data.status !== undefined && data.status !== quotation.status) {
+      if (!validTransitions[quotation.status]?.includes(data.status)) {
+        throw new Error(`Cannot transition quotation from ${quotation.status} to ${data.status}`);
+      }
+    }
+
     const transaction = db.transaction(() => {
       const { customer_id, customer_name, quotation_date, expiry_date, status, notes, terms, warehouse_id, items } = data;
 

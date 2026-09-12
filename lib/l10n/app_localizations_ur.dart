@@ -4527,6 +4527,34 @@ class AppLocalizationsUr extends AppLocalizations {
   String get physicalcountsRecordsave => 'مقدار محفوظ کریں';
 
   @override
+  String get physicalcountsCorrectcount => 'تصدیق درست کریں';
+
+  @override
+  String get physicalcountsCorrecttitle => 'مکمل شدہ تصدیق درست کریں';
+
+  @override
+  String get physicalcountsCorrectconfirm =>
+      'اس تصدیق کو درست کرنے سے اس کی درج کردہ اسٹاک ایڈجسمنٹس اور اکاؤنٹنگ انٹریز کالعدم ہو کر نئی درج شدہ مقداروں کے مطابق دوبارہ لگائی جائیں گی۔ اصل انٹریز آڈٹ ریکارڈ میں محفوظ رہیں گی۔ یہ صرف ایک بار کیا جا سکتا ہے۔';
+
+  @override
+  String get physicalcountsCorrectapply => 'درستگی لاگو کریں';
+
+  @override
+  String get physicalcountsCorrectedmsg => 'تصدیق درست ہو گئی';
+
+  @override
+  String get physicalcountsCorrectedbadge => 'درست شدہ';
+
+  @override
+  String get physicalcountsCorrectnewqty => 'نئی درج شدہ مقدار';
+
+  @override
+  String get physicalcountsCorrectnone => 'کم از کم ایک نئی مقدار درج کریں';
+
+  @override
+  String get physicalcountsCorrectorig => 'اصل میں درج شدہ';
+
+  @override
   String get productionAvailable => 'دستیاب';
 
   @override

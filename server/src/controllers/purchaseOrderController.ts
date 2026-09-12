@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
+import { getQueryInteger, getQueryParam, getRouteParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
 import PurchaseOrderModel from '../models/PurchaseOrder';
 import SupplierLedgerModel from '../models/SupplierLedger';
@@ -291,6 +291,41 @@ function getGoodsReceipts(req: Request, res: Response): void {
   }
 }
 
+/**
+ * Reversal-rules Phase 4: void a goods receipt (POST /:id/receipts/:receiptId/void).
+ */
+function voidGoodsReceipt(req: AuthRequest, res: Response): void {
+  try {
+    const receiptId = parseInt(getRouteParam(req.params.receiptId as string), 10);
+    if (!Number.isFinite(receiptId)) {
+      res.status(400).json({ error: 'Invalid receipt id' });
+      return;
+    }
+
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason : undefined;
+    const receipt = PurchaseOrderModel.voidGoodsReceipt(
+      { receiptId, reason },
+      (req as { user?: { id: number } }).user?.id ?? 0,
+      db
+    );
+
+    res.json(receipt);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      message.includes('not found') ||
+      message.includes('already voided') ||
+      message.includes('Cannot void') ||
+      message.includes('cannot void')
+    ) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    logger.error('Void goods receipt error:', error);
+    res.status(500).json({ error: 'Failed to void goods receipt' });
+  }
+}
+
 function createGoodsReceipt(req: AuthRequest, res: Response): void {
   try {
     const {
@@ -445,6 +480,7 @@ export default {
   getPurchaseOrderPayments,
   getGoodsReceipts,
   createGoodsReceipt,
+  voidGoodsReceipt,
   getPendingOrders,
   getSummaryBySupplier,
   getSupplierBalance,

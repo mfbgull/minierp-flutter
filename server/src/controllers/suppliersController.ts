@@ -201,6 +201,49 @@ function deleteSupplier(req: Request, res: Response): void {
       return;
     }
 
+    // FK-delete 400s (reversal-rules Phase 4): other tables reference
+    // suppliers(id). Without these checks a hard DELETE surfaces as an
+    // opaque 500 FK violation.
+    const refs: Array<[string, number]> = [];
+    const count = (sql: string): number =>
+      (db.prepare(sql).get(supplierId) as { c: number }).c;
+
+    const directPurchases = count(
+      `SELECT COUNT(*) AS c FROM purchases WHERE supplier_id = ?`
+    );
+    if (directPurchases > 0) refs.push([`${directPurchases} direct purchase(s)`, directPurchases]);
+
+    const payments = count(
+      `SELECT COUNT(*) AS c FROM payments WHERE supplier_id = ? AND voided_at IS NULL`
+    );
+    if (payments > 0) refs.push([`${payments} payment(s)`, payments]);
+
+    const ledgerRows = count(
+      `SELECT COUNT(*) AS c FROM supplier_ledger WHERE supplier_id = ?`
+    );
+    if (ledgerRows > 0) refs.push([`${ledgerRows} supplier ledger entr(ies)`, ledgerRows]);
+
+    const creditNotes = count(
+      `SELECT COUNT(*) AS c FROM supplier_refunds WHERE supplier_id = ?`
+    );
+    if (creditNotes > 0) refs.push([`${creditNotes} supplier refund/credit note(s)`, creditNotes]);
+
+    const purchaseReturns = count(
+      `SELECT COUNT(*) AS c FROM purchase_returns pr
+       WHERE pr.source_type = 'PURCHASE' AND pr.source_id IN (
+         SELECT id FROM purchases WHERE supplier_id = ?
+       )`
+    );
+    if (purchaseReturns > 0) refs.push([`${purchaseReturns} purchase return(s)`, purchaseReturns]);
+
+    if (refs.length > 0) {
+      res.status(400).json({
+        success: false,
+        error: `Cannot delete supplier with existing transactions: ${refs.map((r) => r[0]).join(', ')}`
+      });
+      return;
+    }
+
     const existingSupplier = SupplierModel.getById(supplierId, db);
 
     SupplierModel.delete(supplierId, db);
