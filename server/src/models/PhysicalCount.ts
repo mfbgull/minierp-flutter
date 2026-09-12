@@ -526,11 +526,12 @@ class PhysicalCountModel {
         // Stock: reverse the variance effect.
         //  - Surplus (+): draw down the ADJUSTMENT batch created at
         //    completion (must still hold the full surplus, else refuse).
-        //  - Shortage (−): restore the FIFO layers consumed at completion
-        //    (reversal adds back to the same layers — they cannot have been
-        //    partially consumed by later postings because we do not track
-        //    per-layer provenance here; the equal-and-opposite movement plus
-        //    balance reversal keeps aggregate quantities exact).
+        //  - Shortage (−): restore the FIFO layers the original completion
+        //    consumed — the reversal movement's consumed layers are the
+        //    provenance (stock_movements.batch_id on the original
+        //    adjustment), so add back to those exact batches. Without this
+        //    the batches-vs-balances invariant (Phase 5) drifts: balances
+        //    gain +|v| but the layers were zeroed at completion.
         if (originalVariance > 0) {
           const adjBatch = db.prepare(`
             SELECT id, quantity_remaining FROM stock_batches
@@ -543,10 +544,25 @@ class PhysicalCountModel {
           }
           db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?`)
             .run(originalVariance, adjBatch.id);
+        } else {
+          // Shortage: restore the layers consumed by the original
+          // adjustment movement (its batch_id is the primary consumed
+          // layer). Layer provenance across multiple batches is recorded
+          // only on the primary batch, so restore the full shortage there;
+          // the re-application step below re-consumes FIFO-oldest layers,
+          // netting aggregate layer quantity back out exactly.
+          if (item.adjustment_movement_id !== null) {
+            const origMovement = db.prepare(`
+              SELECT batch_id, quantity FROM stock_movements WHERE id = ?
+            `).get(item.adjustment_movement_id) as { batch_id: number | null; quantity: number } | undefined;
+            if (origMovement?.batch_id != null) {
+              db.prepare(`
+                UPDATE stock_batches
+                SET quantity_remaining = quantity_remaining + ? WHERE id = ?
+              `).run(Math.abs(originalVariance), origMovement.batch_id);
+            }
+          }
         }
-        // (Shortage restore: the re-application step below re-consumes FIFO
-        // layers, which nets the layers back out. Balances are corrected
-        // exactly in step 2, so no per-layer restore is needed here.)
 
         // Append-only CORRECTION movement (equal and opposite).
         const reverseNo = StockMovementModel.generateMovementNo(db);
