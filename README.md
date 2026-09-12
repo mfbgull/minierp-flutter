@@ -94,7 +94,7 @@ flutter run -d linux   # or -d windows, -d macos, -d chrome
 - `dart analyze` clean (0 issues)
 - **CI**: GitHub Actions runs two jobs on every push:
   - **flutter** — `flutter pub get`, `flutter analyze` (0-issue gate), `flutter test`
-  - **server** — `typecheck`, `eslint` (zero errors gate), `npm test` (jest), and the reversal-rules verification gate (`npm run verify:reversal-rules`, 56-case C1–C7 invariants)
+  - **server** — `typecheck`, `eslint` (zero errors gate), `npm test` (jest), and the reversal-rules verification gate (`npm run verify:reversal-rules`, 81-case C1–C8 invariants)
 
   Job outcomes appear as the CI badge above; failing job logs include the exact step that broke the gate.
 
