@@ -102,7 +102,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ env.VERSION }}"
-          mkdir -p AppDir/usr/bin AppDir/usr/lib/minierp_app
+          mkdir -p AppDir/usr/bin AppDir/usr/lib/minierp_app AppDir/usr/share/icons/hicolor/512x512/apps
           cp -r build/linux/x64/release/bundle/{minierp_app,lib,data} AppDir/usr/lib/minierp_app/
           cat > AppDir/usr/bin/minierp_app <<'EOF'
           #!/bin/sh
@@ -185,9 +185,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cat > installer.iss <<'EOFISS'
+          cat > installer.iss <<EOFISS
           #define MyAppName "MiniERP"
-          #define MyAppVersion "{#VERSION}"
+          #define MyAppVersion "$VERSION"
           #define MyAppExeName "minierp_app.exe"
           [Setup]
           AppId=com.example.minierpApp
@@ -217,7 +217,7 @@ jobs:
       - name: Compile installer
         shell: pwsh
         run: |
-          & "$env:ISCC" installer.iss /DMyAppVersion=$env:VERSION
+          & "$env:ISCC" installer.iss
           if (-not (Test-Path "dist\MiniERP-$env:VERSION-windows-x64.exe")) { throw 'Windows installer not produced' }
 
       - name: Upload Windows artifact
@@ -252,7 +252,7 @@ jobs:
         run: flutter pub get
 
       - name: Build macOS release
-        run: flutter build macos --release --darwin-arches arm64,x64
+        run: flutter build macos --release
 
       - name: Package DMG
         shell: bash
