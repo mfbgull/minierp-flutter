@@ -44,6 +44,12 @@ describe('migration replay (task 2.6)', () => {
     expect(second).toBe(first);
     // Ledger unchanged — nothing re-executed or double-recorded
     expect((db2.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get() as { n: number }).n).toBe(firstApplied);
+
+    // Close the database before cleanup: on some filesystems (e.g. NTFS
+    // mounts) rmSync cannot delete WAL/SHM files held open by better-sqlite3,
+    // which made this suite fail with ENOTEMPTY although all assertions
+    // had passed.
+    try { db2.close(); } catch { /* already closed */ }
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });

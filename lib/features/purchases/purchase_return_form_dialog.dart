@@ -18,8 +18,11 @@ import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../data/models/purchase.dart' show Purchase;
 import '../../data/models/purchase_order.dart' show PurchaseOrderDetail;
+import '../../data/models/stock_batch.dart' show StockBatch;
 import '../../data/models/warehouse.dart' show Warehouse;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
+import '../../data/repositories/inventory_repository.dart'
+    show inventoryRepositoryProvider;
 import '../../data/repositories/purchase_repository.dart'
     show purchaseRepositoryProvider;
 import '../../l10n/app_localizations.dart';
@@ -146,6 +149,37 @@ class _PurchaseReturnFormDialogState
   bool _warehouseNeedsPick = false;
   bool _busy = false;
   String? _error;
+
+  /// Per-item batch breakdown (batch-location quantities) loaded once
+  /// the source detail arrives — powers the collapsible batch row under
+  /// each line (feature flag `feature_batch_locations` on the server
+  /// fills `locations`; without it the list stays empty and the row is
+  /// hidden).
+  final Map<int, List<StockBatch>> _batchesByItem = {};
+
+  /// Which lines currently show their batch breakdown (source item id →
+  /// expanded).
+  final Map<int, bool> _expandedBatches = {};
+
+  Future<void> _loadBatches(List<_ReturnLine> lines) async {
+    final repo = ref.read(inventoryRepositoryProvider);
+    for (final line in lines) {
+      if (_batchesByItem.containsKey(line.itemId)) continue;
+      final result = await repo.getBatches(itemId: line.itemId);
+      if (!mounted) return;
+      switch (result) {
+        case ApiSuccess(:final data):
+          final withLocations = data
+              .where((b) => b.locations != null && b.locations!.isNotEmpty)
+              .toList();
+          if (withLocations.isNotEmpty) {
+            setState(() => _batchesByItem[line.itemId] = withLocations);
+          }
+        case ApiFailure():
+          break; // Batch breakdown is informational only — ignore errors.
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -372,6 +406,15 @@ class _PurchaseReturnFormDialogState
             : detail is PurchaseOrderDetail
                 ? detail.warehouseId
                 : null);
+    // Fire-and-forget: load the per-item batch breakdown for the
+    // collapsible rows (once per item; ignored when the server feature
+    // flag is off — the batch list then has no `locations` data).
+    if (_batchesByItem.isEmpty) {
+      for (final line in lines) {
+        _batchesByItem[line.itemId] = const [];
+      }
+      _loadBatches(lines);
+    }
     // Live stock per line — decide whether the receipt warehouse still
     // holds the returned quantities (if not, the user picks the
     // warehouse the stock was transferred to). Watched below via
@@ -746,6 +789,9 @@ class _PurchaseReturnFormDialogState
     final invalid = controller.text.trim().isNotEmpty &&
         (qty <= 0 || qty > cap + 0.0001);
 
+    final batches = _batchesByItem[line.itemId];
+    final hasBatches = batches != null && batches.isNotEmpty;
+
     return Container(
       decoration: BoxDecoration(
         border: Border(
@@ -753,50 +799,181 @@ class _PurchaseReturnFormDialogState
         ),
       ),
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  line.itemName,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (line.unitOfMeasure.isNotEmpty)
-                  Text(
-                    line.unitOfMeasure,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            line.itemName,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (hasBatches) ...[
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: () => setState(
+                              () => _expandedBatches[line.sourceItemId] =
+                                  !(_expandedBatches[line.sourceItemId] ??
+                                      false),
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 2,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _expandedBatches[line.sourceItemId] ?? false
+                                        ? Icons.expand_less
+                                        : Icons.expand_more,
+                                    size: 16,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                                  Text(
+                                    'batches',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
+                    if (line.unitOfMeasure.isNotEmpty)
+                      Text(
+                        line.unitOfMeasure,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              _cell(Formatters.currency(line.unitCost), 90,
+                  align: TextAlign.end),
+              _cell(Formatters.number(line.originalQty), 80,
+                  align: TextAlign.end),
+              _cell(Formatters.number(line.returnedQty), 80,
+                  align: TextAlign.end),
+              _cell(
+                Formatters.number(cap),
+                90,
+                align: TextAlign.end,
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 110,
+                child: TextField(
+                  controller: controller,
+                  enabled: !_busy,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
-              ],
-            ),
-          ),
-          _cell(Formatters.currency(line.unitCost), 90, align: TextAlign.end),
-          _cell(Formatters.number(line.originalQty), 80, align: TextAlign.end),
-          _cell(Formatters.number(line.returnedQty), 80, align: TextAlign.end),
-          _cell(
-            Formatters.number(cap),
-            90,
-            align: TextAlign.end,
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 110,
-            child: TextField(
-              controller: controller,
-              enabled: !_busy,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+                  decoration: formInputDecoration(hintText: '0').copyWith(
+                    errorText: invalid ? l10n.purchasesReturnqtyinvalid : null,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
               ),
-              decoration: formInputDecoration(hintText: '0').copyWith(
-                errorText: invalid ? l10n.purchasesReturnqtyinvalid : null,
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
+            ],
           ),
+          if (hasBatches &&
+              (_expandedBatches[line.sourceItemId] ?? false)) ...[
+            const SizedBox(height: 4),
+            Container(
+              margin: const EdgeInsets.only(left: 8),
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final batch in batches)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            batch.batchNo,
+                            style:
+                                Theme.of(context).textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          for (final loc in batch.locations!)
+                            Padding(
+                              padding:
+                                  const EdgeInsets.only(left: 12, top: 1),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: Text(
+                                      loc.locationCode,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      'Phys: ${Formatters.number(loc.quantityPhysical)}',
+                                      textAlign: TextAlign.end,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      'Avail: ${Formatters.number(loc.quantityAvailable)}',
+                                      textAlign: TextAlign.end,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

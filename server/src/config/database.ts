@@ -1467,6 +1467,30 @@ function runBatchHaltColumnsRepairMigration(): void {
   }
 }
 
+/**
+ * inventory-batch-lot-spec: add purchase_return_batches.location_id.
+ * Guarded column-add (SQLite has no ADD COLUMN IF NOT EXISTS) — must
+ * run BEFORE add-batch-location-model.sql, whose
+ * idx_purchase_return_batches_location index references the column.
+ */
+function runPurchaseReturnBatchesLocationMigration(): void {
+  try {
+    const cols = (db.prepare(
+      `SELECT name FROM pragma_table_info('purchase_return_batches')`
+    ).all() as Array<{ name: string }>).map(c => c.name);
+    if (cols.length > 0 && !cols.includes('location_id')) {
+      logger.info('Adding purchase_return_batches.location_id...');
+      db.exec('ALTER TABLE purchase_return_batches ADD COLUMN location_id INTEGER REFERENCES locations(id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_purchase_return_batches_location ON purchase_return_batches(location_id)');
+      logger.info('✅ purchase_return_batches.location_id added');
+    } else if (cols.includes('location_id')) {
+      db.exec('CREATE INDEX IF NOT EXISTS idx_purchase_return_batches_location ON purchase_return_batches(location_id)');
+    }
+  } catch (error: any) {
+    throw new Error('purchase_return_batches location migration error:: ' + error.message, { cause: error });
+  }
+}
+
 function runGLVoidAttributionMigration(): void {
   // Adds journal_lines void attribution (voided_at/voided_by/void_reason)
   // and subledger append-only columns (voided/reversed_by). Idempotent:
@@ -1603,8 +1627,14 @@ runLedgered('fn.runStockInvariantChecksRebuild', runStockInvariantChecksRebuild,
 // Repair: re-add stock_batches halted/halted_reason when an older rebuild
 // dropped them (FEFO consumption hard-fails without the column).
 runLedgered('fn.runBatchHaltColumnsRepairMigration', runBatchHaltColumnsRepairMigration);
-runLedgered("fn.backfillBatchLocations", () => runBackfillBatchLocations(db));
+// Order matters: the schema (tables) must exist before the backfill
+// queries them — on a fresh database the backfill would otherwise
+// hard-fail on missing batch_stock_by_location/locations tables. The
+// purchase_return_batches.location_id column also references locations,
+// so its guarded add runs after this file too.
 runLedgered("add-batch-location-model.sql");
+runLedgered('fn.runPurchaseReturnBatchesLocationMigration', runPurchaseReturnBatchesLocationMigration);
+runLedgered("fn.backfillBatchLocations", () => runBackfillBatchLocations(db));
 
 // Salary payment duplicate guard: pay_period column + unique index
 runLedgered('add-salary-pay-period.sql');

@@ -905,8 +905,7 @@ export default {
 
 export function getBatchReconciliation(req: AuthRequest, res: Response): Response | void {
   try {
-    const db = req.app.get('db');
-    const { item_id, warehouse_id } = req.query as any;
+        const { item_id, warehouse_id } = req.query as any;
 
     let where = 'WHERE 1=1';
     const params: any[] = [];
@@ -937,7 +936,8 @@ export function getBatchReconciliation(req: AuthRequest, res: Response): Respons
       ORDER BY sb.id ASC
     `).all(...params);
 
-    return res.json({ drifts });
+    // Bare array: the client's getRawList parses a top-level JSON list.
+    return res.json(drifts);
   } catch (error: any) {
     logger.error('[BatchReconciliation] get failed:', error);
     return res.status(500).json({ error: error.message });
@@ -946,8 +946,7 @@ export function getBatchReconciliation(req: AuthRequest, res: Response): Respons
 
 export function correctBatchReconciliation(req: AuthRequest, res: Response): Response | void {
   try {
-    const db = req.app.get('db');
-    const { batch_id, location_id, new_quantity_physical } = req.body as any;
+        const { batch_id, location_id, new_quantity_physical } = req.body as any;
     const userId = req.user!.id;
 
     if (!batch_id || location_id === undefined || new_quantity_physical === undefined) {
@@ -1049,8 +1048,7 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
 
 export function updateBatchStatus(req: AuthRequest, res: Response): Response | void {
   try {
-    const db = req.app.get('db');
-    const { id } = req.params;
+        const { id } = req.params;
     const body = req.body as { location_id?: number; status_override?: string };
     const statusOverride = body.status_override as string;
 
@@ -1079,8 +1077,7 @@ export function updateBatchStatus(req: AuthRequest, res: Response): Response | v
 
 export function createReservation(req: AuthRequest, res: Response): Response | void {
   try {
-    const db = req.app.get('db');
-    const { item_id, warehouse_id, location_id, batch_id, quantity_reserved, reference_doctype, reference_docno, reference_line_id } = req.body as any;
+        const { item_id, warehouse_id, location_id, batch_id, quantity_reserved, reference_doctype, reference_docno, reference_line_id } = req.body as any;
     const userId = req.user!.id;
 
     const reservation = StockReservationModel.create(
@@ -1106,8 +1103,7 @@ export function createReservation(req: AuthRequest, res: Response): Response | v
 
 export function releaseReservation(req: AuthRequest, res: Response): Response | void {
   try {
-    const db = req.app.get('db');
-    const { id } = req.params;
+        const { id } = req.params;
     const reservationId = parseInt(id as string, 10);
 
     const reservation = StockReservationModel.getById(reservationId, db);
@@ -1142,8 +1138,7 @@ export function releaseReservation(req: AuthRequest, res: Response): Response | 
 
 export function getReservations(req: AuthRequest, res: Response): Response | void {
   try {
-    const db = req.app.get('db');
-    const { doctype, docno } = req.query as any;
+        const { doctype, docno } = req.query as any;
 
     let reservations: any[];
     if (doctype && docno) {
@@ -1152,7 +1147,8 @@ export function getReservations(req: AuthRequest, res: Response): Response | voi
       reservations = StockReservationModel.getAll(db);
     }
 
-    return res.json({ reservations });
+    // Bare array: the client's getRawList parses a top-level JSON list.
+    return res.json(reservations);
   } catch (error: any) {
     logger.error('[Reservation] list failed:', error);
     return res.status(500).json({ error: error.message });

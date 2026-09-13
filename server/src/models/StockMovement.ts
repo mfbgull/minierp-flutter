@@ -618,13 +618,35 @@ class StockMovementModel {
     const featureOn = isFeatureEnabled(db, 'feature_batch_locations');
 
     // Authoritative check: stock_balances is the source of truth.
+    // quantity_available exists only after the batch-location migration;
+    // select it only when the feature is on so legacy databases (flag
+    // off, column absent) keep the old behavior.
     const balanceRow = db.prepare(`
-      SELECT quantity, quantity_available FROM stock_balances
+      SELECT quantity${featureOn ? ', quantity_available' : ''} FROM stock_balances
       WHERE item_id = ? AND warehouse_id = ?
-    `).get(itemId, warehouseId) as { quantity: number; quantity_available: number } | undefined;
-    const availableQty = featureOn
-      ? (balanceRow ? parseFloat(String(balanceRow.quantity_available)) : 0)
+    `).get(itemId, warehouseId) as { quantity: number; quantity_available?: number } | undefined;
+    // With the flag on, legacy stock that predates batch costing has no
+    // batch_stock_by_location rows, so quantity_available is 0 while
+    // quantity still holds the real on-hand amount. Such stock must stay
+    // consumable (the no-coverage fallback below prices it at standard
+    // cost with batchId null), so fall back to quantity when the item
+    // has no per-location coverage in this warehouse.
+    let availableQty = featureOn
+      ? (balanceRow ? parseFloat(String(balanceRow.quantity_available ?? 0)) : 0)
       : (balanceRow ? parseFloat(String(balanceRow.quantity)) : 0);
+    if (featureOn && availableQty < quantity) {
+      const coverage = db.prepare(`
+        SELECT COALESCE(SUM(bsl.quantity_available), 0) as covered
+        FROM batch_stock_by_location bsl
+        JOIN locations l ON bsl.location_id = l.id
+        JOIN stock_batches sb ON sb.id = bsl.batch_id
+        WHERE l.warehouse_id = ? AND sb.item_id = ?
+      `).get(warehouseId, itemId) as { covered: number };
+      if (coverage.covered + 1e-9 < quantity) {
+        // No (or insufficient) per-location coverage: legacy stock.
+        availableQty = balanceRow ? parseFloat(String(balanceRow.quantity)) : 0;
+      }
+    }
 
     if (availableQty < quantity) {
       const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;

@@ -662,14 +662,17 @@ class InvoiceModel {
                   quantity_available = quantity_available + excluded.quantity_available
               `).run(movement.batch_id, locRow.id, restoreQty, restoreQty);
 
-              // Record the restoration for audit
-              db.prepare(`
-                INSERT INTO invoice_return_batches (invoice_return_id, invoice_item_id, batch_id, location_id, quantity)
-                VALUES (
-                  (SELECT COALESCE(MAX(id), 0) FROM invoice_returns WHERE invoice_id = ? AND reference_doctype = 'RETURN'),
-                  ?, ?, ?, ?
-                )
-              `).run(invoiceNo.includes('RET-') ? 0 : invoiceNo, item.item_id, movement.batch_id, locRow.id, restoreQty);
+              // Record the restoration for audit — identified by the
+              // invoice itself (there is no separate return header table).
+              const invRow = db.prepare(`
+                SELECT id FROM invoices WHERE invoice_no = ? LIMIT 1
+              `).get(invoiceNo) as { id: number } | undefined;
+              if (invRow) {
+                db.prepare(`
+                  INSERT INTO invoice_return_batches (invoice_id, batch_id, location_id, quantity, reference_doctype, reference_docno)
+                  VALUES (?, ?, ?, ?, 'RETURN', ?)
+                `).run(invRow.id, movement.batch_id, locRow.id, restoreQty, invoiceNo);
+              }
             }
           } else {
             db.prepare(`

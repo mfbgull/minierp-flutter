@@ -61,18 +61,23 @@ CREATE INDEX IF NOT EXISTS idx_reservations_ref ON stock_reservations(reference_
 CREATE INDEX IF NOT EXISTS idx_reservations_item_wh ON stock_reservations(item_id, warehouse_id, location_id);
 CREATE INDEX IF NOT EXISTS idx_reservations_status ON stock_reservations(status);
 
--- 6. invoice_return_batches
+-- 6. invoice_return_batches: ledger of batch/location restorations made
+-- by invoice returns (reverseStockForItems). There is no separate
+-- invoice_returns header table — returns are identified by the invoice
+-- (invoice_id) and the reversal movement (reference_docno, 'RETURN').
 CREATE TABLE IF NOT EXISTS invoice_return_batches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    invoice_return_id INTEGER NOT NULL,
-    invoice_item_id INTEGER NOT NULL,
+    invoice_id INTEGER NOT NULL REFERENCES invoices(id),
+    invoice_item_id INTEGER,
     batch_id INTEGER NOT NULL REFERENCES stock_batches(id),
     location_id INTEGER NOT NULL REFERENCES locations(id),
     quantity DECIMAL(15,3) NOT NULL,
+    reference_doctype VARCHAR(30) DEFAULT 'RETURN',
+    reference_docno VARCHAR(50),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_invoice_return_batches_return ON invoice_return_batches(invoice_return_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_return_batches_invoice ON invoice_return_batches(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_return_batches_batch ON invoice_return_batches(batch_id);
 
 -- 7. stock_balances extension
@@ -99,9 +104,14 @@ BEGIN
   WHERE id = NEW.id;
 END;
 
--- 9. Composite index for allocation queries (task 1.9)
+-- 9. Composite index for allocation queries (task 1.9): the per-batch
+-- location scan filters batch_id + status_override + availability.
+-- (item/warehouse live on the joined stock_batches/locations tables.)
 CREATE INDEX IF NOT EXISTS idx_batch_stock_alloc
-  ON batch_stock_by_location(item_id, warehouse_id, status_override, quantity_available);
+  ON batch_stock_by_location(batch_id, status_override, quantity_available);
 
--- 11. Extend purchase_return_batches with location_id
-ALTER TABLE purchase_return_batches ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id);
+-- 11. Extend purchase_return_batches with location_id.
+-- SQLite has no "ADD COLUMN IF NOT EXISTS"; the column AND its index
+-- are added by fn.runPurchaseReturnBatchesLocationMigration in
+-- database.ts (guarded with a pragma column check), which runs AFTER
+-- this file creates the referenced locations table.

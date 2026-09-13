@@ -513,12 +513,12 @@ class InventoryRepository {
     body: {
       'item_id': itemId,
       'warehouse_id': warehouseId,
-      if (locationId != null) 'location_id': locationId,
-      if (batchId != null) 'batch_id': batchId,
+      'location_id': ?locationId,
+      'batch_id': ?batchId,
       'quantity_reserved': quantityReserved,
       'reference_doctype': referenceDocType,
       'reference_docno': referenceDocNo,
-      if (referenceLineId != null) 'reference_line_id': referenceLineId,
+      'reference_line_id': ?referenceLineId,
     },
     parse: (json) => StockReservation.fromJson(json as Map<String, dynamic>),
   );
@@ -533,10 +533,12 @@ class InventoryRepository {
   }) => _api.getRawList(
     ApiEndpoints.reservations,
     queryParameters: {
-      if (doctype != null) 'doctype': doctype,
-      if (docno != null) 'docno': docno,
+      'doctype': ?doctype,
+      'docno': ?docno,
     },
-    parseItem: (json) => StockReservation.fromJson(json as Map<String, dynamic>),
+    parseItem: (json) => StockReservation.fromJson(
+      json as Map<String, dynamic>,
+    ),
   );
 
   // ============================================
