@@ -499,6 +499,13 @@ class PurchaseReturnModel {
               `required ${line.quantity}, only ${(line.quantity - remaining).toFixed(3)} available in source batch locations`
             );
           }
+          // Keep the master batch in sync with the location rows
+          // (same contract as consumeFromOldestBatches).
+          db.prepare(`
+            UPDATE stock_batches
+            SET quantity_remaining = quantity_remaining - ?
+            WHERE id = ?
+          `).run(line.quantity, sourceBatch.id);
         } else {
           db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')
             .run(line.quantity, sourceBatch.id);
@@ -516,22 +523,29 @@ class PurchaseReturnModel {
 
         // Persist per-line batch consumption so void restores exactly
         // these batches (PRET-05, task 4.4).
-        // New path: also record location_id
-        const consumedLoc = isFeatureEnabled(db, 'feature_batch_locations')
-          ? db.prepare(`
+        // New path: also record location_id (flag on only — legacy
+        // databases don't have the column yet).
+        if (isFeatureEnabled(db, 'feature_batch_locations')) {
+          const consumedLoc = db.prepare(`
               SELECT bsl.location_id FROM batch_stock_by_location bsl
               JOIN locations l ON bsl.location_id = l.id
               WHERE bsl.batch_id = ? AND l.warehouse_id = ?
               ORDER BY l.created_at ASC LIMIT 1
-            `).get(sourceBatch.id, data.warehouse_id) as { location_id: number } | undefined
-          : null;
-
-        db.prepare(`
-          INSERT INTO purchase_return_batches (return_line_id, batch_id, quantity, location_id)
-          SELECT id, ?, ?, ? FROM purchase_return_items
-          WHERE purchase_return_id = ? AND source_item_id = ?
-          ORDER BY id DESC LIMIT 1
-        `).run(sourceBatch.id, line.quantity, consumedLoc?.location_id ?? null, returnId, line.source_item_id);
+            `).get(sourceBatch.id, data.warehouse_id) as { location_id: number } | undefined;
+          db.prepare(`
+            INSERT INTO purchase_return_batches (return_line_id, batch_id, quantity, location_id)
+            SELECT id, ?, ?, ? FROM purchase_return_items
+            WHERE purchase_return_id = ? AND source_item_id = ?
+            ORDER BY id DESC LIMIT 1
+          `).run(sourceBatch.id, line.quantity, consumedLoc?.location_id ?? null, returnId, line.source_item_id);
+        } else {
+          db.prepare(`
+            INSERT INTO purchase_return_batches (return_line_id, batch_id, quantity)
+            SELECT id, ?, ? FROM purchase_return_items
+            WHERE purchase_return_id = ? AND source_item_id = ?
+            ORDER BY id DESC LIMIT 1
+          `).run(sourceBatch.id, line.quantity, returnId, line.source_item_id);
+        }
       }
 
       // GL reversal — Dr AP / Cr Inventory at actual return cost, keyed to

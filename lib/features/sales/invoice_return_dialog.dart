@@ -15,9 +15,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/invoice.dart'
     show InvoiceItem, InvoicePaymentRecord;
+import '../../data/models/stock_batch.dart' show StockBatch;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/invoice_repository.dart'
     show invoiceRepositoryProvider;
+import '../../data/repositories/inventory_repository.dart'
+    show inventoryRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/form_field.dart';
@@ -76,6 +79,12 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
   /// Live per-line return totals (gross return value of filled lines).
   double _grossReturn = 0;
 
+  /// Per-item batch breakdown (batch → location quantities) for the
+  /// collapsible "batches" chip on each line — informational, filled
+  /// only when the server feature flag `feature_batch_locations` is on.
+  final Map<int, List<StockBatch>> _batchesByItem = {};
+  final Map<int, bool> _expandedBatches = {};
+
   @override
   void initState() {
     super.initState();
@@ -130,11 +139,36 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
           // only when the invoice is paid off, credit otherwise.
           _disposition = data.balanceAmount <= 0 ? 'refund' : 'credit';
         });
+        _loadBatches();
       case ApiFailure(:final error):
         setState(() {
           _loading = false;
           _loadError = error.message;
         });
+    }
+  }
+
+  /// Fire-and-forget batch breakdown per returnable item — powers the
+  /// collapsible "batches" chip under each line. Empty (chip hidden)
+  /// when the server feature flag is off or the item is unbatched.
+  Future<void> _loadBatches() async {
+    final repo = ref.read(inventoryRepositoryProvider);
+    final itemIds = _returnableItems.map((i) => i.itemId).toSet();
+    for (final itemId in itemIds) {
+      if (_batchesByItem.containsKey(itemId)) continue;
+      final result = await repo.getBatches(itemId: itemId);
+      if (!mounted) return;
+      switch (result) {
+        case ApiSuccess(:final data):
+          final withLocations = data
+              .where((b) => b.locations != null && b.locations!.isNotEmpty)
+              .toList();
+          if (withLocations.isNotEmpty) {
+            setState(() => _batchesByItem[itemId] = withLocations);
+          }
+        case ApiFailure():
+          break; // Informational only.
+      }
     }
   }
 
@@ -302,6 +336,21 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
                 onChanged: (id) => setState(() => _warehouseId = id),
               ),
             ),
+            // Batch-aware restock note — shown only when the server
+            // sends per-location batch data (feature flag on): the
+            // server restocks the returned quantity into the chosen
+            // warehouse's DEFAULT location row for each original batch.
+            if (_batchesByItem.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Returned stock is restocked into the chosen '
+                'warehouse\'s DEFAULT location for each original '
+                'batch.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             if (_returnableItems.isEmpty) ...[
               Text(
@@ -320,6 +369,13 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
                   enabled: !_submitting,
                   onChanged: _recalcTotals,
                   onSubmit: _submit,
+                  batches: _batchesByItem[_returnableItems[i].itemId],
+                  expanded: _expandedBatches[_returnableItems[i].id] ?? false,
+                  onToggleExpanded: () => setState(() {
+                    final lineId = _returnableItems[i].id;
+                    _expandedBatches[lineId] =
+                        !(_expandedBatches[lineId] ?? false);
+                  }),
                 ),
               ],
             ],
@@ -412,10 +468,19 @@ class _ReturnLineRow extends StatelessWidget {
     required this.enabled,
     required this.onChanged,
     required this.onSubmit,
+    this.batches,
+    this.expanded = false,
+    this.onToggleExpanded,
   });
 
   final InvoiceItem item;
   final TextEditingController controller;
+
+  /// Batch-location breakdown for this line's item — shown via the
+  /// collapsible "batches" chip when non-empty (feature flag).
+  final List<StockBatch>? batches;
+  final bool expanded;
+  final VoidCallback? onToggleExpanded;
 
   /// Focuses the first return-qty field on open — the quantities are the
   /// dialog's primary input.
@@ -439,29 +504,73 @@ class _ReturnLineRow extends StatelessWidget {
       context,
     ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    final hasBatches = batches != null && batches!.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.itemName ?? '',
-                style: Theme.of(context).textTheme.bodyMedium,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          item.itemName ?? '',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                      if (hasBatches) ...[
+                        const SizedBox(width: 4),
+                        InkWell(
+                          onTap: onToggleExpanded,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  expanded
+                                      ? Icons.expand_less
+                                      : Icons.expand_more,
+                                  size: 16,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                                Text(
+                                  'batches',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelSmall?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if ((item.itemCode ?? '').isNotEmpty)
+                    Text(item.itemCode!, style: muted),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${l10n.salesreturnsAvailableqty}: '
+                    '${Formatters.number(available)}',
+                    style: muted,
+                  ),
+                ],
               ),
-              if ((item.itemCode ?? '').isNotEmpty)
-                Text(item.itemCode!, style: muted),
-              const SizedBox(height: 2),
-              Text(
-                '${l10n.salesreturnsAvailableqty}: '
-                '${Formatters.number(available)}',
-                style: muted,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
+            ),
+            const SizedBox(width: 12),
         SizedBox(
           width: 130,
           child: FormFieldShell(
@@ -495,6 +604,80 @@ class _ReturnLineRow extends StatelessWidget {
             ),
           ),
         ),
+          ],
+        ),
+        if (hasBatches && expanded) ...[
+          const SizedBox(height: 4),
+          Container(
+            margin: const EdgeInsets.only(left: 8),
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final batch in batches!)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          batch.batchNo,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        for (final loc in batch.locations!)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12, top: 1),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: Text(
+                                    loc.locationCode,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 2,
+                                  child: Text(
+                                    'Phys: ${Formatters.number(loc.quantityPhysical)}',
+                                    textAlign: TextAlign.end,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 2,
+                                  child: Text(
+                                    'Avail: ${Formatters.number(loc.quantityAvailable)}',
+                                    textAlign: TextAlign.end,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

@@ -60,3 +60,6 @@ server/database/**/
 server/database/*.db-*
 server/node_modules/
 server/uploads/
+
+# Server build output (tsc dist) — never tracked
+server/dist/

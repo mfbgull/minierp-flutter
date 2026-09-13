@@ -11,6 +11,8 @@ import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
 import '../../data/models/item.dart' show Item;
 import '../../data/models/stock_batch.dart' show BatchStatus, StockBatch;
+import 'batch_reconciliation_screen.dart';
+import 'reservation_list_screen.dart';
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/inventory_repository.dart'
     show inventoryRepositoryProvider;
@@ -226,6 +228,30 @@ class _BatchManagementScreenState
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.batchManagement),
+        actions: [
+          // Batch-location feature shortcuts — the reconciliation
+          // (drift list) and reservations full-page screens. Same
+          // MaterialPageRoute pattern this screen itself is opened
+          // with, so the back stack stays uniform.
+          IconButton(
+            tooltip: 'Batch Reconciliation',
+            icon: const Icon(Icons.rule),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const BatchReconciliationScreen(),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Reservations',
+            icon: const Icon(Icons.lock_outline),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ReservationListScreen(),
+              ),
+            ),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
