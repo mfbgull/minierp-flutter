@@ -6347,32 +6347,34 @@ void _mockPrintingChannel() {
 }
 
 /// Drives a CSV export through the mocked file_picker save dialog and
-/// waits for the write to actually finish.
+/// waits for the export to complete.
 ///
 /// The save path is real async file I/O (`File.writeAsBytes` with
 /// `flush: true`) that never completes under the test's fake-async
 /// zone, so it must run inside [WidgetTester.runAsync]. A fixed
-/// real-time delay races with the OS write under CI load; instead we
-/// poll until [target] exists on disk — the completion event the
-/// success toast follows in the same microtask chain — with a small
-/// grace period afterwards so the toast continuation runs before the
-/// test returns to fake-async land.
+/// real-time delay races with the OS write and its fsync under CI
+/// load — file existence alone is observable before the write is
+/// flushed, so the success toast can still trail it. The toast is the
+/// exact completion signal the tests assert on, so poll for it
+/// directly (visible for the full 3s [AppToast] duration) with a
+/// generous deadline.
 Future<void> _exportViaSaveDialog(
   WidgetTester tester,
   Finder tap,
   String target,
+  String successText,
 ) async {
   await tester.runAsync(() async {
     await tester.tap(tap);
     await tester.pump();
+    final toast = find.text(successText);
     final deadline = DateTime.now().add(const Duration(seconds: 10));
-    while (!File(target).existsSync() && DateTime.now().isBefore(deadline)) {
+    while (toast.evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(const Duration(milliseconds: 25));
     }
-    // Post-write continuation: the success toast.
-    await Future<void>.delayed(const Duration(milliseconds: 50));
   });
   await tester.pumpAndSettle();
+  expect(find.text(successText), findsOneWidget);
 }
 
 void main() {
@@ -7458,6 +7460,7 @@ void main() {
       tester,
       find.widgetWithText(TextButton, 'Export to CSV'),
       target,
+      'Stock ledger exported',
     );
 
     // Success toast + the CSV file exists with the ledger rows.
@@ -7758,6 +7761,7 @@ void main() {
       tester,
       find.widgetWithText(TextButton, 'Export to CSV'),
       target,
+      'Expenses exported',
     );
 
     // Success toast + the CSV file exists with the expense rows (header
@@ -8328,6 +8332,7 @@ void main() {
       tester,
       find.widgetWithText(TextButton, 'Export to CSV'),
       target,
+      'Report exported',
     );
 
     expect(find.text('Report exported'), findsOneWidget);
@@ -8431,6 +8436,7 @@ void main() {
       tester,
       find.widgetWithText(TextButton, 'Export to CSV'),
       target,
+      'Report exported',
     );
 
     expect(find.text('Report exported'), findsOneWidget);
@@ -8669,6 +8675,7 @@ void main() {
       tester,
       find.widgetWithText(TextButton, 'Export to CSV'),
       target,
+      'Invoices exported',
     );
 
     // Success toast + the CSV file exists with the invoices rows
@@ -8736,6 +8743,7 @@ void main() {
       tester,
       find.text('Export selected'),
       target,
+      'Invoices exported',
     );
 
     // The CSV contains the two selected rows (the 2nd and 3rd fixture
@@ -9182,6 +9190,7 @@ void main() {
       tester,
       find.widgetWithText(TextButton, 'Export to CSV'),
       target,
+      'Invoice returns exported',
     );
 
     // Success toast + the CSV file exists with the returns rows (header
@@ -9799,6 +9808,7 @@ void main() {
       tester,
       find.widgetWithText(TextButton, 'Export to CSV'),
       target,
+      'Sales orders exported',
     );
 
     // Success toast + the CSV file exists with the orders rows (header
@@ -10237,6 +10247,7 @@ void main() {
       tester,
       find.widgetWithText(TextButton, 'Export to CSV'),
       target,
+      'Quotations exported',
     );
 
     // Success toast + the CSV file exists with the quotations rows
@@ -10987,6 +10998,7 @@ void main() {
       tester,
       find.text('Export selected'),
       target,
+      'Export successful',
     );
 
     // The CSV contains the selected customer (the 2nd fixture row,
@@ -12205,6 +12217,7 @@ void main() {
       tester,
       find.widgetWithText(TextButton, 'Export to CSV'),
       target,
+      'Purchase orders exported',
     );
 
     // Success toast + the CSV file exists with the orders rows (header
@@ -12532,6 +12545,7 @@ void main() {
       tester,
       find.widgetWithText(TextButton, 'Export to CSV'),
       target,
+      'Purchase returns exported',
     );
 
     // Success toast + the CSV file exists with the returns rows (header
