@@ -6346,6 +6346,35 @@ void _mockPrintingChannel() {
   });
 }
 
+/// Drives a CSV export through the mocked file_picker save dialog and
+/// waits for the write to actually finish.
+///
+/// The save path is real async file I/O (`File.writeAsBytes` with
+/// `flush: true`) that never completes under the test's fake-async
+/// zone, so it must run inside [WidgetTester.runAsync]. A fixed
+/// real-time delay races with the OS write under CI load; instead we
+/// poll until [target] exists on disk — the completion event the
+/// success toast follows in the same microtask chain — with a small
+/// grace period afterwards so the toast continuation runs before the
+/// test returns to fake-async land.
+Future<void> _exportViaSaveDialog(
+  WidgetTester tester,
+  Finder tap,
+  String target,
+) async {
+  await tester.runAsync(() async {
+    await tester.tap(tap);
+    await tester.pump();
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (!File(target).existsSync() && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+    // Post-write continuation: the success toast.
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+  });
+  await tester.pumpAndSettle();
+}
+
 void main() {
   // The locale provider persists to SharedPreferences; tests use the
   // in-memory mock so the platform plugin isn't hit.
@@ -7425,12 +7454,11 @@ void main() {
     // The save helper does real async file I/O (File.writeAsBytes) that
     // never completes under the test's fake-async zone — drive it inside
     // runAsync so the write finishes and the toast can appear.
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
+    await _exportViaSaveDialog(
+      tester,
+      find.widgetWithText(TextButton, 'Export to CSV'),
+      target,
+    );
 
     // Success toast + the CSV file exists with the ledger rows.
     expect(find.text('Stock ledger exported'), findsOneWidget);
@@ -7726,12 +7754,11 @@ void main() {
     // The save helper does real async file I/O (File.writeAsBytes) that
     // never completes under the test's fake-async zone — drive it inside
     // runAsync so the write finishes and the toast can appear.
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
+    await _exportViaSaveDialog(
+      tester,
+      find.widgetWithText(TextButton, 'Export to CSV'),
+      target,
+    );
 
     // Success toast + the CSV file exists with the expense rows (header
     // columns, both fixture rows with their formatted amounts and the
@@ -8297,12 +8324,11 @@ void main() {
           ),
     );
 
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
+    await _exportViaSaveDialog(
+      tester,
+      find.widgetWithText(TextButton, 'Export to CSV'),
+      target,
+    );
 
     expect(find.text('Report exported'), findsOneWidget);
     final file = File(target);
@@ -8401,12 +8427,11 @@ void main() {
           ),
     );
 
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
+    await _exportViaSaveDialog(
+      tester,
+      find.widgetWithText(TextButton, 'Export to CSV'),
+      target,
+    );
 
     expect(find.text('Report exported'), findsOneWidget);
     final file = File(target);
@@ -8640,12 +8665,11 @@ void main() {
 
     // Real async file I/O — drive it inside runAsync so the write
     // finishes and the toast can appear.
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
+    await _exportViaSaveDialog(
+      tester,
+      find.widgetWithText(TextButton, 'Export to CSV'),
+      target,
+    );
 
     // Success toast + the CSV file exists with the invoices rows
     // (header columns, all three fixture rows with their formatted
@@ -8708,12 +8732,11 @@ void main() {
     expect(find.text('Delete selected'), findsOneWidget);
 
     // Export selected → real async file I/O via runAsync.
-    await tester.runAsync(() async {
-      await tester.tap(find.text('Export selected'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
+    await _exportViaSaveDialog(
+      tester,
+      find.text('Export selected'),
+      target,
+    );
 
     // The CSV contains the two selected rows (the 2nd and 3rd fixture
     // invoices — checkbox order follows the grid rows) but not the first.
@@ -9155,12 +9178,11 @@ void main() {
     // The save helper does real async file I/O (File.writeAsBytes) that
     // never completes under the test's fake-async zone — drive it inside
     // runAsync so the write finishes and the toast can appear.
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
+    await _exportViaSaveDialog(
+      tester,
+      find.widgetWithText(TextButton, 'Export to CSV'),
+      target,
+    );
 
     // Success toast + the CSV file exists with the returns rows (header
     // columns, both fixture rows with their formatted values).
@@ -9773,12 +9795,11 @@ void main() {
     // The save helper does real async file I/O (File.writeAsBytes) that
     // never completes under the test's fake-async zone — drive it inside
     // runAsync so the write finishes and the toast can appear.
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
+    await _exportViaSaveDialog(
+      tester,
+      find.widgetWithText(TextButton, 'Export to CSV'),
+      target,
+    );
 
     // Success toast + the CSV file exists with the orders rows (header
     // columns, both fixture rows with their formatted totals and the
@@ -10212,12 +10233,11 @@ void main() {
 
     // Real async file I/O — drive it inside runAsync so the write
     // finishes and the toast can appear.
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
+    await _exportViaSaveDialog(
+      tester,
+      find.widgetWithText(TextButton, 'Export to CSV'),
+      target,
+    );
 
     // Success toast + the CSV file exists with the quotations rows
     // (header columns, all three fixture rows with their formatted
@@ -10963,12 +10983,11 @@ void main() {
     expect(find.text('Export selected'), findsOneWidget);
 
     // Export selected → real async file I/O via runAsync.
-    await tester.runAsync(() async {
-      await tester.tap(find.text('Export selected'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
+    await _exportViaSaveDialog(
+      tester,
+      find.text('Export selected'),
+      target,
+    );
 
     // The CSV contains the selected customer (the 2nd fixture row,
     // CUST002 / Beta Ltd — checkbox order follows the grid rows) and the
@@ -12182,12 +12201,11 @@ void main() {
     // The save helper does real async file I/O (File.writeAsBytes) that
     // never completes under the test's fake-async zone — drive it inside
     // runAsync so the write finishes and the toast can appear.
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
+    await _exportViaSaveDialog(
+      tester,
+      find.widgetWithText(TextButton, 'Export to CSV'),
+      target,
+    );
 
     // Success toast + the CSV file exists with the orders rows (header
     // columns, both fixture rows with their formatted totals and the
@@ -12510,12 +12528,11 @@ void main() {
     // The save helper does real async file I/O (File.writeAsBytes) that
     // never completes under the test's fake-async zone — drive it inside
     // runAsync so the write finishes and the toast can appear.
-    await tester.runAsync(() async {
-      await tester.tap(find.widgetWithText(TextButton, 'Export to CSV'));
-      await tester.pump();
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    });
-    await tester.pumpAndSettle();
+    await _exportViaSaveDialog(
+      tester,
+      find.widgetWithText(TextButton, 'Export to CSV'),
+      target,
+    );
 
     // Success toast + the CSV file exists with the returns rows (header
     // columns, both fixture rows with their formatted values and the
