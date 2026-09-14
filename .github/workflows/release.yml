@@ -134,13 +134,13 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: minierp-linux-deb
-          path: dist/MiniERP-${VERSION}-linux-x64.deb
+          path: dist/MiniERP-${{ env.VERSION }}-linux-x64.deb
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v6
         with:
           name: minierp-linux-appimage
-          path: MiniERP-${VERSION}-linux-x64.AppImage
+          path: MiniERP-${{ env.VERSION }}-linux-x64.AppImage
 
   build-windows:
     runs-on: windows-latest
@@ -269,7 +269,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: minierp-macos-dmg
-          path: MiniERP-${VERSION}-macos.dmg
+          path: MiniERP-${{ env.VERSION }}-macos.dmg
 
   release:
     needs: [build-linux, build-windows, build-macos]
