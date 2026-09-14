@@ -1092,7 +1092,6 @@ String buildInvoicesCsv(AppLocalizations l10n, List<Invoice> invoices) {
       l10n.fieldsDate,
       l10n.fieldsCustomer,
       l10n.fieldsStatus,
-      'Override',
       l10n.salesTotalsales,
       l10n.salesTotalpaid,
       l10n.salesTotaldue,
@@ -1106,8 +1105,6 @@ String buildInvoicesCsv(AppLocalizations l10n, List<Invoice> invoices) {
         (i.customerName?.isEmpty ?? true) ? '—' : i.customerName!,
       ),
       sanitizeCsvCell(invoiceStatusLabel(l10n, i.status)),
-      i.overrideSale ? 'Yes' : '',
-      Formatters.currency(i.totalAmount),
       Formatters.currency(i.paidAmount),
       Formatters.currency(i.balanceAmount),
       sanitizeCsvCell(

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { AuthRequest } from '../types';
+import { AuthRequest, SellableStockUnavailableError } from '../types';
 import db from '../config/database';
 import logger from '../utils/logger';
 import { getNextSequenceNumber } from '../utils/sequence';
@@ -92,14 +92,17 @@ function createPOSSale(req: AuthRequest, res: Response): void {
     // appear in the customer ledger or invoice paid_amount.
     const paymentAmount = Math.min(cashAmount, total);
 
-    // Stock validation — check all items have sufficient stock before proceeding
+    // Stock validation — all items must be covered by SELLABLE stock
+    // (non-expired, non-halted, ACTIVE-location batches) at the POS
+    // warehouse before proceeding. stock_balances.quantity counts
+    // expired stock, so it must not gate POS sales.
     for (const item of items) {
-      const stockBalance = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?').get(item.item_id, warehouse_id) as { quantity: number } | undefined;
-      const availableStock = stockBalance ? Number(stockBalance.quantity) : 0;
+      const sellable = StockMovementModel.getSellableAvailability(item.item_id, warehouse_id, db)[0];
+      const availableStock = sellable ? sellable.sellable_qty : 0;
       if (availableStock < item.quantity) {
         const itemRecord = db.prepare('SELECT item_name FROM items WHERE id = ?').get(item.item_id) as { item_name: string } | undefined;
         res.status(400).json({
-          error: `Insufficient stock for ${itemRecord?.item_name || 'item ' + item.item_id}. Available: ${availableStock}, Required: ${item.quantity}`
+          error: new SellableStockUnavailableError(itemRecord?.item_name || `item ${item.item_id}`, item.quantity, availableStock).message
         });
         return;
       }
@@ -302,6 +305,11 @@ function createPOSSale(req: AuthRequest, res: Response): void {
     });
 
   } catch (error: unknown) {
+    if (error instanceof SellableStockUnavailableError) {
+      logger.warn('POS sale rejected:', { error: error.message });
+      res.status(400).json({ error: error.message });
+      return;
+    }
     const message = error instanceof Error ? error.message : 'Failed to process POS sale';
     logger.error('POS Sale Error:', error);
     res.status(500).json({ error: message });
@@ -313,6 +321,7 @@ function getPOSTransactions(req: Request, res: Response): void {
     const startDate = req.query.start_date as string | undefined;
     const endDate = req.query.end_date as string | undefined;
     const limitParam = parseInt(req.query.limit as string) || 50;
+
 
     let query = `
       SELECT

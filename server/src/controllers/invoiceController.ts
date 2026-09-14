@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import db from '../config/database';
-import { AuthRequest, Invoice, InvoiceItemDTO, PaymentDTO, InvoiceStatus } from '../types';
+import { AuthRequest, Invoice, InvoiceItemDTO, PaymentDTO, InvoiceStatus, SellableStockUnavailableError } from '../types';
 import StockMovementModel from '../models/StockMovement';
 import InvoiceModel from '../models/Invoice';
 import { InvoiceCancellationGuardError } from '../models/Invoice';
@@ -174,7 +174,6 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       total_amount,
       record_payment,
       payment,
-      expired_batch_overrides,
     } = req.body as {
       invoice_no?: string;
       customer_id: number | string;
@@ -190,11 +189,19 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       total_amount: number | string;
       record_payment?: boolean;
       payment?: PaymentDTO;
-      expired_batch_overrides?: Record<number, string | null>;
     };
 
     if (!customer_id || !invoice_date || !items || items.length === 0) {
       return res.status(400).json({ error: 'Customer, date, and items are required' });
+    }
+
+    // 3.4: legacy clients may still send expired_batch_overrides. The
+    // override flow is removed — expired stock is never sellable — so
+    // the field is inert. Log for observability, do not act on it.
+    if ('expired_batch_overrides' in req.body) {
+      logger.warn('Ignoring removed expired_batch_overrides payload on invoice create', {
+        keys: Object.keys(req.body.expired_batch_overrides ?? {}).length
+      });
     }
 
     const parsedCustomerId = parseInt(String(customer_id), 10);
@@ -267,16 +274,10 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       total_amount: totalAmountNum,
       paid_amount: initialPaidAmount,
       balance_amount: initialBalanceAmount,
-      notes,
-      discount_scope,
-      discount_type,
-      discount_value,
       terms,
       items,
-      override_sale: expired_batch_overrides && Object.keys(expired_batch_overrides).length > 0 ? 1 : 0,
     }, userId);
 
-    // Insert invoice items and deduct stock via FIFO batch consumption
     let cogsTotal = 0;
     const consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }> = [];
     for (const item of items) {
@@ -330,11 +331,10 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       // Track consumption for expiry denormalization
       consumptions.push({ itemId: item.item_id, consumption });
     }
-
-    // Denormalize expiry info onto invoice items and build expiry_notes.
-    // expired_batch_overrides provides original expiry dates for batches
-    // whose dates were temporarily cleared to unblock FEFO consumption.
-    InvoiceModel.denormalizeExpiryInfo(invoiceId, consumptions, db, expired_batch_overrides);
+    // Denormalize expiry info onto invoice items (kept for near-expiry
+    // display; expired batches can no longer be consumed, so no
+    // is_expired_at_sale marking or override merging happens here).
+    InvoiceModel.denormalizeExpiryInfo(invoiceId, consumptions, db);
 
       // Create customer ledger entry (debit to increase AR)
       createLedgerEntry(
@@ -420,6 +420,12 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       { newValue: createdInvoice, correlationId: corrCreate });
     res.status(201).json(createdInvoice);
   } catch (error: unknown) {
+    // Expired/blocked stock is a client-recoverable error, not a 500
+    if (error instanceof SellableStockUnavailableError) {
+      logger.warn('Create invoice rejected:', { error: error.message });
+      res.status(400).json({ error: error.message });
+      return;
+    }
     // ACC-18 interim: client total disagrees with line items → 400
     if (error instanceof TotalMismatchError) {
       logger.warn('Create invoice rejected:', { error: error.message });
@@ -762,6 +768,12 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
       { newValue: updatedInvoice, correlationId: newCorrelationId() });
     res.json(updatedInvoice);
   } catch (error: unknown) {
+    // Expired/blocked stock is a client-recoverable error, not a 500
+    if (error instanceof SellableStockUnavailableError) {
+      logger.warn('Update invoice rejected:', { error: error.message });
+      res.status(400).json({ error: error.message });
+      return;
+    }
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorName = error instanceof Error ? error.name : 'Unknown';
     // PAY-01: crafted cross-invoice payment deletion → client error, not 500
@@ -1151,10 +1163,13 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
       let returnTotalTaxAmount = 0;
 
       for (const returnItem of returnItems) {
-        // Re-fetch item from DB inside transaction to get fresh returned_qty
+        // Re-fetch item from DB inside transaction to get fresh returned_qty.
+        // Scoped to THIS invoice: a bare `OR ii.item_id = ?` match could
+        // return another invoice's line whose item_id happens to equal a
+        // different invoice's line id (return returns the wrong line).
         const freshItem = db.prepare(
-          'SELECT ii.*, i.item_name FROM invoice_items ii LEFT JOIN items i ON ii.item_id = i.id WHERE ii.id = ? OR ii.item_id = ?'
-        ).get(returnItem.invoice_item_id, returnItem.invoice_item_id) as any;
+          'SELECT ii.*, i.item_name FROM invoice_items ii LEFT JOIN items i ON ii.item_id = i.id WHERE ii.invoice_id = ? AND (ii.id = ? OR ii.item_id = ?)'
+        ).get(invoiceId, returnItem.invoice_item_id, returnItem.invoice_item_id) as any;
 
         // Fallback to in-memory item if DB fetch fails
         const invoiceItem = freshItem || invoice.items?.find(

@@ -475,7 +475,7 @@ describe('StockMovementModel', () => {
         StockMovementModel.consumeFromOldestBatches(
           testItemId, testWhId, 15, db
         );
-      }).toThrow('Insufficient stock');
+      }).toThrow('sellable stock');
     });
 
     it('throws error for zero quantity', () => {
@@ -591,7 +591,7 @@ describe('StockMovementModel', () => {
       // Should throw — stock exists but all batches are blocked
       expect(() => {
         StockMovementModel.consumeFromOldestBatches(testItemId, testWhId, 10, db);
-      }).toThrow('All batches for');
+      }).toThrow('sellable stock');
 
       db.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
     });

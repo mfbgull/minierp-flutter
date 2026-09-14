@@ -3,6 +3,7 @@ import logger from '../utils/logger';
 import AccountingService from '../services/accountingService';
 import { sanitizeSortParams, STOCK_BALANCE_SORT_COLUMNS, STOCK_MOVEMENT_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { isFeatureEnabled } from '../utils/featureFlags';
+import { SellableStockUnavailableError } from '../types';
 
 interface StockMovement {
   id: number;
@@ -605,6 +606,97 @@ class StockMovementModel {
     `).run(sums.physical, sums.reserved, sums.available, itemId, warehouseId);
   }
 
+  /**
+   * Core sellable-availability SQL fragment: one row per item+warehouse
+   * with the quantity sellable (non-expired `expiry_date >= date('now')`
+   * or NULL, non-halted, ACTIVE-location batches — the same rules
+   * consumeFromOldestBatches enforces when allocating a sale — plus
+   * legacy non-batch-tracked stock, floored at 0 per warehouse so
+   * batch-tracked items never double-count). Computed read only.
+   */
+  private static sellableAvailabilityByWarehouseSql(db: Database.Database): string {
+    const featureOn = isFeatureEnabled(db, 'feature_batch_locations');
+
+    const batchSellable = featureOn
+      ? `SELECT sb.item_id, l.warehouse_id, SUM(bsl.quantity_available) AS sellable
+         FROM stock_batches sb
+         JOIN batch_stock_by_location bsl ON sb.id = bsl.batch_id
+         JOIN locations l ON bsl.location_id = l.id
+         WHERE bsl.quantity_available > 0
+           AND (sb.halted = 0 OR sb.halted IS NULL)
+           AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'
+           AND (sb.expiry_date IS NULL OR sb.expiry_date >= date('now'))
+         GROUP BY sb.item_id, l.warehouse_id`
+      : `SELECT sb.item_id, sb.warehouse_id, SUM(sb.quantity_remaining) AS sellable
+         FROM stock_batches sb
+         WHERE sb.quantity_remaining > 0
+           AND (sb.halted = 0 OR sb.halted IS NULL)
+           AND (sb.expiry_date IS NULL OR sb.expiry_date >= date('now'))
+         GROUP BY sb.item_id, sb.warehouse_id`;
+
+    return `
+      SELECT bs.item_id, bs.warehouse_id, bs.sellable AS sellable_qty
+      FROM (${batchSellable}) bs
+      UNION ALL
+      SELECT i.id AS item_id, sb_q.warehouse_id,
+             MAX(COALESCE(sb_q.quantity, 0) - COALESCE(ba.total, 0), 0) AS sellable_qty
+      FROM items i
+      JOIN stock_balances sb_q ON sb_q.item_id = i.id
+      LEFT JOIN (
+        SELECT sb.item_id, sb.warehouse_id, SUM(sb.quantity_remaining) AS total
+        FROM stock_batches sb WHERE sb.quantity_remaining > 0
+        GROUP BY sb.item_id, sb.warehouse_id
+      ) ba ON ba.item_id = i.id AND ba.warehouse_id = sb_q.warehouse_id
+      GROUP BY i.id, sb_q.warehouse_id
+      HAVING MAX(COALESCE(sb_q.quantity, 0) - COALESCE(ba.total, 0), 0) > 0
+    `;
+  }
+
+  /**
+   * Per-item sellable availability (summed across warehouses) as a SQL
+   * subquery fragment usable in LEFT JOINs by the items list query.
+   */
+  static sellableAvailabilitySql(db: Database.Database): string {
+    return `
+      SELECT item_id, ROUND(SUM(sellable_qty), 3) AS sellable_qty
+      FROM (${this.sellableAvailabilityByWarehouseSql(db)})
+      GROUP BY item_id
+    `;
+  }
+
+  /**
+   * Sellable availability rows: per item+warehouse sellable quantity.
+   * Computed read only — never mutates stock tables, so invariant E
+   * (stock_balances.quantity == Σ stock_batches.quantity_remaining)
+   * is untouched.
+   */
+  static getSellableAvailability(
+    itemId: number | null,
+    warehouseId: number | null,
+    db: Database.Database
+  ): Array<{ item_id: number; warehouse_id: number; sellable_qty: number }> {
+    const conditions: string[] = [];
+    const params: Array<number | string> = [];
+    if (itemId !== null) {
+      conditions.push('item_id = ?');
+      params.push(itemId);
+    }
+    if (warehouseId !== null) {
+      conditions.push('warehouse_id = ?');
+      params.push(warehouseId);
+    }
+    const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : '';
+    const sql = `
+      SELECT item_id, warehouse_id, ROUND(SUM(sellable_qty), 3) AS sellable_qty
+      FROM (${this.sellableAvailabilityByWarehouseSql(db)})
+      ${where}
+      GROUP BY item_id, warehouse_id
+      HAVING SUM(sellable_qty) > 0
+      ORDER BY item_id, warehouse_id
+    `;
+    return db.prepare(sql).all(...params) as Array<{ item_id: number; warehouse_id: number; sellable_qty: number }>;
+  }
+
   static consumeFromOldestBatches(
     itemId: number,
     warehouseId: number,
@@ -650,9 +742,10 @@ class StockMovementModel {
 
     if (availableQty < quantity) {
       const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
-      throw new Error(
-        `Insufficient stock for ${item?.item_name || `item ${itemId}`} in warehouse ${warehouseId}: ` +
-        `available ${availableQty}, required ${quantity}`
+      throw new SellableStockUnavailableError(
+        item?.item_name || `item ${itemId}`,
+        quantity,
+        availableQty
       );
     }
 
@@ -707,10 +800,10 @@ class StockMovementModel {
         const totalBlocked = allBatchStock?.total ?? 0;
         if (totalBlocked > 0) {
           const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
-          throw new Error(
-            `All batches for ${item?.item_name || `item ${itemId}`} in warehouse ${warehouseId} ` +
-            `are either halted, expired, or location-blocked. Available in stock_balances: ${availableQty}, ` +
-            `but none are available for consumption. Unblock batches or locations, or adjust stock.`
+          throw new SellableStockUnavailableError(
+            item?.item_name || `item ${itemId}`,
+            quantity,
+            0
           );
         }
       }
@@ -733,15 +826,18 @@ class StockMovementModel {
         if (remaining <= 0) break;
         const consumeFromThis = Math.min(remaining, batch.qty_avail);
 
-        // Decrement batch_stock_by_location rows for this batch within the warehouse.
-        // We consume from locations with the oldest created_at first to maintain FIFO/FEFO.
+        // Location rows for this batch in this warehouse. The batch-level
+        // expiry/halted filter already ran in the outer batchRows query;
+        // here only location sellability applies (ACTIVE status).
+        // (The previous version referenced `sb.expiry_date` out of scope
+        // — a latent "no such column" failure on every FEFO consumption.)
         const locRows = db.prepare(`
           SELECT bsl.id, bsl.quantity_available, l.created_at
           FROM batch_stock_by_location bsl
           JOIN locations l ON bsl.location_id = l.id
           WHERE bsl.batch_id = ? AND l.warehouse_id = ?
             AND bsl.quantity_available > 0
-            ${useFEFO ? "AND (bsl.status_override IS NULL OR bsl.status_override = 'ACTIVE') AND (sb.expiry_date IS NULL OR sb.expiry_date >= date('now'))" : ''}
+            AND (bsl.status_override IS NULL OR bsl.status_override = 'ACTIVE')
           ORDER BY l.created_at ASC, bsl.id ASC
         `).all(batch.id, warehouseId) as Array<{ id: number; quantity_available: number; created_at: string }>;
 
@@ -770,10 +866,10 @@ class StockMovementModel {
 
       if (remaining > 0.001) {
         const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
-        throw new Error(
-          `Batch coverage shortfall for ${item?.item_name || `item ${itemId}`} in warehouse ${warehouseId}: ` +
-          `stock_balances shows ${availableQty} but batch_stock_by_location only covers ${(quantity - remaining).toFixed(3)}. ` +
-          `Run a batch reconciliation.`
+        throw new SellableStockUnavailableError(
+          item?.item_name || `item ${itemId}`,
+          quantity,
+          quantity - remaining
         );
       }
 
@@ -825,11 +921,10 @@ class StockMovementModel {
 
     if (batches.length === 0) {
       if (useFEFO && totalBatchTrackedQty > 0) {
-        throw new Error(
-          `All batches for ${itemRow?.item_name || `item ${itemId}`} in warehouse ${warehouseId} ` +
-          `are either halted or expired. Available in stock_balances: ${availableQty}, ` +
-          `but none are available for FEFO consumption. ` +
-          `Unhalt or un-expire batches, or adjust stock.`
+        throw new SellableStockUnavailableError(
+          itemRow?.item_name || `item ${itemId}`,
+          quantity,
+          0
         );
       }
 
@@ -860,13 +955,12 @@ class StockMovementModel {
 
     if (remaining > 0.001) {
       const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
-      throw new Error(
-        `Batch coverage shortfall for ${item?.item_name || `item ${itemId}`} in warehouse ${warehouseId}: ` +
-        `stock_balances shows ${availableQty} but batches only cover ${(quantity - remaining).toFixed(3)}. ` +
-        `Run a batch reconciliation.`
+      throw new SellableStockUnavailableError(
+        item?.item_name || `item ${itemId}`,
+        quantity,
+        quantity - remaining
       );
     }
-
     return consumption;
   }
 

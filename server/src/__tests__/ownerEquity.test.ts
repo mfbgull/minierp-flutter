@@ -316,7 +316,7 @@ describe('owner withdrawals — goods', () => {
         items: [{ item_id: itemA, warehouse_id: warehouseId, quantity: balBefore + 999 }],
         created_by: USER,
       })
-    ).toThrow(/Insufficient stock/i);
+    ).toThrow(/Insufficient stock|sellable stock/i);
 
     const balAfter = Number((db.prepare(
       'SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?'

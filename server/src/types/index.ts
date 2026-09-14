@@ -598,3 +598,27 @@ export interface ActivityStat {
   username?: string;
   date?: string;
 }
+
+// ============ Sellable Stock Errors ============
+
+/**
+ * Thrown when a sale line cannot be satisfied from sellable (non-expired,
+ * non-halted, ACTIVE) batches. Controllers map this to HTTP 400 so the
+ * client sees which item fell short and by how much.
+ */
+export class SellableStockUnavailableError extends Error {
+  public readonly itemName: string;
+  public readonly requestedQty: number;
+  public readonly sellableQty: number;
+
+  constructor(itemName: string, requestedQty: number, sellableQty: number) {
+    super(
+      `${itemName}: sellable stock ${sellableQty}, requested ${requestedQty} ` +
+        `(expired, halted, or location-blocked batches are excluded from sale)`
+    );
+    this.name = 'SellableStockUnavailableError';
+    this.itemName = itemName;
+    this.requestedQty = requestedQty;
+    this.sellableQty = sellableQty;
+  }
+}

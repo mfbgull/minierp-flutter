@@ -912,7 +912,9 @@ class _DescriptionCellState extends State<DescriptionCell> {
             Row(
               children: [
                 Text(
-                  'Stock: ${item.currentStock}',
+                  item.sellableQty != null
+                      ? 'Sellable: ${item.sellableQty}'
+                      : 'Stock: ${item.currentStock}',
                   style: const TextStyle(fontSize: 11),
                 ),
                 const Spacer(),

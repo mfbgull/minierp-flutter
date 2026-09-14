@@ -164,7 +164,6 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
               'invoice_date': PlutoCell(value: inv.invoiceDate),
               'customer_name': PlutoCell(value: inv.customerName ?? ''),
               'status': PlutoCell(value: inv.status),
-              'override_sale': PlutoCell(value: inv.overrideSale),
               'total_amount': PlutoCell(value: inv.totalAmount),
               'paid_amount': PlutoCell(value: inv.paidAmount),
               'balance_amount': PlutoCell(value: inv.balanceAmount),

@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { sanitizeSortParams, ITEM_SORT_COLUMNS } from '../utils/sqlSanitizer';
+import StockMovementModel from './StockMovement';
 
 interface Item {
   id: number;
@@ -18,11 +19,14 @@ interface Item {
   sale_type?: string;
   qty_decimal_precision?: number;
   rounding_step?: number | null;
+  has_expiry?: number;
+  near_expiry_threshold_days?: number;
   current_stock?: number;
   created_by?: number;
   is_active?: number;
   created_at?: string;
   updated_at?: string;
+  sellable_qty?: number;
 }
 
 interface CreateItemDTO {
@@ -70,6 +74,7 @@ interface ItemFilters {
   is_raw_material?: boolean;
   is_finished_good?: boolean;
   lowStock?: boolean;
+  sellableOnly?: boolean;
   sortBy?: string;
   sortOrder?: string;
   page?: number;
@@ -104,34 +109,38 @@ class ItemModel {
     // The low-stock rule mirrors the old `getLowStock` predicates:
     // at/below the reorder level with a positive threshold. `reorder_level 0`
     // (or null) means no reorder threshold.
-    const conditions: string[] = ['is_active = 1', 'deleted_at IS NULL'];
+    const conditions: string[] = ['i.is_active = 1', 'i.deleted_at IS NULL'];
     const params: any[] = [];
 
     if (filters.category) {
-      conditions.push('category = ?');
+      conditions.push('i.category = ?');
       params.push(filters.category);
     }
 
     if (filters.search) {
       conditions.push(
-        '(item_code LIKE ? OR item_name LIKE ? OR description LIKE ?)'
+        '(i.item_code LIKE ? OR i.item_name LIKE ? OR i.description LIKE ?)'
       );
       const searchTerm = `%${filters.search}%`;
       params.push(searchTerm, searchTerm, searchTerm);
     }
 
     if (filters.is_raw_material !== undefined) {
-      conditions.push('is_raw_material = ?');
+      conditions.push('i.is_raw_material = ?');
       params.push(filters.is_raw_material ? 1 : 0);
     }
 
     if (filters.is_finished_good !== undefined) {
-      conditions.push('is_finished_good = ?');
+      conditions.push('i.is_finished_good = ?');
       params.push(filters.is_finished_good ? 1 : 0);
     }
 
     if (filters.lowStock) {
-      conditions.push('current_stock < reorder_level AND reorder_level > 0');
+      conditions.push('i.current_stock < i.reorder_level AND i.reorder_level > 0');
+    }
+
+    if (filters.sellableOnly) {
+      conditions.push('COALESCE(sa.sellable_qty, 0) > 0');
     }
 
     const where = `WHERE ${conditions.join(' AND ')}`;
@@ -146,13 +155,21 @@ class ItemModel {
       'ASC'
     );
 
+    // Sellable availability (non-expired, non-halted, ACTIVE batches +
+    // legacy stock) via the shared StockMovementModel fragment, so the
+    // picker's offer can never disagree with backend sale validation.
+    // LEFT JOIN keeps non-sellable items listed unless sellableOnly.
+    const sellableJoin = `LEFT JOIN (${StockMovementModel.sellableAvailabilitySql(db)}) sa ON sa.item_id = i.id`;
+    // Sort columns are whitelisted; qualify them against the items alias.
+    const qualifiedColumn = column.startsWith('i.') ? column : `i.${column}`;
+
     const offset = (pageNum - 1) * limitNum;
     const rows = db
-      .prepare(`SELECT * FROM items ${where} ORDER BY ${column} ${order} LIMIT ? OFFSET ?`)
+      .prepare(`SELECT i.*, COALESCE(sa.sellable_qty, 0) AS sellable_qty FROM items i ${sellableJoin} ${where} ORDER BY ${qualifiedColumn} ${order} LIMIT ? OFFSET ?`)
       .all(...params, limitNum, offset) as Item[];
 
     const countRow = db
-      .prepare(`SELECT COUNT(*) as total FROM items ${where}`)
+      .prepare(`SELECT COUNT(*) as total FROM items i ${sellableJoin} ${where}`)
       .get(...params) as { total: number };
 
     return { rows, total: countRow.total, pageNum, limitNum };
