@@ -83,32 +83,6 @@ List<PlutoColumn> buildSalesColumns({
       ),
     ),
     PlutoColumn(
-      title: '',
-      field: 'override_sale',
-      type: PlutoColumnType.text(),
-      width: 40,
-      readOnly: true,
-      enableContextMenu: false,
-      enableFilterMenuItem: false,
-      enableHideColumnMenuItem: false,
-      enableSetColumnsMenuItem: false,
-      renderer: (ctx) {
-        final isOverride = ctx.cell.value == true || ctx.cell.value == 1;
-        if (!isOverride) return const SizedBox.shrink();
-        return Align(
-          alignment: Alignment.center,
-          child: Tooltip(
-            message: 'Override Sale',
-            child: Icon(
-              Icons.warning_amber_rounded,
-              size: 16,
-              color: Colors.amber.shade700,
-            ),
-          ),
-        );
-      },
-    ),
-    PlutoColumn(
       title: l10n.salesTotalsales,
       field: 'total_amount',
       type: PlutoColumnType.number(format: '#,###.##'),

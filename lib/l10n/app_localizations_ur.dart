@@ -5758,9 +5758,6 @@ class AppLocalizationsUr extends AppLocalizations {
   String get nearExpiryNotice => 'قریبی مونثی کا نوٹس';
 
   @override
-  String get soldAfterExpiry => 'مونثی کے بعد فروخت';
-
-  @override
   String get expiringSoon => 'جلد ختم ہو رہا ہے';
 
   @override
@@ -5866,16 +5863,11 @@ class AppLocalizationsUr extends AppLocalizations {
   }
 
   @override
-  String get overrideExpiredSale => 'آورائیڈ اور بیچیں';
+  String get expiredStockNotSellable => 'ختم شدہ اسٹاک فروخت نہیں ہو سکتا';
 
   @override
-  String get overrideExpiredBody =>
-      'درج ذیل بیچز ختم ہو چکے ہیں۔ آورائیڈ ان کی مونثی تاریخ کو عارضی طور پر صاف کرے گا تاکہ یہ فروخت ممکن ہو سکے۔';
-
-  @override
-  String batchOverrideCleared(Object count) {
-    return '$count ختم شدہ بیچ(es) اس فروخت کے لیے آورائیڈ کیے گئے';
-  }
+  String get expiredStockBlockedBody =>
+      'درج ذیل بیچز ختم ہو چکے ہیں اور اب فروخت نہیں ہو سکتے۔ ان سطروں کو ہٹا دیں یا ختم نہ ہوا اسٹاک استعمال کریں۔';
 
   @override
   String get navOwnersequity => 'مالک کی سرمائے کاری';

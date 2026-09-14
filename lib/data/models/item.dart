@@ -44,6 +44,7 @@ class Item {
     this.isActive = true,
     this.hasExpiry = false,
     this.nearExpiryThresholdDays,
+    this.sellableQty,
     this.createdBy,
     this.createdAt,
     this.updatedAt,
@@ -70,9 +71,9 @@ class Item {
     saleType: SaleType.fromString(json['sale_type']),
     qtyDecimalPrecision: asNum(json['qty_decimal_precision']),
     roundingStep: asNum(json['rounding_step']),
-    isActive: asBool(json['is_active'], fallback: true),
     hasExpiry: asBool(json['has_expiry']),
     nearExpiryThresholdDays: asNum(json['near_expiry_threshold_days']),
+    sellableQty: asNum(json['sellable_qty']),
     createdBy: asInt(json['created_by']),
     createdAt: asString(json['created_at']),
     updatedAt: asString(json['updated_at']),
@@ -107,6 +108,11 @@ class Item {
   final bool isActive;
   final bool hasExpiry;
   final num? nearExpiryThresholdDays;
+
+  /// Server-computed sellable stock (non-expired, non-halted,
+  /// ACTIVE-location batches; `sellable_only=1` lists only carry it).
+  /// Null when the endpoint did not compute it.
+  final num? sellableQty;
   final int? createdBy;
   final String? createdAt;
   final String? updatedAt;

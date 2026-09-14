@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { AuthRequest } from '../types';
+import { AuthRequest, SellableStockUnavailableError } from '../types';
 import db from '../config/database';
 import { getRouteParam } from '../utils/queryUtils';
 import logger from '../utils/logger';
@@ -139,6 +139,13 @@ export async function submitInvoice(req: AuthRequest, res: Response) {
     const createdInvoice = MobileInvoiceModel.getInvoiceWithCustomer(db, invoiceId);
     res.status(201).json({ success: true, data: createdInvoice, message: 'Invoice created successfully' });
   } catch (error) {
+    if (error instanceof SellableStockUnavailableError) {
+      logger.warn('Submit invoice rejected:', { error: error.message });
+      // Keep the mobile error envelope ({success: false}); the message
+      // names the item and shortfall.
+      res.status(400).json({ success: false, error: error.message });
+      return;
+    }
     logger.error('Submit invoice error:', error);
     res.status(500).json({ success: false, error: 'Failed to create invoice' });
   }

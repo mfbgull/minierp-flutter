@@ -21,6 +21,7 @@ function getItems(req: Request, res: Response): void {
     const lowStock = getQueryParam(req.query.low_stock);
     const isRawMaterial = getQueryParam(req.query.is_raw_material);
     const isFinishedGood = getQueryParam(req.query.is_finished_good);
+    const sellableOnly = getQueryParam(req.query.sellable_only);
 
     const truthy = (v: string | undefined) =>
       v === '1' || v?.toLowerCase() === 'true';
@@ -31,6 +32,7 @@ function getItems(req: Request, res: Response): void {
       lowStock: truthy(lowStock),
       is_raw_material: isRawMaterial === undefined ? undefined : truthy(isRawMaterial),
       is_finished_good: isFinishedGood === undefined ? undefined : truthy(isFinishedGood),
+      sellableOnly: truthy(sellableOnly),
       sortBy: sortBy || undefined,
       sortOrder: sortOrder || undefined,
       page,
@@ -549,7 +551,7 @@ function createStockTransfer(req: AuthRequest, res: Response): void {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to record transfer';
-    const isClientError = /Insufficient stock|must differ|must be positive/i.test(message);
+    const isClientError = /Insufficient stock|sellable stock|must differ|must be positive/i.test(message);
     if (isClientError) {
       res.status(400).json({ error: message });
     } else {

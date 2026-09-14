@@ -131,9 +131,20 @@ router.patch('/stock-batches/:id', requirePermission('inventory', 'write'), vali
     const batchId = Number(req.params.id);
     const { expiry_date } = req.body;
 
-    const batch = db.prepare('SELECT id FROM stock_batches WHERE id = ?').get(batchId);
+    const batch = db.prepare('SELECT id, quantity_remaining FROM stock_batches WHERE id = ?').get(batchId) as { id: number; quantity_remaining: number } | undefined;
     if (!batch) {
       res.status(404).json({ error: 'Batch not found' });
+      return;
+    }
+
+    // Expired-stock-sale blocking: a batch that still holds stock cannot
+    // have its expiry cleared or moved into the past — that would re-open
+    // a sale path for already-expired goods. Future dates and edits on
+    // fully consumed batches stay allowed.
+    const newDate = expiry_date || null;
+    if (batch.quantity_remaining > 0 && (!newDate || newDate < new Date().toISOString().split('T')[0])) {
+      logger.warn('Blocked batch expiry edit that would unblock expired stock:', { batchId, requested: newDate });
+      res.status(400).json({ error: 'Cannot clear or backdate expiry_date on a batch with remaining stock' });
       return;
     }
 
@@ -141,7 +152,7 @@ router.patch('/stock-batches/:id', requirePermission('inventory', 'write'), vali
       UPDATE stock_batches
       SET expiry_date = ?
       WHERE id = ?
-    `).run(expiry_date || null, batchId);
+    `).run(newDate, batchId);
 
     const updated = db.prepare('SELECT * FROM stock_batches WHERE id = ?').get(batchId);
     res.json(updated);

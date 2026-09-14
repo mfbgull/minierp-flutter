@@ -11270,12 +11270,6 @@ abstract class AppLocalizations {
   /// **'Near-Expiry Notice'**
   String get nearExpiryNotice;
 
-  /// No description provided for @soldAfterExpiry.
-  ///
-  /// In en, this message translates to:
-  /// **'Sold after expiry'**
-  String get soldAfterExpiry;
-
   /// No description provided for @expiringSoon.
   ///
   /// In en, this message translates to:
@@ -11452,23 +11446,17 @@ abstract class AppLocalizations {
     Object itemName,
   );
 
-  /// No description provided for @overrideExpiredSale.
+  /// No description provided for @expiredStockNotSellable.
   ///
   /// In en, this message translates to:
-  /// **'Override & Sell'**
-  String get overrideExpiredSale;
+  /// **'Expired stock cannot be sold'**
+  String get expiredStockNotSellable;
 
-  /// No description provided for @overrideExpiredBody.
+  /// No description provided for @expiredStockBlockedBody.
   ///
   /// In en, this message translates to:
-  /// **'The following batches are expired. Override will temporarily clear their expiry date to allow this sale.'**
-  String get overrideExpiredBody;
-
-  /// No description provided for @batchOverrideCleared.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} expired batch(es) overridden for this sale'**
-  String batchOverrideCleared(Object count);
+  /// **'The following batches are expired and are no longer sellable. Remove these lines or replace them with non-expired stock.'**
+  String get expiredStockBlockedBody;
 
   /// No description provided for @navOwnersequity.
   ///

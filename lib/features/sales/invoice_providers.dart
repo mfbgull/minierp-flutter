@@ -126,14 +126,20 @@ final invoiceCustomersProvider = FutureProvider<List<Customer>>((ref) async {
   };
 });
 
-/// All active items for the invoice form's line-item selects. Uses the
-/// repository directly (the shared `itemsProvider` is bound to the
-/// inventory screen's search filter and paging state) — fetched as one
-/// large page so the dropdown holds the full list.
+/// All active items with SELLABLE stock for the invoice form's line-item
+/// selects. `sellable_only=1` makes the server exclude items whose every
+/// batch is expired, halted, or location-blocked (computed availability,
+/// same rule the allocator enforces at save time). Uses the repository
+/// directly (the shared `itemsProvider` is bound to the inventory screen's
+/// search filter and paging state) — fetched as one large page so the
+/// dropdown holds the full list.
 final invoiceItemsProvider = FutureProvider<List<Item>>((ref) async {
-  final result = await ref
-      .watch(inventoryRepositoryProvider)
-      .items(const PagedRequest(limit: 10000));
+  final result = await ref.watch(inventoryRepositoryProvider).items(
+        const PagedRequest(
+          limit: 10000,
+          extra: {'sellable_only': 1},
+        ),
+      );
   return switch (result) {
     ApiSuccess(:final data) => data.items,
     ApiFailure(:final error) => throw error,

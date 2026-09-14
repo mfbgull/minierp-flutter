@@ -94,7 +94,6 @@ export interface CreateInvoiceDTO {
   // pass these so the invoice's amounts reflect the recorded payment.
   paid_amount?: number;
   balance_amount?: number;
-  override_sale?: number;
 }
 
 export interface CreateInvoiceItemDTO {
@@ -190,8 +189,12 @@ class InvoiceModel {
   }
 
   /**
-   * After stock consumption, denormalize expiry info onto invoice items
-   * and build the invoice-level expiry_notes string.
+   * After stock consumption, denormalize the earliest consumed-batch
+   * expiry_date onto invoice items (near-expiry display support).
+   *
+   * Expired batches can no longer be consumed (sellable-stock rule),
+   * so the is_expired_at_sale / expiry_notes writers are gone; existing
+   * invoices keep rendering from stored data.
    *
    * @param invoiceId - The invoice to process
    * @param consumptions - Array of { itemId, consumption[] } per line item
@@ -200,12 +203,8 @@ class InvoiceModel {
   static denormalizeExpiryInfo(
     invoiceId: number,
     consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }>,
-    db: Database.Database,
-    expiryOverrides?: Record<number, string | null>
+    db: Database.Database
   ): void {
-    const today = new Date().toISOString().split('T')[0];
-    const expiryNotes: string[] = [];
-
     for (const { itemId, consumption } of consumptions) {
       // Get ALL invoice item rows for this item (handles duplicate lines)
       const invoiceItems = db.prepare(
@@ -222,47 +221,18 @@ class InvoiceModel {
         `SELECT id, expiry_date FROM stock_batches WHERE id IN (${batchIds.map(() => '?').join(',')})`
       ).all(...batchIds) as Array<{ id: number; expiry_date: string | null }>;
 
-      // Merge DB expiry dates with frontend override dates.
-      // Overrides provide the *original* expiry_date that was temporarily
-      // cleared before posting to unblock FEFO consumption.
-      const effectiveDates: string[] = [];
-      for (const b of batches) {
-        const overrideDate = expiryOverrides?.[b.id];
-        const date = b.expiry_date ?? overrideDate ?? null;
-        if (date) effectiveDates.push(date);
-      }
-
-      if (effectiveDates.length === 0) continue;
-
       // Find the earliest expiry date across consumed batches
-      effectiveDates.sort();
-      const earliestExpiry = effectiveDates[0];
-      const isExpired = earliestExpiry < today;
+      const dates = batches.map(b => b.expiry_date).filter((d): d is string => d !== null);
+      if (dates.length === 0) continue;
+      dates.sort();
+      const earliestExpiry = dates[0];
 
-      // Get item name for the note
-      const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
-      const itemName = item?.item_name || `Item ${itemId}`;
-
-      // Update ALL invoice item rows for this item with expiry info
+      // Update ALL invoice item rows for this item with the expiry date
       for (const ii of invoiceItems) {
         db.prepare(
-          'UPDATE invoice_items SET expiry_date = ?, is_expired_at_sale = ? WHERE id = ?'
-        ).run(earliestExpiry, isExpired ? 1 : 0, ii.id);
+          'UPDATE invoice_items SET expiry_date = ? WHERE id = ?'
+        ).run(earliestExpiry, ii.id);
       }
-
-      // Build note line (only once per item, not per line)
-      if (isExpired) {
-        const expiryDate = new Date(earliestExpiry);
-        const todayDate = new Date(today);
-        const daysExpired = Math.floor((todayDate.getTime() - expiryDate.getTime()) / (1000 * 60 * 60 * 24));
-        expiryNotes.push(`• ${itemName} — expired on ${earliestExpiry} (sold ${daysExpired} days after expiry)`);
-      }
-    }
-
-    // Build the expiry_notes string
-    if (expiryNotes.length > 0) {
-      const notes = `⚠️ Expiry Notice\n${expiryNotes.join('\n')}`;
-      db.prepare('UPDATE invoices SET expiry_notes = ? WHERE id = ?').run(notes, invoiceId);
     }
   }
 
@@ -540,49 +510,41 @@ class InvoiceModel {
       return explicitWarehouseId;
     }
 
-    // Find warehouse with sufficient stock
-    const warehouseWithStock = db.prepare(`
-      SELECT warehouse_id, quantity
-      FROM stock_balances
-      WHERE item_id = ? AND quantity >= ?
-      ORDER BY quantity DESC
-      LIMIT 1
-    `).get(itemId, requestedQty) as { warehouse_id: number; quantity: number } | undefined;
-
-    if (warehouseWithStock) {
-      return warehouseWithStock.warehouse_id;
+    // Find warehouse with sufficient SELLABLE stock (non-expired,
+    // non-halted, ACTIVE batches — same rules as the allocator).
+    // stock_balances.quantity counts expired stock, so it must not
+    // drive warehouse selection.
+    const sellable = StockMovementModel.getSellableAvailability(itemId, null, db);
+    const sufficient = sellable.find(w => w.sellable_qty >= requestedQty);
+    if (sufficient) {
+      return sufficient.warehouse_id;
     }
 
-    // Fallback: any warehouse with this item (even if insufficient)
-    const anyWarehouse = db.prepare(`
-      SELECT warehouse_id, quantity
-      FROM stock_balances
-      WHERE item_id = ? AND quantity > 0
-      ORDER BY quantity DESC
-      LIMIT 1
-    `).get(itemId) as { warehouse_id: number; quantity: number } | undefined;
-
-    if (anyWarehouse) {
+    if (sellable.length > 0) {
+      const best = sellable.reduce((a, b) => (b.sellable_qty > a.sellable_qty ? b : a));
       logger.warn(
-        `No warehouse has sufficient stock for item ${itemId}: ` +
-        `best available=${anyWarehouse.quantity}, requested=${requestedQty}. ` +
-        `Using warehouse ${anyWarehouse.warehouse_id}.`
+        `No warehouse has sufficient sellable stock for item ${itemId}: ` +
+        `best sellable=${best.sellable_qty}, requested=${requestedQty}. ` +
+        `Using warehouse ${best.warehouse_id}.`
       );
-      return anyWarehouse.warehouse_id;
+      return best.warehouse_id;
     }
 
-    // Last resort: default warehouse
+    // No sellable stock anywhere — expired/blocked batches only (or none
+    // at all). Fall back to default warehouse; the sale will fail inside
+    // the transaction with a SellableStockUnavailableError.
     const defaultWarehouse = db.prepare(
       `SELECT id FROM warehouses WHERE warehouse_code = ? AND is_active = 1`
     ).get('WH-001') as { id: number } | undefined;
 
     logger.warn(
-      `No stock found for item ${itemId} in any warehouse. ` +
-      `Falling back to default warehouse.`
+      `No sellable stock for item ${itemId} in any warehouse (all stock ` +
+      `expired, halted, or location-blocked). Falling back to default warehouse.`
     );
 
     return defaultWarehouse ? defaultWarehouse.id : 1;
   }
+
 
   /**
    * Reverse stock movements for a list of invoice items that were previously sold.
@@ -748,9 +710,9 @@ class InvoiceModel {
         invoice_no, customer_id, invoice_date, due_date, status,
         total_amount, paid_amount, balance_amount, notes,
         discount_scope, discount_type, discount_value, terms, created_by,
-        source_type, override_sale
+        source_type
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.invoice_no || null,
       data.customer_id,
@@ -766,8 +728,7 @@ class InvoiceModel {
       data.discount_value || 0,
       data.terms || null,
       userId,
-      data.source_type || null,
-      data.override_sale || 0
+      data.source_type || null
     );
     return result.lastInsertRowid as number;
   }

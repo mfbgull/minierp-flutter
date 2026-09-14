@@ -1,8 +1,9 @@
 import Database from 'better-sqlite3';
 import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, SALES_ORDER_SORT_COLUMNS } from '../utils/sqlSanitizer';
-import { QuotationWithWarehouse, InvoiceWithUsername } from '../types';
+import { QuotationWithWarehouse, InvoiceWithUsername, SellableStockUnavailableError } from '../types';
 import InvoiceModel from './Invoice';
+import StockMovementModel from './StockMovement';
 import ledgerUtils from '../utils/ledgerUtils';
 import AccountingService from '../services/accountingService';
 import { parseCurrency } from '../utils/currency';
@@ -637,17 +638,19 @@ class SalesOrderModel {
     }
 
     const transaction = db.transaction(() => {
-      // Validate stock availability
+      // Validate SELLABLE stock availability (non-expired, non-halted,
+      // ACTIVE batches — same rules as the allocator). stock_balances
+      // .quantity counts expired stock, so it must not gate conversion.
       for (const item of salesOrder.items || []) {
-        const stockBalance = db.prepare(`
-          SELECT quantity FROM stock_balances
-          WHERE item_id = ? AND warehouse_id = ?
-        `).get(item.item_id, salesOrder.warehouse_id) as { quantity: number } | undefined;
-
-        const availableStock = stockBalance ? parseFloat(String(stockBalance.quantity)) : 0;
-
-        if (availableStock < item.quantity) {
-          throw new Error(`Insufficient stock for item ${item.item_code}. Available: ${availableStock}, Required: ${item.quantity}`);
+        const sellable = StockMovementModel.getSellableAvailability(item.item_id, salesOrder.warehouse_id, db)[0];
+        const availableSellable = sellable ? sellable.sellable_qty : 0;
+        if (availableSellable < item.quantity) {
+          const itemRow = db.prepare('SELECT item_name FROM items WHERE id = ?').get(item.item_id) as { item_name: string } | undefined;
+          throw new SellableStockUnavailableError(
+            itemRow?.item_name || item.item_code || `item ${item.item_id}`,
+            item.quantity,
+            availableSellable
+          );
         }
       }
 

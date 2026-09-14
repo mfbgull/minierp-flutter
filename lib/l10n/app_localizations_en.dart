@@ -5761,9 +5761,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nearExpiryNotice => 'Near-Expiry Notice';
 
   @override
-  String get soldAfterExpiry => 'Sold after expiry';
-
-  @override
   String get expiringSoon => 'Expiring Soon';
 
   @override
@@ -5869,16 +5866,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get overrideExpiredSale => 'Override & Sell';
+  String get expiredStockNotSellable => 'Expired stock cannot be sold';
 
   @override
-  String get overrideExpiredBody =>
-      'The following batches are expired. Override will temporarily clear their expiry date to allow this sale.';
-
-  @override
-  String batchOverrideCleared(Object count) {
-    return '$count expired batch(es) overridden for this sale';
-  }
+  String get expiredStockBlockedBody =>
+      'The following batches are expired and are no longer sellable. Remove these lines or replace them with non-expired stock.';
 
   @override
   String get navOwnersequity => 'Owner\'s Equity';

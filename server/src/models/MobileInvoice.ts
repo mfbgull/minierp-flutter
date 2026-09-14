@@ -173,19 +173,16 @@ function getPaymentTerms(db: Database.Database) {
 }
 
 function findWarehouseForItem(db: Database.Database, itemId: number, quantity: number): number {
-  const balance = db.prepare(`
-    SELECT warehouse_id, quantity FROM stock_balances
-    WHERE item_id = ? AND quantity >= ? ORDER BY quantity DESC LIMIT 1
-  `).get(itemId, quantity) as { warehouse_id: number; quantity: number } | undefined;
+  // SELLABLE stock (non-expired, non-halted, ACTIVE batches) — same
+  // rules as the allocator. stock_balances.quantity counts expired
+  // stock, so it must not drive warehouse selection.
+  const sellable = StockMovementModel.getSellableAvailability(itemId, null, db);
+  const sufficient = sellable.find(w => w.sellable_qty >= quantity);
+  if (sufficient) return sufficient.warehouse_id;
 
-  if (balance?.warehouse_id) return balance.warehouse_id;
-
-  const anyBalance = db.prepare(`
-    SELECT warehouse_id, quantity FROM stock_balances
-    WHERE item_id = ? AND quantity > 0 ORDER BY quantity DESC LIMIT 1
-  `).get(itemId) as { warehouse_id: number; quantity: number } | undefined;
-
-  if (anyBalance?.warehouse_id) return anyBalance.warehouse_id;
+  if (sellable.length > 0) {
+    return sellable.reduce((a, b) => (b.sellable_qty > a.sellable_qty ? b : a)).warehouse_id;
+  }
 
   const defaultWh = db.prepare(
     'SELECT id FROM warehouses WHERE warehouse_code = ? AND is_active = 1'
