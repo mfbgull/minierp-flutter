@@ -1148,6 +1148,7 @@
   "customersBillingaddress": "بلنگ ایڈریس",
   "customersCancelinvoice": "انوائس منسوخ کریں",
   "customersCancelinvoiceconfirm": "کیا یہ انوائس منسوخ کریں؟ یہ واپس نہیں ہو سکتی۔",
+  "customersConfirmcancelinvoice": "کیا یہ انوائس منسوخ کریں؟ یہ واپس نہیں ہو سکتی۔",
   "customersClosingbalance": "اختتامی بیلنس",
   "customersConfirmdeleteinvoice": "انوائس حذف کریں",
   "customersConfirmdeletepayment": "ادائیگی حذف کریں",

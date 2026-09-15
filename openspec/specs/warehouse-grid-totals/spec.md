@@ -1,7 +1,7 @@
 # warehouse-grid-totals Specification
 
 ## Purpose
-TBD - created by archiving change inventory-screen-improvements. Update Purpose after archive.
+Displays aggregated inventory totals per warehouse in the stock grid, showing both total quantity of items and unique item count. Server-side calculations ensure accurate totals regardless of which items are currently visible in the grid, providing warehouse managers with quick inventory summaries.
 ## Requirements
 ### Requirement: Warehouses grid displays Total Items and Unique Items
 The Warehouses grid SHALL display each warehouse's Total Items and Unique

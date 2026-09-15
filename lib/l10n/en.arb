@@ -1202,6 +1202,7 @@
   "customersCancelinvoice": "Cancel Invoice",
   "customersCancelinvoiceconfirm": "Cancel this invoice? This cannot be undone.",
   "customersClosingbalance": "Closing Balance",
+  "customersConfirmcancelinvoice": "Cancel this invoice? This cannot be undone.",
   "customersConfirmdeleteinvoice": "Delete invoice",
   "customersConfirmdeletepayment": "Delete payment",
   "customersContactinfo": "Contact Info",

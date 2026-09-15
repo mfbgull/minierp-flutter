@@ -196,7 +196,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     // Refresh the sellable-items pool on every form open so a batch
     // that expired (or stock that moved) since the last visit is not
     // still offered in the picker. FutureProvider caches otherwise.
-    ref.invalidate(invoiceItemsProvider);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.invalidate(invoiceItemsProvider);
+    });
 
     if (invoice != null) {
       if (invoice.items == null || invoice.items!.isEmpty) {
@@ -1786,19 +1788,21 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
 
   List<Item>? _cachedSearchPool;
 
-  /// All active items are sellable from the invoice form (spec §4.3) —
-  /// raw materials included. Memoized so the list *identity* is stable
-  /// across rebuilds; the description cell's `didUpdateWidget` compares
-  /// identities to detect a genuinely changed pool (spec §4.5).
+  /// All active items with SELLABLE stock are available from the invoice
+  /// form (spec §4.3). Items with zero sellable quantity (expired, halted,
+  /// or location-blocked batches) are excluded. Memoized so the list
+  /// *identity* is stable across rebuilds; the description cell's
+  /// `didUpdateWidget` compares identities to detect a genuinely changed
+  /// pool (spec §4.5).
   List<Item> get _searchPool {
     final items = ref.read(invoiceItemsProvider).valueOrNull ?? const <Item>[];
-    final active = [
+    final sellable = [
       for (final it in items)
-        if (it.isActive) it,
+        if (it.isActive && (it.sellableQty ?? 0) > 0) it,
     ];
     final cached = _cachedSearchPool;
-    if (cached != null && _poolEquals(cached, active)) return cached;
-    return _cachedSearchPool = active;
+    if (cached != null && _poolEquals(cached, sellable)) return cached;
+    return _cachedSearchPool = sellable;
   }
 
   static bool _poolEquals(List<Item> a, List<Item> b) {
@@ -1809,7 +1813,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       if (x.id != y.id ||
           x.itemName != y.itemName ||
           x.itemCode != y.itemCode ||
-          x.isActive != y.isActive) {
+          x.isActive != y.isActive ||
+          x.sellableQty != y.sellableQty) {
         return false;
       }
     }

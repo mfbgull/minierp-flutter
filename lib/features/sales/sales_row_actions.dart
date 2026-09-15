@@ -11,13 +11,13 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/confirm_dialog.dart';
 import 'calculations/invoice_rules.dart'
-    show canReturnInvoice, canShowDeleteAction;
+    show canCancelInvoice, canReturnInvoice, canShowDeleteAction;
 import 'invoice_payment_dialog.dart' show showInvoicePaymentDialog;
 import 'invoice_providers.dart';
 import 'invoice_return_dialog.dart' show showInvoiceReturnDialog;
 
 /// The per-row ⋮ menu actions for an invoice row.
-enum InvoiceRowAction { view, edit, payment, returnItem, print, delete }
+enum InvoiceRowAction { view, edit, payment, returnItem, print, cancel, delete }
 
 /// Opens the row-actions menu anchored at [context] (the ⋮ cell),
 /// mirroring the customers grid: a raw Listener receives the tap even
@@ -36,12 +36,14 @@ Future<void> openSalesRowMenu({
   // Payment is offered while anything is still owed (Unpaid /
   // Partially Paid / Overdue / Sent / Draft with a balance); Return
   // follows the shared rule (hidden for Draft / Cancelled / fully
-  // Returned); Delete follows the shared rule (Draft/Unpaid with no
-  // money moved).
+  // Returned); Cancel follows the shared rule (not if paid/returned/
+  // already cancelled/returned); Delete follows the shared rule
+  // (Draft/Unpaid with no money moved).
   final canPay = invoice.balanceAmount > 0 &&
       invoice.status != 'Cancelled' &&
       invoice.status != 'Returned';
   final canReturn = canReturnInvoice(invoice);
+  final canCancel = canCancelInvoice(invoice);
   final canDelete = canShowDeleteAction(invoice);
 
   final action = await showMenu<InvoiceRowAction>(
@@ -98,6 +100,26 @@ Future<void> openSalesRowMenu({
             ],
           ),
         ),
+      if (canCancel)
+        PopupMenuItem(
+          value: InvoiceRowAction.cancel,
+          child: Row(
+            children: [
+              Icon(
+                Icons.cancel_outlined,
+                size: 18,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                l10n.commonCancel,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ],
+          ),
+        ),
       PopupMenuItem(
         value: InvoiceRowAction.print,
         child: Row(
@@ -148,6 +170,8 @@ Future<void> openSalesRowMenu({
         await printSalesInvoice(context, ref, invoice);
       case InvoiceRowAction.delete:
         await deleteSalesInvoice(context, ref, invoice);
+      case InvoiceRowAction.cancel:
+        await cancelSalesInvoice(context, ref, invoice);
     }
   }
 }
@@ -206,6 +230,36 @@ Future<void> deleteSalesInvoice(
   switch (result) {
     case ApiSuccess():
       showAppToast(context, l10n.customersInvoicedeleted);
+      ref.invalidate(invoicesProvider);
+    case ApiFailure(:final error):
+      showAppToast(context, error.message, isError: true);
+  }
+}
+
+/// Cancel (void) with confirm — calls the server's cancel endpoint which
+/// reverses stock, voids GL entries, and sets status to 'Cancelled'.
+/// Guarded by `canCancelInvoice` (no payments, no returns, not already
+/// cancelled/returned).
+Future<void> cancelSalesInvoice(
+  BuildContext context,
+  WidgetRef ref,
+  Invoice invoice,
+) async {
+  final l10n = AppLocalizations.of(context)!;
+  final confirmed = await showConfirmDialog(
+    context,
+    title: l10n.commonCancel,
+    message: '${l10n.customersConfirmcancelinvoice} "${invoice.invoiceNo}"?',
+    confirmLabel: l10n.commonCancel,
+    destructive: true,
+  );
+  if (!confirmed || !context.mounted) return;
+
+  final result = await ref.read(invoiceRepositoryProvider).cancel(invoice.id);
+  if (!context.mounted) return;
+  switch (result) {
+    case ApiSuccess():
+      showAppToast(context, l10n.customersInvoicecancelled);
       ref.invalidate(invoicesProvider);
     case ApiFailure(:final error):
       showAppToast(context, error.message, isError: true);

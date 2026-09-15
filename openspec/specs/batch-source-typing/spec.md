@@ -1,7 +1,7 @@
 # batch-source-typing Specification
 
 ## Purpose
-TBD - created by archiving change inventory-integrity. Update Purpose after archive.
+Ensures inventory batch source tracking is unambiguous and auditable by enforcing strict source type namespaces. Each batch originates from a single, well-defined source (production, purchase, receipt, return, adjustment, opening, transfer, or reconciliation) with matching source identifier, preventing cross-namespace queries and ensuring accurate inventory reconciliation.
 ## Requirements
 ### Requirement: Disjoint source_type namespaces
 `stock_batches.source_type` SHALL be constrained to a widened enum — at minimum `('PRODUCTION','PURCHASE','GOODS_RECEIPT','RETURN','ADJUSTMENT','OPENING','TRANSFER','RECON')` — and each writer SHALL use the single value matching its true origin. `goods_receipt_items.id`, `purchases.id` and reconciliation runs SHALL never share one `source_type` value.

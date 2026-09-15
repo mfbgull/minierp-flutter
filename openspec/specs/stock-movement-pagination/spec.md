@@ -1,7 +1,7 @@
 # stock-movement-pagination Specification
 
 ## Purpose
-TBD - created by archiving change inventory-screen-improvements. Update Purpose after archive.
+Provides efficient, paginated access to stock movement history for large warehouses. Loads movement records incrementally with cursor-based pagination, supports filtering by warehouse and date ranges, and maintains responsive UI performance even with thousands of historical movements per location.
 ## Requirements
 ### Requirement: Stock Movement grid paginates loaded rows
 The Stock Movement screen SHALL split its loaded movement rows into
