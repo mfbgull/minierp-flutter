@@ -251,16 +251,17 @@ class ReportRepository {
     int? warehouseId,
     int? thresholdDays,
     String? status,
-  }) => _api.getRawList(
-    ApiEndpoints.reportExpiry,
-    queryParameters: <String, dynamic>{
-      'warehouse_id': ?warehouseId,
-      'threshold_days': ?thresholdDays,
-      'status': ?status,
-    },
-    parseItem: (Object? json) =>
-        ExpiryReportRow.fromJson(json as Map<String, dynamic>),
-  );
+  }) =>
+      _api.getList(
+        ApiEndpoints.reportExpiry,
+        queryParameters: <String, dynamic>{
+          'warehouse_id': ?warehouseId,
+          'threshold_days': ?thresholdDays,
+          'status': ?status,
+        },
+        parseItem: (Object? json) =>
+            ExpiryReportRow.fromJson(json as Map<String, dynamic>),
+      );
 
   /// GET /dashboard/expiry-alerts — top batches expiring within [days].
   Future<ApiResult<List<ExpiryAlert>>> expiryAlerts({int days = 30}) =>

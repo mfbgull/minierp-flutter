@@ -169,11 +169,11 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
 
     return PlutoGrid(
       key: ValueKey('$_currentPage-$_pageSize-${report.hashCode}'),
+      mode: PlutoGridMode.multiSelect,
       configuration: plutoGridConfigurationFor(context, compact: true),
       columns: _columns(context, l10n),
       rows: [for (final r in pageData) _toRow(r)],
       onLoaded: (e) {
-        e.stateManager.setSelectingMode(PlutoGridSelectingMode.multi);
         autoFitPlutoColumns(e.stateManager);
         _widthTracker?.dispose();
         _widthTracker = GridColumnWidths.attach(
@@ -183,11 +183,11 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
       },
       onSelected: (event) {
         if (event == null) return;
-        final rows = event.rows;
-        if (rows != null && mounted) {
+        final selectedRows = event.selectedRows;
+        if (selectedRows != null && mounted) {
           setState(() {
             _selectedBatchNos.clear();
-            for (final row in rows) {
+            for (final row in selectedRows) {
               final batchNo = row.cells['batchNo']?.value;
               if (batchNo is String) _selectedBatchNos.add(batchNo);
             }
