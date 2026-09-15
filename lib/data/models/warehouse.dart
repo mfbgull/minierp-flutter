@@ -8,6 +8,7 @@ class Warehouse {
     this.warehouseName,
     this.location,
     this.isActive = true,
+    this.isSystem = false,
     this.createdAt,
     this.updatedAt,
     this.totalItems = 0,
@@ -20,6 +21,9 @@ class Warehouse {
     warehouseName: asString(json['warehouse_name']),
     location: asString(json['location']),
     isActive: asBool(json['is_active'], fallback: true),
+    // System warehouses (EXPIRED / DAMAGED) are permanent infrastructure —
+    // seeded by add-expired-stock.sql, guarded against deletion server-side.
+    isSystem: asBool(json['is_system'], fallback: false),
     createdAt: asString(json['created_at']),
     updatedAt: asString(json['updated_at']),
     totalItems: asNum(json['total_items']) ?? 0,
@@ -31,6 +35,11 @@ class Warehouse {
   final String? warehouseName;
   final String? location;
   final bool isActive;
+
+  /// True for seeded system warehouses (EXPIRED, DAMAGED). These are
+  /// non-deletable (server 400 + DB trigger) and excluded from the delete
+  /// UI. Read-only in the app — never sent in create/update bodies.
+  final bool isSystem;
   final String? createdAt;
   final String? updatedAt;
   final num totalItems;

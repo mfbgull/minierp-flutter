@@ -237,12 +237,24 @@ function getWarehouse(req: Request, res: Response): void {
   }
 }
 
+// Expired-stock plan Phase 4.1: system warehouse codes are reserved —
+// the boot task and write-off flow resolve them by code, so a user-created
+// warehouse squatting on one would break expiry detection. The UNIQUE
+// constraint already blocks collisions with the seeded rows; this also
+// blocks the codes when a system warehouse has been disabled/renamed.
+const SYSTEM_WAREHOUSE_CODES = new Set(['EXPIRED', 'DAMAGED']);
+
 function createWarehouse(req: AuthRequest, res: Response): void {
   try {
     const { warehouse_code, warehouse_name } = req.body;
 
     if (!warehouse_code || !warehouse_name) {
       res.status(400).json({ error: 'Warehouse code and name are required' });
+      return;
+    }
+
+    if (SYSTEM_WAREHOUSE_CODES.has(String(warehouse_code).trim().toUpperCase())) {
+      res.status(400).json({ error: `'${warehouse_code}' is a reserved system warehouse code` });
       return;
     }
 
@@ -280,8 +292,19 @@ function updateWarehouse(req: AuthRequest, res: Response): void {
       return;
     }
 
+    const newCode = String(req.body.warehouse_code || existing.warehouse_code);
+    // Renaming INTO a reserved system code is blocked even though the
+    // seeded rows already hold those codes (they may be inactive).
+    if (
+      newCode.toUpperCase() !== existing.warehouse_code.toUpperCase() &&
+      SYSTEM_WAREHOUSE_CODES.has(newCode.trim().toUpperCase())
+    ) {
+      res.status(400).json({ error: `'${newCode}' is a reserved system warehouse code` });
+      return;
+    }
+
     WarehouseModel.update(db, warehouseId, {
-      warehouse_code: req.body.warehouse_code || existing.warehouse_code,
+      warehouse_code: newCode,
       warehouse_name: req.body.warehouse_name || existing.warehouse_name,
       location: req.body.location,
       // D25: accept is_active to allow reactivation after bulk deactivate
@@ -334,6 +357,19 @@ function deleteWarehouse(req: AuthRequest, res: Response): void {
 
     if (!existing) {
       res.status(404).json({ error: 'Warehouse not found' });
+      return;
+    }
+
+    // Expired-stock plan Phase 1: system warehouses (EXPIRED / DAMAGED,
+    // is_system = 1) are permanent infrastructure — the boot task and the
+    // write-off flow resolve them by warehouse_code, so deleting one would
+    // silently break expiry detection. The DB trigger is the backstop; this
+    // check provides the user-facing 400.
+    const isSystem = (db.prepare(
+      `SELECT is_system FROM warehouses WHERE id = ?`
+    ).get(warehouseId) as { is_system?: number } | undefined)?.is_system;
+    if (isSystem === 1) {
+      res.status(400).json({ error: `Cannot delete system warehouse '${existing.warehouse_code}'` });
       return;
     }
 
@@ -863,6 +899,104 @@ function deletePhysicalCount(req: AuthRequest, res: Response): void {
   }
 }
 
+// Expired-stock plan Phase 3: POST /inventory/expired/write-off
+// Body: { batchIds: number[], reason: string (1-500 chars), glAccount: '7201'..'7204' }
+// Per batch (one transaction each): auto-transfers to EXPIRED when needed
+// (shared recordExpiryTransfer path), records a WRITE_OFF movement, and
+// posts Dr <loss 7201-7204> / Cr inventory_asset (1200) at batch cost.
+const WRITE_OFF_LOSS_ACCOUNTS = new Set(['7200', '7201', '7202', '7203', '7204']);
+
+function writeOffExpiredBatches(req: AuthRequest, res: Response): void {
+  try {
+    const { batchIds, reason, glAccount } = req.body as {
+      batchIds?: unknown;
+      reason?: unknown;
+      glAccount?: unknown;
+    };
+
+    // --- Validation (plan 3.2) ---
+    if (!Array.isArray(batchIds) || batchIds.length === 0 ||
+        !batchIds.every(id => Number.isInteger(id) && id > 0)) {
+      res.status(400).json({ error: 'batchIds must be a non-empty array of positive integers' });
+      return;
+    }
+    if (batchIds.length > 200) {
+      res.status(400).json({ error: 'batchIds limited to 200 per request' });
+      return;
+    }
+    const reasonText = typeof reason === 'string' ? reason.trim() : '';
+    if (reasonText.length === 0 || reasonText.length > 500) {
+      res.status(400).json({ error: 'reason is required (1-500 characters)' });
+      return;
+    }
+    const accountCode = typeof glAccount === 'string' ? glAccount.trim() : '';
+    if (!WRITE_OFF_LOSS_ACCOUNTS.has(accountCode)) {
+      res.status(400).json({ error: 'glAccount must be one of 7200, 7201, 7202, 7203, 7204' });
+      return;
+    }
+    // Enforce the 7200 hierarchy (plan 3.2): the account must exist AND be
+    // 7200 itself or a child of 7200 — not merely exist.
+    const account = db.prepare(`
+      SELECT c.id, c.code FROM chart_of_accounts c
+      WHERE c.code = ? AND c.type = 'expense'
+        AND (c.code = '7200' OR c.parent_id = (SELECT id FROM chart_of_accounts WHERE code = '7200'))
+    `).get(accountCode) as { id: number; code: string } | undefined;
+    if (!account) {
+      res.status(400).json({ error: `glAccount ${accountCode} is not a valid loss account under 7200` });
+      return;
+    }
+
+    const expiredWarehouse = db.prepare(
+      `SELECT id FROM warehouses WHERE warehouse_code = 'EXPIRED' AND is_active = 1`
+    ).get() as { id: number } | undefined;
+    if (!expiredWarehouse) {
+      res.status(500).json({ error: "System warehouse 'EXPIRED' is missing — run migrations" });
+      return;
+    }
+
+    const results: Array<{
+      batchId: number; batchNo?: string; movementNo?: string; journalEntryId?: number | null;
+      transferred?: boolean; qty?: number; value?: number; error?: string;
+    }> = [];
+    let succeeded = 0;
+    for (const batchId of batchIds as number[]) {
+      try {
+        const r = StockMovementModel.writeOffBatch(
+          { batchId, expiredWarehouseId: expiredWarehouse.id, reason: reasonText, lossAccountCode: account.code },
+          req.user!.id,
+          db
+        );
+        results.push({ batchId, batchNo: undefined, movementNo: r.movementNo, journalEntryId: r.journalEntryId, transferred: r.transferred, qty: r.qty, value: r.value });
+        succeeded++;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        results.push({ batchId, error: message });
+        logger.warn(`Write-off failed for batch ${batchId}: ${message}`);
+      }
+    }
+
+    if (succeeded === 0) {
+      res.status(400).json({ error: 'No batches were written off', data: results });
+      return;
+    }
+
+    logCRUD(ActionType.STOCK_WRITE_OFF, 'StockBatch', 0,
+      `Write-off of ${succeeded} expired batch(es): ${reasonText}`, req.user!.id,
+      { batchIds: batchIds, glAccount: account.code });
+    req.activityLogged = true;
+
+    res.json({
+      success: true,
+      message: `${succeeded} of ${batchIds.length} batch(es) written off`,
+      data: results,
+      error: null
+    });
+  } catch (error) {
+    logger.error('Write-off endpoint error:', error);
+    res.status(500).json({ error: 'Failed to write off batches' });
+  }
+}
+
 export default {
   getItems,
   getItem,
@@ -896,6 +1030,7 @@ export default {
   getBatchReconciliation,
   correctBatchReconciliation,
   updateBatchStatus,
+  writeOffExpiredBatches,
   createReservation,
   releaseReservation,
   getReservations

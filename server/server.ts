@@ -7,6 +7,7 @@ import settingsController from './src/controllers/settingsController';
 import logger from './src/utils/logger';
 import { disposeLogger } from './src/services/activityLogger';
 import { startBackupScheduler } from './src/services/backupService';
+import { runExpiryDetection } from './src/boot/expiryDetection';
 
 const PORT = parseInt(process.env.PORT || '3011', 10);
 const HOST = process.env.BIND_ADDRESS || process.env.HOST || '127.0.0.1';
@@ -67,7 +68,24 @@ function gracefulExit(exitCode: number): void {
 // Async seed gate (spec 2.1): the admin user is hashed off the event
 // loop — hold the bind until the row exists so early logins can't race it.
 let server: Server;
-void dbSeedReady.then(() => {
+void dbSeedReady.then(async () => {
+  // Expired-stock boot task (plan Phase 2): migrations (including the
+  // EXPIRED warehouse seed) have run inside `import db from
+  // './src/config/database'`, and dbSeedReady guarantees the admin user
+  // exists. Runs synchronously (better-sqlite3) BEFORE listen, so no
+  // request can observe a half-swept valuation; the delay is bounded by
+  // the candidate count.
+  try {
+    const sweep = runExpiryDetection(db);
+    if (sweep.failed > 0) {
+      logger.warn(`Expiry detection: ${sweep.failed} batch(es) failed and will retry on next boot`);
+    }
+  } catch (err) {
+    // Missing EXPIRED warehouse (migration bug) or a hard sweep failure:
+    // log loud and continue serving — never block the app on this task.
+    logger.error('Expiry detection boot task failed:', err);
+  }
+
   server = app.listen(PORT, HOST, () => {
     console.log('\n=================================');
     console.log('🚀 Mini ERP Server Started');

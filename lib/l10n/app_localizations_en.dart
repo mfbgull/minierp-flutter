@@ -3709,6 +3709,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get customersClosingbalance => 'Closing Balance';
 
   @override
+  String get customersConfirmcancelinvoice =>
+      'Cancel this invoice? This cannot be undone.';
+
+  @override
   String get customersConfirmdeleteinvoice => 'Delete invoice';
 
   @override
@@ -5483,6 +5487,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get warehousesDeletedmsg => 'Warehouse deleted';
+
+  @override
+  String get warehousesSystemWarehouse => 'System';
+
+  @override
+  String get warehousesSystemCannotDelete =>
+      'System warehouses cannot be deleted';
 
   @override
   String get customersErrorEmail => 'Invalid email format';

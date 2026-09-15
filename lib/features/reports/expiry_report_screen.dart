@@ -19,6 +19,7 @@ import '../../widgets/screen_toolbar.dart' show ScreenToolbar;
 import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show warehousesProvider;
 import 'report_providers.dart';
+import 'write_off_dialog.dart' show showWriteOffDialog;
 
 class ExpiryReportScreen extends ConsumerStatefulWidget {
   const ExpiryReportScreen({super.key});
@@ -33,6 +34,8 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
   int _pageSize = 50;
   // Replaced on every grid (re)load — the grid is keyed per page.
   GridColumnWidths? _widthTracker;
+  // Tracks selected batch numbers for bulk write-off.
+  final Set<String> _selectedBatchNos = {};
 
   static const _pageSizeOptions = [25, 50, 100, 200];
 
@@ -43,24 +46,26 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    // Reset page when filters change
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.listen(expiryReportWarehouseIdProvider, (_, _) {
-        if (mounted) setState(() => _currentPage = 1);
-      });
-      ref.listen(expiryReportStatusProvider, (_, _) {
-        if (mounted) setState(() => _currentPage = 1);
-      });
-      ref.listen(expiryReportThresholdProvider, (_, _) {
-        if (mounted) setState(() => _currentPage = 1);
+  Widget build(BuildContext context) {
+    // Reset page and selection when any filter changes
+    ref.listen(expiryReportWarehouseIdProvider, (_, _) {
+      if (mounted) setState(() {
+        _currentPage = 1;
+        _selectedBatchNos.clear();
       });
     });
-  }
-
-  @override
-  Widget build(BuildContext context) {
+    ref.listen(expiryReportStatusProvider, (_, _) {
+      if (mounted) setState(() {
+        _currentPage = 1;
+        _selectedBatchNos.clear();
+      });
+    });
+    ref.listen(expiryReportThresholdProvider, (_, _) {
+      if (mounted) setState(() {
+        _currentPage = 1;
+        _selectedBatchNos.clear();
+      });
+    });
     final l10n = AppLocalizations.of(context)!;
     final report = ref.watch(expiryReportProvider);
 
@@ -77,10 +82,34 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
         ScreenToolbar(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           onRefresh: () {
-            setState(() => _currentPage = 1);
+            setState(() {
+              _currentPage = 1;
+              _selectedBatchNos.clear();
+            });
             ref.invalidate(expiryReportProvider);
           },
           actions: [
+            TextButton.icon(
+              onPressed: _selectedBatchNos.isEmpty || report.isLoading
+                  ? null
+                  : () async {
+                      final data = report.valueOrNull;
+                      if (data == null) return;
+                      final selected = data
+                          .where((r) => _selectedBatchNos.contains(r.batchNo))
+                          .toList();
+                      final result = await showWriteOffDialog(
+                        context,
+                        batches: selected,
+                      );
+                      if (result == true && mounted) {
+                        setState(() => _selectedBatchNos.clear());
+                        ref.invalidate(expiryReportProvider);
+                      }
+                    },
+              icon: const Icon(Icons.delete_outline, size: 18),
+              label: Text(l10n.writeOff),
+            ),
             TextButton.icon(
               onPressed: report.isLoading || report.valueOrNull == null
                   ? null
@@ -144,13 +173,26 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
       columns: _columns(context, l10n),
       rows: [for (final r in pageData) _toRow(r)],
       onLoaded: (e) {
-        e.stateManager.setSelectingMode(PlutoGridSelectingMode.none);
+        e.stateManager.setSelectingMode(PlutoGridSelectingMode.multi);
         autoFitPlutoColumns(e.stateManager);
         _widthTracker?.dispose();
         _widthTracker = GridColumnWidths.attach(
           stateManager: e.stateManager,
           screenKey: 'report_expiry',
         );
+      },
+      onSelected: (event) {
+        if (event == null) return;
+        final rows = event.rows;
+        if (rows != null && mounted) {
+          setState(() {
+            _selectedBatchNos.clear();
+            for (final row in rows) {
+              final batchNo = row.cells['batchNo']?.value;
+              if (batchNo is String) _selectedBatchNos.add(batchNo);
+            }
+          });
+        }
       },
       rowColorCallback: (ctx) {
         final status = BatchStatus.fromString(

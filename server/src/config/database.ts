@@ -1669,6 +1669,13 @@ runLedgered('fn.verifyOwnerEquityAccounts', () => {
 runLedgered('add-payment-salary-void-columns.sql');
 runLedgered('add-employee-loan-void-columns.sql');
 
+// Expired Stock Management (Phase 1): GL loss accounts 7201-7204 under the
+// existing 7200 parent, warehouses.is_system + EXPIRED/DAMAGED seeds,
+// system-warehouse delete trigger, boot-task sweep indexes.
+// Requires: chart_of_accounts (GL foundation), warehouses (init),
+// stock_batches/stock_movements (init + rebuilds) — all applied above.
+runLedgered('add-expired-stock.sql');
+
 // Ensure dbSeedReady resolves on every boot — createDefaultUser() is
 // only called from initializeDatabase(), which runLedgered() skips on
 // existing databases (already recorded in schema_migrations).

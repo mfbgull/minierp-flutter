@@ -26,5 +26,7 @@ router.get('/income-statement', requirePermission('reports', 'read'), sensitiveO
 router.get('/tax-summary', requirePermission('reports', 'read'), sensitiveOperationLimiter, reportsController.getTaxSummaryReport);
 router.get('/batch-traceability/:itemId', requirePermission('reports', 'read'), reportsController.getBatchTraceabilityReport);
 router.get('/expiry', requirePermission('reports', 'read'), reportsController.getExpiryReport);
+// Expired-stock plan Phase 4.2: separated valuation buckets at cost basis
+router.get('/inventory-valuation', requirePermission('reports', 'read'), reportsController.getInventoryValuationReport);
 
 export default router;
