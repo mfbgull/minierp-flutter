@@ -1,7 +1,7 @@
 # stock-by-warehouse-filter Specification
 
 ## Purpose
-TBD - created by archiving change inventory-screen-improvements. Update Purpose after archive.
+Allows users to filter stock grid data by warehouse, showing only items and batches belonging to the selected warehouse. Provides both total quantities and unique item counts per warehouse, with the ability to switch between warehouses seamlessly while maintaining grid state and search filters.
 ## Requirements
 ### Requirement: Warehouse dropdown filters Stock by Warehouse grid
 The Stock by Warehouse screen toolbar SHALL provide a warehouse dropdown

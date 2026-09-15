@@ -74,9 +74,18 @@ bool canShowDeleteAction(Invoice invoice) {
       (invoice.status == 'Draft' || invoice.status == 'Unpaid');
 }
 
-/// Check if an invoice can be cancelled.
+/// Check if an invoice can be cancelled (void). Cancel is allowed for
+/// Unpaid, Partially Paid, Overdue, and Sent invoices, but NOT if there
+/// are recorded payments (paidAmount > 0) or returns (returnedAmount > 0),
+/// or if already Cancelled/Returned/Partially Returned.
 bool canCancelInvoice(Invoice invoice) {
-  return invoice.status != 'Cancelled';
+  return invoice.paidAmount == 0 &&
+      invoice.returnedAmount == 0 &&
+      (invoice.status == 'Unpaid' ||
+          invoice.status == 'Partially Paid' ||
+          invoice.status == 'Overdue' ||
+          invoice.status == 'Sent' ||
+          invoice.status == 'Draft');
 }
 
 /// Check if an invoice can have a return processed — the row-menu Return

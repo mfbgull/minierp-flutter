@@ -1,7 +1,7 @@
 # physical-count-batch-sync Specification
 
 ## Purpose
-TBD - created by archiving change inventory-integrity. Update Purpose after archive.
+Defines the complete, atomic workflow for completing a physical count: adjusting stock balances, creating adjustment batches, posting journal entries, and ensuring all three tables (movements, balances, batches) remain perfectly reconciled. Handles both shortages (consuming FIFO layers) and surpluses (creating adjustment batches) with proper cost accounting.
 ## Requirements
 ### Requirement: Count completion reconciles all three tables
 Completing a physical count SHALL, for every variance, inside one `.immediate()` transaction: write the ADJUSTMENT movement; update `stock_balances` and `items.current_stock`; and update `stock_batches` — consuming FIFO-oldest layers for negative variance and inserting a `source_type='ADJUSTMENT'` batch at `item.unit_cost` for positive variance — plus post its journal entry. After completion, `SUM(stock_batches.quantity_remaining)` per (item, warehouse) MUST equal `stock_balances.quantity`.

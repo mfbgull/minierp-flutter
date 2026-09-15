@@ -1,7 +1,7 @@
 # boot-task-gating Specification
 
 ## Purpose
-TBD - created by archiving change inventory-integrity. Update Purpose after archive.
+Guarantees server startup never silently modifies stock data by prohibiting write operations during boot. Stock discrepancies are surfaced as read-only diagnostics rather than auto-corrected, with reconciliation available only via explicit admin scripts to maintain data integrity and auditability.
 ## Requirements
 ### Requirement: No boot process writes to stock tables
 Server startup MUST NOT execute any INSERT, UPDATE or DELETE against `stock_movements`, `stock_balances`, `stock_batches` or `items.current_stock`. The former self-heal (rewrite of balances from `SUM(stock_movements)`) MUST be reduced to a read-only comparison that logs discrepancies and exposes them on an admin-only health endpoint.

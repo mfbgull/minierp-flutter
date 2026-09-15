@@ -1,7 +1,7 @@
 # physical-count-create Specification
 
 ## Purpose
-TBD - created by archiving change inventory-screen-improvements. Update Purpose after archive.
+Enables warehouse staff to initiate new physical counts through a dedicated UI workflow. Creates count snapshots, assigns them to warehouses, and provides a clean interface for entering count dates and notes, with proper validation and grid refresh upon successful creation.
 ## Requirements
 ### Requirement: Physical Count screen provides a New Count action
 The Physical Count screen toolbar SHALL provide a "New Count" button that
