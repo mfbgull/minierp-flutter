@@ -22,6 +22,7 @@ import '../../data/models/report.dart'
         ExpiryReportRow,
         GeneralLedgerRow,
         IncomeStatementReport,
+        InventoryValuationReport,
         ProfitLossReport,
         TaxSummaryReport,
         TopDebtorRow,
@@ -268,6 +269,14 @@ class ReportRepository {
         queryParameters: <String, dynamic>{'days': days},
         parseItem: (Object? json) =>
             ExpiryAlert.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// GET /reports/inventory-valuation — separated valuation buckets at cost basis.
+  Future<ApiResult<InventoryValuationReport>> inventoryValuation() =>
+      _api.get(
+        ApiEndpoints.reportInventoryValuation,
+        parse: (Object? json) =>
+            InventoryValuationReport.fromJson(json as Map<String, dynamic>),
       );
 }
 

@@ -700,6 +700,134 @@ function columnExistsSafe(db: Database.Database, table: string, column: string):
   return (db.pragma(`table_info('${table}')`) as Array<{ name: string }>).some(c => c.name === column);
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  INVENTORY VALUATION (expired-stock plan Phase 4.2)
+// ═══════════════════════════════════════════════════════════════
+
+export interface ValuationBucket { qty: number; value: number }
+
+export interface InventoryValuationReport {
+  as_of_date: string;
+  sellable: ValuationBucket;
+  reserved: ValuationBucket;   // subset of sellable — reported separately, NOT additive
+  expired: ValuationBucket;    // stock at the EXPIRED system warehouse
+  damaged: ValuationBucket;    // batches with status_override = 'DAMAGED'
+  writtenOff: { count: number; qty: number; totalValue: number };
+  totalPhysical: ValuationBucket; // (sellable − reserved) + expired + damaged
+  invariant: string;
+}
+
+/**
+ * Inventory valuation at cost with the plan's fixed bucket semantics:
+ *  - sellable: non-expired, non-halted batches at non-system warehouses
+ *    (everything that could still be sold — EXPIRED/DAMAGED warehouses are
+ *    excluded by construction, and expired batches there can't resurface).
+ *  - reserved: subset of sellable currently held by ACTIVE reservations
+ *    (reported for visibility; not additive with sellable).
+ *  - expired: batches at the EXPIRED warehouse (cost-basis value).
+ *  - damaged: batches whose batch_stock_by_location.status_override is
+ *    'DAMAGED' (cost-basis value; empty when the batch-locations feature
+ *    flag is off).
+ *  - writtenOff: count/qty/value of WRITE_OFF movements (qty is 0 on the
+ *    shelf — this bucket is historical).
+ *  - totalPhysical = (sellable − reserved) + expired + damaged.
+ *
+ * Invariant: accurate as of the last boot sweep — a batch that expired but
+ * hasn't been swept yet still shows under sellable (the boot task runs
+ * before listen, so the window is one server lifetime at most).
+ *
+ * All values are at the batch's unit_cost (cost basis), never selling price.
+ */
+function getInventoryValuation(db: Database.Database): InventoryValuationReport {
+  const asOfDate = new Date().toISOString().split('T')[0];
+  const expiredWh = db.prepare(
+    `SELECT id FROM warehouses WHERE warehouse_code = 'EXPIRED' AND is_active = 1`
+  ).get() as { id: number } | undefined;
+  const expiredWhId = expiredWh?.id ?? -1; // -1 matches nothing when missing
+  const featureOn = columnExistsSafe(db, 'settings', 'key') &&
+    !!(db.prepare(`SELECT 1 FROM settings WHERE key = 'feature_batch_locations' AND value = '1'`).get());
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const sum = (rows: Array<{ q: number; v: number }>): ValuationBucket => ({
+    qty: round2(rows.reduce((s, r) => s + r.q, 0)),
+    value: round2(rows.reduce((s, r) => s + r.v, 0)),
+  });
+
+  // sellable = batches NOT at the EXPIRED warehouse, not expired by date,
+  // not halted. Per-batch rows so cost basis stays exact.
+  const sellableRows = db.prepare(`
+    SELECT sb.quantity_remaining as q, sb.quantity_remaining * sb.unit_cost as v
+    FROM stock_batches sb
+    WHERE sb.quantity_remaining > 0
+      AND sb.warehouse_id <> @expiredWh
+      AND (sb.expiry_date IS NULL OR date(sb.expiry_date) >= date('now', 'localtime'))
+      ${columnExistsSafe(db, 'stock_batches', 'halted') ? 'AND COALESCE(sb.halted, 0) = 0' : ''}
+  `).all({ expiredWh: expiredWhId }) as Array<{ q: number; v: number }>;
+  const sellable = sum(sellableRows);
+
+  // reserved = sellable quantity currently held by ACTIVE reservations
+  // (legacy path: stock_reservations; subset of sellable by definition).
+  const reservedRows = db.prepare(`
+    SELECT sr.quantity_reserved as q,
+           sr.quantity_reserved * COALESCE(sb.unit_cost, 0) as v
+    FROM stock_reservations sr
+    LEFT JOIN stock_batches sb ON sb.id = sr.batch_id
+    WHERE sr.status = 'ACTIVE'
+  `).all() as Array<{ q: number; v: number }>;
+  const reserved = sum(reservedRows);
+
+  // expired = everything sitting at the EXPIRED warehouse (cost basis).
+  const expiredRows = db.prepare(`
+    SELECT sb.quantity_remaining as q, sb.quantity_remaining * sb.unit_cost as v
+    FROM stock_batches sb
+    WHERE sb.quantity_remaining > 0 AND sb.warehouse_id = @expiredWh
+  `).all({ expiredWh: expiredWhId }) as Array<{ q: number; v: number }>;
+  const expired = sum(expiredRows);
+
+  // damaged = batches flagged DAMAGED via location override (feature-flag
+  // path only; joins back to stock_batches for cost basis).
+  let damagedRows: Array<{ q: number; v: number }> = [];
+  if (featureOn) {
+    damagedRows = db.prepare(`
+      SELECT SUM(bsl.quantity_physical) as q,
+             SUM(bsl.quantity_physical) * sb.unit_cost as v
+      FROM batch_stock_by_location bsl
+      JOIN stock_batches sb ON sb.id = bsl.batch_id
+      WHERE bsl.quantity_physical > 0 AND bsl.status_override = 'DAMAGED'
+      GROUP BY sb.id
+    `).all() as Array<{ q: number; v: number }>;
+  }
+  const damaged = sum(damagedRows);
+
+  // writtenOff = historical roll-up of WRITE_OFF movements.
+  const wo = db.prepare(`
+    SELECT COUNT(*) as count,
+           COALESCE(SUM(ABS(sm.quantity)), 0) as qty,
+           COALESCE(SUM(sm.financial_value), 0) as totalValue
+    FROM stock_movements sm
+    WHERE sm.movement_type = 'WRITE_OFF'
+  `).get() as { count: number; qty: number; totalValue: number };
+
+  return {
+    as_of_date: asOfDate,
+    sellable,
+    reserved,
+    expired,
+    damaged,
+    writtenOff: {
+      count: wo.count,
+      qty: round2(wo.qty),
+      totalValue: round2(wo.totalValue),
+    },
+    totalPhysical: {
+      qty: round2(sellable.qty - reserved.qty + expired.qty + damaged.qty),
+      value: round2(sellable.value - reserved.value + expired.value + damaged.value),
+    },
+    invariant: 'Accurate as of the last boot sweep — batches expired since the last server start still appear under sellable until the next startup sweep moves them.',
+  };
+}
+
+
 function getCashFlow(startDate: string, endDate: string, db: Database.Database) {
   // Same money-movement tables as the dashboard cash position
   // (cashService.collectFlows — payments, expenses, salary_payments,
@@ -1173,4 +1301,5 @@ export default {
   getCashReconciliation, saveCashReconciliation,
   getGLReconciliation,
   getExpiryReport, getExpiryAlerts,
+  getInventoryValuation,
 };

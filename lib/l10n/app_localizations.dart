@@ -7310,6 +7310,12 @@ abstract class AppLocalizations {
   /// **'Closing Balance'**
   String get customersClosingbalance;
 
+  /// No description provided for @customersConfirmcancelinvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this invoice? This cannot be undone.'**
+  String get customersConfirmcancelinvoice;
+
   /// No description provided for @customersConfirmdeleteinvoice.
   ///
   /// In en, this message translates to:
@@ -10747,6 +10753,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Warehouse deleted'**
   String get warehousesDeletedmsg;
+
+  /// No description provided for @warehousesSystemWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get warehousesSystemWarehouse;
+
+  /// No description provided for @warehousesSystemCannotDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'System warehouses cannot be deleted'**
+  String get warehousesSystemCannotDelete;
 
   /// No description provided for @customersErrorEmail.
   ///

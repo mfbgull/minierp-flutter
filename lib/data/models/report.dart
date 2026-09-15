@@ -1187,3 +1187,70 @@ class BatchTraceabilityReport {
   final List<BatchTraceabilityBatch> batches;
   final BatchTraceabilitySummary summary;
 }
+
+// ---------------------------------------------------------------------------
+// Inventory Valuation Report (Phase 4.2)
+// ---------------------------------------------------------------------------
+
+class ValuationBucket {
+  const ValuationBucket({required this.qty, required this.value});
+  factory ValuationBucket.fromJson(Map<String, dynamic> json) =>
+      ValuationBucket(
+        qty: (json['qty'] as num?)?.toDouble() ?? 0,
+        value: (json['value'] as num?)?.toDouble() ?? 0,
+      );
+  final double qty;
+  final double value;
+}
+
+class WrittenOffBucket {
+  const WrittenOffBucket({
+    required this.count,
+    required this.qty,
+    required this.totalValue,
+  });
+  factory WrittenOffBucket.fromJson(Map<String, dynamic> json) =>
+      WrittenOffBucket(
+        count: (json['count'] as num?)?.toInt() ?? 0,
+        qty: (json['qty'] as num?)?.toDouble() ?? 0,
+        totalValue: (json['totalValue'] as num?)?.toDouble() ?? 0,
+      );
+  final int count;
+  final double qty;
+  final double totalValue;
+}
+
+class InventoryValuationReport {
+  const InventoryValuationReport({
+    required this.asOfDate,
+    required this.sellable,
+    required this.reserved,
+    required this.expired,
+    required this.damaged,
+    required this.writtenOff,
+    required this.totalPhysical,
+  });
+  factory InventoryValuationReport.fromJson(Map<String, dynamic> json) =>
+      InventoryValuationReport(
+        asOfDate: json['as_of_date'] as String? ?? '',
+        sellable: ValuationBucket.fromJson(
+            json['sellable'] as Map<String, dynamic>? ?? {}),
+        reserved: ValuationBucket.fromJson(
+            json['reserved'] as Map<String, dynamic>? ?? {}),
+        expired: ValuationBucket.fromJson(
+            json['expired'] as Map<String, dynamic>? ?? {}),
+        damaged: ValuationBucket.fromJson(
+            json['damaged'] as Map<String, dynamic>? ?? {}),
+        writtenOff: WrittenOffBucket.fromJson(
+            json['writtenOff'] as Map<String, dynamic>? ?? {}),
+        totalPhysical: ValuationBucket.fromJson(
+            json['totalPhysical'] as Map<String, dynamic>? ?? {}),
+      );
+  final String asOfDate;
+  final ValuationBucket sellable;
+  final ValuationBucket reserved;
+  final ValuationBucket expired;
+  final ValuationBucket damaged;
+  final WrittenOffBucket writtenOff;
+  final ValuationBucket totalPhysical;
+}

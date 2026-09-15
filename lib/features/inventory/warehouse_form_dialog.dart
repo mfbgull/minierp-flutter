@@ -41,6 +41,25 @@ class _WarehouseFormDialogState extends ConsumerState<WarehouseFormDialog> {
   bool _saving = false;
   String? _error;
 
+  /// Reserved system warehouse codes (expired-stock plan Phase 4.1) — the
+  /// server rejects them too; this gives immediate inline feedback.
+  static const _reservedCodes = {'EXPIRED', 'DAMAGED'};
+
+  String? _validateCode(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Required';
+    final editing = widget.warehouse != null;
+    // Edit mode keeps the existing code (field disabled), so a reserved
+    // value here means the user is trying to rename INTO a reserved code.
+    if (!editing ||
+        v.trim().toUpperCase() !=
+            (widget.warehouse!.warehouseCode.toUpperCase())) {
+      if (_reservedCodes.contains(v.trim().toUpperCase())) {
+        return 'This code is reserved for system warehouses';
+      }
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -123,6 +142,7 @@ class _WarehouseFormDialogState extends ConsumerState<WarehouseFormDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final isEdit = widget.warehouse != null;
+    final isSystem = widget.warehouse?.isSystem ?? false;
     return Dialog(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -140,13 +160,45 @@ class _WarehouseFormDialogState extends ConsumerState<WarehouseFormDialog> {
                 ScreenErrorPanel(message: _error!, onRetry: () {}),
                 const SizedBox(height: 12),
               ],
+              if (isSystem) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.lock_outline,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.onSecondaryContainer,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          l10n.warehousesSystemWarehouse,
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSecondaryContainer,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               TextFormField(
                 controller: _codeController,
                 onFieldSubmitted: submitOnEnter(_submit),
                 decoration: InputDecoration(labelText: 'Warehouse Code'),
                 enabled: !isEdit,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: _validateCode,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -165,7 +217,9 @@ class _WarehouseFormDialogState extends ConsumerState<WarehouseFormDialog> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  if (isEdit)
+                  // System warehouses (EXPIRED / DAMAGED) are permanent —
+                  // no delete button (server would 400 anyway).
+                  if (isEdit && !isSystem)
                     OutlinedButton.icon(
                       onPressed: _saving ? null : _delete,
                       icon: const Icon(Icons.delete_outline, size: 18),

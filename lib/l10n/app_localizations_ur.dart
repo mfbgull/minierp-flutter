@@ -3709,6 +3709,10 @@ class AppLocalizationsUr extends AppLocalizations {
   String get customersClosingbalance => 'اختتامی بیلنس';
 
   @override
+  String get customersConfirmcancelinvoice =>
+      'کیا یہ انوائس منسوخ کریں؟ یہ واپس نہیں ہو سکتی۔';
+
+  @override
   String get customersConfirmdeleteinvoice => 'انوائس حذف کریں';
 
   @override
@@ -5480,6 +5484,12 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get warehousesDeletedmsg => 'گودام حذف ہو گیا';
+
+  @override
+  String get warehousesSystemWarehouse => 'سسٹم';
+
+  @override
+  String get warehousesSystemCannotDelete => 'سسٹم گودام حذف نہیں کیے جا سکتے';
 
   @override
   String get customersErrorEmail => 'غلط ای میل فارمیٹ';

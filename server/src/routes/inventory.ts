@@ -52,6 +52,11 @@ router.post('/batch-reconciliation/correct', requirePermission('inventory', 'upd
 // Batch status admin
 router.put('/batches/:id/status', requirePermission('inventory', 'update'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), inventoryController.updateBatchStatus);
 
+// Expired-stock write-off (plan Phase 3): GL-impacting loss posting —
+// Dr 7201-7204 / Cr 1200. Ships with inventory:update; a dedicated
+// inventory.write_off permission is planned once roles support it.
+router.post('/expired/write-off', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.writeOffExpiredBatches);
+
 // Reservations
 router.post('/reservations', requirePermission('inventory', 'create'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), inventoryController.createReservation);
 router.delete('/reservations/:id/release', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.releaseReservation);

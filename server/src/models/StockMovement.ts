@@ -100,7 +100,7 @@ interface RecordMovementDTO {
 }
 
 class StockMovementModel {
-  static recordMovement(data: RecordMovementDTO, userId: number, db: Database.Database): { id: number; movement_no: string } {
+  static recordMovement(data: RecordMovementDTO, userId: number | null, db: Database.Database): { id: number; movement_no: string } {
     const transaction = db.transaction(() => {
       const movementNo = this.generateMovementNo(db);
 
@@ -123,7 +123,7 @@ class StockMovementModel {
         data.reference_docno || null,
         data.remarks || null,
         data.movement_date || new Date().toISOString().split('T')[0],
-        userId,
+        userId ?? null, // nullable: system-initiated movements (boot task) have no actor
         data.batch_id || null
       );
 
@@ -1051,6 +1051,275 @@ class StockMovementModel {
       }, userId, db);
 
       return { out, in: into };
+    });
+
+    return run();
+  }
+
+  /**
+   * Expired-stock plan Phase 2: batch-targeted paired-leg transfer used by
+   * BOTH the boot task (expiryDetection.ts) and the write-off endpoint's
+   * auto-transfer path — one implementation, one code path.
+   *
+   * Moves a SPECIFIC batch (not FEFO consumption) from its current warehouse
+   * to the destination system warehouse (EXPIRED), following the exact
+   * mirror-batch pattern of recordTransfer:
+   *
+   *  1. Zero the batch's batch_stock_by_location rows (so the OUT leg's
+   *     syncStockBalancesExtension recomputes to 0, never stale).
+   *  2. OUT leg at the source warehouse (−qty, batch-linked).
+   *  3. Zero stock_batches.quantity_remaining — the caller's responsibility
+   *     per the plan's ownership rule (recordMovement never writes
+   *     stock_batches); done here so every caller inherits it exactly once.
+   *  4. Mint a mirrored batch at the destination (source_type 'TRANSFER'
+   *     per plan 1.5 — semantics ride on movement_type 'EXPIRY_TRANSFER').
+   *  5. IN leg at the destination (+qty, mirror-batch-linked,
+   *     reference_docno = OUT movement_no).
+   *
+   * Idempotency: refuses a batch that already has an EXPIRY_TRANSFER
+   * movement. All work is one transaction.
+   *
+   * userId may be null for system-initiated transfers (boot task): the
+   * created_by column is nullable and the audit trail distinguishes system
+   * rows via the 'source=SYSTEM' remark instead of a borrowed admin id.
+   */
+  static recordExpiryTransfer(
+    data: { batchId: number; toWarehouseId: number; remarks?: string | null },
+    userId: number | null,
+    db: Database.Database
+  ): { out: { id: number; movement_no: string }; in: { id: number; movement_no: string }; mirrorBatchId: number } {
+    const today = new Date().toISOString().split('T')[0];
+
+    const run = db.transaction(() => {
+      const batch = db.prepare(`
+        SELECT id, batch_no, item_id, warehouse_id, quantity_remaining,
+               unit_cost, expiry_date
+        FROM stock_batches WHERE id = ?
+      `).get(data.batchId) as {
+        id: number; batch_no: string; item_id: number; warehouse_id: number;
+        quantity_remaining: number; unit_cost: number | null; expiry_date: string | null;
+      } | undefined;
+
+      if (!batch) throw new Error(`Batch ${data.batchId} not found`);
+      const qty = Number(batch.quantity_remaining);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        throw new Error(`Batch ${batch.batch_no} has no remaining quantity to transfer`);
+      }
+      if (batch.warehouse_id === data.toWarehouseId) {
+        throw new Error(`Batch ${batch.batch_no} is already at the destination warehouse`);
+      }
+
+      // Idempotency: never re-transfer a batch that already moved.
+      const already = db.prepare(`
+        SELECT 1 FROM stock_movements
+        WHERE batch_id = ? AND movement_type = 'EXPIRY_TRANSFER' LIMIT 1
+      `).get(batch.id);
+      if (already) {
+        throw new Error(`Batch ${batch.batch_no} already has an EXPIRY_TRANSFER movement`);
+      }
+
+      const systemRemark = userId === null ? ' source=SYSTEM' : '';
+      const remarks = (data.remarks || `Expiry transfer: batch ${batch.batch_no} expired on ${batch.expiry_date ?? 'unknown'}`) + systemRemark;
+
+      // 1. Drain the source batch's location rows BEFORE the OUT leg so the
+      //    extension-column resync inside recordMovement sees the truth.
+      if (isFeatureEnabled(db, 'feature_batch_locations')) {
+        db.prepare(`
+          UPDATE batch_stock_by_location
+          SET quantity_physical = 0, quantity_available = 0, updated_at = CURRENT_TIMESTAMP
+          WHERE batch_id = ?
+        `).run(batch.id);
+      }
+      // 2. OUT leg (negative) at the source warehouse.
+      const out = this.recordMovement({
+        item_id: batch.item_id,
+        warehouse_id: batch.warehouse_id,
+        movement_type: 'EXPIRY_TRANSFER',
+        quantity: -qty,
+        unit_cost: batch.unit_cost ?? undefined,
+        reference_doctype: 'EXPIRY_TRANSFER',
+        reference_docno: batch.batch_no,
+        remarks,
+        batch_id: batch.id
+      }, userId, db);
+
+      // 3. Zero the source batch (single zeroing point — see docstring).
+      db.prepare(`
+        UPDATE stock_batches SET quantity_remaining = 0 WHERE id = ?
+      `).run(batch.id);
+
+      // 4. Mint the mirrored batch at the destination (TRANSFER source_type
+      //    per plan 1.5; avoids a BATCH_SOURCE_TYPES table rebuild).
+      const nextNo = (() => {
+        db.prepare(`
+          INSERT INTO settings (key, value, updated_at)
+          VALUES ('BATCH_EXP_last_no', '1', CURRENT_TIMESTAMP)
+          ON CONFLICT(key) DO UPDATE SET
+            value = CAST(CAST(settings.value AS INTEGER) + 1 AS TEXT),
+            updated_at = CURRENT_TIMESTAMP
+        `).run();
+        const row = db.prepare(`SELECT value FROM settings WHERE key = 'BATCH_EXP_last_no'`).get() as { value: string };
+        return parseInt(row.value, 10);
+      })();
+      const mirrorBatchNo = `BATCH-${new Date().getFullYear() % 100}-EXP-${nextNo.toString().padStart(4, '0')}`;
+      const mirrorBatch = db.prepare(`
+        INSERT INTO stock_batches (
+          batch_no, item_id, warehouse_id, source_type,
+          source_id, quantity_original, quantity_remaining,
+          unit_cost, received_date, expiry_date
+        ) VALUES (?, ?, ?, 'TRANSFER', ?, ?, ?, ?, ?, ?)
+      `).run(
+        mirrorBatchNo, batch.item_id, data.toWarehouseId, out.id,
+        qty, qty, batch.unit_cost, today, batch.expiry_date
+      );
+      const mirrorBatchId = mirrorBatch.lastInsertRowid as number;
+
+      // Seed the mirror batch's location layer before the IN leg resync.
+      this.syncBatchStockByLocationForNewBatch(mirrorBatchId, data.toWarehouseId, qty, db);
+
+      // 5. IN leg (positive) at the destination, back-referencing the OUT leg.
+      const into = this.recordMovement({
+        item_id: batch.item_id,
+        warehouse_id: data.toWarehouseId,
+        movement_type: 'EXPIRY_TRANSFER',
+        quantity: qty,
+        unit_cost: batch.unit_cost ?? undefined,
+        reference_doctype: 'EXPIRY_TRANSFER',
+        reference_docno: out.movement_no,
+        remarks,
+        batch_id: mirrorBatchId
+      }, userId, db);
+
+      return { out, in: into, mirrorBatchId };
+    });
+
+    return run();
+  }
+
+  /**
+   * Expired-stock plan Phase 3: write off an expired batch.
+   *
+   * Writes the batch's remaining quantity off to a loss account with the
+   * GL entry Dr <loss> / Cr inventory_asset. Used by the
+   * POST /inventory/expired/write-off endpoint.
+   *
+   * Flow (one transaction per batch; recordMovement/recordExpiryTransfer
+   * nesting becomes savepoints):
+   *  1. If the batch is NOT yet at the EXPIRED warehouse, perform the
+   *     expiry transfer first (same code path as the boot task —
+   *     recordExpiryTransfer). The WRITE_OFF then lands on the mirrored
+   *     batch at the EXPIRED warehouse, keeping the ledger consistent.
+   *  2. Record a single WRITE_OFF movement (negative qty, batch-linked)
+   *     via recordMovement — balances sync automatically, and the
+   *     movement doubles as the audit record. "WRITTEN_OFF" is derivable
+   *     from this movement (plan 1.3) — no status column.
+   *  3. Post Dr <loss account> / Cr Inventory Asset (1200) at the
+   *     batch's actual unit_cost (not standard_cost) via
+   *     postLegacyStockEntry, and stamp the movement's financial columns.
+   *
+   * Idempotency: refuses a batch that already has a WRITE_OFF movement.
+   */
+  static writeOffBatch(
+    args: { batchId: number; expiredWarehouseId: number; reason: string; lossAccountCode: string },
+    userId: number,
+    db: Database.Database
+  ): { movementNo: string; journalEntryId: number | null; transferred: boolean; qty: number; value: number } {
+    const today = new Date().toISOString().split('T')[0];
+
+    const run = db.transaction(() => {
+      const batch = db.prepare(`
+        SELECT id, batch_no, item_id, warehouse_id, quantity_remaining,
+               unit_cost, expiry_date
+        FROM stock_batches WHERE id = ?
+      `).get(args.batchId) as {
+        id: number; batch_no: string; item_id: number; warehouse_id: number;
+        quantity_remaining: number; unit_cost: number | null; expiry_date: string | null;
+      } | undefined;
+
+      if (!batch) throw new Error(`Batch ${args.batchId} not found`);
+      if (!batch.expiry_date || batch.expiry_date >= today) {
+        throw new Error(`Batch ${batch.batch_no} is not expired (expiry ${batch.expiry_date ?? 'none'})`);
+      }
+
+      // 1. Auto-transfer to EXPIRED when the batch is still elsewhere.
+      let targetBatchId = batch.id;
+      let transferred = false;
+      if (batch.warehouse_id !== args.expiredWarehouseId) {
+        const transfer = this.recordExpiryTransfer(
+          { batchId: batch.id, toWarehouseId: args.expiredWarehouseId },
+          userId,
+          db
+        );
+        targetBatchId = transfer.mirrorBatchId;
+        transferred = true;
+      }
+
+      // Idempotency: either the source or the mirrored batch already
+      // carrying a WRITE_OFF movement blocks a re-write-off.
+      const alreadyOff = db.prepare(`
+        SELECT 1 FROM stock_movements
+        WHERE movement_type = 'WRITE_OFF' AND batch_id IN (?, ?) LIMIT 1
+      `).get(batch.id, targetBatchId);
+      if (alreadyOff) {
+        throw new Error(`Batch ${batch.batch_no} is already written off`);
+      }
+
+      const target = db.prepare(`
+        SELECT quantity_remaining, unit_cost FROM stock_batches WHERE id = ?
+      `).get(targetBatchId) as { quantity_remaining: number; unit_cost: number | null };
+      const qty = Number(target.quantity_remaining);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        throw new Error(`Batch ${batch.batch_no} has no remaining quantity to write off`);
+      }
+      const unitCost = Number(target.unit_cost ?? 0);
+      const value = Math.round(qty * unitCost * 100) / 100;
+
+      // 2. WRITE_OFF movement (negative qty at the EXPIRED warehouse).
+      const remarks = `[WRITE_OFF] reason=${args.reason} gl=${args.lossAccountCode} batch=${batch.batch_no}`;
+      const movement = this.recordMovement({
+        item_id: batch.item_id,
+        warehouse_id: args.expiredWarehouseId,
+        movement_type: 'WRITE_OFF',
+        quantity: -qty,
+        unit_cost: unitCost || undefined,
+        reference_doctype: 'WRITE_OFF',
+        reference_docno: batch.batch_no,
+        remarks,
+        batch_id: targetBatchId,
+        movement_date: today
+      }, userId, db);
+
+      // Zero the written-off batch (the caller's responsibility per the
+      // stock_batches ownership rule — recordMovement never writes it).
+      db.prepare(`UPDATE stock_batches SET quantity_remaining = 0 WHERE id = ?`).run(targetBatchId);
+
+      // 3. GL posting: Dr <loss> / Cr inventory_asset at batch cost.
+      let journalEntryId: number | null = null;
+      if (value > 0) {
+        const lossAcct = db.prepare(
+          `SELECT id, code, text_code FROM chart_of_accounts WHERE code = ?`
+        ).get(args.lossAccountCode) as { id: number; code: string; text_code: string | null } | undefined;
+        if (!lossAcct || !lossAcct.text_code) {
+          throw new Error(`Loss account ${args.lossAccountCode} not found in chart of accounts`);
+        }
+        journalEntryId = AccountingService.postLegacyStockEntry(db, {
+          referenceType: 'WRITE_OFF',
+          referenceId: movement.id,
+          entryDate: today,
+          description: `Write-off: ${qty} unit(s) of batch ${batch.batch_no} — ${args.reason}`,
+          debitTextCode: lossAcct.text_code,
+          creditTextCode: 'inventory_asset',
+          amount: value,
+          createdBy: userId
+        });
+        db.prepare(`
+          UPDATE stock_movements
+          SET financial_value = ?, financial_posted = TRUE, journal_entry_id = ?
+          WHERE id = ?
+        `).run(value, journalEntryId, movement.id);
+      }
+
+      return { movementNo: movement.movement_no, journalEntryId, transferred, qty, value };
     });
 
     return run();

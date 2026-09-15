@@ -198,10 +198,22 @@ function getExpiryReport(req: Request, res: Response): void {
   }
 }
 
+// Expired-stock plan Phase 4.2: separated valuation buckets (sellable /
+// reserved subset / expired / damaged / writtenOff + totalPhysical) at
+// cost basis. Semantics documented on ReportsModel.getInventoryValuation.
+function getInventoryValuationReport(req: Request, res: Response): void {
+  try {
+    res.json({ success: true, data: ReportsModel.getInventoryValuation(db) });
+  } catch (error) {
+    logger.error('Error fetching inventory valuation report:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch inventory valuation report' });
+  }
+}
+
 export default {
   getARAgingReport, getAPAgingReport, getCustomerStatements, getTopDebtors, getDSOMetric, getReceivablesSummary,
   getProfitLossReport, getCashFlowReport,
   getTrialBalanceReport, getGeneralLedgerReport, getBalanceSheetReport,
   getIncomeStatementReport, getTaxSummaryReport, getCashReconciliation, saveCashReconciliation,
-  getBatchTraceabilityReport, getExpiryReport,
+  getBatchTraceabilityReport, getExpiryReport, getInventoryValuationReport,
 };

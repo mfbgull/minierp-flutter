@@ -19,6 +19,7 @@ import '../../core/utils/csv_export.dart';
 import '../../data/models/warehouse.dart' show Warehouse;
 import '../../data/repositories/inventory_repository.dart' show inventoryRepositoryProvider;
 import '../../l10n/app_localizations.dart';
+import '../../widgets/app_toast.dart';
 import '../../widgets/bulk_operations.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/pluto_grid_screen.dart';
@@ -76,13 +77,25 @@ class _WarehousesScreenState extends ConsumerState<WarehousesScreen>
   }
 
   /// Bulk soft-delete of selected warehouses (no undo until D25 extends
-  /// PUT with `is_active`).
+  /// PUT with `is_active`). System warehouses (EXPIRED / DAMAGED) are
+  /// filtered out — they are permanent infrastructure and the server
+  /// would reject them with a 400.
   Future<void> _bulkDelete(Set<int> ids) async {
     final l10n = AppLocalizations.of(context)!;
+    final deletable = ids
+        .where((id) => !(_warehousesById[id]?.isSystem ?? false))
+        .toSet();
+    if (deletable.isEmpty) {
+      showAppToast(context, l10n.warehousesSystemCannotDelete);
+      return;
+    }
+    if (deletable.length < ids.length) {
+      showAppToast(context, l10n.warehousesSystemCannotDelete);
+    }
     final confirmed = await showConfirmDialog(
       context,
       title: l10n.commonDelete,
-      message: '${l10n.bulkDeleteSelected} (${ids.length})?',
+      message: '${l10n.bulkDeleteSelected} (${deletable.length})?',
       confirmLabel: l10n.commonDelete,
       cancelLabel: l10n.commonCancel,
       destructive: true,
@@ -92,7 +105,7 @@ class _WarehousesScreenState extends ConsumerState<WarehousesScreen>
     final repo = ref.read(inventoryRepositoryProvider);
     setState(() => _bulkBusy = true);
     final result = await runBulkOperation(
-      ids: ids.toList(),
+      ids: deletable.toList(),
       labelFor: (id) => _warehousesById[id]?.warehouseCode ?? '#$id',
       operation: repo.deleteWarehouse,
     );
@@ -166,6 +179,7 @@ class _WarehousesScreenState extends ConsumerState<WarehousesScreen>
       'items': PlutoCell(value: w.totalItems),
       'unique': PlutoCell(value: w.uniqueItems),
       'active': PlutoCell(value: w.isActive),
+      'system': PlutoCell(value: w.isSystem),
     },
   );
 
@@ -321,6 +335,34 @@ class _WarehousesScreenState extends ConsumerState<WarehousesScreen>
           child: StatusBadge(
             status: active ? l10n.statusActive : l10n.statusInactive,
             color: StatusColors.of(context).active(active),
+          ),
+        );
+      },
+    ),
+    PlutoColumn(
+      // System flag: locked badge for EXPIRED / DAMAGED — visible cue that
+      // the warehouse is permanent and delete is unavailable.
+      title: '',
+      field: 'system',
+      type: PlutoColumnType.text(),
+      width: 70,
+      readOnly: true,
+      enableContextMenu: false,
+      enableFilterMenuItem: false,
+      enableHideColumnMenuItem: false,
+      enableSetColumnsMenuItem: false,
+      renderer: (ctx) {
+        final isSystem = ctx.cell.value == true;
+        if (!isSystem) return const SizedBox.shrink();
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: Tooltip(
+            message: l10n.warehousesSystemCannotDelete,
+            child: Icon(
+              Icons.lock_outline,
+              size: 16,
+              color: Theme.of(context).colorScheme.tertiary,
+            ),
           ),
         );
       },

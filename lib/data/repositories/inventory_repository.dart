@@ -303,6 +303,19 @@ class InventoryRepository {
     parse: (Object? json) => (json ?? <String, dynamic>{}) as Map<String, dynamic>,
   );
 
+  /// Expired-stock plan Phase 3: write off expired batches with GL
+  /// posting (`POST /inventory/expired/write-off`). Body:
+  /// `{ batchIds, reason, glAccount }` where glAccount is a loss account
+  /// in the 7200 family (7200 parent or 7201-7204 children). Returns
+  /// per-batch results (`movementNo`/`journalEntryId`/`error`).
+  Future<ApiResult<Map<String, dynamic>>> writeOffExpiredBatches(
+    Map<String, dynamic> body,
+  ) => _api.postRaw(
+    ApiEndpoints.expiredWriteOff,
+    body: body,
+    parse: (Object? json) => (json ?? <String, dynamic>{}) as Map<String, dynamic>,
+  );
+
   Future<ApiResult<List<dynamic>>> stockSummary() => _api.getRawList(
     ApiEndpoints.stockSummary,
     parseItem: (Object? json) => json,

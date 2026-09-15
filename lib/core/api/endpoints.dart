@@ -48,6 +48,9 @@ abstract final class ApiEndpoints {
   static const batchStatus = '/inventory/batches';
   static const reservations = '/inventory/reservations';
   static const locations = '/inventory/locations';
+  // Expired-stock plan Phase 3: batch write-off with GL posting
+  // (Dr 7201-7204 / Cr 1200).
+  static const expiredWriteOff = '/inventory/expired/write-off';
 
   // Sales
   static const invoices = '/invoices';
@@ -85,6 +88,7 @@ abstract final class ApiEndpoints {
   static const reportIncomeStatement = '/reports/income-statement';
   static const reportTaxSummary = '/reports/tax-summary';
   static const reportBatchTraceability = '/reports/batch-traceability';
+  static const reportInventoryValuation = '/reports/inventory-valuation';
 
   // Misc
   static const customers = '/customers';
