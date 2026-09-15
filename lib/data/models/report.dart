@@ -1065,6 +1065,7 @@ class BatchTraceabilityBatch {
 /// One row of the expiry report (`GET /reports/expiry`).
 class ExpiryReportRow {
   const ExpiryReportRow({
+    required this.id,
     required this.itemCode,
     required this.itemName,
     required this.batchNo,
@@ -1078,6 +1079,7 @@ class ExpiryReportRow {
   });
 
   factory ExpiryReportRow.fromJson(Map<String, dynamic> json) => ExpiryReportRow(
+    id: asNum(json['id'])?.toInt() ?? 0,
     itemCode: asString(json['item_code']) ?? '',
     itemName: asString(json['item_name']) ?? '',
     batchNo: asString(json['batch_no']) ?? '',
@@ -1090,6 +1092,8 @@ class ExpiryReportRow {
     halted: asBool(json['halted']),
   );
 
+  /// Numeric batch ID (stock_batches.id) — used for write-off endpoint.
+  final int id;
   final String itemCode;
   final String itemName;
   final String batchNo;
