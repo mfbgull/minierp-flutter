@@ -11442,6 +11442,144 @@ abstract class AppLocalizations {
   /// **'Batches: {total} total, {near} near-expiry, {expired} expired'**
   String batchesSummary(Object expired, Object near, Object total);
 
+  /// No description provided for @writeOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Write Off'**
+  String get writeOff;
+
+  /// No description provided for @writeOffBatches.
+  ///
+  /// In en, this message translates to:
+  /// **'Write Off Batches'**
+  String get writeOffBatches;
+
+  /// No description provided for @writeOffConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to write off {count} batch(es)?'**
+  String writeOffConfirm(Object count);
+
+  /// No description provided for @writeOffSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} batch(es) written off successfully'**
+  String writeOffSuccess(Object count);
+
+  /// No description provided for @writeOffFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Write-off failed'**
+  String get writeOffFailed;
+
+  /// No description provided for @writeOffReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason for write-off'**
+  String get writeOffReason;
+
+  /// No description provided for @writeOffReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter reason (1-500 characters)'**
+  String get writeOffReasonHint;
+
+  /// No description provided for @writeOffGlAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'GL Loss Account'**
+  String get writeOffGlAccount;
+
+  /// No description provided for @writeOffGlAccountHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select loss account'**
+  String get writeOffGlAccountHint;
+
+  /// No description provided for @writeOffSelectBatches.
+  ///
+  /// In en, this message translates to:
+  /// **'Select batches to write off'**
+  String get writeOffSelectBatches;
+
+  /// No description provided for @writeOffNoSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'No batches selected'**
+  String get writeOffNoSelection;
+
+  /// No description provided for @writeOffBatchValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Value: {value}'**
+  String writeOffBatchValue(Object value);
+
+  /// No description provided for @writeOffTotalValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Total write-off value: {value}'**
+  String writeOffTotalValue(Object value);
+
+  /// No description provided for @valuationSellable.
+  ///
+  /// In en, this message translates to:
+  /// **'Sellable Inventory'**
+  String get valuationSellable;
+
+  /// No description provided for @valuationReserved.
+  ///
+  /// In en, this message translates to:
+  /// **'Reserved Inventory'**
+  String get valuationReserved;
+
+  /// No description provided for @valuationExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired Inventory'**
+  String get valuationExpired;
+
+  /// No description provided for @valuationDamaged.
+  ///
+  /// In en, this message translates to:
+  /// **'Damaged Inventory'**
+  String get valuationDamaged;
+
+  /// No description provided for @valuationWrittenOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Written Off'**
+  String get valuationWrittenOff;
+
+  /// No description provided for @valuationTotalPhysical.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Physical Inventory'**
+  String get valuationTotalPhysical;
+
+  /// No description provided for @valuationAsOfDate.
+  ///
+  /// In en, this message translates to:
+  /// **'As of {date}'**
+  String valuationAsOfDate(Object date);
+
+  /// No description provided for @valuationQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity: {qty}'**
+  String valuationQty(Object qty);
+
+  /// No description provided for @valuationValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Value: {value}'**
+  String valuationValue(Object value);
+
+  /// No description provided for @valuationNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Values are at cost price, not selling price'**
+  String get valuationNote;
+
   /// No description provided for @confirmSellExpired.
   ///
   /// In en, this message translates to:

@@ -5859,6 +5859,89 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get writeOff => 'Write Off';
+
+  @override
+  String get writeOffBatches => 'Write Off Batches';
+
+  @override
+  String writeOffConfirm(Object count) {
+    return 'Are you sure you want to write off $count batch(es)?';
+  }
+
+  @override
+  String writeOffSuccess(Object count) {
+    return '$count batch(es) written off successfully';
+  }
+
+  @override
+  String get writeOffFailed => 'Write-off failed';
+
+  @override
+  String get writeOffReason => 'Reason for write-off';
+
+  @override
+  String get writeOffReasonHint => 'Enter reason (1-500 characters)';
+
+  @override
+  String get writeOffGlAccount => 'GL Loss Account';
+
+  @override
+  String get writeOffGlAccountHint => 'Select loss account';
+
+  @override
+  String get writeOffSelectBatches => 'Select batches to write off';
+
+  @override
+  String get writeOffNoSelection => 'No batches selected';
+
+  @override
+  String writeOffBatchValue(Object value) {
+    return 'Value: $value';
+  }
+
+  @override
+  String writeOffTotalValue(Object value) {
+    return 'Total write-off value: $value';
+  }
+
+  @override
+  String get valuationSellable => 'Sellable Inventory';
+
+  @override
+  String get valuationReserved => 'Reserved Inventory';
+
+  @override
+  String get valuationExpired => 'Expired Inventory';
+
+  @override
+  String get valuationDamaged => 'Damaged Inventory';
+
+  @override
+  String get valuationWrittenOff => 'Written Off';
+
+  @override
+  String get valuationTotalPhysical => 'Total Physical Inventory';
+
+  @override
+  String valuationAsOfDate(Object date) {
+    return 'As of $date';
+  }
+
+  @override
+  String valuationQty(Object qty) {
+    return 'Quantity: $qty';
+  }
+
+  @override
+  String valuationValue(Object value) {
+    return 'Value: $value';
+  }
+
+  @override
+  String get valuationNote => 'Values are at cost price, not selling price';
+
+  @override
   String confirmSellExpired(Object days) {
     return 'This item expired $days days ago. Are you sure you want to sell it?';
   }

@@ -5855,6 +5855,90 @@ class AppLocalizationsUr extends AppLocalizations {
   }
 
   @override
+  String get writeOff => 'رائٹ آف';
+
+  @override
+  String get writeOffBatches => 'بیچز رائٹ آف کریں';
+
+  @override
+  String writeOffConfirm(Object count) {
+    return 'کیا آپ واقعی $count بیچز رائٹ آف کرنا چاہتے ہیں؟';
+  }
+
+  @override
+  String writeOffSuccess(Object count) {
+    return '$count بیچز کامیابی سے رائٹ آف ہو گئیں';
+  }
+
+  @override
+  String get writeOffFailed => 'رائٹ آف ناکام ہو گیا';
+
+  @override
+  String get writeOffReason => 'رائٹ آف کی وجہ';
+
+  @override
+  String get writeOffReasonHint => 'وجہ درج کریں (1-500 حروف)';
+
+  @override
+  String get writeOffGlAccount => 'GL نقصان اکاؤنٹ';
+
+  @override
+  String get writeOffGlAccountHint => 'نقصان اکاؤنٹ منتخب کریں';
+
+  @override
+  String get writeOffSelectBatches => 'رائٹ آف کے لیے بیچز منتخب کریں';
+
+  @override
+  String get writeOffNoSelection => 'کوئی بیچ منتخب نہیں';
+
+  @override
+  String writeOffBatchValue(Object value) {
+    return 'قدر: $value';
+  }
+
+  @override
+  String writeOffTotalValue(Object value) {
+    return 'کل رائٹ آف قدر: $value';
+  }
+
+  @override
+  String get valuationSellable => 'فروخت کے قابل انونٹری';
+
+  @override
+  String get valuationReserved => 'محفوظ انونٹری';
+
+  @override
+  String get valuationExpired => 'ختم شدہ انونٹری';
+
+  @override
+  String get valuationDamaged => 'خراب انونٹری';
+
+  @override
+  String get valuationWrittenOff => 'رائٹ آف شدہ';
+
+  @override
+  String get valuationTotalPhysical => 'کل فزیکل انونٹری';
+
+  @override
+  String valuationAsOfDate(Object date) {
+    return 'تاریخ $date تک';
+  }
+
+  @override
+  String valuationQty(Object qty) {
+    return 'مقدار: $qty';
+  }
+
+  @override
+  String valuationValue(Object value) {
+    return 'قدر: $value';
+  }
+
+  @override
+  String get valuationNote =>
+      'قدروں کی قیمت کی قیمت پر ہیں، فروخت کی قیمت پر نہیں';
+
+  @override
   String confirmSellExpired(Object days) {
     return 'یہ آئٹم $days دن پہلے ختم ہو چکا ہے۔ کیا آپ واقعی اسے بیچنا چاہتے ہیں؟';
   }
