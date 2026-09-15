@@ -53,23 +53,21 @@ class InventoryValuationReport extends ConsumerWidget {
             onRetry: () => ref.invalidate(_valuationProvider),
           );
         },
-        data: (report) => _buildContent(context, l10n, scheme, report),
+        data: (report) => _buildContent(context, ref, l10n, scheme, report),
       ),
     );
   }
 
   Widget _buildContent(
     BuildContext context,
+    WidgetRef ref,
     AppLocalizations l10n,
     ColorScheme scheme,
     InventoryValuationReport report,
   ) {
     return RefreshIndicator(
       onRefresh: () async {
-        final ref = ProviderScope.of(context).read;
-        // Invalidate via the provider
-        context.findAncestorStateOfType<ConsumerState>()?.ref
-            .read(_valuationProvider.notifier).build;
+        ref.invalidate(_valuationProvider);
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),

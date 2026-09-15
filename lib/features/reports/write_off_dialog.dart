@@ -55,15 +55,10 @@ class _WriteOffDialogState extends ConsumerState<_WriteOffDialog> {
     }
     setState(() => _loading = true);
     try {
-      // ExpiryReportRow doesn't carry a numeric batch id — batchNo is the
-      // natural key. The server write-off endpoint accepts batch IDs (int);
-      // we attempt to parse batchNo as int. If the batchNo is a string code
-      // (e.g. "BATCH-26-EXP-0001"), the caller must supply numeric IDs via
-      // a different flow; the dialog gracefully skips unparsable rows.
       final batchIds = <int>[];
       for (final i in _selectedIndices) {
-        final id = int.tryParse(widget.batches[i].batchNo);
-        if (id != null && id > 0) batchIds.add(id);
+        final id = widget.batches[i].id;
+        if (id > 0) batchIds.add(id);
       }
 
       if (batchIds.isEmpty) {
@@ -85,15 +80,15 @@ class _WriteOffDialogState extends ConsumerState<_WriteOffDialog> {
       });
 
       if (!mounted) return;
-      result.when(
-        success: (_) {
+      result.fold(
+        onSuccess: (_) {
           showAppToast(
             context,
             AppLocalizations.of(context)!.writeOffSuccess(batchIds.length),
           );
           Navigator.of(context).pop(true);
         },
-        failure: (error) {
+        onFailure: (error) {
           showAppToast(context, error.message, isError: true);
         },
       );
