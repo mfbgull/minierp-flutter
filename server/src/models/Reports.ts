@@ -622,6 +622,7 @@ function getCustomerLedgerReport(startDate: string, endDate: string, db: Databas
 // ═══════════════════════════════════════════════════════════════
 
 interface ExpiryReportRow {
+  id: number;
   item_id: number;
   item_code: string;
   item_name: string;
