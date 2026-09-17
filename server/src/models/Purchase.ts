@@ -114,10 +114,12 @@ class PurchaseModel {
   }
 
   static generateBatchNo(db: Database.Database): string {
-    const year = new Date().getFullYear();
-    const settingKey = `BATCH_last_no_${year}`;
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const settingKey = `BATCH_last_no_${month}${year}`;
     const nextNo = getNextSequenceNumber(db, settingKey);
-    return `BATCH-${year % 100}-PUR-${nextNo.toString().padStart(4, '0')}`;
+    return `BATCH-${month}${year}-PUR-${String(nextNo).padStart(5, '0')}`;
   }
 
   static generateMovementNo(db: Database.Database): string {

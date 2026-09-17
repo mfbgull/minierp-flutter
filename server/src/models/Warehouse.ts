@@ -5,6 +5,7 @@ interface Warehouse {
   warehouse_code: string;
   warehouse_name?: string;
   is_active?: number;
+  is_system?: number;
   created_at?: string;
   updated_at?: string;
 }

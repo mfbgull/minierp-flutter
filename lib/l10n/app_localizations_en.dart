@@ -1388,7 +1388,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get purchasesInvoicenumber => 'Invoice Number';
 
   @override
-  String get purchasesInvoiceplaceholder => 'e.g., INV-2025-001';
+  String get purchasesInvoiceplaceholder => 'e.g., INV-0926-00001';
 
   @override
   String get purchasesRemarks => 'Remarks';
@@ -1946,6 +1946,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get navStockvaluation => 'Stock Valuation';
+
+  @override
+  String get inventoryvaluation => 'Inventory Valuation';
 
   @override
   String get navInventorymovement => 'Inventory Movement';
@@ -4954,6 +4957,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get salesPaymentupdated => 'Payment updated';
 
   @override
+  String get salesCreditoffset => 'Credit Offset';
+
+  @override
+  String get salesAvailablecredit => 'Available credit';
+
+  @override
   String get salesPeritem => 'Per Item';
 
   @override
@@ -5778,6 +5787,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get expiryReport => 'Expiry Report';
 
   @override
+  String get expiredToday => 'Expired Today';
+
+  @override
+  String get expiringThisMonth => 'This Month';
+
+  @override
+  String get expiring7Days => 'In 7 Days';
+
+  @override
+  String get expiring30Days => 'In 30 Days';
+
+  @override
+  String get writeOffBatch => 'Write Off';
+
+  @override
   String expiryReportPagination(
     Object currentPage,
     Object totalPages,
@@ -5940,6 +5964,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get valuationNote => 'Values are at cost price, not selling price';
+
+  @override
+  String get valuationNoteReservedSubset =>
+      'Reserved is a subset of sellable (not additive)';
 
   @override
   String confirmSellExpired(Object days) {

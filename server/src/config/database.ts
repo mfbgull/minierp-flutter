@@ -1052,14 +1052,17 @@ function runStockCoverageReconciliation(): void {
         const unitCost = avg.cost > 0 ? avg.cost : ((db.prepare('SELECT standard_cost FROM items WHERE id = ?').get(m.item_id) as { standard_cost: number } | undefined)?.standard_cost || 0);
 
         const nextNo = getNextSequenceNumber(db, 'BATCH_RECON_last_no');
+        const reconDate = new Date();
+        const reconMonth = String(reconDate.getMonth() + 1).padStart(2, '0');
+        const reconYear = String(reconDate.getFullYear()).slice(-2);
         db.prepare(`
           INSERT INTO stock_batches (
             batch_no, item_id, warehouse_id, source_type,
             source_id, quantity_original, quantity_remaining,
             unit_cost, received_date
           ) VALUES (?, ?, ?, 'RECON', 0, ?, ?, ?, ?)
-        `).run(
-          `BATCH-${new Date().getFullYear() % 100}-RECON-${nextNo.toString().padStart(4, '0')}`,
+          `).run(
+          `BATCH-${reconMonth}${reconYear}-RECON-${nextNo.toString().padStart(5, '0')}`,
           m.item_id, m.warehouse_id, delta, delta, unitCost,
           new Date().toISOString().split('T')[0]
         );
@@ -1550,6 +1553,7 @@ runLedgered('fn.runBatchCostingMigration', runBatchCostingMigration);
 runLedgered('fn.runGLFoundationMigration', runGLFoundationMigration);
 runLedgered('fn.runSalaryPaymentsMigration', runSalaryPaymentsMigration);
 runLedgered('fn.runCreditBalanceMigration', runCreditBalanceMigration);
+runLedgered('add-customer-credit-account.sql');
 runLedgered('fn.runEmployeesMigration', runEmployeesMigration);
 runLedgered('fn.runPhysicalCountsMigration', runPhysicalCountsMigration);
 runLedgered('fn.runForecastEnhancementsMigration', runForecastEnhancementsMigration);
@@ -1563,6 +1567,7 @@ runLedgered('fn.runOpeningBalancesMigration', runOpeningBalancesMigration);
 runLedgered('fn.runUserPreferencesMigration', runUserPreferencesMigration);
 runLedgered('fn.runEmployeeLoansMigration', runEmployeeLoansMigration);
 runLedgered('fn.runOwnerPersonalLoansMigration', runOwnerPersonalLoansMigration);
+runLedgered('fix-invoice-ledger-reference.sql');
 // INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
 // INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
 runLedgered('fn.runGLVoidAttributionMigration', runGLVoidAttributionMigration);
@@ -1579,6 +1584,7 @@ runLedgered('add-invoice-soft-delete.sql');
 // Pre-delete status capture so the invoice restore endpoint (undo
 // pattern) can bring the invoice back to exactly its prior state.
 runLedgered('add-invoice-restore-status.sql');
+runLedgered('add-invoice-credit-offset.sql');
 runLedgered('add-customer-item-soft-delete.sql');
 runLedgered('add-hot-path-indexes.sql');
 runLedgered('normalize-payment-methods.sql', undefined, { noTxn: true }); // rebuilds payments — FK off required

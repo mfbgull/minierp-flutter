@@ -14,6 +14,7 @@ migrate_working_dir/
 .opencode/
 .fuse_hidden*
 openspec/
+**/specs/
 
 # IntelliJ related
 *.iml

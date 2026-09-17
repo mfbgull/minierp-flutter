@@ -94,6 +94,7 @@ export interface CreateInvoiceDTO {
   // pass these so the invoice's amounts reflect the recorded payment.
   paid_amount?: number;
   balance_amount?: number;
+  credit_offset?: number;
 }
 
 export interface CreateInvoiceItemDTO {
@@ -485,7 +486,10 @@ class InvoiceModel {
 
     // Atomically increment and get the next sequence number
     const nextNo = getNextSequenceNumber(db, settingKey);
-    return `PAY${String(nextNo).padStart(3, '0')}`;
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    return `PAY-${month}${year}-${String(nextNo).padStart(5, '0')}`;
   }
 
   /**
@@ -704,15 +708,16 @@ class InvoiceModel {
     const totalAmount = data.total_amount ?? 0;
     const paidAmount = data.paid_amount ?? 0;
     const balanceAmount = data.balance_amount ?? Math.max(0, totalAmount - paidAmount);
+    const creditOffset = data.credit_offset ?? 0;
 
     const result = db.prepare(`
       INSERT INTO invoices (
         invoice_no, customer_id, invoice_date, due_date, status,
         total_amount, paid_amount, balance_amount, notes,
         discount_scope, discount_type, discount_value, terms, created_by,
-        source_type
+        source_type, credit_offset
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.invoice_no || null,
       data.customer_id,
@@ -728,7 +733,8 @@ class InvoiceModel {
       data.discount_value || 0,
       data.terms || null,
       userId,
-      data.source_type || null
+      data.source_type || null,
+      creditOffset
     );
     return result.lastInsertRowid as number;
   }
@@ -1138,12 +1144,28 @@ class InvoiceModel {
   }
 
   static getPayments(invoiceId: number, db: Database.Database) {
-    return db.prepare(`
+    const rows = db.prepare(`
       SELECT p.id, p.payment_no, p.payment_date, p.payment_method,
              p.reference_no, p.notes, pa.amount
       FROM payment_allocations pa JOIN payments p ON pa.payment_id = p.id
       WHERE pa.invoice_id = ? AND pa.voided_at IS NULL ORDER BY p.payment_date DESC
-    `).all(invoiceId);
+    `).all(invoiceId) as Array<{ id: number; payment_no: string; payment_date: string; payment_method: string; reference_no: string; notes: string; amount: number }>;
+
+    const invoice = db.prepare('SELECT credit_offset, invoice_no FROM invoices WHERE id = ?').get(invoiceId) as { credit_offset: number; invoice_no: string } | undefined;
+
+    if (invoice && invoice.credit_offset > 0) {
+      rows.push({
+        id: 0,
+        payment_no: `CREDIT-${invoice.invoice_no}`,
+        payment_date: '',
+        payment_method: 'CREDIT',
+        reference_no: `Credit offset for ${invoice.invoice_no}`,
+        notes: 'Customer credit applied',
+        amount: invoice.credit_offset,
+      });
+    }
+
+    return rows;
   }
 
   static getItemsForStockReverse(invoiceId: number, db: Database.Database) {

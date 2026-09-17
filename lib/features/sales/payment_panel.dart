@@ -53,6 +53,9 @@ class PaymentPanel extends StatefulWidget {
     required this.onRecord,
     required this.onDeletePayment,
     required this.onEditPayment,
+    required this.creditOffset,
+    required this.availableCredit,
+    required this.onCreditOffsetChanged,
   });
 
   final bool isEdit;
@@ -81,6 +84,10 @@ class PaymentPanel extends StatefulWidget {
   final VoidCallback onRecord;
   final void Function(InvoicePaymentRecord payment) onDeletePayment;
   final void Function(InvoicePaymentRecord payment) onEditPayment;
+
+  final num creditOffset;
+  final num availableCredit;
+  final ValueChanged<num> onCreditOffsetChanged;
 
   @override
   State<PaymentPanel> createState() => PaymentPanelState();
@@ -265,9 +272,15 @@ class PaymentPanelState extends State<PaymentPanel> {
         _summaryLine(l10n.salesGrandtotal, widget.total, null),
         _summaryLine(
           l10n.salesTotalpaid,
-          widget.paidAmount,
+          widget.paidAmount - widget.creditOffset,
           const Color(0xff16a34a),
         ),
+        if (widget.creditOffset > 0)
+          _summaryLine(
+            'Cr Used',
+            widget.creditOffset,
+            const Color(0xff16a34a),
+          ),
         _summaryLine(
           l10n.salesBalance,
           widget.balance,
@@ -400,7 +413,30 @@ class PaymentPanelState extends State<PaymentPanel> {
         for (final m in widget.methods) _methodRow(l10n, m),
         const SizedBox(height: 6),
         _summaryLine(l10n.salesPaymenttotal, _paymentSum, null),
+        if (widget.creditOffset > 0)
+          _summaryLine(l10n.salesCreditoffset, widget.creditOffset, null),
         _summaryLine(l10n.salesBalance, widget.balance, null),
+        if (widget.availableCredit > 0) ...[
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Checkbox(
+                value: widget.creditOffset > 0,
+                onChanged: widget.saving
+                    ? null
+                    : (v) => widget.onCreditOffsetChanged(
+                          v == true ? widget.availableCredit : 0,
+                        ),
+              ),
+              Expanded(
+                child: Text(
+                  '${l10n.salesCreditoffset} (${l10n.salesAvailablecredit}: ${Formatters.currency(widget.availableCredit)})',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 8),
         TextField(
           controller: _notes,

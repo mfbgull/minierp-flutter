@@ -39,8 +39,8 @@ void main() {
   });
 
   group('invoice helpers', () {
-    test('generateInvoiceNo has the INV-YYYY-NNNNNN shape', () {
-      expect(generateInvoiceNo(), matches(RegExp(r'^INV-\d{4}-\d{6}$')));
+    test('generateInvoiceNo has the INV-MMYY-XXXXX shape', () {
+      expect(generateInvoiceNo(), matches(RegExp(r'^INV-\d{4}-\d{5}$')));
     });
 
     test('field order follows the discount scope', () {
@@ -84,7 +84,7 @@ void main() {
       expect(state.status, 'Unpaid');
       expect(state.discountScope, DiscountScope.invoice);
       expect(state.items.length, 1);
-      expect(state.invoiceNo, matches(RegExp(r'^INV-\d{4}-\d{6}$')));
+      expect(state.invoiceNo, matches(RegExp(r'^INV-\d{4}-\d{5}$')));
       expect(state.customerId, '');
     });
 
@@ -394,7 +394,7 @@ void main() {
 
     test('default state', () {
       final state = createDefaultInvoiceV2State();
-      expect(state.invoiceNo, matches(RegExp(r'^INV-\d{4}-\d{6}$')));
+      expect(state.invoiceNo, matches(RegExp(r'^INV-\d{4}-\d{5}$')));
       expect(state.customer, null);
       expect(state.discountScope, DiscountScope.invoice);
       expect(state.items.length, 1);

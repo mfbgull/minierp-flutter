@@ -104,6 +104,7 @@ export interface CreateInvoiceDTO {
   total_amount: number;
   record_payment?: boolean;
   payment?: PaymentDTO;
+  credit_offset?: number;
 }
 
 export interface Invoice {

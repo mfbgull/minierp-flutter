@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { AuthRequest, SellableStockUnavailableError } from '../types';
 import db from '../config/database';
 import logger from '../utils/logger';
-import { getNextSequenceNumber } from '../utils/sequence';
+import { generateDocNo } from '../utils/sequence';
 import InvoiceModel from '../models/Invoice';
 import StockMovementModel from '../models/StockMovement';
 import WarehouseModel from '../models/Warehouse';
@@ -11,10 +11,7 @@ import { ActionType, newCorrelationId, logActivityInTx } from '../services/activ
 import { parseCurrency, addCurrency, multiplyCurrency } from '../utils/currency';
 
 function generatePOSTransactionNo(): string {
-  const year = new Date().getFullYear();
-  const settingKey = `POS_last_no_${year}`;
-  const nextNo = getNextSequenceNumber(db, settingKey);
-  return `POS-${year}-${nextNo.toString().padStart(6, '0')}`;
+  return generateDocNo(db, 'POS', 5);
 }
 
 /**

@@ -39,3 +39,15 @@ try {
 - `invoiceController.ts` - Invoice generation
 - `reportsController.ts` - Financial reports
 - `customersController.ts` - Customer ledger
+
+## CREDIT OFFSET GOTCHAS (fix-customer-credit-reflection)
+
+Two bugs were found and fixed in `invoiceController.ts`:
+
+1. **RETURN ledger date**: Use `invoice.invoice_date`, NOT `todayDate`.
+   `rebuildLedgerBalances()` reorders by `(transaction_date, id)`.
+   A backdated return with today's date corrupts the running balance chain.
+
+2. **CREDIT_OFFSET in customer_ledger**: Do NOT create a `customer_ledger`
+   entry for credit offsets. The invoice DEBIT entry already covers the
+   total. The GL entry via `postCreditOffsetEntry()` is sufficient.

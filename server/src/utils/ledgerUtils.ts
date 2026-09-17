@@ -141,7 +141,7 @@ function reverseLedgerEntry(
 
 
 function calculateInvoiceBalance(invoiceId: number): number {
-  const invoice = db.prepare('SELECT total_amount, returned_amount, return_fee FROM invoices WHERE id = ?').get(invoiceId) as { total_amount: number; returned_amount?: number; return_fee?: number } | undefined;
+  const invoice = db.prepare('SELECT total_amount, returned_amount, return_fee, credit_offset FROM invoices WHERE id = ?').get(invoiceId) as { total_amount: number; returned_amount?: number; return_fee?: number; credit_offset?: number } | undefined;
 
   if (!invoice) {
     throw new Error(`Invoice ${invoiceId} not found`);
@@ -154,16 +154,17 @@ function calculateInvoiceBalance(invoiceId: number): number {
   `).get(invoiceId) as { total_paid: number };
 
   const totalPaid = parseCurrency(paidResult?.total_paid);
+  const creditOffset = parseCurrency(invoice.credit_offset || 0);
   const totalAmount = parseCurrency(invoice.total_amount);
   const returnedAmount = parseCurrency(invoice.returned_amount || 0);
   const returnFee = parseCurrency(invoice.return_fee || 0);
-  // Balance = total owed minus paid minus (returned minus fee)
-  // Equivalent to: total - paid - returned + return_fee
+  // Balance = total owed minus cash payments minus credit offset minus (returned minus fee)
   const netReturnReduction = subtractCurrency(returnedAmount, returnFee);
-  const newBalance = subtractCurrency(subtractCurrency(totalAmount, totalPaid), netReturnReduction);
+  const totalDeductions = totalPaid + creditOffset;
+  const newBalance = subtractCurrency(subtractCurrency(totalAmount, totalDeductions), netReturnReduction);
 
   db.prepare('UPDATE invoices SET paid_amount = ?, balance_amount = ? WHERE id = ?')
-    .run(totalPaid, newBalance, invoiceId);
+    .run(totalPaid + creditOffset, newBalance, invoiceId);
 
   return newBalance;
 }

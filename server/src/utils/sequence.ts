@@ -21,14 +21,16 @@ export function getNextSequenceNumber(db: Database.Database, settingKey: string)
 }
 
 /**
- * Generate a year-based document number: PREFIX-YEAR-NNNN
- * e.g., generateDocNo(db, 'INV') → 'INV-2026-0001'
+ * Generate a month-based document number: PREFIX-MMYY-NNNNN
+ * e.g., generateDocNo(db, 'INV') → 'INV-0926-00001'
  */
 export function generateDocNo(db: Database.Database, prefix: string, padLength = 4): string {
-  const year = new Date().getFullYear();
-  const settingKey = `${prefix}_last_no_${year}`;
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = String(now.getFullYear()).slice(-2);
+  const settingKey = `${prefix}_last_no_${month}${year}`;
   const nextNo = getNextSequenceNumber(db, settingKey);
-  return `${prefix}-${year}-${nextNo.toString().padStart(padLength, '0')}`;
+  return `${prefix}-${month}${year}-${nextNo.toString().padStart(padLength, '0')}`;
 }
 
 /**

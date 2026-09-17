@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import StockMovementModel from './StockMovement';
-import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/sequence';
+import { initializeSequenceFromMax, getNextSequenceNumber, generateDocNo } from '../utils/sequence';
 import ledgerUtils from '../utils/ledgerUtils';
 import AccountingService from '../services/accountingService';
 import { parseCurrency, computeInvoiceTotal, decomposeLineAmount } from '../utils/currency';
@@ -217,7 +217,7 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
         total_amount, paid_amount, balance_amount, notes, terms, created_by
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      data.invoice_no || generateInvoiceNumber(),
+      data.invoice_no || generateDocNo(db, 'INV', 5),
       data.customer_id,
       data.invoice_date,
       data.due_date || data.invoice_date,
@@ -270,7 +270,10 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
       }
       initializeSequenceFromMax(db, 'PAY_last_no', 'payments', 'payment_no', 'PAY');
       const nextPaymentNo = getNextSequenceNumber(db, 'PAY_last_no');
-      const paymentNo = `PAY${String(nextPaymentNo).padStart(3, '0')}`;
+      const now = new Date();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = String(now.getFullYear()).slice(-2);
+      const paymentNo = `PAY-${month}${year}-${String(nextPaymentNo).padStart(5, '0')}`;
 
       const paymentResult = db.prepare(`
         INSERT INTO payments (
@@ -370,12 +373,6 @@ function getInvoiceWithCustomer(db: Database.Database, invoiceId: number) {
   `).get(invoiceId);
 }
 
-function generateInvoiceNumber(): string {
-  const year = new Date().getFullYear();
-  const timestamp = Date.now().toString().slice(-6);
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `INV-${year}-${timestamp}${random}`;
-}
 
 export default {
   getDraftById,

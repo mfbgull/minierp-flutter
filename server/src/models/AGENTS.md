@@ -34,3 +34,22 @@ Database access layer. SQLite queries via better-sqlite3.
 - `PurchaseOrder.ts` - 24KB, largest
 - `Quotation.ts` - 19KB
 - `Invoice.ts` - 11KB
+
+## CREDIT OFFSET BEHAVIOR
+
+Customer credits are generated from invoice returns (`disposition: 'credit'`).
+When a customer applies credit to a new invoice via `credit_offset`:
+
+- `invoices.paid_amount` = cash payments + credit_offset (already handled)
+- `invoices.balance_amount` = total_amount - paid_amount
+- GL entry: Dr Customer Credit (1110) / Cr AR (1100) via `postCreditOffsetEntry()`
+- `InvoiceModel.getPayments()` adds a synthetic `CREDIT-{invoice_no}` entry
+
+**DO NOT** create a `CREDIT_OFFSET` entry in `customer_ledger`. The invoice
+DEBIT entry already accounts for the full total. Adding a CREDIT_OFFSET
+CREDIT entry double-counts and prevents `recalcCustomerBalanceFromLedger()`
+from reducing the customer's balance after credit application.
+
+**RETURN ledger entries** must use `invoice.invoice_date` (not today's date)
+as the `transaction_date`. Otherwise `rebuildLedgerBalances()` reorders by
+date and corrupts the running balance chain for backdated returns.

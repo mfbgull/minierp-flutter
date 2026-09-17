@@ -214,6 +214,8 @@ pw.Widget _buildTotals(Invoice invoice) {
   final subtotal = items.fold<num>(0, (s, i) => s + i.amount);
   final total = invoice.totalAmount;
   final paid = invoice.paidAmount;
+  final creditOffset = invoice.creditOffset;
+  final cashPaid = paid - creditOffset;
   final balance = invoice.balanceAmount;
   final hasTax = items.any((i) => i.taxRate > 0);
 
@@ -234,12 +236,15 @@ pw.Widget _buildTotals(Invoice invoice) {
         ),
       ],
       _totalRowBold('Total', _fmtCurrency(total)),
-      if (paid > 0) ...[
-        _totalRow('Paid', _fmtCurrency(paid)),
+      if (cashPaid > 0) ...[
+        _totalRow('Paid', _fmtCurrency(cashPaid)),
         if (invoice.returnedAmount > 0)
           _totalRow('Returned', _fmtCurrency(invoice.returnedAmount)),
-        _totalRowBold('Balance Due', _fmtCurrency(balance)),
       ],
+      if (creditOffset > 0)
+        _totalRow('Cr Used', _fmtCurrency(creditOffset)),
+      if (cashPaid > 0 || creditOffset > 0)
+        _totalRowBold('Balance Due', _fmtCurrency(balance)),
     ],
   );
 }

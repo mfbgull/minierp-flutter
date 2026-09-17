@@ -92,7 +92,10 @@ function createEmployee(req: Request, res: Response): void {
     // Generate employee code
     initializeSequenceFromMax(db, 'EMP_last_no', 'employees', 'employee_code', 'EMP-');
     const nextNumber = getNextSequenceNumber(db, 'EMP_last_no');
-    const employee_code = `EMP-${String(nextNumber).padStart(3, '0')}`;
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const employee_code = `EMP-${month}${year}-${String(nextNumber).padStart(5, '0')}`;
 
     const id = EmployeeModel.create({
       employee_code,
@@ -184,11 +187,17 @@ function getNextEmployeeCode(req: Request, res: Response): void {
   try {
     initializeSequenceFromMax(db, 'EMP_last_no', 'employees', 'employee_code', 'EMP-');
     const nextNumber = getNextSequenceNumber(db, 'EMP_last_no');
-    const code = `EMP-${String(nextNumber).padStart(3, '0')}`;
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const code = `EMP-${month}${year}-${String(nextNumber).padStart(5, '0')}`;
     res.json({ success: true, data: { code } });
   } catch (error) {
     logger.error('Error generating employee code:', error);
-    const code = 'EMP-001';
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const code = `EMP-${month}${year}-00001`;
     res.json({ success: true, data: { code } });
   }
 }

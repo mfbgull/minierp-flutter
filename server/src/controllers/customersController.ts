@@ -76,7 +76,10 @@ function createCustomer(req: AuthRequest, res: Response): void {
 
     initializeSequenceFromMax(db, 'CUST_last_no', 'customers', 'customer_code', 'CUST');
     const nextCustomerNo = getNextSequenceNumber(db, 'CUST_last_no');
-    const newCustomerCode = `CUST${String(nextCustomerNo).padStart(3, '0')}`;
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const newCustomerCode = `CUST-${month}${year}-${String(nextCustomerNo).padStart(5, '0')}`;
 
     const customerId = db.transaction(() => {
       const cid = CustomerModel.create({ ...req.body, opening_balance: opening_balance || 0 }, db);

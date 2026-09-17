@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/report.dart'
-    show InventoryValuationReport, ValuationBucket, WrittenOffBucket;
+    show InventoryValuationReport, WrittenOffBucket;
 import '../../data/repositories/api_result.dart' show ApiError;
 import '../../data/repositories/report_repository.dart'
     show reportRepositoryProvider;
@@ -18,14 +18,14 @@ import '../../widgets/screen_error_panel.dart';
 final _valuationProvider = FutureProvider<InventoryValuationReport>((ref) async {
   final repo = ref.watch(reportRepositoryProvider);
   final result = await repo.inventoryValuation();
-  return result.when(
-    success: (data) => data,
-    failure: (error) => throw error,
+  return result.fold(
+    onSuccess: (data) => data,
+    onFailure: (error) => throw error,
   );
 });
 
-class InventoryValuationReport extends ConsumerWidget {
-  const InventoryValuationReport({super.key});
+class InventoryValuationScreen extends ConsumerWidget {
+  const InventoryValuationScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,7 +40,7 @@ class InventoryValuationReport extends ConsumerWidget {
           IconButton(
             onPressed: () => ref.invalidate(_valuationProvider),
             icon: const Icon(Icons.refresh),
-            tooltip: MaterialLocalizations.of(context).refreshButtonTooltip,
+            tooltip: 'Refresh',
           ),
         ],
       ),
@@ -181,7 +181,7 @@ class InventoryValuationReport extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '• Reserved is a subset of sellable (not additive)',
+                      '• ${l10n.valuationNoteReservedSubset}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),

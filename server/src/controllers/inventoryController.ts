@@ -904,7 +904,7 @@ function deletePhysicalCount(req: AuthRequest, res: Response): void {
 // Per batch (one transaction each): auto-transfers to EXPIRED when needed
 // (shared recordExpiryTransfer path), records a WRITE_OFF movement, and
 // posts Dr <loss 7201-7204> / Cr inventory_asset (1200) at batch cost.
-const WRITE_OFF_LOSS_ACCOUNTS = new Set(['7200', '7201', '7202', '7203', '7204']);
+const WRITE_OFF_LOSS_ACCOUNTS = new Set(['7201', '7202', '7203', '7204']);
 
 function writeOffExpiredBatches(req: AuthRequest, res: Response): void {
   try {
@@ -997,6 +997,44 @@ function writeOffExpiredBatches(req: AuthRequest, res: Response): void {
   }
 }
 
+// Damage transfer: POST /inventory/damaged/transfer
+// Body: { batchId: number, remarks?: string }
+// Moves a batch to the DAMAGED warehouse (no GL impact).
+function damageTransferBatch(req: AuthRequest, res: Response): void {
+  try {
+    const { batchId, remarks } = req.body as {
+      batchId?: unknown;
+      remarks?: unknown;
+    };
+    if (!Number.isInteger(batchId) || (batchId as number) <= 0) {
+      res.status(400).json({ error: 'batchId must be a positive integer' });
+      return;
+    }
+    const damagedWarehouse = db.prepare(
+      `SELECT id FROM warehouses WHERE warehouse_code = 'DAMAGED' AND is_active = 1`
+    ).get() as { id: number } | undefined;
+    if (!damagedWarehouse) {
+      res.status(500).json({ error: "System warehouse 'DAMAGED' is missing — run migrations" });
+      return;
+    }
+
+    const r = StockMovementModel.recordDamageTransfer(
+      { batchId: batchId as number, toWarehouseId: damagedWarehouse.id, remarks: typeof remarks === 'string' ? remarks.trim() : null },
+      req.user!.id,
+      db
+    );
+
+      logCRUD(ActionType.STOCK_WRITE_OFF, 'StockBatch', batchId as number,
+        `Damage transfer to DAMAGED warehouse: ${r.mirrorBatchId}`, req.user!.id);
+    req.activityLogged = true;
+
+    res.json({ success: true, message: 'Batch transferred to DAMAGED warehouse', data: r });
+  } catch (error) {
+    logger.error('Damage transfer endpoint error:', error);
+    res.status(500).json({ error: 'Failed to transfer batch to DAMAGED warehouse' });
+  }
+}
+
 export default {
   getItems,
   getItem,
@@ -1031,6 +1069,7 @@ export default {
   correctBatchReconciliation,
   updateBatchStatus,
   writeOffExpiredBatches,
+  damageTransferBatch,
   createReservation,
   releaseReservation,
   getReservations

@@ -307,18 +307,19 @@ class _SalesScreenState extends ConsumerState<SalesScreen> {
         rowColorCallback: moneyRowColorCallback(
           context,
           ref,
-          // Money in — an invoice brings receivable value into the
-          // business. Draft (nothing realized yet) and Cancelled rows
-          // stay neutral. Returned/Partially Returned stay green: the
-          // original sale was still realized.
           (row) {
             final status =
                 (row.cells['data']?.value as Invoice?)?.status ??
                 row.cells['status']?.value?.toString() ??
                 '';
-            return status == 'Draft' || status == 'Cancelled'
-                ? MoneyDirection.neutral
-                : MoneyDirection.inflow;
+            return switch (status) {
+              'Draft' || 'Cancelled' => MoneyDirection.neutral,
+              'Returned' || 'Partially Returned' =>
+                MoneyDirection.returned,
+              'Unpaid' => MoneyDirection.outflow,
+              'Partially Paid' => MoneyDirection.partialInflow,
+              _ => MoneyDirection.inflow,
+            };
           },
         ),
         onLoaded: (event) {

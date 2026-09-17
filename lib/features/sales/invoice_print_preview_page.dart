@@ -137,9 +137,15 @@ class _InvoicePrintPreviewPageState
     setState(() => _printing = true);
     try {
       final service = PrintService(context);
+      final repo = ref.read(invoiceRepositoryProvider);
+      final paymentsResult = await repo.invoicePayments(widget.invoice.id);
+      final payments = switch (paymentsResult) {
+        ApiSuccess(:final data) => data,
+        ApiFailure() => const <InvoicePaymentRecord>[],
+      };
       await service.printInvoice(
         _detail ?? widget.invoice,
-        payments: const [],
+        payments: payments,
         format: format,
       );
     } catch (error) {

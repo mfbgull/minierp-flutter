@@ -283,7 +283,10 @@ function getNextSupplierCode(req: Request, res: Response): void {
   try {
     initializeSequenceFromMax(db, 'SUP_last_no', 'suppliers', 'supplier_code', 'SUP-');
     const nextNumber = getNextSequenceNumber(db, 'SUP_last_no');
-    const code = `SUP-${String(nextNumber).padStart(3, '0')}`;
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const code = `SUP-${month}${year}-${String(nextNumber).padStart(5, '0')}`;
     res.json({ success: true, data: { code } });
   } catch (error) {
     logger.error('Error generating supplier code:', error);

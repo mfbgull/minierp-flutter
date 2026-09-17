@@ -51,6 +51,8 @@ abstract final class ApiEndpoints {
   // Expired-stock plan Phase 3: batch write-off with GL posting
   // (Dr 7201-7204 / Cr 1200).
   static const expiredWriteOff = '/inventory/expired/write-off';
+  // Damage transfer: move batch to DAMAGED warehouse (no GL impact).
+  static const damagedTransfer = '/inventory/damaged/transfer';
 
   // Sales
   static const invoices = '/invoices';

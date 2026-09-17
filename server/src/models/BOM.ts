@@ -82,9 +82,11 @@ const BOM_SORT_COLUMN_MAP: Record<string, string> = {
 
 class BOMModel {
   static generateBOMNo(db: Database.Database): string {
-    const year = new Date().getFullYear();
-    const prefix = `BOM-${year}-`;
-    const settingKey = `BOM_last_no_${year}`;
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const prefix = `BOM-${month}${year}-`;
+    const settingKey = `BOM_last_no_${month}${year}`;
 
     // Seed from existing max on first call
     const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get(settingKey) as { value: string } | undefined;
@@ -100,7 +102,7 @@ class BOMModel {
     }
 
     const nextNo = getNextSequenceNumber(db, settingKey);
-    return `${prefix}${nextNo.toString().padStart(4, '0')}`;
+    return `${prefix}${String(nextNo).padStart(5, '0')}`;
   }
 
   static create(data: CreateBOMDTO, userId: number, db: Database.Database): BOMWithItems {

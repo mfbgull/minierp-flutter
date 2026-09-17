@@ -447,6 +447,8 @@ pw.Widget _buildSummarySection(
   final discount = _totalDiscount(invoice);
   final tax = _totalTax(invoice);
   final paid = invoice.paidAmount;
+  final creditOffset = invoice.creditOffset;
+  final cashPaid = paid - creditOffset;
   final returned = invoice.returnedAmount;
 
   return pw.Row(
@@ -544,13 +546,19 @@ pw.Widget _buildSummarySection(
             ),
             pw.SizedBox(height: 5),
             _totalRow('Total', _currency(invoice.totalAmount), bold: true),
-            if (paid > 0) ...[
+            if (cashPaid > 0) ...[
               pw.SizedBox(height: 3),
-              _totalRow('Paid', _currency(paid)),
+              _totalRow('Paid', _currency(cashPaid)),
               if (returned > 0) ...[
                 pw.SizedBox(height: 3),
                 _totalRow('Returned', _currency(returned)),
               ],
+            ],
+            if (creditOffset > 0) ...[
+              pw.SizedBox(height: 3),
+              _totalRow('Cr Used', _currency(creditOffset)),
+            ],
+            if (cashPaid > 0 || creditOffset > 0) ...[
               pw.SizedBox(height: 3),
               _totalRow('Balance Due', _currency(invoice.balanceAmount),
                   bold: true),
