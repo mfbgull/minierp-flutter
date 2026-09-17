@@ -241,7 +241,10 @@ String getExpectedStatus(
 
 String generateInvoiceNo() {
   final now = DateTime.now();
-  return 'INV-${now.year}-${(now.millisecondsSinceEpoch % 1000000).toString().padLeft(6, '0')}';
+  final month = now.month.toString().padLeft(2, '0');
+  final year = now.year.toString().substring(2);
+  final unique = (now.microsecondsSinceEpoch % 100000).toString().padLeft(5, '0');
+  return 'INV-$month$year-$unique';
 }
 
 /* ── Default invoice state ──────────────────────────────────────── */

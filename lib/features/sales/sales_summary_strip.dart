@@ -18,6 +18,8 @@ class SalesSummaryStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final scheme = Theme.of(context).colorScheme;
+    // Gross sales = totalAmount (all invoices, including returns).
+    // Invariant: Total Sales − Total Paid = Total Due.
     final totalSales = rows.fold<num>(0, (sum, i) => sum + i.totalAmount);
     final totalPaid = rows.fold<num>(0, (sum, i) => sum + i.paidAmount);
     final totalDue = rows.fold<num>(0, (sum, i) => sum + i.balanceAmount);

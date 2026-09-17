@@ -516,6 +516,47 @@ export class AccountingService {
   }
 
   /**
+   * Post a customer credit offset applied to an invoice.
+   * Dr Customer Credit (1110) / Cr Accounts Receivable (1100).
+   * The customer credit balance is also tracked in customer_ledger/
+   * customers.current_balance for sub-ledger reporting.
+   */
+  static postCreditOffsetEntry(
+    db: Database.Database,
+    args: {
+      invoiceId: number;
+      invoiceNo: string;
+      amount: number;
+      invoiceDate: string;
+      customerId?: number;
+      userId?: number;
+    }
+  ): PostedEntry | null {
+    if (!args.amount || args.amount <= 0) return null;
+
+    const ar = AccountingService.getAccountByCode(db, '1100');
+    const customerCredit = AccountingService.getAccountByCode(db, '1110');
+    if (!ar) {
+      throw new Error('Chart of accounts is missing required account: 1100 (AR)');
+    }
+    if (!customerCredit) {
+      throw new Error('Chart of accounts is missing required account: 1110 (Customer Credit)');
+    }
+
+    return AccountingService.postEntry(db, {
+      entry_date: args.invoiceDate,
+      description: `Credit offset for invoice ${args.invoiceNo} — ${args.amount.toFixed(2)}`,
+      reference_type: 'CREDIT_OFFSET',
+      reference_id: args.invoiceId,
+      created_by: args.userId,
+      lines: [
+        { account_id: customerCredit.id, debit: args.amount, description: `Customer credit applied to ${args.invoiceNo}` },
+        { account_id: ar.id, credit: args.amount, description: `AR reduced by credit offset for ${args.invoiceNo}` },
+      ],
+    });
+  }
+
+  /**
    * Post a purchase order commitment. Dr Inventory Asset, Cr Accounts
    * Payable. Posted at PO creation in this implementation; in
    * stricter systems you'd post at goods receipt instead. Either

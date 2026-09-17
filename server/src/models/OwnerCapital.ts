@@ -47,7 +47,7 @@ export function generateCapitalNo(db: Database.Database, capitalDate: string): s
   // Shared atomic counter, allocated inside the same transaction as the
   // INSERT (EXP-05 pattern); UNIQUE(capital_no) backstops it.
   const nextNo = getNextSequenceNumber(db, `CAP_last_no_${year}${month}`);
-  return `CAP-${year}${month}-${String(nextNo).padStart(4, '0')}`;
+  return `CAP-${year}${month}-${String(nextNo).padStart(5, '0')}`;
 }
 
 function create(db: Database.Database, data: CreateOwnerCapitalDTO): number {

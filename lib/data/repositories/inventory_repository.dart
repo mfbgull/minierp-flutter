@@ -316,6 +316,16 @@ class InventoryRepository {
     parse: (Object? json) => (json ?? <String, dynamic>{}) as Map<String, dynamic>,
   );
 
+  /// Damage transfer: move a batch to the DAMAGED warehouse
+  /// (`POST /inventory/damaged/transfer`). Body: `{ batchId, remarks? }`.
+  Future<ApiResult<Map<String, dynamic>>> damageTransferBatch(
+    Map<String, dynamic> body,
+  ) => _api.postRaw(
+    ApiEndpoints.damagedTransfer,
+    body: body,
+    parse: (Object? json) => (json ?? <String, dynamic>{}) as Map<String, dynamic>,
+  );
+
   Future<ApiResult<List<dynamic>>> stockSummary() => _api.getRawList(
     ApiEndpoints.stockSummary,
     parseItem: (Object? json) => json,

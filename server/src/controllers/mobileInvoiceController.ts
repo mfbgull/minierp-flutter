@@ -5,6 +5,7 @@ import { getRouteParam } from '../utils/queryUtils';
 import logger from '../utils/logger';
 import MobileInvoiceModel from '../models/MobileInvoice';
 import { getQueryParam } from '../utils/queryUtils';
+import { generateDocNo } from '../utils/sequence';
 
 export async function createDraft(req: AuthRequest, res: Response) {
   try {
@@ -130,9 +131,19 @@ export async function submitInvoice(req: AuthRequest, res: Response) {
     if (!invoice_date) { return res.status(400).json({ error: 'Invoice date is required', field: 'invoice_date' }); }
     if (!items || items.length === 0) { return res.status(400).json({ error: 'At least one item is required', field: 'items' }); }
 
+    const resolvedInvoiceNo = generateDocNo(db, 'INV', 5);
     const invoiceId = MobileInvoiceModel.submitInvoice(db, {
       draft_id: draft_id ? parseInt(draft_id, 10) : undefined,
-      invoice_no, customer_id, invoice_date, due_date, status, terms, notes, items, record_payment, payment,
+      invoice_no: resolvedInvoiceNo,
+      customer_id,
+      invoice_date,
+      due_date,
+      status,
+      terms,
+      notes,
+      items,
+      record_payment,
+      payment,
       userId: req.user!.id,
     });
 

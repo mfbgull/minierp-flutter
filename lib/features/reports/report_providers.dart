@@ -384,7 +384,9 @@ final expiryReportProvider =
       .watch(reportRepositoryProvider)
       .expiryReport(
         warehouseId: warehouseId,
-        status: status == 'all' ? null : status,
+        status: status == 'all'
+            ? null
+            : (status == 'near_expiry' ? 'expiring' : status),
         thresholdDays: threshold,
       );
   return switch (result) {

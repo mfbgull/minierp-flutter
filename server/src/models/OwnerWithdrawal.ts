@@ -80,7 +80,7 @@ export function generateWithdrawalNo(db: Database.Database, withdrawalDate: stri
   // Shared atomic counter allocated inside the caller's INSERT transaction
   // (EXP-05 pattern); UNIQUE(withdrawal_no) backstops it.
   const nextNo = getNextSequenceNumber(db, `WD_last_no_${year}${month}`);
-  return `WD-${year}${month}-${String(nextNo).padStart(4, '0')}`;
+  return `WD-${year}${month}-${String(nextNo).padStart(5, '0')}`;
 }
 
 /**
@@ -126,9 +126,11 @@ function getOriginalMovements(db: Database.Database, withdrawalNo: string): Orig
 }
 
 function nextAdjBatchNo(db: Database.Database): string {
-  const yy = String(new Date().getFullYear()).slice(-2);
-  const nextNo = getNextSequenceNumber(db, `BATCH_ADJ_last_no_${yy}`);
-  return `BATCH-${yy}-ADJ-${String(nextNo).padStart(4, '0')}`;
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = String(now.getFullYear()).slice(-2);
+  const nextNo = getNextSequenceNumber(db, `BATCH_ADJ_last_no_${month}${year}`);
+  return `BATCH-${month}${year}-ADJ-${String(nextNo).padStart(5, '0')}`;
 }
 
 /**

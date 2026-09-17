@@ -110,10 +110,16 @@ class PhysicalCountModel {
         updated_at = CURRENT_TIMESTAMP
     `).run(settingKey);
 
-    const setting = db.prepare('SELECT value FROM settings WHERE key = ?').get(settingKey) as { value: string };
+    const setting = db.prepare('SELECT value FROM settings WHERE key = ?').get(settingKey) as { value: string } | undefined;
+    if (!setting) {
+      throw new Error(`Failed to initialize physical count sequence: ${settingKey}`);
+    }
     const nextNo = parseInt(setting.value);
 
-    return `PC-${year}-${nextNo.toString().padStart(4, '0')}`;
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const currentYear = String(now.getFullYear()).slice(-2);
+    return `PC-${month}${currentYear}-${String(nextNo).padStart(5, '0')}`;
   }
 
   static create(data: CreateCountDTO, userId: number, db: Database.Database): number {

@@ -2771,7 +2771,7 @@ abstract class AppLocalizations {
   /// No description provided for @purchasesInvoiceplaceholder.
   ///
   /// In en, this message translates to:
-  /// **'e.g., INV-2025-001'**
+  /// **'e.g., INV-0926-00001'**
   String get purchasesInvoiceplaceholder;
 
   /// No description provided for @purchasesRemarks.
@@ -3877,6 +3877,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stock Valuation'**
   String get navStockvaluation;
+
+  /// No description provided for @inventoryvaluation.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory Valuation'**
+  String get inventoryvaluation;
 
   /// No description provided for @navInventorymovement.
   ///
@@ -9722,6 +9728,18 @@ abstract class AppLocalizations {
   /// **'Payment updated'**
   String get salesPaymentupdated;
 
+  /// No description provided for @salesCreditoffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit Offset'**
+  String get salesCreditoffset;
+
+  /// No description provided for @salesAvailablecredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Available credit'**
+  String get salesAvailablecredit;
+
   /// No description provided for @salesPeritem.
   ///
   /// In en, this message translates to:
@@ -11300,6 +11318,36 @@ abstract class AppLocalizations {
   /// **'Expiry Report'**
   String get expiryReport;
 
+  /// No description provided for @expiredToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired Today'**
+  String get expiredToday;
+
+  /// No description provided for @expiringThisMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'This Month'**
+  String get expiringThisMonth;
+
+  /// No description provided for @expiring7Days.
+  ///
+  /// In en, this message translates to:
+  /// **'In 7 Days'**
+  String get expiring7Days;
+
+  /// No description provided for @expiring30Days.
+  ///
+  /// In en, this message translates to:
+  /// **'In 30 Days'**
+  String get expiring30Days;
+
+  /// No description provided for @writeOffBatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Write Off'**
+  String get writeOffBatch;
+
   /// No description provided for @expiryReportPagination.
   ///
   /// In en, this message translates to:
@@ -11579,6 +11627,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Values are at cost price, not selling price'**
   String get valuationNote;
+
+  /// No description provided for @valuationNoteReservedSubset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reserved is a subset of sellable (not additive)'**
+  String get valuationNoteReservedSubset;
 
   /// No description provided for @confirmSellExpired.
   ///

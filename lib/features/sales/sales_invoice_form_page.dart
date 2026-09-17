@@ -123,6 +123,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   late final GridNavController _nav;
 
   int? _customerId;
+  Customer? _selectedCustomer;
+  num _creditOffset = 0;
   String? _status;
   late DateTime _invoiceDate;
   late DateTime _dueDate;
@@ -166,6 +168,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       text: invoice == null ? '0' : _numText(invoice.discountValue ?? 0),
     );
     _customerId = invoice?.customerId;
+    _creditOffset = invoice?.creditOffset ?? 0;
     _status = invoice?.status ?? 'Unpaid';
     _invoiceDate =
         DateTime.tryParse(invoice?.invoiceDate ?? '') ?? DateTime.now();
@@ -297,8 +300,14 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   /// Customer selected (create or edit): commit any in-flight grid cell,
   /// then hand focus to the first row's description cell in edit mode
   /// (dropdown closed) — spec §2.3.
-  void _onCustomerChanged(int? value) {
-    setState(() => _customerId = value);
+  void _onCustomerChanged(int? value, AsyncValue<List<Customer>> customers) {
+    setState(() {
+      _customerId = value;
+      _selectedCustomer = (customers.valueOrNull ?? const <Customer>[])
+          .cast<Customer?>()
+          .firstWhere((c) => c != null && c.id == value, orElse: () => null);
+      _creditOffset = 0;
+    });
     _nav.commitCurrent();
     _pendingHandoff = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -565,8 +574,13 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   num get _paymentSum => _paymentMethods.fold<num>(0, (s, m) => s + m.amount);
 
   num get _remainingBalance => _isEdit
-      ? (widget.invoice!.balanceAmount - _paymentSum)
-      : (calculateTotal(_filledLines, _scope, _invoiceDiscount) - _paymentSum);
+      ? (widget.invoice!.balanceAmount - _paymentSum - _creditOffset)
+      : (calculateTotal(_filledLines, _scope, _invoiceDiscount) - _paymentSum - _creditOffset);
+
+  num get _availableCustomerCredit =>
+      _selectedCustomer != null && _selectedCustomer!.currentBalance < 0
+          ? _selectedCustomer!.currentBalance.abs()
+          : 0;
 
   void _addPaymentMethod() {
     setState(() {
@@ -633,6 +647,15 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         context,
         l10n.paymentsErrorAmountExceedsBalance(
           Formatters.currency(_remainingBalance < 0 ? 0 : _remainingBalance),
+        ),
+      );
+      return false;
+    }
+    if (_creditOffset > _availableCustomerCredit) {
+      showAppToast(
+        context,
+        l10n.paymentsErrorAmountExceedsBalance(
+          Formatters.currency(_availableCustomerCredit),
         ),
       );
       return false;
@@ -845,7 +868,6 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     final filled = _filledLines;
     final scope = _scope == DiscountScope.item ? 'item' : 'invoice';
     return {
-      if (!_isEdit) 'invoice_no': generateInvoiceNo(),
       'customer_id': _customerId!,
       'invoice_date': isoDate(_invoiceDate),
       'due_date': isoDate(_dueDate),
@@ -872,6 +894,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       if (notes.isNotEmpty) 'notes': notes,
       if (_isEdit && _deletedPayments.isNotEmpty)
         'deleted_payments': _deletedPayments.toList(),
+      if (_recordPayment) 'record_payment': true,
+      if (_creditOffset > 0) 'credit_offset': _creditOffset,
     };
   }
 
@@ -1548,7 +1572,40 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       onRecord: () => _recordPayments(),
       onDeletePayment: _onDeletePayment,
       onEditPayment: _onEditPayment,
+      creditOffset: _creditOffset,
+      availableCredit: _availableCustomerCredit,
+      onCreditOffsetChanged: _applyCreditOffset,
     );
+  }
+
+  void _applyCreditOffset(num creditOffset) {
+    final total = calculateTotal(_filledLines, _scope, _invoiceDiscount);
+    final available = _availableCustomerCredit;
+    final effectiveOffset = creditOffset > 0 ? available : 0;
+    setState(() {
+      _creditOffset = effectiveOffset;
+      if (effectiveOffset > 0 && total > effectiveOffset) {
+        final remaining = total - effectiveOffset;
+        if (_paymentMethods.isEmpty) {
+          _paymentMethods.add(
+            PaymentMethod(
+              id: _methodSeq++,
+              method: kPaymentMethods.first,
+              amount: remaining,
+            ),
+          );
+        } else {
+          _paymentMethods[0] = PaymentMethod(
+            id: _paymentMethods[0].id,
+            method: _paymentMethods[0].method,
+            amount: remaining,
+            referenceNo: _paymentMethods[0].referenceNo,
+          );
+        }
+      } else if (effectiveOffset > 0) {
+        _paymentMethods.clear();
+      }
+    });
   }
 
   /// Customer | Invoice Date | Due Date | Status — one row on wide
@@ -1574,7 +1631,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         },
         autoOpen: !_isEdit,
         openSignal: _customerOpenSignal,
-        onChanged: _onCustomerChanged,
+        onChanged: (value) => _onCustomerChanged(value, customers),
       ),
     );
     final date = FormFieldShell(

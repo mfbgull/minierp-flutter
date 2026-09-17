@@ -57,6 +57,9 @@ router.put('/batches/:id/status', requirePermission('inventory', 'update'), sens
 // inventory.write_off permission is planned once roles support it.
 router.post('/expired/write-off', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.writeOffExpiredBatches);
 
+// Damage transfer: move batch to DAMAGED warehouse (no GL impact).
+router.post('/damaged/transfer', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.damageTransferBatch);
+
 // Reservations
 router.post('/reservations', requirePermission('inventory', 'create'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), inventoryController.createReservation);
 router.delete('/reservations/:id/release', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.releaseReservation);

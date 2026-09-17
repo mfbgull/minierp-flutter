@@ -58,7 +58,7 @@ function generateExpenseNo(db: Database.Database, expenseDate: string): string {
   // the same transaction as the INSERT. Counters are seeded from existing
   // maxima by migrations/seed-expense-sequence.sql.
   const nextNo = getNextSequenceNumber(db, `EXP_last_no_${year}${month}`);
-  return `EXP-${year}${month}-${String(nextNo).padStart(4, '0')}`;
+  return `EXP-${year}${month}-${String(nextNo).padStart(5, '0')}`;
 }
 
 function create(db: Database.Database, data: CreateExpenseDTO): number {

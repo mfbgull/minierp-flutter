@@ -49,22 +49,28 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
   Widget build(BuildContext context) {
     // Reset page and selection when any filter changes
     ref.listen(expiryReportWarehouseIdProvider, (_, _) {
-      if (mounted) setState(() {
-        _currentPage = 1;
-        _selectedBatchNos.clear();
-      });
+      if (mounted) {
+        setState(() {
+          _currentPage = 1;
+          _selectedBatchNos.clear();
+        });
+      }
     });
     ref.listen(expiryReportStatusProvider, (_, _) {
-      if (mounted) setState(() {
-        _currentPage = 1;
-        _selectedBatchNos.clear();
-      });
+      if (mounted) {
+        setState(() {
+          _currentPage = 1;
+          _selectedBatchNos.clear();
+        });
+      }
     });
     ref.listen(expiryReportThresholdProvider, (_, _) {
-      if (mounted) setState(() {
-        _currentPage = 1;
-        _selectedBatchNos.clear();
-      });
+      if (mounted) {
+        setState(() {
+          _currentPage = 1;
+          _selectedBatchNos.clear();
+        });
+      }
     });
     final l10n = AppLocalizations.of(context)!;
     final report = ref.watch(expiryReportProvider);
@@ -182,7 +188,6 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
         );
       },
       onSelected: (event) {
-        if (event == null) return;
         final selectedRows = event.selectedRows;
         if (selectedRows != null && mounted) {
           setState(() {
@@ -417,6 +422,44 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
       type: PlutoColumnType.text(),
       width: 80,
     ),
+    PlutoColumn(
+      title: l10n.writeOffGlAccount,
+      field: 'glAccount',
+      type: PlutoColumnType.text(),
+      width: 110,
+    ),
+    PlutoColumn(
+      title: l10n.writeOff,
+      field: 'action',
+      type: PlutoColumnType.text(),
+      width: 80,
+      textAlign: PlutoColumnTextAlign.center,
+      titleTextAlign: PlutoColumnTextAlign.center,
+      renderer: (ctx) {
+        final batchId = ctx.cell.value as int?;
+        if (batchId == null || batchId <= 0) {
+          return const SizedBox.shrink();
+        }
+        final report = ref.read(expiryReportProvider).valueOrNull;
+        final matches = report?.where((r) => r.id == batchId).toList();
+        if (matches == null || matches.isEmpty) return const SizedBox.shrink();
+        final batch = matches.first;
+        return IconButton(
+          icon: const Icon(Icons.delete_outline, size: 18),
+          tooltip: l10n.writeOffBatch,
+          onPressed: () async {
+            final result = await showWriteOffDialog(
+              context,
+              batches: [batch],
+            );
+            if (result == true && mounted) {
+              setState(() => _selectedBatchNos.clear());
+              ref.invalidate(expiryReportProvider);
+            }
+          },
+        );
+      },
+    ),
   ];
 
   PlutoRow _toRow(ExpiryReportRow r) {
@@ -441,6 +484,8 @@ class _ExpiryReportScreenState extends ConsumerState<ExpiryReportScreen> {
         'status': PlutoCell(value: status.value),
         'days': PlutoCell(value: r.daysUntilExpiry ?? 0),
         'halted': PlutoCell(value: r.halted ? '✓' : ''),
+        'glAccount': PlutoCell(value: r.glAccount ?? ''),
+        'action': PlutoCell(value: r.id),
       },
     );
   }
@@ -464,16 +509,61 @@ class _Filters extends ConsumerWidget {
       (l10n.statusNormal, 'normal'),
     ];
 
+    void applyPreset(String preset) {
+      switch (preset) {
+        case 'expired_today':
+          ref.read(expiryReportStatusProvider.notifier).state = 'expired';
+          ref.read(expiryReportThresholdProvider.notifier).state = null;
+        case 'this_month':
+          ref.read(expiryReportStatusProvider.notifier).state = 'near_expiry';
+          ref.read(expiryReportThresholdProvider.notifier).state = 30;
+        case '7_days':
+          ref.read(expiryReportStatusProvider.notifier).state = 'near_expiry';
+          ref.read(expiryReportThresholdProvider.notifier).state = 7;
+        case '30_days':
+          ref.read(expiryReportStatusProvider.notifier).state = 'near_expiry';
+          ref.read(expiryReportThresholdProvider.notifier).state = 30;
+      }
+      ref.invalidate(expiryReportProvider);
+    }
+
+    final presets = [
+      (l10n.expiredToday, 'expired_today'),
+      (l10n.expiringThisMonth, 'this_month'),
+      (l10n.expiring7Days, '7_days'),
+      (l10n.expiring30Days, '30_days'),
+    ];
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 200,
-            child: SearchableSelect<int>(
+          // Preset filter chips
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final (label, key) in presets)
+                ActionChip(
+                  label: Text(label),
+                  onPressed: () => applyPreset(key),
+                  padding: EdgeInsets.zero,
+                  labelPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 200,
+                child: SearchableSelect<int>(
               items: [for (final w in warehouses) w.id],
               selected: warehouseId,
               labelBuilder: (id) {
@@ -569,6 +659,9 @@ class _Filters extends ConsumerWidget {
             ),
         ],
       ),
-    );
+    ],
+  ),
+);
   }
 }
+

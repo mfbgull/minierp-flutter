@@ -1390,7 +1390,7 @@ class AppLocalizationsUr extends AppLocalizations {
   String get purchasesInvoicenumber => 'انوائس نمبر';
 
   @override
-  String get purchasesInvoiceplaceholder => 'مثال: INV-2025-001';
+  String get purchasesInvoiceplaceholder => 'مثال: INV-0926-00001';
 
   @override
   String get purchasesRemarks => 'نوٹس';
@@ -1948,6 +1948,9 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get navStockvaluation => 'اسٹاک ویلیویشن';
+
+  @override
+  String get inventoryvaluation => 'انوینٹری ویلیویشن';
 
   @override
   String get navInventorymovement => 'انوینٹری موومنٹ';
@@ -4951,6 +4954,12 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesPaymentupdated => 'ادائیگی اپڈیٹ ہو گئی';
 
   @override
+  String get salesCreditoffset => 'کریڈٹ افسیٹ';
+
+  @override
+  String get salesAvailablecredit => 'دستیاب کریڈٹ';
+
+  @override
   String get salesPeritem => 'فی آئٹم';
 
   @override
@@ -5774,6 +5783,21 @@ class AppLocalizationsUr extends AppLocalizations {
   String get expiryReport => 'مونثی رپورٹ';
 
   @override
+  String get expiredToday => 'آج ختم شدہ';
+
+  @override
+  String get expiringThisMonth => 'اس ماہ';
+
+  @override
+  String get expiring7Days => '7 دنوں میں';
+
+  @override
+  String get expiring30Days => '30 دنوں میں';
+
+  @override
+  String get writeOffBatch => 'رائٹ آف';
+
+  @override
   String expiryReportPagination(
     Object currentPage,
     Object totalPages,
@@ -5937,6 +5961,10 @@ class AppLocalizationsUr extends AppLocalizations {
   @override
   String get valuationNote =>
       'قدروں کی قیمت کی قیمت پر ہیں، فروخت کی قیمت پر نہیں';
+
+  @override
+  String get valuationNoteReservedSubset =>
+      'محفوظ اسٹاک فروخت کے قابل اسٹاک کا حصہ ہے (اضافی نہیں)';
 
   @override
   String confirmSellExpired(Object days) {

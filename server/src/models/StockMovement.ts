@@ -1197,6 +1197,117 @@ class StockMovementModel {
   }
 
   /**
+   * Damage transfer: move a batch to the DAMAGED system warehouse.
+   * Same paired-leg pattern as recordExpiryTransfer, but with
+   * movement_type = 'DAMAGE_TRANSFER' and no GL impact (physical
+   * reclassification only). Used by POST /inventory/damaged/transfer.
+   */
+  static recordDamageTransfer(
+    data: { batchId: number; toWarehouseId: number; remarks?: string | null },
+    userId: number | null,
+    db: Database.Database
+  ): { out: { id: number; movement_no: string }; in: { id: number; movement_no: string }; mirrorBatchId: number } {
+    const today = new Date().toISOString().split('T')[0];
+
+    const run = db.transaction(() => {
+      const batch = db.prepare(`
+        SELECT id, batch_no, item_id, warehouse_id, quantity_remaining,
+               unit_cost, expiry_date
+        FROM stock_batches WHERE id = ?
+      `).get(data.batchId) as {
+        id: number; batch_no: string; item_id: number; warehouse_id: number;
+        quantity_remaining: number; unit_cost: number | null; expiry_date: string | null;
+      } | undefined;
+
+      if (!batch) throw new Error(`Batch ${data.batchId} not found`);
+      const qty = Number(batch.quantity_remaining);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        throw new Error(`Batch ${batch.batch_no} has no remaining quantity to transfer`);
+      }
+      if (batch.warehouse_id === data.toWarehouseId) {
+        throw new Error(`Batch ${batch.batch_no} is already at the destination warehouse`);
+      }
+
+      const already = db.prepare(`
+        SELECT 1 FROM stock_movements
+        WHERE batch_id = ? AND movement_type = 'DAMAGE_TRANSFER' LIMIT 1
+      `).get(batch.id);
+      if (already) {
+        throw new Error(`Batch ${batch.batch_no} already has a DAMAGE_TRANSFER movement`);
+      }
+
+      const systemRemark = userId === null ? ' source=SYSTEM' : '';
+      const remarks = (data.remarks || `Damage transfer: batch ${batch.batch_no}`) + systemRemark;
+
+      if (isFeatureEnabled(db, 'feature_batch_locations')) {
+        db.prepare(`
+          UPDATE batch_stock_by_location
+          SET quantity_physical = 0, quantity_available = 0, updated_at = CURRENT_TIMESTAMP
+          WHERE batch_id = ?
+        `).run(batch.id);
+      }
+
+      const out = this.recordMovement({
+        item_id: batch.item_id,
+        warehouse_id: batch.warehouse_id,
+        movement_type: 'DAMAGE_TRANSFER',
+        quantity: -qty,
+        unit_cost: batch.unit_cost ?? undefined,
+        reference_doctype: 'DAMAGE_TRANSFER',
+        reference_docno: batch.batch_no,
+        remarks,
+        batch_id: batch.id
+      }, userId, db);
+
+      db.prepare(`
+        UPDATE stock_batches SET quantity_remaining = 0 WHERE id = ?
+      `).run(batch.id);
+
+      const nextNo = (() => {
+        db.prepare(`
+          INSERT INTO settings (key, value, updated_at)
+          VALUES ('BATCH_DAM_last_no', '1', CURRENT_TIMESTAMP)
+          ON CONFLICT(key) DO UPDATE SET
+            value = CAST(CAST(settings.value AS INTEGER) + 1 AS TEXT),
+            updated_at = CURRENT_TIMESTAMP
+        `).run();
+        const row = db.prepare(`SELECT value FROM settings WHERE key = 'BATCH_DAM_last_no'`).get() as { value: string };
+        return parseInt(row.value, 10);
+      })();
+      const mirrorBatchNo = `BATCH-${new Date().getFullYear() % 100}-DAM-${nextNo.toString().padStart(4, '0')}`;
+      const mirrorBatch = db.prepare(`
+        INSERT INTO stock_batches (
+          batch_no, item_id, warehouse_id, source_type,
+          source_id, quantity_original, quantity_remaining,
+          unit_cost, received_date, expiry_date
+        ) VALUES (?, ?, ?, 'TRANSFER', ?, ?, ?, ?, ?, ?)
+      `).run(
+        mirrorBatchNo, batch.item_id, data.toWarehouseId, out.id,
+        qty, qty, batch.unit_cost, today, batch.expiry_date
+      );
+      const mirrorBatchId = mirrorBatch.lastInsertRowid as number;
+
+      this.syncBatchStockByLocationForNewBatch(mirrorBatchId, data.toWarehouseId, qty, db);
+
+      const into = this.recordMovement({
+        item_id: batch.item_id,
+        warehouse_id: data.toWarehouseId,
+        movement_type: 'DAMAGE_TRANSFER',
+        quantity: qty,
+        unit_cost: batch.unit_cost ?? undefined,
+        reference_doctype: 'DAMAGE_TRANSFER',
+        reference_docno: out.movement_no,
+        remarks,
+        batch_id: mirrorBatchId
+      }, userId, db);
+
+      return { out, in: into, mirrorBatchId };
+    });
+
+    return run();
+  }
+
+  /**
    * Expired-stock plan Phase 3: write off an expired batch.
    *
    * Writes the batch's remaining quantity off to a loss account with the

@@ -1076,6 +1076,7 @@ class ExpiryReportRow {
     this.expiryDate,
     required this.status,
     this.halted = false,
+    this.glAccount,
   });
 
   factory ExpiryReportRow.fromJson(Map<String, dynamic> json) => ExpiryReportRow(
@@ -1090,6 +1091,7 @@ class ExpiryReportRow {
     expiryDate: asString(json['expiry_date']),
     status: asString(json['status']) ?? 'normal',
     halted: asBool(json['halted']),
+    glAccount: asString(json['gl_account']),
   );
 
   /// Numeric batch ID (stock_batches.id) — used for write-off endpoint.
@@ -1104,6 +1106,7 @@ class ExpiryReportRow {
   final String? expiryDate;
   final String status;
   final bool halted;
+  final String? glAccount;
 
   num get totalValue => quantityRemaining * unitCost;
 

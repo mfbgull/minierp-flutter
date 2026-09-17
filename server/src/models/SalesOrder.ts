@@ -892,7 +892,7 @@ class SalesOrderModel {
   }
 
   private static generateInvoiceNo(db: Database.Database): string {
-    return generateDocNo(db, 'INV');
+    return generateDocNo(db, 'INV', 5);
   }
 
   private static generateMovementNo(db: Database.Database): string {

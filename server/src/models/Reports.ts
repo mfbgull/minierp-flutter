@@ -636,6 +636,7 @@ interface ExpiryReportRow {
   days_remaining: number;
   status: 'expired' | 'expiring' | 'normal';
   halted: boolean;
+  gl_account?: string | null;
 }
 
 /** Batches carrying an expiry_date with stock remaining, classified as
@@ -652,7 +653,13 @@ function getExpiryReport(
       sb.quantity_remaining, sb.unit_cost, sb.received_date,
       date(sb.expiry_date) as expiry_date,
       CAST(julianday(sb.expiry_date) - julianday(date('now', 'localtime')) AS INTEGER) as days_remaining,
-      ${columnExistsSafe(db, 'stock_batches', 'halted') ? 'sb.halted' : '0'} as halted
+      ${columnExistsSafe(db, 'stock_batches', 'halted') ? 'sb.halted' : '0'} as halted,
+      (SELECT je.debit_account
+       FROM stock_movements sm
+       LEFT JOIN journal_entries je ON je.reference_id = sm.id AND je.reference_type = 'WRITE_OFF'
+       WHERE sm.batch_id = sb.id AND sm.movement_type = 'WRITE_OFF'
+       ORDER BY sm.movement_date DESC LIMIT 1
+      ) as gl_account
     FROM stock_batches sb
     JOIN items i ON sb.item_id = i.id
     JOIN warehouses w ON sb.warehouse_id = w.id

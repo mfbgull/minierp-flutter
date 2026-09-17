@@ -101,16 +101,17 @@ describe('EXP-05: atomic numbering from settings counter', () => {
     db.exec(`INSERT INTO expenses (expense_no, expense_category, amount, expense_date, status, created_by)
              VALUES ('EXP-2608-0007', 'Meals', 5, '2026-08-01', 'Draft', 1)`);
     db.exec(`
-      INSERT OR IGNORE INTO settings (key, value)
+      INSERT OR REPLACE INTO settings (key, value, updated_at)
       SELECT 'EXP_last_no_' || substr(expense_no, 5, 4),
-             CAST(CAST(substr(expense_no, 10) AS INTEGER) AS TEXT)
-      FROM expenses WHERE expense_no LIKE 'EXP-____-____'
+             CAST(CAST(substr(expense_no, 10) AS INTEGER) AS TEXT),
+             CURRENT_TIMESTAMP
+      FROM expenses WHERE expense_no LIKE 'EXP-____-___%'
       GROUP BY substr(expense_no, 5, 4)
       HAVING MAX(CAST(substr(expense_no, 10) AS INTEGER))
     `);
 
-    expect(ExpenseModel.generateExpenseNo(db, '2026-08-15')).toBe('EXP-2608-0008');
-    expect(ExpenseModel.generateExpenseNo(db, '2026-08-16')).toBe('EXP-2608-0009');
+    expect(ExpenseModel.generateExpenseNo(db, '2026-08-15')).toBe('EXP-2608-00008');
+    expect(ExpenseModel.generateExpenseNo(db, '2026-08-16')).toBe('EXP-2608-00009');
     db.close();
   });
 });

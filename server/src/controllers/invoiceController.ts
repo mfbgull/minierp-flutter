@@ -16,6 +16,7 @@ import {
   computeInvoiceGrandTotal,
 } from '../utils/currency';
 import { isValidPaymentMethod } from '../services/cashService';
+import { generateDocNo } from '../utils/sequence';
 
 /**
  * ACC-18 interim: thrown when a client-supplied invoice total disagrees
@@ -36,6 +37,17 @@ class InvalidPaymentMethodError extends Error {
   constructor(method?: string | null) {
     super(`Invalid payment_method "${method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
     this.name = 'InvalidPaymentMethodError';
+  }
+}
+
+/**
+ * Credit offset exceeds the customer's available credit balance — a
+ * client error (400), not a server fault.
+ */
+class InsufficientCreditError extends Error {
+  constructor(offset: number, available: number) {
+    super(`Credit offset (${offset.toFixed(2)}) exceeds available credit balance (${available.toFixed(2)})`);
+    this.name = 'InsufficientCreditError';
   }
 }
 
@@ -174,6 +186,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       total_amount,
       record_payment,
       payment,
+      credit_offset,
     } = req.body as {
       invoice_no?: string;
       customer_id: number | string;
@@ -189,6 +202,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       total_amount: number | string;
       record_payment?: boolean;
       payment?: PaymentDTO;
+      credit_offset?: number;
     };
 
     if (!customer_id || !invoice_date || !items || items.length === 0) {
@@ -231,12 +245,22 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
         : 0;
 
     // Determine initial paid/balance/status
-    const initialPaidAmount = paymentAmountNum;
-    const initialBalanceAmount = subtractCurrency(totalAmountNum, paymentAmountNum);
+    const creditOffsetNum = credit_offset ? parseCurrency(credit_offset) : 0;
+    const initialPaidAmount = paymentAmountNum + creditOffsetNum;
+    const initialBalanceAmount = subtractCurrency(totalAmountNum, initialPaidAmount);
 
-    // Guard: payment cannot exceed the invoice total
-    if (record_payment && payment && paymentAmountNum > totalAmountNum) {
-      throw new Error(`Payment amount (${paymentAmountNum.toFixed(2)}) exceeds invoice total (${totalAmountNum.toFixed(2)})`);
+    // Guard: payment + credit offset cannot exceed the invoice total
+    if (record_payment && payment && (paymentAmountNum + creditOffsetNum) > totalAmountNum) {
+      throw new Error(`Payment + credit offset (${(paymentAmountNum + creditOffsetNum).toFixed(2)}) exceeds invoice total (${totalAmountNum.toFixed(2)})`);
+    }
+
+    // Guard: credit offset cannot exceed available credit balance
+    if (creditOffsetNum > 0) {
+      const customerBalance = db.prepare('SELECT current_balance FROM customers WHERE id = ?').get(parsedCustomerId) as { current_balance: number } | undefined;
+      const availableCredit = customerBalance ? Math.abs(Math.min(0, customerBalance.current_balance)) : 0;
+      if (creditOffsetNum > availableCredit) {
+        throw new InsufficientCreditError(creditOffsetNum, availableCredit);
+      }
     }
 
     // Same whitelist as PaymentModel — inline payments reached the GL
@@ -265,8 +289,9 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
     // invoice header match the payment that is about to be recorded
     // below. Previously these were hard-coded to 0/total, leaving
     // the A/R ledger inconsistent with payment_allocations.
+    const resolvedInvoiceNo = invoice_no || generateDocNo(db, 'INV', 5);
     const invoiceId = InvoiceModel.createInvoice(db, {
-      invoice_no,
+      invoice_no: resolvedInvoiceNo,
       customer_id: parsedCustomerId,
       invoice_date,
       due_date: resolvedDueDate,
@@ -274,6 +299,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       total_amount: totalAmountNum,
       paid_amount: initialPaidAmount,
       balance_amount: initialBalanceAmount,
+      credit_offset: creditOffsetNum,
       terms,
       items,
     }, userId);
@@ -317,8 +343,8 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
             quantity: -entry.consumed,
             unit_cost: entry.unitCost,
             reference_doctype: 'INVOICE',
-            reference_docno: invoice_no!,
-            remarks: `Sold via Invoice ${invoice_no} ${batchLabel}`,
+            reference_docno: resolvedInvoiceNo,
+            remarks: `Sold via Invoice ${resolvedInvoiceNo} ${batchLabel}`,
             movement_date: invoice_date,
             batch_id: entry.batchId ?? undefined,
           },
@@ -341,10 +367,10 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
         parsedCustomerId,
         invoice_date,
         'INVOICE',
-        invoice_no!,
+        resolvedInvoiceNo,
         totalAmountNum, // debit
         0,              // credit
-        `Invoice ${invoice_no}`
+        `Invoice ${resolvedInvoiceNo}`
       );
 
       // Post the sales invoice to the GL (Dr AR / Cr Sales Revenue net / Cr Tax Payable).
@@ -359,7 +385,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       }, 0);
       AccountingService.postInvoiceEntry(db, {
         invoiceId,
-        invoiceNo: invoice_no!,
+        invoiceNo: resolvedInvoiceNo,
         totalAmount: totalAmountNum,
         invoiceDate: invoice_date,
         userId,
@@ -370,7 +396,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       if (cogsTotal > 0) {
         AccountingService.postCOGSEntry(db, {
           invoiceId,
-          invoiceNo: invoice_no!,
+          invoiceNo: resolvedInvoiceNo,
           cogsAmount: parseCurrency(cogsTotal),
           invoiceDate: invoice_date,
           userId,
@@ -398,6 +424,21 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
         amount: paymentAmountNum,
         paymentDate: payment.payment_date,
         paymentMethod: payment.payment_method,
+        customerId: parsedCustomerId,
+        userId,
+      });
+    }
+
+    // --- Credit offset recording INSIDE transaction ---
+    if (creditOffsetNum > 0) {
+      const creditRefNo = `CREDIT-${resolvedInvoiceNo}`;
+
+      // Post credit offset to GL (Dr Customer Credit / Cr AR)
+      AccountingService.postCreditOffsetEntry(db, {
+        invoiceId,
+        invoiceNo: resolvedInvoiceNo,
+        amount: creditOffsetNum,
+        invoiceDate: invoice_date,
         customerId: parsedCustomerId,
         userId,
       });
@@ -433,6 +474,11 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       return;
     }
     if (error instanceof InvalidPaymentMethodError) {
+      logger.warn('Create invoice rejected:', { error: error.message });
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error instanceof InsufficientCreditError) {
       logger.warn('Create invoice rejected:', { error: error.message });
       res.status(400).json({ error: error.message });
       return;
@@ -1151,6 +1197,11 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
     const resolvedDisposition: 'refund' | 'credit' | 'adjust' =
       disposition || (invoiceExists.balance_amount <= 0 ? 'refund' : 'credit');
 
+    // Capture refundable amount BEFORE the transaction runs, because the
+    // refund allocation (created inside the transaction) would reduce the
+    // refundable balance if we queried it afterwards.
+    const preReturnRefundable = PaymentModel.refundableOnInvoice(db, invoiceId);
+
     const transaction = db.transaction(() => {
       // Re-read invoice INSIDE transaction to get fresh returned_qty values
       // This prevents race conditions on concurrent return requests
@@ -1335,7 +1386,7 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
         // Create customer ledger entry for the return (credit to reduce AR) — net amount
         createLedgerEntry(
           invoice.customer_id,
-          todayDate,
+          invoice.invoice_date,
           'RETURN',
           invoice.invoice_no,
           0,
@@ -1422,7 +1473,7 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
         // Create customer ledger entry for the return (credit to reduce AR) — net amount
         createLedgerEntry(
           invoice.customer_id,
-          todayDate,
+          invoice.invoice_date,
           'RETURN',
           invoice.invoice_no,
           0,
@@ -1554,14 +1605,11 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
         returnAmount,
         netReturn,
         deduction,
-        // Refund split (reversal-rules #11): cash refunded is capped at
-        // what the customer actually collected; the rest stays as a
-        // customer credit on account.
         refundAmount: resolvedDisposition === 'refund'
-          ? Math.min(netReturn, PaymentModel.refundableOnInvoice(db, invoiceId))
+          ? Math.min(netReturn, preReturnRefundable)
           : 0,
         retainedCredit: resolvedDisposition === 'refund'
-          ? parseCurrency(subtractCurrency(netReturn, Math.min(netReturn, PaymentModel.refundableOnInvoice(db, invoiceId))))
+          ? parseCurrency(subtractCurrency(netReturn, Math.min(netReturn, preReturnRefundable)))
           : netReturn,
       };
     });

@@ -9,7 +9,7 @@ import '../../l10n/app_localizations.dart';
 /// presentation-layer classification: a row's model maps to exactly one
 /// direction and voided/cancelled/draft rows are always [neutral]
 /// (nothing realized).
-enum MoneyDirection { inflow, outflow, neutral }
+enum MoneyDirection { inflow, outflow, neutral, partialInflow, returned }
 
 /// Light theme: solid green/red-100 tints (already used across the app's
 /// status badges). Dark theme: green/red at 15% alpha so the onSurface
@@ -103,6 +103,14 @@ Color _tint(MoneyDirection direction, bool dark) {
       dark ? Colors.green.withValues(alpha: 0.15) : const Color(0xFFDCFCE7),
     MoneyDirection.outflow =>
       dark ? Colors.red.withValues(alpha: 0.15) : const Color(0xFFFEE2E2),
+    MoneyDirection.partialInflow =>
+      dark
+          ? Colors.orange.withValues(alpha: 0.15)
+          : const Color(0xFFFFF3E0),
+    MoneyDirection.returned =>
+      dark
+          ? Colors.teal.withValues(alpha: 0.15)
+          : const Color(0xFFE0F2F1),
     _ => Colors.transparent,
   };
 }
