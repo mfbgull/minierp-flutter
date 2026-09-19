@@ -1682,6 +1682,31 @@ runLedgered('add-employee-loan-void-columns.sql');
 // stock_batches/stock_movements (init + rebuilds) — all applied above.
 runLedgered('add-expired-stock.sql');
 
+// Invoice Returns (invoice-return-spec.md Milestone 1): first-class return
+// documents — invoice_returns / invoice_return_items / return_settlements.
+// FK-free on purpose (SQLite FKs to invoices/customers/users already exist),
+// so position in the runner is flexible; kept near the other invoice
+// migrations. No legacy backfill (spec D11).
+runLedgered('add-invoice-returns.sql');
+// Milestone 2: per-line stock-movement attribution + settlement voided_by,
+// so voiding one return reverses exactly that return (spec §5.3).
+runLedgered('add-invoice-return-void-attribution.sql');
+// Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
+// return time — a legacy COA predating GL foundation must fail the boot
+// with a clear error, never mis-post.
+{
+  const feeAcct = db.prepare(
+    `SELECT id FROM chart_of_accounts WHERE code = '4150'`
+  ).get() as { id: number } | undefined;
+  if (!feeAcct) {
+    throw new Error(
+      'Invoice returns migration check failed: chart_of_accounts is missing ' +
+      "account 4150 (Restocking Fee Income). Run add-gl-foundation.sql or add " +
+      "the account manually before booting."
+    );
+  }
+}
+
 // Ensure dbSeedReady resolves on every boot — createDefaultUser() is
 // only called from initializeDatabase(), which runLedgered() skips on
 // existing databases (already recorded in schema_migrations).

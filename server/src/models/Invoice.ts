@@ -474,12 +474,17 @@ class InvoiceModel {
 
     const maxNo = maxResult?.max_val ?? 0;
     if (maxNo > 0) {
-        // Atomically bump setting to at least maxNo so next number is fresh
+        // Atomically bump setting to at least maxNo so next number is fresh.
+        // Type-affinity trap: SQLite's scalar MAX returns the TEXT operand
+        // over an INTEGER one (TEXT > INTEGER in type ordering), so
+        // MAX(2, '1') === '1' — a TEXT-bound param here would RESET the
+        // sequence. CAST the bound param to INTEGER so both MAX sides share
+        // a storage class. (Same fix as InvoiceReturnModel generators.)
         db.prepare(`
           INSERT INTO settings (key, value, updated_at)
           VALUES (?, CAST(? AS TEXT), CURRENT_TIMESTAMP)
           ON CONFLICT(key) DO UPDATE SET
-            value = CAST(MAX(CAST(settings.value AS INTEGER), ?) AS TEXT),
+            value = CAST(MAX(CAST(settings.value AS INTEGER), CAST(? AS INTEGER)) AS TEXT),
             updated_at = CURRENT_TIMESTAMP
         `).run(settingKey, maxNo.toString(), maxNo.toString());
     }
@@ -562,7 +567,8 @@ class InvoiceModel {
     userId: number,
     referenceDoctype: string,
     explicitWarehouseId?: number
-  ): void {
+  ): Array<{ item_id: number; movement_id: number; quantity: number; warehouse_id: number; unit_cost: number }> {
+    const posted: Array<{ item_id: number; movement_id: number; quantity: number; warehouse_id: number; unit_cost: number }> = [];
     for (const item of items) {
       // Find all SALE movements for this item + invoice (they have batch_id links)
       const saleMovements = db.prepare(`
@@ -661,7 +667,7 @@ class InvoiceModel {
       const avgUnitCost = totalQty > 0 ? totalActualCost / totalQty : item.unit_price;
 
       // Add stock back (positive quantity to reverse the sale) — only the remaining qty
-      StockMovementModel.recordMovement(
+      const recordedMovement = StockMovementModel.recordMovement(
         {
           item_id: item.item_id,
           warehouse_id: warehouseId,
@@ -676,16 +682,21 @@ class InvoiceModel {
         userId,
         db
       );
+      posted.push({
+        item_id: item.item_id,
+        movement_id: recordedMovement.id,
+        quantity: remainingToReturn,
+        warehouse_id: warehouseId,
+        unit_cost: avgUnitCost,
+      });
     }
+    return posted;
   }
 
   /**
    * Create a new invoice
    */
   static createInvoice(db: Database.Database, data: CreateInvoiceDTO, userId: number): number {
-    if (!data.customer_id || data.customer_id <= 0) {
-      throw new Error('Invalid customer_id');
-    }
     if (!data.invoice_date) {
       throw new Error('invoice_date is required');
     }

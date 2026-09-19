@@ -5,7 +5,8 @@ import '../models/price_history.dart' show ItemPriceHistory;
 import '../models/invoice.dart' show Invoice, InvoicePaymentRecord;
 import '../models/payment.dart' show Payment;
 import '../models/unified_payment.dart' show UnifiedPayment;
-import '../models/sales_return.dart' show SalesReturn, SalesReturnResult;
+import '../models/sales_return.dart'
+    show InvoicePosition, SalesReturn, SalesReturnResult;
 import 'api_result.dart';
 import 'paged_request.dart' show PagedRequest, PagedResponse;
 import 'repository_client.dart';
@@ -234,33 +235,91 @@ class InvoiceRepository {
     parseItem: (Object? json) =>
         SalesReturn.fromJson(json as Map<String, dynamic>),
   );
+  /// The authoritative money position of an invoice (spec §3.2/§4.2) —
+  /// `GET /invoices/:id/position`. The invoice detail embeds the same
+  /// object as `data.position`, so most screens read it from there.
+  Future<ApiResult<InvoicePosition>> position(int id) => _api.getRaw(
+    '${ApiEndpoints.invoices}/$id/position',
+    parse: (Object? json) =>
+        InvoicePosition.fromJson(json as Map<String, dynamic>),
+  );
 
-  /// Process a return — enveloped `{success, message, data:
-  /// {returnedItems, totalItems, disposition, returnAmount, netReturn,
-  /// deduction}}`. The server rejects (400) cancelled invoices, unknown
-  /// invoice items, and non-positive or over-available quantities, and
-  /// rejects monetary over-return beyond the invoice total.
+  /// Process a return (spec §5.1) — enveloped `{success, message,
+  /// data: {returnId, returnNo, status, returnedAmount, feeAmount,
+  /// netAmount, settledAmount, settlements, position, …legacy aliases}}`.
+  ///
+  /// The server rejects (400) cancelled invoices, unknown invoice items,
+  /// non-positive or over-available quantities, over-settlement beyond
+  /// [netAmount], and an invalid `warehouse_id`/`return_date`.
   Future<ApiResult<SalesReturnResult>> processReturn(
     int id, {
     required List<Map<String, dynamic>> items,
-    String? reason,
-    String? disposition,
 
-    /// The warehouse the returned goods are restocked into
-    /// (`warehouse_id`). When omitted the server restocks into the
-    /// warehouse the sale was dispatched from.
+    /// 'none' | 'fixed' | 'percentage' — the fee is always charged
+    /// (spec D5 revised); defaults to 'none' server-side.
+    String? feeType,
+    num? feeValue,
+
+    /// 'YYYY-MM-DD'; defaults to today (D14).
+    String? returnDate,
+    String? reason,
+
+    /// The warehouse the returned goods are restocked into. When omitted
+    /// the server restocks into the warehouse the sale was dispatched
+    /// from.
     int? warehouseId,
+
+    /// Explicit settlement allocations (Option A, spec §5.1 step 8).
+    /// Omit → the return is recorded unsettled (Option B).
+    List<Map<String, dynamic>>? settlements,
   }) => _api.post(
     '${ApiEndpoints.invoices}/$id/return',
     body: {
       'items': items,
+      if (feeType != null) 'fee_type': feeType,
+      if (feeValue != null) 'fee_value': feeValue,
+      if (returnDate != null) 'return_date': returnDate,
       if (reason != null && reason.isNotEmpty) 'reason': reason,
-      'disposition': ?disposition,
       'warehouse_id': ?warehouseId,
+      'settlements': ?settlements,
     },
     parse: (Object? json) =>
         SalesReturnResult.fromJson(json as Map<String, dynamic>),
   );
+
+  /// Settle an existing return (spec §5.2) — one or more allocations
+  /// against `remainingRefundDue`. `POST /invoice-returns/:id/settle`.
+  Future<ApiResult<SalesReturnResult>> settleReturn(
+    int returnId, {
+    required List<Map<String, dynamic>> settlements,
+  }) => _api.post(
+    '${ApiEndpoints.invoiceReturns}/$returnId/settle',
+    body: {'settlements': settlements},
+    parse: (Object? json) =>
+        SalesReturnResult.fromJson(json as Map<String, dynamic>),
+  );
+
+  /// Void a return and reverse its GL/stock/ledger/settlements (spec
+  /// §5.2 / D24). `POST /invoice-returns/:id/void`.
+  Future<ApiResult<void>> voidReturn(int returnId, {String? reason}) =>
+      _api.post(
+        '${ApiEndpoints.invoiceReturns}/$returnId/void',
+        body: {
+          if (reason != null && reason.isNotEmpty) 'reason': reason,
+        },
+        parse: (_) {},
+      );
+
+  /// Void one settlement allocation, releasing it back to the refund/
+  /// credit due (spec §5.2 / D24). `POST /return-settlements/:id/void`.
+  Future<ApiResult<void>> voidSettlement(int settlementId, {String? reason}) =>
+      _api.post(
+        '${ApiEndpoints.returnSettlements}/$settlementId/void',
+        body: {
+          if (reason != null && reason.isNotEmpty) 'reason': reason,
+        },
+        parse: (_) {},
+      );
 }
 
 final invoiceRepositoryProvider = Provider<InvoiceRepository>(

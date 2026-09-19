@@ -10058,6 +10058,120 @@ abstract class AppLocalizations {
   /// **'Select an invoice'**
   String get salesreturnsSelectinvoice;
 
+  /// No description provided for @salesreturnsFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Restocking Fee'**
+  String get salesreturnsFee;
+
+  /// No description provided for @salesreturnsFeeFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed'**
+  String get salesreturnsFeeFixed;
+
+  /// No description provided for @salesreturnsFeeNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get salesreturnsFeeNone;
+
+  /// No description provided for @salesreturnsFeeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The invoice is unpaid — the restocking fee increases the Balance Due.'**
+  String get salesreturnsFeeNote;
+
+  /// No description provided for @salesreturnsFeePercentage.
+  ///
+  /// In en, this message translates to:
+  /// **'Percentage'**
+  String get salesreturnsFeePercentage;
+
+  /// No description provided for @salesreturnsFeeValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee value'**
+  String get salesreturnsFeeValue;
+
+  /// No description provided for @salesreturnsPositionBalanceDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance Due'**
+  String get salesreturnsPositionBalanceDue;
+
+  /// No description provided for @salesreturnsPositionNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Net'**
+  String get salesreturnsPositionNet;
+
+  /// No description provided for @salesreturnsPositionRefundDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund/Credit Due'**
+  String get salesreturnsPositionRefundDue;
+
+  /// No description provided for @salesreturnsPositionReturned.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned Value'**
+  String get salesreturnsPositionReturned;
+
+  /// No description provided for @salesreturnsRecordOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Record return only'**
+  String get salesreturnsRecordOnly;
+
+  /// No description provided for @salesreturnsRecordOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave unsettled — settle later from the invoice.'**
+  String get salesreturnsRecordOnlyHint;
+
+  /// No description provided for @salesreturnsSettleAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add allocation'**
+  String get salesreturnsSettleAdd;
+
+  /// No description provided for @salesreturnsSettleExceeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Allocations exceed the net return amount.'**
+  String get salesreturnsSettleExceeds;
+
+  /// No description provided for @salesreturnsSettleMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Method'**
+  String get salesreturnsSettleMethod;
+
+  /// No description provided for @salesreturnsSettleNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Settle now'**
+  String get salesreturnsSettleNow;
+
+  /// No description provided for @salesreturnsSettleTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Target invoice'**
+  String get salesreturnsSettleTarget;
+
+  /// No description provided for @salesreturnsSettleTargetRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the invoice to apply the adjustment to.'**
+  String get salesreturnsSettleTargetRequired;
+
+  /// No description provided for @salesreturnsSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement'**
+  String get salesreturnsSettlement;
+
   /// No description provided for @settingsBackupDeleteFailed.
   ///
   /// In en, this message translates to:
@@ -10171,6 +10285,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Company Tax ID'**
   String get settingsKeyCompanyTaxId;
+
+  /// No description provided for @salesreturnsPositionCurrentValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Invoice Value'**
+  String get salesreturnsPositionCurrentValue;
+
+  /// No description provided for @salesreturnsPositionOriginalPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Original Payments'**
+  String get salesreturnsPositionOriginalPayments;
+
+  /// No description provided for @salesreturnsPositionOriginalTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Original Invoice Total'**
+  String get salesreturnsPositionOriginalTotal;
+
+  /// No description provided for @salesreturnsPositionRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded/Credited'**
+  String get salesreturnsPositionRefunded;
+
+  /// No description provided for @salesreturnsPositionRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining Refund Due'**
+  String get salesreturnsPositionRemaining;
+
+  /// No description provided for @salesreturnsPositionTotalReturned.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Returned'**
+  String get salesreturnsPositionTotalReturned;
 
   /// No description provided for @settingsKeyCurrency.
   ///

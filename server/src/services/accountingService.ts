@@ -1032,6 +1032,12 @@ export class AccountingService {
       cogsAmount: number;
       entryDate: string;
       userId?: number;
+      // The return rework keys return-related GL groups to the return
+      // document so a void removes exactly that return's postings.
+      // Legacy callers (invoice delete/cancel) omit these and keep the
+      // old invoice-keyed group.
+      referenceId?: number;
+      referenceType?: string;
     }
   ): PostedEntry | null {
     if (!args.cogsAmount || args.cogsAmount <= 0) return null;
@@ -1048,8 +1054,8 @@ export class AccountingService {
     return AccountingService.postEntry(db, {
       entry_date: args.entryDate,
       description: `COGS reversal for Invoice return ${args.invoiceNo} — ${args.cogsAmount.toFixed(2)}`,
-      reference_type: 'INVOICE_RETURN',
-      reference_id: args.invoiceId,
+      reference_type: args.referenceType ?? 'INVOICE_RETURN',
+      reference_id: args.referenceId ?? args.invoiceId,
       created_by: args.userId,
       lines: [
         { account_id: inventory.id, debit: args.cogsAmount, description: `Inventory restored for return of ${args.invoiceNo}` },
@@ -1059,29 +1065,38 @@ export class AccountingService {
   }
 
   /**
-   * Post GL reversal for a sales invoice return, with optional restocking fee.
-   * Reverses what postInvoiceEntry originally posted:
-   *   Cr AR (1100) — reduce receivable by NET (gross - deduction)
-   *   Dr Sales Returns (4100) — full gross return (contra-revenue)
-   *   Dr Tax Payable (2100) — reverse tax liability (if any)
-   *   Cr Restocking Fee Income (4150) — fee the shop keeps (if deduction > 0)
+   * Post the GL reversal for an invoice return — spec §3.5 (reworked).
    *
-   * Returns the posted entry's journal_entry_id, or null if total is zero.
+   *   Dr Sales Returns (4100)  Σ returnedNet    (tax-EXCLUSIVE contra-revenue)
+   *   Dr Tax Payable    (2100)  Σ returnedTax   (only when a line carries tax)
+   *   Cr AR             (1100)  Σ (returnedNet + returnedTax)  — tax-INCLUSIVE
+   *
+   * The restocking fee is deliberately NOT part of this entry: it posts as
+   * its own group via postReturnFeeEntry (spec D20) so a fee can be
+   * voided/reported independently of the goods reversal. The group is keyed
+   * to the return document (reference_id = returnId), which is what the
+   * void flow voids and what scenario 19 asserts as balanced.
+   *
+   * Per-line {returnedNet, returnedTax} pairs keep the additive tax mirror
+   * proportional at the line level (§3.5) instead of one aggregate.
+   *
+   * Returns the posted entry id, or null when there is nothing to reverse.
    */
   static postInvoiceReturnEntry(
     db: Database.Database,
     args: {
-      invoiceId: number;
+      returnId: number;
       invoiceNo: string;
-      grossReturn: number;      // full return value before deduction
-      netReturn: number;        // what AR is actually reduced by (gross - deduction)
-      deduction: number;        // restocking fee (0 if none)
-      invoiceDate: string;
+      lines: Array<{ returnedNet: number; returnedTax: number }>;
+      entryDate: string;
       userId?: number;
-      taxAmount?: number;
     }
   ): PostedEntry | null {
-    if (!args.grossReturn || args.grossReturn <= 0) return null;
+    const round2 = (n: number): number => Math.round((Number(n) || 0) * 100) / 100;
+    const returnedNet = round2(args.lines.reduce((sum, l) => sum + (Number(l.returnedNet) || 0), 0));
+    const returnedTax = round2(args.lines.reduce((sum, l) => sum + (Number(l.returnedTax) || 0), 0));
+    const gross = round2(returnedNet + returnedTax);
+    if (gross <= 0) return null;
 
     const ar = AccountingService.getAccountByCode(db, '1100');
     const salesReturns = AccountingService.getAccountByCode(db, '4100');
@@ -1091,109 +1106,87 @@ export class AccountingService {
       );
     }
 
-    const taxAmount = Number(args.taxAmount) || 0;
-    const deduction = Number(args.deduction) || 0;
-    const grossAmount = args.grossReturn;
-    const netAmount = args.netReturn; // gross - deduction (further reduced by tax if applicable — handled below)
+    const lines: Array<{ account_id: number; debit: number; credit: number; description: string }> = [
+      {
+        account_id: ar.id,
+        debit: 0,
+        credit: gross,
+        description: `AR reduced for return of ${args.invoiceNo}${returnedTax > 0 ? ` (incl. tax ${returnedTax.toFixed(2)})` : ''}`,
+      },
+      {
+        account_id: salesReturns.id,
+        debit: returnedNet,
+        credit: 0,
+        description: `Sales returns contra-revenue for ${args.invoiceNo}`,
+      },
+    ];
 
-    let restockingFeeAcct: Account | undefined;
-    if (deduction > 0) {
-      restockingFeeAcct = AccountingService.getAccountByCode(db, '4150');
-      if (!restockingFeeAcct) {
-        throw new Error('Chart of accounts is missing required account: 4150 (Restocking Fee Income)');
-      }
-    }
-
-    // Build lines array
-
-    if (taxAmount > 0) {
+    if (returnedTax > 0) {
       const taxPayable = AccountingService.getAccountByCode(db, '2100');
       if (!taxPayable) {
         throw new Error('Chart of accounts is missing required account: 2100 (Tax Payable)');
       }
-
-      const lines: Array<{ account_id: number; debit: number; credit: number; description: string }> = [];
-
-      // Cr AR by netReturn (what AR is actually reduced by)
-      lines.push({
-        account_id: ar.id,
-        debit: 0,
-        credit: netAmount,
-        description: `AR reduced for return of ${args.invoiceNo}`,
-      });
-
-      // Dr Sales Returns by grossReturn (full reversal of revenue before any deduction)
-      lines.push({
-        account_id: salesReturns.id,
-        debit: grossAmount,
-        credit: 0,
-        description: `Sales returns contra-revenue for ${args.invoiceNo}`,
-      });
-
-      // Dr Tax Payable by taxAmount
       lines.push({
         account_id: taxPayable.id,
-        debit: taxAmount,
+        debit: returnedTax,
         credit: 0,
         description: `Tax reversal for return of ${args.invoiceNo}`,
-      });
-
-      // Cr Restocking Fee Income by deduction (if any)
-      if (restockingFeeAcct && deduction > 0) {
-        lines.push({
-          account_id: restockingFeeAcct.id,
-          debit: 0,
-          credit: deduction,
-          description: `Restocking fee on return of ${args.invoiceNo}`,
-        });
-      }
-
-      return AccountingService.postEntry(db, {
-        entry_date: args.invoiceDate,
-        description: `Sales return for ${args.invoiceNo} — ${grossAmount.toFixed(2)} gross, ${netAmount.toFixed(2)} net${deduction > 0 ? `, fee ${deduction.toFixed(2)}` : ''}${taxAmount > 0 ? `, tax ${taxAmount.toFixed(2)}` : ''}`,
-        reference_type: 'INVOICE_RETURN',
-        reference_id: args.invoiceId,
-        created_by: args.userId,
-        lines,
-      });
-    }
-
-    // No tax — 2 or 3 line reversal depending on deduction
-    const lines: Array<{ account_id: number; debit: number; credit: number; description: string }> = [];
-
-    // Cr AR by netReturn
-    lines.push({
-      account_id: ar.id,
-      debit: 0,
-      credit: netAmount,
-      description: `AR reduced for return of ${args.invoiceNo}`,
-    });
-
-    // Dr Sales Returns by grossReturn
-    lines.push({
-      account_id: salesReturns.id,
-      debit: grossAmount,
-      credit: 0,
-      description: `Sales returns contra-revenue for ${args.invoiceNo}`,
-    });
-
-    // Cr Restocking Fee Income by deduction (if any)
-    if (restockingFeeAcct && deduction > 0) {
-      lines.push({
-        account_id: restockingFeeAcct.id,
-        debit: 0,
-        credit: deduction,
-        description: `Restocking fee on return of ${args.invoiceNo}`,
       });
     }
 
     return AccountingService.postEntry(db, {
-      entry_date: args.invoiceDate,
-      description: `Sales return for ${args.invoiceNo} — ${grossAmount.toFixed(2)} gross, ${netAmount.toFixed(2)} net${deduction > 0 ? `, fee ${deduction.toFixed(2)}` : ''}`,
+      entry_date: args.entryDate,
+      description: `Sales return for ${args.invoiceNo} — ${returnedNet.toFixed(2)} net, ${returnedTax.toFixed(2)} tax, ${gross.toFixed(2)} gross`,
       reference_type: 'INVOICE_RETURN',
-      reference_id: args.invoiceId,
+      reference_id: args.returnId,
       created_by: args.userId,
       lines,
+    });
+  }
+
+  /**
+   * Post the restocking-fee leg of an invoice return — spec D20 / §8-2c.
+   *
+   *   Dr AR (1100)        feeAmount
+   *   Cr Restocking Fee Income (4150)   feeAmount
+   *
+   * The fee is kept by the shop, so it restores part of the AR the goods
+   * reversal credited. It posts as its OWN journal group
+   * (reference_type = 'RETURN_FEE', keyed to the return id) so that the
+   * fee income report and the void flow can treat it separately from the
+   * goods reversal. Balanced by construction (single amount, both legs).
+   */
+  static postReturnFeeEntry(
+    db: Database.Database,
+    args: {
+      returnId: number;
+      invoiceNo: string;
+      feeAmount: number;
+      entryDate: string;
+      userId?: number;
+    }
+  ): PostedEntry | null {
+    const feeAmount = Math.round((Number(args.feeAmount) || 0) * 100) / 100;
+    if (feeAmount <= 0) return null;
+
+    const ar = AccountingService.getAccountByCode(db, '1100');
+    const feeIncome = AccountingService.getAccountByCode(db, '4150');
+    if (!ar || !feeIncome) {
+      throw new Error(
+        'Chart of accounts is missing required accounts: 1100 (AR) or 4150 (Restocking Fee Income)'
+      );
+    }
+
+    return AccountingService.postEntry(db, {
+      entry_date: args.entryDate,
+      description: `Restocking fee for return of ${args.invoiceNo} — ${feeAmount.toFixed(2)}`,
+      reference_type: 'RETURN_FEE',
+      reference_id: args.returnId,
+      created_by: args.userId,
+      lines: [
+        { account_id: ar.id, debit: feeAmount, description: `Restocking fee charged on return of ${args.invoiceNo}` },
+        { account_id: feeIncome.id, credit: feeAmount, description: `Restocking fee income for ${args.invoiceNo}` },
+      ],
     });
   }
 
@@ -1276,7 +1269,7 @@ export class AccountingService {
     return AccountingService.postEntry(db, {
       entry_date: args.refundDate,
       description: `Refund ${args.refundPaymentNo} — ${args.amount.toFixed(2)} (${cashCode})`,
-      reference_type: 'REFUND',
+      reference_type: 'PAYMENT',
       reference_id: args.refundPaymentId,
       created_by: args.userId,
       lines: [
@@ -1324,9 +1317,6 @@ export class AccountingService {
     return result.changes;
   }
 
-  // ------------------------------------------------------------------
-  // Period management
-  // ------------------------------------------------------------------
 
   static listPeriods(db: Database.Database): Array<{
     id: number;

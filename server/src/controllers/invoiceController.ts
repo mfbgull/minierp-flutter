@@ -6,6 +6,8 @@ import InvoiceModel from '../models/Invoice';
 import { InvoiceCancellationGuardError } from '../models/Invoice';
 import PaymentModel from '../models/Payment';
 import AccountingService from '../services/accountingService';
+import { InvoiceReturnService, ReturnError, type SettlementInput } from '../services/invoiceReturnService';
+import type { FeeType } from '../services/returnMath';
 import ledgerUtils from '../utils/ledgerUtils';
 import logger from '../utils/logger';
 import { log, logCRUD, ActionType, newCorrelationId } from '../services/activityLogger';
@@ -157,7 +159,16 @@ function getInvoice(req: AuthRequest, res: Response): Response | void {
     const invoice = InvoiceModel.getWithCustomer(id, db) as InvoiceRow | undefined;
     if (!invoice) { return res.status(404).json({ error: 'Invoice not found' }); }
     invoice.items = InvoiceModel.getItems(id, db) as InvoiceItemRow[];
-    res.json(invoice);
+
+    // The invoice detail screen and the printouts need the full return
+    // picture: the returns themselves, the authoritative money position
+    // (spec §4.2) and the transaction timeline (spec §6.3).
+    const returns = InvoiceReturnService.getReturnDetails(id);
+    const position = InvoiceReturnService.getPosition(id);
+    const timeline = InvoiceReturnService.getTimeline(id);
+    const payments = InvoiceModel.getPayments(id, db);
+
+    res.json({ ...invoice, payments, returns, position, timeline });
   } catch (error: unknown) {
     logger.error('Get invoice error:', { error });
     res.status(500).json({ error: 'Failed to fetch invoice' });
@@ -1145,481 +1156,78 @@ function getInvoicePayments(req: AuthRequest, res: Response): void {
 
 /**
  * POST /api/invoices/:id/return
- * Process a return for invoice items — reverses stock using FIFO batch restoration
- * and creates ADJUSTMENT movements to add stock back into inventory.
+ *
+ * Thin adapter over `InvoiceReturnService.processReturn` (spec §5.1 /
+ * §10). Accepts the new payload — `fee_type`/`fee_value`, `return_date`,
+ * `warehouse_id`, explicit `settlements[]` — and the legacy shape
+ * (`disposition`, `adjust_invoice_ids`, `deduction_type`,
+ * `deduction_value`, per-item `reason`) so existing desktop and mobile
+ * clients keep working unchanged.
  */
 function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
   try {
-    const { id } = req.params;
-    const invoiceId = parseInt(id as string, 10);
+    const invoiceId = parseInt(req.params.id as string, 10);
     const userId = req.user!.id;
+    const body = req.body as Record<string, unknown>;
 
-    // Normalize payload: support both legacy format (items + reason at top level)
-    // and new format from InvoiceReturn.tsx (items with reason inside each item, disposition, adjust_invoice_ids)
-    const body = req.body as Record<string, any>;
     const rawItems = body.items;
-    const rawDisposition = body.disposition;
-    const rawAdjustInvoiceIds = body.adjust_invoice_ids;
-    const rawReason = body.reason;
-    const rawDeductionType = body.deduction_type;      // 'percentage' | 'flat' | undefined
-    const rawDeductionValue = Number(body.deduction_value) || 0;
-    // Optional restock warehouse — a customer return is restocked where
-    // the user chooses; when omitted the server restocks into the
-    // warehouse the sale was dispatched from (backward compatible).
-    const rawWarehouseId = body.warehouse_id;
-    const warehouseId = rawWarehouseId === undefined || rawWarehouseId === null || rawWarehouseId === ''
-      ? undefined
-      : Number(rawWarehouseId);
-    if (warehouseId !== undefined && (!Number.isInteger(warehouseId) || warehouseId <= 0)) {
-      return res.status(400).json({ error: 'A valid warehouse_id is required' });
-    }
-
-    const returnItems: Array<{ invoice_item_id: number; return_quantity: number }> = Array.isArray(rawItems) ? rawItems : [];
-    const reason: string = rawReason || (returnItems.length > 0 ? (returnItems[0] as any).reason || '' : '');
-    const disposition: 'refund' | 'credit' | 'adjust' | undefined = rawDisposition;
-    const adjust_invoice_ids: number[] | undefined = rawAdjustInvoiceIds;
-
-    if (returnItems.length === 0) {
+    const items: Array<{ invoice_item_id: number; return_quantity: number }> = Array.isArray(rawItems)
+      ? rawItems
+      : [];
+    if (items.length === 0) {
       return res.status(400).json({ error: 'Invalid request: items must be a non-empty array' });
     }
 
-    // Fast-fail checks outside transaction
-    const invoiceExists = InvoiceModel.getById(invoiceId, db);
-    if (!invoiceExists) {
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
+    // Legacy clients send the reason inside the first item.
+    const legacyReason = items.length > 0 ? String((items[0] as Record<string, unknown>)?.reason ?? '') : '';
+    const reason = body.reason ? String(body.reason) : legacyReason || null;
 
-    if (invoiceExists.status === 'Cancelled') {
-      return res.status(400).json({ error: 'Cannot return a cancelled invoice' });
-    }
-
-    // Default disposition: if invoice was paid, default to refund; otherwise default to credit
-    const resolvedDisposition: 'refund' | 'credit' | 'adjust' =
-      disposition || (invoiceExists.balance_amount <= 0 ? 'refund' : 'credit');
-
-    // Capture refundable amount BEFORE the transaction runs, because the
-    // refund allocation (created inside the transaction) would reduce the
-    // refundable balance if we queried it afterwards.
-    const preReturnRefundable = PaymentModel.refundableOnInvoice(db, invoiceId);
-
-    const transaction = db.transaction(() => {
-      // Re-read invoice INSIDE transaction to get fresh returned_qty values
-      // This prevents race conditions on concurrent return requests
-      const invoice = InvoiceModel.getById(invoiceId, db);
-      if (!invoice) {
-        throw new Error('Invoice not found');
-      }
-
-      const processedItems: Array<{ item_id: number; quantity: number; unit_price: number; discount_type?: string; discount_value?: number }> = [];
-      let returnTotalTaxAmount = 0;
-
-      for (const returnItem of returnItems) {
-        // Re-fetch item from DB inside transaction to get fresh returned_qty.
-        // Scoped to THIS invoice: a bare `OR ii.item_id = ?` match could
-        // return another invoice's line whose item_id happens to equal a
-        // different invoice's line id (return returns the wrong line).
-        const freshItem = db.prepare(
-          'SELECT ii.*, i.item_name FROM invoice_items ii LEFT JOIN items i ON ii.item_id = i.id WHERE ii.invoice_id = ? AND (ii.id = ? OR ii.item_id = ?)'
-        ).get(invoiceId, returnItem.invoice_item_id, returnItem.invoice_item_id) as any;
-
-        // Fallback to in-memory item if DB fetch fails
-        const invoiceItem = freshItem || invoice.items?.find(
-          (ii: any) => ii.id === returnItem.invoice_item_id || ii.item_id === returnItem.invoice_item_id
-        );
-
-        if (!invoiceItem) {
-          throw new Error(`Invoice item ${returnItem.invoice_item_id} not found`);
-        }
-
-        if (returnItem.return_quantity <= 0) {
-          throw new Error('Return quantity must be positive');
-        }
-
-        const returnedQty = Number(invoiceItem.returned_qty) || 0;
-        const availableQty = Number(invoiceItem.quantity) - returnedQty;
-
-        if (returnItem.return_quantity > availableQty) {
-          throw new Error(
-            `Return quantity (${returnItem.return_quantity}) exceeds available quantity (${availableQty}) for item ${invoiceItem.item_name}. Already returned: ${returnedQty}.`
-          );
-        }
-
-        processedItems.push({
-          item_id: invoiceItem.item_id,
-          quantity: returnItem.return_quantity,
-          unit_price: invoiceItem.unit_price,
-          discount_type: invoiceItem.discount_type || 'percentage',
-          discount_value: Number(invoiceItem.discount_value) || 0,
-        });
-
-        // Calculate line amount with item discount applied
-        const grossLineAmount = Number(returnItem.return_quantity) * Number(invoiceItem.unit_price);
-        const itemDiscountType = invoiceItem.discount_type || 'percentage';
-        const itemDiscountValue = Number(invoiceItem.discount_value) || 0;
-        let lineAmount = grossLineAmount;
-        if (itemDiscountType === 'percentage' && itemDiscountValue > 0) {
-          lineAmount = grossLineAmount * (1 - itemDiscountValue / 100);
-        } else if (itemDiscountType === 'flat' && itemDiscountValue > 0) {
-          lineAmount = Math.max(0, grossLineAmount - itemDiscountValue * Number(returnItem.return_quantity));
-        }
-        returnTotalTaxAmount += lineAmount * ((Number(invoiceItem.tax_rate) || 0) / 100);
-
-        // Update per-item returned quantity tracking
-        db.prepare(`UPDATE invoice_items SET returned_qty = returned_qty + ? WHERE id = ?`)
-          .run(returnItem.return_quantity, returnItem.invoice_item_id);
-      }
-
-      // Reverse stock for the returned items using the same batch-aware logic —
-      // restocked into the user-chosen warehouse when provided.
-      InvoiceModel.reverseStockForItems(
-        db,
-        processedItems,
-        invoice.invoice_no,
-        userId,
-        'RETURN',
-        warehouseId
-      );
-
-      // Calculate the total return amount (with item discounts applied)
-      const returnAmount = processedItems.reduce(
-        (sum: number, item: { quantity: number; unit_price: number; discount_type?: string; discount_value?: number }) => {
-          const grossAmount = Number(item.quantity) * Number(item.unit_price);
-          const discountType = item.discount_type || 'percentage';
-          const discountValue = Number(item.discount_value) || 0;
-          let netAmount = grossAmount;
-          if (discountType === 'percentage' && discountValue > 0) {
-            netAmount = grossAmount * (1 - discountValue / 100);
-          } else if (discountType === 'flat' && discountValue > 0) {
-            netAmount = Math.max(0, grossAmount - discountValue * Number(item.quantity));
-          }
-          return sum + netAmount;
-        },
-        0
-      );
-
-      const todayDate = new Date().toISOString().split('T')[0];
-
-      // Compute deduction (restocking fee) if applicable
-      const deductionType: 'percentage' | 'flat' = rawDeductionType === 'percentage' ? 'percentage' : 'flat';
-      let deduction = 0;
-      if (rawDeductionValue > 0) {
-        if (deductionType === 'percentage') {
-          deduction = returnAmount * (rawDeductionValue / 100);
-        } else {
-          deduction = Math.min(rawDeductionValue, returnAmount);
-        }
-      }
-      const netReturn = returnAmount - deduction;
-
-      // Post GL reversal — reverse AR by net, reverse revenue by gross, record fee
-      AccountingService.postInvoiceReturnEntry(db, {
-        invoiceId,
-        invoiceNo: invoice.invoice_no,
-        grossReturn: returnAmount,
-        netReturn,
-        deduction,
-        invoiceDate: todayDate,
-        userId,
-        taxAmount: returnTotalTaxAmount,
-      });
-
-      // Post COGS reversal — Dr Inventory Asset, Cr COGS at actual FIFO cost
-      let returnCogsTotal = 0;
-      for (const item of processedItems) {
-        const saleMovements = db.prepare(`
-          SELECT quantity, unit_cost, batch_id
-          FROM stock_movements
-          WHERE item_id = ? AND reference_docno = ? AND movement_type = 'SALE'
-          ORDER BY id
-        `).all(item.item_id, invoice.invoice_no) as Array<{
-          quantity: number; unit_cost: number; batch_id: number | null;
-        }>;
-
-        if (saleMovements.length === 0) continue;
-
-        const totalSold = saleMovements.reduce((sum, m) => sum + Math.abs(m.quantity), 0);
-        const ratio = totalSold > 0 ? Math.min(Math.abs(item.quantity) / totalSold, 1) : 1;
-
-        for (const movement of saleMovements) {
-          returnCogsTotal += Math.abs(movement.quantity) * movement.unit_cost * ratio;
-        }
-      }
-
-      if (returnCogsTotal > 0) {
-        AccountingService.postCOGSReversalEntry(db, {
-          invoiceId,
-          invoiceNo: invoice.invoice_no,
-          cogsAmount: parseCurrency(returnCogsTotal),
-          entryDate: todayDate,
-          userId,
-        });
-      }
-
-      // Update returned_amount and return_fee on the invoice
-      // Guard: prevent monetary over-return (defense in depth beyond item-level check)
-      const currentReturned = Number(invoice.returned_amount || 0);
-      const invoiceTotal = Number(invoice.total_amount);
-      const newReturnedTotal = currentReturned + returnAmount;
-      if (newReturnedTotal > invoiceTotal && (newReturnedTotal - invoiceTotal) > 0.01) {
-        throw new Error(
-          `Cannot return more than the invoice total. ` +
-          `Already returned: ${parseCurrency(currentReturned)}, ` +
-          `this return: ${parseCurrency(returnAmount)}, ` +
-          `invoice total: ${parseCurrency(invoiceTotal)}.`
-        );
-      }
-      // Update returned_amount (+gross) and return_fee (+deduction)
-      db.prepare(
-        `UPDATE invoices SET returned_amount = returned_amount + ?, return_fee = return_fee + ? WHERE id = ?`
-      ).run(returnAmount.toFixed(2), deduction.toFixed(2), invoiceId);
-
-      // ==================================================================
-      // DISPOSITION HANDLING
-      // ==================================================================
-      //
-      // The RETURN ledger entry is created per-disposition so we don't
-      // double-count credits: REFUND and CREDIT create one RETURN entry
-      // (credit reduces AR). ADJUST skips it because the PAYMENT entries
-      // below already handle the AR reduction.
-
-      if (resolvedDisposition === 'refund') {
-        // Create customer ledger entry for the return (credit to reduce AR) — net amount
-        createLedgerEntry(
-          invoice.customer_id,
-          invoice.invoice_date,
-          'RETURN',
-          invoice.invoice_no,
-          0,
-          netReturn,
-          `Return on Invoice ${invoice.invoice_no}${deduction > 0 ? ` (fee: $${deduction.toFixed(2)})` : ''}`
-        );
-        // ----------------------------------------------------------------
-        // REFUND: Create a refund payment (negative payment record),
-        // reverse/fraction the original payment allocation, post GL entry
-        //
-        // ERP rule: never refund more than the customer actually paid.
-        //   refundAmount = min(netReturn, collected on this invoice)
-        // The remainder (the previously-outstanding AR portion of the
-        // return) is already cleared by the RETURN ledger entry + the
-        // Cr AR side of postInvoiceReturnEntry — it stays as a customer
-        // credit on account, not cash out.
-        // ----------------------------------------------------------------
-
-        const paidOnInvoice = PaymentModel.refundableOnInvoice(db, invoiceId);
-        const refundAmount = Math.min(netReturn, Math.max(0, paidOnInvoice));
-        const retainedCredit = parseCurrency(subtractCurrency(netReturn, refundAmount));
-
-        if (refundAmount > 0) {
-          const refundPaymentNo = InvoiceModel.generatePaymentNoAtomic(db);
-
-          // Create a refund payment (negative amount = money going out)
-          const refundPaymentId = InvoiceModel.createPayment(
-            db,
-            refundPaymentNo,
-            invoice.customer_id,
-            todayDate,
-            -refundAmount,
-            'Cash',
-            null,
-            `Refund for return on ${invoice.invoice_no}${deduction > 0 ? ` (fee: $${deduction.toFixed(2)})` : ''}${retainedCredit > 0 ? ` — ${parseCurrency(retainedCredit).toFixed(2)} retained as credit on account` : ''}`
-          );
-
-          // Record a refund allocation (negative allocation = reduction of original payment)
-          InvoiceModel.createPaymentAllocation(db, refundPaymentId, invoiceId, -refundAmount);
-          // Ledger entry: Dr (debit) the refund payment no. to reflect cash out
-          createLedgerEntry(
-            invoice.customer_id,
-            todayDate,
-            'REFUND',
-            refundPaymentNo,
-            refundAmount,   // debit = customer owes us more (contra)
-            0,
-            `Refund ${refundPaymentNo} for return on ${invoice.invoice_no}`
-          );
-
-          // Post GL entry for refund: Dr AR / Cr Cash (refund paid out).
-          // Funds guard: refunds are cash-out — block if Cash cannot cover it.
-          const refundCashCode = AccountingService._cashOrBankAccountCode('Cash');
-          const refundCashAccount = AccountingService.getAccountByCode(db, refundCashCode);
-          if (!refundCashAccount) {
-            throw new Error(`Chart of accounts is missing required account: ${refundCashCode}`);
-          }
-          AccountingService.assertSufficientFunds(db, {
-            accountId: refundCashAccount.id,
-            amount: refundAmount,
-            asOfDate: todayDate,
-            label: `refund ${refundPaymentNo}`,
-          });
-          AccountingService.postRefundEntry(db, {
-            refundPaymentId,
-            refundPaymentNo,
-            amount: refundAmount,
-            refundDate: todayDate,
-            paymentMethod: 'Cash',
-            customerId: invoice.customer_id,
-            userId,
-          });
-        }
-        // When refundAmount < netReturn the difference (retainedCredit)
-        // remains as a net customer-ledger credit: the RETURN entry
-        // credited netReturn while only refundAmount was debited back.
-      }
-
-      else if (resolvedDisposition === 'credit') {
-        // ----------------------------------------------------------------
-        // CREDIT: Add the net returned amount to customer's credit_balance
-        // ----------------------------------------------------------------
-
-        // Create customer ledger entry for the return (credit to reduce AR) — net amount
-        createLedgerEntry(
-          invoice.customer_id,
-          invoice.invoice_date,
-          'RETURN',
-          invoice.invoice_no,
-          0,
-          netReturn,
-          `Return on Invoice ${invoice.invoice_no}${deduction > 0 ? ` (fee: $${deduction.toFixed(2)})` : ''}`
-        );
-
-        // Credit memos remain visible as ledger credits; ACC-13 removes
-        // the parallel credit_balance column writer.
-      }
-      else if (resolvedDisposition === 'adjust') {
-        // ----------------------------------------------------------------
-        // ADJUST: Apply the return credit to unpaid/partially-paid invoices
-        // Creates a PAYMENT entry (not zero-amount) so the credit is
-        // clearly visible as a payment against the target invoice.
-        // The RETURN entry above serves as the audit trail for the return itself.
-        // ----------------------------------------------------------------
-
-        let remainingCredit = netReturn;
-
-        // Determine which invoices to adjust
-        let targetInvoiceIds = adjust_invoice_ids;
-
-        if (!targetInvoiceIds || targetInvoiceIds.length === 0) {
-          // Auto-fetch oldest unpaid/partially-paid invoices for this customer
-          const unpaidInvoices = db.prepare(`
-            SELECT id FROM invoices
-            WHERE customer_id = ? AND status IN ('Unpaid', 'Partially Paid')
-              AND balance_amount > 0
-            ORDER BY invoice_date ASC, id ASC
-          `).all(invoice.customer_id) as Array<{ id: number }>;
-
-          targetInvoiceIds = unpaidInvoices.map((inv: { id: number }) => inv.id);
-        }
-
-        if (!targetInvoiceIds || targetInvoiceIds.length === 0) {
-          throw new Error('No unpaid invoices found to adjust against');
-        }
-
-        for (const targetInvoiceId of targetInvoiceIds) {
-          if (remainingCredit <= 0) break;
-
-          const targetInvoice = db.prepare(
-            `SELECT id, invoice_no, total_amount, paid_amount, balance_amount, status FROM invoices WHERE id = ?`
-          ).get(targetInvoiceId) as {
-            id: number; invoice_no: string; total_amount: number;
-            paid_amount: number; balance_amount: number; status: string;
-          } | undefined;
-
-          if (!targetInvoice) continue;
-          if (targetInvoice.balance_amount <= 0) continue;
-
-          const allocAmount = Math.min(remainingCredit, targetInvoice.balance_amount);
-
-          // Generate a payment number for the return credit
-          const adjustPaymentNo = InvoiceModel.generatePaymentNoAtomic(db);
-
-          // Create a payment record with the actual credit amount
-          const adjustPaymentId = InvoiceModel.createPayment(
-            db,
-            adjustPaymentNo,
-            invoice.customer_id,
-            todayDate,
-            allocAmount,
-            'Credit',
-            null,
-            `Return credit from ${invoice.invoice_no} applied to ${targetInvoice.invoice_no}`
-          );
-
-          // Allocate the credit to the target invoice
-          InvoiceModel.createPaymentAllocation(db, adjustPaymentId, targetInvoiceId, allocAmount);
-
-          // For ADJUST, we create PAYMENT ledger entries (credit reduces AR)
-          // but do NOT create a separate RETURN entry above to avoid double-counting.
-          createLedgerEntry(
-            invoice.customer_id,
-            todayDate,
-            'PAYMENT',
-            adjustPaymentNo,
-            0,
-            allocAmount,
-            `Return credit from ${invoice.invoice_no} applied to ${targetInvoice.invoice_no}`
-          );
-
-          // Recalculate target invoice balance and status
-          calculateInvoiceBalance(targetInvoiceId);
-          updateInvoiceStatus(targetInvoiceId);
-
-          remainingCredit -= allocAmount;
-        }
-
-        // Leftover credit stays visible as ledger credits only; ACC-13
-        // removed the parallel credit_balance column writer.
-      }
-
-      // ==================================================================
-      // FINALIZE
-      // ==================================================================
-
-      // Recalculate return invoice balance and status
-      calculateInvoiceBalance(invoiceId);
-      updateInvoiceStatus(invoiceId);
-
-      // Sync the customer's current_balance and credit_balance-aware total
-      recalcCustomerBalanceFromLedger(invoice.customer_id);
-
-      // Log the return activity (include disposition info)
-      const dispositionLabels: Record<string, string> = {
-        refund: 'Refund to customer',
-        credit: 'Customer credit',
-        adjust: 'Adjusted against unpaid invoice(s)',
-      };
-
-      logCRUD('INVOICE_RETURN', 'Invoice', invoiceId,
-        `Return processed for ${processedItems.length} item(s) on Invoice ${invoice.invoice_no}` +
-        ` — Disposition: ${dispositionLabels[resolvedDisposition] || resolvedDisposition}` +
-        `${reason ? '. Reason: ' + reason : ''}`,
-        userId,
-        { disposition: resolvedDisposition, processedItems: processedItems.length },
-        {
-          reason: reason || (dispositionLabels[resolvedDisposition] || resolvedDisposition),
-          correlationId: newCorrelationId()
-        });
-
-      return {
-        returnedItems: processedItems,
-        totalItems: processedItems.length,
-        disposition: resolvedDisposition,
-        returnAmount,
-        netReturn,
-        deduction,
-        refundAmount: resolvedDisposition === 'refund'
-          ? Math.min(netReturn, preReturnRefundable)
-          : 0,
-        retainedCredit: resolvedDisposition === 'refund'
-          ? parseCurrency(subtractCurrency(netReturn, Math.min(netReturn, preReturnRefundable)))
-          : netReturn,
-      };
+    const result = InvoiceReturnService.processReturn({
+      invoiceId,
+      items,
+      feeType: (body.fee_type as FeeType | undefined) ?? undefined,
+      feeValue: body.fee_value !== undefined ? Number(body.fee_value) : undefined,
+      returnDate: body.return_date ? String(body.return_date) : null,
+      warehouseId: body.warehouse_id === undefined || body.warehouse_id === null || body.warehouse_id === ''
+        ? null
+        : Number(body.warehouse_id),
+      reason,
+      settlements: Array.isArray(body.settlements) && body.settlements.length > 0
+        ? (body.settlements as SettlementInput[])
+        : null,
+      // Legacy shim (spec §10) — honoured only when `settlements` is absent.
+      disposition: (body.disposition as 'refund' | 'credit' | 'adjust' | null) ?? null,
+      adjustInvoiceIds: Array.isArray(body.adjust_invoice_ids) ? (body.adjust_invoice_ids as number[]) : null,
+      deductionType: (body.deduction_type as 'fixed' | 'percentage' | 'flat' | null) ?? null,
+      deductionValue: body.deduction_value !== undefined ? Number(body.deduction_value) : undefined,
+      userId,
     });
 
-    const result = transaction();
-    res.json({ success: true, message: 'Return processed successfully', data: result });
+    return res.json({ success: true, message: 'Return processed successfully', data: result });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Return invoice items error:', { error: errorMessage });
-    res.status(400).json({ error: errorMessage });
+    if (error instanceof ReturnError) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    logger.error('Return invoice items error:', { error });
+    return res.status(500).json({ error: 'Failed to process the return' });
+  }
+}
+
+/**
+ * GET /api/invoices/:id/position
+ * The authoritative money position of an invoice (spec §3.2 / §4.2).
+ */
+function getInvoicePosition(req: AuthRequest, res: Response): Response | void {
+  try {
+    const invoiceId = parseInt(req.params.id as string, 10);
+    const position = InvoiceReturnService.getPosition(invoiceId);
+    return res.json({ success: true, data: position });
+  } catch (error: unknown) {
+    if (error instanceof ReturnError) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    logger.error('Get invoice position error:', { error });
+    return res.status(500).json({ error: 'Failed to fetch the invoice position' });
   }
 }
 
@@ -1683,6 +1291,7 @@ export {
   getInvoicePayments,
   returnInvoiceItems,
   getInvoiceReturnHistory,
+  getInvoicePosition,
 };
 
 export default {
@@ -1696,4 +1305,5 @@ export default {
   getInvoicePayments,
   returnInvoiceItems,
   getInvoiceReturnHistory,
+  getInvoicePosition,
 };

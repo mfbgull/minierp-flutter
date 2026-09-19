@@ -9,6 +9,7 @@ router.use(authenticateToken);
 
 router.get('/', requirePermission('invoices', 'read'), invoiceController.getInvoices);
 router.get('/returns', requirePermission('invoices', 'read'), invoiceController.getInvoiceReturnHistory);
+router.get('/:id/position', requirePermission('invoices', 'read'), invoiceController.getInvoicePosition);
 router.get('/:id', requirePermission('invoices', 'read'), invoiceController.getInvoice);
 router.get('/:id/payments', requirePermission('invoices', 'read'), invoiceController.getInvoicePayments);
 router.post('/', requirePermission('invoices', 'create'), validateZodBody(zodBodySchemas.invoiceCreate), invoiceController.createInvoice);

@@ -14,13 +14,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/invoice.dart'
-    show InvoiceItem, InvoicePaymentRecord;
+    show Invoice, InvoiceItem;
+import '../../data/models/sales_return.dart';
 import '../../data/models/stock_batch.dart' show StockBatch;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/invoice_repository.dart'
-    show invoiceRepositoryProvider;
-import '../../data/repositories/inventory_repository.dart'
-    show inventoryRepositoryProvider;
+    show InvoiceFilters, invoiceRepositoryProvider;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import '../../widgets/form_field.dart';
@@ -55,6 +54,7 @@ class InvoiceReturnDialog extends ConsumerStatefulWidget {
 class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
   final _formKey = GlobalKey<FormState>();
   final _reasonController = TextEditingController();
+  final _feeValueController = TextEditingController();
 
   /// Lines that still have something to return, with one qty controller
   /// per line (parallel lists — both rebuilt on load).
@@ -65,25 +65,41 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
   /// (invoices never record one, so the user must choose).
   int? _warehouseId;
 
-  String _disposition = 'credit';
+  /// Return date (spec §5.1 / D14) — `yyyy-MM-dd`, defaults to today
+  /// and the server posts ledger entries dated today regardless.
+  String _returnDate = DateTime.now().toIso8601String().substring(0, 10);
+
+  /// Restocking-fee selector (spec §3.6 / D5 — always charged, clamped
+  /// to the returned value by the server).
+  String _feeType = 'none';
+
+  /// The invoice's live position (spec §4.2) — the starting point the
+  /// preview adds this return's figures onto.
+  InvoicePosition? _position;
+
+  /// Settlement builder (spec §5.2 / D4): allocate the net return now,
+  /// or leave the return Unsettled for later ("record return only").
+  bool _settleNow = false;
+  final List<_SettlementDraft> _allocations = [];
+
+  /// Open invoices of the same customer — pickers for `adjust`
+  /// allocations (D7 — the server auto-picks the oldest unpaid when
+  /// none is supplied, but the user may target one explicitly).
+  List<Invoice> _targetOptions = const [];
+
   bool _submitting = false;
   bool _loading = true;
   String? _loadError;
   String? _error;
-
-  /// What the customer actually collected on this invoice (paid minus
-  /// prior refunds). The server caps any cash refund at this amount —
-  /// mirrored here so the preview matches what will actually happen.
-  double _refundable = 0;
-
-  /// Live per-line return totals (gross return value of filled lines).
-  double _grossReturn = 0;
 
   /// Per-item batch breakdown (batch → location quantities) for the
   /// collapsible "batches" chip on each line — informational, filled
   /// only when the server feature flag `feature_batch_locations` is on.
   final Map<int, List<StockBatch>> _batchesByItem = {};
   final Map<int, bool> _expandedBatches = {};
+
+  /// Cached invoice (customer id for adjust-target loading).
+  Invoice? _customer;
 
   @override
   void initState() {
@@ -94,6 +110,10 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
   @override
   void dispose() {
     _reasonController.dispose();
+    _feeValueController.dispose();
+    for (final a in _allocations) {
+      a.amountController.dispose();
+    }
     for (final c in _qtyControllers) {
       c.dispose();
     }
@@ -107,21 +127,8 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
     if (!mounted) return;
     switch (result) {
       case ApiSuccess(:final data):
-        // Collected cash = Σ payment allocations (refund records carry
-        // negative amounts) — same math as the server's cap.
-        final paymentsResult = await ref
-            .read(invoiceRepositoryProvider)
-            .invoicePayments(widget.invoiceId);
-        var collected = 0.0;
-        if (paymentsResult is ApiSuccess<List<InvoicePaymentRecord>>) {
-          for (final p in paymentsResult.data) {
-            collected += p.amount;
-          }
-        }
-        if (!mounted) return;
         setState(() {
           _loading = false;
-          _refundable = collected.clamp(0.0, double.infinity);
           final items = data.items ?? const <InvoiceItem>[];
           _returnableItems = [
             for (final item in items)
@@ -135,11 +142,13 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
             ..addAll([
               for (final _ in _returnableItems) TextEditingController(),
             ]);
-          // The server's default when no disposition is sent: refund
-          // only when the invoice is paid off, credit otherwise.
-          _disposition = data.balanceAmount <= 0 ? 'refund' : 'credit';
+          _customer = data;
+          _position = data.position;
+          // Default the settlement step to "unsettled" unless this
+          // return actually creates a refund/credit entitlement (spec
+          _settleNow = _postRefundDue > 0;
         });
-        _loadBatches();
+        _loadTargets();
       case ApiFailure(:final error):
         setState(() {
           _loading = false;
@@ -148,51 +157,132 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
     }
   }
 
-  /// Fire-and-forget batch breakdown per returnable item — powers the
-  /// collapsible "batches" chip under each line. Empty (chip hidden)
-  /// when the server feature flag is off or the item is unbatched.
-  Future<void> _loadBatches() async {
-    final repo = ref.read(inventoryRepositoryProvider);
-    final itemIds = _returnableItems.map((i) => i.itemId).toSet();
-    for (final itemId in itemIds) {
-      if (_batchesByItem.containsKey(itemId)) continue;
-      final result = await repo.getBatches(itemId: itemId);
-      if (!mounted) return;
-      switch (result) {
-        case ApiSuccess(:final data):
-          final withLocations = data
-              .where((b) => b.locations != null && b.locations!.isNotEmpty)
-              .toList();
-          if (withLocations.isNotEmpty) {
-            setState(() => _batchesByItem[itemId] = withLocations);
-          }
-        case ApiFailure():
-          break; // Informational only.
-      }
+
+  /// Open invoices of the same customer — pickers for `adjust`
+  /// allocations. Fire-and-forget; the server auto-picks the oldest
+  /// unpaid invoice when none is supplied (D7), so this is optional.
+  Future<void> _loadTargets() async {
+    final customerId = _customer?.customerId;
+    if (customerId == null) return;
+    final result = await ref
+        .read(invoiceRepositoryProvider)
+        .invoices(filters: InvoiceFilters(customerId: customerId));
+
+    if (!mounted) return;
+    switch (result) {
+      case ApiSuccess(:final data):
+        setState(() => _targetOptions = data);
+      case ApiFailure():
+        break; // Informational — adjust falls back to auto-pick.
     }
   }
+  /// Gross (tax-inclusive) returned value of the filled lines —
+  /// `computeReturnedLine` on the server: proportional split of the
+  /// line's net and tax, full-return snapped to ratio 1.
+  double _lineReturnedGross(InvoiceItem item, num qty) {
+    final q = item.quantity;
+    if (q <= 0 || qty <= 0) return 0;
+    final ratio = qty >= q - 1e-9 ? 1.0 : qty / q;
+    final net = item.amount.toDouble();
+    final tax = (net * item.taxRate.toDouble() / 100).roundToDouble();
+    return (ratio * net).roundToDouble() + (ratio * tax).roundToDouble();
+  }
+
+  double get _grossReturnNow {
+    var total = 0.0;
+    for (var i = 0; i < _returnableItems.length; i++) {
+      final item = _returnableItems[i];
+      final qty = double.tryParse(_qtyControllers[i].text.trim()) ?? 0;
+      total += _lineReturnedGross(item, qty);
+    }
+    return total;
+  }
+
+  /// `resolveFee` on the server: percentage fees take the tax-inclusive
+  /// returned value as base; everything clamps to the returned value.
+  double get _feeAmount {
+    final base = _grossReturnNow;
+    final value = double.tryParse(_feeValueController.text.trim()) ?? 0;
+    if (_feeType == 'none' || value <= 0) return 0;
+    final raw = _feeType == 'percentage' ? base * (value / 100) : value;
+    return raw < base ? raw : base;
+  }
+
+  double get _netAmount => _grossReturnNow - _feeAmount;
+
+  /// Post-return position (spec §3.2) — this return's figures added on
+  /// top of the invoice's live `position` (server is authoritative).
+  InvoicePosition _postPosition() {
+    final p = _position;
+    final originalTotal = p?.originalTotal ?? 0;
+    final totalPaid = p?.totalPaid ?? 0;
+    final totalSettled = p?.totalSettled ?? 0;
+    final totalReturned = (p?.totalReturned ?? 0) + _grossReturnNow;
+    final totalFees = (p?.totalFees ?? 0) + _feeAmount;
+    final currentInvoiceValue =
+        originalTotal - totalReturned < 0 ? 0.0 : originalTotal - totalReturned;
+    final netPosition = totalPaid - currentInvoiceValue - totalFees;
+    final refundCreditDue = netPosition > 0 ? netPosition : 0.0;
+    final balanceDue = netPosition < 0 ? -netPosition : 0.0;
+    final remainingRefundDue =
+        refundCreditDue - totalSettled < 0 ? 0.0 : refundCreditDue - totalSettled;
+    return InvoicePosition(
+      originalTotal: originalTotal,
+      totalReturned: totalReturned,
+      currentInvoiceValue: currentInvoiceValue,
+      totalPaid: totalPaid,
+      totalFees: totalFees,
+      netPosition: netPosition,
+      refundCreditDue: refundCreditDue,
+      totalSettled: totalSettled,
+      remainingRefundDue: remainingRefundDue,
+      balanceDue: balanceDue,
+      remainingSettlementCapacity: remainingRefundDue,
+      settledAmount: totalSettled,
+    );
+  }
+
+  num get _postRefundDue => _postPosition().refundCreditDue;
+  num get _postBalanceDue => _postPosition().balanceDue;
+
+  /// Σ allocation amounts in the settlement builder.
+  double get _allocationsTotal {
+    var total = 0.0;
+    for (final a in _allocations) {
+      total += double.tryParse(a.amountController.text.trim()) ?? 0;
+    }
+    return total;
+  }
+
+  /// True when the batch fits both limits the server enforces: the
+  /// return's own net remainder and the invoice's cumulative cap
+  /// (spec §3.4 / D18 — all types share one pool).
+  bool get _allocationsFit =>
+      _allocationsTotal <= _netAmount + 0.005 &&
+      _allocationsTotal <= _postPosition().remainingSettlementCapacity + 0.005;
 
   /// Recompute the live return totals from the filled qty fields.
-  void _recalcTotals() {
-    var gross = 0.0;
-    for (var i = 0; i < _returnableItems.length; i++) {
-      final qty = double.tryParse(_qtyControllers[i].text.trim()) ?? 0;
-      if (qty > 0) {
-        gross += qty * _returnableItems[i].unitPrice;
-      }
-    }
-    setState(() => _grossReturn = gross);
-  }
+  /// Rebuild the live position preview (the getters read the qty
+  /// controllers directly, so only a repaint is needed).
+  void _recalc() => setState(() {});
 
-  /// Server mirrors this: refundAmount = min(netReturn, refundable).
-  /// Returns (refund, retainedCredit) for the disposition refund, else
-  /// the whole amount is a credit/adjustment.
-  (double, double) get _refundSplit {
-    if (_disposition != 'refund') return (0, _grossReturn);
-    final refund = _grossReturn <= 0
-        ? 0.0
-        : (_grossReturn <= _refundable ? _grossReturn : _refundable);
-    return (refund, _grossReturn - refund);
+  /// Add one settlement allocation to the builder, prefilled with the
+  /// remaining net amount so the common case (single full refund) is
+  /// one click (§6.1 Option A).
+  void _addAllocation() {
+    final remainder = _netAmount - _allocationsTotal;
+    setState(() {
+      _allocations.add(
+        _SettlementDraft(
+          type: 'refund',
+          amountController: TextEditingController(
+            text: remainder > 0.005
+                ? remainder.toStringAsFixed(2)
+                : '',
+          ),
+        ),
+      );
+    });
   }
 
   Future<void> _submit() async {
@@ -223,32 +313,47 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
       _error = null;
     });
 
+    final settlements = <Map<String, dynamic>>[];
+    if (_settleNow && _postRefundDue > 0) {
+      for (final a in _allocations) {
+        final amount = double.tryParse(a.amountController.text.trim()) ?? 0;
+        if (amount <= 0) continue;
+        settlements.add({
+          'type': a.type,
+          'amount': amount,
+          if (a.type == 'refund' && a.method != null) 'method': a.method,
+          if (a.type == 'adjust' && a.targetInvoiceId != null)
+            'target_invoice_id': a.targetInvoiceId,
+        });
+      }
+    }
+
     final result = await ref
         .read(invoiceRepositoryProvider)
         .processReturn(
           widget.invoiceId,
           items: items,
+          feeType: _feeType,
+          feeValue: double.tryParse(_feeValueController.text.trim()),
+          returnDate: _returnDate,
           reason: _reasonController.text,
-          disposition: _disposition,
           warehouseId: _warehouseId,
+          settlements: settlements,
         );
     if (!mounted) return;
-
     switch (result) {
       case ApiSuccess(:final data):
         ref.invalidate(invoicesProvider);
         ref.invalidate(invoiceReturnsProvider);
-        final refund = data.refundAmount;
-        final credit = data.retainedCredit;
-        final split = refund > 0 && credit > 0
-            ? ' — ${l10n.salesreturnsRefundsplit} '
-                '${Formatters.currency(refund)}, '
-                '${Formatters.currency(credit)} ${l10n.salesreturnsCreditonsplit}'
-            : ' — ${Formatters.currency(data.netReturn)}';
+
         showAppToast(
           context,
-          '${l10n.salesreturnsReturnprocessed}$split',
+          '${l10n.salesreturnsReturnprocessed} — '
+          '${Formatters.currency(data.netAmount)}',
         );
+        if (data.returnNo != null) {
+          showAppToast(context, '${l10n.salesreturnsReturnno}: ${data.returnNo}');
+        }
         Navigator.of(context).pop();
       case ApiFailure(:final error):
         setState(() {
@@ -367,7 +472,7 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
                   controller: _qtyControllers[i],
                   autofocus: i == 0,
                   enabled: !_submitting,
-                  onChanged: _recalcTotals,
+                  onChanged: _recalc,
                   onSubmit: _submit,
                   batches: _batchesByItem[_returnableItems[i].itemId],
                   expanded: _expandedBatches[_returnableItems[i].id] ?? false,
@@ -379,46 +484,158 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
                 ),
               ],
             ],
-            if (_grossReturn > 0) ...[
+            if (_grossReturnNow > 0) ...[
               const SizedBox(height: 10),
-              _RefundSplitSummary(
-                grossReturn: _grossReturn,
-                refund: _refundSplit.$1,
-                retainedCredit: _refundSplit.$2,
-                isCapped:
-                    _disposition == 'refund' && _grossReturn > _refundable,
+              _PositionPreview(
+                grossReturn: _grossReturnNow,
+                fee: _feeAmount,
+                net: _netAmount,
+                position: _postPosition(),
               ),
+              const SizedBox(height: 12),
+              // Settlement (§5.2 / D4): allocate the net return now, or
+              // leave it Unsettled — the server auto-marks Not Required
+              // when there is nothing to refund (unpaid invoice).
+              FormFieldShell(
+                label: l10n.salesreturnsSettlement,
+                child: SwitchListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l10n.salesreturnsSettleNow),
+                  subtitle: Text(
+                    _postRefundDue > 0.005
+                        ? l10n.salesreturnsRefundsplit
+                        : l10n.salesreturnsRecordOnlyHint,
+                  ),
+                  value: _settleNow,
+                  onChanged: _submitting || _postRefundDue <= 0.005
+                      ? null
+                      : (v) => setState(() => _settleNow = v),
+                ),
+              ),
+              if (_settleNow) ...[
+                if (!_allocationsFit) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.salesreturnsSettleExceeds,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
+                for (var i = 0; i < _allocations.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  _SettlementRow(
+                    draft: _allocations[i],
+                    enabled: !_submitting,
+                    targetOptions: _targetOptions,
+                    onRemove: () => setState(() {
+                      _allocations[i].amountController.dispose();
+                      _allocations.removeAt(i);
+                    }),
+                    onChanged: _recalc,
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _submitting ? null : _addAllocation,
+                    icon: const Icon(Icons.add, size: 16),
+                    label: Text(l10n.salesreturnsSettleAdd),
+                  ),
+                ),
+              ],
             ],
             const SizedBox(height: 12),
+            // Return date (§5.1 / D14): today by default; back-dated
+            // returns inside a CLOSED accounting period are rejected by
+            // the server (D23) — today is always allowed.
             FormFieldShell(
-              label: l10n.salesreturnsReturnreason,
-              child: TextFormField(
-                controller: _reasonController,
-                enabled: !_submitting,
-                onFieldSubmitted: submitOnEnter(_submit),
-                decoration: formInputDecoration(
-                  hintText: l10n.salesreturnsReturnreasonplaceholder,
+              label: l10n.salesreturnsReturndate,
+              child: InkWell(
+                onTap: _submitting
+                    ? null
+                    : () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.tryParse(_returnDate) ??
+                              DateTime.now(),
+                          firstDate:
+                              DateTime.now().subtract(const Duration(days: 365)),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked == null) return;
+                        setState(() =>
+                            _returnDate = picked.toIso8601String().substring(0, 10));
+                      },
+                child: InputDecorator(
+                  decoration: formInputDecoration(),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.event, size: 16),
+                      const SizedBox(width: 6),
+                      Text(_returnDate),
+                    ],
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 10),
+            // Restocking fee (§3.6 / D5 — always charged, clamped to the
+            // returned value server-side; on an unpaid invoice it just
+            // increases the Balance Due).
             FormFieldShell(
-              label: l10n.salesreturnsDisposition,
-              child: SearchableSelect<String>(
-                items: const ['refund', 'credit', 'adjust'],
-                selected: _disposition,
-                labelBuilder: (value) => switch (value) {
-                  'refund' => l10n.salesreturnsDispositionrefund,
-                  'credit' => l10n.salesreturnsDispositioncredit,
-                  _ => l10n.salesreturnsDispositionadjust,
-                },
-                enabled: !_submitting,
-                decoration: formInputDecoration(),
-                onChanged: (value) {
-                  if (value != null) setState(() => _disposition = value);
-                },
+              label: l10n.salesreturnsFee,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: SearchableSelect<String>(
+                      items: const ['none', 'fixed', 'percentage'],
+                      selected: _feeType,
+                      labelBuilder: (value) => switch (value) {
+                        'fixed' => l10n.salesreturnsFeeFixed,
+                        'percentage' => l10n.salesreturnsFeePercentage,
+                        _ => l10n.salesreturnsFeeNone,
+                      },
+                      enabled: !_submitting,
+                      decoration: formInputDecoration(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _feeType = value);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _feeValueController,
+                      enabled: !_submitting && _feeType != 'none',
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => _recalc(),
+                      onFieldSubmitted: submitOnEnter(_submit),
+                      decoration: formInputDecoration(
+                        hintText: l10n.salesreturnsFeeValue,
+                      ).copyWith(
+                        suffixText: _feeType == 'percentage' ? '%' : null,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+            if (_postBalanceDue > 0.005 && _feeAmount > 0) ...[
+              const SizedBox(height: 6),
+              Text(
+                l10n.salesreturnsFeeNote,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.tertiary,
+                ),
+              ),
+            ],
             if (_error != null) ...[
               const SizedBox(height: 10),
               ErrorBanner(message: _error!),
@@ -718,21 +935,22 @@ class _WarehousePicker extends ConsumerWidget {
   }
 }
 
-/// Live refund/credit split preview for the return dialog — mirrors the
-/// server's cap (reversal-rules #11): cash refund is limited to what the
-/// customer actually collected; the remainder stays as customer credit.
-class _RefundSplitSummary extends StatelessWidget {
-  const _RefundSplitSummary({
+/// Live position preview for the return dialog (spec §6.1 / §3.2):
+/// Returned Value, Restocking Fee, Net, and the POST-return Balance
+/// Due and Refund/Credit Due — both always shown, mirroring the
+/// server's `computePosition` exactly (D12).
+class _PositionPreview extends StatelessWidget {
+  const _PositionPreview({
     required this.grossReturn,
-    required this.refund,
-    required this.retainedCredit,
-    required this.isCapped,
+    required this.fee,
+    required this.net,
+    required this.position,
   });
 
   final double grossReturn;
-  final double refund;
-  final double retainedCredit;
-  final bool isCapped;
+  final double fee;
+  final double net;
+  final InvoicePosition position;
 
   @override
   Widget build(BuildContext context) {
@@ -742,6 +960,8 @@ class _RefundSplitSummary extends StatelessWidget {
         .textTheme
         .bodySmall
         ?.copyWith(color: scheme.onSurfaceVariant);
+    final bold =
+        Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -755,38 +975,176 @@ class _RefundSplitSummary extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(l10n.salesreturnsReturnquantity, style: muted),
-              Text(Formatters.currency(grossReturn)),
+              Text(l10n.salesreturnsPositionReturned, style: muted),
+              Text(Formatters.currency(grossReturn), style: bold),
             ],
           ),
-          if (refund > 0)
+          if (fee > 0.005)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(l10n.salesreturnsRefundsplit, style: muted),
-                Text(Formatters.currency(refund)),
+                Text(l10n.salesreturnsFee, style: muted),
+                Text(Formatters.currency(fee), style: bold),
               ],
             ),
-          if (retainedCredit > 0)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(l10n.salesreturnsCreditonsplit, style: muted),
-                Text(Formatters.currency(retainedCredit)),
-              ],
-            ),
-          if (isCapped) ...[
-            const SizedBox(height: 4),
-            Text(
-              l10n.salesreturnsRefundcapnote,
-              style: muted?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: scheme.tertiary,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(l10n.salesreturnsPositionNet, style: muted),
+              Text(Formatters.currency(net), style: bold),
+            ],
+          ),
+          const Divider(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(l10n.salesreturnsPositionBalanceDue, style: muted),
+              Text(
+                Formatters.currency(position.balanceDue),
+                style: bold?.copyWith(
+                  color: position.balanceDue > 0.005 ? scheme.error : muted?.color,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(l10n.salesreturnsPositionRefundDue, style: muted),
+              Text(
+                Formatters.currency(position.refundCreditDue),
+                style: bold?.copyWith(
+                  color: position.refundCreditDue > 0.005
+                      ? scheme.tertiary
+                      : muted?.color,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
+}
+
+/// One editable settlement allocation (spec §5.2): type picker, amount,
+/// and per-type context — method for refunds, target invoice for
+/// adjustments (D7 — the server auto-picks the oldest unpaid when
+/// omitted; credit needs nothing extra).
+class _SettlementRow extends StatelessWidget {
+  const _SettlementRow({
+    required this.draft,
+    required this.enabled,
+    required this.targetOptions,
+    required this.onRemove,
+    required this.onChanged,
+  });
+
+  final _SettlementDraft draft;
+  final bool enabled;
+  final List<Invoice> targetOptions;
+  final VoidCallback onRemove;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: SearchableSelect<String>(
+            items: const ['refund', 'credit', 'adjust'],
+            selected: draft.type,
+            labelBuilder: (value) => switch (value) {
+              'refund' => l10n.salesreturnsDispositionrefund,
+              'credit' => l10n.salesreturnsDispositioncredit,
+              _ => l10n.salesreturnsDispositionadjust,
+            },
+            enabled: enabled,
+            decoration: formInputDecoration(),
+            onChanged: (value) {
+              if (value != null) {
+                draft.type = value;
+                onChanged();
+              }
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: TextFormField(
+            controller: draft.amountController,
+            enabled: enabled,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => onChanged(),
+            decoration: formInputDecoration(hintText: l10n.salesreturnsFeeValue),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 2,
+          child: draft.type == 'refund'
+              ? SearchableSelect<String>(
+                  items: const ['cash', 'bank', 'card'],
+                  selected: draft.method ?? 'cash',
+                  labelBuilder: (value) => value.toUpperCase(),
+                  enabled: enabled,
+                  decoration: formInputDecoration(
+                    hintText: l10n.salesreturnsSettleMethod,
+                  ),
+                  onChanged: (value) {
+                    if (value != null) {
+                      draft.method = value;
+                      onChanged();
+                    }
+                  },
+                )
+              : draft.type == 'adjust'
+                  ? SearchableSelect<int>(
+                      items: [for (final inv in targetOptions) inv.id],
+                      selected: draft.targetInvoiceId,
+                      labelBuilder: (id) {
+                        final match =
+                            targetOptions.where((inv) => inv.id == id);
+                        return match.isEmpty
+                            ? '#$id'
+                            : '${match.first.invoiceNo} '
+                                '· ${Formatters.currency(match.first.balanceAmount)}';
+                      },
+                      enabled: enabled,
+                      decoration: formInputDecoration(
+                        hintText: l10n.salesreturnsSettleTarget,
+                      ),
+                      onChanged: (value) {
+                        draft.targetInvoiceId = value;
+                        onChanged();
+                      },
+                    )
+                  : const SizedBox.shrink(),
+        ),
+        IconButton(
+          icon: const Icon(Icons.remove_circle_outline, size: 18),
+          onPressed: enabled ? onRemove : null,
+        ),
+      ],
+    );
+  }
+}
+
+/// Mutable settlement-allocation draft for the dialog's builder.
+class _SettlementDraft {
+  _SettlementDraft({required this.type, required this.amountController});
+
+  /// 'refund' | 'credit' | 'adjust' (spec §5.2).
+  String type;
+
+  /// Refund method — 'cash' | 'bank' | 'card' (D8), refunds only.
+  String? method;
+
+  /// Explicit target for adjustments (D7 — null = oldest unpaid auto).
+  int? targetInvoiceId;
+  final TextEditingController amountController;
 }

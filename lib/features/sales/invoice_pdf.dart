@@ -25,6 +25,12 @@ import 'package:pdf/widgets.dart' as pw;
 import '../../core/utils/formatters.dart';
 import '../../data/models/invoice.dart'
     show CompanyInfo, Invoice, InvoiceItem, InvoicePaymentRecord;
+import '../../data/models/sales_return.dart'
+    show
+        InvoicePosition,
+        ReturnDocument,
+        ReturnSettlement,
+        TimelineEvent;
 import 'models/sales_forms.dart' show defaultCompany;
 
 /// Accent color — the DESIGN.md emerald (matches the app's primary).
@@ -53,6 +59,14 @@ Future<Uint8List> buildA4InvoicePdf({
         _buildItemsTable(invoice),
         pw.SizedBox(height: 16),
         _buildSummarySection(invoice, payments),
+        if (invoice.returns.isNotEmpty) ...[
+          pw.SizedBox(height: 20),
+          _buildReturnHistorySection(invoice.returns),
+          pw.SizedBox(height: 16),
+          _buildPositionSection(invoice.position),
+          pw.SizedBox(height: 16),
+          _buildTimelineSection(invoice.timeline),
+        ],
       ],
     ),
   );
@@ -715,6 +729,330 @@ pw.Widget _buildFooter(CompanyInfo company) {
       ],
     ),
   );
+}
+
+// ── Return history (spec §6.3 sections 3–5) ────────────────────────
+
+/// Sections 3–5: per return — RET- no + date, returned items at their
+/// original rates, financial summary (returned value / fee with type /
+/// net), and every settlement allocation. Voided returns are skipped.
+pw.Widget _buildReturnHistorySection(List<ReturnDocument> returns) {
+  final active = returns.where((r) => r.status != 'Voided').toList();
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      _pdfSectionHeading('Return History'),
+      for (final ret in active) ...[
+        pw.SizedBox(height: 8),
+        _pdfSubHeading(
+          '${ret.returnNo} - ${_fmtDate(ret.returnDate)}'
+          '${ret.status == 'Unsettled' ? ' (Unsettled)' : ''}',
+        ),
+        if ((ret.reason ?? '').trim().isNotEmpty)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 4),
+            child: pw.Text(
+              'Reason: ${ret.reason}',
+              style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey700),
+            ),
+          ),
+        _returnItemsTable(ret),
+        pw.SizedBox(height: 6),
+        _returnFinancialSummary(ret),
+        if (ret.settlements.isNotEmpty) ...[
+          pw.SizedBox(height: 6),
+          _settlementsTable(ret.settlements),
+        ],
+      ],
+    ],
+  );
+}
+
+/// Section 6: the current invoice position (spec D12).
+pw.Widget _buildPositionSection(InvoicePosition? position) {
+  if (position == null) return pw.SizedBox();
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      _pdfKeyValueBlock([
+        ('Original Invoice Total', _currency(position.originalTotal), false),
+        ('Total Returned', _currency(position.totalReturned), false),
+        ('Current Invoice Value', _currency(position.currentInvoiceValue), false),
+        ('Original Payments', _currency(position.totalPaid), false),
+        ('Restocking Fees', _currency(position.totalFees), false),
+        ('Refunded/Credited', _currency(position.totalSettled), false),
+      ]),
+      pw.SizedBox(height: 4),
+      _pdfKeyValueBlock([
+        ('Balance Due', _currency(position.balanceDue), true),
+        ('Refund/Credit Due', _currency(position.refundCreditDue), true),
+        if (position.remainingRefundDue > 0.005)
+          ('Remaining Refund Due', _currency(position.remainingRefundDue), true),
+      ]),
+    ],
+  );
+}
+
+/// Section 7: chronological transaction history from persisted rows
+/// (invoice → payments → returns → fees → settlements).
+pw.Widget _buildTimelineSection(List<TimelineEvent> timeline) {
+  if (timeline.isEmpty) return pw.SizedBox();
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      _pdfSectionHeading('Transaction History'),
+      pw.Table(
+        tableWidth: pw.TableWidth.max,
+        border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+        columnWidths: const {
+          0: pw.FixedColumnWidth(78),
+          1: pw.FixedColumnWidth(96),
+          3: pw.FixedColumnWidth(72),
+        },
+        children: [
+          pw.TableRow(
+            children: _pdfHeaderCells(['Date', 'Type', 'Reference', 'Amount']),
+          ),
+          for (final ev in timeline)
+            pw.TableRow(
+              children: _pdfCells([
+                _fmtDate(ev.date),
+                _timelineTypeLabel(ev.type),
+                ev.reference,
+                _currency(ev.amount),
+              ], lastRight: true),
+            ),
+        ],
+      ),
+    ],
+  );
+}
+
+pw.Widget _pdfSectionHeading(String text) => pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 6),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: pw.BoxDecoration(
+        color: const PdfColor.fromInt(0xFFD9F5E7),
+        border: pw.Border(
+          left: pw.BorderSide(color: _accent, width: 3),
+        ),
+      ),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          fontSize: 11,
+          fontWeight: pw.FontWeight.bold,
+          color: _accent,
+        ),
+      ),
+    );
+
+pw.Widget _pdfSubHeading(String text) => pw.Text(
+      text,
+      style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+    );
+
+pw.Widget _pdfKeyValueBlock(
+  List<(String, String, bool?)> rows,
+) =>
+    pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.grey100,
+        border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          for (final (label, value, bold) in rows)
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    label,
+                    style: pw.TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: bold == true
+                          ? pw.FontWeight.bold
+                          : pw.FontWeight.normal,
+                    ),
+                  ),
+                  pw.Text(
+                    value,
+                    style: pw.TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: bold == true
+                          ? pw.FontWeight.bold
+                          : pw.FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+
+pw.Widget _returnItemsTable(ReturnDocument ret) {
+  final items = ret.items;
+  return pw.Table(
+    tableWidth: pw.TableWidth.max,
+    border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+    columnWidths: const {
+      1: pw.FixedColumnWidth(42),
+      2: pw.FixedColumnWidth(64),
+      3: pw.FixedColumnWidth(64),
+      4: pw.FixedColumnWidth(78),
+    },
+    children: [
+      pw.TableRow(
+        children: _pdfHeaderCells([
+          'Item',
+          'Qty',
+          'Rate',
+          'Tax',
+          'Returned Value',
+        ]),
+      ),
+      for (final item in items)
+        pw.TableRow(
+          children: _pdfCells([
+            'Item #${item.itemId}',
+            _trimNum(item.quantity),
+            _currency(item.unitPrice),
+            _currency(item.taxAmount),
+            _currency(item.lineAmount),
+          ], lastRight: true),
+        ),
+    ],
+  );
+}
+
+pw.Widget _returnFinancialSummary(ReturnDocument ret) {
+  final feeType = (ret.feeType ?? 'none');
+  final feeLabel = feeType == 'percentage'
+      ? 'Restocking Fee (${_trimNum(ret.feeValue)}%)'
+      : feeType == 'fixed'
+          ? 'Restocking Fee (fixed)'
+          : 'Restocking Fee';
+  return pw.Align(
+    alignment: pw.Alignment.centerRight,
+    child: pw.Container(
+      constraints: const pw.BoxConstraints(maxWidth: 260),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          _pdfSummaryRow('Returned Value', _currency(ret.returnedAmount)),
+          _pdfSummaryRow(feeLabel, _currency(ret.feeAmount)),
+          _pdfSummaryRow('Net', _currency(ret.netAmount), bold: true),
+          if (ret.settledAmount > 0.005)
+            _pdfSummaryRow('Settled', _currency(ret.settledAmount)),
+        ],
+      ),
+    ),
+  );
+}
+
+pw.Widget _pdfSummaryRow(String label, String value, {bool bold = false}) =>
+    pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 1),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label, style: pw.TextStyle(fontSize: 9)),
+          pw.Text(
+            value,
+            style: pw.TextStyle(
+              fontSize: 9,
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+
+pw.Widget _settlementsTable(List<ReturnSettlement> settlements) => pw.Table(
+      tableWidth: pw.TableWidth.max,
+      border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+      columnWidths: const {
+        0: pw.FixedColumnWidth(78),
+        1: pw.FixedColumnWidth(78),
+        3: pw.FixedColumnWidth(72),
+      },
+      children: [
+        pw.TableRow(
+          children: _pdfHeaderCells([
+            'Settlement Date',
+            'Type',
+            'Method/Reference',
+            'Amount',
+          ]),
+        ),
+        for (final s in settlements)
+          pw.TableRow(
+            children: _pdfCells([
+              _fmtDate(s.settledDate),
+              s.type,
+              [
+                if (s.method != null && s.method!.isNotEmpty) s.method!,
+                if (s.reference != null && s.reference!.isNotEmpty)
+                  s.reference!,
+              ].join(' - '),
+              _currency(s.amount),
+            ], lastRight: true),
+          ),
+      ],
+    );
+
+List<pw.Widget> _pdfHeaderCells(List<String> labels) => [
+      for (final label in labels)
+        pw.Container(
+          color: PdfColors.grey200,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+          child: pw.Text(
+            label,
+            style: pw.TextStyle(
+              fontSize: 8.5,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        ),
+    ];
+
+List<pw.Widget> _pdfCells(List<String> values, {bool lastRight = false}) => [
+      for (var i = 0; i < values.length; i++)
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+          alignment: (lastRight && i == values.length - 1)
+              ? pw.Alignment.centerRight
+              : null,
+          child: pw.Text(values[i], style: const pw.TextStyle(fontSize: 8.5)),
+        ),
+    ];
+
+String _timelineTypeLabel(String type) {
+  switch (type) {
+    case 'INVOICE':
+      return 'Invoice';
+    case 'PAYMENT':
+      return 'Payment';
+    case 'RETURN':
+      return 'Return';
+    case 'RESTOCKING_FEE':
+      return 'Restocking Fee';
+    case 'SETTLEMENT':
+      return 'Settlement';
+  }
+  return type;
+}
+
+/// ISO date → "yyyy-MM-dd" (already that shape on the wire; trimmed for
+/// safety — datetimes keep their date part).
+String _fmtDate(String? iso) {
+  if (iso == null || iso.isEmpty) return '';
+  return iso.length >= 10 ? iso.substring(0, 10) : iso;
 }
 
 // ── Totals math + formatting ────────────────────────────────────────

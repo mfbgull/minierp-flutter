@@ -5123,6 +5123,67 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesreturnsSelectinvoice => 'بل منتخب کریں';
 
   @override
+  String get salesreturnsFee => 'اسٹاک بحالی فیس';
+
+  @override
+  String get salesreturnsFeeFixed => 'مقررہ';
+
+  @override
+  String get salesreturnsFeeNone => 'کوئی نہیں';
+
+  @override
+  String get salesreturnsFeeNote =>
+      'بل ابھی ادا نہیں ہوا — اسٹاک بحالی فیس قابلِ ادائیگی بڑھا دیتی ہے۔';
+
+  @override
+  String get salesreturnsFeePercentage => 'فیصد';
+
+  @override
+  String get salesreturnsFeeValue => 'فیس کی قیمت';
+
+  @override
+  String get salesreturnsPositionBalanceDue => 'قابلِ ادائیگی بقایا';
+
+  @override
+  String get salesreturnsPositionNet => 'خالص';
+
+  @override
+  String get salesreturnsPositionRefundDue => 'واپسی/کریڈٹ واجب الادا';
+
+  @override
+  String get salesreturnsPositionReturned => 'واپسی کی قیمت';
+
+  @override
+  String get salesreturnsRecordOnly => 'صرف واپسی درج کریں';
+
+  @override
+  String get salesreturnsRecordOnlyHint =>
+      'غیر تصفیہ شدہ چھوڑیں — بعد میں بل سے تصفیہ کریں۔';
+
+  @override
+  String get salesreturnsSettleAdd => 'تقسیم شامل کریں';
+
+  @override
+  String get salesreturnsSettleExceeds =>
+      'تقسیمات خالص واپسی کی قیمت سے زیادہ ہیں۔';
+
+  @override
+  String get salesreturnsSettleMethod => 'طریقہ';
+
+  @override
+  String get salesreturnsSettleNow => 'ابھی تصفیہ کریں';
+
+  @override
+  String get salesreturnsSettleTarget => 'ہدف بل';
+
+  @override
+  String get salesreturnsSettleTargetRequired =>
+      'وہ بل منتخب کریں جس پر ایڈجسٹمنٹ لگانی ہے۔';
+
+  @override
+  String get salesreturnsSettlement => 'تصفیہ';
+
+  @override
   String get settingsBackupDeleteFailed => 'بیک اپ حذف کرنے میں ناکامی';
 
   @override
@@ -5179,6 +5240,24 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get settingsKeyCompanyTaxId => 'کمپنی ٹیکس شناخت';
+
+  @override
+  String get salesreturnsPositionCurrentValue => 'موجودہ بل کی قیمت';
+
+  @override
+  String get salesreturnsPositionOriginalPayments => 'اصل ادائیگیاں';
+
+  @override
+  String get salesreturnsPositionOriginalTotal => 'اصل بل کی کل قیمت';
+
+  @override
+  String get salesreturnsPositionRefunded => 'واپسی/کریڈٹ کردہ';
+
+  @override
+  String get salesreturnsPositionRemaining => 'باقی واپسی واجب الادا';
+
+  @override
+  String get salesreturnsPositionTotalReturned => 'کل واپس کردہ';
 
   @override
   String get settingsKeyCurrency => 'کرنسی';

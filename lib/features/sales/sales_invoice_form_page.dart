@@ -30,6 +30,7 @@ import '../../core/utils/print_service.dart' show PrintFormat, PrintService;
 import '../../core/utils/formatters.dart';
 import '../../core/utils/invoice_status.dart';
 import '../../data/models/customer.dart' show Customer;
+import '../../data/models/sales_return.dart' show InvoicePosition;
 import '../../data/models/invoice.dart'
     show
         Discount,
@@ -57,8 +58,7 @@ import 'calculations/invoice_calculations.dart'
         calculateDiscount,
         calculateSubtotal,
         calculateTax,
-        calculateTotal,
-        generateInvoiceNo;
+        calculateTotal;
 import 'calculations/invoice_rules.dart'
     show doesPaymentExceedBalance, isValidPaymentAmount;
 import 'invoice_providers.dart';
@@ -157,8 +157,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   PlutoRow? _hintRow;
   bool _hintFetching = false;
 
+  Invoice? _detail;
   bool get _isEdit => widget.invoice != null;
-
   @override
   void initState() {
     super.initState();
@@ -404,6 +404,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       case ApiSuccess(:final data):
         if (!mounted) return;
         setState(() {
+          _detail = data;
           _setLines(data.items ?? const <InvoiceItem>[]);
         });
       case ApiFailure(:final error):
@@ -1299,17 +1300,22 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                 label: Text(l10n.actionsPrint),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: TextButton.icon(
-                onPressed: () => showInvoiceReturnDialog(
-                  context,
-                  invoiceId: widget.invoice!.id,
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: TextButton.icon(
+                  onPressed: () async {
+                    await showInvoiceReturnDialog(
+                      context,
+                      invoiceId: widget.invoice!.id,
+                    );
+                    if (!mounted) return;
+                    _loadInvoiceDetail(widget.invoice!.id);
+                    _loadExistingPayments(widget.invoice!.id);
+                  },
+                  icon: const Icon(Icons.assignment_return_outlined, size: 18),
+                  label: Text(l10n.salesreturnsProcessreturn),
                 ),
-                icon: const Icon(Icons.assignment_return_outlined, size: 18),
-                label: Text(l10n.salesreturnsProcessreturn),
               ),
-            ),
           ],
         ],
       ),
@@ -1475,12 +1481,50 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                 totalsRow(l10n.salesTax, tax),
                 const Divider(height: 10),
                 totalsRow(l10n.salesGrandtotal, total, bold: true),
+                if (_detail?.position != null) ...[
+                  const Divider(height: 10),
+                  ..._buildPositionRows(l10n, _detail!.position!, totalsRow),
+                ],
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// Position block (spec §6.2 / D12): Original Invoice Total, Total
+  /// Returned, Current Invoice Value, Original Payments, Restocking
+  /// Fees, Balance Due and Refund/Credit Due — both always shown —
+  /// plus Refunded/Credited and Remaining Refund Due when settled.
+  List<Widget> _buildPositionRows(
+    AppLocalizations l10n,
+    InvoicePosition p,
+    Widget Function(String, num, {bool bold}) totalsRow,
+  ) {
+    return [
+      totalsRow(l10n.salesreturnsPositionOriginalTotal, p.originalTotal),
+      const SizedBox(height: 4),
+      totalsRow(l10n.salesreturnsPositionTotalReturned, p.totalReturned),
+      const SizedBox(height: 4),
+      totalsRow(l10n.salesreturnsPositionCurrentValue, p.currentInvoiceValue),
+      const SizedBox(height: 4),
+      totalsRow(l10n.salesreturnsPositionOriginalPayments, p.totalPaid),
+      const SizedBox(height: 4),
+      totalsRow(l10n.salesreturnsFee, p.totalFees),
+      const Divider(height: 10),
+      totalsRow(l10n.salesreturnsPositionBalanceDue, p.balanceDue, bold: true),
+      const SizedBox(height: 4),
+      totalsRow(l10n.salesreturnsPositionRefundDue, p.refundCreditDue),
+      if (p.totalSettled > 0.005) ...[
+        const SizedBox(height: 4),
+        totalsRow(l10n.salesreturnsPositionRefunded, p.totalSettled),
+      ],
+      if (p.remainingRefundDue > 0.005) ...[
+        const SizedBox(height: 4),
+        totalsRow(l10n.salesreturnsPositionRemaining, p.remainingRefundDue),
+      ],
+    ];
   }
 
   Widget _notesField(AppLocalizations l10n) {
