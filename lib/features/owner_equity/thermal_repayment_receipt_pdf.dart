@@ -14,6 +14,7 @@ import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import '../../core/utils/pdf_fonts.dart';
 
 import '../../data/models/invoice.dart' show CompanyInfo;
 import '../../features/sales/models/sales_forms.dart' show defaultCompany;
@@ -38,7 +39,7 @@ Future<Uint8List> buildThermalRepaymentReceiptPdf(
   final usedCompany = company ?? defaultCompany;
   final history = allRepayments ?? <PersonalLoanRepayment>[repayment];
   final totals = _historyTotals(loan, history);
-  final doc = pw.Document();
+  final doc = pw.Document(theme: await PdfFonts.theme());
 
   doc.addPage(
     pw.MultiPage(

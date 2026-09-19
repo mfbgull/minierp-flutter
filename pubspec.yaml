@@ -104,3 +104,12 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+  # Unicode TrueType fonts used only for PDF generation (dart_pdf).
+  # Helvetica has no Unicode support, so every PDF document renders with
+  # these instead of the built-in Type1 faces.
+  assets:
+    - assets/fonts/NotoSans-Regular.ttf
+    - assets/fonts/NotoSans-Bold.ttf
+    - assets/fonts/NotoSans-Italic.ttf
+    - assets/fonts/NotoSans-BoldItalic.ttf

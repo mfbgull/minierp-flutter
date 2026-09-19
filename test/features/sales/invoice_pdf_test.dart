@@ -10,6 +10,8 @@ import 'package:minierp_app/features/sales/invoice_pdf.dart';
 
 void main() {
   setUpAll(() async {
+    // The PDF builders load Noto Sans from the asset bundle.
+    TestWidgetsFlutterBinding.ensureInitialized();
     // Formatters.date needs the intl date symbols for the en locale.
     await initializeDateFormatting('en');
   });

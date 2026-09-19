@@ -17,6 +17,7 @@ import 'dart:typed_data';
 import 'package:flutter/painting.dart' show Color;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import '../../core/utils/pdf_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart' as qr;
 import 'dart:ui' as ui;
 
@@ -39,7 +40,7 @@ Future<Uint8List> buildThermalInvoicePdf({
   final qrData = 'INV:${invoice.invoiceNo}|TOTAL:${_fmtCurrency(invoice.totalAmount)}|';
   final qrImage = await _generateQrImage(qrData);
 
-  final doc = pw.Document();
+  final doc = pw.Document(theme: await PdfFonts.theme());
 
   doc.addPage(
     pw.MultiPage(

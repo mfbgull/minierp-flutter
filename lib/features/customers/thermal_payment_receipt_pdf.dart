@@ -15,6 +15,7 @@ import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import '../../core/utils/pdf_fonts.dart';
 
 import '../../data/models/invoice.dart' show CompanyInfo;
 import '../../data/models/payment.dart' show Payment;
@@ -38,7 +39,7 @@ Future<Uint8List> buildThermalPaymentReceiptPdf(
   List<PaymentAllocation>? allocations,
 }) async {
   final usedCompany = company ?? defaultCompany;
-  final doc = pw.Document();
+  final doc = pw.Document(theme: await PdfFonts.theme());
 
   doc.addPage(
     pw.MultiPage(

@@ -22,6 +22,7 @@ import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import '../../core/utils/pdf_fonts.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../data/models/invoice.dart' show CompanyInfo;
@@ -40,7 +41,7 @@ Future<Uint8List> buildA4QuotationPdf({
   CompanyInfo? company,
 }) async {
   final usedCompany = company ?? defaultCompany;
-  final doc = pw.Document();
+  final doc = pw.Document(theme: await PdfFonts.theme());
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
