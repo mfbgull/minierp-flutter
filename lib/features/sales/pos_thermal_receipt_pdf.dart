@@ -12,6 +12,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/painting.dart' show Color;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import '../../core/utils/pdf_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart' as qr;
 
 import 'pos_models.dart';
@@ -27,7 +28,7 @@ Future<Uint8List> buildPosThermalReceiptPdf(PosSale sale) async {
       'CHANGE:${_fmtCurrency(sale.change)}';
   final qrImage = await _generateQrImage(qrData);
 
-  final doc = pw.Document();
+  final doc = pw.Document(theme: await PdfFonts.theme());
 
   doc.addPage(
     pw.MultiPage(

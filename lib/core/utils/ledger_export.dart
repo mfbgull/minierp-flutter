@@ -17,6 +17,7 @@ import 'dart:typed_data';
 import 'package:csv/csv.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'pdf_fonts.dart';
 
 import '../../data/models/ledger_entry.dart' show LedgerEntry;
 import '../../l10n/app_localizations.dart';
@@ -174,7 +175,7 @@ Future<Uint8List> buildLedgerPdf(
     ],
   ];
 
-  final doc = pw.Document();
+  final doc = pw.Document(theme: await PdfFonts.theme());
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4.landscape,

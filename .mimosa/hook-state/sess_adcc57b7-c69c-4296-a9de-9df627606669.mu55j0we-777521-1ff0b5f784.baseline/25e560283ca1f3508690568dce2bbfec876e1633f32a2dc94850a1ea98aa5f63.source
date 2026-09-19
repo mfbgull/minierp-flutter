@@ -1,0 +1,54 @@
+name: Nightly backup verification
+
+on:
+  schedule:
+    # 03:00 UTC daily — after typical business hours in all likely TZs.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup-verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+
+      # Build a fresh database from the migrations (the same path a
+      # production restore would take: empty file → schema + seed), then
+      # exercise the full backup → verify chain against it.
+      - name: Create seeded database
+        run: |
+          mkdir -p database
+          node -e "
+            const Database = require('better-sqlite3');
+            const db = new Database('database/erp.db');
+            db.close();
+          "
+          node -e "
+            process.env.DATABASE_PATH = process.cwd() + '/database';
+            require('ts-node').register({ transpileOnly: true, project: './tsconfig.json' });
+            require('./src/config/database').default;
+          "
+
+      - name: Backup
+        run: npm run db:backup
+
+      - name: Verify backup is restorable and consistent
+        run: |
+          LATEST=$(ls -1t database/backups/erp-backup-*.db | head -1)
+          echo "Verifying $LATEST"
+          node scripts/verify-backup.js "$LATEST"
+
+      - name: Restore smoke test (open copy, read core rows)
+        run: |
+          LATEST=$(ls -1t database/backups/erp-backup-*.db | head -1)
+          echo "Smoke-testing restored copy of $LATEST"
+          node scripts/restore-smoke.js "$LATEST"

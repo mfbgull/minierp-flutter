@@ -26,10 +26,6 @@ import '../../widgets/app_toast.dart';
 import '../../widgets/screen_error_panel.dart';
 import 'invoice_pdf.dart' show buildA4InvoicePdf;
 import 'invoice_return_dialog.dart' show showInvoiceReturnDialog;
-import '../../core/utils/formatters.dart' show Formatters;
-import 'return_receipt_pdf.dart' show buildReturnReceiptPdf;
-import '../../data/models/sales_return.dart'
-    show InvoicePosition, ReturnDocument;
 
 /// Print-preview page for one invoice.
 class InvoicePrintPreviewPage extends ConsumerStatefulWidget {
@@ -161,30 +157,6 @@ class _InvoicePrintPreviewPageState
     }
   }
 
-  /// Prints the standalone Return Receipt (spec §6.3 / D10) for one
-  /// return of the previewed invoice.
-  Future<void> _printReturnReceipt(ReturnDocument ret) async {
-    final l10n = AppLocalizations.of(context)!;
-    final detail = _detail;
-    if (detail == null) return;
-    setState(() => _printing = true);
-    try {
-      final bytes = await buildReturnReceiptPdf(
-        returnDoc: ret,
-        invoice: detail,
-        company: detail.company,
-      );
-      if (!mounted) return;
-      await printPdfBytes(bytes, '${ret.returnNo}.pdf', context);
-    } catch (error) {
-      if (mounted) {
-        showAppToast(context, '${l10n.errorsFailed}: $error', isError: true);
-      }
-    } finally {
-      if (mounted) setState(() => _printing = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -196,72 +168,12 @@ class _InvoicePrintPreviewPageState
     } else if (!ready) {
       body = const Center(child: CircularProgressIndicator());
     } else {
-      final expiryNotes = _detail?.expiryNotes?.trim();
-      body = Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (expiryNotes != null && expiryNotes.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _detail!.items
-                            ?.any((i) => i.isExpiredAtSale) ==
-                        true
-                    ? Colors.red.shade50
-                    : Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: _detail!.items
-                              ?.any((i) => i.isExpiredAtSale) ==
-                          true
-                      ? Colors.red.shade200
-                      : Colors.orange.shade200,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_detail!.overrideSale)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        children: [
-                          Icon(Icons.warning_amber_rounded,
-                              size: 16, color: Colors.amber.shade700),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Override Sale',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                              color: Colors.amber.shade800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  Text(expiryNotes),
-                ],
-              ),
-            ),
-          if (_detail?.position != null)
-            _PositionPanel(
-              position: _detail!.position!,
-              returns: _detail?.returns ?? const <ReturnDocument>[],
-              onPrintReceipt: _printReturnReceipt,
-              printing: _printing,
-            ),
-          Expanded(
-            child: PdfPreview(
-              build: _previewBuild,
-              pdfFileName: '${widget.invoice.invoiceNo}.pdf',
-              // The page owns its actions (Print in the app bar, Cancel
-              // via back); the built-in bar would duplicate them.
-              useActions: false,
-            ),
-          ),
-        ],
+      body = PdfPreview(
+        build: _previewBuild,
+        pdfFileName: '${widget.invoice.invoiceNo}.pdf',
+        // The page owns its actions (Print in the app bar, Cancel
+        // via back); the built-in bar would duplicate them.
+        useActions: false,
       );
     }
 
@@ -318,190 +230,6 @@ class _InvoicePrintPreviewPageState
         ],
       ),
       body: body,
-    );
-  }
-}
-
-/// Position block (spec §6.2) for the invoice preview: the seven
-/// position rows plus the per-return history (RET no, date, fee, and
-/// settlement detail). Shown above the PDF preview when the invoice has
-/// any return activity.
-class _PositionPanel extends StatelessWidget {
-  const _PositionPanel({
-    required this.position,
-    required this.returns,
-    this.onPrintReceipt,
-    this.printing = false,
-  });
-
-  final InvoicePosition position;
-  final List<ReturnDocument> returns;
-  final Future<void> Function(ReturnDocument)? onPrintReceipt;
-  final bool printing;
-
-  Widget _row(
-    AppLocalizations l10n,
-    String label,
-    num value, {
-    bool bold = false,
-  }) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 2),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label),
-        Text(
-          Formatters.currency(value),
-          style: TextStyle(fontWeight: bold ? FontWeight.w700 : FontWeight.w400),
-        ),
-      ],
-    ),
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                l10n.salesreturnsReturns,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              Text(l10n.salesreturnsReturnno),
-            ],
-          ),
-          const Divider(height: 10),
-          _row(l10n, l10n.salesreturnsPositionOriginalTotal, position.originalTotal),
-          _row(l10n, l10n.salesreturnsPositionTotalReturned, position.totalReturned),
-          _row(l10n, l10n.salesreturnsPositionCurrentValue, position.currentInvoiceValue),
-          _row(l10n, l10n.salesreturnsPositionOriginalPayments, position.totalPaid),
-          _row(l10n, l10n.salesreturnsFee, position.totalFees),
-          const Divider(height: 10),
-          _row(l10n, l10n.salesreturnsPositionBalanceDue, position.balanceDue, bold: true),
-          _row(l10n, l10n.salesreturnsPositionRefundDue, position.refundCreditDue),
-          if (position.totalSettled > 0.005)
-            _row(l10n, l10n.salesreturnsPositionRefunded, position.totalSettled),
-          if (position.remainingRefundDue > 0.005)
-            _row(l10n, l10n.salesreturnsPositionRemaining, position.remainingRefundDue),
-          for (final ret in returns) ...[
-            const Divider(height: 12),
-            _ReturnRow(
-              ret: ret,
-              onPrintReceipt: onPrintReceipt,
-              printing: printing,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// One entry in the per-return history (spec §6.2 returns tab).
-class _ReturnRow extends StatelessWidget {
-  const _ReturnRow({
-    required this.ret,
-    this.onPrintReceipt,
-    this.printing = false,
-  });
-
-  final ReturnDocument ret;
-  final Future<void> Function(ReturnDocument)? onPrintReceipt;
-  final bool printing;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final items = ret.items;
-    final settlements = ret.settlements;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Text(ret.returnNo,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  if (onPrintReceipt != null) ...[
-                    const SizedBox(width: 6),
-                    IconButton(
-                      tooltip: l10n.actionsPrint,
-                      iconSize: 16,
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: printing ? null : () => onPrintReceipt!(ret),
-                      icon: const Icon(Icons.print_outlined),
-                    ),
-                  ],
-                ],
-              ),
-              Text(ret.returnDate),
-            ],
-          ),
-          if (items.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                '${l10n.salesItems}: ${items.map((i) => '#${i.itemId}×${i.quantity}').join(', ')}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(l10n.salesreturnsFee),
-                Text(Formatters.currency(ret.feeAmount)),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(l10n.salesreturnsPositionNet),
-                Text(Formatters.currency(ret.netAmount)),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              '${l10n.commonStatus}: ${ret.status}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-          if (settlements.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                '${l10n.salesreturnsSettlement}: '
-                '${settlements.map((s) => '${s.type} ${Formatters.currency(s.amount)}'
-                    '${s.method != null ? ' (${s.method})' : ''}'
-                    '${s.reference != null && s.reference!.isNotEmpty ? ' ${s.reference}' : ''}').join('; ')}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-        ],
-      ),
     );
   }
 }
