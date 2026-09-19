@@ -62,16 +62,20 @@ export function customerArImbalances(): Violation[] {
     problems.push({ label: `customer ${r.id} (${r.customer_name}) balance vs ledger`, diff: r.diff });
   }
 
+  // paid_amount is the gross collected base — positive allocations plus
+  // any credit offset applied at sale. Refund allocations are negative
+  // out-flows that must not shrink it (invoice-return spec §3.2 /
+  // scenario 10), so the comparison excludes them here.
   const paidDrift = db.prepare(`
     SELECT i.id, i.invoice_no,
-           i.paid_amount - COALESCE(a.paid, 0) AS diff
+           i.paid_amount - (COALESCE(a.paid, 0) + COALESCE(i.credit_offset, 0)) AS diff
     FROM invoices i
     LEFT JOIN (
-      SELECT invoice_id, SUM(amount) AS paid
+      SELECT invoice_id, SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS paid
       FROM payment_allocations WHERE voided_at IS NULL
       GROUP BY invoice_id
     ) a ON a.invoice_id = i.id
-    WHERE ABS(i.paid_amount - COALESCE(a.paid, 0)) > 0.005
+    WHERE ABS(i.paid_amount - (COALESCE(a.paid, 0) + COALESCE(i.credit_offset, 0))) > 0.005
   `).all() as Array<{ id: number; invoice_no: string; diff: number }>;
   for (const r of paidDrift) {
     problems.push({ label: `invoice ${r.id} (${r.invoice_no}) paid_amount vs allocations`, diff: r.diff });

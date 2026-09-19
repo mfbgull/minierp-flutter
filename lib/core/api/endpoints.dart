@@ -60,6 +60,8 @@ abstract final class ApiEndpoints {
   static const quotations = '/quotations';
   static const salesOrders = '/sales-orders';
   static const pos = '/pos';
+  static const invoiceReturns = '/invoice-returns';
+  static const returnSettlements = '/return-settlements';
 
   // Purchasing
   static const purchases = '/purchases';

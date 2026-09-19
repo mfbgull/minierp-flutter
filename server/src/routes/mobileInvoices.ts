@@ -22,6 +22,11 @@ router.get('/customers/search', requirePermission('invoices', 'read'), mobileInv
 router.get('/tax-rates', requirePermission('invoices', 'read'), mobileInvoiceController.getTaxRates);
 router.get('/payment-terms', requirePermission('invoices', 'read'), mobileInvoiceController.getPaymentTerms);
 
+
+// Invoice return (spec §5.3 / D17) — same handler as the desktop
+// `POST /invoices/:id/return`; registered before any `/:id` route so the
+// param route cannot shadow it.
+router.post('/:id/return', requirePermission('invoices', 'update'), validateZodBody(zodBodySchemas.object), mobileInvoiceController.processReturn);
 // Final submission - creates actual invoice from draft or direct data
 router.post('/submit', requirePermission('invoices', 'create'), validateZodBody(zodBodySchemas.mobileSubmit), mobileInvoiceController.submitInvoice);
 

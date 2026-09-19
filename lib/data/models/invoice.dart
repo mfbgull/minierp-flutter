@@ -1,4 +1,7 @@
+import 'sales_return.dart';
 import 'json_helpers.dart';
+
+
 
 /// Invoice status values — the full union from the server Invoice model
 /// (`INVOICE_STATUSES` in types/client-types.ts, plus `Returned`).
@@ -330,6 +333,9 @@ class Invoice {
     this.company,
     this.payment,
     this.paymentMethods,
+    this.position,
+    this.returns = const [],
+    this.timeline = const [],
     this.expiryNotes,
     this.overrideSale = false,
     this.creditOffset = 0,
@@ -385,6 +391,11 @@ class Invoice {
         ? InvoicePayment.fromJson(json['payment'] as Map<String, dynamic>)
         : null,
     paymentMethods: _parseList(json['paymentMethods'], PaymentMethod.fromJson),
+    position: json['position'] is Map<String, dynamic>
+        ? InvoicePosition.fromJson(json['position'] as Map<String, dynamic>)
+        : null,
+    returns: _parseList(json['returns'], ReturnDocument.fromJson) ?? const [],
+    timeline: _parseList(json['timeline'], TimelineEvent.fromJson) ?? const [],
   );
 
   final int id;
@@ -430,6 +441,9 @@ class Invoice {
   final CompanyInfo? company;
   final InvoicePayment? payment;
   final List<PaymentMethod>? paymentMethods;
+  final InvoicePosition? position;
+  final List<ReturnDocument> returns;
+  final List<TimelineEvent> timeline;
 
   Map<String, dynamic> toJson() => {
     'id': id,

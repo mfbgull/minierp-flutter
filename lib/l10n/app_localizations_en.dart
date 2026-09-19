@@ -5127,6 +5127,67 @@ class AppLocalizationsEn extends AppLocalizations {
   String get salesreturnsSelectinvoice => 'Select an invoice';
 
   @override
+  String get salesreturnsFee => 'Restocking Fee';
+
+  @override
+  String get salesreturnsFeeFixed => 'Fixed';
+
+  @override
+  String get salesreturnsFeeNone => 'None';
+
+  @override
+  String get salesreturnsFeeNote =>
+      'The invoice is unpaid — the restocking fee increases the Balance Due.';
+
+  @override
+  String get salesreturnsFeePercentage => 'Percentage';
+
+  @override
+  String get salesreturnsFeeValue => 'Fee value';
+
+  @override
+  String get salesreturnsPositionBalanceDue => 'Balance Due';
+
+  @override
+  String get salesreturnsPositionNet => 'Net';
+
+  @override
+  String get salesreturnsPositionRefundDue => 'Refund/Credit Due';
+
+  @override
+  String get salesreturnsPositionReturned => 'Returned Value';
+
+  @override
+  String get salesreturnsRecordOnly => 'Record return only';
+
+  @override
+  String get salesreturnsRecordOnlyHint =>
+      'Leave unsettled — settle later from the invoice.';
+
+  @override
+  String get salesreturnsSettleAdd => 'Add allocation';
+
+  @override
+  String get salesreturnsSettleExceeds =>
+      'Allocations exceed the net return amount.';
+
+  @override
+  String get salesreturnsSettleMethod => 'Method';
+
+  @override
+  String get salesreturnsSettleNow => 'Settle now';
+
+  @override
+  String get salesreturnsSettleTarget => 'Target invoice';
+
+  @override
+  String get salesreturnsSettleTargetRequired =>
+      'Select the invoice to apply the adjustment to.';
+
+  @override
+  String get salesreturnsSettlement => 'Settlement';
+
+  @override
   String get settingsBackupDeleteFailed => 'Failed to delete backup';
 
   @override
@@ -5183,6 +5244,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsKeyCompanyTaxId => 'Company Tax ID';
+
+  @override
+  String get salesreturnsPositionCurrentValue => 'Current Invoice Value';
+
+  @override
+  String get salesreturnsPositionOriginalPayments => 'Original Payments';
+
+  @override
+  String get salesreturnsPositionOriginalTotal => 'Original Invoice Total';
+
+  @override
+  String get salesreturnsPositionRefunded => 'Refunded/Credited';
+
+  @override
+  String get salesreturnsPositionRemaining => 'Remaining Refund Due';
+
+  @override
+  String get salesreturnsPositionTotalReturned => 'Total Returned';
 
   @override
   String get settingsKeyCurrency => 'Currency';

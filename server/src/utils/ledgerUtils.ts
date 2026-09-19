@@ -147,8 +147,12 @@ function calculateInvoiceBalance(invoiceId: number): number {
     throw new Error(`Invoice ${invoiceId} not found`);
   }
 
+  // Total paid = positive payment allocations (voided excluded) plus any
+  // credit offset applied at sale time. Negative allocations are refund
+  // OUT-flows — counting them as "paid" would shrink the collected base
+  // (spec §3.2 / scenario 10: two refunds leave totalPaid unchanged).
   const paidResult = db.prepare(`
-    SELECT COALESCE(SUM(amount), 0) as total_paid
+    SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS total_paid
     FROM payment_allocations
     WHERE invoice_id = ? AND voided_at IS NULL
   `).get(invoiceId) as { total_paid: number };
@@ -158,13 +162,23 @@ function calculateInvoiceBalance(invoiceId: number): number {
   const totalAmount = parseCurrency(invoice.total_amount);
   const returnedAmount = parseCurrency(invoice.returned_amount || 0);
   const returnFee = parseCurrency(invoice.return_fee || 0);
-  // Balance = total owed minus cash payments minus credit offset minus (returned minus fee)
-  const netReturnReduction = subtractCurrency(returnedAmount, returnFee);
-  const totalDeductions = totalPaid + creditOffset;
-  const newBalance = subtractCurrency(subtractCurrency(totalAmount, totalDeductions), netReturnReduction);
+  const collections = addCurrency(totalPaid, creditOffset);
 
+  // Balance = what the customer still owes for the goods kept, plus the
+  // fees charged, minus everything collected: (total − returned) + fee −
+  // paid. Algebraically identical to the legacy formula; the difference
+  // is the floor at 0 (spec D2 — balance due is never negative) and the
+  // refund-excluding paid base above.
+  const owed = subtractCurrency(
+    addCurrency(subtractCurrency(totalAmount, returnedAmount), returnFee),
+    collections
+  );
+  const newBalance = owed > 0 ? owed : 0;
+
+  // paid_amount stores the gross collected base (the same figure the
+  // position reports as totalPaid), not the net of refunds.
   db.prepare('UPDATE invoices SET paid_amount = ?, balance_amount = ? WHERE id = ?')
-    .run(totalPaid + creditOffset, newBalance, invoiceId);
+    .run(collections, newBalance, invoiceId);
 
   return newBalance;
 }

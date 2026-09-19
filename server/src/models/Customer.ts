@@ -298,6 +298,9 @@ class CustomerModel {
         cl.debit, cl.credit, cl.balance, cl.description, cl.created_at,
         CASE
           WHEN cl.transaction_type = 'RETURN' THEN COALESCE(
+            -- 1. refund/credit payment whose notes mention this reference
+            --    (legacy rows carry the invoice_no; reworked rows carry the
+            --    RET- number and the refund note quotes it).
             (
               SELECT GROUP_CONCAT(i.invoice_no, ', ')
               FROM payments pr
@@ -307,6 +310,15 @@ class CustomerModel {
                 AND pr.amount <= 0
                 AND pra.voided_at IS NULL
                 AND pr.notes LIKE '%' || cl.reference_no || '%'
+            ),
+            -- 2. the return document itself (reworked RETURN rows are
+            --    keyed by return_no, one row per return).
+            (
+              SELECT i.invoice_no
+              FROM invoice_returns ir
+              JOIN invoices i ON i.id = ir.invoice_id
+              WHERE ir.return_no = cl.reference_no
+                AND ir.voided_at IS NULL
             ),
             cl.reference_no
           )
@@ -341,6 +353,13 @@ class CustomerModel {
                 AND pr.amount <= 0
                 AND pra.voided_at IS NULL
                 AND pr.notes LIKE '%' || cl.reference_no || '%'
+            ),
+            (
+              SELECT i.invoice_no
+              FROM invoice_returns ir
+              JOIN invoices i ON i.id = ir.invoice_id
+              WHERE ir.return_no = cl.reference_no
+                AND ir.voided_at IS NULL
             ),
             cl.reference_no
           )
