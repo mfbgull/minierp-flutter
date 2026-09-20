@@ -78,12 +78,18 @@ class SupplierLedgerModel {
    * (balance = previous balance + debit - credit, in id order) and sync
    * suppliers.current_balance to the final row. Fixes chains corrupted by
    * mid-chain deletions or the old MAX(balance) model.
+   *
+   * Order matters: `balance` is the position as the entry was appended,
+   * so the rebuild must follow insertion order (id). Sorting by
+   * transaction_date instead re-sorts backdated entries ahead of the
+   * payments that already settled them and rewrites every later row,
+   * so the stored column drifts off Σ(debit − credit).
    */
   static rebuildBalances(supplierId: number, db: Database.Database): number {
     const rows = db.prepare(`
       SELECT id, debit, credit FROM supplier_ledger
       WHERE supplier_id = ? AND voided = 0 AND reversed_by IS NULL
-      ORDER BY transaction_date ASC, id ASC
+      ORDER BY id ASC
     `).all(supplierId) as Array<{ id: number; debit: number; credit: number }>;
 
     let running = 0;

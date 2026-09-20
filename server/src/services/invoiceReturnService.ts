@@ -593,11 +593,13 @@ export class InvoiceReturnService {
   // ======================================================================
 
   static voidReturn(returnId: number, userId: number, reason?: string | null): void {
-    const txn = db.transaction(() => {
-      const ret = InvoiceReturnModel.getById(db, returnId);
-      if (!ret) throw new ReturnError(404, 'Return not found');
-      if (ret.voided_at) throw new ReturnError(400, 'Return is already voided');
+    const ret = InvoiceReturnModel.getById(db, returnId);
+    if (!ret) throw new ReturnError(404, 'Return not found');
+    if (ret.voided_at) throw new ReturnError(400, 'Return is already voided');
 
+    AccountingService.assertPeriodNotClosed(db, ret.return_date, `Sales return ${ret.return_no}`);
+
+    const txn = db.transaction(() => {
       const invoice = InvoiceModel.getById(ret.invoice_id, db);
       if (!invoice) throw new ReturnError(404, 'Invoice not found');
 
@@ -697,6 +699,8 @@ export class InvoiceReturnService {
       if (ret.voided_at) {
         throw new ReturnError(400, 'Cannot void a settlement of a voided return');
       }
+
+      AccountingService.assertPeriodNotClosed(db, ret.return_date, `Sales return ${ret.return_no}`);
 
       InvoiceReturnService.revertSettlement(
         db,

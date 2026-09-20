@@ -576,6 +576,8 @@ export class PaymentModel {
     const existing = this.getById(db, id);
     if (!existing) throw new Error('Payment not found');
 
+    AccountingService.assertPeriodNotClosed(db, existing.payment_date, `Payment ${existing.payment_no}`);
+
     // PAY-04 (financial-audit-p0-remediation 2.1): amount edits on an
     // allocated payment silently rescaled allocations past invoice balances
     // and desynced allocations/ledger/GL. Policy: void-and-reissue.
@@ -628,6 +630,8 @@ export class PaymentModel {
     const existing = this.getById(db, id);
     if (!existing) throw new Error('Payment not found');
     if (existing.voided_at) throw new Error('Payment is already voided');
+
+    AccountingService.assertPeriodNotClosed(db, existing.payment_date, `Payment ${existing.payment_no}`);
 
     db.transaction(() => {
       // GL consistency (ACC-09): the payment's journal lines (Dr Cash /

@@ -6,6 +6,9 @@
  *   - direct purchases        Dr 1200 Inventory Asset / Cr 2000 AP
  *     (the writer records direct purchases on credit; immediate payment
  *      goes through the supplier-payment path, which posts its own entry)
+ *   - purchase-order receipts Dr 1200 Inventory Asset / Cr 2000 AP
+ *     (pre-fix receipts created stock and a batch cost layer but posted
+ *      nothing, understating GL inventory and AP by the received value)
  *   - supplier payments       Dr 2000 AP / Cr cash-per-method
  *   - customer payments       Dr cash-per-method / Cr 1100 AR
  *     (negative rows = refunds paid out: Dr 1100 / Cr cash)
@@ -234,6 +237,40 @@ export function runBackfillGlPreposting(db: Database.Database): void {
         const today = (db.prepare(`SELECT date('now', 'localtime') as d`).get() as { d: string }).d;
         if (post(today, 'opening capital from opening_balances', 'BACKFILL_OPENING', 0, lines)) postedCount += 1;
       }
+    }
+
+    // ── 7. Goods receipts (PO) ───────────────────────────────────────
+    // Receipts created before receipt-time GL posting added stock and a
+    // batch cost layer but no Dr 1200 / Cr 2000, so GL inventory and AP
+    // both understated the real position. Voided receipts are skipped:
+    // their stock is already reversed, and any GOODS_RECEIPT group they
+    // carry is voided, not active.
+    //
+    // `goods_receipts.voided_at` arrives with the receipt-void migration;
+    // a legacy database running this backfill may predate it, so filter
+    // on it only when the column exists.
+    const grCols = db.prepare(`SELECT name FROM pragma_table_info('goods_receipts')`).all() as Array<{ name: string }>;
+    const hasVoidedAt = grCols.some((c) => c.name === 'voided_at');
+    const receipts = db.prepare(`
+      SELECT gr.id, gr.receipt_no, gr.po_id, gr.receipt_date, po.po_no
+      FROM goods_receipts gr
+      JOIN purchase_orders po ON po.id = gr.po_id
+      ${hasVoidedAt ? 'WHERE gr.voided_at IS NULL' : ''}
+    `).all() as Array<{ id: number; receipt_no: string; po_id: number; receipt_date: string; po_no: string }>;
+    for (const r of receipts) {
+      if (hasActiveLines.get('GOODS_RECEIPT', r.id)) continue;
+      const row = db.prepare(`
+        SELECT COALESCE(SUM(gri.received_quantity * poi.unit_price), 0) AS value
+        FROM goods_receipt_items gri
+        JOIN purchase_order_items poi ON poi.id = gri.po_item_id
+        WHERE gri.receipt_id = ?
+      `).get(r.id) as { value: number };
+      const amt = round2(Number(row.value));
+      if (amt <= 0) continue;
+      if (post(r.receipt_date, `Goods receipt ${r.receipt_no} (PO ${r.po_no})`, 'GOODS_RECEIPT', r.id, [
+        { code: '1200', debit: amt, label: `Inventory received via ${r.receipt_no} (backfill)` },
+        { code: '2000', credit: amt, label: `AP created for ${r.receipt_no} (backfill)` },
+      ])) postedCount += 1;
     }
 
     // ── Sanity: the whole table must still foot ───────────────────────

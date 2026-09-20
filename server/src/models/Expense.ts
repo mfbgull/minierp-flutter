@@ -152,6 +152,8 @@ function update(db: Database.Database, id: number, data: UpdateExpenseDTO, opts?
   const existing = getById(db, id) as Record<string, unknown> | undefined;
   if (!existing) throw new Error('Expense not found');
 
+  AccountingService.assertPeriodNotClosed(db, String(existing.expense_date), `Expense ${existing.expense_no}`);
+
   const glWorthy = (status: unknown): boolean => status !== 'Cancelled' && status !== 'Draft';
   const wasGlWorthy = glWorthy(existing.status);
 
@@ -230,8 +232,11 @@ function update(db: Database.Database, id: number, data: UpdateExpenseDTO, opts?
 }
 
 function deleteExpense(db: Database.Database, id: number): void {
-  const existing = getById(db, id);
+  const existing = getById(db, id) as Record<string, unknown> | undefined;
   if (!existing) throw new Error('Expense not found');
+
+  AccountingService.assertPeriodNotClosed(db, String(existing.expense_date), `Expense ${existing.expense_no}`);
+
   db.transaction(() => {
     // Defensive: remove any active EXPENSE GL lines before the row goes.
     AccountingService.voidJournalLinesByReference(db, 'EXPENSE', id);

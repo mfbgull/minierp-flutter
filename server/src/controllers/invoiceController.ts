@@ -390,10 +390,11 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       // time as new activity flows through.
       // MAJOR-5 fix: tax is now split out into a separate Tax Payable line
       // when items have tax_rate > 0.
-      const computedTaxAmount = items.reduce<number>((sum, item) => {
-        const lineAmount = item.quantity * item.unit_price;
-        return sum + lineAmount * ((item.tax_rate || 0) / 100);
-      }, 0);
+      // H3: the posted tax is READ from the stored invoice_items rows
+      // (the same columns the tax report and return math use) instead of
+      // being recomputed from gross qty × price, which ignored discounts
+      // and per-line rounding and diverged from the stored tax.
+      const computedTaxAmount = InvoiceModel.getInvoiceTaxTotal(db, invoiceId);
       AccountingService.postInvoiceEntry(db, {
         invoiceId,
         invoiceNo: resolvedInvoiceNo,
@@ -564,6 +565,8 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // Re-read invoice INSIDE transaction for fresh data
         const originalInvoice = InvoiceModel.getById(invoiceId, db);
         if (!originalInvoice) throw new Error('Invoice not found');
+
+        AccountingService.assertPeriodNotClosed(db, originalInvoice.invoice_date, `Invoice ${originalInvoice.invoice_no}`);
 
         // ACC-18 interim: server-authoritative totals on update too.
         const computedTotal = computeInvoiceGrandTotal(items, {
@@ -781,10 +784,10 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
             voidReason: `Invoice ${resolvedInvoiceNo} updated`,
         });
 
-        const updatedTaxAmount = items.reduce<number>((sum, item) => {
-            const lineAmount = item.quantity * item.unit_price;
-            return sum + lineAmount * ((item.tax_rate || 0) / 100);
-        }, 0);
+        // H3: posted tax must equal the STORED invoice tax — read it back
+        // from the invoice_items rows just re-inserted above instead of
+        // recomputing from gross (which ignored discounts + rounding).
+        const updatedTaxAmount = InvoiceModel.getInvoiceTaxTotal(db, invoiceId);
 
         AccountingService.postInvoiceEntry(db, {
             invoiceId,
@@ -851,6 +854,10 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
       res.status(400).json({ error: error.message });
       return;
     }
+    // Closed accounting period: cannot rewrite history.
+    if (errorMessage.includes('inside closed accounting period')) {
+      return res.status(409).json({ error: errorMessage });
+    }
 
     logger.error('Update invoice error:', { error: errorMessage, name: errorName, stack: error instanceof Error ? error.stack : undefined });
     res.status(500).json({ error: 'Failed to update invoice' });
@@ -886,6 +893,8 @@ function deleteInvoice(req: AuthRequest, res: Response): Response | void {
       });
     }
 
+    AccountingService.assertPeriodNotClosed(db, invoice.invoice_date, `Invoice ${invoice.invoice_no}`);
+
     const transaction = db.transaction(() => {
       // AUD-06 (task 5.2): soft-delete. The invoice row is never removed, so
       // journal lines and customer-ledger rows can never be orphaned.
@@ -898,8 +907,16 @@ function deleteInvoice(req: AuthRequest, res: Response): Response | void {
       InvoiceModel.reverseStockForItems(db, invoiceItems, freshInvoice.invoice_no, userId, 'INVOICE_DELETE');
 
       // Void ALL related journal lines (invoice + returns). Must affect rows.
-      const voided1 = AccountingService.voidJournalLinesByReference(db, 'INVOICE', invoiceId);
-      const voided2 = AccountingService.voidJournalLinesByReference(db, 'INVOICE_RETURN', invoiceId);
+      // Return GL groups are keyed to the return document, not the invoice,
+      // so void them by return id — see InvoiceModel.voidOwnReturnJournalLines.
+      const voided1 = AccountingService.voidJournalLinesByReference(db, 'INVOICE', invoiceId, {
+        voidedBy: userId,
+        voidReason: `Invoice ${freshInvoice.invoice_no} deleted`,
+      });
+      const voided2 = InvoiceModel.voidOwnReturnJournalLines(
+        db, invoiceId, userId,
+        `Invoice ${freshInvoice.invoice_no} deleted`,
+      );
       if ((voided1 ?? 0) + (voided2 ?? 0) === 0 && freshInvoice.total_amount > 0) {
         throw new Error(`Refusing to soft-delete invoice ${freshInvoice.invoice_no}: no journal lines were voided — GL state unexpected`);
       }
@@ -941,6 +958,11 @@ function deleteInvoice(req: AuthRequest, res: Response): Response | void {
       { oldValue: { invoice_no: invoice.invoice_no, status: invoice.status, total_amount: invoice.total_amount }, reason: 'Manual deletion via API', correlationId: newCorrelationId() });
     res.status(200).json({ message: 'Invoice deleted successfully' });
   } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    // Closed accounting period: cannot rewrite history.
+    if (errorMessage.includes('inside closed accounting period')) {
+      return res.status(409).json({ error: errorMessage });
+    }
     logger.error('Delete invoice error:', { error });
     res.status(500).json({ error: 'Failed to delete invoice' });
   }
@@ -1105,6 +1127,8 @@ function cancelInvoice(req: AuthRequest, res: Response): Response | void {
       return res.status(400).json({ error: 'Invoice is already cancelled' });
     }
 
+    AccountingService.assertPeriodNotClosed(db, invoice.invoice_date, `Invoice ${invoice.invoice_no}`);
+
     const transaction = db.transaction(() => {
       // Reversal-rules C1/C4: one shared primitive for every cancel
       // path (dedicated endpoint + SO.cancel). Guards: payments lock,
@@ -1137,6 +1161,11 @@ function cancelInvoice(req: AuthRequest, res: Response): Response | void {
     // states — 400 with the reason, not a 500 server fault.
     if (error instanceof InvoiceCancellationGuardError) {
       return res.status(400).json({ error: error.message });
+    }
+    const cancelError = error instanceof Error ? error.message : String(error);
+    // Closed accounting period: cannot rewrite history.
+    if (cancelError.includes('inside closed accounting period')) {
+      return res.status(409).json({ error: cancelError });
     }
     logger.error('Cancel invoice error:', { error });
     res.status(500).json({ error: 'Failed to cancel invoice' });

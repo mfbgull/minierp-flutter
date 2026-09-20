@@ -36,6 +36,10 @@ function voidReturn(req: AuthRequest, res: Response): Response | void {
     if (error instanceof ReturnError) {
       return res.status(error.status).json({ error: error.message });
     }
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('inside closed accounting period')) {
+      return res.status(409).json({ error: errorMessage });
+    }
     logger.error('Void return error:', { error });
     return res.status(500).json({ error: 'Failed to void the return' });
   }
@@ -50,6 +54,10 @@ function voidSettlement(req: AuthRequest, res: Response): Response | void {
   } catch (error: unknown) {
     if (error instanceof ReturnError) {
       return res.status(error.status).json({ error: error.message });
+    }
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('inside closed accounting period')) {
+      return res.status(409).json({ error: errorMessage });
     }
     logger.error('Void settlement error:', { error });
     return res.status(500).json({ error: 'Failed to void the settlement' });
