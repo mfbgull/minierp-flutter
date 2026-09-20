@@ -1,0 +1,61 @@
+version: 1
+workspace:
+    history_max_messages: 50
+    history_char_limit: 12000
+    attachment_max_mb: 100
+    cleanup_retention_days: 30
+harness:
+    name: codex
+    model: kilo/stepfun-step-3.7-flash:free
+    reasoning_effort: high
+    service_mode: ""
+    sandbox: danger-full-access
+    chat_agent_prefix: ""
+    developer_agent_prefix: ""
+    reviewer_agent_prefix: ""
+    heartbeat_agent_prefix: ""
+    reviews: skip-trivial
+channels:
+    tui:
+        title: Spynel
+        theme: spynel
+    telegram:
+        enabled: false
+        name: spynel
+        token_env: SPYNEL_TELEGRAM_TOKEN
+        mode: polling
+        webhook_listen: 127.0.0.1:8787
+        allowed_users: []
+        poll_timeout_seconds: 30
+        group_mode: mention
+        welcome_enabled: false
+        welcome_message: Welcome, {name}!
+        notify_messages: false
+        attachment_max_age_hours: 0
+    whatsapp:
+        enabled: false
+        mode: self-chat
+        database: .spynel/whatsapp.db
+        allowed_numbers: []
+        allow_groups: false
+        poll_interval_seconds: 3
+speech:
+    enabled: true
+    language: en
+    num_threads: 2
+    max_file_mb: 100
+    max_duration_seconds: 1800
+    chunk_seconds: 600
+startup:
+    enabled: false
+orchestrator:
+    enabled: true
+    interval_seconds: 10
+    retrigger_unresponded_messages: true
+    semantic_heartbeat_minutes: 15
+    task_notifications: decide
+    max_parallel: 4
+extensions:
+    enabled: true
+    directory: .spynel/extensions
+    hook_timeout: 30s
