@@ -1,0 +1,10 @@
+{
+  "instance_id": "f94be7e7bca92302377dc38dce52df1d",
+  "pid": 3097073,
+  "endpoint": "127.0.0.1:43957",
+  "environment_id": "efbafe1a5e9817f85a93c84cd8f799e57f622c4d76b8da526b2c6374e68362a3",
+  "token": "kIgZTl1BfX9Dxe4koEuxehFDtoGiRULN8TAsKaP4zts",
+  "started_at": "2026-09-19T14:43:13.657479955Z",
+  "heartbeat_at": "2026-09-19T16:37:27.657178874Z",
+  "handoff_at": "0001-01-01T00:00:00Z"
+}
