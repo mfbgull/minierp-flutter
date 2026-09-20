@@ -557,24 +557,29 @@ export class AccountingService {
   }
 
   /**
-   * Post a purchase order commitment. Dr Inventory Asset, Cr Accounts
-   * Payable. Posted at PO creation in this implementation; in
-   * stricter systems you'd post at goods receipt instead. Either
-   * approach is acceptable as long as the trial balance is consistent
-   * (PO postings here are paired with the supplier_ledger running
-   * balance that drives the BS AP line).
+   * Post GL for a purchase-order goods receipt: Dr 1200 Inventory
+   * Asset / Cr 2000 Accounts Payable, for the value of the goods that
+   * actually arrived (Σ received_quantity × unit_price).
+   *
+   * Posted at receipt time, not at PO submission, so the GL recognises
+   * inventory and the matching payable only for goods that physically
+   * arrived. Partial receipts post partial value; repeated receipts are
+   * additive rather than duplicative because each receipt is its own
+   * document (its own reference_id), and voiding a receipt voids exactly
+   * this group via voidJournalLinesByReference.
    */
-  static postPurchaseOrderEntry(
+  static postGoodsReceiptEntry(
     db: Database.Database,
     args: {
-      purchaseOrderId: number;
+      receiptId: number;
+      receiptNo: string;
       poNo: string;
-      totalAmount: number;
-      poDate: string;
+      amount: number;
+      receiptDate: string;
       userId?: number;
     }
   ): PostedEntry | null {
-    if (!args.totalAmount || args.totalAmount <= 0) return null;
+    if (!args.amount || args.amount <= 0) return null;
 
     const inventory = AccountingService.getAccountByCode(db, '1200');
     const ap = AccountingService.getAccountByCode(db, '2000');
@@ -583,14 +588,14 @@ export class AccountingService {
     }
 
     return AccountingService.postEntry(db, {
-      entry_date: args.poDate,
-      description: `Purchase order ${args.poNo} — total ${args.totalAmount.toFixed(2)}`,
-      reference_type: 'PURCHASE_ORDER',
-      reference_id: args.purchaseOrderId,
+      entry_date: args.receiptDate,
+      description: `Goods receipt ${args.receiptNo} (PO ${args.poNo}) — ${args.amount.toFixed(2)}`,
+      reference_type: 'GOODS_RECEIPT',
+      reference_id: args.receiptId,
       created_by: args.userId,
       lines: [
-        { account_id: inventory.id, debit: args.totalAmount, description: `Inventory received against ${args.poNo}` },
-        { account_id: ap.id, credit: args.totalAmount, description: `AP created for ${args.poNo}` },
+        { account_id: inventory.id, debit: args.amount, description: `Inventory received via ${args.receiptNo}` },
+        { account_id: ap.id, credit: args.amount, description: `AP created for ${args.receiptNo}` },
       ],
     });
   }
@@ -1192,7 +1197,7 @@ export class AccountingService {
 
   /**
    * Post GL reversal for a purchase return.
-   * Reverses what postPurchaseOrderEntry originally posted:
+   * Reverses the goods-receipt / purchase posting (Dr Inventory / Cr AP):
    *   Dr AP (2000) — reduce liability
    *   Cr Inventory Asset (1200) — remove returned stock value
    *
@@ -1313,6 +1318,50 @@ export class AccountingService {
       attribution?.voidReason ?? null,
       referenceType,
       referenceId
+    );
+    return result.changes;
+  }
+
+
+  /**
+   * Void the LEGACY invoice-keyed INVOICE_RETURN lines that genuinely
+   * belong to `invoiceId`.
+   *
+   * Canonical return GL groups are keyed to the RETURN document
+   * (reference_id = invoice_returns.id — see postInvoiceReturnEntry and
+   * postCOGSReversalEntry), and invoice_returns.id is an AUTOINCREMENT
+   * sequence independent of invoices.id. Only legacy/pre-rework
+   * postings key INVOICE_RETURN lines to an invoice id, so this pass is
+   * deliberately narrow: a line is reversed only when no return bearing
+   * that numeric id belongs to a DIFFERENT invoice. Without that
+   * exclusion, cancelling invoice N would reverse the AR / Sales
+   * Returns / Tax Payable / COGS of a return whose id happens to be N
+   * but which was raised against another invoice entirely.
+   */
+  static voidOwnInvoiceReturnLines(
+    db: Database.Database,
+    invoiceId: number,
+    attribution?: { voidedBy?: number; voidReason?: string }
+  ): number {
+    const result = db.prepare(`
+      UPDATE journal_lines
+      SET voided = 1,
+          voided_at = CURRENT_TIMESTAMP,
+          voided_by = ?,
+          void_reason = ?
+      WHERE reference_type = 'INVOICE_RETURN'
+        AND reference_id = ?
+        AND voided = 0
+        AND NOT EXISTS (
+          SELECT 1 FROM invoice_returns other_returns
+          WHERE other_returns.id = journal_lines.reference_id
+            AND other_returns.invoice_id <> ?
+        )
+    `).run(
+      attribution?.voidedBy ?? null,
+      attribution?.voidReason ?? null,
+      invoiceId,
+      invoiceId
     );
     return result.changes;
   }

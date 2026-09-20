@@ -798,12 +798,16 @@ class SalesOrderModel {
       `).all(invoiceNo) as Array<{ line_cogs: number }>;
       const cogsTotal = cogsRows.reduce((s, r) => s + Math.abs(Number(r.line_cogs)), 0);
 
+      // H3: posted tax must equal the stored invoice tax. SO lines store
+      // tax_amount = 0 (no breakdown carried), so this reads 0 today —
+      // reading the stored rows keeps the GL right if that ever changes.
       AccountingService.postInvoiceEntry(db, {
         invoiceId,
         invoiceNo,
         totalAmount: salesOrder.total_amount,
         invoiceDate,
         userId,
+        taxAmount: InvoiceModel.getInvoiceTaxTotal(db, invoiceId),
       });
 
       if (cogsTotal > 0) {

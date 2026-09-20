@@ -596,17 +596,35 @@ class PurchaseOrderModel {
       // credit inside this same transaction, then rebuild the chain.
       // Draft POs never posted a ledger entry, so only POs arriving at
       // Cancelled from Submitted/Partially Received need the reversal.
+      //
+      // The credit is only for the unreceived remainder: goods already
+      // received are real inventory backed by a real payable (posted to
+      // the GL at receipt time), so that portion of the liability must
+      // survive the cancellation. Reversing the full PO total would
+      // over-credit the supplier for goods we still hold.
       if (status === 'Cancelled' && (po.status === 'Submitted' || po.status === 'Partially Received')) {
-        SupplierLedgerModel.createEntry({
-          supplier_id: po.supplier_id,
-          transaction_date: po.po_date,
-          transaction_type: 'PURCHASE_ORDER_CANCEL',
-          reference_no: po.po_no,
-          debit: 0,
-          credit: po.total_amount,
-          description: `Purchase Order ${po.po_no} cancelled — reverses submission debit`,
-        }, db);
-        SupplierLedgerModel.rebuildBalances(po.supplier_id, db);
+        const receivedRow = db.prepare(`
+          SELECT COALESCE(SUM(received_quantity * unit_price), 0) AS received_value
+          FROM purchase_order_items WHERE po_id = ?
+        `).get(id) as { received_value: number };
+        const receivedValue = roundCurrency(Number(receivedRow.received_value));
+        const cancellationCredit = roundCurrency(po.total_amount - receivedValue);
+
+        if (cancellationCredit > 0) {
+          SupplierLedgerModel.createEntry({
+            supplier_id: po.supplier_id,
+            transaction_date: po.po_date,
+            transaction_type: 'PURCHASE_ORDER_CANCEL',
+            reference_no: po.po_no,
+            debit: 0,
+            credit: cancellationCredit,
+            description:
+              receivedValue > 0
+                ? `Purchase Order ${po.po_no} cancelled — reverses unreceived portion of submission debit`
+                : `Purchase Order ${po.po_no} cancelled — reverses submission debit`,
+          }, db);
+          SupplierLedgerModel.rebuildBalances(po.supplier_id, db);
+        }
       }
 
       db.prepare(`
@@ -670,11 +688,10 @@ class PurchaseOrderModel {
    *    for audit — batches are never deleted);
    *  - appends a PURCHASE_RETURN movement referencing the receipt no
    *    (append-only trail; originals untouched);
+   *  - voids the receipt's GL group (Dr Inventory / Cr AP posted at
+   *    receipt time) so the books match the stock reversal;
    *  - reduces received_quantity and recomputes PO status;
    *  - stamps voided_at / voided_by / void_reason (idempotency guard).
-   *
-   * GL note: receipts post no GL of their own — the PO's financial posting
-   * happens at commit/payment — so no GL reversal is needed here.
    */
   static voidGoodsReceipt(
     data: { receiptId: number; reason?: string },
@@ -793,6 +810,16 @@ class PurchaseOrderModel {
           WHERE id = ?
         `).run(item.item_id, item.item_id);
       }
+
+      // Void the receipt's own GL group (Dr Inventory / Cr AP posted at
+      // receipt time) so the books follow the stock reversal. Canonical
+      // void: lines stay in the ledger, voided = 1. A receipt predating
+      // receipt-time posting has no GOODS_RECEIPT group and this is a
+      // no-op.
+      AccountingService.voidJournalLinesByReference(db, 'GOODS_RECEIPT', data.receiptId, {
+        voidedBy: userId,
+        voidReason: data.reason,
+      });
 
       // Stamp the void (idempotency marker) and log activity.
       db.prepare(`
@@ -966,7 +993,7 @@ class PurchaseOrderModel {
 
         // Create stock movement using atomic movement number generation
         const movementNo = StockMovementModel.generateMovementNo(db);
-        db.prepare(`
+        const movementResult = db.prepare(`
           INSERT INTO stock_movements (
             movement_no, item_id, warehouse_id, movement_type,
             quantity, unit_cost, reference_doctype, reference_docno,
@@ -986,6 +1013,16 @@ class PurchaseOrderModel {
           userId,
           batchId
         );
+        const movementId = movementResult.lastInsertRowid as number;
+
+        // Stamp the financial columns so the movement is not mistaken for
+        // an unposted one by a later backfill (mirrors Purchase.ts).
+        const movementValue = roundCurrency(receiptItem.received_quantity * poItem.unit_price);
+        db.prepare(`
+          UPDATE stock_movements
+          SET financial_posted = 1, financial_value = ?
+          WHERE id = ?
+        `).run(movementValue, movementId);
 
         // Update stock balance
         const existingBalance = db.prepare(`
@@ -1008,6 +1045,25 @@ class PurchaseOrderModel {
 
         totalQuantity += receiptItem.received_quantity;
         totalAmount += receiptItem.received_quantity * poItem.unit_price;
+      }
+
+      // GL posting (PO receipt completeness): Dr 1200 Inventory Asset /
+      // Cr 2000 AP for the value that actually arrived, keyed to this
+      // receipt so a void removes exactly this group. Posted at receipt
+      // time (not PO submit) because only received goods are real
+      // inventory and a real payable — the rest of the PO is still an
+      // unfulfilled commitment. Partial receipts post partial value;
+      // repeated receipts are additive, each under its own receipt id.
+      const postedAmount = roundCurrency(totalAmount);
+      if (postedAmount > 0) {
+        AccountingService.postGoodsReceiptEntry(db, {
+          receiptId,
+          receiptNo,
+          poNo: po.po_no,
+          amount: postedAmount,
+          receiptDate: receipt_date,
+          userId,
+        });
       }
 
       // Update item current_stock

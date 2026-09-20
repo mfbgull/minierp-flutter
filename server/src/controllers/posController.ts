@@ -232,7 +232,10 @@ function createPOSSale(req: AuthRequest, res: Response): void {
         posCogsTotal += cogsRows.reduce((s, r) => s + Math.abs(Number(r.line_cogs)), 0);
       }
 
-      const computedPosTax = 0; // POS cart carries no tax_rate today (ACC-19 scope)
+      // H3: posted tax must equal the stored invoice tax. POS carts carry
+      // no tax_rate today (ACC-19 scope), so this reads 0 — but reading
+      // the stored rows keeps it correct the moment POS gains tax rates.
+      const computedPosTax = InvoiceModel.getInvoiceTaxTotal(db, invoiceId);
       AccountingService.postInvoiceEntry(db, {
         invoiceId,
         invoiceNo: transactionNo,

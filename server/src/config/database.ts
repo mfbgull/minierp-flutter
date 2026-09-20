@@ -9,6 +9,7 @@ import { backfillPurchaseReturns } from '../utils/purchaseReturnBackfill';
 import { runBackfillGlPreposting } from '../migrations/backfillGlPreposting';
 import { runBackfillGlUnification } from '../migrations/backfillGlUnification';
 import { runBackfillInvoiceItemTax } from '../migrations/backfillInvoiceItemTax';
+import { runBackfillInvoiceTaxGl } from '../migrations/backfillInvoiceTaxGl';
 import { runBackfillBatchLocations } from "../migrations/backfillBatchLocations";
 
 // Fail-closed: tests must never fall through to a shared dev DB by accident
@@ -1626,6 +1627,9 @@ runLedgered('fn.backfillGlUnification', () => runBackfillGlUnification(db));
 // one-time decomposition of stored amounts into net_amount + tax_amount.
 runLedgered('add-invoice-item-tax-columns.sql');
 runLedgered('fn.backfillInvoiceItemTax', () => runBackfillInvoiceItemTax(db));
+// H3 repair: with the stored tax authoritative, move the historical GL Tax
+// Payable split by the delta (AR/COGS/returns untouched; idempotent).
+runLedgered('fn.backfillInvoiceTaxGl', () => runBackfillInvoiceTaxGl(db));
 // INV-21 prerequisite: reconcile live batch/balance drift before CHECK constraints land
 runLedgered('fn.runStockCoverageReconciliation', runStockCoverageReconciliation);
 // INV-21: database-level invariants — applied only after live data reconciled

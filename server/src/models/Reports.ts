@@ -1269,7 +1269,7 @@ function getGLReconciliation(asOfDate: string, db: Database.Database) {
           SELECT MAX(sl2.id) FROM supplier_ledger sl2
           WHERE sl2.supplier_id = sl1.supplier_id AND sl2.voided = 0
         )
-    ) WHERE balance > 0
+    )
   `).get() as { total: number };
   const apOp = round(apOpRow.total);
   rows.push({

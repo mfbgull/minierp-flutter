@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
 import Purchase from '../models/Purchase';
+import AccountingService from '../services/accountingService';
 import db from '../config/database';
 import logger from '../utils/logger';
 
@@ -212,6 +213,14 @@ function voidPurchase(req: AuthRequest, res: Response): void {
       return;
     }
 
+    const purchase = Purchase.getById(id, db);
+    if (!purchase) {
+      res.status(404).json({ success: false, error: 'Purchase not found' });
+      return;
+    }
+
+    AccountingService.assertPeriodNotClosed(db, purchase.purchase_date, `Purchase ${purchase.purchase_no}`);
+
     Purchase.void(id, req.user!.id, reason, db);
 
     res.json({ success: true, message: 'Purchase voided successfully' });
@@ -219,8 +228,9 @@ function voidPurchase(req: AuthRequest, res: Response): void {
     const message = error?.message || 'Failed to void purchase';
     // Guard rejections are client errors — surface the reason.
     const isClientError = /Cannot void|already voided|not found|reason is required/i.test(message);
+    const isClosedPeriod = /inside closed accounting period/i.test(message);
     logger.error('Void purchase error:', error);
-    res.status(isClientError ? 400 : 500).json({ success: false, error: message });
+    res.status(isClosedPeriod ? 409 : isClientError ? 400 : 500).json({ success: false, error: message });
   }
 }
 

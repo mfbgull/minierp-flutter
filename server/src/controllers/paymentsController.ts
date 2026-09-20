@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { getQueryParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
+import AccountingService from '../services/accountingService';
 import db from '../config/database';
 import { getRouteParam } from '../utils/queryUtils';
 import { PAYMENT_SORT_COLUMNS } from '../utils/sqlSanitizer';
@@ -215,6 +216,8 @@ function updatePayment(req: AuthRequest, res: Response): void {
     const existing = PaymentModel.getById(db, id);
     if (!existing) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
 
+    AccountingService.assertPeriodNotClosed(db, existing.payment_date, `Payment ${existing.payment_no}`);
+
     PaymentModel.update(db, id, { payment_date, amount, payment_method, reference_no, notes });
 
     logCRUD(ActionType.PAYMENT_UPDATE, 'Payment', id, `Updated payment: ${existing.payment_no}`, req.user!.id, { payment_no: existing.payment_no, changes: Object.keys(req.body).filter(k => req.body[k] !== undefined) });
@@ -228,6 +231,8 @@ function updatePayment(req: AuthRequest, res: Response): void {
     if (message.includes('Cannot change the amount')) { res.status(400).json({ success: false, error: message }); return; }
     // CASH-02 (task 1.4): bad method on edit is a client error too.
     if (message.includes('Invalid payment_method')) { res.status(400).json({ success: false, error: message }); return; }
+    // Closed period guard: editing history is forbidden, not a server failure.
+    if (message.includes('inside closed accounting period')) { res.status(409).json({ success: false, error: message }); return; }
     logger.error('Error updating payment:', error);
     res.status(500).json({ success: false, error: 'Failed to update payment' });
   }
@@ -240,6 +245,8 @@ function deletePayment(req: AuthRequest, res: Response): void {
 
     const existing = PaymentModel.getById(db, id);
     if (!existing) { res.status(404).json({ success: false, error: 'Payment not found' }); return; }
+
+    AccountingService.assertPeriodNotClosed(db, existing.payment_date, `Payment ${existing.payment_no}`);
 
     // C6 (reversal-rules): void with attribution — payments are never
     // hard-deleted once they have moved money.
@@ -257,6 +264,8 @@ function deletePayment(req: AuthRequest, res: Response): void {
       res.status(400).json({ success: false, error: message });
       return;
     }
+    // Closed period guard: voiding history is forbidden, not a server failure.
+    if (message.includes('inside closed accounting period')) { res.status(409).json({ success: false, error: message }); return; }
     logger.error('Error deleting payment:', error);
     res.status(500).json({ success: false, error: 'Failed to delete payment' });
   }

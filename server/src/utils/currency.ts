@@ -77,6 +77,32 @@ export function decomposeLineAmount(args: {
 }
 
 /**
+ * Single source of truth for the tax on a set of invoice lines:
+ * Σ decomposeLineAmount(item).taxAmount — exactly the decomposition the
+ * storage path writes into invoice_items.net_amount / tax_amount.
+ *
+ * Every GL Tax Payable posting MUST go through this function (or the
+ * stored-row accessor InvoiceModel.getInvoiceTaxTotal, which reads those
+ * same columns back) so the posted tax can never diverge from the stored
+ * tax. Recomputing tax from gross qty × unit_price ignores discounts and
+ * per-line rounding — that divergence is H3.
+ */
+export function sumInvoiceLineTax(items: Array<{
+  quantity: number;
+  unit_price: number;
+  tax_rate?: number;
+  discount_type?: string;
+  discount_value?: number;
+  amount?: number;
+}>): number {
+  let tax = 0;
+  for (const item of items) {
+    tax = addCurrency(tax, decomposeLineAmount(item).taxAmount);
+  }
+  return tax;
+}
+
+/**
  * Header total = Σ of server-computed line amounts.
  */
 export function computeInvoiceTotal(items: Array<{

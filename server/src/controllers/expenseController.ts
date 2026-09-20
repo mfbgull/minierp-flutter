@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { getQueryParam, getRouteParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
+import AccountingService from '../services/accountingService';
 import db from '../config/database';
 import logger from '../utils/logger';
 import { sanitizeSortParams, EXPENSE_SORT_COLUMNS } from '../utils/sqlSanitizer';
@@ -165,6 +166,8 @@ function updateExpense(req: AuthRequest, res: Response): void {
     const existing = ExpenseModel.getById(db, id) as Record<string, unknown> | undefined;
     if (!existing) { res.status(404).json({ success: false, error: 'Expense not found' }); return; }
 
+    AccountingService.assertPeriodNotClosed(db, String(existing.expense_date), `Expense ${existing.expense_no}`);
+
     const currentStatus = String(existing.status);
 
     // Status transition validation.
@@ -238,6 +241,12 @@ function updateExpense(req: AuthRequest, res: Response): void {
 
     res.json({ success: true, message: 'Expense updated successfully', data: ExpenseModel.getById(db, id) });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    // Closed accounting period: cannot rewrite history.
+    if (errorMessage.includes('inside closed accounting period')) {
+      res.status(409).json({ success: false, error: errorMessage });
+      return;
+    }
     logger.error('Error updating expense:', error);
     res.status(500).json({ success: false, error: 'Failed to update expense' });
   }

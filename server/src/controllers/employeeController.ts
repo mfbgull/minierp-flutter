@@ -416,6 +416,8 @@ function deleteSalaryPayment(req: Request, res: Response): void {
       return;
     }
 
+    AccountingService.assertPeriodNotClosed(db, payment.payment_date, `Salary payment #${salaryPaymentId}`);
+
     // C6 (reversal-rules): one transaction wraps GL void, soft-void and
     // activity log so a failure at any step rolls back everything. GL
     // lines are voided by reference — unconditionally. Older payment rows
@@ -452,8 +454,13 @@ function deleteSalaryPayment(req: Request, res: Response): void {
     trx();
     res.status(204).send();
   } catch (error: any) {
+    const message = error?.message || 'Failed to delete salary payment';
+    if (message.includes('inside closed accounting period')) {
+      res.status(409).json({ success: false, error: message });
+      return;
+    }
     logger.error('Error deleting salary payment:', error);
-    res.status(500).json({ success: false, error: error.message || 'Failed to delete salary payment' });
+    res.status(500).json({ success: false, error: message });
   }
 }
 
@@ -908,6 +915,8 @@ function voidLoanRepayment(req: Request, res: Response): void {
       return;
     }
 
+    AccountingService.assertPeriodNotClosed(db, repayment.payment_date, `Loan repayment ${parsedRepaymentId}`);
+
     const trx = db.transaction(() => {
       // C5 (reversal-rules): void by reference unconditionally for direct
       // repayments — legacy rows can carry a NULL journal link while their
@@ -939,8 +948,13 @@ function voidLoanRepayment(req: Request, res: Response): void {
 
     trx();
   } catch (error: any) {
+    const message = error?.message || 'Failed to void repayment';
+    if (message.includes('inside closed accounting period')) {
+      res.status(409).json({ success: false, error: message });
+      return;
+    }
     logger.error('Void loan repayment error:', error);
-    res.status(500).json({ success: false, error: 'Failed to void repayment' });
+    res.status(500).json({ success: false, error: message });
   }
 }
 

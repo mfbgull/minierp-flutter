@@ -6,6 +6,7 @@ import Database from 'better-sqlite3';
 import logger from '../utils/logger';
 import StockMovementModel from './StockMovement';
 import AccountingService from '../services/accountingService';
+import InvoiceReturnModel from './InvoiceReturn';
 import { isFeatureEnabled } from '../utils/featureFlags';
 
 /**
@@ -607,13 +608,23 @@ class InvoiceModel {
       const alreadyReturnedQty = Math.abs(alreadyReturned.total_returned);
       const remainingToReturn = Math.max(0, totalToReturn - alreadyReturnedQty);
 
-      if (remainingToReturn <= 0) {
+      // For the return path, each call carries this return's quantity only,
+      // so the effective remaining is the full totalToReturn. For cancel/delete
+      // it is the original line qty minus any prior returns.
+      const effectiveRemaining = referenceDoctype === 'RETURN' ? totalToReturn : remainingToReturn;
+      if (effectiveRemaining <= 0) {
         logger.warn(`[BatchReversal] Item ${item.item_id} already fully returned on invoice ${invoiceNo}`);
         continue;
       }
 
-      // Ratio based on remaining-to-return vs total sold
-      const ratio = Math.abs(totalSold) < 0.001 ? 1 : Math.min(remainingToReturn / totalSold, 1);
+      // Ratio based on this return's quantity vs total sold.
+      // For the return path, item.quantity is this return's quantity only,
+      // so we use totalToReturn directly — already-returned quantity is
+      // tracked per-call by the caller and must not be subtracted here,
+      // otherwise subsequent partial returns under-restock physical stock
+      // while the GL already posted the full return value.
+      const effectiveQty = referenceDoctype === 'RETURN' ? totalToReturn : remainingToReturn;
+      const ratio = Math.abs(totalSold) < 0.001 ? 1 : Math.min(effectiveQty / totalSold, 1);
 
       // Restore quantity on each consumed batch (new path: batch_stock_by_location)
       for (const movement of saleMovements) {
@@ -666,13 +677,17 @@ class InvoiceModel {
       }
       const avgUnitCost = totalQty > 0 ? totalActualCost / totalQty : item.unit_price;
 
-      // Add stock back (positive quantity to reverse the sale) — only the remaining qty
+      // Add stock back (positive quantity to reverse the sale).
+      // For returns, the caller supplies this return's quantity only,
+      // so the full totalToReturn is recorded. For cancel/delete the
+      // quantity is the original line qty and remainingToReturn == totalToReturn.
+      const movementQty = referenceDoctype === 'RETURN' ? totalToReturn : remainingToReturn;
       const recordedMovement = StockMovementModel.recordMovement(
         {
           item_id: item.item_id,
           warehouse_id: warehouseId,
           movement_type: 'ADJUSTMENT',
-          quantity: remainingToReturn, // Only the remaining qty to return
+          quantity: movementQty,
           unit_cost: avgUnitCost,
           reference_doctype: referenceDoctype,
           reference_docno: invoiceNo,
@@ -685,7 +700,7 @@ class InvoiceModel {
       posted.push({
         item_id: item.item_id,
         movement_id: recordedMovement.id,
-        quantity: remainingToReturn,
+        quantity: movementQty,
         warehouse_id: warehouseId,
         unit_cost: avgUnitCost,
       });
@@ -778,6 +793,22 @@ class InvoiceModel {
       netAmount,
       taxAmount
     );
+  }
+
+  /**
+   * Σ stored invoice_items.tax_amount — the authoritative invoice tax.
+   *
+   * This is the single source of truth for GL Tax Payable postings: the
+   * tax report and the return math both read these same stored columns,
+   * so the GL must too (H3: tax posting matches stored invoice tax).
+   * Returns 0 when the invoice has no rated lines (or no rows at all).
+   */
+  static getInvoiceTaxTotal(db: Database.Database, invoiceId: number): number {
+    const row = db.prepare(`
+      SELECT COALESCE(SUM(tax_amount), 0) AS tax
+      FROM invoice_items WHERE invoice_id = ?
+    `).get(invoiceId) as { tax: number };
+    return parseCurrency(row.tax);
   }
 
   /**
@@ -931,6 +962,45 @@ class InvoiceModel {
   }
 
   /**
+   * Void this invoice's OWN sales-return GL groups (reversal-rules
+   * rules 2 + 3). One primitive for every invoice reversal path
+   * (cancel + soft-delete) so the two can never diverge.
+   *
+   * Return postings are keyed to the RETURN DOCUMENT —
+   * journal_lines.reference_id = invoice_returns.id (see
+   * postInvoiceReturnEntry / postCOGSReversalEntry) — and
+   * invoice_returns.id is an AUTOINCREMENT sequence that is independent
+   * of invoices.id. Voiding INVOICE_RETURN by the bare invoice id
+   * therefore reverses the AR / Sales Returns / Tax Payable / COGS of a
+   * return whose numeric id merely coincides with this invoice id but
+   * which belongs to a DIFFERENT invoice. Two passes, both scoped:
+   *   1. this invoice's returns, by their real return id;
+   *   2. legacy invoice-keyed rows, excluding any group a different
+   *      invoice's return has already claimed.
+   *
+   * Returns the number of lines voided (0 is legitimate). Safe to call
+   * when the invoice has no returns.
+   */
+  static voidOwnReturnJournalLines(
+    db: Database.Database,
+    invoiceId: number,
+    userId: number,
+    voidReason: string,
+  ): number {
+    let voided = 0;
+    for (const ret of InvoiceReturnModel.getByInvoiceId(db, invoiceId)) {
+      voided += AccountingService.voidJournalLinesByReference(
+        db, 'INVOICE_RETURN', ret.id,
+        { voidedBy: userId, voidReason },
+      );
+    }
+    return voided + AccountingService.voidOwnInvoiceReturnLines(
+      db, invoiceId,
+      { voidedBy: userId, voidReason },
+    );
+  }
+
+  /**
    * Shared invoice-cancellation primitive (reversal-rules rule 2).
    *
    * Called by BOTH cancelInvoice (POST /api/invoices/:id/cancel) and
@@ -978,17 +1048,15 @@ class InvoiceModel {
     }
 
     // ---- 2. GL void (canonical journal_lines) ----
-    // INVOICE lines carry AR / Sales Revenue / Tax Payable / COGS.
-    // INVOICE_RETURN lines carry return contra-entries; they are also
-    // dead once the invoice is cancelled, so void them too.
+    const voidReason = `Invoice ${invoice.invoice_no} cancelled`;
     const voidedInvoice = AccountingService.voidJournalLinesByReference(
       db, 'INVOICE', invoice.id,
-      { voidedBy: userId, voidReason: `Invoice ${invoice.invoice_no} cancelled` }
+      { voidedBy: userId, voidReason }
     );
-    const voidedReturn = AccountingService.voidJournalLinesByReference(
-      db, 'INVOICE_RETURN', invoice.id,
-      { voidedBy: userId, voidReason: `Invoice ${invoice.invoice_no} cancelled` }
-    );
+    // Return GL groups are keyed to the RETURN document, not the
+    // invoice, so they must be voided by return id — see
+    // InvoiceModel.voidOwnReturnJournalLines.
+    const voidedReturn = InvoiceModel.voidOwnReturnJournalLines(db, invoice.id, userId, voidReason);
     if ((voidedInvoice ?? 0) + (voidedReturn ?? 0) === 0 && parseCurrency(invoice.total_amount) > 0) {
       throw new Error(
         `Refusing to cancel invoice ${invoice.invoice_no}: no journal lines were voided — GL state unexpected`

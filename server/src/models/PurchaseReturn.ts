@@ -610,6 +610,8 @@ class PurchaseReturnModel {
     if (!header) throw new Error('Purchase return not found');
     if (header.status !== 'POSTED') throw new Error('Only POSTED returns can be voided');
 
+    AccountingService.assertPeriodNotClosed(db, header.return_date, `Purchase return ${header.return_no}`);
+
     const transaction = db.transaction(() => {
       const lines = header.items || [];
 

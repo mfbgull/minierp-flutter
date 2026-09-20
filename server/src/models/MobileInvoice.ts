@@ -3,6 +3,7 @@ import StockMovementModel from './StockMovement';
 import { initializeSequenceFromMax, getNextSequenceNumber, generateDocNo } from '../utils/sequence';
 import ledgerUtils from '../utils/ledgerUtils';
 import AccountingService from '../services/accountingService';
+import InvoiceModel from './Invoice';
 import { parseCurrency, computeInvoiceTotal, decomposeLineAmount } from '../utils/currency';
 import { isValidPaymentMethod } from '../services/cashService';
 
@@ -206,10 +207,9 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
     // round(qty × price − discount) with tax at the line boundary; the
     // header total is the sum of those lines.
     const totalAmount = computeInvoiceTotal(data.items);
-    const totalTax = data.items.reduce((sum, item) => {
-      const gross = (item.quantity || 0) * (item.unit_price || 0);
-      return sum + gross * ((item.tax_rate || 0) / 100);
-    }, 0);
+    // H3: the GL tax is read from the stored invoice_items rows below
+    // (InvoiceModel.getInvoiceTaxTotal) so it can never diverge from the
+    // stored tax. Recomputing from gross ignored discounts + rounding.
 
     const invoiceResult = db.prepare(`
       INSERT INTO invoices (
@@ -317,7 +317,10 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
       totalAmount,
       invoiceDate: data.invoice_date,
       userId: data.userId,
-      taxAmount: totalTax,
+      // H3: posted tax = Σ stored invoice_items.tax_amount (the same
+      // columns the tax report / return math read), not a gross-based
+      // recomputation.
+      taxAmount: InvoiceModel.getInvoiceTaxTotal(db, invoiceId),
     });
 
     const cogsRows = db.prepare(`
