@@ -591,12 +591,40 @@ export class PaymentModel {
 
   /**
    * Update payment
+   *
+   * H8 (payment-edit-gl-integrity): an operational edit must never leave
+   * the books behind. `reference_no` / `notes` are pure metadata, but
+   * `payment_date` and `payment_method` move accounting, so they follow
+   * the same void-and-reissue model as payment deletion:
+   *
+   *   amount         — never editable; void and re-record (PAY-04).
+   *   payment_date   — the journal entry date AND the subledger row date
+   *                    move with the payment: the old journal lines are
+   *                    voided and a fresh entry posts at the new date, and
+   *                    the ledger row is reversed and reissued at it.
+   *   payment_method — selects a different cash/bank GL account, so the
+   *                    journal is voided and reposted against the new
+   *                    account — for supplier payments too (the old path
+   *                    only reposted customer payments, leaving a supplier
+   *                    method change crediting the old cash account).
+   *
+   * Accounting is re-posted only where it already existed (the void count
+   * tells us), so an edit never invents a money movement. The OLD period
+   * and, when the date moves, the NEW one must both be open.
+   *
+   * Refund payments (negative amount, posted by postRefundEntry) are
+   * reposted through the SAME refund primitive — postPaymentEntry ignores
+   * amounts ≤ 0, so a refund edit routed through it would void the GL and
+   * silently lose the cash exit.
    */
-  static update(db: Database.Database, id: number, data: { payment_date?: string; amount?: number; payment_method?: string; reference_no?: string; notes?: string }): void {
+  static update(
+    db: Database.Database,
+    id: number,
+    data: { payment_date?: string; amount?: number; payment_method?: string; reference_no?: string; notes?: string },
+    attribution?: { userId?: number | null },
+  ): void {
     const existing = this.getById(db, id);
     if (!existing) throw new Error('Payment not found');
-
-    AccountingService.assertPeriodNotClosed(db, existing.payment_date, `Payment ${existing.payment_no}`);
 
     // PAY-04 (financial-audit-p0-remediation 2.1): amount edits on an
     // allocated payment silently rescaled allocations past invoice balances
@@ -614,8 +642,31 @@ export class PaymentModel {
       throw new Error(`Invalid payment_method "${data.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
     }
 
+    const dateChanged = !!data.payment_date && data.payment_date !== existing.payment_date;
     const methodChanged = data.payment_method !== undefined &&
       data.payment_method.toLowerCase() !== String(existing.payment_method).toLowerCase();
+
+    // The payment already posted in its CURRENT period and, when the date
+    // moves, will post in the TARGET period — both must be open before any
+    // accounting is rewritten (H6 closed-period immutability).
+    AccountingService.assertPeriodNotClosed(db, existing.payment_date, `Payment ${existing.payment_no}`);
+    if (dateChanged) {
+      AccountingService.assertPeriodNotClosed(db, data.payment_date as string, `Payment ${existing.payment_no}`);
+    }
+
+    // Pure metadata: nothing accounting-affecting changed, so a plain
+    // in-place UPDATE is enough — no GL / ledger work needed.
+    if (!dateChanged && !methodChanged) {
+      db.transaction(() => {
+        db.prepare(`
+          UPDATE payments SET
+            payment_date = COALESCE(?, payment_date),
+            payment_method = COALESCE(?, payment_method), reference_no = COALESCE(?, reference_no),
+            notes = COALESCE(?, notes) WHERE id = ?
+        `).run(data.payment_date, data.payment_method, data.reference_no, data.notes, id);
+      })();
+      return;
+    }
 
     db.transaction(() => {
       db.prepare(`
@@ -625,19 +676,105 @@ export class PaymentModel {
           notes = COALESCE(?, notes) WHERE id = ?
       `).run(data.payment_date, data.payment_method, data.reference_no, data.notes, id);
 
-      // Method change moves money between accounts → GL void + repost only.
-      if (methodChanged && existing.customer_id) {
-        AccountingService.voidJournalLinesByReference(db, 'PAYMENT', id);
-        const finalPayment = this.getById(db, id);
-        if (finalPayment) {
+      const finalPayment = this.getById(db, id);
+      if (!finalPayment) throw new Error('Payment not found');
+
+      // H8: void-and-reissue the GL so the journal carries the payment's
+      // FINAL date and cash/bank account. voidJournalLinesByReference
+      // returns how many lines it retired — repost only when the payment
+      // actually had a posting, so an edit never invents a movement.
+      const changes = [dateChanged && 'date', methodChanged && 'method'].filter(Boolean).join(' + ');
+      const voidedLines = AccountingService.voidJournalLinesByReference(db, 'PAYMENT', id, {
+        voidedBy: attribution?.userId ?? undefined,
+        voidReason: `Payment ${existing.payment_no} edited (${changes})`,
+      });
+      const finalAmount = parseCurrency(finalPayment.amount);
+      const isRefund = finalAmount < 0;
+      if (voidedLines > 0) {
+        if (isRefund && finalPayment.customer_id) {
+          AccountingService.postRefundEntry(db, {
+            refundPaymentId: id,
+            refundPaymentNo: finalPayment.payment_no,
+            amount: Math.abs(finalAmount),
+            refundDate: finalPayment.payment_date,
+            paymentMethod: finalPayment.payment_method,
+            customerId: finalPayment.customer_id,
+            userId: attribution?.userId ?? undefined,
+          });
+        } else if (finalPayment.customer_id) {
           AccountingService.postPaymentEntry(db, {
             paymentId: id,
             paymentNo: finalPayment.payment_no,
-            amount: parseCurrency(finalPayment.amount),
+            amount: finalAmount,
             paymentDate: finalPayment.payment_date,
             paymentMethod: finalPayment.payment_method,
-            customerId: existing.customer_id,
+            customerId: finalPayment.customer_id,
+            userId: attribution?.userId ?? undefined,
           });
+        } else if (finalPayment.supplier_id) {
+          AccountingService.postSupplierPaymentEntry(db, {
+            paymentId: id,
+            paymentNo: finalPayment.payment_no,
+            amount: finalAmount,
+            paymentDate: finalPayment.payment_date,
+            paymentMethod: finalPayment.payment_method,
+            userId: attribution?.userId ?? undefined,
+          });
+        }
+      }
+
+      // H8: a date edit must also move the subledger row — otherwise the
+      // ledger keeps posting on the old date while the payment row carries
+      // the new one. Reverse the active PAYMENT row append-only and reissue
+      // one fresh row at the new date (ACC-14 / ACC-20 reversal rules —
+      // the same primitives payment deletion uses).
+      // NB: ledgerUtils writes through the config/database singleton, so
+      // these nest as savepoints only when `db` IS that singleton (as all
+      // controllers pass it).
+      if (dateChanged) {
+        const newDate = data.payment_date as string;
+        if (finalPayment.customer_id) {
+          // Refund payments sit in the ledger as REFUND debits (applyRefund);
+          // ordinary customer payments as PAYMENT credits.
+          const ledgerType = isRefund ? 'REFUND' : 'PAYMENT';
+          const custRows = db.prepare(
+            `SELECT id, description FROM customer_ledger
+             WHERE reference_no = ? AND voided = 0 AND transaction_type = ? AND customer_id = ?`
+          ).all(finalPayment.payment_no, ledgerType, finalPayment.customer_id) as Array<{ id: number; description: string | null }>;
+          if (custRows.length > 0) {
+            for (const row of custRows) {
+              ledgerUtils.reverseLedgerEntry('customer_ledger', row.id, `payment ${finalPayment.payment_no} date edited to ${newDate}`);
+            }
+            ledgerUtils.createLedgerEntry(
+              finalPayment.customer_id,
+              newDate,
+              ledgerType,
+              finalPayment.payment_no,
+              isRefund ? Math.abs(finalAmount) : 0,
+              isRefund ? 0 : finalAmount,
+              custRows[0].description || `Payment ${finalPayment.payment_no}`,
+            );
+            ledgerUtils.recalcCustomerBalanceFromLedger(finalPayment.customer_id);
+          }
+        } else if (finalPayment.supplier_id) {
+          const supRows = db.prepare(
+            `SELECT id, description FROM supplier_ledger
+             WHERE reference_no = ? AND voided = 0 AND transaction_type = 'PAYMENT' AND supplier_id = ?`
+          ).all(finalPayment.payment_no, finalPayment.supplier_id) as Array<{ id: number; description: string | null }>;
+          if (supRows.length > 0) {
+            for (const row of supRows) {
+              ledgerUtils.reverseLedgerEntry('supplier_ledger', row.id, `payment ${finalPayment.payment_no} date edited to ${newDate}`);
+            }
+            SupplierLedgerModel.createEntry({
+              supplier_id: finalPayment.supplier_id,
+              transaction_date: newDate,
+              transaction_type: 'PAYMENT',
+              reference_no: finalPayment.payment_no,
+              credit: parseCurrency(finalPayment.amount),
+              description: supRows[0].description || `Payment ${finalPayment.payment_no}`,
+            }, db);
+            SupplierLedgerModel.rebuildBalances(finalPayment.supplier_id, db);
+          }
         }
       }
     })();

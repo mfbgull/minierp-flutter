@@ -218,7 +218,7 @@ function updatePayment(req: AuthRequest, res: Response): void {
 
     AccountingService.assertPeriodNotClosed(db, existing.payment_date, `Payment ${existing.payment_no}`);
 
-    PaymentModel.update(db, id, { payment_date, amount, payment_method, reference_no, notes });
+    PaymentModel.update(db, id, { payment_date, amount, payment_method, reference_no, notes }, { userId: req.user?.id ?? null });
 
     logCRUD(ActionType.PAYMENT_UPDATE, 'Payment', id, `Updated payment: ${existing.payment_no}`, req.user!.id, { payment_no: existing.payment_no, changes: Object.keys(req.body).filter(k => req.body[k] !== undefined) });
     req.activityLogged = true;
