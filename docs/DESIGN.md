@@ -474,7 +474,10 @@ running total:
 
 Direct purchases that carry a `supplier_id` post an AP supplier-ledger
 entry on record (mirroring PO submit), so supplier balances stay correct
-across the purchase → payment lifecycle.
+across the purchase → payment lifecycle. A purchase *without* a supplier
+is an immediate (counter / walk-in) purchase — it credits `1000 Cash`
+directly and never touches `2000 Accounts Payable`, because an AP
+liability with no supplier is an orphan no payment can ever settle.
 
 ## Implementation Notes
 

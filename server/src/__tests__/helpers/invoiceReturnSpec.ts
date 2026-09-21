@@ -65,9 +65,29 @@ export async function createItem(name: string, authCookie: string): Promise<numb
   return res.body.id;
 }
 
+/**
+ * Seed sellable stock. Stock is bought on CREDIT from a fixture supplier
+ * (Cr 2000 AP), never with cash — these suites exercise cash refunds, so a
+ * cash purchase would drain the Cash account and trip the (correct) cash
+ * funds guard on every refund. A supplier-linked purchase is the ordinary
+ * way a shop acquires resale stock (see H12: no supplier → immediate
+ * purchase on Cash).
+ */
+let stockSupplierId: number | undefined;
+
 export async function purchaseStock(
   itemId: number, warehouseId: number, quantity: number, unitCost: number, authCookie: string,
 ): Promise<void> {
+  if (stockSupplierId === undefined) {
+    const existing = db.prepare(
+      `SELECT id FROM suppliers WHERE supplier_code = 'RET-FIX-SUPPLIER' LIMIT 1`
+    ).get() as { id: number } | undefined;
+    stockSupplierId = existing?.id ?? (
+      await request(app).post('/api/suppliers')
+        .set('Cookie', authCookie)
+        .send({ supplier_code: 'RET-FIX-SUPPLIER', supplier_name: 'Return Spec Supplier' })
+    ).body?.data?.id;
+  }
   const res = await request(app).post('/api/purchases')
     .set('Cookie', authCookie)
     .send({
@@ -76,7 +96,7 @@ export async function purchaseStock(
       quantity,
       unit_cost: unitCost,
       purchase_date: '2026-09-01',
-      supplier_name: 'Return Spec Supplier',
+      supplier_id: stockSupplierId,
     });
   if (res.status !== 201 && res.status !== 200) {
     throw new Error(`purchaseStock failed: ${res.status} ${JSON.stringify(res.body)}`);

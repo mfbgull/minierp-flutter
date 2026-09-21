@@ -2525,7 +2525,7 @@ abstract class AppLocalizations {
   /// No description provided for @purchasesSupplierrequiredforpayment.
   ///
   /// In en, this message translates to:
-  /// **'Select a supplier to record a payment'**
+  /// **'Recorded as an immediate cash purchase — select a supplier to record a payment instead'**
   String get purchasesSupplierrequiredforpayment;
 
   /// No description provided for @purchaseordersSubtitle.

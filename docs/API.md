@@ -430,6 +430,13 @@ supplier-ledger entry (debit) so the purchase can be paid via
 `POST /payments` with `purchase_allocations`. `invoice_no` / `remarks`
 are also accepted.
 
+Without a `supplier_id` the purchase is treated as an **immediate
+(counter / walk-in) purchase**: the GL credits the `1000 Cash` account
+instead of `2000 Accounts Payable`, and no supplier-ledger row is
+written. An AP liability is never created without a supplier to owe it
+to — payments are supplier-keyed, so a credit AP entry would be an
+untraceable, unsetttable orphan.
+
 ```json
 {
   "item_id": 4,

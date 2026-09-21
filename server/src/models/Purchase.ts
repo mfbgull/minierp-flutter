@@ -155,7 +155,9 @@ class PurchaseModel {
   /**
    * Insert ONE purchase row plus its full side-effect chain — stock
    * batch, stock movement, stock balances/current_stock refresh,
-   * supplier AP entry, GL posting (ACC-02), activity log. Runs inside
+   * supplier AP entry, GL posting (ACC-02), activity log. A purchase with
+   * a linked supplier posts on credit (Cr 2000 AP + supplier ledger); one
+   * without is an immediate purchase (Cr 1000 Cash, no AP). Runs inside
    * the caller's transaction; both [recordPurchase] and
    * [recordPurchaseMulti] funnel through here.
    */
@@ -294,16 +296,18 @@ class PurchaseModel {
       SupplierLedgerModel.rebuildBalances(resolvedSupplierId, db);
     }
 
-    // GL posting (ACC-02): Dr 1200 Inventory Asset /
-    // Cr 2000 AP. Direct purchases are recorded on credit in this
-    // flow — immediate payment happens through the supplier-payment
-    // path, which posts its own cash-side entry.
+    // GL posting (ACC-02): Dr 1200 Inventory Asset / Cr 2000 AP for a
+    // supplier-linked purchase (settled later through the supplier-payment
+    // path, which posts its own cash-side entry). A purchase with no
+    // supplier is an immediate (counter / walk-in) purchase — there is no
+    // ledger to owe, so it must not create an AP liability. It credits the
+    // cash account instead (ACC-02 / H12: no supplier-less credit posting).
     AccountingService.postPurchaseEntry(db, {
       purchaseId,
       purchaseNo,
       totalCost,
       purchaseDate: purchase_date,
-      paymentMethod: 'credit',
+      paymentMethod: resolvedSupplierId ? 'credit' : 'cash',
       userId,
     });
 

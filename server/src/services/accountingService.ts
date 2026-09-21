@@ -623,6 +623,10 @@ export class AccountingService {
       throw new Error('Chart of accounts is missing required account: 1200 (Inventory Asset)');
     }
     const creditAccount = AccountingService.purchaseCreditAccount(db, args.paymentMethod);
+    const isCredit = !args.paymentMethod || args.paymentMethod.toLowerCase() === 'credit';
+    const creditDescription = isCredit
+      ? `Obligation for ${args.purchaseNo}`
+      : `Immediate payment for ${args.purchaseNo}`;
 
     return AccountingService.postEntry(db, {
       entry_date: args.purchaseDate,
@@ -632,7 +636,7 @@ export class AccountingService {
       created_by: args.userId,
       lines: [
         { account_id: inventory.id, debit: args.totalCost, description: `Inventory received via ${args.purchaseNo}` },
-        { account_id: creditAccount.id, credit: args.totalCost, description: `Obligation for ${args.purchaseNo}` },
+        { account_id: creditAccount.id, credit: args.totalCost, description: creditDescription },
       ],
     });
   }

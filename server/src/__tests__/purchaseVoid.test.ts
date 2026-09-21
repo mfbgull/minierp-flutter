@@ -271,7 +271,9 @@ describe('purchases grid: voided filter + multi-item recording', () => {
     expect(movements.n).toBe(2);
     expect(movements.posted).toBe(2);
 
-    // One balanced Dr Inventory / Cr AP entry per purchase row.
+    // One balanced GL entry per purchase row — Dr Inventory / Cr AP for a
+    // supplier-linked line, Dr Inventory / Cr Cash when there is no supplier
+    // (an immediate purchase must not create an orphan AP liability).
     for (const row of created) {
       const lines = db.prepare(
         `SELECT debit, credit FROM journal_lines WHERE reference_type='PURCHASE' AND reference_id=? AND voided=0`

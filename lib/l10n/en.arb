@@ -403,7 +403,7 @@
   "purchasesSubtitle": "Record direct purchases and track costs",
   "purchasesRecordpurchase": "Record Purchase",
   "purchasesDocument": "Document",
-  "purchasesSupplierrequiredforpayment": "Select a supplier to record a payment",
+  "purchasesSupplierrequiredforpayment": "Recorded as an immediate cash purchase — select a supplier to record a payment instead",
   "purchaseordersSubtitle": "Order stock from suppliers and track the PO's payment status",
   "purchasesTotalpurchasescard": "Total Purchases",
   "purchasesAlltransactions": "All transactions",
