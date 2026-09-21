@@ -43,6 +43,19 @@ export const NET_REVENUE_STATUS = (alias = ''): string =>
   `${alias ? `${alias}.` : ''}status != 'Cancelled'`;
 
 /**
+ * Outstanding-receivable predicate (H4: AR must not hide returned debt).
+ * AR inclusion is a BALANCE question — a 'Partially Returned' or 'Sent'
+ * invoice with balance_amount > 0 is still money owed. Only genuinely
+ * non-collectable rows are excluded: Cancelled (voided sale) and Draft
+ * (never issued to the customer). Payment state and return state must
+ * never be conflated by filtering on a status IN-list.
+ */
+export const AR_OUTSTANDING = (alias = ''): string => {
+  const p = alias ? `${alias}.` : '';
+  return `${p}balance_amount > 0 AND ${p}status NOT IN ('Cancelled', 'Draft')`;
+};
+
+/**
  * COGS condition over stock_movements: SALE movements plus the
  * ADJUSTMENT reversals that undo sold cost (returns / deletes / updates).
  * The legacy balance-sheet variant additionally matched 'OUT', but no

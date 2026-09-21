@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
 import { CASH_ACCOUNTS, getCashAccountTotals, collectFlows, normalizeCashMethod } from '../services/cashService';
-import { netRevenueSum, NET_REVENUE_STATUS, cogsForPeriod } from '../utils/reportSql';
+import { netRevenueSum, NET_REVENUE_STATUS, AR_OUTSTANDING, cogsForPeriod } from '../utils/reportSql';
 
 function getARAgingReport(asOfDate: string, db: Database.Database) {
   const agingData = db.prepare(`
@@ -12,7 +12,7 @@ function getARAgingReport(asOfDate: string, db: Database.Database) {
       SUM(CASE WHEN julianday(?) - julianday(i.due_date) > 60 AND julianday(?) - julianday(i.due_date) <= 90 THEN i.balance_amount ELSE 0 END) as days_61_90,
       SUM(CASE WHEN julianday(?) - julianday(i.due_date) > 90 THEN i.balance_amount ELSE 0 END) as days_over_90
     FROM invoices i JOIN customers c ON i.customer_id = c.id
-    WHERE i.status IN ('Unpaid', 'Partially Paid', 'Overdue') AND i.balance_amount > 0
+    WHERE ${AR_OUTSTANDING('i')}
     GROUP BY i.customer_id, c.customer_name, c.customer_code ORDER BY total_outstanding DESC
   `).all(asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate);
 
@@ -23,7 +23,7 @@ function getARAgingReport(asOfDate: string, db: Database.Database) {
       SUM(CASE WHEN julianday(?) - julianday(due_date) > 30 AND julianday(?) - julianday(due_date) <= 60 THEN balance_amount ELSE 0 END) as total_31_60,
       SUM(CASE WHEN julianday(?) - julianday(due_date) > 60 AND julianday(?) - julianday(due_date) <= 90 THEN balance_amount ELSE 0 END) as total_61_90,
       SUM(CASE WHEN julianday(?) - julianday(due_date) > 90 THEN balance_amount ELSE 0 END) as total_over_90
-    FROM invoices WHERE status IN ('Unpaid', 'Partially Paid', 'Overdue') AND balance_amount > 0
+    FROM invoices WHERE ${AR_OUTSTANDING()}
   `).get(asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate);
 
   return { asOfDate, agingBuckets: agingData, summary };
@@ -104,7 +104,7 @@ function getTopDebtors(db: Database.Database, limit: number = 10, asOfDate?: str
       SUM(i.total_amount) as total_invoiced,
       COUNT(i.id) as invoice_count
     FROM invoices i JOIN customers c ON i.customer_id = c.id
-    WHERE i.status IN ('Unpaid', 'Partially Paid', 'Overdue') AND i.balance_amount > 0${dateFilter}
+    WHERE ${AR_OUTSTANDING('i')}${dateFilter}
     GROUP BY i.customer_id ORDER BY total_outstanding DESC LIMIT ?
   `).all(...params);
   return rows;
@@ -115,7 +115,7 @@ function getDSOMetric(db: Database.Database, startDateStr: string, endDateStr: s
   const days = Math.max(1, Math.ceil((new Date(endDateStr).getTime() - new Date(startDateStr).getTime()) / (1000 * 60 * 60 * 24)));
 
   const avgReceivables = db.prepare(`
-    SELECT AVG(balance_amount) as avg_balance FROM invoices WHERE status IN ('Unpaid', 'Partially Paid', 'Overdue') AND invoice_date BETWEEN ? AND ?
+    SELECT AVG(balance_amount) as avg_balance FROM invoices WHERE ${AR_OUTSTANDING()} AND invoice_date BETWEEN ? AND ?
   `).get(startDateStr, endDateStr) as { avg_balance: number };
 
   const totalCreditSales = db.prepare(`SELECT ${netRevenueSum()} as total FROM invoices WHERE invoice_date BETWEEN ? AND ? AND ${NET_REVENUE_STATUS()}`).get(startDateStr, endDateStr) as { total: number };
@@ -190,16 +190,23 @@ function getReceivablesSummary(db: Database.Database, asOfDate: string = new Dat
       END), 0) as bucket_over_90,
 
       -- Per-status counts and totals, unchanged in spirit but
-      -- separated from the aging buckets.
+      -- separated from the aging buckets. H4: partial returns keep
+      -- their (reduced) outstanding, so they get their own bucket —
+      -- the breakdown must still foot to total_outstanding.
       COALESCE(SUM(CASE WHEN status = 'Unpaid' THEN balance_amount ELSE 0 END), 0) as unpaid_amount,
       COALESCE(SUM(CASE WHEN status = 'Partially Paid' THEN balance_amount ELSE 0 END), 0) as partially_paid_amount,
       COALESCE(SUM(CASE WHEN status = 'Overdue' THEN balance_amount ELSE 0 END), 0) as overdue_amount,
+      COALESCE(SUM(CASE WHEN status = 'Sent' THEN balance_amount ELSE 0 END), 0) as sent_amount,
+      COALESCE(SUM(CASE WHEN status = 'Partially Returned' THEN balance_amount ELSE 0 END), 0) as partially_returned_amount,
+      COALESCE(SUM(CASE WHEN status = 'Returned' THEN balance_amount ELSE 0 END), 0) as returned_amount,
       COUNT(CASE WHEN status = 'Unpaid' THEN 1 END) as unpaid_count,
       COUNT(CASE WHEN status = 'Partially Paid' THEN 1 END) as partial_count,
-      COUNT(CASE WHEN status = 'Overdue' THEN 1 END) as overdue_count
+      COUNT(CASE WHEN status = 'Overdue' THEN 1 END) as overdue_count,
+      COUNT(CASE WHEN status = 'Sent' THEN 1 END) as sent_count,
+      COUNT(CASE WHEN status = 'Partially Returned' THEN 1 END) as partially_returned_count,
+      COUNT(CASE WHEN status = 'Returned' THEN 1 END) as returned_count
     FROM invoices
-    WHERE status IN ('Unpaid', 'Partially Paid', 'Overdue', 'Sent')
-      AND balance_amount > 0
+    WHERE ${AR_OUTSTANDING()}
       AND invoice_date <= ?
   `).get(
     asOfDate, asOfDate, asOfDate, asOfDate, asOfDate,
@@ -217,9 +224,15 @@ function getReceivablesSummary(db: Database.Database, asOfDate: string = new Dat
     unpaid_amount: number;
     partially_paid_amount: number;
     overdue_amount: number;
+    sent_amount: number;
+    partially_returned_amount: number;
+    returned_amount: number;
     unpaid_count: number;
     partial_count: number;
     overdue_count: number;
+    sent_count: number;
+    partially_returned_count: number;
+    returned_count: number;
   };
 
   return {
@@ -235,11 +248,15 @@ function getReceivablesSummary(db: Database.Database, asOfDate: string = new Dat
     total_31_60: result.bucket_31_60,
     total_61_90: result.bucket_61_90,
     total_over_90: result.bucket_over_90,
-    // Status breakdown, unchanged in shape, still meaningful.
+    // Status breakdown, extended (not renamed) for H4 — returned-state
+    // invoices with a live outstanding get their own bucket.
     statusBreakdown: {
       unpaid: { count: result.unpaid_count, amount: result.unpaid_amount },
       partiallyPaid: { count: result.partial_count, amount: result.partially_paid_amount },
       overdue: { count: result.overdue_count, amount: result.overdue_amount },
+      sent: { count: result.sent_count, amount: result.sent_amount },
+      partiallyReturned: { count: result.partially_returned_count, amount: result.partially_returned_amount },
+      returned: { count: result.returned_count, amount: result.returned_amount },
     },
   };
 }
@@ -1244,10 +1261,12 @@ function getGLReconciliation(asOfDate: string, db: Database.Database) {
   });
 
   // --- AR: GL 1100 vs open invoice balances --------------------------------
+  // H4: same outstanding predicate as every AR surface — GL 1100 moves on
+  // returns/refunds exactly as the invoice balance does, so the control
+  // totals must be computed the same way to reconcile.
   const arOpRow = db.prepare(`
     SELECT COALESCE(SUM(balance_amount), 0) as total FROM invoices
-    WHERE status IN ('Unpaid', 'Partially Paid', 'Overdue', 'Sent')
-      AND balance_amount > 0
+    WHERE ${AR_OUTSTANDING()}
       AND invoice_date <= ?
   `).get(asOfDate) as { total: number };
   const arOp = round(arOpRow.total);

@@ -31,6 +31,7 @@ import db from '../config/database';
 import { AccountingService } from './accountingService';
 import {
   computeReturnedLine,
+  allocateHeaderDiscount,
   resolveFee,
   computePosition,
   validateAllocations,
@@ -46,8 +47,8 @@ import InvoiceModel from '../models/Invoice';
 import PaymentModel from '../models/Payment';
 import StockMovementModel from '../models/StockMovement';
 import ledgerUtils from '../utils/ledgerUtils';
-import { parseCurrency, roundCurrency } from '../utils/currency';
-import { todayLocal } from '../utils/reportSql';
+import { decomposeLineAmount, parseCurrency, roundCurrency } from '../utils/currency';
+import { todayLocal, AR_OUTSTANDING } from '../utils/reportSql';
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { logCRUD, newCorrelationId } from './activityLogger';
 
@@ -225,7 +226,7 @@ export class InvoiceReturnService {
       assertPeriodOpen(returnDate);
 
       // Validate each line and mirror it proportionally (§3.5).
-      const lines: Array<ReturnedLine & { invoice_item_id: number; item_id: number }> = [];
+      const rawLines: Array<ReturnedLine & { invoice_item_id: number; item_id: number }> = [];
       for (const line of input.items) {
         const row = db.prepare(
           `SELECT ii.id, ii.item_id, ii.quantity, ii.unit_price, ii.tax_rate,
@@ -256,7 +257,7 @@ export class InvoiceReturnService {
           );
         }
 
-        lines.push({
+        rawLines.push({
           invoice_item_id: row.id,
           item_id: row.item_id,
           ...computeReturnedLine({
@@ -269,6 +270,40 @@ export class InvoiceReturnService {
           }),
         });
       }
+
+      // H2: give back the invoice-scope header discount proportionally.
+      // The sale discounted the pre-tax subtotal, so the return deducts
+      // each line's share from its returned NET (contra-revenue) — the
+      // tax reversal stays exact (H3) and a full return credits exactly
+      // the invoice grand total.
+      // NOTE: the gross here is qty × unit_price only — the same pre-tax
+      // base computeInvoiceGrandTotal discounted on the sale side. The
+      // stored `amount` is tax-INCLUSIVE (net + tax), so feeding it as the
+      // decomposeLineAmount override would inflate the discount base by
+      // the tax and match nothing the sale ever computed.
+      const allItemRows = db.prepare(
+        `SELECT quantity, unit_price, tax_rate, discount_type, discount_value
+         FROM invoice_items WHERE invoice_id = ?`
+      ).all(input.invoiceId) as Array<{
+        quantity: number; unit_price: number; tax_rate: number | null;
+        discount_type: string | null; discount_value: number | null;
+      }>;
+      const invoiceSubtotal = allItemRows.reduce(
+        (s, row) => s + decomposeLineAmount({
+          quantity: Number(row.quantity),
+          unit_price: Number(row.unit_price),
+          tax_rate: Number(row.tax_rate) || 0,
+          discount_type: row.discount_type ?? undefined,
+          discount_value: Number(row.discount_value) || 0,
+        }).gross,
+        0,
+      );
+      const lines = allocateHeaderDiscount(rawLines, {
+        discount_scope: fresh.discount_scope ?? undefined,
+        discount_type: fresh.discount_type ?? undefined,
+        discount_value: fresh.discount_value ?? undefined,
+        invoiceSubtotal,
+      });
 
       const returnedGross = roundCurrency(lines.reduce((s, l) => s + l.returnedGross, 0));
 
@@ -1062,8 +1097,7 @@ export class InvoiceReturnService {
     if (!targetId) {
       const oldest = dbArg.prepare(`
         SELECT id FROM invoices
-        WHERE customer_id = ? AND status IN ('Unpaid', 'Partially Paid')
-          AND balance_amount > 0 AND id <> ?
+        WHERE customer_id = ? AND ${AR_OUTSTANDING()} AND id <> ?
         ORDER BY invoice_date ASC, id ASC LIMIT 1
       `).get(args.customerId, args.returnHeader.invoice_id) as { id: number } | undefined;
       if (!oldest) {
@@ -1171,8 +1205,7 @@ export class InvoiceReturnService {
     if (!targets || targets.length === 0) {
       targets = (dbArg.prepare(`
         SELECT id FROM invoices
-        WHERE customer_id = ? AND status IN ('Unpaid', 'Partially Paid')
-          AND balance_amount > 0 AND id <> ?
+        WHERE customer_id = ? AND ${AR_OUTSTANDING()} AND id <> ?
         ORDER BY invoice_date ASC, id ASC
       `).all(args.customerId, args.returnHeader.invoice_id) as Array<{ id: number }>)
         .map((r) => r.id);

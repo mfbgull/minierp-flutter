@@ -5,6 +5,7 @@ import {
 } from '../services/cashService';
 import { getForUser } from './UserPreferences';
 import { weekBounds } from '../utils/weekMath';
+import { AR_OUTSTANDING } from '../utils/reportSql';
 
 interface DashboardSummary {
   totalItems: number;
@@ -575,7 +576,7 @@ function getKPI(
     case 'outstanding_receivables': {
       const result = db.prepare(`
         SELECT COALESCE(SUM(balance_amount), 0) as total FROM invoices
-        WHERE status IN ('Unpaid', 'Partially Paid', 'Overdue')
+        WHERE ${AR_OUTSTANDING()}
       `).get() as { total: number };
 
       return { metric, value: result.total, unit: 'currency', label: 'Outstanding Receivables' };
@@ -690,10 +691,9 @@ function getARSummary(db: Database.Database): ARSummaryResult {
       COALESCE(SUM(CASE WHEN julianday('now') - julianday(due_date) BETWEEN 31 AND 60 THEN balance_amount ELSE 0 END), 0) as amount_31_60,
       COALESCE(SUM(CASE WHEN julianday('now') - julianday(due_date) BETWEEN 61 AND 90 THEN balance_amount ELSE 0 END), 0) as amount_61_90,
       COALESCE(SUM(CASE WHEN julianday('now') - julianday(due_date) > 90 THEN balance_amount ELSE 0 END), 0) as amount_over_90,
-      (SELECT COUNT(DISTINCT customer_id) FROM invoices WHERE balance_amount > 0 AND status IN ('Unpaid', 'Partially Paid', 'Overdue')) as customer_count
+      (SELECT COUNT(DISTINCT customer_id) FROM invoices WHERE ${AR_OUTSTANDING()}) as customer_count
     FROM invoices
-    WHERE balance_amount > 0
-      AND status IN ('Unpaid', 'Partially Paid', 'Overdue')
+    WHERE ${AR_OUTSTANDING()}
   `).get() as ARSummaryResult;
 
   return result;
