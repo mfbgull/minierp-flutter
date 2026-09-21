@@ -53,6 +53,17 @@ class InsufficientCreditError extends Error {
   }
 }
 
+/**
+ * H9: payment + credit offset exceeds the invoice total (entitlement) —
+ * a client error (400), not a server fault.
+ */
+class OffsetExceedsTotalError extends Error {
+  constructor(applied: number, total: number) {
+    super(`Payment + credit offset (${applied.toFixed(2)}) exceeds invoice total (${total.toFixed(2)})`);
+    this.name = 'OffsetExceedsTotalError';
+  }
+}
+
 const {
   createLedgerEntry,
   recalcCustomerBalanceFromLedger,
@@ -262,16 +273,32 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
 
     // Guard: payment + credit offset cannot exceed the invoice total
     if (record_payment && payment && (paymentAmountNum + creditOffsetNum) > totalAmountNum) {
-      throw new Error(`Payment + credit offset (${(paymentAmountNum + creditOffsetNum).toFixed(2)}) exceeds invoice total (${totalAmountNum.toFixed(2)})`);
+      throw new OffsetExceedsTotalError(paymentAmountNum + creditOffsetNum, totalAmountNum);
     }
 
-    // Guard: credit offset cannot exceed available credit balance
+    // Guard: credit offset cannot exceed available credit (H9). Available
+    // credit has TWO non-overlapping representations:
+    //   1. the explicit store-credit pool (customers.credit_balance) —
+    //      created by a 'credit' return settlement, which also moves the
+    //      ledger credit OFF customer_ledger, and
+    //   2. legacy ledger credit, which shows as a negative current_balance.
+    // A settlement consumes the pool FIRST; the pool half is mirrored by a
+    // customer_ledger CREDIT entry below (its credit lives in the column,
+    // not the ledger — unlike the AGENTS.md CREDIT_OFFSET case, where the
+    // RETURN credit row already carries it and a second row would
+    // double-count).
+    let poolCreditApplied = 0;
     if (creditOffsetNum > 0) {
-      const customerBalance = db.prepare('SELECT current_balance FROM customers WHERE id = ?').get(parsedCustomerId) as { current_balance: number } | undefined;
-      const availableCredit = customerBalance ? Math.abs(Math.min(0, customerBalance.current_balance)) : 0;
-      if (creditOffsetNum > availableCredit) {
+      const customerRow = db.prepare(
+        'SELECT current_balance, COALESCE(credit_balance, 0) as credit_balance FROM customers WHERE id = ?'
+      ).get(parsedCustomerId) as { current_balance: number; credit_balance: number } | undefined;
+      const pool = Math.max(0, customerRow?.credit_balance ?? 0);
+      const ledgerCredit = Math.abs(Math.min(0, customerRow?.current_balance ?? 0));
+      const availableCredit = pool + ledgerCredit;
+      if (creditOffsetNum > availableCredit + 0.005) {
         throw new InsufficientCreditError(creditOffsetNum, availableCredit);
       }
+      poolCreditApplied = Math.min(creditOffsetNum, pool);
     }
 
     // Same whitelist as PaymentModel — inline payments reached the GL
@@ -283,6 +310,10 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
     let initialStatus: InvoiceStatus;
     if (record_payment && payment && paymentAmountNum > 0) {
       initialStatus = paymentAmountNum >= totalAmountNum ? 'Paid' : 'Partially Paid';
+    } else if (creditOffsetNum > 0) {
+      // H9: a credit offset settles the invoice just like cash — reflect
+      // that in the status instead of leaving a paid-in-full 'Unpaid'.
+      initialStatus = initialBalanceAmount <= 0.005 ? 'Paid' : 'Partially Paid';
     } else {
       initialStatus = status || 'Unpaid';
     }
@@ -454,6 +485,26 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
         customerId: parsedCustomerId,
         userId,
       });
+
+      // H9: consume the store-credit pool half. The pool lives in
+      // customers.credit_balance and is deliberately absent from
+      // customer_ledger (its applying debit was posted when the credit
+      // settlement moved it there), so the ledger needs its own credit row
+      // here to offset the full-value INVOICE debit — otherwise the
+      // customer would show receivable they already paid with credit.
+      if (poolCreditApplied > 0) {
+        db.prepare('UPDATE customers SET credit_balance = MAX(0, credit_balance - ?) WHERE id = ?')
+          .run(poolCreditApplied, parsedCustomerId);
+        createLedgerEntry(
+          parsedCustomerId,
+          invoice_date,
+          'CREDIT',
+          creditRefNo,
+          0,
+          poolCreditApplied,
+          `Store credit applied to Invoice ${resolvedInvoiceNo}`
+        );
+      }
     }
 
     // --- FIX #6: Customer balance update inside transaction ---
@@ -491,6 +542,11 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       return;
     }
     if (error instanceof InsufficientCreditError) {
+      logger.warn('Create invoice rejected:', { error: error.message });
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error instanceof OffsetExceedsTotalError) {
       logger.warn('Create invoice rejected:', { error: error.message });
       res.status(400).json({ error: error.message });
       return;

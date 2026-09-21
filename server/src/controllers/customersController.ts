@@ -274,7 +274,8 @@ function getCustomerBalance(req: Request, res: Response): void {
       data: {
         customerId: customer.id,
         customerName: customer.customer_name,
-        currentBalance: parseFloat(String(customer.current_balance))
+        currentBalance: parseFloat(String(customer.current_balance)),
+        creditBalance: parseFloat(String(customer.credit_balance ?? 0))
       }
     });
   } catch (error) {

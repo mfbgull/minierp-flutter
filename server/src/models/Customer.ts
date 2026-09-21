@@ -30,6 +30,10 @@ interface Customer {
   payment_terms_days?: number;
   credit_limit?: number;
   current_balance?: number;
+  /// H9: explicit store-credit pool (returns settled as 'credit').
+  /// Kept OUT of customer_ledger/AR while unused — negative
+  /// current_balance is a DIFFERENT (legacy) credit representation.
+  credit_balance?: number;
   opening_balance?: number;
   is_active?: number;
   created_at?: string;
@@ -91,7 +95,7 @@ class CustomerModel {
       SELECT
         id, customer_code, customer_name, contact_person, email, phone,
         billing_address, shipping_address, payment_terms, payment_terms_days,
-        credit_limit, current_balance,
+        credit_limit, current_balance, COALESCE(credit_balance, 0) as credit_balance,
         CASE
           WHEN credit_limit > 0 THEN ROUND((current_balance / credit_limit) * 100,2)
           ELSE 0
@@ -141,7 +145,7 @@ class CustomerModel {
       SELECT
         id, customer_code, customer_name, contact_person, email, phone,
         billing_address, shipping_address, payment_terms, payment_terms_days,
-        credit_limit, current_balance, opening_balance,
+        credit_limit, current_balance, opening_balance, COALESCE(credit_balance, 0) as credit_balance,
         CASE
           WHEN credit_limit > 0 THEN ROUND((current_balance / credit_limit) * 100,2)
           ELSE 0
@@ -408,8 +412,8 @@ class CustomerModel {
     return { transactions, openingBalance };
   }
 
-  static getBalance(id: string | string[] | number, db: Database.Database): { id: number; customer_name: string; current_balance: number } | undefined {
-    return db.prepare('SELECT id, customer_name, current_balance FROM customers WHERE id = ?').get(id) as { id: number; customer_name: string; current_balance: number } | undefined;
+  static getBalance(id: string | string[] | number, db: Database.Database): { id: number; customer_name: string; current_balance: number; credit_balance: number } | undefined {
+    return db.prepare('SELECT id, customer_name, current_balance, COALESCE(credit_balance, 0) as credit_balance FROM customers WHERE id = ?').get(id) as { id: number; customer_name: string; current_balance: number; credit_balance: number } | undefined;
   }
 
   static getAllIds(db: Database.Database): number[] {

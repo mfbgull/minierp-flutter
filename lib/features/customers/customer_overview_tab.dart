@@ -120,12 +120,19 @@ class CustomerOverviewTab extends ConsumerWidget {
                 valueColor: metrics.totalOutstanding > 0
                     ? scheme.error
                     : null,
-                // A negative ledger net is money we owe the customer
-                // (return credits / advances) — surface it next to the
-                // outstanding figure so the two never look contradictory.
-                footer: metrics.currentBalance < 0
-                    ? '${l10n.customersCredit}: ${Formatters.currency(-metrics.currentBalance)}'
-                    : null,
+                // Credit money we owe the customer comes in two forms
+                // (H9): the explicit store-credit pool (returns settled
+                // as credit) and legacy ledger credit (negative balance).
+                // Surface the total so it never looks contradictory.
+                footer: () {
+                  final credit = customer.creditBalance +
+                      (metrics.currentBalance < 0
+                          ? -metrics.currentBalance
+                          : 0);
+                  return credit > 0
+                      ? '${l10n.customersCredit}: ${Formatters.currency(credit)}'
+                      : null;
+                }(),
               ),
               const SizedBox(width: 12),
               _SummaryCard(
