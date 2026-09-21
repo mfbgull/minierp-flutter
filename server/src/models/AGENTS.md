@@ -37,7 +37,21 @@ Database access layer. SQLite queries via better-sqlite3.
 
 ## CREDIT OFFSET BEHAVIOR
 
-Customer credits are generated from invoice returns (`disposition: 'credit'`).
+Customer credit has TWO non-overlapping representations (H9):
+
+1. **Store-credit pool** — `customers.credit_balance`, created by return
+   settlements of type `credit` (`InvoiceReturnService.applyCredit`). The
+   settlement posts a consuming CREDIT *debit* on `customer_ledger`, so the
+   pool is deliberately ABSENT from the ledger/AR while unused. When
+   `credit_offset` consumes pool credit, the controller writes a matching
+   CREDIT *credit* ledger row (`CREDIT-{invoice_no}`) and decrements
+   `credit_balance`. Available credit = `credit_balance` + legacy negative
+   `current_balance` (they never coexist for the same money).
+
+2. **Legacy ledger credit** — a RETURN credit row that sits on
+   `customer_ledger` (negative `current_balance`). Consumed directly by the
+   invoice's full-value DEBIT row.
+
 When a customer applies credit to a new invoice via `credit_offset`:
 
 - `invoices.paid_amount` = cash payments + credit_offset (already handled)
@@ -45,10 +59,11 @@ When a customer applies credit to a new invoice via `credit_offset`:
 - GL entry: Dr Customer Credit (1110) / Cr AR (1100) via `postCreditOffsetEntry()`
 - `InvoiceModel.getPayments()` adds a synthetic `CREDIT-{invoice_no}` entry
 
-**DO NOT** create a `CREDIT_OFFSET` entry in `customer_ledger`. The invoice
-DEBIT entry already accounts for the full total. Adding a CREDIT_OFFSET
-CREDIT entry double-counts and prevents `recalcCustomerBalanceFromLedger()`
-from reducing the customer's balance after credit application.
+**DO NOT** create an extra `CREDIT_OFFSET` entry for the LEGACY half — the
+invoice DEBIT entry plus the existing RETURN credit already account for the
+total; a second credit double-counts and breaks
+`recalcCustomerBalanceFromLedger()`. The pool-half credit row is required
+(see 1 above) because no ledger row carries that credit anymore.
 
 **RETURN ledger entries** must use `invoice.invoice_date` (not today's date)
 as the `transaction_date`. Otherwise `rebuildLedgerBalances()` reorders by

@@ -19,6 +19,7 @@ class Customer {
     this.creditLimit,
     this.creditUtilizationPercent,
     required this.currentBalance,
+    this.creditBalance = 0,
     this.openingBalance,
     this.isActive = true,
     this.createdAt,
@@ -39,6 +40,7 @@ class Customer {
     creditLimit: asNum(json['credit_limit']),
     creditUtilizationPercent: asNum(json['credit_utilization_percent']),
     currentBalance: asNum(json['current_balance']) ?? 0,
+    creditBalance: asNum(json['credit_balance']) ?? 0,
     openingBalance: asNum(json['opening_balance']),
     isActive: asBool(json['is_active'], fallback: true),
     createdAt: asString(json['created_at']),
@@ -58,6 +60,10 @@ class Customer {
   final num? creditLimit;
   final num? creditUtilizationPercent;
   final num currentBalance;
+
+  /// Explicit store-credit pool from returns settled as credit (H9).
+  /// Not part of AR while unused.
+  final num creditBalance;
   final num? openingBalance;
   final bool isActive;
   final String? createdAt;
@@ -78,6 +84,7 @@ class Customer {
     if (creditUtilizationPercent != null)
       'credit_utilization_percent': creditUtilizationPercent,
     'current_balance': currentBalance,
+    'credit_balance': creditBalance,
     if (openingBalance != null) 'opening_balance': openingBalance,
     'is_active': isActive ? 1 : 0,
     if (createdAt != null) 'created_at': createdAt,

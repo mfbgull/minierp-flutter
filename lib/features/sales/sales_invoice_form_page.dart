@@ -578,10 +578,14 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       ? (widget.invoice!.balanceAmount - _paymentSum - _creditOffset)
       : (calculateTotal(_filledLines, _scope, _invoiceDiscount) - _paymentSum - _creditOffset);
 
-  num get _availableCustomerCredit =>
-      _selectedCustomer != null && _selectedCustomer!.currentBalance < 0
-          ? _selectedCustomer!.currentBalance.abs()
-          : 0;
+  // H9: available credit is the explicit store-credit pool plus any
+  // legacy ledger credit (negative AR). The server enforces the same sum.
+  num get _availableCustomerCredit => _selectedCustomer == null
+      ? 0
+      : _selectedCustomer!.creditBalance +
+            (_selectedCustomer!.currentBalance < 0
+                ? _selectedCustomer!.currentBalance.abs()
+                : 0);
 
   void _addPaymentMethod() {
     setState(() {

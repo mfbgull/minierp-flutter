@@ -48,6 +48,12 @@ Two bugs were found and fixed in `invoiceController.ts`:
    `rebuildLedgerBalances()` reorders by `(transaction_date, id)`.
    A backdated return with today's date corrupts the running balance chain.
 
-2. **CREDIT_OFFSET in customer_ledger**: Do NOT create a `customer_ledger`
-   entry for credit offsets. The invoice DEBIT entry already covers the
-   total. The GL entry via `postCreditOffsetEntry()` is sufficient.
+2. **CREDIT_OFFSET in customer_ledger** (amended by H9): Do NOT create an
+   extra ledger entry for offsets against LEGACY ledger credit — the
+   invoice DEBIT plus the existing RETURN credit already cover it.
+   Pool credit (`customers.credit_balance`, from 'credit' settlements) is
+   the exception: it was removed from the ledger when settled, so its
+   consumption writes a `CREDIT-{invoice_no}` credit row AND decrements
+   `credit_balance`. Available offset credit =
+   `credit_balance + max(0, -current_balance)` — the guard must use this
+   sum, never one half alone.
