@@ -52,7 +52,7 @@ interface CreateSupplierPaymentDTO {
   payment_method?: string;
   reference_no?: string;
   notes?: string;
-  po_allocations: Array<{ po_id: string; amount: number }>;
+  po_allocations?: Array<{ po_id: string; amount: number }>;
   purchase_allocations?: Array<{ purchase_id: string; amount: number }>;
   userId: number;
 }
@@ -480,6 +480,26 @@ export class PaymentModel {
             `Allocation amount (${parseCurrency(alloc.amount).toFixed(2)}) for purchase ${purchaseId} exceeds the remaining balance (${remainingBalance.toFixed(2)})`
           );
         }
+      }
+
+      // H7: the payment must be fully allocated. A payment of 1000 accepted
+      // with a single 100 allocation left the supplier balance debited by
+      // 1000 while the purchase balances only dropped by 100 (and the GL
+      // cash posting paid out the full 1000). There is no supplier-advance /
+      // unallocated-payment concept in this system (advances exist only on
+      // the employee-salary side), so the allocation total must equal the
+      // payment amount exactly. Checked here — inside the transaction and
+      // before the first INSERT — so a rejected payment changes nothing.
+      const allocatedTotal = [...poAllocs, ...purchaseAllocs].reduce(
+        (sum, alloc) => sum + parseCurrency(alloc.amount), 0,
+      );
+      const paymentTotal = parseCurrency(data.amount);
+      if (Math.abs(allocatedTotal - paymentTotal) > 0.01) {
+        throw new Error(
+          `Allocation total (${allocatedTotal.toFixed(2)}) does not match the payment amount ` +
+          `(${paymentTotal.toFixed(2)}) — the full payment amount is required to be allocated across ` +
+          `the selected PO(s) / purchase(s); unallocated supplier payments are not supported`
+        );
       }
 
       const paymentNo = this.generatePaymentNo(db);

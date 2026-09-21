@@ -479,6 +479,17 @@ is an immediate (counter / walk-in) purchase — it credits `1000 Cash`
 directly and never touches `2000 Accounts Payable`, because an AP
 liability with no supplier is an orphan no payment can ever settle.
 
+A supplier payment's allocation lines must sum to the payment amount
+exactly (the payment modal blocks a submit where they differ — see the
+"Unallocated" readout). The server enforces the same rule in
+`PaymentModel.createSupplierPayment`, inside the transaction and before
+the first write: the payment amount is what the supplier ledger, the
+supplier balance and the GL cash posting all record, so a payment whose
+allocations total less (or more) desyncs all three. Supplier advances /
+unallocated payments are not a supported concept — advances exist only
+on the employee-salary side — so the match is exact, and a rejected
+payment changes nothing.
+
 ## Implementation Notes
 
 - This design system prioritizes data density and efficiency for business users
