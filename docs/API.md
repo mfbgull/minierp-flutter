@@ -352,6 +352,15 @@ Create payment with allocations. Customer payments allocate across
 allocation of either kind, and each line amount is validated against
 that document's remaining balance.
 
+**Allocation reconciliation (H7):** the allocation lines must sum to the
+payment `amount` exactly (±0.01). The payment is the single source of
+truth for how much money left the business — the supplier ledger, the
+supplier balance and the GL cash posting all post the *full* amount — so
+a 1,000 payment accepted with a single 100 allocation would desync every
+one of them. There is no supplier-advance / unallocated-payment concept
+here (advances exist only on the employee-salary side), so under- and
+over-allocation are both rejected with 400 before anything is written.
+
 ```json
 {
   "customer_id": 1,
