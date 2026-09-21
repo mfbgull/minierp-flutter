@@ -1266,7 +1266,7 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get purchasesSupplierrequiredforpayment =>
-      'ادائیگی ریکارڈ کرنے کے لیے سپلائر منتخب کریں';
+      'فوری نقد خرید کے طور پر ریکارڈ ہوگا — ادائیگی ریکارڈ کرنے کے لیے سپلائر منتخب کریں';
 
   @override
   String get purchaseordersSubtitle =>

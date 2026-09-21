@@ -1264,7 +1264,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get purchasesSupplierrequiredforpayment =>
-      'Select a supplier to record a payment';
+      'Recorded as an immediate cash purchase — select a supplier to record a payment instead';
 
   @override
   String get purchaseordersSubtitle =>

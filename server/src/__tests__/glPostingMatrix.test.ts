@@ -103,6 +103,7 @@ describe('GL posting matrix', () => {
   });
 
   it('purchase posts a balanced Dr Inventory / Cr AP entry', async () => {
+    // A linked supplier → credit purchase: Dr 1200 Inventory / Cr 2000 AP.
     const res = await request(app).post('/api/purchases')
       .set('Cookie', authCookie)
       .send({
@@ -111,7 +112,7 @@ describe('GL posting matrix', () => {
         quantity: 5,
         unit_cost: 30,
         purchase_date: '2026-08-05',
-        supplier_name: 'Matrix Supplier Two',
+        supplier_id: supplierId,
       });
     expect(res.status).toBe(201);
 
@@ -124,6 +125,30 @@ describe('GL posting matrix', () => {
     const apLine = lines.find(l => l.account_id === apId);
     expect(invLine?.debit).toBeCloseTo(150, 2); // 5 × 30
     expect(apLine?.credit).toBeCloseTo(150, 2);
+
+    // A supplier-name-only purchase is an immediate purchase: same Dr
+    // Inventory, but the credit lands on Cash, never on AP (H12 — an AP
+    // liability with no supplier is an orphan no payment can settle).
+    const cashRes = await request(app).post('/api/purchases')
+      .set('Cookie', authCookie)
+      .send({
+        item_id: itemId,
+        warehouse_id: warehouseId,
+        quantity: 2,
+        unit_cost: 30,
+        purchase_date: '2026-08-05',
+        supplier_name: 'Matrix Supplier Two',
+      });
+    expect(cashRes.status).toBe(201);
+    const cashLines = linesFor('PURCHASE', cashRes.body.id as number);
+    expectBalanced(cashLines);
+    const cashId = accountId('1000');
+    const cashInvLine = cashLines.find(l => l.account_id === inventoryId);
+    const cashLine = cashLines.find(l => l.account_id === cashId);
+    const orphanAp = cashLines.find(l => l.account_id === apId);
+    expect(cashInvLine?.debit).toBeCloseTo(60, 2); // 2 × 30
+    expect(cashLine?.credit).toBeCloseTo(60, 2);
+    expect(orphanAp).toBeUndefined();
 
     // Movement flagged financially posted
     const mv = db.prepare(
