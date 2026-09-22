@@ -37,6 +37,8 @@ export interface ReturnedLine {
   returnedNet: number;       // tax-exclusive (Sales Returns debit basis)
   returnedTax: number;       // proportional additive tax (Tax Payable debit)
   returnedGross: number;     // net + tax — AR credit and fee base (tax-inclusive)
+  /** Full-line gross the proportional split came from (H2 header-discount base). */
+  lineGross: number;
 }
 
 /**
@@ -79,7 +81,94 @@ export function computeReturnedLine(line: ReturnedLineInput): ReturnedLine {
     returnedNet,
     returnedTax,
     returnedGross: roundCurrency(returnedNet + returnedTax),
+    lineGross: full.gross,
   };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Invoice-scope header discount (H2)
+// ────────────────────────────────────────────────────────────────────
+
+/**
+ * Give back the invoice-scope header discount proportionally (H2).
+ *
+ * The sale deducted the header discount from the pre-tax subtotal
+ * (currency.ts::computeInvoiceGrandTotal) and the GL absorbed it into
+ * revenue, so a return must deduct the same discount from the returned
+ * NET — the contra-revenue (4100) side — never from tax: the tax
+ * reversal must keep matching the stored invoice tax exactly (H3).
+ *
+ * Allocation mirrors the sale-side base exactly: the discount is spread
+ * pro-rata by line gross over the WHOLE invoice, and each returned line
+ * gives up its own share scaled by its returned ratio. Consequences:
+ *  - a full return of every line credits exactly the invoice grand total;
+ *  - a partial return gives up only its own share of the discount;
+ *  - a flat discount stays a fixed total spread across all lines, so
+ *    returning one line cannot consume a flat discount that belongs to
+ *    the others.
+ *
+ * The total deduction is rounded once then re-split across the lines with
+ * the largest-remainder method, so the sum of the per-line deductions is
+ * exactly the rounded total (a full return closes to the cent against the
+ * invoice total). Per-line deductions are floored at 0 — a pathological
+ * discount can never make a return credit negative.
+ */
+export function allocateHeaderDiscount<T extends ReturnedLine>(
+  lines: T[],
+  context: {
+    discount_scope?: string;
+    discount_type?: string;
+    discount_value?: number;
+    /** Σ line gross over EVERY invoice line — the discount base the sale used. */
+    invoiceSubtotal: number;
+  },
+): T[] {
+  if (context.discount_scope !== 'invoice') return lines;
+  const discountValue = roundCurrency(Number(context.discount_value ?? 0));
+  const subtotal = roundCurrency(Number(context.invoiceSubtotal));
+  if (!(discountValue > 0) || !(subtotal > 0) || lines.length === 0) return lines;
+
+  const rawDiscount = context.discount_type === 'percentage'
+    ? subtotal * (discountValue / 100)
+    : discountValue;
+
+  // What this request gives back in total: each line's pro-rata share of
+  // the discount, scaled by its returned ratio.
+  const exactTotal = lines.reduce(
+    (sum, l) => sum + (rawDiscount * (l.lineGross / subtotal)) * l.returnedRatio,
+    0,
+  );
+  // Round once, same boundary as the sale's single deduction.
+  const totalToDeduct = Math.min(roundCurrency(exactTotal), roundCurrency(
+    lines.reduce((s, l) => s + l.returnedNet, 0),
+  ));
+  if (!(totalToDeduct > 0)) return lines;
+
+  // Largest-remainder split into cents so the parts sum to the total.
+  const cents = Math.round(totalToDeduct * 100);
+  const exactParts = lines.map((l) => {
+    const share = (rawDiscount * (l.lineGross / subtotal)) * l.returnedRatio;
+    return { line: l, exact: exactTotal > 0 ? share / exactTotal : 0 };
+  });
+  const floors = exactParts.map((p) => Math.floor(p.exact * cents));
+  let remaining = cents - floors.reduce((a, b) => a + b, 0);
+  const order = exactParts
+    .map((p, i) => ({ i, frac: p.exact * cents - floors[i] }))
+    .sort((a, b) => b.frac - a.frac);
+  for (let k = 0; k < order.length && remaining > 0; k += 1) {
+    floors[order[k].i] += 1;
+    remaining -= 1;
+  }
+
+  return exactParts.map((p, i) => {
+    const deduction = floors[i] / 100;
+    const returnedNet = Math.max(0, roundCurrency(p.line.returnedNet - deduction));
+    return {
+      ...p.line,
+      returnedNet,
+      returnedGross: roundCurrency(returnedNet + p.line.returnedTax),
+    };
+  });
 }
 
 // ────────────────────────────────────────────────────────────────────

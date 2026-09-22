@@ -6,6 +6,7 @@ import AccountingService from '../services/accountingService';
 import InvoiceModel from './Invoice';
 import { parseCurrency, computeInvoiceTotal, decomposeLineAmount } from '../utils/currency';
 import { isValidPaymentMethod } from '../services/cashService';
+import { claimIdempotencyKey, MOBILE_INVOICE_CREATE_SCOPE } from '../utils/idempotency';
 
 interface DraftRecord {
   id: number;
@@ -64,6 +65,9 @@ interface SubmitInvoiceDTO {
   record_payment?: boolean;
   payment?: PaymentDTO;
   userId: number;
+  /** P11: claim the key inside this transaction so the (key → invoice)
+   * row persists if and only if the submit commits. */
+  idempotency?: { key: string; hash: string };
 }
 
 function getDraftById(db: Database.Database, id: number): DraftRecord | undefined {
@@ -211,13 +215,23 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
     // (InvoiceModel.getInvoiceTaxTotal) so it can never diverge from the
     // stored tax. Recomputing from gross ignored discounts + rounding.
 
+    // TASK 17: the stock-movement reference is the invoice NUMBER, exactly
+    // like the desktop invoice path — every reversal consumer
+    // (InvoiceModel.reverseStockForItems for cancel/delete/update/return,
+    // restoreInvoice, the return-report joins) resolves SALE movements by
+    // reference_docno = invoice_no. Keying to the numeric id made those
+    // lookups find nothing, so a cancelled mobile invoice left stock
+    // permanently reduced. Derive the number once, before the insert, so
+    // the stored value and every downstream key are the same string.
+    const invoiceNo = data.invoice_no || generateDocNo(db, 'INV', 5);
+
     const invoiceResult = db.prepare(`
       INSERT INTO invoices (
         invoice_no, customer_id, invoice_date, due_date, status,
         total_amount, paid_amount, balance_amount, notes, terms, created_by
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      data.invoice_no || generateDocNo(db, 'INV', 5),
+      invoiceNo,
       data.customer_id,
       data.invoice_date,
       data.due_date || data.invoice_date,
@@ -231,7 +245,14 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
     );
 
     const invoiceId = invoiceResult.lastInsertRowid as number;
-    const invoiceNo = data.invoice_no || (invoiceResult.lastInsertRowid ? `INV-${Date.now()}` : '');
+    // P11: claim the idempotency key inside this transaction — the
+    // (key → invoice) row persists if and only if the submit commits,
+    // so a rolled-back attempt leaves no trace and the retry runs
+    // normally, while a post-commit client timeout replays this invoice.
+    if (data.idempotency) {
+      claimIdempotencyKey(db, MOBILE_INVOICE_CREATE_SCOPE, data.idempotency.key, data.idempotency.hash, invoiceId);
+    }
+
 
     for (const item of data.items) {
       const { amount, netAmount, taxAmount } = decomposeLineAmount(item);
@@ -255,8 +276,8 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
         quantity: -item.quantity,
         unit_cost: item.unit_price,
         reference_doctype: 'INVOICE',
-        reference_docno: String(invoiceId),
-        remarks: `Sold via Invoice ${invoiceId}`,
+        reference_docno: invoiceNo,
+        remarks: `Sold via Invoice ${invoiceNo}`,
         movement_date: data.invoice_date,
       }, data.userId, db);
 
@@ -327,7 +348,7 @@ function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
       SELECT quantity * unit_cost AS line_cogs FROM stock_movements
       WHERE reference_doctype = 'INVOICE' AND reference_docno = ?
         AND movement_type = 'SALE'
-    `).all(String(invoiceId)) as Array<{ line_cogs: number }>;
+    `).all(invoiceNo) as Array<{ line_cogs: number }>;
     const cogsTotal = cogsRows.reduce((s, r) => s + Math.abs(Number(r.line_cogs)), 0);
     if (cogsTotal > 0) {
       AccountingService.postCOGSEntry(db, {

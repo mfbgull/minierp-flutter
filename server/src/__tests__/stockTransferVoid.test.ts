@@ -107,7 +107,6 @@ describe('Stock transfer void (Phase 4)', () => {
       .set('Cookie', authCookie);
     expect(res.status).toBe(200);
 
-    // Balances back to pre-transfer state
     const afterVoid = balances();
     expect(afterVoid.src).toBe(20);
     expect(afterVoid.dst).toBe(0);

@@ -19,6 +19,14 @@ import {
 } from '../utils/currency';
 import { isValidPaymentMethod } from '../services/cashService';
 import { generateDocNo } from '../utils/sequence';
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  INVOICE_CREATE_SCOPE,
+  normalizeIdempotencyKey,
+  hashRequestPayload,
+  findIdempotencyRecord,
+  claimIdempotencyKey,
+} from '../utils/idempotency';
 
 /**
  * ACC-18 interim: thrown when a client-supplied invoice total disagrees
@@ -243,6 +251,34 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
     const parsedCustomerId = parseInt(String(customer_id), 10);
     const userId = req.user!.id;
 
+    // P11: idempotent create. A retry after a client-side timeout must
+    // replay the original invoice, never double-create (stock/GL/ledger).
+    // Requests without the header keep the legacy (unguarded) behavior.
+    let idemKey: string | null;
+    try {
+      idemKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
+    } catch (keyError) {
+      return res.status(400).json({ error: (keyError as Error).message });
+    }
+    const idemHash = idemKey ? hashRequestPayload(req.body) : '';
+    if (idemKey) {
+      const existing = findIdempotencyRecord(db, INVOICE_CREATE_SCOPE, idemKey);
+      if (existing) {
+        if (existing.request_hash !== idemHash) {
+          return res.status(409).json({
+            error: 'Idempotency-Key was already used with a different request payload',
+          });
+        }
+        if (existing.resource_id != null) {
+          const original = InvoiceModel.getWithCustomer(existing.resource_id, db);
+          if (original) {
+            res.set('X-Idempotent-Replay', 'true');
+            return res.status(201).json(original);
+          }
+        }
+      }
+    }
+
     // === ENTIRE operation inside one transaction ===
     const transaction = db.transaction(() => {
       // ACC-18 interim: the server is authoritative over invoice money.
@@ -332,6 +368,11 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
     // below. Previously these were hard-coded to 0/total, leaving
     // the A/R ledger inconsistent with payment_allocations.
     const resolvedInvoiceNo = invoice_no || generateDocNo(db, 'INV', 5);
+    // H2: persist the invoice-scope header discount and notes. They were
+    // read from the request and used to compute the grand total, but
+    // never forwarded to the model — so a discounted invoice stored
+    // discount_value 0 and lost its notes, and the return path had no
+    // discount to give back (updateInvoice already persists these).
     const invoiceId = InvoiceModel.createInvoice(db, {
       invoice_no: resolvedInvoiceNo,
       customer_id: parsedCustomerId,
@@ -343,8 +384,20 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       balance_amount: initialBalanceAmount,
       credit_offset: creditOffsetNum,
       terms,
+      notes,
+      discount_scope,
+      discount_type,
+      discount_value,
       items,
     }, userId);
+
+    // P11: claim the idempotency key inside this same transaction — the
+    // (key → invoice) row persists if and only if the invoice creation
+    // commits, so a rolled-back attempt leaves no trace and a retry runs
+    // normally, while a post-commit client timeout replays this invoice.
+    if (idemKey) {
+      claimIdempotencyKey(db, INVOICE_CREATE_SCOPE, idemKey, idemHash, invoiceId);
+    }
 
     let cogsTotal = 0;
     const consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }> = [];

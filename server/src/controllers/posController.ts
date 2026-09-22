@@ -9,6 +9,15 @@ import WarehouseModel from '../models/Warehouse';
 import AccountingService from '../services/accountingService';
 import { ActionType, newCorrelationId, logActivityInTx } from '../services/activityLogger';
 import { parseCurrency, addCurrency, multiplyCurrency } from '../utils/currency';
+import { roundQty } from '../utils/quantity';
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  POS_SALE_SCOPE,
+  normalizeIdempotencyKey,
+  hashRequestPayload,
+  findIdempotencyRecord,
+  claimIdempotencyKey,
+} from '../utils/idempotency';
 
 function generatePOSTransactionNo(): string {
   return generateDocNo(db, 'POS', 5);
@@ -33,6 +42,56 @@ function ensureWalkinCustomer(): number {
   logger.info(`Created Walk-in Customer with id=${walkinId}`);
   return walkinId;
 }
+
+/**
+ * P11: rebuild the POS sale result for an idempotent replay. The retried
+ * request body is hash-verified identical to the original, so every
+ * client-supplied field (warehouse, sale date, cash received, customer
+ * name) is taken from it and only the server-derived fields (transaction
+ * no, invoice id, item details, totals) are read back from the stored
+ * invoice — the response is byte-equivalent to the original.
+ */
+function replayPosSaleResult(invoiceId: number, reqBody: Record<string, unknown>): Record<string, unknown> | undefined {
+  const inv = db.prepare(
+    'SELECT invoice_no, total_amount, customer_name, invoice_date FROM invoices WHERE id = ? AND source_type = ?'
+  ).get(invoiceId, 'POS') as { invoice_no: string; total_amount: number; customer_name: string | null; invoice_date: string } | undefined;
+  if (!inv) return undefined;
+
+  const itemDetails = db.prepare(`
+    SELECT ? AS sale_id, ? AS sale_no, ii.item_id, i.item_code, i.item_name, i.unit_of_measure,
+           ii.quantity, ii.unit_price, ii.quantity * ii.unit_price AS line_total
+    FROM invoice_items ii
+    JOIN items i ON i.id = ii.item_id
+    WHERE ii.invoice_id = ?
+    ORDER BY ii.id
+  `).all(invoiceId, inv.invoice_no, invoiceId) as Array<Record<string, unknown>>;
+  if (itemDetails.length === 0) return undefined;
+
+  const total = Number(inv.total_amount);
+  const cashReceived = parseFloat(String(reqBody.cash_received ?? '')) || total;
+  const warehouse = WarehouseModel.getById(db, Number(reqBody.warehouse_id));
+
+  return {
+    transaction_no: inv.invoice_no,
+    sale_date: inv.invoice_date,
+    warehouse_id: reqBody.warehouse_id,
+    warehouse_name: warehouse?.warehouse_name,
+    customer_name: inv.customer_name || customerNameOrDefault(reqBody.customer_name),
+    items: itemDetails,
+    subtotal: total,
+    total,
+    cash_received: cashReceived,
+    change: cashReceived - total,
+    items_count: itemDetails.length,
+    sale_ids: [invoiceId],
+  };
+}
+
+function customerNameOrDefault(raw: unknown): string {
+  const name = typeof raw === 'string' ? raw.trim() : '';
+  return name || 'Walk-in Customer';
+}
+
 
 function createPOSSale(req: AuthRequest, res: Response): void {
   try {
@@ -59,6 +118,38 @@ function createPOSSale(req: AuthRequest, res: Response): void {
       res.status(400).json({ error: 'Warehouse not found' });
       return;
     }
+
+    // P11: idempotent POS sale. A retry after a client-side timeout must
+    // replay the original sale, never double-create (stock/GL/ledger).
+    // Requests without the header keep the legacy (unguarded) behavior.
+    let idemKey: string | null;
+    try {
+      idemKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
+    } catch (keyError) {
+      res.status(400).json({ error: (keyError as Error).message });
+      return;
+    }
+    const idemHash = idemKey ? hashRequestPayload(req.body) : '';
+    if (idemKey) {
+      const existing = findIdempotencyRecord(db, POS_SALE_SCOPE, idemKey);
+      if (existing) {
+        if (existing.request_hash !== idemHash) {
+          res.status(409).json({
+            error: 'Idempotency-Key was already used with a different request payload',
+          });
+          return;
+        }
+        if (existing.resource_id != null) {
+          const replayed = replayPosSaleResult(existing.resource_id, req.body);
+          if (replayed) {
+            res.set('X-Idempotent-Replay', 'true');
+            res.status(201).json({ success: true, message: 'POS sale completed successfully', data: replayed });
+            return;
+          }
+        }
+      }
+    }
+
 
     // ACC-18 interim: the server computes each line (rounded) and sums.
     let total = 0;
@@ -95,11 +186,12 @@ function createPOSSale(req: AuthRequest, res: Response): void {
     // expired stock, so it must not gate POS sales.
     for (const item of items) {
       const sellable = StockMovementModel.getSellableAvailability(item.item_id, warehouse_id, db)[0];
-      const availableStock = sellable ? sellable.sellable_qty : 0;
-      if (availableStock < item.quantity) {
+      const availableStock = roundQty(sellable ? sellable.sellable_qty : 0);
+      const requiredQty = roundQty(item.quantity);
+      if (availableStock < requiredQty) {
         const itemRecord = db.prepare('SELECT item_name FROM items WHERE id = ?').get(item.item_id) as { item_name: string } | undefined;
         res.status(400).json({
-          error: new SellableStockUnavailableError(itemRecord?.item_name || `item ${item.item_id}`, item.quantity, availableStock).message
+          error: new SellableStockUnavailableError(itemRecord?.item_name || `item ${item.item_id}`, requiredQty, availableStock).message
         });
         return;
       }
@@ -134,6 +226,14 @@ function createPOSSale(req: AuthRequest, res: Response): void {
       );
 
       const invoiceId = invoiceResult.lastInsertRowid as number;
+      // P11: claim the idempotency key inside this transaction — the
+      // (key → invoice) row persists if and only if the sale commits,
+      // so a rolled-back attempt leaves no trace and the retry runs
+      // normally, while a post-commit client timeout replays this sale.
+      if (idemKey) {
+        claimIdempotencyKey(db, POS_SALE_SCOPE, idemKey, idemHash, invoiceId);
+      }
+
 
       // Create invoice_items and stock movements for each cart item
       const itemDetails: Array<{

@@ -23,6 +23,7 @@
  */
 import Database from 'better-sqlite3';
 import AccountingService from './accountingService';
+import { ACTIVE_EXPENSE_STATUS } from '../utils/reportSql';
 
 /** The tracked cash accounts, in display order. `key` matches both the
  * reconciliation table's `account_key` column and the normalized
@@ -227,7 +228,7 @@ export function collectFlows(
   const expenses = db.prepare(`
     SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
     FROM expenses
-    WHERE status NOT IN ('Cancelled', 'Draft') AND expense_date > ? AND expense_date <= ?
+    WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date > ? AND expense_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
   for (const row of expenses) {
@@ -554,7 +555,7 @@ export function getCashAccountTransactions(
     SELECT expense_date as date, payment_method as method, expense_no as reference,
            description, amount
     FROM expenses
-    WHERE status NOT IN ('Cancelled', 'Draft') AND expense_date <= ?
+    WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date <= ?
   `).all(uptoDate) as Array<Record<string, unknown>>) {
     const amount = Number(r.amount) || 0;
     push({ method: r.method as string | null, date: r.date as string, reference: r.reference as string | null, description: r.description as string | null, amount: -amount, type: 'expense' });

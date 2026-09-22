@@ -94,7 +94,27 @@ function createItem(req: AuthRequest, res: Response): void {
 
     const itemId = ItemModel.create(req.body, req.user!.id, db);
 
-    // Log item creation using activity logger
+    // H10 fix: when current_stock is supplied on creation, create an OPENING
+    // batch so the initial stock has an identifiable cost layer for FIFO.
+    const openingQty = Number(req.body.current_stock) || 0;
+    if (openingQty > 0) {
+      const warehouseId = req.body.warehouse_id
+        || (WarehouseModel.getDefaultWarehouse(db))?.id;
+      if (warehouseId) {
+        StockMovementModel.recordMovement({
+          item_id: itemId,
+          warehouse_id: warehouseId,
+          quantity: openingQty,
+          unit_cost: req.body.standard_cost || 0,
+          movement_type: 'OPENING',
+          reference_doctype: 'ITEM_CREATE',
+          reference_docno: item_code,
+          remarks: `Opening stock for new item ${item_code}`,
+          movement_date: new Date().toISOString().split('T')[0],
+        }, req.user!.id, db);
+      }
+    }
+
     logCRUD(ActionType.ITEM_CREATE, 'Item', itemId, `Created item: ${item_name}`, req.user!.id, {
       item_code,
       item_name,

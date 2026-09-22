@@ -4,6 +4,7 @@ import AccountingService from '../services/accountingService';
 import { sanitizeSortParams, STOCK_BALANCE_SORT_COLUMNS, STOCK_MOVEMENT_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { SellableStockUnavailableError } from '../types';
+import { roundQty, qtyEpsilon, qtyLessThan, qtyPositive } from '../utils/quantity';
 
 interface StockMovement {
   id: number;
@@ -97,12 +98,60 @@ interface RecordMovementDTO {
   movement_type: string;
   movement_date?: string;
   batch_id?: number;
+  /** When true, skip H10 batch creation — the caller manages batches directly. */
+  skipBatchCreation?: boolean;
 }
 
 class StockMovementModel {
+  /**
+   * Next sequence number for batch numbers (shared with PhysicalCount via
+   * the settings table key BATCH_ADJ_last_no).
+   */
+  static getNextBatchSequence(db: Database.Database): number {
+    db.prepare(`
+      INSERT INTO settings (key, value, updated_at)
+      VALUES ('BATCH_ADJ_last_no', '1', CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET
+        value = CAST(CAST(settings.value AS INTEGER) + 1 AS TEXT),
+        updated_at = CURRENT_TIMESTAMP
+    `).run();
+    const row = db.prepare(`SELECT value FROM settings WHERE key = 'BATCH_ADJ_last_no'`).get() as { value: string };
+    return parseInt(row.value, 10);
+  }
+
   static recordMovement(data: RecordMovementDTO, userId: number | null, db: Database.Database): { id: number; movement_no: string } {
     const transaction = db.transaction(() => {
       const movementNo = this.generateMovementNo(db);
+      const qty = roundQty(data.quantity);
+
+      // H10 fix: incoming movements (quantity > 0) without an explicit batch_id
+      // create a costed batch so every sellable unit has an identifiable cost
+      // layer for FIFO consumption.  Source type maps to the movement type
+      // (ADJUSTMENT → ADJUSTMENT, everything else → OPENING).
+      let resolvedBatchId = data.batch_id || null;
+      if (qty > 0 && !resolvedBatchId && !data.skipBatchCreation) {
+        const batchSeq = this.getNextBatchSequence(db);
+        const sourceType = data.movement_type === 'ADJUSTMENT' ? 'ADJUSTMENT' : 'OPENING';
+        const batchNo = `BATCH-${new Date().getFullYear() % 100}-${sourceType === 'ADJUSTMENT' ? 'ADJ' : 'OP'}-${batchSeq.toString().padStart(4, '0')}`;
+        const unitCost = data.unit_cost || 0;
+        const batchResult = db.prepare(`
+          INSERT INTO stock_batches (
+            batch_no, item_id, warehouse_id, source_type,
+            source_id, quantity_original, quantity_remaining,
+            unit_cost, received_date
+          ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)
+        `).run(
+          batchNo,
+          data.item_id,
+          data.warehouse_id,
+          sourceType,
+          qty,
+          qty,
+          unitCost,
+          data.movement_date || new Date().toISOString().split('T')[0]
+        );
+        resolvedBatchId = batchResult.lastInsertRowid as number;
+      }
 
       const movementStmt = db.prepare(`
         INSERT INTO stock_movements (
@@ -117,14 +166,14 @@ class StockMovementModel {
         data.item_id,
         data.warehouse_id,
         data.movement_type,
-        data.quantity,
+        qty,
         data.unit_cost || null,
         data.reference_doctype || null,
         data.reference_docno || null,
         data.remarks || null,
         data.movement_date || new Date().toISOString().split('T')[0],
         userId ?? null, // nullable: system-initiated movements (boot task) have no actor
-        data.batch_id || null
+        resolvedBatchId
       );
 
       const existingBalance = db.prepare(`
@@ -138,12 +187,12 @@ class StockMovementModel {
           SET quantity = quantity + ?,
               last_updated = CURRENT_TIMESTAMP
           WHERE item_id = ? AND warehouse_id = ?
-        `).run(data.quantity, data.item_id, data.warehouse_id);
+        `).run(qty, data.item_id, data.warehouse_id);
       } else {
         db.prepare(`
           INSERT INTO stock_balances (item_id, warehouse_id, quantity)
           VALUES (?, ?, ?)
-        `).run(data.item_id, data.warehouse_id, data.quantity);
+        `).run(data.item_id, data.warehouse_id, qty);
       }
 
       // New path: keep extension columns in sync with batch_stock_by_location
@@ -169,7 +218,8 @@ class StockMovementModel {
           item_id: data.item_id,
           quantity: data.quantity,
           movement_date: data.movement_date || new Date().toISOString().split('T')[0],
-          created_by: userId
+          created_by: userId,
+          batch_id: resolvedBatchId
         }, db);
       }
 
@@ -360,17 +410,25 @@ class StockMovementModel {
     quantity: number;
     movement_date: string;
     created_by: number;
+    batch_id?: number | null;
   }, db: Database.Database): void {
-    const { id, item_id, quantity, movement_date, created_by } = params;
+    const { id, item_id, quantity, movement_date, created_by, batch_id } = params;
 
-    const item = db.prepare(`
-      SELECT standard_cost FROM items WHERE id = ?
-    `).get(item_id) as { standard_cost: number } | undefined;
+    let unitCost = 0;
+    if (batch_id) {
+      const batch = db.prepare(`
+        SELECT unit_cost FROM stock_batches WHERE id = ?
+      `).get(batch_id) as { unit_cost: number } | undefined;
+      unitCost = batch?.unit_cost || 0;
+    }
+    if (!unitCost) {
+      const item = db.prepare(`
+        SELECT standard_cost FROM items WHERE id = ?
+      `).get(item_id) as { standard_cost: number } | undefined;
+      unitCost = item?.standard_cost || 0;
+    }
 
-    if (!item) return;
-
-    const standardCost = item.standard_cost || 0;
-    const value = Math.abs(quantity) * standardCost;
+    const value = Math.abs(quantity) * unitCost;
 
     if (value === 0) return;
 
@@ -381,8 +439,8 @@ class StockMovementModel {
       : { debit: 'inventory_asset', credit: 'inventory_correction' };
 
     const description = isRemoval
-      ? `Stock removal: ${Math.abs(quantity)} units @ ${standardCost}`
-      : `Stock addition: ${Math.abs(quantity)} units @ ${standardCost}`;
+      ? `Stock removal: ${Math.abs(quantity)} units @ ${unitCost}`
+      : `Stock addition: ${Math.abs(quantity)} units @ ${unitCost}`;
 
     const journalEntryId = AccountingService.postLegacyStockEntry(db, {
       referenceType: 'stock_adjustment',
@@ -703,8 +761,9 @@ class StockMovementModel {
     quantity: number,
     db: Database.Database
   ): Array<{ batchId: number | null; consumed: number; unitCost: number }> {
-    if (quantity <= 0) {
-      throw new Error(`consumeFromOldestBatches: quantity must be positive, got ${quantity}`);
+    const roundedQty = roundQty(quantity);
+    if (roundedQty <= 0) {
+      throw new Error(`consumeFromOldestBatches: quantity must be positive, got ${roundedQty}`);
     }
 
     const featureOn = isFeatureEnabled(db, 'feature_batch_locations');
@@ -724,9 +783,9 @@ class StockMovementModel {
     // cost with batchId null), so fall back to quantity when the item
     // has no per-location coverage in this warehouse.
     let availableQty = featureOn
-      ? (balanceRow ? parseFloat(String(balanceRow.quantity_available ?? 0)) : 0)
-      : (balanceRow ? parseFloat(String(balanceRow.quantity)) : 0);
-    if (featureOn && availableQty < quantity) {
+      ? (balanceRow ? roundQty(parseFloat(String(balanceRow.quantity_available ?? 0))) : 0)
+      : (balanceRow ? roundQty(parseFloat(String(balanceRow.quantity))) : 0);
+    if (featureOn && qtyLessThan(availableQty, roundedQty)) {
       const coverage = db.prepare(`
         SELECT COALESCE(SUM(bsl.quantity_available), 0) as covered
         FROM batch_stock_by_location bsl
@@ -734,17 +793,17 @@ class StockMovementModel {
         JOIN stock_batches sb ON sb.id = bsl.batch_id
         WHERE l.warehouse_id = ? AND sb.item_id = ?
       `).get(warehouseId, itemId) as { covered: number };
-      if (coverage.covered + 1e-9 < quantity) {
+      if (roundQty(coverage.covered) < roundedQty) {
         // No (or insufficient) per-location coverage: legacy stock.
-        availableQty = balanceRow ? parseFloat(String(balanceRow.quantity)) : 0;
+        availableQty = balanceRow ? roundQty(parseFloat(String(balanceRow.quantity))) : 0;
       }
     }
 
-    if (availableQty < quantity) {
+    if (qtyLessThan(availableQty, roundedQty)) {
       const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
       throw new SellableStockUnavailableError(
         item?.item_name || `item ${itemId}`,
-        quantity,
+        roundedQty,
         availableQty
       );
     }
@@ -819,12 +878,13 @@ class StockMovementModel {
       }
 
       // Consume from oldest batches first, respecting per-batch available.
-      let remaining = quantity;
+      let remaining = roundedQty;
       const consumption: Array<{ batchId: number | null; consumed: number; unitCost: number }> = [];
 
       for (const batch of batchRows) {
         if (remaining <= 0) break;
-        const consumeFromThis = Math.min(remaining, batch.qty_avail);
+        const batchAvail = roundQty(batch.qty_avail);
+        const consumeFromThis = roundQty(Math.min(remaining, batchAvail));
 
         // Location rows for this batch in this warehouse. The batch-level
         // expiry/halted filter already ran in the outer batchRows query;
@@ -844,7 +904,8 @@ class StockMovementModel {
         let batchRemaining = consumeFromThis;
         for (const loc of locRows) {
           if (batchRemaining <= 0) break;
-          const take = Math.min(batchRemaining, loc.quantity_available);
+          const locAvail = roundQty(loc.quantity_available);
+          const take = roundQty(Math.min(batchRemaining, locAvail));
           db.prepare(`
             UPDATE batch_stock_by_location
             SET quantity_physical = quantity_physical - ?, quantity_reserved = quantity_reserved
@@ -864,12 +925,12 @@ class StockMovementModel {
         remaining -= consumeFromThis;
       }
 
-      if (remaining > 0.001) {
+      if (qtyPositive(remaining)) {
         const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
         throw new SellableStockUnavailableError(
           item?.item_name || `item ${itemId}`,
-          quantity,
-          quantity - remaining
+          roundedQty,
+          roundQty(roundedQty - remaining)
         );
       }
 
@@ -936,12 +997,13 @@ class StockMovementModel {
       return [{ batchId: null, consumed: quantity, unitCost: fallbackCost }];
     }
 
-    let remaining = quantity;
+    let remaining = roundedQty;
     const consumption: Array<{ batchId: number | null; consumed: number; unitCost: number }> = [];
 
     for (const batch of batches) {
       if (remaining <= 0) break;
-      const consumeFromThis = Math.min(remaining, batch.quantity_remaining);
+      const batchRemaining = roundQty(batch.quantity_remaining);
+      const consumeFromThis = roundQty(Math.min(remaining, batchRemaining));
 
       db.prepare(`
         UPDATE stock_batches
@@ -953,12 +1015,12 @@ class StockMovementModel {
       remaining -= consumeFromThis;
     }
 
-    if (remaining > 0.001) {
+    if (qtyPositive(remaining)) {
       const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
       throw new SellableStockUnavailableError(
         item?.item_name || `item ${itemId}`,
-        quantity,
-        quantity - remaining
+        roundedQty,
+        roundQty(roundedQty - remaining)
       );
     }
     return consumption;
@@ -979,7 +1041,7 @@ class StockMovementModel {
     if (data.from_warehouse_id === data.to_warehouse_id) {
       throw new Error('Source and destination warehouses must differ');
     }
-    const qty = parseFloat(String(data.quantity));
+    const qty = roundQty(parseFloat(String(data.quantity)));
     if (!Number.isFinite(qty) || qty <= 0) {
       throw new Error(`Transfer quantity must be positive, got ${data.quantity}`);
     }
@@ -1520,11 +1582,13 @@ class StockMovementModel {
       `).all(outLeg.movement_no) as Array<{
         id: number; quantity: number; batch_id: number | null;
       }>;
+      let restoredBatchId: number | null = null;
       for (const leg of outConsumptions) {
         if (leg.batch_id !== null) {
           db.prepare(`
             UPDATE stock_batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?
           `).run(Math.abs(leg.quantity), leg.batch_id);
+          if (restoredBatchId === null) restoredBatchId = leg.batch_id;
           // New path: restore to default location of source warehouse
           if (isFeatureEnabled(db, 'feature_batch_locations')) {
             const srcLoc = db.prepare(`
@@ -1572,6 +1636,7 @@ class StockMovementModel {
         movement_type: 'ADJUSTMENT',
         quantity: qty,
         unit_cost: outLeg.unit_cost ?? undefined,
+        batch_id: restoredBatchId ?? undefined,
         reference_doctype: 'TRANSFER_VOID',
         reference_docno: outLeg.movement_no,
         remarks: `Transfer ${outLeg.movement_no} voided — stock returned to source`,

@@ -7,6 +7,7 @@ import StockMovementModel from './StockMovement';
 import ledgerUtils from '../utils/ledgerUtils';
 import AccountingService from '../services/accountingService';
 import { parseCurrency } from '../utils/currency';
+import { roundQty } from '../utils/quantity';
 
 export interface SalesOrder {
   id: number;
@@ -643,12 +644,13 @@ class SalesOrderModel {
       // .quantity counts expired stock, so it must not gate conversion.
       for (const item of salesOrder.items || []) {
         const sellable = StockMovementModel.getSellableAvailability(item.item_id, salesOrder.warehouse_id, db)[0];
-        const availableSellable = sellable ? sellable.sellable_qty : 0;
-        if (availableSellable < item.quantity) {
+        const availableSellable = roundQty(sellable ? sellable.sellable_qty : 0);
+        const requiredQty = roundQty(item.quantity);
+        if (availableSellable < requiredQty) {
           const itemRow = db.prepare('SELECT item_name FROM items WHERE id = ?').get(item.item_id) as { item_name: string } | undefined;
           throw new SellableStockUnavailableError(
             itemRow?.item_name || item.item_code || `item ${item.item_id}`,
-            item.quantity,
+            requiredQty,
             availableSellable
           );
         }
