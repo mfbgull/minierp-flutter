@@ -1,7 +1,7 @@
 /**
  * Reversal-rules Phase 5 — shared accounting-invariant checkers.
  *
- * Five invariants over the whole database:
+ * Nine invariants over the whole database:
  *   A. GL balance: every journal_lines reference group sums debit == credit.
  *   B. Customer subledger: customers.current_balance == customer_ledger sum
  *      (voided and reversed rows excluded, matching the authoritative
@@ -10,8 +10,12 @@
  *   D. Supplier subledger: suppliers.current_balance == supplier_ledger sum.
  *   E. Stock vs batches: stock_balances.quantity == Σ stock_batches
  *      .quantity_remaining per item/warehouse.
+ *   F. GL AR (1100) == sum of customer balances.
+ *   G. GL AP (2000) == sum of supplier balances.
+ *   H. GL Inventory (1200) == inventory batch values.
+ *   I. GL Cash == cash account operational balances.
  *
- * `expectAllInvariantsHold(context)` asserts all five; the individual
+ * `expectAllInvariantsHold(context)` asserts all nine; the individual
  * collectors are exported for targeted assertions.
  */
 import db from '../../config/database';
@@ -19,6 +23,11 @@ import db from '../../config/database';
 export interface Violation {
   label: string;
   diff: number;
+  /** Structured detail for reconciliation invariants F-I. */
+  account?: string;
+  expected?: number;
+  actual?: number;
+  reference?: string;
 }
 
 interface GroupImbalance {
@@ -117,7 +126,95 @@ export function stockImbalances(): Violation[] {
   `).all() as unknown as Violation[];
 }
 
-/** Assert all five invariants; `context` aids debugging on failure. */
+// ============================================================================
+// Invariants F–I: GL ↔ operational-balance reconciliation
+// ============================================================================
+
+const GL_ACCOUNT_ID = (code: string): number | undefined =>
+  (db.prepare('SELECT id FROM chart_of_accounts WHERE code = ?').get(code) as { id: number } | undefined)?.id;
+
+const GL_BALANCE = (code: string): number => {
+  const id = GL_ACCOUNT_ID(code);
+  if (!id) return 0;
+  const row = db.prepare(
+    'SELECT COALESCE(SUM(debit) - SUM(credit), 0) AS balance FROM journal_lines WHERE account_id = ? AND voided = 0'
+  ).get(id) as { balance: number };
+  return Number(row.balance);
+};
+
+const R2 = (v: number): number => Math.round(v * 100) / 100;
+
+/** Invariant F: GL AR (1100) == Σ customer balances. */
+export function arImbalances(): Violation[] {
+  const glBalance = R2(Math.abs(GL_BALANCE('1100')));
+  const row = db.prepare(
+    'SELECT COALESCE(SUM(current_balance), 0) AS total FROM customers'
+  ).get() as { total: number };
+  const custBalance = R2(Math.abs(row.total));
+  if (Math.abs(glBalance - custBalance) > 0.005) {
+    return [{ label: 'GL AR vs customer balances', diff: R2(glBalance - custBalance), account: '1100', expected: custBalance, actual: glBalance }];
+  }
+  return [];
+}
+
+/** Invariant G: GL AP (2000) == Σ supplier balances. */
+export function apImbalances(): Violation[] {
+  const glBalance = R2(Math.abs(GL_BALANCE('2000')));
+  const row = db.prepare(
+    'SELECT COALESCE(SUM(current_balance), 0) AS total FROM suppliers'
+  ).get() as { total: number };
+  const supBalance = R2(Math.abs(row.total));
+  if (Math.abs(glBalance - supBalance) > 0.005) {
+    return [{ label: 'GL AP vs supplier balances', diff: R2(glBalance - supBalance), account: '2000', expected: supBalance, actual: glBalance }];
+  }
+  return [];
+}
+
+/** Invariant H: GL Inventory (1200) == stock batch + legacy item values. */
+export function inventoryImbalances(): Violation[] {
+  const glBalance = R2(Math.abs(GL_BALANCE('1200')));
+  const batchVal = db.prepare(
+    'SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) AS v FROM stock_batches WHERE quantity_remaining > 0'
+  ).get() as { v: number };
+  const legacyVal = db.prepare(`
+    SELECT COALESCE(SUM(i.current_stock * i.standard_cost), 0) AS v
+    FROM items i
+    WHERE i.is_active = 1 AND i.current_stock > 0
+      AND NOT EXISTS (SELECT 1 FROM stock_batches sb WHERE sb.item_id = i.id AND sb.quantity_remaining > 0)
+  `).get() as { v: number };
+  const opBalance = R2(batchVal.v + legacyVal.v);
+  if (Math.abs(glBalance - opBalance) > 0.005) {
+    return [{ label: 'GL Inventory vs batch values', diff: R2(glBalance - opBalance), account: '1200', expected: opBalance, actual: glBalance }];
+  }
+  return [];
+}
+
+/** Invariant I: GL Cash accounts == operational cash balances. */
+export function cashImbalances(): Violation[] {
+  const CASH_CODES: Array<{ code: string; name: string }> = [
+    { code: '1000', name: 'Cash' },
+    { code: '1010', name: 'Bank' },
+    { code: '1020', name: 'Easypaisa' },
+    { code: '1030', name: 'JazzCash' },
+    { code: '1040', name: 'UPaisa' },
+  ];
+  const violations: Violation[] = [];
+  for (const { code, name } of CASH_CODES) {
+    const glBalance = R2(GL_BALANCE(code));
+    const acctId = GL_ACCOUNT_ID(code);
+    if (!acctId) continue;
+    const row = db.prepare(
+      'SELECT COALESCE(SUM(debit) - SUM(credit), 0) AS balance FROM journal_lines WHERE account_id = ? AND voided = 0'
+    ).get(acctId) as { balance: number };
+    const opBalance = R2(row.balance);
+    if (Math.abs(glBalance - opBalance) > 0.005) {
+      violations.push({ label: `GL Cash (${name}) vs operational`, diff: R2(glBalance - opBalance), account: code, expected: opBalance, actual: glBalance });
+    }
+  }
+  return violations;
+}
+
+/** Assert invariants A–E; `context` aids debugging on failure. */
 export function expectAllInvariantsHold(context: string): void {
   const gl = glImbalances();
   expect(gl.groups).toEqual([]);
@@ -126,4 +223,17 @@ export function expectAllInvariantsHold(context: string): void {
   expect(supplierApImbalances()).toEqual([]);
   expect(stockImbalances()).toEqual([]);
   void context;
+}
+
+/**
+ * Assert all nine invariants A–I. Use only in scenarios that seed
+ * inventory through proper GL-posting flows (PO receipts), not raw
+ * batch inserts.
+ */
+export function expectAllReconciliationInvariantsHold(context: string): void {
+  expectAllInvariantsHold(context);
+  expect(arImbalances()).toEqual([]);
+  expect(apImbalances()).toEqual([]);
+  expect(inventoryImbalances()).toEqual([]);
+  expect(cashImbalances()).toEqual([]);
 }
