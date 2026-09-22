@@ -1,29 +1,22 @@
 /**
- * C3: purchase-order goods receipts must post to the GL.
+ * C3 + ACC-16: purchase-order goods receipts are the sole poster.
  *
- * Root cause: PurchaseOrder.addReceipt created stock, a FIFO batch cost
- * layer and a PURCHASE movement but posted no journal_lines, so GL
- * Inventory (1200) and GL AP (2000) both understated the real position
- * by the value of everything ever received via a PO. This suite proves
- * the receipt now posts Dr 1200 / Cr 2000 for the received value only,
- * that partial and repeated receipts are additive (never duplicative),
- * that voiding a receipt reverses exactly its own GL group, and that a
- * cancellation does not reverse the value of goods already received.
+ * Model (gl-posting-matrix ACC-16 + reversal-rules C3):
+ *   - PO submission posts NOTHING — no GL entry, no supplier-ledger
+ *     debit. A submitted PO is a commitment, not a liability.
+ *   - Goods receipt posts Dr 1200 Inventory / Cr 2000 AP for the value
+ *     that actually arrived, keyed to the receipt.
+ *   - Cancelling a PO never touches any ledger: nothing was posted at
+ *     submission, so there is nothing to reverse. Received goods keep
+ *     their receipt-time AP; the unreceived remainder was never a
+ *     liability.
  *
- * Two identities are asserted throughout (same derivations as
- * Reports.getGLReconciliation):
- *
+ * Identities asserted throughout:
  *   GL Inventory (1200) == Σ batch cost layers (+ legacy item fallback)
- *
- *   GL AP (2000)       == Σ supplier ledger positions − Σ PO value still
- *                         outstanding (submitted but not yet received)
- *
- * The AP identity reduces to "GL AP == supplier balances" — invariant 10
- * in the task spec — once every PO has been fully received. The
- * outstanding term is what keeps it true in the intermediate states this
- * suite deliberately builds: submission posts the supplier ledger (the
- * commitment), the receipt posts the GL (the actual liability), so the
- * two only converge when the goods land.
+ *   GL AP (2000)        == Σ supplier ledger positions
+ * (the old "less open PO commitments" term is gone — submission no
+ * longer writes the supplier ledger, so the two ledgers agree at every
+ * instant, not only when goods land)
  */
 import request from 'supertest';
 import app from '../app';
@@ -79,34 +72,19 @@ function batchValue(): number {
  * per-row `balance` running total is maintained by
  * SupplierLedgerModel.rebuildBalances and can drift when an entry's
  * transaction_date falls out of id order; the debit/credit columns
- * are the source of truth. GL 2000 tracks this same value, less the
- * value committed to POs that have not landed yet.
+ * are the source of truth. Under ACC-16 the GL tracks this same value
+ * exactly: receipts credit AP, payments debit it, nothing else writes
+ * either side.
  */
 function supplierBalanceTotal(): number {
   const row = db.prepare(`
     SELECT COALESCE(SUM(debit - credit), 0) AS total
     FROM supplier_ledger WHERE voided = 0
   `).get() as { total: number };
+  // Positive = we owe the supplier (debit-normal ledger), matching the
+  // GL AP accountBalance() convention (a credit-normal account reads
+  // positive when credits exceed debits).
   return Number(row.total);
-}
-
-/**
- * Value committed to suppliers but not yet received: the submitted PO
- * total less what has actually landed, over every PO that is still
- * open. Voiding a receipt rolls purchase_order_items.received_quantity
- * back, so this term tracks the receipts that are currently live.
- */
-function outstandingPoValue(): number {
-  const row = db.prepare(`
-    SELECT COALESCE(SUM(po.total_amount - COALESCE(rec.value, 0)), 0) AS v
-    FROM purchase_orders po
-    LEFT JOIN (
-      SELECT po_id, SUM(received_quantity * unit_price) AS value
-      FROM purchase_order_items GROUP BY po_id
-    ) rec ON rec.po_id = po.id
-    WHERE po.status NOT IN ('Cancelled', 'Closed', 'Draft')
-  `).get() as { v: number };
-  return Number(row.v);
 }
 
 /** Signed GL balance of one account, voided lines excluded. */
@@ -129,8 +107,12 @@ function accountBalance(code: string): number {
 }
 
 function assertInvariants(): void {
-  expect(accountBalance(INVENTORY_CODE)).toBeCloseTo(batchValue(), 2);
-  expect(accountBalance(AP_CODE)).toBeCloseTo(supplierBalanceTotal() - outstandingPoValue(), 2);
+  const glInv = accountBalance(INVENTORY_CODE);
+  const opInv = batchValue();
+  expect(glInv).toBeCloseTo(opInv, 2);
+  const glAp = accountBalance(AP_CODE);
+  const supBal = supplierBalanceTotal();
+  expect(glAp).toBeCloseTo(supBal, 2);
 }
 
 interface Fixture { poId: number; poNo: string; poItemId: number }
@@ -268,16 +250,25 @@ beforeAll(async () => {
 });
 
 describe('C3: PO goods receipts post to the GL', () => {
-  it('scenario 1: a submitted PO with no receipt posts no GL', async () => {
+  it('scenario 1: a submitted PO posts nothing — no GL, no supplier ledger (ACC-16)', async () => {
     const invBefore = accountBalance(INVENTORY_CODE);
     const apBefore = accountBalance(AP_CODE);
-    await createSubmittedPo(5, 20);
+    const supplierBefore = supplierBalanceTotal();
+    const po = await createSubmittedPo(5, 20);
 
-    // Submission posts the supplier ledger (the commitment) but no GL:
-    // nothing has arrived, so there is no inventory and no liability to
-    // recognise.
+    // Submission must be invisible to both ledgers: nothing has
+    // arrived, so there is no inventory and no liability to recognise.
     expect(accountBalance(INVENTORY_CODE)).toBeCloseTo(invBefore, 2);
     expect(accountBalance(AP_CODE)).toBeCloseTo(apBefore, 2);
+    expect(supplierBalanceTotal()).toBeCloseTo(supplierBefore, 2);
+
+    // and no PURCHASE_ORDER commitment rows exist for this PO at all
+    const commitment = db.prepare(`
+      SELECT COUNT(*) AS n FROM supplier_ledger
+      WHERE transaction_type = 'PURCHASE_ORDER' AND reference_no = ?
+    `).get(po.poNo) as { n: number };
+    expect(commitment.n).toBe(0);
+
     assertInvariants();
   });
 
@@ -302,6 +293,8 @@ describe('C3: PO goods receipts post to the GL', () => {
     expect(lines.find(l => l.account_code === INVENTORY_CODE)?.debit).toBeCloseTo(1000, 2);
     expect(lines.find(l => l.account_code === AP_CODE)?.credit).toBeCloseTo(1000, 2);
 
+    // The receipt is the sole poster: GL AP and the supplier ledger
+    // moved together.
     assertInvariants();
   });
 
@@ -316,7 +309,7 @@ describe('C3: PO goods receipts post to the GL', () => {
     expect(accountBalance(AP_CODE)).toBeCloseTo(apBefore + 400, 2);
 
     // The PO is partially received; the remaining 600 is still only a
-    // commitment and must not appear in the GL.
+    // commitment and must not appear in the GL — or anywhere else.
     const status = db.prepare('SELECT status FROM purchase_orders WHERE id = ?').get(po.poId) as { status: string };
     expect(status.status).toBe('Partially Received');
 
@@ -374,8 +367,9 @@ describe('C3: PO goods receipts post to the GL', () => {
     await receive(po, 5);
     await paySupplier(po.poId, 500);
 
-    // The payment debits GL AP and credits the supplier ledger by the
-    // same 500, so both return to their pre-PO level and the PO closes.
+    // The receipt credited both ledgers by 500; the payment's PAYMENT row
+    // credits the ledger and debits GL AP by 500, so both return to their
+    // pre-PO level and the PO closes.
     expect(accountBalance(AP_CODE)).toBeCloseTo(apBefore, 2);
     expect(supplierBalanceTotal()).toBeCloseTo(supplierBefore, 2);
 
@@ -472,30 +466,22 @@ describe('C3: PO goods receipts post to the GL', () => {
     const po = await createSubmittedPo(10, 100); // total 1000
     await receive(po, 4); // 400 received, 600 still outstanding
 
-
     const cancel = await request(app)
       .post(`/api/purchase-orders/${po.poId}/status`)
       .set('Cookie', authCookie)
       .send({ status: 'Cancelled' });
     expect(cancel.status).toBe(200);
 
-    // The reversal must be only the outstanding 600, not the full 1000:
-    // the 400 of received goods is real inventory backed by a real
-    // payable and must survive the cancellation.
+    // ACC-16: cancellation writes NO ledger rows at all. There was no
+    // submission debit to reverse; the received 400 keeps its
+    // receipt-time AP; the unreceived 600 was never a liability.
     const rows = db.prepare(`
       SELECT transaction_type, debit, credit
       FROM supplier_ledger
       WHERE reference_no = ? AND voided = 0
       ORDER BY id
     `).all(po.poNo) as Array<{ transaction_type: string; debit: number; credit: number }>;
-    expect(rows).toHaveLength(2);
-    expect(rows[0].transaction_type).toBe('PURCHASE_ORDER');
-    expect(Number(rows[0].debit)).toBeCloseTo(1000, 2);
-    expect(rows[1].transaction_type).toBe('PURCHASE_ORDER_CANCEL');
-    expect(Number(rows[1].credit)).toBeCloseTo(600, 2);
-
-    const net = rows.reduce((s, r) => s + Number(r.debit) - Number(r.credit), 0);
-    expect(net).toBeCloseTo(400, 2);
+    expect(rows).toHaveLength(0);
 
     // Supplier and GL both retain exactly the received 400.
     expect(supplierBalanceTotal()).toBeCloseTo(supplierBefore + 400, 2);
@@ -505,7 +491,7 @@ describe('C3: PO goods receipts post to the GL', () => {
     assertInvariants();
   });
 
-  it('scenario 9: cancelling a fully-unreceived PO still reverses the whole commitment', async () => {
+  it('scenario 9: cancelling a fully-unreceived PO moves no ledger at all', async () => {
     const supplierBefore = supplierBalanceTotal();
     const apBefore = accountBalance(AP_CODE);
     const po = await createSubmittedPo(8, 50); // total 400, nothing received
@@ -516,14 +502,14 @@ describe('C3: PO goods receipts post to the GL', () => {
       .send({ status: 'Cancelled' });
     expect(cancel.status).toBe(200);
 
-    // Nothing was received, so the full commitment reverses and neither
-    // the GL nor the supplier ledger moves.
+    // Nothing was received and nothing was ever posted, so neither the
+    // GL nor the supplier ledger moves.
     const rows = db.prepare(`
       SELECT transaction_type, debit, credit
       FROM supplier_ledger
       WHERE reference_no = ? AND voided = 0 ORDER BY id
     `).all(po.poNo) as Array<{ transaction_type: string; debit: number; credit: number }>;
-    expect(Number(rows[1].credit)).toBeCloseTo(400, 2);
+    expect(rows).toHaveLength(0);
 
     expect(supplierBalanceTotal()).toBeCloseTo(supplierBefore, 2);
     expect(accountBalance(AP_CODE)).toBeCloseTo(apBefore, 2);
@@ -534,21 +520,11 @@ describe('C3: PO goods receipts post to the GL', () => {
     expect(accountBalance(INVENTORY_CODE)).toBeCloseTo(batchValue(), 2);
   });
 
-  it('invariant 10: GL AP tracks supplier balances less open commitments', () => {
-    // The identity that must hold at every instant: GL 2000 recognises
-    // only value that has actually landed, while the supplier ledger
-    // carries the full commitment from submit. The gap between them is
-    // exactly the ordered-but-unreceived value still open.
-    expect(accountBalance(AP_CODE)).toBeCloseTo(
-      supplierBalanceTotal() - outstandingPoValue(), 2
-    );
-
-    // The suite deliberately leaves POs open, so the outstanding term is
-    // non-zero by construction and its composition is known: scenario 1
-    // is never received (100), scenario 3 is partially received (600),
-    // and scenario 7's receipt was voided, returning its PO to nothing
-    // received (1000).
-    expect(outstandingPoValue()).toBeCloseTo(1700, 2);
+  it('invariant 10: GL AP equals the supplier ledger exactly (ACC-16)', () => {
+    // With no commitment postings, the two ledgers agree at every
+    // instant — not only when goods land. This is the identity the old
+    // submission debit broke.
+    expect(accountBalance(AP_CODE)).toBeCloseTo(supplierBalanceTotal(), 2);
   });
 });
 

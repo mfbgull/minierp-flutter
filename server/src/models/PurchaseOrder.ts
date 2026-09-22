@@ -572,60 +572,19 @@ class PurchaseOrderModel {
         WHERE id = ?
       `).run(status, id);
 
-      // Create AP ledger entry if submitting
-      if (status === 'Submitted' && po.status !== 'Submitted') {
-        SupplierLedgerModel.createEntry({
-          supplier_id: po.supplier_id,
-          transaction_date: po.po_date,
-          transaction_type: 'PURCHASE_ORDER',
-          reference_no: po.po_no,
-          debit: po.total_amount,
-          credit: 0,
-          description: `Purchase Order ${po.po_no}`
-        }, db);
-        // Keep suppliers.current_balance in lockstep with the new tail —
-        // createEntry alone never touches the header balance (same as
-        // every other createEntry site).
-        SupplierLedgerModel.rebuildBalances(po.supplier_id, db);
-      }
+      // ACC-16: PO submission posts NOTHING — no GL entry, no supplier-
+      // ledger debit. A submitted PO is a commitment, not a liability:
+      // the payable comes into existence only when goods are received
+      // (recordPurchase posts Dr inventory / Cr AP at receipt time).
+      // Posting a debit here double-counted the commitment: a received-
+      // and-paid PO left a spurious supplier credit and drove the GL AP
+      // and supplier subledger permanently out of sync.
+      void status;
 
-      // Reversal-rules C3: cancelling a Submitted/Partially Received
-      // PO must reverse the AP ledger entry that submission posted,
-      // or supplier balances (and AP Aging, which reads supplier_ledger
-      // directly) stay inflated forever. Append an equal-and-opposite
-      // credit inside this same transaction, then rebuild the chain.
-      // Draft POs never posted a ledger entry, so only POs arriving at
-      // Cancelled from Submitted/Partially Received need the reversal.
-      //
-      // The credit is only for the unreceived remainder: goods already
-      // received are real inventory backed by a real payable (posted to
-      // the GL at receipt time), so that portion of the liability must
-      // survive the cancellation. Reversing the full PO total would
-      // over-credit the supplier for goods we still hold.
-      if (status === 'Cancelled' && (po.status === 'Submitted' || po.status === 'Partially Received')) {
-        const receivedRow = db.prepare(`
-          SELECT COALESCE(SUM(received_quantity * unit_price), 0) AS received_value
-          FROM purchase_order_items WHERE po_id = ?
-        `).get(id) as { received_value: number };
-        const receivedValue = roundCurrency(Number(receivedRow.received_value));
-        const cancellationCredit = roundCurrency(po.total_amount - receivedValue);
-
-        if (cancellationCredit > 0) {
-          SupplierLedgerModel.createEntry({
-            supplier_id: po.supplier_id,
-            transaction_date: po.po_date,
-            transaction_type: 'PURCHASE_ORDER_CANCEL',
-            reference_no: po.po_no,
-            debit: 0,
-            credit: cancellationCredit,
-            description:
-              receivedValue > 0
-                ? `Purchase Order ${po.po_no} cancelled — reverses unreceived portion of submission debit`
-                : `Purchase Order ${po.po_no} cancelled — reverses submission debit`,
-          }, db);
-          SupplierLedgerModel.rebuildBalances(po.supplier_id, db);
-        }
-      }
+      // ACC-16: no cancellation reversal is needed anymore — submission
+      // never posted a commitment debit (see above), so there is nothing
+      // to reverse. Received goods keep their real receipt-time AP; the
+      // unreceived remainder was never a liability in the first place.
 
       db.prepare(`
         INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
@@ -820,6 +779,23 @@ class PurchaseOrderModel {
         voidedBy: userId,
         voidReason: data.reason,
       });
+
+      // ACC-16: void the receipt's supplier-ledger credit as well so the
+      // subledger follows the GL reversal (mirrors the GOODS_RECEIPT GL
+      // group void above). Same canonical void the purchase-void path
+      // uses (ledgerUtils.reverseLedgerEntry).
+      {
+        const slRow = db.prepare(`
+          SELECT id, supplier_id FROM supplier_ledger
+          WHERE transaction_type = 'GOODS_RECEIPT' AND reference_no = ? AND voided = 0
+        `).get(receipt.receipt_no) as { id: number; supplier_id: number } | undefined;
+        if (slRow) {
+          // Pure void (not a move): mark the row voided so it drops out of
+          // balances — no reversal row, the receipt simply never happened.
+          db.prepare(`UPDATE supplier_ledger SET voided = 1 WHERE id = ?`).run(slRow.id);
+          SupplierLedgerModel.rebuildBalances(slRow.supplier_id, db);
+        }
+      }
 
       // Stamp the void (idempotency marker) and log activity.
       db.prepare(`
@@ -1064,6 +1040,28 @@ class PurchaseOrderModel {
           receiptDate: receipt_date,
           userId,
         });
+
+        // ACC-16: the receipt — not the submission — creates the real
+        // liability, so the supplier ledger is credited here in lockstep
+        // with the GL AP credit. This keeps GL 2000 == supplier balances
+        // at every instant (the old submission debit broke that identity;
+        // a direct purchase does the same via Purchase.recordPurchase).
+        if (po.supplier_id) {
+          // The supplier ledger is DEBIT-normal (debit = we owe more), so
+          // the receipt debits it while the GL AP credit posts in
+          // parallel; the later supplier payment credits the ledger and
+          // debits GL AP. The two ledgers move in lockstep.
+          SupplierLedgerModel.createEntry({
+            supplier_id: po.supplier_id,
+            transaction_date: receipt_date,
+            transaction_type: 'GOODS_RECEIPT',
+            reference_no: receiptNo,
+            debit: postedAmount,
+            credit: 0,
+            description: `Goods receipt ${receiptNo} against PO ${po.po_no}`,
+          }, db);
+          SupplierLedgerModel.rebuildBalances(po.supplier_id, db);
+        }
       }
 
       // Update item current_stock

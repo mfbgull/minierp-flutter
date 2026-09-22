@@ -1,10 +1,13 @@
 /**
- * H11: PO cancellation must reverse only the unreceived remainder.
+ * H11: PO cancellation must leave only the received obligation.
  *
- * Accounting contract:
- *   Submit  → supplier_ledger PURCHASE_ORDER debit = po.total_amount (no GL)
+ * Accounting contract (ACC-16 receipt-only posting model):
+ *   Submit  → posts NOTHING (a submitted PO is a commitment, not a liability)
  *   Receipt → GL Dr 1200 Inventory / Cr 2000 AP (per receipt value)
- *   Cancel  → supplier_ledger PURCHASE_ORDER_CANCEL credit = unreceived portion
+ *           + supplier_ledger GOODS_RECEIPT credit = received value
+ *   Cancel  → posts NOTHING and reverses NOTHING — the unreceived
+ *             remainder was never a liability, and received goods keep
+ *             their real receipt-time obligation
  *
  * Stock from received goods must survive cancellation.  GL from receipt
  * must survive cancellation.  Supplier obligation must reflect only the
@@ -104,11 +107,16 @@ describe('H11: PO cancel only unreceived remainder', () => {
     return res.body.id as number;
   }
 
-  function getLedgerEntries(poNo: string) {
+  function getLedgerEntries(poId: number) {
+    // Receipt liability rows are keyed by receipt_no — join through the
+    // receipt to scope them to this PO.
     return db.prepare(
-      `SELECT transaction_type, debit, credit FROM supplier_ledger
-       WHERE reference_no = ? AND voided = 0 ORDER BY id`
-    ).all(poNo) as Array<{ transaction_type: string; debit: number; credit: number }>;
+      `SELECT sl.transaction_type, sl.debit, sl.credit
+       FROM supplier_ledger sl
+       JOIN goods_receipts gr ON sl.reference_no = gr.receipt_no
+       WHERE gr.po_id = ? AND sl.voided = 0
+       ORDER BY sl.id`
+    ).all(poId) as Array<{ transaction_type: string; debit: number; credit: number }>;
   }
 
   function getSupplierBalance(): number {
@@ -130,7 +138,7 @@ describe('H11: PO cancel only unreceived remainder', () => {
 
   describe('cancel before any receipt', () => {
     it('reverses full PO value — net supplier effect 0, stock 0', async () => {
-      const { poId, poNo } = await createPO(10, 100);
+      const { poId } = await createPO(10, 100);
 
       const balBefore = getSupplierBalance();
       const stockBefore = getStockQty();
@@ -141,15 +149,10 @@ describe('H11: PO cancel only unreceived remainder', () => {
         .send({ status: 'Cancelled' });
       expect(cancel.status).toBe(200);
 
-      const ledger = getLedgerEntries(poNo);
-      expect(ledger).toHaveLength(2);
-      expect(ledger[0].transaction_type).toBe('PURCHASE_ORDER');
-      expect(ledger[0].debit).toBeCloseTo(1000, 2);
-      expect(ledger[1].transaction_type).toBe('PURCHASE_ORDER_CANCEL');
-      expect(ledger[1].credit).toBeCloseTo(1000, 2);
-
-      const net = ledger.reduce((s, r) => s + Number(r.debit) - Number(r.credit), 0);
-      expect(net).toBeCloseTo(0, 2);
+      // ACC-16: submission posted nothing and cancellation posts nothing —
+      // an unreceived PO never touched the ledger at all
+      const ledger = getLedgerEntries(poId);
+      expect(ledger).toHaveLength(0);
 
       expect(getStockQty()).toBeCloseTo(stockBefore, 2);
     });
@@ -157,7 +160,7 @@ describe('H11: PO cancel only unreceived remainder', () => {
 
   describe('cancel after partial receipt (core H11 scenario)', () => {
     it('PO 10×100, receive 4, cancel — stock stays at received level, supplier owes for 4 only', async () => {
-      const { poId, poNo } = await createPO(10, 100);
+      const { poId } = await createPO(10, 100);
 
       const stockBeforeReceipt = getStockQty();
       await receivePO(poId, 4);
@@ -170,13 +173,12 @@ describe('H11: PO cancel only unreceived remainder', () => {
         .send({ status: 'Cancelled' });
       expect(cancel.status).toBe(200);
 
-      const ledger = getLedgerEntries(poNo);
-      expect(ledger).toHaveLength(2);
-      expect(ledger[0].transaction_type).toBe('PURCHASE_ORDER');
-      expect(ledger[0].debit).toBeCloseTo(1000, 2);
-
-      expect(ledger[1].transaction_type).toBe('PURCHASE_ORDER_CANCEL');
-      expect(ledger[1].credit).toBeCloseTo(600, 2);
+      // ACC-16: the only ledger row is the receipt's real liability.
+      // Cancel does not post — the unreceived 600 was never owed.
+      const ledger = getLedgerEntries(poId);
+      expect(ledger).toHaveLength(1);
+      expect(ledger[0].transaction_type).toBe('GOODS_RECEIPT');
+      expect(ledger[0].debit).toBeCloseTo(400, 2);
 
       const net = ledger.reduce((s, r) => s + Number(r.debit) - Number(r.credit), 0);
       expect(net).toBeCloseTo(400, 2);
@@ -207,7 +209,7 @@ describe('H11: PO cancel only unreceived remainder', () => {
 
   describe('cancel after full receipt', () => {
     it('blocked by state machine — PO auto-completes, Completed cannot Cancel', async () => {
-      const { poId, poNo } = await createPO(10, 100);
+      const { poId } = await createPO(10, 100);
 
       const stockBeforeReceipt = getStockQty();
       await receivePO(poId, 10);
@@ -222,16 +224,17 @@ describe('H11: PO cancel only unreceived remainder', () => {
         .send({ status: 'Cancelled' });
       expect(cancel.status).toBe(400);
 
-      const ledger = getLedgerEntries(poNo);
+      // Only the receipt's real liability exists (debit-normal ledger)
+      const ledger = getLedgerEntries(poId);
       expect(ledger).toHaveLength(1);
-      expect(ledger[0].transaction_type).toBe('PURCHASE_ORDER');
+      expect(ledger[0].transaction_type).toBe('GOODS_RECEIPT');
       expect(ledger[0].debit).toBeCloseTo(1000, 2);
     });
   });
 
   describe('multiple partial receipts then cancel', () => {
     it('receives 2 + 2, cancels remaining 6 of 10', async () => {
-      const { poId, poNo } = await createPO(10, 100);
+      const { poId } = await createPO(10, 100);
 
       const stockBeforeReceipts = getStockQty();
       await receivePO(poId, 2);
@@ -245,10 +248,14 @@ describe('H11: PO cancel only unreceived remainder', () => {
         .send({ status: 'Cancelled' });
       expect(cancel.status).toBe(200);
 
-      const ledger = getLedgerEntries(poNo);
+      // ACC-16: two receipt liabilities (200 each), no commitment debit,
+      // no cancel reversal
+      const ledger = getLedgerEntries(poId);
       expect(ledger).toHaveLength(2);
-      expect(ledger[1].transaction_type).toBe('PURCHASE_ORDER_CANCEL');
-      expect(ledger[1].credit).toBeCloseTo(600, 2);
+      expect(ledger[0].transaction_type).toBe('GOODS_RECEIPT');
+      expect(ledger[0].debit).toBeCloseTo(200, 2);
+      expect(ledger[1].transaction_type).toBe('GOODS_RECEIPT');
+      expect(ledger[1].debit).toBeCloseTo(200, 2);
 
       const net = ledger.reduce((s, r) => s + Number(r.debit) - Number(r.credit), 0);
       expect(net).toBeCloseTo(400, 2);
@@ -259,7 +266,7 @@ describe('H11: PO cancel only unreceived remainder', () => {
 
   describe('repeated cancellation (idempotency)', () => {
     it('second cancel is blocked by state machine', async () => {
-      const { poId, poNo } = await createPO(10, 100);
+      const { poId } = await createPO(10, 100);
 
       await receivePO(poId, 4);
 
@@ -275,8 +282,12 @@ describe('H11: PO cancel only unreceived remainder', () => {
         .send({ status: 'Cancelled' });
       expect(cancel2.status).toBe(400);
 
-      const ledger = getLedgerEntries(poNo);
-      expect(ledger).toHaveLength(2);
+      // ACC-16: only the receipt's liability exists — repeated cancel
+      // attempts add no ledger rows
+      const ledger = getLedgerEntries(poId);
+      expect(ledger).toHaveLength(1);
+      expect(ledger[0].transaction_type).toBe('GOODS_RECEIPT');
+      expect(ledger[0].debit).toBeCloseTo(400, 2);
     });
   });
 

@@ -1,10 +1,15 @@
 /**
  * Reversal-rules Phase 1 regression tests — C3 (purchase-order
- * cancellation must reverse the supplier AP debit).
+ * cancellation), updated for ACC-16 receipt-only posting.
+ *
+ * Under ACC-16 a PO submission posts NOTHING (no GL entry, no supplier-
+ * ledger debit) — a submitted PO is a commitment, not a liability. The
+ * payable comes into existence only when goods are received. Cancellation
+ * therefore has nothing to reverse and must also stay ledger-silent.
  *
  * Audit cases covered:
- *   6. Submitted → Cancelled → ledger debit + equal credit, net 0
- *   7. Cancelled → Submitted is blocked by the state machine; no double post
+ *   6. Submitted → Cancelled → no supplier-ledger rows ever created; net 0
+ *   7. Cancelled → Submitted is blocked by the state machine; no rows appear
  */
 import request from 'supertest';
 import app from '../app';
@@ -26,7 +31,7 @@ async function getAuthCookie(): Promise<string> {
   return tokenCookie ? tokenCookie.split(';')[0] : '';
 }
 
-describe('Purchase-order cancellation AP reversal (C3)', () => {
+describe('Purchase-order cancellation AP reversal (C3, ACC-16 model)', () => {
   let authCookie: string;
   let itemId: number;
   let supplierId: number;
@@ -75,19 +80,18 @@ describe('Purchase-order cancellation AP reversal (C3)', () => {
     return { poId, poNo, supplierId };
   }
 
-  it('case 6: cancelling a submitted PO appends an equal AP credit — net supplier effect 0', async () => {
-    const { poId, poNo } = await createSubmittedPo();
+  it('case 6: cancelling a submitted PO leaves no supplier-ledger rows — net supplier effect 0', async () => {
+    const { poId, poNo, supplierId: supId } = await createSubmittedPo();
 
-    // Submission posted the AP debit
-    const debit = (db.prepare(
-      `SELECT debit FROM supplier_ledger WHERE reference_no = ? AND transaction_type = 'PURCHASE_ORDER' AND voided = 0`
-    ).get(poNo) as { debit: number } | undefined);
-    expect(debit).toBeDefined();
-    expect(Number(debit!.debit)).toBeCloseTo(100, 2); // 5 × 20
+    // ACC-16: submission posted NOTHING — no commitment debit exists
+    const afterSubmit = db.prepare(
+      `SELECT COUNT(*) AS n FROM supplier_ledger WHERE reference_no = ?`
+    ).get(poNo) as { n: number };
+    expect(afterSubmit.n).toBe(0);
 
     const balanceBefore = (db.prepare(
       'SELECT current_balance FROM suppliers WHERE id = ?'
-    ).get(supplierId) as { current_balance: number }).current_balance;
+    ).get(supId) as { current_balance: number }).current_balance;
 
     const cancel = await request(app)
       .post(`/api/purchase-orders/${poId}/status`)
@@ -95,28 +99,20 @@ describe('Purchase-order cancellation AP reversal (C3)', () => {
       .send({ status: 'Cancelled' });
     expect(cancel.status).toBe(200);
 
-    // Equal-and-opposite credit appended (append-only, not deleted)
+    // Cancellation is ledger-silent too: nothing to reverse
     const rows = db.prepare(
-      'SELECT transaction_type, debit, credit FROM supplier_ledger WHERE reference_no = ? AND voided = 0 ORDER BY id'
-    ).all(poNo) as Array<{ transaction_type: string; debit: number; credit: number }>;
-    expect(rows.length).toBe(2);
-    expect(rows[0].transaction_type).toBe('PURCHASE_ORDER');
-    expect(Number(rows[0].debit)).toBeCloseTo(100, 2);
-    expect(rows[1].transaction_type).toBe('PURCHASE_ORDER_CANCEL');
-    expect(Number(rows[1].credit)).toBeCloseTo(100, 2);
+      'SELECT transaction_type, debit, credit, voided FROM supplier_ledger WHERE reference_no = ?'
+    ).all(poNo) as Array<{ transaction_type: string; debit: number; credit: number; voided: number }>;
+    expect(rows.length).toBe(0);
 
-    // Net effect on the supplier is zero
-    const net = rows.reduce((s, r) => s + Number(r.debit) - Number(r.credit), 0);
-    expect(net).toBeCloseTo(0, 2);
-
-    // Supplier balance returned to its pre-PO level
+    // Net effect on the supplier is zero — balance untouched
     const balanceAfter = (db.prepare(
       'SELECT current_balance FROM suppliers WHERE id = ?'
-    ).get(supplierId) as { current_balance: number }).current_balance;
-    expect(balanceAfter).toBeCloseTo(balanceBefore - 100, 2);
+    ).get(supId) as { current_balance: number }).current_balance;
+    expect(balanceAfter).toBeCloseTo(balanceBefore, 2);
   });
 
-  it('case 7: Submitted → Cancelled → Submitted is blocked; exactly one active PURCHASE_ORDER row', async () => {
+  it('case 7: Submitted → Cancelled → Submitted is blocked; no supplier-ledger rows appear', async () => {
     const { poId, poNo } = await createSubmittedPo();
 
     const cancel = await request(app)
@@ -133,13 +129,12 @@ describe('Purchase-order cancellation AP reversal (C3)', () => {
     // Phase 5: illegal transitions map to 400 (client error), not 500
     expect(resubmit.status).toBe(400);
 
-    // Still cancelled, still exactly one active debit + one credit
+    // Still cancelled, and still zero ledger rows of any kind
     const po = db.prepare('SELECT status FROM purchase_orders WHERE id = ?').get(poId) as { status: string };
     expect(po.status).toBe('Cancelled');
     const rows = db.prepare(
       'SELECT transaction_type, voided FROM supplier_ledger WHERE reference_no = ?'
     ).all(poNo) as Array<{ transaction_type: string; voided: number }>;
-    const activePoRows = rows.filter(r => r.voided === 0 && r.transaction_type === 'PURCHASE_ORDER');
-    expect(activePoRows.length).toBe(1);
+    expect(rows.length).toBe(0);
   });
 });
