@@ -21,29 +21,38 @@ import path from 'path';
 import PaymentModel from '../models/Payment';
 import OwnerCapitalModel, { generateCapitalNo } from '../models/OwnerCapital';
 
+/**
+ * Migrations required for supplier payment allocation tests.
+ *
+ * Kept in sync with the full migration chain so that schema changes
+ * (new columns, constraints, table rebuilds) are exercised by H7.
+ * Last audited: 2026-09-22 against 89 migration files.
+ */
 const MIGRATIONS = [
   'init.sql',
   'add-purchases-table.sql',
+  'add-purchase-return-fields.sql',
   'create-supplier-ledger.sql',
   'create-payment-allocations.sql',
   'add-expenses-table.sql',
   'add-supplier-payment-support.sql',
   'add-purchase-supplier-payment.sql',
   'add-gl-foundation.sql',
-  // journal_entries + stock_movements financial columns (any GL posting
-  // writes a journal_entries row).
   'add-stock-adjustment-financial.sql',
   'create-customer-ledger.sql',
-  // journal_lines exists now: void attribution + ledger `voided` columns.
   'add-gl-void-attribution.sql',
   'add-salary-payments.sql',
   'add-cash-accounts.sql',
   'add-opening-balances.sql',
-  // voided_at on payments / *_allocations (queried by createSupplierPayment)
   'add-payment-salary-void-columns.sql',
-  // owner_capital — the fixture seeds opening capital so payouts clear the
-  // cash funds guard (getAccountBalance reads journal_lines only).
   'add-owner-equity.sql',
+  'add-batch-costing.sql',
+  'add-purchase-void-columns.sql',
+  'add-purchase-return-batches.sql',
+  'add-purchase-returns-tables.sql',
+  'add-invoice-returns.sql',
+  'add-invoice-return-void-attribution.sql',
+  'add-idempotency-keys.sql',
 ];
 
 function createFixture(): Database.Database {

@@ -169,6 +169,18 @@ describe('H5: expense aggregates follow GL-worthiness', () => {
     db.close();
   });
 
+  it('closed period blocks expense update and delete', () => {
+    const db = makeDb();
+    const id = addExpense(db, 'EXP-CP', 200, 'Submitted');
+    db.prepare(`INSERT INTO accounting_periods (period_name, start_date, end_date, status)
+                VALUES ('2026-09-cp', '2026-09-01', '2026-09-30', 'closed')`).run();
+    expect(() => ExpenseModel.update(db, id, { amount: 999 }, { userId: 1 }))
+      .toThrow(/closed accounting period/i);
+    expect(() => ExpenseModel.delete(db, id)).toThrow(/closed accounting period/i);
+    expect((db.prepare('SELECT amount FROM expenses WHERE id = ?').get(id) as { amount: number }).amount).toBe(200);
+    db.close();
+  });
+
   it('all expense surfaces agree via the shared predicate', () => {
     const db = makeDb();
     addExpense(db, 'EXP-A', 300, 'Submitted');

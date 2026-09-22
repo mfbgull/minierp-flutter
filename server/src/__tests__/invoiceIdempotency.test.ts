@@ -162,6 +162,22 @@ describe('P11: idempotent invoice creation', () => {
     expect(replay.status).toBe(201);
     expect(replay.body.id).toBe(good.body.id);
   });
+
+  it('concurrent requests with the same key create only one invoice', async () => {
+    const key = `p11-${runId}-concurrent`;
+    const b = body(2);
+    const [r1, r2, r3] = await Promise.all([
+      request(app).post('/api/invoices').set('Idempotency-Key', key).set('Cookie', authCookie).send(b),
+      request(app).post('/api/invoices').set('Idempotency-Key', key).set('Cookie', authCookie).send(b),
+      request(app).post('/api/invoices').set('Idempotency-Key', key).set('Cookie', authCookie).send(b),
+    ]);
+    const statuses = [r1.status, r2.status, r3.status].sort();
+    expect(statuses).toEqual([201, 201, 201]);
+    const ids = [r1.body.id, r2.body.id, r3.body.id];
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(1);
+    expect(count('SELECT COUNT(*) as c FROM invoices WHERE customer_id = ?', customerId)).toBe(5);
+  });
 });
 
 describe('P11: idempotent mobile invoice submit', () => {
