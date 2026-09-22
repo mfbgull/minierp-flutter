@@ -43,6 +43,21 @@ export const NET_REVENUE_STATUS = (alias = ''): string =>
   `${alias ? `${alias}.` : ''}status != 'Cancelled'`;
 
 /**
+ * Expense statuses with NO financial effect (H5): Draft rows carry no GL
+ * lines and Cancelled rows have theirs voided (see the glWorthy test in
+ * models/Expense.ts), and both are excluded from cash flows. Every expense
+ * aggregate — P&L, expense summaries, dashboard cards — must use this same
+ * definition so reports agree with the GL.
+ */
+export const GL_INACTIVE_EXPENSE_STATUSES = ['Draft', 'Cancelled'] as const;
+
+/** Active-expense status predicate matching GL-worthiness. */
+export const ACTIVE_EXPENSE_STATUS = (alias = ''): string => {
+  const p = alias ? `${alias}.` : '';
+  return `${p}status NOT IN ('Draft', 'Cancelled')`;
+};
+
+/**
  * Outstanding-receivable predicate (H4: AR must not hide returned debt).
  * AR inclusion is a BALANCE question — a 'Partially Returned' or 'Sent'
  * invoice with balance_amount > 0 is still money owed. Only genuinely

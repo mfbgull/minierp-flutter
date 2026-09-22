@@ -462,7 +462,8 @@ describe('StockMovementModel', () => {
     });
 
     it('throws error when batch stock is insufficient', () => {
-      // Clean up old test data
+      // Clean up old test data (stock_movements first — FK to stock_batches)
+      db.prepare(`DELETE FROM stock_movements WHERE item_id = ?`).run(testItemId);
       db.prepare(`DELETE FROM stock_batches WHERE item_id = ?`).run(testItemId);
       db.prepare(`UPDATE stock_balances SET quantity = 10 WHERE item_id = ?`).run(testItemId);
 
@@ -490,6 +491,7 @@ describe('StockMovementModel', () => {
 
     it('FEFO: consumes nearest-expiry batch first when has_expiry=1', () => {
       // Clean slate
+      db.prepare('DELETE FROM stock_movements WHERE item_id = ?').run(testItemId);
       db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
 
       // Update item to have expiry tracking
@@ -520,6 +522,7 @@ describe('StockMovementModel', () => {
     });
 
     it('FEFO: skips halted batches', () => {
+      db.prepare('DELETE FROM stock_movements WHERE item_id = ?').run(testItemId);
       db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
       db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
 
@@ -548,6 +551,7 @@ describe('StockMovementModel', () => {
     });
 
     it('FEFO: excludes expired batches (expiry_date < today)', () => {
+      db.prepare('DELETE FROM stock_movements WHERE item_id = ?').run(testItemId);
       db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
       db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
 
@@ -575,6 +579,7 @@ describe('StockMovementModel', () => {
     });
 
     it('FEFO: throws when all batches are halted/expired but stock_balances > 0', () => {
+      db.prepare('DELETE FROM stock_movements WHERE item_id = ?').run(testItemId);
       db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
       db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
 
@@ -597,6 +602,7 @@ describe('StockMovementModel', () => {
     });
 
     it('FEFO: NULL expiry dates consumed after dated ones', () => {
+      db.prepare('DELETE FROM stock_movements WHERE item_id = ?').run(testItemId);
       db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
       db.prepare('UPDATE items SET has_expiry = 1 WHERE id = ?').run(testItemId);
 
@@ -623,6 +629,7 @@ describe('StockMovementModel', () => {
     });
 
     it('legacy: uses standard_cost when no batch rows exist', () => {
+      db.prepare('DELETE FROM stock_movements WHERE item_id = ?').run(testItemId);
       db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(testItemId);
       db.prepare('UPDATE items SET has_expiry = 0 WHERE id = ?').run(testItemId);
 

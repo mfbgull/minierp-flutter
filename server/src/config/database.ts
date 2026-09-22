@@ -10,6 +10,8 @@ import { runBackfillGlPreposting } from '../migrations/backfillGlPreposting';
 import { runBackfillGlUnification } from '../migrations/backfillGlUnification';
 import { runBackfillInvoiceItemTax } from '../migrations/backfillInvoiceItemTax';
 import { runBackfillInvoiceTaxGl } from '../migrations/backfillInvoiceTaxGl';
+import { runBackfillMobileInvoiceStockReference } from '../migrations/backfillMobileInvoiceStockReference';
+import { runBackfillInvoiceHeaderDiscount } from '../migrations/backfillInvoiceHeaderDiscount';
 import { runBackfillBatchLocations } from "../migrations/backfillBatchLocations";
 
 // Fail-closed: tests must never fall through to a shared dev DB by accident
@@ -1630,6 +1632,9 @@ runLedgered('fn.backfillInvoiceItemTax', () => runBackfillInvoiceItemTax(db));
 // H3 repair: with the stored tax authoritative, move the historical GL Tax
 // Payable split by the delta (AR/COGS/returns untouched; idempotent).
 runLedgered('fn.backfillInvoiceTaxGl', () => runBackfillInvoiceTaxGl(db));
+// H2 repair: recover the header discount that createInvoice never
+// persisted (stored total < line sum), so returns give it back.
+runLedgered('fn.backfillInvoiceHeaderDiscount', () => runBackfillInvoiceHeaderDiscount(db));
 // INV-21 prerequisite: reconcile live batch/balance drift before CHECK constraints land
 runLedgered('fn.runStockCoverageReconciliation', runStockCoverageReconciliation);
 // INV-21: database-level invariants — applied only after live data reconciled
@@ -1645,6 +1650,11 @@ runLedgered('fn.runBatchHaltColumnsRepairMigration', runBatchHaltColumnsRepairMi
 runLedgered("add-batch-location-model.sql");
 runLedgered('fn.runPurchaseReturnBatchesLocationMigration', runPurchaseReturnBatchesLocationMigration);
 runLedgered("fn.backfillBatchLocations", () => runBackfillBatchLocations(db));
+// TASK 17: mobile-invoice SALE movements were keyed to the invoice ID while
+// every reversal resolves them by invoice_no, so a cancelled mobile invoice
+// left stock permanently reduced. Re-key the legacy movements and restore the
+// stock of invoices already cancelled under the old key (idempotent).
+runLedgered('fn.backfillMobileInvoiceStockReference', () => runBackfillMobileInvoiceStockReference(db));
 
 // Salary payment duplicate guard: pay_period column + unique index
 runLedgered('add-salary-pay-period.sql');
@@ -1695,6 +1705,9 @@ runLedgered('add-invoice-returns.sql');
 // Milestone 2: per-line stock-movement attribution + settlement voided_by,
 // so voiding one return reverses exactly that return (spec §5.3).
 runLedgered('add-invoice-return-void-attribution.sql');
+// P11: idempotency_keys table — retries of a timed-out create request must
+// replay the original result, not create a second document.
+runLedgered('add-idempotency-keys.sql');
 // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
 // return time — a legacy COA predating GL foundation must fail the boot
 // with a clear error, never mis-post.

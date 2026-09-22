@@ -7,6 +7,7 @@ import logger from '../utils/logger';
 import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, PURCHASE_RETURN_HEADER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { isFeatureEnabled } from '../utils/featureFlags';
+import { roundQty } from '../utils/quantity';
 
 /**
  * PurchaseReturnModel — the redesigned, first-class purchase return document.
@@ -300,10 +301,11 @@ class PurchaseReturnModel {
           }
 
           const returned = purchase.returned_quantity || 0;
-          const returnable = purchase.quantity - returned;
-          if (agg.quantity > returnable + 0.001) {
+          const returnable = roundQty(purchase.quantity - returned);
+          const returnQty = roundQty(agg.quantity);
+          if (returnQty > returnable) {
             throw new Error(
-              `Return quantity (${agg.quantity}) exceeds remaining available (${returnable}) ` +
+              `Return quantity (${returnQty}) exceeds remaining available (${returnable}) ` +
               `for purchase ${purchase.id}`
             );
           }
@@ -335,10 +337,11 @@ class PurchaseReturnModel {
           }
 
           const returned = poItem.returned_quantity || 0;
-          const netReceived = (poItem.received_quantity || 0) - returned;
-          if (agg.quantity > netReceived + 0.001) {
+          const netReceived = roundQty((poItem.received_quantity || 0) - returned);
+          const returnQty = roundQty(agg.quantity);
+          if (returnQty > netReceived) {
             throw new Error(
-              `Return quantity (${agg.quantity}) exceeds net received quantity ` +
+              `Return quantity (${returnQty}) exceeds net received quantity ` +
               `(${netReceived}) for PO line ${poItem.id}`
             );
           }
@@ -412,11 +415,12 @@ class PurchaseReturnModel {
           SELECT quantity FROM stock_balances
           WHERE item_id = ? AND warehouse_id = ?
         `).get(line.item_id, data.warehouse_id) as { quantity: number } | undefined;
-        const available = balance ? Number(balance.quantity) : 0;
-        if (available < line.quantity - 0.001) {
+        const available = roundQty(balance ? Number(balance.quantity) : 0);
+        const requiredQty = roundQty(line.quantity);
+        if (available < requiredQty) {
           throw new Error(
             `Insufficient stock for ${line.item_name} in warehouse ${data.warehouse_id}: ` +
-            `available ${available}, required ${line.quantity}`
+            `available ${available}, required ${requiredQty}`
           );
         }
 
@@ -463,10 +467,10 @@ class PurchaseReturnModel {
           data.warehouse_id
         ) as { id: number; quantity_remaining: number } | undefined;
 
-        if (!sourceBatch || sourceBatch.quantity_remaining < line.quantity - 0.001) {
+        if (!sourceBatch || roundQty(sourceBatch.quantity_remaining) < roundQty(line.quantity)) {
           throw new Error(
             `Insufficient stock in the source batch for ${line.item_name}: ` +
-            `available ${sourceBatch?.quantity_remaining ?? 0}, required ${line.quantity}. ` +
+            `available ${roundQty(sourceBatch?.quantity_remaining ?? 0)}, required ${roundQty(line.quantity)}. ` +
             `Goods already sold cannot be returned to the supplier.`
           );
         }
@@ -482,10 +486,11 @@ class PurchaseReturnModel {
             ORDER BY l.created_at ASC, bsl.id ASC
           `).all(sourceBatch.id, data.warehouse_id) as Array<{ id: number; quantity_available: number; location_id: number }>;
 
-          let remaining = line.quantity;
+          let remaining = roundQty(line.quantity);
           for (const loc of locRows) {
             if (remaining <= 0) break;
-            const take = Math.min(remaining, loc.quantity_available);
+            const locAvail = roundQty(loc.quantity_available);
+            const take = roundQty(Math.min(remaining, locAvail));
             db.prepare(`
               UPDATE batch_stock_by_location
               SET quantity_physical = quantity_physical - ?
@@ -493,10 +498,10 @@ class PurchaseReturnModel {
             `).run(take, loc.id);
             remaining -= take;
           }
-          if (remaining > 0.001) {
+          if (remaining > 0) {
             throw new Error(
               `Insufficient batch_stock_by_location for ${line.item_name}: ` +
-              `required ${line.quantity}, only ${(line.quantity - remaining).toFixed(3)} available in source batch locations`
+              `required ${roundQty(line.quantity)}, only ${roundQty(roundQty(line.quantity) - remaining).toFixed(3)} available in source batch locations`
             );
           }
           // Keep the master batch in sync with the location rows
@@ -635,6 +640,7 @@ class PurchaseReturnModel {
           unit_cost: line.unit_cost,
           reference_doctype: header.return_type,
           reference_docno: header.return_no,
+          skipBatchCreation: true,
           remarks: `Voided return ${header.return_no}${reason ? ': ' + reason : ''}`,
           movement_date: new Date().toISOString().split('T')[0],
         }, userId, db);

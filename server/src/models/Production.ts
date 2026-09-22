@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { parseCurrency } from '../utils/currency';
+import { roundQty } from '../utils/quantity';
 import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, PRODUCTION_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
@@ -198,11 +199,12 @@ class ProductionModel {
           WHERE item_id = ? AND warehouse_id = ?
         `).get(input.item_id, materialsWarehouseId) as { quantity: any } | undefined;
 
-        const availableStock = stockBalance ? parseFloat(String(stockBalance.quantity)) : 0;
+        const availableStock = roundQty(stockBalance ? parseFloat(String(stockBalance.quantity)) : 0);
+        const requiredQty = roundQty(input.quantity);
 
-        if (availableStock < input.quantity) {
+        if (availableStock < requiredQty) {
           const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(input.item_id) as { item_name: string };
-          throw new Error(`Insufficient stock for ${item.item_name} in warehouse. Available: ${availableStock}, Required: ${input.quantity}`);
+          throw new Error(`Insufficient stock for ${item.item_name} in warehouse. Available: ${availableStock}, Required: ${requiredQty}`);
         }
 
         inputStmt.run(productionId, input.item_id, input.quantity, materialsWarehouseId);

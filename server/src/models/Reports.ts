@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
 import { CASH_ACCOUNTS, getCashAccountTotals, collectFlows, normalizeCashMethod } from '../services/cashService';
-import { netRevenueSum, NET_REVENUE_STATUS, AR_OUTSTANDING, cogsForPeriod } from '../utils/reportSql';
+import { netRevenueSum, NET_REVENUE_STATUS, AR_OUTSTANDING, ACTIVE_EXPENSE_STATUS, cogsForPeriod } from '../utils/reportSql';
 
 function getARAgingReport(asOfDate: string, db: Database.Database) {
   const agingData = db.prepare(`
@@ -424,7 +424,9 @@ function getProfitLossReport(startDate: string, endDate: string, db: Database.Da
   // counting as cost of goods sold.
   const cogs = { total: cogsForPeriod(db, startDate, endDate) };
 
-  const expenses = db.prepare(`SELECT expense_category, SUM(amount) as total FROM expenses WHERE expense_date BETWEEN ? AND ? GROUP BY expense_category ORDER BY total DESC`).all(startDate, endDate) as Array<{ expense_category: string; total: number }>;
+  // H5: expenses must follow the same GL-worthiness rule the journal and
+  // cash flows use — Draft rows never post, Cancelled rows are voided.
+  const expenses = db.prepare(`SELECT expense_category, SUM(amount) as total FROM expenses WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date BETWEEN ? AND ? GROUP BY expense_category ORDER BY total DESC`).all(startDate, endDate) as Array<{ expense_category: string; total: number }>;
 
   const totalExpenses = expenses.reduce((sum, e) => sum + e.total, 0);
   const grossProfit = revenue.total - cogs.total;
@@ -961,7 +963,7 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
            COALESCE(NULLIF(e.vendor_name, ''), e.expense_category) as party,
            e.payment_method as method, e.description as description, e.amount
     FROM expenses e
-    WHERE e.status NOT IN ('Cancelled', 'Draft') AND e.expense_date BETWEEN ? AND ?
+    WHERE ${ACTIVE_EXPENSE_STATUS('e')} AND e.expense_date BETWEEN ? AND ?
     ORDER BY e.expense_date DESC
   `).all(startDate, endDate) as Array<{ date: string; reference: string; party: string | null; method: string | null; description: string | null; amount: number }>;
   for (const r of expenseRows) {

@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
 import { getNextSequenceNumber } from '../utils/sequence';
+import { ACTIVE_EXPENSE_STATUS, GL_INACTIVE_EXPENSE_STATUSES } from '../utils/reportSql';
 
 interface ExpenseFilters {
   category?: string;
@@ -154,7 +155,8 @@ function update(db: Database.Database, id: number, data: UpdateExpenseDTO, opts?
 
   AccountingService.assertPeriodNotClosed(db, String(existing.expense_date), `Expense ${existing.expense_no}`);
 
-  const glWorthy = (status: unknown): boolean => status !== 'Cancelled' && status !== 'Draft';
+  const glWorthy = (status: unknown): boolean =>
+    !(GL_INACTIVE_EXPENSE_STATUSES as readonly string[]).includes(String(status));
   const wasGlWorthy = glWorthy(existing.status);
 
   const newStatus = data.status !== undefined ? data.status : String(existing.status);
@@ -253,7 +255,7 @@ function getByDateRange(db: Database.Database, from_date: string, to_date: strin
     WHERE e.expense_date BETWEEN ? AND ? ORDER BY e.expense_date DESC
   `).all(from_date, to_date);
 
-  const total = db.prepare('SELECT SUM(amount) as total FROM expenses WHERE expense_date BETWEEN ? AND ?').get(from_date, to_date) as { total: number } | undefined;
+  const total = db.prepare(`SELECT SUM(amount) as total FROM expenses WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date BETWEEN ? AND ?`).get(from_date, to_date) as { total: number } | undefined;
 
   return { expenses, total_amount: parseFloat(total?.total?.toString() || '0') };
 }
@@ -272,7 +274,7 @@ function getByCategory(db: Database.Database, category: string, from_date?: stri
 
   const expenses = db.prepare(query).all(...params);
 
-  let totalQuery = 'SELECT SUM(amount) as total FROM expenses WHERE expense_category = ?';
+  let totalQuery = `SELECT SUM(amount) as total FROM expenses WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_category = ?`;
   const totalParams: (string | number)[] = [category];
   if (from_date && to_date) { totalQuery += ' AND expense_date BETWEEN ? AND ?'; totalParams.push(from_date, to_date); }
 
@@ -282,7 +284,10 @@ function getByCategory(db: Database.Database, category: string, from_date?: stri
 }
 
 function getSummary(db: Database.Database, from_date?: string, to_date?: string) {
-  let query = 'SELECT expense_category, COUNT(*) as count, SUM(amount) as total_amount FROM expenses WHERE 1=1';
+  // H5: financial summaries count only GL-worthy expenses (Draft has no
+  // cash effect yet, Cancelled has its GL lines voided) — same definition
+  // as the P&L, cash flows and the journal.
+  let query = `SELECT expense_category, COUNT(*) as count, SUM(amount) as total_amount FROM expenses WHERE ${ACTIVE_EXPENSE_STATUS()}`;
   const params: (string | number)[] = [];
 
   if (from_date && to_date) { query += ' AND expense_date BETWEEN ? AND ?'; params.push(from_date, to_date); }
@@ -290,7 +295,7 @@ function getSummary(db: Database.Database, from_date?: string, to_date?: string)
 
   const categorySummary = db.prepare(query).all(...params);
 
-  let overallQuery = 'SELECT COUNT(*) as total_expenses, SUM(amount) as total_amount FROM expenses WHERE 1=1';
+  let overallQuery = `SELECT COUNT(*) as total_expenses, SUM(amount) as total_amount FROM expenses WHERE ${ACTIVE_EXPENSE_STATUS()}`;
   const overallParams: (string | number)[] = [];
   if (from_date && to_date) { overallQuery += ' AND expense_date BETWEEN ? AND ?'; overallParams.push(from_date, to_date); }
 

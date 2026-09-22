@@ -12,6 +12,13 @@ import {
 } from '../services/invoiceReturnService';
 import type { FeeType } from '../services/returnMath';
 import { generateDocNo } from '../utils/sequence';
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  MOBILE_INVOICE_CREATE_SCOPE,
+  normalizeIdempotencyKey,
+  hashRequestPayload,
+  findIdempotencyRecord,
+} from '../utils/idempotency';
 
 export async function createDraft(req: AuthRequest, res: Response) {
   try {
@@ -131,11 +138,40 @@ export async function getPaymentTerms(req: AuthRequest, res: Response) {
 
 export async function submitInvoice(req: AuthRequest, res: Response) {
   try {
-    const { draft_id, invoice_no, customer_id, invoice_date, due_date, status, terms, notes, items, record_payment, payment } = req.body;
+    const { draft_id, customer_id, invoice_date, due_date, status, terms, notes, items, record_payment, payment } = req.body;
 
     if (!customer_id) { return res.status(400).json({ error: 'Customer is required', field: 'customer_id' }); }
     if (!invoice_date) { return res.status(400).json({ error: 'Invoice date is required', field: 'invoice_date' }); }
     if (!items || items.length === 0) { return res.status(400).json({ error: 'At least one item is required', field: 'items' }); }
+
+    // P11: idempotent submit. A retry after a client-side timeout must
+    // replay the original invoice, never double-create (stock/GL/ledger).
+    // Requests without the header keep the legacy (unguarded) behavior.
+    let idemKey: string | null;
+    try {
+      idemKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
+    } catch (keyError) {
+      return res.status(400).json({ success: false, error: (keyError as Error).message });
+    }
+    const idemHash = idemKey ? hashRequestPayload(req.body) : '';
+    if (idemKey) {
+      const existing = findIdempotencyRecord(db, MOBILE_INVOICE_CREATE_SCOPE, idemKey);
+      if (existing) {
+        if (existing.request_hash !== idemHash) {
+          return res.status(409).json({
+            success: false,
+            error: 'Idempotency-Key was already used with a different request payload',
+          });
+        }
+        if (existing.resource_id != null) {
+          const original = MobileInvoiceModel.getInvoiceWithCustomer(db, existing.resource_id);
+          if (original) {
+            res.set('X-Idempotent-Replay', 'true');
+            return res.status(201).json({ success: true, data: original, message: 'Invoice created successfully' });
+          }
+        }
+      }
+    }
 
     const resolvedInvoiceNo = generateDocNo(db, 'INV', 5);
     const invoiceId = MobileInvoiceModel.submitInvoice(db, {
@@ -151,6 +187,7 @@ export async function submitInvoice(req: AuthRequest, res: Response) {
       record_payment,
       payment,
       userId: req.user!.id,
+      idempotency: idemKey ? { key: idemKey, hash: idemHash } : undefined,
     });
 
     const createdInvoice = MobileInvoiceModel.getInvoiceWithCustomer(db, invoiceId);

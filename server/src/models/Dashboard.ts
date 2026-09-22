@@ -5,7 +5,7 @@ import {
 } from '../services/cashService';
 import { getForUser } from './UserPreferences';
 import { weekBounds } from '../utils/weekMath';
-import { AR_OUTSTANDING } from '../utils/reportSql';
+import { AR_OUTSTANDING, ACTIVE_EXPENSE_STATUS } from '../utils/reportSql';
 
 interface DashboardSummary {
   totalItems: number;
@@ -365,6 +365,8 @@ function getSalesSummary(db: Database.Database, period: string = 'today', userId
 /**
  * Get expense summary for a given period.
  * period: 'week' | 'month' (week is week-start-aware per user).
+ * H5: counts only GL-worthy expenses (Draft/Cancelled excluded), matching
+ * the P&L, cash flows and the journal.
  */
 function getExpenseSummary(db: Database.Database, period: string = 'month', userId?: number): ExpenseSummaryResult {
   const { where, params } = periodWhereClause(db, period, 'expense_date', userId);
@@ -375,7 +377,7 @@ function getExpenseSummary(db: Database.Database, period: string = 'month', user
       COUNT(*) as count
     FROM expenses
     WHERE ${where}
-      AND status != 'Cancelled'
+      AND ${ACTIVE_EXPENSE_STATUS()}
   `).get(...params) as ExpenseSummaryResult;
 }
 
@@ -594,11 +596,11 @@ function getKPI(
 
     // ── Additional cards (match the P&L / cash reports) ─────────────
     case 'expenses': {
-      // Same SQL as getExpenseSummary + the P&L report: non-cancelled
-      // expenses within the range.
+      // Same SQL as getExpenseSummary + the P&L report: GL-worthy
+      // (non-Draft, non-Cancelled) expenses within the range.
       const result = db.prepare(`
         SELECT COALESCE(SUM(amount), 0) as total FROM expenses
-        WHERE status != 'Cancelled' AND expense_date BETWEEN ? AND ?
+        WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date BETWEEN ? AND ?
       `).get(from, to) as { total: number };
       return { metric, value: result.total, unit: 'currency', label: 'Expenses' };
     }
@@ -622,7 +624,7 @@ function getKPI(
       `).get(from, to) as { total: number };
       const expenseRow = db.prepare(`
         SELECT COALESCE(SUM(amount), 0) as total FROM expenses
-        WHERE status != 'Cancelled' AND expense_date BETWEEN ? AND ?
+        WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date BETWEEN ? AND ?
       `).get(from, to) as { total: number };
       return {
         metric,
