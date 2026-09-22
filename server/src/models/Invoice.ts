@@ -1090,20 +1090,6 @@ class InvoiceModel {
   }
 
   /**
-   * Delete payment allocations by invoice ID
-   */
-  static deletePaymentAllocationsByInvoiceId(db: Database.Database, invoiceId: number): void {
-    db.prepare(`DELETE FROM payment_allocations WHERE invoice_id = ?`).run(invoiceId);
-  }
-
-  /**
-   * Delete payment by ID
-   */
-  static deletePaymentById(db: Database.Database, paymentId: number): void {
-    db.prepare(`DELETE FROM payments WHERE id = ?`).run(paymentId);
-  }
-
-  /**
    * Delete invoice
    */
   static deleteInvoice(db: Database.Database, invoiceId: number): void {

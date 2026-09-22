@@ -233,19 +233,6 @@ function update(db: Database.Database, id: number, data: UpdateExpenseDTO, opts?
   })();
 }
 
-function deleteExpense(db: Database.Database, id: number): void {
-  const existing = getById(db, id) as Record<string, unknown> | undefined;
-  if (!existing) throw new Error('Expense not found');
-
-  AccountingService.assertPeriodNotClosed(db, String(existing.expense_date), `Expense ${existing.expense_no}`);
-
-  db.transaction(() => {
-    // Defensive: remove any active EXPENSE GL lines before the row goes.
-    AccountingService.voidJournalLinesByReference(db, 'EXPENSE', id);
-    db.prepare('DELETE FROM expenses WHERE id = ?').run(id);
-  })();
-}
-
 function getByDateRange(db: Database.Database, from_date: string, to_date: string) {
   const expenses = db.prepare(`
     SELECT e.id, e.expense_no, e.expense_category, e.description, e.amount,
@@ -378,7 +365,6 @@ export default {
   getCount,
   getById,
   update,
-  delete: deleteExpense,
   getByDateRange,
   getByCategory,
   getSummary,
