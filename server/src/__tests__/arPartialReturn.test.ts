@@ -34,7 +34,14 @@ if (!TEST_PASSWORD) {
   throw new Error('TEST_ADMIN_PASSWORD environment variable must be set for integration tests.');
 }
 
-const AS_OF = '2026-09-30';          // covers all fixture dates incl. today's returns
+// Covers all fixture dates AND today's return postings: returns post at
+// todayLocal(), so a fixed calendar date stops covering them the day the
+// suite runs past it. Derive the as-of from the current date (last day of
+// the current month) instead of hardcoding one.
+const AS_OF = (() => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-28`;
+})();
 const INVOICE_DATE = '2026-06-10';  // helper pins due_date to 2026-09-30
 
 let token: string;

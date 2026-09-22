@@ -518,12 +518,23 @@ describe('H8 payment date/method edit reposting', () => {
     expect(activeBefore.map((l) => `${l.account_code}:${l.debit}-${l.credit}`).sort()).toEqual(REFUND_LEGS);
 
     const originalDate = row.payment_date;
-    const newDate = `${originalDate.slice(0, 8)}${String(Math.min(28, Number(originalDate.slice(8, 10)) + 3)).padStart(2, '0')}`;
+    // Move within the same month, staying ≤ day 28 so one as-of date can
+    // bracket the whole edit. Day +3 wraps to day −3 near month end —
+    // capping at 28 would make day 28 a no-op move and trip the guard below.
+    const originalDay = Number(originalDate.slice(8, 10));
+    const newDay = originalDay + 3 > 28 ? originalDay - 3 : originalDay + 3;
+    const newDate = `${originalDate.slice(0, 8)}${String(newDay).padStart(2, '0')}`;
     expect(newDate).not.toBe(originalDate);
 
+    // The refund's GL posts at todayLocal() — the payment row's own date —
+    // so derive the balance as-of from the row instead of a hardcoded
+    // calendar date (which silently drops the refund from every read once
+    // the suite runs past it).
+    const asOf = `${originalDate.slice(0, 7)}-28`;
+
     const custBalanceBefore = (db.prepare('SELECT current_balance FROM customers WHERE id = ?').get(customerId) as { current_balance: number }).current_balance;
-    const arBefore = glBalance(AR_CODE, '2026-09-30');
-    const cashBefore = glBalance('1000', '2026-09-30');
+    const arBefore = glBalance(AR_CODE, asOf);
+    const cashBefore = glBalance('1000', asOf);
 
     const res = await api('put', `/api/payments/${refundId}`, { payment_date: newDate });
     expect(res.status).toBe(200);
@@ -542,8 +553,8 @@ describe('H8 payment date/method edit reposting', () => {
     expect(refundLedger[0].debit).toBe(200);
 
     // same-month move: nothing changed in the balances
-    expect(glBalance(AR_CODE, '2026-09-30')).toBeCloseTo(arBefore, 2);
-    expect(glBalance('1000', '2026-09-30')).toBeCloseTo(cashBefore, 2);
+    expect(glBalance(AR_CODE, asOf)).toBeCloseTo(arBefore, 2);
+    expect(glBalance('1000', asOf)).toBeCloseTo(cashBefore, 2);
     const custBalanceAfter = (db.prepare('SELECT current_balance FROM customers WHERE id = ?').get(customerId) as { current_balance: number }).current_balance;
     expect(custBalanceAfter).toBeCloseTo(custBalanceBefore, 2);
   });
@@ -552,8 +563,12 @@ describe('H8 payment date/method edit reposting', () => {
     const customerId = await createCustomer('H8 Refund Method', token);
     const refundId = await createRefundPayment(customerId, 200);
 
-    const cashBefore = glBalance('1000', '2026-09-30');
-    const bankBefore = glBalance('1010', '2026-09-30');
+    // Same as-of derivation as the date-edit test: the refund posts at
+    // todayLocal(), so read balances at that row's own month (day 28 ≥
+    // every date this test can touch).
+    const asOf = `${paymentRow(refundId).payment_date.slice(0, 7)}-28`;
+    const cashBefore = glBalance('1000', asOf);
+    const bankBefore = glBalance('1010', asOf);
 
     const res = await api('put', `/api/payments/${refundId}`, { payment_method: 'Bank' });
     expect(res.status).toBe(200);
@@ -564,7 +579,7 @@ describe('H8 payment date/method edit reposting', () => {
     expect(active.map((l) => `${l.account_code}:${l.debit}-${l.credit}`).sort()).toEqual(['1010:0-200', '1100:200-0']);
 
     // the exit left Cash and lands on Bank instead
-    expect(glBalance('1000', '2026-09-30')).toBeCloseTo(cashBefore + 200, 2);
-    expect(glBalance('1010', '2026-09-30')).toBeCloseTo(bankBefore - 200, 2);
+    expect(glBalance('1000', asOf)).toBeCloseTo(cashBefore + 200, 2);
+    expect(glBalance('1010', asOf)).toBeCloseTo(bankBefore - 200, 2);
   });
 });
