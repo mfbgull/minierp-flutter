@@ -806,6 +806,7 @@
   "statusCompleted": "Completed",
   "statusCancelled": "Cancelled",
   "statusDraft": "Draft",
+  "statusRecorded": "Recorded",
   "statusPaid": "Paid",
   "statusUnpaid": "Unpaid",
   "statusPartial": "Partial",

@@ -10,6 +10,8 @@
 //   └────────────────────────┴──────────────────┘
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math' show Random;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
@@ -45,6 +47,26 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   // apart (the human-typing threshold), and treat Enter as scan-complete.
   final _scannerFocusNode = FocusNode(debugLabel: 'pos-scanner');
   final _scanBuffer = StringBuffer();
+
+  // P11: idempotent sale commit. The key is bound to the exact submitted
+  // body: an unchanged resubmit (the retry after a lost response) reuses
+  // it and the server replays the original sale, while any cart/edit
+  // rotates it so the new payload legitimately creates a new sale. The
+  // submitting flag alone cannot survive the timeout/retry window.
+  String? _idemKey;
+  String? _idemKeyBody;
+  static final Random _idemRandom = Random();
+
+  String _idempotencyKeyFor(Map<String, dynamic> body) {
+    final encoded = jsonEncode(body);
+    if (_idemKey == null || _idemKeyBody != encoded) {
+      _idemKey =
+          'pos-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
+          '-${_idemRandom.nextInt(1 << 32).toRadixString(36)}';
+      _idemKeyBody = encoded;
+    }
+    return _idemKey!;
+  }
   DateTime? _lastScanKeyAt;
   DateTime? _scanStartedAt;
 
@@ -224,19 +246,32 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     try {
       final repo = ref.watch(posRepositoryProvider);
       final saleDate = ref.watch(posSaleDateProvider) ?? DateTime.now();
+      final saleDateStr = DateFormat('yyyy-MM-dd').format(saleDate);
+      final customerName = ref.read(posCustomerNameProvider);
+      final saleItems = [
+        for (final c in cart)
+          {
+            'item_id': c.item.id,
+            'quantity': c.quantity,
+            'unit_price': c.unitPrice,
+          },
+      ];
+      // P11: the key is derived from the exact body being sent, so an
+      // unchanged retry reuses it (server replays) while any cart change
+      // rotates it (new sale).
       final result = await repo.createSale(
         warehouseId: warehouseId,
-        saleDate: DateFormat('yyyy-MM-dd').format(saleDate),
-        items: [
-          for (final c in cart)
-            {
-              'item_id': c.item.id,
-              'quantity': c.quantity,
-              'unit_price': c.unitPrice,
-            },
-        ],
+        saleDate: saleDateStr,
+        items: saleItems,
         cashReceived: cashReceived,
-        customerName: ref.read(posCustomerNameProvider),
+        customerName: customerName,
+        idempotencyKey: _idempotencyKeyFor(<String, dynamic>{
+          'warehouse_id': warehouseId,
+          'sale_date': saleDateStr,
+          'items': saleItems,
+          'cash_received': cashReceived,
+          if (customerName.isNotEmpty) 'customer_name': customerName,
+        }),
       );
 
       if (!mounted) return;

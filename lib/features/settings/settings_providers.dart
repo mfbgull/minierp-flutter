@@ -5,6 +5,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/formatters.dart';
 import '../../data/models/setting.dart' show AppSetting;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../data/repositories/settings_repository.dart'
@@ -17,4 +18,21 @@ final settingsProvider = FutureProvider<Map<String, AppSetting>>((ref) async {
     ApiSuccess(:final data) => data,
     ApiFailure(:final error) => throw error,
   };
+});
+
+/// Current display-only currency configuration, with safe defaults while
+/// settings are loading or unavailable.
+final currencyConfigProvider = Provider<CurrencyConfig>((ref) {
+  final settings = ref.watch(settingsProvider).valueOrNull;
+  final config = CurrencyConfig.fromValues(
+    symbol: settings?['currency_symbol']?.value,
+    code: settings?['currency_code']?.value,
+  );
+  CurrencyConfigStore.set(config);
+  return config;
+});
+
+/// Formatter used by user-facing monetary displays and exports.
+final currencyFormatterProvider = Provider<CurrencyFormatter>((ref) {
+  return CurrencyFormatter(ref.watch(currencyConfigProvider));
 });

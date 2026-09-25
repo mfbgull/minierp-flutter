@@ -524,6 +524,11 @@ void main() {
     expect(csv, isNot(contains('+admin')));
     expect(csv, contains('admin'));
     expect(csv, contains('800.00'));
+    expect(
+      csv,
+      contains('Acme Corp,Unpaid,"Rs. 1,500.00",Rs. 0.00,"Rs. 1,500.00",Fawad'),
+    );
+    expect(csv, contains('Beta Ltd,Paid,Rs. 800.00,Rs. 800.00,Rs. 0.00,admin'));
   });
 
   test('buildCustomersCsv emits the grid columns and sanitizes cells', () {
@@ -819,12 +824,11 @@ void main() {
     expect(csv, contains('Cost of Goods Sold (COGS)'));
     expect(csv, contains('271,315.50'));
     expect(csv, contains('Gross Profit'));
-    expect(csv, contains('-169,420.50'));
+    expect(csv, contains('-Rs. 169,420.50'));
     expect(csv, contains('Net Profit'));
     expect(csv, contains('-166.27%')); // gross margin value
     expect(csv, contains('-168.23%')); // net margin value
   });
-
 
   test('buildTopDebtorsCsv emits debtor columns', () {
     final l10n = lookupAppLocalizations(const Locale('en'));

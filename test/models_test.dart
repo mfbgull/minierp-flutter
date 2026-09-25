@@ -100,6 +100,17 @@ void main() {
       expect(item.roundingStep, isNull);
     });
 
+    test('preserves an inactive is_active flag from the server payload', () {
+      final item = Item.fromJson({
+        'id': 13,
+        'item_code': 'ITM-OLD',
+        'item_name': 'Retired Item',
+        'is_active': 0,
+      });
+
+      expect(item.isActive, isFalse);
+    });
+
     test('tolerates string ids and loose sale_type', () {
       final item = Item.fromJson({
         'id': '11',

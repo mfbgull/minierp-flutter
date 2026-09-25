@@ -2491,6 +2491,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get statusDraft => 'مسودہ';
 
   @override
+  String get statusRecorded => 'ریکارڈ شدہ';
+
+  @override
   String get statusPaid => 'ادا شدہ';
 
   @override

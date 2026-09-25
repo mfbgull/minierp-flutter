@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import 'core/auth/auth_notifier.dart';
 import 'core/auth/session_events.dart';
 import 'core/i18n/locale_provider.dart';
-import 'core/router/module_registry.dart' show moduleRegistry, shellDestinations;
+import 'core/utils/formatters.dart';
+import 'core/router/module_registry.dart'
+    show moduleRegistry, shellDestinations;
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'core/utils/print_service.dart' show PrintFormatMemory;
@@ -104,6 +106,7 @@ class MiniErpApp extends ConsumerWidget {
         // login so a different user's week start / default range /
         // presets replace the previous user's.
         if (next.status == AuthStatus.unauthenticated) {
+          CurrencyConfigStore.reset();
           resetUserPreferences(ref);
           // Per-user print-format memory is local-only; clear it on
           // logout so the next user isn't pinned to the previous one's

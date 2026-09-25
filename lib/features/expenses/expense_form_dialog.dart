@@ -2,7 +2,7 @@
 //
 // Field set mirrors the server's createExpense/updateExpense DTOs: only
 // expense_category, amount and expense_date are required (400 otherwise);
-// status defaults to Approved on create; everything else is optional.
+// status defaults to Draft on create; everything else is optional.
 // The category/status/payment-method dropdowns load from the reference
 // endpoints; option lists always include the current value so an edit
 // form never loses a value the loaded lists don't contain.
@@ -27,6 +27,8 @@ import '../../widgets/date_picker.dart' show pickDate;
 import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
 import '../../widgets/searchable_select.dart';
+import '../dashboard/cash_opening_balance_dialog.dart'
+    show showCashOpeningBalanceDialog;
 import 'expense_category_dialog.dart';
 import 'expense_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
@@ -455,7 +457,15 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (_error != null) ...[
-                      _ErrorBanner(message: _error!),
+                      ErrorBanner(
+                        message: _error!,
+                        actionLabel: _error!.contains('Insufficient funds')
+                            ? l10n.dashboardOpeningbalance
+                            : null,
+                        onAction: _error!.contains('Insufficient funds')
+                            ? () => showCashOpeningBalanceDialog(context, ref)
+                            : null,
+                      ),
                       const SizedBox(height: 8),
                     ],
                     Row(
@@ -507,34 +517,4 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
   );
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: AppBorderRadius.smRadius,
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, size: 18, color: scheme.onErrorContainer),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: scheme.onErrorContainer),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

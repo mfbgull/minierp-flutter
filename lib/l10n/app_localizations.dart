@@ -4934,6 +4934,12 @@ abstract class AppLocalizations {
   /// **'Draft'**
   String get statusDraft;
 
+  /// No description provided for @statusRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded'**
+  String get statusRecorded;
+
   /// No description provided for @statusPaid.
   ///
   /// In en, this message translates to:

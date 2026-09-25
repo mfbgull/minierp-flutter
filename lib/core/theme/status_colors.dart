@@ -52,8 +52,8 @@ class StatusColors {
   };
 
   Color expense(String s) => switch (s) {
-    'Draft' => neutral, 'Submitted' => info, 'Approved' => success,
-    'Paid' => _scheme.tertiary, 'Cancelled' => error, _ => neutral,
+    'Draft' => neutral, 'Recorded' => success, 'Cancelled' => error,
+    _ => neutral,
   };
 
   Color stock(String s) => switch (s.toLowerCase()) {

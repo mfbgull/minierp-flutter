@@ -50,10 +50,19 @@ InputDecoration formInputDecoration({String? hintText}) => InputDecoration(
 );
 
 /// Inline API-error banner shown above the dialog footer on ApiFailure.
+/// Optional [actionLabel]/[onAction] render a recovery CTA (e.g. open
+/// the opening-balance editor on an Insufficient-funds 400).
 class ErrorBanner extends StatelessWidget {
-  const ErrorBanner({super.key, required this.message});
+  const ErrorBanner({
+    super.key,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
 
   final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +85,17 @@ class ErrorBanner extends StatelessWidget {
               ).textTheme.bodySmall?.copyWith(color: scheme.onErrorContainer),
             ),
           ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: onAction,
+              style: TextButton.styleFrom(
+                foregroundColor: scheme.onErrorContainer,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: Text(actionLabel!),
+            ),
+          ],
         ],
       ),
     );

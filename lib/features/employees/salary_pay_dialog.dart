@@ -158,23 +158,23 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
     final deduction = _loanDeduction;
     if (deduction <= 0) return;
 
-    final activeLoans = ref.read(employeeActiveLoansProvider(widget.employee.id));
+    final activeLoans = ref.read(
+      employeeActiveLoansProvider(widget.employee.id),
+    );
     if (activeLoans.isEmpty) return;
 
     // Apply deduction to the first active loan (sorted by due date)
     final loan = activeLoans.first;
     final repayAmount = deduction <= loan.balance ? deduction : loan.balance;
 
-    await ref.read(loanRepositoryProvider).repayLoan(
-      widget.employee.id,
-      loan.id,
-      {
-        'amount': repayAmount,
-        'payment_date': isoDate(_paymentDate),
-        'payment_method': _paymentMethod?.toLowerCase() ?? 'bank',
-        'notes': 'Loan deduction from salary payment',
-      },
-    );
+    await ref
+        .read(loanRepositoryProvider)
+        .repayLoan(widget.employee.id, loan.id, {
+          'amount': repayAmount,
+          'payment_date': isoDate(_paymentDate),
+          'payment_method': _paymentMethod?.toLowerCase() ?? 'bank',
+          'notes': 'Loan deduction from salary payment',
+        });
   }
 
   @override
@@ -191,194 +191,200 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
       child: Form(
         key: _formKey,
         child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.employeesPaysalary,
-                      style: Theme.of(context).textTheme.titleLarge,
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.employeesPaysalary,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${employee.employeeCode} · ${employee.fullName}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${employee.employeeCode} · ${employee.fullName}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const Divider(height: 1),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: FormFieldShell(
-                              label: l10n.employeesSalaryamount,
-                              required: true,
-                              child: TextFormField(
-                                controller: _amountController,
-                                onFieldSubmitted: submitOnEnter(_submit),
-                                autofocus: true,
-                                enabled: !_submitting,
-                                keyboardType: const TextInputType
-                                    .numberWithOptions(decimal: true),
-                                decoration: _decoration(),
-                                validator: _validateAmount,
-                              ),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: FormFieldShell(
+                            label: l10n.employeesSalaryamount,
+                            required: true,
+                            child: TextFormField(
+                              controller: _amountController,
+                              onFieldSubmitted: submitOnEnter(_submit),
+                              autofocus: true,
+                              enabled: !_submitting,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              decoration: _decoration(),
+                              validator: _validateAmount,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: FormFieldShell(
-                              label: l10n.employeesPaymentdate,
-                              required: true,
-                              child: SizedBox(
-                                height: 44,
-                                child: OutlinedButton.icon(
-                                  onPressed: _submitting ? null : _pickDate,
-                                  icon: const Icon(
-                                    Icons.calendar_today_outlined,
-                                    size: 16,
-                                  ),
-                                  label: Text(
-                                    Formatters.date(isoDate(_paymentDate)),
-                                  ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FormFieldShell(
+                            label: l10n.employeesPaymentdate,
+                            required: true,
+                            child: SizedBox(
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                onPressed: _submitting ? null : _pickDate,
+                                icon: const Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  Formatters.date(isoDate(_paymentDate)),
                                 ),
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      FormFieldShell(
-                        label: l10n.employeesPaymenttype,
-                        child: SearchableSelect<String>(
-                          items: const ['full', 'advance', 'partial'],
-                          selected: _paymentType,
-                          labelBuilder: (v) => switch (v) {
-                            'full' => l10n.employeesPaymenttypeFull,
-                            'advance' => l10n.employeesPaymenttypeAdvance,
-                            'partial' => l10n.employeesPaymenttypePartial,
-                            _ => v,
-                          },
-                          onChanged: (v) => setState(() => _paymentType = v ?? 'full'),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      _RemainingBalance(employee: widget.employee, paymentType: _paymentType, paymentDate: _paymentDate),
-                      if (activeLoans.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        _LoanDeductionSection(
-                          activeLoans: activeLoans,
-                          controller: _loanDeductionController,
-                          enabled: !_submitting,
                         ),
                       ],
-                      const SizedBox(height: 10),
-                      FormFieldShell(
-                        label: l10n.employeesPaymentmethod,
-                        child: SearchableSelect<String>(
-                          items: kPaymentMethods,
-                          selected: _paymentMethod,
-                          labelBuilder: (v) => v,
-                          onChanged: (v) =>
-                              setState(() => _paymentMethod = v),
-                        ),
+                    ),
+                    const SizedBox(height: 10),
+                    FormFieldShell(
+                      label: l10n.employeesPaymenttype,
+                      child: SearchableSelect<String>(
+                        items: const ['full', 'advance', 'partial'],
+                        selected: _paymentType,
+                        labelBuilder: (v) => switch (v) {
+                          'full' => l10n.employeesPaymenttypeFull,
+                          'advance' => l10n.employeesPaymenttypeAdvance,
+                          'partial' => l10n.employeesPaymenttypePartial,
+                          _ => v,
+                        },
+                        onChanged: (v) =>
+                            setState(() => _paymentType = v ?? 'full'),
                       ),
+                    ),
+                    const SizedBox(height: 6),
+                    _RemainingBalance(
+                      employee: widget.employee,
+                      paymentType: _paymentType,
+                      paymentDate: _paymentDate,
+                    ),
+                    if (activeLoans.isNotEmpty) ...[
                       const SizedBox(height: 10),
-                      FormFieldShell(
-                        label: l10n.employeesReferenceno,
-                        child: TextFormField(
-                          controller: _referenceController,
-                          onFieldSubmitted: submitOnEnter(_submit),
-                          enabled: !_submitting,
-                          decoration: _decoration(),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      FormFieldShell(
-                        label: l10n.employeesSalarynotes,
-                        child: TextFormField(
-                          controller: _notesController,
-                          enabled: !_submitting,
-                          minLines: 2,
-                          maxLines: 3,
-                          decoration: _decoration(),
-                        ),
+                      _LoanDeductionSection(
+                        activeLoans: activeLoans,
+                        controller: _loanDeductionController,
+                        enabled: !_submitting,
                       ),
                     ],
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (_error != null) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.errorContainer,
-                          borderRadius: AppBorderRadius.smRadius,
-                        ),
-                        child: Text(
-                          _error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onErrorContainer,
-                          ),
-                        ),
+                    const SizedBox(height: 10),
+                    FormFieldShell(
+                      label: l10n.employeesPaymentmethod,
+                      child: SearchableSelect<String>(
+                        items: kPaymentMethods,
+                        selected: _paymentMethod,
+                        labelBuilder: (v) => v,
+                        onChanged: (v) => setState(() => _paymentMethod = v),
                       ),
-                      const SizedBox(height: 8),
-                    ],
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: _submitting
-                              ? null
-                              : () => Navigator.of(context).pop(),
-                          child: Text(l10n.commonCancel),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          onPressed: _submitting ? null : _submit,
-                          icon: _submitting
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.payments_outlined, size: 16),
-                          label: Text(l10n.employeesPaysalary),
-                        ),
-                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    FormFieldShell(
+                      label: l10n.employeesReferenceno,
+                      child: TextFormField(
+                        controller: _referenceController,
+                        onFieldSubmitted: submitOnEnter(_submit),
+                        enabled: !_submitting,
+                        decoration: _decoration(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    FormFieldShell(
+                      label: l10n.employeesSalarynotes,
+                      child: TextFormField(
+                        controller: _notesController,
+                        enabled: !_submitting,
+                        minLines: 2,
+                        maxLines: 3,
+                        decoration: _decoration(),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_error != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        borderRadius: AppBorderRadius.smRadius,
+                      ),
+                      child: Text(
+                        _error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: _submitting
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        child: Text(l10n.commonCancel),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: _submitting ? null : _submit,
+                        icon: _submitting
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.payments_outlined, size: 16),
+                        label: Text(l10n.employeesPaysalary),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      );
+      ),
+    );
   }
 
   InputDecoration _decoration() => InputDecoration(
@@ -410,31 +416,40 @@ class _RemainingBalance extends ConsumerWidget {
       // For advance payments, just show the salary amount as context
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: scheme.primaryContainer.withValues(alpha: 0.3),
-        borderRadius: AppBorderRadius.smRadius,
-      ),
-      child: Text(
-        '${l10n.employeesSalaryamount}: ${Formatters.currency(employee.salary)}',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: scheme.onPrimaryContainer,
+        decoration: BoxDecoration(
+          color: scheme.primaryContainer.withValues(alpha: 0.3),
+          borderRadius: AppBorderRadius.smRadius,
         ),
-      ),
-    );
+        child: Text(
+          '${l10n.employeesSalaryamount}: ${Formatters.currency(employee.salary)}',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: scheme.onPrimaryContainer),
+        ),
+      );
     }
 
     return history.when(
       data: (months) {
-        final selectedMonth = '${paymentDate.year}-${paymentDate.month.toString().padLeft(2, '0')}';
+        final selectedMonth =
+            '${paymentDate.year}-${paymentDate.month.toString().padLeft(2, '0')}';
         final thisMonth = months.where((m) => m.payPeriod == selectedMonth);
         final totalPaid = thisMonth.fold<num>(0, (sum, m) => sum + m.totalPaid);
-        final advanceCarryover = thisMonth.fold<num>(0, (sum, m) => sum + m.advanceCarryover);
-        final sourceMonth = thisMonth.isNotEmpty ? thisMonth.first.displaySourceMonth : null;
-        final effectiveRemaining = employee.salary - totalPaid - advanceCarryover;
-        if (effectiveRemaining <= 0 && advanceCarryover <= 0) return const SizedBox.shrink();
+        final advanceCarryover = thisMonth.fold<num>(
+          0,
+          (sum, m) => sum + m.advanceCarryover,
+        );
+        final sourceMonth = thisMonth.isNotEmpty
+            ? thisMonth.first.displaySourceMonth
+            : null;
+        final effectiveRemaining =
+            employee.salary - totalPaid - advanceCarryover;
+        if (effectiveRemaining <= 0 && advanceCarryover <= 0) {
+          return const SizedBox.shrink();
+        }
         final advanceLabel = sourceMonth != null
-          ? '${l10n.employeesAdvanceFrom} $sourceMonth'
-          : l10n.employeesAdvanceFromPrevious;
+            ? '${l10n.employeesAdvanceFrom} $sourceMonth'
+            : l10n.employeesAdvanceFromPrevious;
         if (effectiveRemaining <= 0) {
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -444,9 +459,9 @@ class _RemainingBalance extends ConsumerWidget {
             ),
             child: Text(
               '$advanceLabel: ${Formatters.currency(advanceCarryover)} — ${l10n.employeesRemainingbalance}: ${Formatters.currency(0)}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onPrimaryContainer,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onPrimaryContainer),
             ),
           );
         }
@@ -458,11 +473,11 @@ class _RemainingBalance extends ConsumerWidget {
           ),
           child: Text(
             advanceCarryover > 0
-              ? '${l10n.employeesAlreadyPaid}: ${Formatters.currency(totalPaid)} + $advanceLabel: ${Formatters.currency(advanceCarryover)} — ${l10n.employeesRemainingbalance}: ${Formatters.currency(effectiveRemaining)}'
-              : '${l10n.employeesAlreadyPaid}: ${Formatters.currency(totalPaid)} — ${l10n.employeesRemainingbalance}: ${Formatters.currency(effectiveRemaining)}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: scheme.onTertiaryContainer,
-            ),
+                ? '${l10n.employeesAlreadyPaid}: ${Formatters.currency(totalPaid)} + $advanceLabel: ${Formatters.currency(advanceCarryover)} — ${l10n.employeesRemainingbalance}: ${Formatters.currency(effectiveRemaining)}'
+                : '${l10n.employeesAlreadyPaid}: ${Formatters.currency(totalPaid)} — ${l10n.employeesRemainingbalance}: ${Formatters.currency(effectiveRemaining)}',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.onTertiaryContainer),
           ),
         );
       },
@@ -491,8 +506,8 @@ class _LoanDeductionSection extends StatelessWidget {
     final loan = activeLoans.first;
 
     // Default suggestion: monthly installment or remaining balance
-    final suggested = loan.monthlyInstallment > 0 &&
-            loan.monthlyInstallment <= loan.balance
+    final suggested =
+        loan.monthlyInstallment > 0 && loan.monthlyInstallment <= loan.balance
         ? loan.monthlyInstallment
         : loan.balance;
 
@@ -508,9 +523,7 @@ class _LoanDeductionSection extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.tertiaryContainer.withValues(alpha: 0.3),
         borderRadius: AppBorderRadius.smRadius,
-        border: Border.all(
-          color: scheme.tertiary.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: scheme.tertiary.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -564,13 +577,20 @@ class _LoanDeductionSection extends StatelessWidget {
                 child: TextFormField(
                   controller: controller,
                   enabled: enabled,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   style: Theme.of(context).textTheme.bodySmall,
                   decoration: InputDecoration(
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    border: OutlineInputBorder(borderRadius: AppBorderRadius.smRadius),
-                    prefixText: 'Rs. ',
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: AppBorderRadius.smRadius,
+                    ),
+                    prefixText: '${CurrencyConfigStore.current.symbol} ',
                     prefixStyle: Theme.of(context).textTheme.labelSmall,
                   ),
                 ),

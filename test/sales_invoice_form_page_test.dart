@@ -57,12 +57,26 @@ class _FakeInvoiceRepository extends InvoiceRepository {
   /// Last body passed to [create] (for in-flight-commit assertions).
   Map<String, dynamic>? lastCreateBody;
 
+  /// Last Idempotency-Key passed to [create] (P11 retry guard).
+  final List<String?> createKeys = [];
+
+  /// When set, `create` fails with this message (simulates the timeout
+  /// whose retry must replay, not duplicate — P11).
+  String? failCreateWith;
+
   /// Last body passed to [update] (edit-mode in-flight-commit assertions).
   Map<String, dynamic>? lastUpdateBody;
 
   @override
-  Future<ApiResult<Invoice>> create(Map<String, dynamic> body) async {
+  Future<ApiResult<Invoice>> create(
+    Map<String, dynamic> body, {
+    String? idempotencyKey,
+  }) async {
     lastCreateBody = body;
+    createKeys.add(idempotencyKey);
+    if (failCreateWith != null) {
+      return ApiFailure(ApiError(message: failCreateWith!, isNetwork: true));
+    }
     return ApiSuccess(Invoice.fromJson(const <String, dynamic>{}));
   }
 
@@ -1373,6 +1387,43 @@ void main() {
       7,
       reason: 'the in-flight quantity is committed before saving',
     );
+  });
+
+  testWidgets('P11: unchanged resubmit reuses the Idempotency-Key', (
+    tester,
+  ) async {
+    final repo = _FakeInvoiceRepository()
+      ..failCreateWith = 'connection timed out';
+    await _pumpPage(tester, repo: repo);
+
+    await tester.tap(find.text('Acme Corp').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'Wid');
+    await tester.pump();
+    await tester.tap(find.text('Widget').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(gridEditor(), '7');
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    Future<void> save() async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+    }
+
+    // Attempt 1: transport failure (server may still have committed).
+    await save();
+    expect(repo.createKeys, hasLength(1));
+    final key = repo.createKeys.single;
+    expect(key, isNotNull, reason: 'creates carry an Idempotency-Key');
+
+    // Attempt 2: identical body — the key must be reused so the server
+    // replays the original invoice instead of double-creating.
+    await save();
+    expect(repo.createKeys, hasLength(2));
+    expect(repo.createKeys[1], key);
   });
 
   testWidgets('Alt+C opens the customer popup', (tester) async {

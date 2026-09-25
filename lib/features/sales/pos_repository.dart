@@ -24,6 +24,7 @@ class PosRepository {
     required List<Map<String, dynamic>> items,
     required double cashReceived,
     String? customerName,
+    String? idempotencyKey,
   }) async {
     return _api.postEnvelope(
       '${ApiEndpoints.pos}/sale',
@@ -35,6 +36,9 @@ class PosRepository {
         if (customerName != null && customerName.isNotEmpty)
           'customer_name': customerName,
       },
+      headers: idempotencyKey == null
+          ? null
+          : <String, dynamic>{'Idempotency-Key': idempotencyKey},
       parse: (json) => PosSale.fromJson(
         json['data'] as Map<String, dynamic>,
       ),

@@ -825,10 +825,10 @@ void main() {
       ]);
     });
 
-    test('legacy formatters', () {
-      expect(formatAsCurrency(1234.5), r'$1,234.50');
-      expect(formatAsCurrency('100'), r'$100.00');
-      expect(formatAsCurrency(null), r'$0.00');
+    test('legacy formatters use the configured currency', () {
+      expect(formatAsCurrency(1234.5), 'Rs. 1,234.50');
+      expect(formatAsCurrency('100'), 'Rs. 100.00');
+      expect(formatAsCurrency(null), 'Rs. 0.00');
       expect(formatAsFixed(12.5), '12.50');
       expect(formatDateString('2026-08-03'), 'Aug 3, 2026');
       expect(formatDateString(null), '');

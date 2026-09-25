@@ -11,6 +11,7 @@ import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import '../core/utils/formatters.dart';
 import '../core/utils/pdf_fonts.dart';
 
 import '../data/models/invoice.dart' show CompanyInfo;
@@ -27,6 +28,7 @@ Future<Uint8List> buildPaymentReceiptPdf(
   Payment payment, {
   CompanyInfo? company,
   String? entityName,
+  CurrencyFormatter? formatter,
 }) async {
   final usedCompany = company ?? defaultCompany;
   final doc = pw.Document(theme: await PdfFonts.theme());
@@ -47,7 +49,7 @@ Future<Uint8List> buildPaymentReceiptPdf(
         pw.SizedBox(height: 20),
         _buildDetails(payment, entityName),
         pw.SizedBox(height: 24),
-        _buildAmountBox(payment),
+        _buildAmountBox(payment, formatter),
       ],
     ),
   );
@@ -136,16 +138,15 @@ pw.Widget _detailLine(String text) => pw.Padding(
 
 pw.Widget _buildDetails(Payment payment, String? entityName) {
   final isSupplier = payment.supplierId != null;
-  final resolvedName =
-      entityName?.trim().isNotEmpty == true
-          ? entityName!
-          : isSupplier
-          ? (payment.supplierName?.trim().isNotEmpty == true
-                ? payment.supplierName!
-                : 'Supplier #${payment.supplierId}')
-          : payment.customerName?.trim().isNotEmpty == true
-          ? payment.customerName!
-          : 'Customer #${payment.customerId}';
+  final resolvedName = entityName?.trim().isNotEmpty == true
+      ? entityName!
+      : isSupplier
+      ? (payment.supplierName?.trim().isNotEmpty == true
+            ? payment.supplierName!
+            : 'Supplier #${payment.supplierId}')
+      : payment.customerName?.trim().isNotEmpty == true
+      ? payment.customerName!
+      : 'Customer #${payment.customerId}';
   return pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
@@ -158,10 +159,7 @@ pw.Widget _buildDetails(Payment payment, String? entityName) {
             pw.SizedBox(height: 4),
             pw.Text(
               resolvedName,
-              style: pw.TextStyle(
-                fontSize: 11,
-                fontWeight: pw.FontWeight.bold,
-              ),
+              style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
             ),
           ],
         ),
@@ -185,7 +183,11 @@ pw.Widget _buildDetails(Payment payment, String? entityName) {
   );
 }
 
-pw.Widget _buildAmountBox(Payment payment) {
+pw.Widget _buildAmountBox(Payment payment, CurrencyFormatter? formatter) {
+  final amount = formatPaymentReceiptAmount(
+    payment.amount,
+    formatter: formatter,
+  );
   return pw.Container(
     padding: const pw.EdgeInsets.all(16),
     decoration: pw.BoxDecoration(
@@ -201,7 +203,7 @@ pw.Widget _buildAmountBox(Payment payment) {
           style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
         ),
         pw.Text(
-          '${_currencySymbol()}${payment.amount.toStringAsFixed(2)}',
+          amount,
           style: pw.TextStyle(
             fontSize: 16,
             fontWeight: pw.FontWeight.bold,
@@ -238,8 +240,8 @@ String _fmtDate(String iso) {
   return '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
 }
 
-String _currencySymbol() {
-  // Mirrors the settings currency; PDF labels are English-only so keep
-  // the plain $ like the reference receipt.
-  return r'$';
+String formatPaymentReceiptAmount(num value, {CurrencyFormatter? formatter}) {
+  return (formatter ?? CurrencyFormatter(CurrencyConfigStore.current)).format(
+    value,
+  );
 }

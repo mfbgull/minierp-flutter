@@ -28,6 +28,8 @@ import '../../widgets/form_field.dart';
 import '../../widgets/form_helpers.dart';
 import '../../widgets/payment_success_screen.dart' show PaymentSuccessScreen;
 import '../../widgets/searchable_select.dart';
+import '../dashboard/cash_opening_balance_dialog.dart'
+    show showCashOpeningBalanceDialog;
 import '../payments/payments_providers.dart' show paymentsProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'supplier_providers.dart';
@@ -723,7 +725,22 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
                               ),
                               if (_error != null) ...[
                                 const SizedBox(height: 10),
-                                ErrorBanner(message: _error!),
+                                ErrorBanner(
+                                  message: _error!,
+                                  actionLabel: _error!.contains(
+                                        'Insufficient funds',
+                                      )
+                                      ? l10n.dashboardOpeningbalance
+                                      : null,
+                                  onAction: _error!.contains(
+                                        'Insufficient funds',
+                                      )
+                                      ? () => showCashOpeningBalanceDialog(
+                                          context,
+                                          ref,
+                                        )
+                                      : null,
+                                ),
                               ],
                               const SizedBox(height: 12),
                               Wrap(

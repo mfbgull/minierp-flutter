@@ -13,9 +13,7 @@ import '../../l10n/app_localizations.dart';
 String expenseStatusLabel(AppLocalizations l10n, String status) =>
     switch (status) {
       'Draft' => l10n.statusDraft,
-      'Submitted' => l10n.statusSubmitted,
-      'Approved' => l10n.statusApproved,
-      'Paid' => l10n.statusPaid,
+      'Recorded' => l10n.statusRecorded,
       'Cancelled' => l10n.statusCancelled,
       _ => status,
     };

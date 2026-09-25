@@ -484,6 +484,18 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
                 ),
               ],
             ],
+            const SizedBox(height: 12),
+            FormFieldShell(
+              label: l10n.salesreturnsReturnreason,
+              child: TextFormField(
+                controller: _reasonController,
+                enabled: !_submitting,
+                maxLines: 2,
+                decoration: formInputDecoration(
+                  hintText: l10n.salesreturnsReturnreasonplaceholder,
+                ),
+              ),
+            ),
             if (_grossReturnNow > 0) ...[
               const SizedBox(height: 10),
               _PositionPreview(

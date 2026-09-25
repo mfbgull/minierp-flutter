@@ -9,6 +9,8 @@ import 'package:minierp_app/data/models/quotation.dart';
 import 'package:minierp_app/features/quotations/quotation_pdf.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUpAll(() async {
     // Formatters.date needs the intl date symbols for the en locale.
     await initializeDateFormatting('en');

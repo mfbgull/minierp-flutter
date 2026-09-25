@@ -107,7 +107,7 @@ final expenseCategoriesProvider = FutureProvider<List<ExpenseCategory>>((
   };
 });
 
-/// Status options (Draft/Submitted/Approved/Paid/Cancelled).
+/// Status options (Draft/Recorded/Cancelled).
 final expenseStatusOptionsProvider = FutureProvider<List<ExpenseOption>>((
   ref,
 ) async {

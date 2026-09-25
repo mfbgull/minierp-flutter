@@ -36,7 +36,7 @@ class ExpenseFilters {
   /// Exact `expense_category` match.
   final String? category;
 
-  /// Exact status match (Draft/Submitted/Approved/Paid/Cancelled).
+  /// Exact status match (Draft/Recorded/Cancelled).
   final String? status;
 
   /// Inclusive `from_date` / `to_date` (`YYYY-MM-DD`).
