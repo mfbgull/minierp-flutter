@@ -273,7 +273,7 @@ class ProductionModel {
       // Calculate total batch cost from actual FIFO consumption
       const totalOverhead = overhead_cost ?? 0;
       const totalBatchCost = totalMaterialCost + totalOverhead;
-      const costPerUnit = output_quantity > 0 ? totalBatchCost / output_quantity : 0;
+      const costPerUnit = output_quantity > 0 ? roundQty(totalBatchCost / output_quantity) : 0;
 
       // Create a stock_batch record for the finished good
       db.prepare(`

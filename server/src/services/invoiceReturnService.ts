@@ -458,6 +458,10 @@ export class InvoiceReturnService {
       if (!posted.length && legacyDisposition) {
         const legacyPosition = InvoiceReturnService.getPosition(input.invoiceId);
         if (legacyPosition.refundCreditDue > 0.005) {
+          // ACC-18: validate refund against authoritative settlement capacity
+          if (legacyDisposition === 'refund' && netAmount > legacyPosition.remainingSettlementCapacity) {
+            throw new ReturnError(400, `Refund of ${netAmount} exceeds remaining settlement capacity of ${legacyPosition.remainingSettlementCapacity}`);
+          }
           if (legacyDisposition === 'refund') {
             const legacyRefundSettlement = InvoiceReturnService.applyLegacyRefund(db, {
               returnHeader: header,

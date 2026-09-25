@@ -5,6 +5,7 @@ import Purchase from '../models/Purchase';
 import AccountingService from '../services/accountingService';
 import db from '../config/database';
 import logger from '../utils/logger';
+import { handleBusinessError } from '../utils/businessRuleError';
 
 function recordPurchase(req: AuthRequest, res: Response): void {
   try {
@@ -73,7 +74,7 @@ function recordPurchase(req: AuthRequest, res: Response): void {
     res.status(201).json(purchase);
   } catch (error: any) {
     logger.error('Record purchase error:', error);
-    res.status(500).json({ error: error.message || 'Failed to record purchase' });
+    handleBusinessError(res, error, 'Record purchase', 'Failed to record purchase');
   }
 }
 

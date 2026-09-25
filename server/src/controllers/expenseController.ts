@@ -8,6 +8,7 @@ import logger from '../utils/logger';
 import { sanitizeSortParams, EXPENSE_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import ExpenseModel from '../models/Expense';
 import { isValidPaymentMethod } from '../services/cashService';
+import { handleBusinessError } from '../utils/businessRuleError';
 
 function createExpense(req: AuthRequest, res: Response): void {
   try {
@@ -68,7 +69,7 @@ function createExpense(req: AuthRequest, res: Response): void {
     });
   } catch (error) {
     logger.error('Error creating expense:', error);
-    res.status(500).json({ success: false, error: 'Failed to create expense' });
+    handleBusinessError(res, error, 'Create expense', 'Failed to create expense', { success: true });
   }
 }
 
@@ -140,13 +141,12 @@ function getExpenseById(req: Request, res: Response): void {
   }
 }
 
-// EXP-03 (task 5.2): the expense status machine.
-const EXPENSE_STATUSES = ['Draft', 'Submitted', 'Approved', 'Paid', 'Cancelled'] as const;
+// TASK 25 Option A: truthful statuses. Leave Draft posts GL/cash; Recorded
+// is the active (GL-worthy) state; Cancelled voids. Cash timing unchanged.
+const EXPENSE_STATUSES = ['Draft', 'Recorded', 'Cancelled'] as const;
 const EXPENSE_TRANSITIONS: Record<string, string[]> = {
-  Draft: ['Submitted', 'Cancelled'],
-  Submitted: ['Approved', 'Cancelled'],
-  Approved: ['Paid', 'Cancelled'],
-  Paid: [],
+  Draft: ['Recorded', 'Cancelled'],
+  Recorded: ['Cancelled'],
   Cancelled: [],
 };
 
@@ -183,9 +183,9 @@ function updateExpense(req: AuthRequest, res: Response): void {
         });
         return;
       }
-      // Approvals are a control point: moving into Approved/Paid requires
-      // expenses:approve (Admin bypasses in the middleware itself).
-      if ((targetStatus === 'Approved' || targetStatus === 'Paid') && req.user!.role !== 'admin') {
+      // Recording is the control point that posts cash: moving into Recorded
+      // requires expenses:approve (Admin bypasses in the middleware itself).
+      if (targetStatus === 'Recorded' && req.user!.role !== 'admin') {
         const perm = db.prepare(`
           SELECT 1 FROM role_permissions rp
           JOIN permissions p ON p.id = rp.permission_id
@@ -194,15 +194,15 @@ function updateExpense(req: AuthRequest, res: Response): void {
           LIMIT 1
         `).get(req.user!.id);
         if (!perm) {
-          res.status(403).json({ success: false, error: 'The expenses:approve permission is required to approve or pay expenses' });
+          res.status(403).json({ success: false, error: 'The expenses:approve permission is required to record expenses' });
           return;
         }
       }
     }
 
-    // Immutability: Approved/Paid documents reject field edits. Only the
-    // documented reversal (→ Cancelled) is possible.
-    const isLocked = currentStatus === 'Approved' || currentStatus === 'Paid';
+    // Immutability: Recorded/Cancelled documents reject field edits. Only the
+    // documented reversal (→ Cancelled from a prior state) is possible.
+    const isLocked = currentStatus === 'Recorded' || currentStatus === 'Cancelled';
     const hasFieldEdits = [expense_category, description, amount, expense_date, payment_method, reference_no, vendor_name, project]
       .some((v) => v !== undefined);
     if (isLocked && hasFieldEdits && (targetStatus === undefined || targetStatus === currentStatus)) {
@@ -247,8 +247,7 @@ function updateExpense(req: AuthRequest, res: Response): void {
       res.status(409).json({ success: false, error: errorMessage });
       return;
     }
-    logger.error('Error updating expense:', error);
-    res.status(500).json({ success: false, error: 'Failed to update expense' });
+    handleBusinessError(res, error, 'Update expense', 'Failed to update expense', { success: true });
   }
 }
 
@@ -374,10 +373,7 @@ function getExpenseStatusOptions(req: Request, res: Response): void {
 }
 
 function getExpensePaymentMethodOptions(req: Request, res: Response): void {
-  // 'Other' removed: it normalized to 'unclassified' in the cash flows
-  // while the GL mapped it to 1010 Bank, guaranteeing a variance.
-  const options = ExpenseModel.getPaymentMethodOptions().filter((o) => o.value !== 'Other');
-  res.json({ success: true, data: options });
+  res.json({ success: true, data: ExpenseModel.getPaymentMethodOptions() });
 }
 
 export default {

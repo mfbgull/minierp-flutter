@@ -150,7 +150,7 @@ beforeAll(() => {
 
   db.prepare(`
     INSERT OR IGNORE INTO expenses (expense_no, expense_category, description, amount, expense_date, status)
-    VALUES ('EXP-001', 'Office Supplies', 'Office rent August', 25000, '2024-08-01', 'Approved')
+    VALUES ('EXP-001', 'Office Supplies', 'Office rent August', 25000, '2024-08-01', 'Recorded')
   `).run();
 
   db.prepare(`
@@ -216,6 +216,42 @@ describe('Search API', () => {
       const aliKhan = customers.find((c: any) => c.title === 'Ali Khan');
       expect(aliKhan).toBeDefined();
       expect(aliKhan.subtitle).toContain('CUST-001');
+    });
+
+    it('uses the configured currency symbol in monetary subtitles', async () => {
+      const setting = db
+        .prepare('SELECT value FROM settings WHERE key = ?')
+        .get('currency_symbol') as { value: string } | undefined;
+      db.prepare(
+        `INSERT INTO settings (key, value, description)
+         VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      ).run('currency_symbol', '€', 'Currency symbol displayed throughout the application');
+
+      try {
+        const res = await request(app)
+          .get('/api/search?q=ali&limit=10')
+          .set('Cookie', authCookie);
+        expect(res.status).toBe(200);
+        const results = res.body.data.results as Array<{
+          type: string;
+          title: string;
+          subtitle: string;
+        }>;
+        const customer = results.find(
+          (result) => result.type === 'customer' && result.title === 'Ali Khan',
+        );
+        expect(customer?.subtitle).toContain('€ 12,500.00');
+      } finally {
+        if (setting) {
+          db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(
+            setting.value,
+            'currency_symbol',
+          );
+        } else {
+          db.prepare('DELETE FROM settings WHERE key = ?').run('currency_symbol');
+        }
+      }
     });
 
     it('returns inactive customers filtered out', async () => {

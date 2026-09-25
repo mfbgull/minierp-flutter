@@ -39,6 +39,8 @@ beforeEach(() => {
       customer_id    INTEGER,
       invoice_date   TEXT,
       status         TEXT,
+      payment_status TEXT DEFAULT 'Unpaid',
+      return_status  TEXT DEFAULT 'None',
       total_amount   REAL DEFAULT 0,
       returned_amount REAL DEFAULT 0,
       balance_amount REAL DEFAULT 0
@@ -114,10 +116,12 @@ function seedInvoice(
   status = 'Paid',
   returned = 0,
 ): void {
+  const paymentStatus = status === 'Paid' ? 'Paid' : status === 'Partially Paid' ? 'Partially Paid' : 'Unpaid';
+  const returnStatus = returned > 0 && returned >= amount ? 'Fully Returned' : returned > 0 ? 'Partially Returned' : 'None';
   db.prepare(
-    `INSERT INTO invoices (invoice_no, customer_id, invoice_date, status, total_amount, returned_amount, balance_amount)
-     VALUES (?, 1, ?, ?, ?, ?, 0)`,
-  ).run(`INV-${Date.now()}-${Math.random()}`, date, status, amount, returned);
+    `INSERT INTO invoices (invoice_no, customer_id, invoice_date, status, payment_status, return_status, total_amount, returned_amount, balance_amount)
+     VALUES (?, 1, ?, ?, ?, ?, ?, ?, 0)`,
+  ).run(`INV-${Date.now()}-${Math.random()}`, date, status, paymentStatus, returnStatus, amount, returned);
 }
 
 function seedMovement(
@@ -230,7 +234,7 @@ describe('dashboard /kpi core metrics (Phase 1)', () => {
 });
 
 describe('dashboard /kpi additional cards (net profit, expenses, etc.)', () => {
-  function seedExpense(date: string, amount: number, status = 'Approved'): void {
+  function seedExpense(date: string, amount: number, status = 'Recorded'): void {
     db.prepare(
       `INSERT INTO expenses (expense_no, expense_date, amount, status)
        VALUES (?, ?, ?, ?)`,

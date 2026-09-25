@@ -533,7 +533,7 @@ function getKPI(
     case 'inventory_turnover': {
       const purchases = db.prepare(`
         SELECT COALESCE(SUM(total_cost), 0) as total FROM purchases
-        WHERE purchase_date >= date('now', '-12 months')
+        WHERE purchase_date >= date('now', '-12 months') AND voided_at IS NULL
       `).get() as { total: number };
 
       const avgStock = db.prepare(`
@@ -552,7 +552,7 @@ function getKPI(
             COALESCE((SELECT MIN(payment_date) FROM payments WHERE invoice_id = invoices.id), invoice_date)
           ) - julianday(invoice_date)), 0) as avg_days
         FROM invoices
-        WHERE status = 'Paid' AND paid_amount > 0
+        WHERE payment_status = 'Paid' AND paid_amount > 0
       `).get() as { avg_days: number };
 
       return { metric, value: Math.round(result.avg_days * 10) / 10, unit: 'days', label: 'Avg Days to Pay' };

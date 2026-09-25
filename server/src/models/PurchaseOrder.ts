@@ -6,6 +6,7 @@ import { sanitizeSortParams, PURCHASE_ORDER_SORT_COLUMNS } from '../utils/sqlSan
 import { StockBalance } from '../types';
 import logger from '../utils/logger';
 import { addCurrency, multiplyCurrency, roundCurrency } from '../utils/currency';
+import { roundQty, qtyEpsilon } from '../utils/quantity';
 
 interface PurchaseOrder {
   id: number;
@@ -698,10 +699,10 @@ class PurchaseOrderModel {
         `).all(item.id) as Array<{ id: number; quantity_original: number; quantity_remaining: number }>;
 
         for (const batch of batches) {
-          if (Number(batch.quantity_remaining) + 1e-9 < Number(batch.quantity_original)) {
+          if (roundQty(Number(batch.quantity_remaining)) < roundQty(Number(batch.quantity_original)) - qtyEpsilon()) {
             throw new Error(
               `Cannot void receipt ${receipt.receipt_no}: units from this receipt were already consumed ` +
-              `(batch ${batch.id} has ${Number(batch.quantity_remaining)} of ${Number(batch.quantity_original)} remaining)`
+              `(batch ${batch.id} has ${roundQty(Number(batch.quantity_remaining))} of ${roundQty(Number(batch.quantity_original))} remaining)`
             );
           }
         }
@@ -746,7 +747,7 @@ class PurchaseOrderModel {
         `).run(item.received_quantity, item.po_item_id);
 
         totalQuantity += item.received_quantity;
-        totalAmount += item.received_quantity * item.unit_price;
+        totalAmount += roundQty(item.received_quantity * item.unit_price);
       }
 
       // Recompute PO status (mirrors addReceipt).
@@ -889,7 +890,7 @@ class PurchaseOrderModel {
           throw new Error('Purchase Order Item not found');
         }
 
-        const pending = poItem.quantity - poItem.received_quantity;
+        const pending = roundQty(poItem.quantity - poItem.received_quantity);
         if (receiptItem.received_quantity > pending) {
           throw new Error(`Cannot receive more than pending quantity (${pending})`);
         }
@@ -934,7 +935,7 @@ class PurchaseOrderModel {
         const receiptItemId = receiptItemResult.lastInsertRowid as number;
 
         // Update PO item received_quantity
-        const newReceived = poItem.received_quantity + receiptItem.received_quantity;
+        const newReceived = roundQty(poItem.received_quantity + receiptItem.received_quantity);
         db.prepare(`
           UPDATE purchase_order_items
           SET received_quantity = ?
@@ -1020,7 +1021,7 @@ class PurchaseOrderModel {
         }
 
         totalQuantity += receiptItem.received_quantity;
-        totalAmount += receiptItem.received_quantity * poItem.unit_price;
+        totalAmount += roundQty(receiptItem.received_quantity * poItem.unit_price);
       }
 
       // GL posting (PO receipt completeness): Dr 1200 Inventory Asset /

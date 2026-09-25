@@ -253,7 +253,7 @@ export class PaymentModel {
              COALESCE(e.vendor_name, e.expense_category) party, NULL party_id, NULL party_type,
              e.status, e.description,
              COALESCE(e.created_at, e.expense_date)
-      FROM expenses e WHERE e.status = 'Paid'
+      FROM expenses e WHERE e.status NOT IN ('Draft', 'Cancelled')
       UNION ALL
       SELECT 'salary', sp.id, 'SAL-' || sp.id, sp.payment_date, ABS(sp.amount),
              ${PaymentModel.unifiedMethodSql('sp.payment_method')}, 'salary',
@@ -368,8 +368,8 @@ export class PaymentModel {
       for (const alloc of data.invoice_allocations) {
         const invoiceId = parseInt(alloc.invoice_id, 10);
         db.prepare('INSERT INTO payment_allocations (payment_id, invoice_id, amount) VALUES (?, ?, ?)').run(paymentId, invoiceId, alloc.amount);
-        ledgerUtils.calculateInvoiceBalance(invoiceId);
-        ledgerUtils.updateInvoiceStatus(invoiceId);
+        ledgerUtils.calculateInvoiceBalance(invoiceId, db);
+        ledgerUtils.updateInvoiceStatus(invoiceId, db);
       }
 
       const currentBalance = db.prepare('SELECT current_balance FROM customers WHERE id = ?').get(data.customer_id) as { current_balance: number };
@@ -400,7 +400,7 @@ export class PaymentModel {
         userId: data.userId,
       });
 
-      ledgerUtils.recalcCustomerBalanceFromLedger(data.customer_id);
+      ledgerUtils.recalcCustomerBalanceFromLedger(data.customer_id, db);
 
       return paymentId;
     })();

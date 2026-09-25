@@ -1163,7 +1163,7 @@ class StockMovementModel {
       } | undefined;
 
       if (!batch) throw new Error(`Batch ${data.batchId} not found`);
-      const qty = Number(batch.quantity_remaining);
+      const qty = roundQty(Number(batch.quantity_remaining));
       if (!Number.isFinite(qty) || qty <= 0) {
         throw new Error(`Batch ${batch.batch_no} has no remaining quantity to transfer`);
       }
@@ -1282,7 +1282,7 @@ class StockMovementModel {
       } | undefined;
 
       if (!batch) throw new Error(`Batch ${data.batchId} not found`);
-      const qty = Number(batch.quantity_remaining);
+      const qty = roundQty(Number(batch.quantity_remaining));
       if (!Number.isFinite(qty) || qty <= 0) {
         throw new Error(`Batch ${batch.batch_no} has no remaining quantity to transfer`);
       }
@@ -1440,12 +1440,12 @@ class StockMovementModel {
       const target = db.prepare(`
         SELECT quantity_remaining, unit_cost FROM stock_batches WHERE id = ?
       `).get(targetBatchId) as { quantity_remaining: number; unit_cost: number | null };
-      const qty = Number(target.quantity_remaining);
+      const qty = roundQty(Number(target.quantity_remaining));
       if (!Number.isFinite(qty) || qty <= 0) {
         throw new Error(`Batch ${batch.batch_no} has no remaining quantity to write off`);
       }
-      const unitCost = Number(target.unit_cost ?? 0);
-      const value = Math.round(qty * unitCost * 100) / 100;
+      const unitCost = roundQty(Number(target.unit_cost ?? 0));
+      const value = roundQty(qty * unitCost);
 
       // 2. WRITE_OFF movement (negative qty at the EXPIRED warehouse).
       const remarks = `[WRITE_OFF] reason=${args.reason} gl=${args.lossAccountCode} batch=${batch.batch_no}`;
@@ -1555,7 +1555,7 @@ class StockMovementModel {
         throw new Error(`Transfer ${outLeg.movement_no} is missing its destination leg — cannot void`);
       }
 
-      const qty = Math.abs(outLeg.quantity);
+      const qty = roundQty(Math.abs(outLeg.quantity));
 
       // The mirrored TRANSFER batch at the destination must still hold the
       // transferred quantity. If those units were consumed (sold/transferred
@@ -1567,10 +1567,10 @@ class StockMovementModel {
         if (!mirrorBatch) {
           throw new Error(`Transfer ${outLeg.movement_no} mirrored batch is missing — cannot void`);
         }
-        if (Number(mirrorBatch.quantity_remaining) + 1e-9 < qty) {
+        if (roundQty(Number(mirrorBatch.quantity_remaining)) < qty - qtyEpsilon()) {
           throw new Error(
             `Cannot void transfer ${outLeg.movement_no}: ${qty} unit(s) were already consumed from the destination ` +
-            `(only ${Number(mirrorBatch.quantity_remaining)} remaining in the transfer batch)`
+            `(only ${roundQty(Number(mirrorBatch.quantity_remaining))} remaining in the transfer batch)`
           );
         }
       }

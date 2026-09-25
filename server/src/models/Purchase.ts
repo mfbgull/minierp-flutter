@@ -5,6 +5,7 @@ import StockMovementModel from './StockMovement';
 import SupplierLedgerModel from './SupplierLedger';
 import AccountingService from '../services/accountingService';
 import ledgerUtils from '../utils/ledgerUtils';
+import { roundQty } from '../utils/quantity';
 
 interface Purchase {
   id: number;
@@ -180,7 +181,7 @@ class PurchaseModel {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const totalCost = quantity * unit_cost;
+    const totalCost = roundQty(quantity * unit_cost);
 
     const result = purchaseStmt.run(
       purchaseNo,
@@ -538,7 +539,7 @@ class PurchaseModel {
         MIN(purchase_date) as first_purchase_date,
         MAX(purchase_date) as last_purchase_date
       FROM purchases
-      WHERE item_id = ?
+      WHERE item_id = ? AND voided_at IS NULL
     `).get(item_id);
   }
 
@@ -551,7 +552,7 @@ class PurchaseModel {
         COUNT(DISTINCT item_id) as unique_items,
         COUNT(DISTINCT supplier_name) as unique_suppliers
       FROM purchases
-      WHERE purchase_date BETWEEN ? AND ?
+      WHERE purchase_date BETWEEN ? AND ? AND voided_at IS NULL
     `).get(start_date, end_date);
   }
 
@@ -563,7 +564,7 @@ class PurchaseModel {
         SUM(quantity) as total_quantity,
         SUM(total_cost) as total_cost
       FROM purchases
-      WHERE supplier_name IS NOT NULL
+      WHERE supplier_name IS NOT NULL AND voided_at IS NULL
       GROUP BY supplier_name
       ORDER BY total_cost DESC
       LIMIT ?
@@ -618,7 +619,7 @@ class PurchaseModel {
       }
 
       // Guard: any returned quantity makes the return history unreversable.
-      const returned = Number((purchase as { returned_quantity?: number }).returned_quantity) || 0;
+      const returned = roundQty(Number((purchase as { returned_quantity?: number }).returned_quantity) || 0);
       if (returned > 0.001) {
         throw new Error(
           `Cannot void purchase ${purchase.purchase_no} — ${returned} unit(s) already returned`
@@ -635,8 +636,8 @@ class PurchaseModel {
       // Guard: stock already sold — remaining < original means consumption
       // happened that cannot be attributed back once the purchase is voided.
       if (batch) {
-        const original = Number(batch.quantity_original);
-        const remaining = Number(batch.quantity_remaining);
+        const original = roundQty(Number(batch.quantity_original));
+        const remaining = roundQty(Number(batch.quantity_remaining));
         if (remaining < original - 0.01) {
           throw new Error(
             `Cannot void purchase ${purchase.purchase_no} — ${(original - remaining).toFixed(3)} unit(s) of its stock already sold/consumed`

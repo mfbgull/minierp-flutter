@@ -47,6 +47,8 @@ interface CreateItemDTO {
   rounding_step?: number | null;
   has_expiry?: boolean;
   near_expiry_threshold_days?: number;
+  current_stock?: number;
+  warehouse_id?: number;
 }
 
 interface UpdateItemDTO {

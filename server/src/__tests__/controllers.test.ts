@@ -1,5 +1,6 @@
 import request from 'supertest';
 import app from '../app';
+import db from '../config/database';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
@@ -131,6 +132,64 @@ describe('Inventory Controller', () => {
     expect(res.body).toHaveProperty('id');
     expect(res.body.item_code).toContain('TEST-');
     createdItemId = res.body.id;
+  });
+
+  it('createItem persists opening stock in a costed batch', async () => {
+    const itemCode = `OPENING-${Date.now()}`;
+    const res = await request(app)
+      .post('/api/inventory/items')
+      .set('Cookie', [authCookie, csrfCookie])
+      .set('x-csrf-token', csrfToken)
+      .send({
+        item_code: itemCode,
+        item_name: 'Opening Stock Item',
+        current_stock: 50,
+        standard_cost: 7.5,
+      });
+
+    expect(res.status).toBe(201);
+    const item = db.prepare('SELECT current_stock FROM items WHERE id = ?').get(res.body.id) as { current_stock: number };
+    expect(Number(item.current_stock)).toBe(50);
+
+    const batch = db.prepare(`
+      SELECT source_type, quantity_original, quantity_remaining, unit_cost
+      FROM stock_batches
+      WHERE item_id = ? AND source_type = 'OPENING'
+    `).get(res.body.id) as {
+      source_type: string;
+      quantity_original: number;
+      quantity_remaining: number;
+      unit_cost: number;
+    };
+    expect(batch).toBeTruthy();
+    expect(batch.quantity_original).toBe(50);
+    expect(batch.quantity_remaining).toBe(50);
+    expect(batch.unit_cost).toBe(7.5);
+
+    const balance = db.prepare(`
+      SELECT COALESCE(SUM(quantity), 0) AS quantity
+      FROM stock_balances
+      WHERE item_id = ?
+    `).get(res.body.id) as { quantity: number };
+    expect(Number(balance.quantity)).toBe(50);
+  });
+
+  it('createItem rejects opening stock without a positive standard cost', async () => {
+    const itemCode = `OPENING-NO-COST-${Date.now()}`;
+    const res = await request(app)
+      .post('/api/inventory/items')
+      .set('Cookie', [authCookie, csrfCookie])
+      .set('x-csrf-token', csrfToken)
+      .send({
+        item_code: itemCode,
+        item_name: 'Opening Stock Missing Cost',
+        current_stock: 50,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('standard_cost');
+    const count = db.prepare('SELECT COUNT(*) AS count FROM items WHERE item_code = ?').get(itemCode) as { count: number };
+    expect(count.count).toBe(0);
   });
 
   it('createItem rejects duplicate item_code', async () => {

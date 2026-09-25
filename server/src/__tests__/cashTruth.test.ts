@@ -256,7 +256,7 @@ describe('opening balances sync to the GL (dashboard seed)', () => {
 
     db.prepare(`UPDATE opening_balances SET amount = 1000 WHERE account_key = 'cash'`).run();
     db.prepare(`INSERT INTO expenses (expense_no, expense_category, description, amount, expense_date, payment_method, status)
-                VALUES ('EXP-001','Utilities','test',100,'2026-03-05','Cash','Submitted')`).run();
+                VALUES ('EXP-001','Utilities','test',100,'2026-03-05','Cash','Recorded')`).run();
 
     db.transaction(() => syncOpeningBalancesToGl(db, 1))();
 
@@ -272,8 +272,8 @@ describe('opening balances sync to the GL (dashboard seed)', () => {
   });
 });
 
-describe('expense GL lifecycle (draft → submit → cancel)', () => {
-  it('draft carries no GL; submit posts; cancel voids; edit while live re-posts', () => {
+describe('expense GL lifecycle (draft → record → cancel)', () => {
+  it('draft carries no GL; record posts; cancel voids; edit while live re-posts', () => {
     const db = fixtureDb();
     for (const f of ['create-customer-ledger.sql', 'create-supplier-ledger.sql', 'add-gl-void-attribution.sql']) {
       db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
@@ -291,15 +291,15 @@ describe('expense GL lifecycle (draft → submit → cancel)', () => {
     const activeLines = () => db.prepare(`SELECT COUNT(*) as n FROM journal_lines WHERE reference_type = 'EXPENSE' AND reference_id = ? AND voided = 0`).get(id) as { n: number };
     expect(activeLines().n).toBe(0); // Draft → no GL
 
-    ExpenseModel.update(db, id, { status: 'Submitted' }, { userId: 1 });
-    expect(activeLines().n).toBe(2); // submitted → Dr 6000 / Cr 1000
+    ExpenseModel.update(db, id, { status: 'Recorded' }, { userId: 1 });
+    expect(activeLines().n).toBe(2); // recorded → Dr 6000 / Cr 1000
 
     ExpenseModel.update(db, id, { status: 'Cancelled' }, { userId: 1 });
     expect(activeLines().n).toBe(0); // cancelled → voided
 
-    // Re-open the lifecycle: submit again re-posts, and a money edit while
+    // Re-open the lifecycle: record again re-posts, and a money edit while
     // live voids + re-posts using the final values.
-    ExpenseModel.update(db, id, { status: 'Submitted' }, { userId: 1 });
+    ExpenseModel.update(db, id, { status: 'Recorded' }, { userId: 1 });
     expect(activeLines().n).toBe(2);
     ExpenseModel.update(db, id, { amount: 200, expense_date: '2026-09-02', payment_method: 'Cash' }, { userId: 1 });
     const live = db.prepare(`SELECT debit, credit, line_date FROM journal_lines WHERE reference_type = 'EXPENSE' AND reference_id = ? AND voided = 0`).all(id) as Array<{ debit: number; credit: number; line_date: string }>;

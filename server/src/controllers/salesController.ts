@@ -349,7 +349,7 @@ function cancelSalesOrder(req: AuthRequest, res: Response): void {
     res.json({ success: true, message: 'Sales order cancelled successfully', ...result });
   } catch (error: any) {
     if (error instanceof InvoiceCancellationGuardError) {
-      res.status(400).json({ error: error.message });
+      res.status(409).json({ error: error.message });
       return;
     }
     logger.error('Cancel sales order error:', error);
@@ -455,9 +455,9 @@ function getSalesDashboard(_req: Request, res: Response): void {
     const invoices = db.prepare(`
       SELECT
         COUNT(*) as total,
-        SUM(CASE WHEN status = 'Unpaid' THEN 1 ELSE 0 END) as unpaid,
-        SUM(CASE WHEN status = 'Paid' THEN 1 ELSE 0 END) as paid,
-        SUM(CASE WHEN status = 'Partially Paid' THEN 1 ELSE 0 END) as partially_paid,
+        SUM(CASE WHEN payment_status = 'Unpaid' THEN 1 ELSE 0 END) as unpaid,
+        SUM(CASE WHEN payment_status = 'Paid' THEN 1 ELSE 0 END) as paid,
+        SUM(CASE WHEN payment_status = 'Partially Paid' THEN 1 ELSE 0 END) as partially_paid,
         SUM(total_amount) as total_revenue,
         SUM(balance_amount) as outstanding_receivables
       FROM invoices

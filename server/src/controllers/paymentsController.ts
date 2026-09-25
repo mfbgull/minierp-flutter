@@ -13,6 +13,7 @@ import CustomerModel from '../models/Customer';
 import ledgerUtils from '../utils/ledgerUtils';
 import InvoiceModel from '../models/Invoice';
 import SupplierModel from '../models/Supplier';
+import { handleBusinessError } from '../utils/businessRuleError';
 
 function getPayments(req: Request, res: Response): void {
   try {
@@ -201,10 +202,7 @@ function createPayment(req: AuthRequest, res: Response): void {
       return;
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    logger.error('Error creating payment:', error);
-    const isClientError = message.includes('not allowed') || message.includes('required') || message.includes('Invalid');
-    res.status(isClientError ? 400 : 500).json({ success: false, error: message || 'Failed to create payment' });
+    handleBusinessError(res, error, 'Create payment', 'Failed to create payment', { success: true });
   }
 }
 
@@ -233,8 +231,7 @@ function updatePayment(req: AuthRequest, res: Response): void {
     if (message.includes('Invalid payment_method')) { res.status(400).json({ success: false, error: message }); return; }
     // Closed period guard: editing history is forbidden, not a server failure.
     if (message.includes('inside closed accounting period')) { res.status(409).json({ success: false, error: message }); return; }
-    logger.error('Error updating payment:', error);
-    res.status(500).json({ success: false, error: 'Failed to update payment' });
+    handleBusinessError(res, error, 'Update payment', 'Failed to update payment', { success: true });
   }
 }
 
@@ -258,16 +255,15 @@ function deletePayment(req: AuthRequest, res: Response): void {
     res.json({ success: true, message: 'Payment voided successfully' });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    // Double-fire / stale-UI guard: an already-voided payment is a client
-    // state error, not a server failure (Phase 5).
+    // Double-fire / stale-UI guard: an already-voided payment is a state
+    // conflict, not a server failure (Phase 5 / TASK 24).
     if (message === 'Payment is already voided') {
-      res.status(400).json({ success: false, error: message });
+      res.status(409).json({ success: false, error: message });
       return;
     }
     // Closed period guard: voiding history is forbidden, not a server failure.
     if (message.includes('inside closed accounting period')) { res.status(409).json({ success: false, error: message }); return; }
-    logger.error('Error deleting payment:', error);
-    res.status(500).json({ success: false, error: 'Failed to delete payment' });
+    handleBusinessError(res, error, 'Delete payment', 'Failed to delete payment', { success: true });
   }
 }
 
@@ -497,9 +493,7 @@ function allocatePaymentToInvoice(req: AuthRequest, res: Response): void {
 
     res.json({ success: true, message: 'Allocation recorded', data: PaymentModel.getById(db, id) });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to allocate payment';
-    logger.error('Error allocating payment:', error);
-    res.status(500).json({ success: false, error: message });
+    handleBusinessError(res, error, 'Allocate payment', 'Failed to allocate payment', { success: true });
   }
 }
 

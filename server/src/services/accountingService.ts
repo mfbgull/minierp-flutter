@@ -952,9 +952,16 @@ export class AccountingService {
   ): void {
     const bal = AccountingService.getAccountBalance(db, args.accountId, args.asOfDate);
     if (bal.balance < args.amount - 0.01) {
+      // Fresh shops seed opening_balances at 0 → every cash-out fails
+      // before onboarding. Keep the guard (never bypass it) but make the
+      // 400 actionable so the client can offer the opening-balance CTA.
+      const guidance =
+        bal.balance < 0.01
+          ? '. Record your starting cash (Dashboard → Opening balance) or owner capital first.'
+          : '';
       throw new Error(
         `Insufficient funds in ${bal.account_name}: available ${bal.balance.toFixed(2)}, ` +
-        `required ${args.amount.toFixed(2)}${args.label ? ` — ${args.label}` : ''}`
+        `required ${args.amount.toFixed(2)}${args.label ? ` — ${args.label}` : ''}${guidance}`
       );
     }
   }

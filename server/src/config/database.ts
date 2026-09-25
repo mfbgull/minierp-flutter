@@ -1612,6 +1612,52 @@ runLedgered('add-count-correction-columns.sql');
 // states repairable like the runPurchaseReturnsTablesMigration recovery).
 runLedgered('fn.runDispositionAndSupplierRefundsMigration', runDispositionAndSupplierRefundsMigration);
 runLedgered('seed-expense-sequence.sql');
+runLedgered('normalize-expense-statuses.sql');
+runLedgered('normalize-expense-payment-methods.sql');
+// P23: Split invoice status into payment_status + return_status so
+// 'Partially Returned' no longer hides whether money is still due.
+// Must run BEFORE recalcInvoiceBalances and updateInvoiceStatus, which
+// reference these columns in their UPDATE statements.
+runLedgered('fn.addInvoiceSplitStatus', () => {
+  const cols = (db.prepare(`SELECT name FROM pragma_table_info('invoices')`).all() as Array<{ name: string }>).map(c => c.name);
+  const has = (name: string) => cols.includes(name);
+
+  if (!has('payment_status')) {
+    db.exec(`ALTER TABLE invoices ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'Unpaid'`);
+  }
+  if (!has('return_status')) {
+    db.exec(`ALTER TABLE invoices ADD COLUMN return_status TEXT NOT NULL DEFAULT 'None'`);
+  }
+  if (!has('deleted_from_payment_status')) {
+    db.exec(`ALTER TABLE invoices ADD COLUMN deleted_from_payment_status TEXT`);
+  }
+  if (!has('deleted_from_return_status')) {
+    db.exec(`ALTER TABLE invoices ADD COLUMN deleted_from_return_status TEXT`);
+  }
+
+  db.exec(`UPDATE invoices SET return_status = 'Fully Returned' WHERE status = 'Returned'`);
+  db.exec(`UPDATE invoices SET return_status = 'Partially Returned' WHERE status = 'Partially Returned'`);
+  db.exec(`UPDATE invoices SET payment_status = 'Paid' WHERE status = 'Paid' AND return_status = 'None'`);
+  db.exec(`UPDATE invoices SET payment_status = 'Partially Paid' WHERE status = 'Partially Paid' AND return_status = 'None'`);
+  db.exec(`UPDATE invoices SET payment_status = 'Overdue' WHERE status = 'Overdue' AND return_status = 'None'`);
+  db.exec(`UPDATE invoices SET payment_status = 'Unpaid' WHERE status = 'Unpaid' AND return_status = 'None'`);
+
+  db.exec(`UPDATE invoices SET payment_status = CASE
+    WHEN paid_amount >= total_amount THEN 'Paid'
+    WHEN paid_amount > 0 THEN 'Partially Paid'
+    ELSE 'Unpaid'
+  END
+  WHERE return_status != 'None'`);
+
+  db.exec(`UPDATE invoices SET payment_status = 'Overpaid'
+  WHERE paid_amount > total_amount AND total_amount > 0 AND return_status = 'None'`);
+
+  db.exec(`UPDATE invoices SET
+    deleted_from_payment_status = payment_status,
+    deleted_from_return_status = return_status
+  WHERE deleted_at IS NOT NULL`);
+});
+
 // One-time data backfills (audit-remediation 3.2/3.3) — ledgered so they run
 // exactly once per database, never again on reboot.
 runLedgered('fn.recalcInvoiceBalances', recalcInvoiceBalancesBackfill);
@@ -2710,11 +2756,11 @@ function recalcInvoiceBalancesBackfill(): void {
       ), 0) - COALESCE(returned_amount, 0) + COALESCE(return_fee, 0))
       `);
   db.exec(`
-    UPDATE invoices SET status = 'Returned' WHERE returned_amount >= total_amount AND total_amount > 0;
-    UPDATE invoices SET status = 'Partially Returned' WHERE returned_amount > 0 AND returned_amount < total_amount AND total_amount > 0;
-    UPDATE invoices SET status = 'Paid' WHERE balance_amount <= 0 AND total_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
-    UPDATE invoices SET status = 'Partially Paid' WHERE balance_amount > 0 AND balance_amount < total_amount AND paid_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
-    UPDATE invoices SET status = 'Unpaid' WHERE (paid_amount = 0 OR paid_amount IS NULL) AND (returned_amount IS NULL OR returned_amount = 0) AND total_amount > 0;
+    UPDATE invoices SET status = 'Returned', return_status = 'Fully Returned' WHERE returned_amount >= total_amount AND total_amount > 0;
+    UPDATE invoices SET status = 'Partially Returned', return_status = 'Partially Returned' WHERE returned_amount > 0 AND returned_amount < total_amount AND total_amount > 0;
+    UPDATE invoices SET status = 'Paid', payment_status = 'Paid' WHERE balance_amount <= 0 AND total_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
+    UPDATE invoices SET status = 'Partially Paid', payment_status = 'Partially Paid' WHERE balance_amount > 0 AND balance_amount < total_amount AND paid_amount > 0 AND (returned_amount IS NULL OR returned_amount = 0);
+    UPDATE invoices SET status = 'Unpaid', payment_status = 'Unpaid' WHERE (paid_amount = 0 OR paid_amount IS NULL) AND (returned_amount IS NULL OR returned_amount = 0) AND total_amount > 0;
   `);
   logger.info('✅ Invoice balances recalculated from allocations (one-time backfill)');
 }

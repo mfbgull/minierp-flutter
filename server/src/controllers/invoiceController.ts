@@ -18,6 +18,7 @@ import {
   computeInvoiceGrandTotal,
 } from '../utils/currency';
 import { isValidPaymentMethod } from '../services/cashService';
+import { handleBusinessError } from '../utils/businessRuleError';
 import { generateDocNo } from '../utils/sequence';
 import {
   IDEMPOTENCY_KEY_HEADER,
@@ -604,11 +605,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       res.status(400).json({ error: error.message });
       return;
     }
-    // FIX #7: Generic error message, log detail server-side
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorCode = (error as { code?: string }).code;
-    logger.error('Create invoice error:', { error: errorMessage, code: errorCode, stack: error instanceof Error ? error.stack : undefined });
-    res.status(500).json({ error: 'Failed to create invoice' });
+    handleBusinessError(res, error, 'Create invoice', 'Failed to create invoice');
   }
 }
 
@@ -969,7 +966,7 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
     }
 
     logger.error('Update invoice error:', { error: errorMessage, name: errorName, stack: error instanceof Error ? error.stack : undefined });
-    res.status(500).json({ error: 'Failed to update invoice' });
+    handleBusinessError(res, error, 'Update invoice', 'Failed to update invoice');
   }
 }
 
@@ -1053,8 +1050,8 @@ function deleteInvoice(req: AuthRequest, res: Response): Response | void {
       // Soft-delete marker + rebuild balances. The pre-delete status is
       // preserved in `deleted_from_status` so the restore endpoint can
       // bring the invoice back exactly as it was (undo pattern).
-      db.prepare('UPDATE invoices SET status = ?, deleted_from_status = ?, deleted_at = ?, deleted_by = ? WHERE id = ?')
-        .run('Deleted', freshInvoice.status, new Date().toISOString(), userId, invoiceId);
+      db.prepare('UPDATE invoices SET status = ?, payment_status = ?, return_status = ?, deleted_from_status = ?, deleted_from_payment_status = ?, deleted_from_return_status = ?, deleted_at = ?, deleted_by = ? WHERE id = ?')
+        .run('Deleted', 'Unpaid', 'None', freshInvoice.status, freshInvoice.payment_status, freshInvoice.return_status, new Date().toISOString(), userId, invoiceId);
       ledgerUtils.rebuildLedgerBalances(freshInvoice.customer_id);
       ledgerUtils.recalcCustomerBalanceFromLedger(freshInvoice.customer_id);
     });
@@ -1072,8 +1069,7 @@ function deleteInvoice(req: AuthRequest, res: Response): Response | void {
     if (errorMessage.includes('inside closed accounting period')) {
       return res.status(409).json({ error: errorMessage });
     }
-    logger.error('Delete invoice error:', { error });
-    res.status(500).json({ error: 'Failed to delete invoice' });
+    handleBusinessError(res, error, 'Delete invoice', 'Failed to delete invoice');
   }
 }
 
@@ -1153,12 +1149,27 @@ function restoreInvoice(req: AuthRequest, res: Response): Response | void {
 
       // 2. Un-void the journal lines the delete voided (GL is restored to
       //    its pre-delete state — no new posting, no double counting).
+      //    Scoped exactly like the void side (InvoiceModel.voidOwnReturnJournalLines):
+      //    return GL groups are keyed to the RETURN document, not the invoice,
+      //    so a bare invoice id on INVOICE_RETURN would resurrect lines that
+      //    belong to another invoice's return carrying the same numeric id.
       db.prepare(`
         UPDATE journal_lines
         SET voided = 0, voided_by = NULL, void_reason = NULL
-        WHERE reference_type IN ('INVOICE', 'INVOICE_RETURN')
+        WHERE reference_type = 'INVOICE'
           AND reference_id = ? AND voided = 1
       `).run(invoiceId);
+      db.prepare(`
+        UPDATE journal_lines
+        SET voided = 0, voided_by = NULL, void_reason = NULL
+        WHERE reference_type = 'INVOICE_RETURN'
+          AND reference_id = ? AND voided = 1
+          AND NOT EXISTS (
+            SELECT 1 FROM invoice_returns other_returns
+            WHERE other_returns.id = journal_lines.reference_id
+              AND other_returns.invoice_id <> ?
+          )
+      `).run(invoiceId, invoiceId);
 
       // 3. Undo the customer-ledger reversal created by
       //    deleteLedgerEntryByReference: drop the REVERSAL row and
@@ -1182,11 +1193,16 @@ function restoreInvoice(req: AuthRequest, res: Response): Response | void {
       const restoredStatus =
         invoice.deleted_from_status ||
         (parseCurrency(invoice.total_amount) > 0 ? 'Unpaid' : 'Draft');
+      const restoredPaymentStatus = invoice.deleted_from_payment_status || 'Unpaid';
+      const restoredReturnStatus = invoice.deleted_from_return_status || 'None';
       db.prepare(`
         UPDATE invoices
-        SET status = ?, deleted_at = NULL, deleted_by = NULL, updated_at = CURRENT_TIMESTAMP
+        SET status = ?, payment_status = ?, return_status = ?,
+            deleted_at = NULL, deleted_by = NULL,
+            deleted_from_status = NULL, deleted_from_payment_status = NULL, deleted_from_return_status = NULL,
+            updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(restoredStatus, invoiceId);
+      `).run(restoredStatus, restoredPaymentStatus, restoredReturnStatus, invoiceId);
 
       // 5. Rebuild balances (same as delete — the ledger chain changed).
       ledgerUtils.rebuildLedgerBalances(invoice.customer_id);
@@ -1212,7 +1228,7 @@ function restoreInvoice(req: AuthRequest, res: Response): Response | void {
     });
   } catch (error: unknown) {
     logger.error('Restore invoice error:', { error });
-    res.status(500).json({ error: 'Failed to restore invoice' });
+    handleBusinessError(res, error, 'Restore invoice', 'Failed to restore invoice');
   }
 }
 
@@ -1233,7 +1249,7 @@ function cancelInvoice(req: AuthRequest, res: Response): Response | void {
     }
 
     if (invoice.status === 'Cancelled') {
-      return res.status(400).json({ error: 'Invoice is already cancelled' });
+      return res.status(409).json({ error: 'Invoice is already cancelled' });
     }
 
     AccountingService.assertPeriodNotClosed(db, invoice.invoice_date, `Invoice ${invoice.invoice_no}`);
@@ -1266,18 +1282,17 @@ function cancelInvoice(req: AuthRequest, res: Response): Response | void {
     const updatedInvoice = InvoiceModel.getWithCustomer(invoiceId, db);
     res.json({ success: true, message: 'Invoice cancelled successfully', data: updatedInvoice });
   } catch (error: unknown) {
-    // Guard rejections (payments/returns lock) are caller-correctable
-    // states — 400 with the reason, not a 500 server fault.
+    // Guard rejections (payments/returns lock) are state conflicts — 409
+    // with the reason, not a 500 server fault.
     if (error instanceof InvoiceCancellationGuardError) {
-      return res.status(400).json({ error: error.message });
+      return res.status(409).json({ error: error.message });
     }
     const cancelError = error instanceof Error ? error.message : String(error);
     // Closed accounting period: cannot rewrite history.
     if (cancelError.includes('inside closed accounting period')) {
       return res.status(409).json({ error: cancelError });
     }
-    logger.error('Cancel invoice error:', { error });
-    res.status(500).json({ error: 'Failed to cancel invoice' });
+    handleBusinessError(res, error, 'Cancel invoice', 'Failed to cancel invoice');
   }
 }
 
@@ -1347,7 +1362,7 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
       return res.status(error.status).json({ error: error.message });
     }
     logger.error('Return invoice items error:', { error });
-    return res.status(500).json({ error: 'Failed to process the return' });
+    handleBusinessError(res, error, 'Return invoice', 'Failed to process the return');
   }
 }
 

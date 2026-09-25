@@ -66,7 +66,7 @@ function seedInvoice(date: string, amount: number): void {
 function seedExpense(date: string, amount: number): void {
   db.prepare(
     `INSERT INTO expenses (expense_no, expense_date, status, amount)
-     VALUES (?, ?, 'Approved', ?)`,
+     VALUES (?, ?, 'Recorded', ?)`,
   ).run(`EXP-${Date.now()}-${Math.floor(Math.random() * 1e6)}`, date, amount);
 }
 
