@@ -70,20 +70,20 @@ function addExpense(
   db: Database.Database,
   no: string,
   amount: number,
-  finalStatus: 'Draft' | 'Submitted' | 'Cancelled',
-): number {
-  const id = ExpenseModel.create(db, {
-    expense_no: no, expense_category: 'Utilities', description: no,
-    amount, expense_date: '2026-09-01', payment_method: 'Cash', status: 'Draft', created_by: 1,
-  });
-  if (finalStatus === 'Submitted') {
-    ExpenseModel.update(db, id, { status: 'Submitted' }, { userId: 1 });
-  } else if (finalStatus === 'Cancelled') {
-    ExpenseModel.update(db, id, { status: 'Submitted' }, { userId: 1 });
-    ExpenseModel.update(db, id, { status: 'Cancelled' }, { userId: 1 });
+finalStatus: 'Draft' | 'Recorded' | 'Cancelled',
+  ): number {
+    const id = ExpenseModel.create(db, {
+      expense_no: no, expense_category: 'Utilities', description: no,
+      amount, expense_date: '2026-09-01', payment_method: 'Cash', status: 'Draft', created_by: 1,
+    });
+    if (finalStatus === 'Recorded') {
+      ExpenseModel.update(db, id, { status: 'Recorded' }, { userId: 1 });
+    } else if (finalStatus === 'Cancelled') {
+      ExpenseModel.update(db, id, { status: 'Recorded' }, { userId: 1 });
+      ExpenseModel.update(db, id, { status: 'Cancelled' }, { userId: 1 });
+    }
+    return id;
   }
-  return id;
-}
 
 /** Active (non-voided) GL debit on account 6000 Operating Expenses. */
 function glExpenseTotal(db: Database.Database): number {
@@ -98,7 +98,7 @@ describe('H5: expense aggregates follow GL-worthiness', () => {
   // Audit scenario: active 300 + cancelled 120 must report 300 everywhere.
   it('P&L excludes a cancelled expense (audit case: 420 → 300)', () => {
     const db = makeDb();
-    addExpense(db, 'EXP-A', 300, 'Submitted');
+    addExpense(db, 'EXP-A', 300, 'Recorded');
     addExpense(db, 'EXP-B', 120, 'Cancelled');
 
     const pl = ReportsModel.getProfitLossReport(RANGE.from, RANGE.to, db);
@@ -109,7 +109,7 @@ describe('H5: expense aggregates follow GL-worthiness', () => {
 
   it('income statement and expense summary exclude cancelled and draft', () => {
     const db = makeDb();
-    addExpense(db, 'EXP-A', 300, 'Submitted');
+    addExpense(db, 'EXP-A', 300, 'Recorded');
     addExpense(db, 'EXP-B', 120, 'Cancelled');
     addExpense(db, 'EXP-C', 50, 'Draft');
 
@@ -132,7 +132,7 @@ describe('H5: expense aggregates follow GL-worthiness', () => {
 
   it('dashboard expense summary and expense/net-profit KPIs exclude cancelled and draft', () => {
     const db = makeDb();
-    addExpense(db, 'EXP-A', 300, 'Submitted');
+    addExpense(db, 'EXP-A', 300, 'Recorded');
     addExpense(db, 'EXP-B', 120, 'Cancelled');
     addExpense(db, 'EXP-C', 50, 'Draft');
 
@@ -147,7 +147,7 @@ describe('H5: expense aggregates follow GL-worthiness', () => {
 
   it('cash flow and GL exclude cancelled; active expense stays in both', () => {
     const db = makeDb();
-    addExpense(db, 'EXP-A', 300, 'Submitted');
+    addExpense(db, 'EXP-A', 300, 'Recorded');
     addExpense(db, 'EXP-B', 120, 'Cancelled');
     addExpense(db, 'EXP-C', 50, 'Draft');
 
@@ -171,7 +171,7 @@ describe('H5: expense aggregates follow GL-worthiness', () => {
 
   it('closed period blocks expense update', () => {
     const db = makeDb();
-    const id = addExpense(db, 'EXP-CP', 200, 'Submitted');
+    const id = addExpense(db, 'EXP-CP', 200, 'Recorded');
     db.prepare(`INSERT INTO accounting_periods (period_name, start_date, end_date, status)
                 VALUES ('2026-09-cp', '2026-09-01', '2026-09-30', 'closed')`).run();
     expect(() => ExpenseModel.update(db, id, { amount: 999 }, { userId: 1 }))
@@ -182,7 +182,7 @@ describe('H5: expense aggregates follow GL-worthiness', () => {
 
   it('all expense surfaces agree via the shared predicate', () => {
     const db = makeDb();
-    addExpense(db, 'EXP-A', 300, 'Submitted');
+    addExpense(db, 'EXP-A', 300, 'Recorded');
     addExpense(db, 'EXP-B', 120, 'Cancelled');
     addExpense(db, 'EXP-C', 50, 'Draft');
 

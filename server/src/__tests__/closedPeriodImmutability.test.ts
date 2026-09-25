@@ -166,7 +166,7 @@ describe('Closed accounting period immutability (H6)', () => {
     const expenseId = db.prepare(`
       INSERT INTO expenses (expense_no, expense_category, description, amount, expense_date, payment_method, status, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run('EXP-CLOSED-1', 'Utilities', 'Electricity', 500, '2026-09-10', 'Cash', 'Paid', 1).lastInsertRowid as number;
+    `).run('EXP-CLOSED-1', 'Utilities', 'Electricity', 500, '2026-09-10', 'Cash', 'Recorded', 1).lastInsertRowid as number;
 
     closePeriodFor('2026-09-10');
     const editRes = await api('put', `/api/expenses/${expenseId}`, {

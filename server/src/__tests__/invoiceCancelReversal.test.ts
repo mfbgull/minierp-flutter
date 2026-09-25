@@ -171,7 +171,7 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
     expect(cancelMovement.c).toBeGreaterThan(0);
   });
 
-  it('case 2: cancelling a fully paid invoice is blocked with 400 and no state changes', async () => {
+  it('case 2: cancelling a fully paid invoice is blocked with 409 and no state changes', async () => {
     const { invoiceId, invoiceNo } = await createInvoice();
     await recordPayment(invoiceId, 100);
 
@@ -181,7 +181,7 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
     const res = await request(app)
       .put(`/api/invoices/${invoiceId}/cancel`)
       .set('Cookie', authCookie);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
     expect(res.body.error).toMatch(/payments/i);
 
     // Nothing changed
@@ -201,7 +201,7 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
     const res = await request(app)
       .put(`/api/invoices/${invoiceId}/cancel`)
       .set('Cookie', authCookie);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
 
     const inv = db.prepare('SELECT status, paid_amount FROM invoices WHERE id = ?').get(invoiceId) as { status: string; paid_amount: number };
     expect(inv.status).not.toBe('Cancelled');
@@ -240,7 +240,7 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
     const res = await request(app)
       .post(`/api/sales-orders/${soId}/cancel`)
       .set('Cookie', authCookie);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
     expect(res.body.error).toMatch(/payments/i);
 
     // Invoice + SO both unchanged

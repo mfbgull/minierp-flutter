@@ -67,6 +67,9 @@ export type InvoiceStatus =
   | 'Returned'
   | 'Partially Returned';
 
+export type PaymentStatus = 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overpaid' | 'Overdue';
+export type ReturnStatus = 'None' | 'Partially Returned' | 'Fully Returned';
+
 export interface InvoiceItemDTO {
   item_id: number;
   description?: string;
@@ -129,6 +132,8 @@ export interface Invoice {
   deleted_at?: string | null;
   deleted_by?: number | null;
   deleted_from_status?: string | null;
+  deleted_from_payment_status?: string | null;
+  deleted_from_return_status?: string | null;
 }
 
 // ============ BOM Types ============

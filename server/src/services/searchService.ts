@@ -1,4 +1,5 @@
 import db from '../config/database';
+import { formatCurrency, getCurrencySymbol } from '../utils/displayCurrency';
 import { SearchResult, SearchAction, SearchResponse, ActionDef, PageAction } from '../types/search';
 import { AuthRequest } from '../types';
 
@@ -206,7 +207,12 @@ export function filterActions(
 // Per-entity search functions
 // ============================================================
 
-export function searchCustomers(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
+export function searchCustomers(
+  query: string,
+  limit: number,
+  ctx: PermissionContext,
+  currencySymbol = 'Rs.',
+): SearchResult[] {
   const q = `%${query}%`;
   const qs = `${query}%`;
   const rows = db
@@ -237,7 +243,7 @@ export function searchCustomers(query: string, limit: number, ctx: PermissionCon
 
   return rows.map((r) => {
     const balance = Number(r.current_balance) || 0;
-    const subtitle = `${r.customer_code} · Rs. ${balance.toLocaleString()} due`;
+    const subtitle = `${r.customer_code} · ${formatCurrency(balance, currencySymbol)} due`;
     return {
       type: 'customer',
       id: r.id,
@@ -253,7 +259,12 @@ export function searchCustomers(query: string, limit: number, ctx: PermissionCon
   });
 }
 
-export function searchSuppliers(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
+export function searchSuppliers(
+  query: string,
+  limit: number,
+  ctx: PermissionContext,
+  currencySymbol = 'Rs.',
+): SearchResult[] {
   const q = `%${query}%`;
   const qs = `${query}%`;
   const rows = db
@@ -284,7 +295,7 @@ export function searchSuppliers(query: string, limit: number, ctx: PermissionCon
 
   return rows.map((r) => {
     const balance = Number(r.current_balance) || 0;
-    const subtitle = `${r.supplier_code} · Payable: Rs. ${balance.toLocaleString()}`;
+    const subtitle = `${r.supplier_code} · Payable: ${formatCurrency(balance, currencySymbol)}`;
     return {
       type: 'supplier',
       id: r.id,
@@ -300,7 +311,12 @@ export function searchSuppliers(query: string, limit: number, ctx: PermissionCon
   });
 }
 
-export function searchProducts(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
+export function searchProducts(
+  query: string,
+  limit: number,
+  ctx: PermissionContext,
+  currencySymbol = 'Rs.',
+): SearchResult[] {
   const q = `%${query}%`;
   const qs = `${query}%`;
   const rows = db
@@ -335,7 +351,7 @@ export function searchProducts(query: string, limit: number, ctx: PermissionCont
   return rows.map((r) => {
     const stock = Number(r.current_stock) || 0;
     const price = Number(r.standard_selling_price) || 0;
-    const subtitle = `${r.item_code} · Stock: ${stock} · Rs. ${price.toLocaleString()}`;
+    const subtitle = `${r.item_code} · Stock: ${stock} · ${formatCurrency(price, currencySymbol)}`;
     return {
       type: 'product',
       id: r.id,
@@ -352,7 +368,12 @@ export function searchProducts(query: string, limit: number, ctx: PermissionCont
   });
 }
 
-export function searchInvoices(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
+export function searchInvoices(
+  query: string,
+  limit: number,
+  ctx: PermissionContext,
+  currencySymbol = 'Rs.',
+): SearchResult[] {
   const q = `%${query}%`;
   const qs = `${query}%`;
   const rows = db
@@ -385,7 +406,7 @@ export function searchInvoices(query: string, limit: number, ctx: PermissionCont
     }>;
 
   return rows.map((r) => {
-    const subtitle = `${r.customer_name} · ${r.status} · Rs. ${Number(r.balance_amount).toLocaleString()}`;
+    const subtitle = `${r.customer_name} · ${r.status} · ${formatCurrency(Number(r.balance_amount), currencySymbol)}`;
     return {
       type: 'invoice',
       id: r.id,
@@ -403,7 +424,12 @@ export function searchInvoices(query: string, limit: number, ctx: PermissionCont
   });
 }
 
-export function searchPurchaseOrders(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
+export function searchPurchaseOrders(
+  query: string,
+  limit: number,
+  ctx: PermissionContext,
+  currencySymbol = 'Rs.',
+): SearchResult[] {
   const q = `%${query}%`;
   const qs = `${query}%`;
   const rows = db
@@ -426,7 +452,7 @@ export function searchPurchaseOrders(query: string, limit: number, ctx: Permissi
     }>;
 
   return rows.map((r) => {
-    const subtitle = `${r.supplier_name} · ${r.status} · Rs. ${Number(r.total_amount).toLocaleString()}`;
+    const subtitle = `${r.supplier_name} · ${r.status} · ${formatCurrency(Number(r.total_amount), currencySymbol)}`;
     return {
       type: 'purchase_order',
       id: r.id,
@@ -443,7 +469,12 @@ export function searchPurchaseOrders(query: string, limit: number, ctx: Permissi
   });
 }
 
-export function searchQuotations(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
+export function searchQuotations(
+  query: string,
+  limit: number,
+  ctx: PermissionContext,
+  currencySymbol = 'Rs.',
+): SearchResult[] {
   const q = `%${query}%`;
   const rows = db
     .prepare(
@@ -465,7 +496,7 @@ export function searchQuotations(query: string, limit: number, ctx: PermissionCo
     }>;
 
   return rows.map((r) => {
-    const subtitle = `${r.customer_name} · ${r.status} · Rs. ${Number(r.total_amount).toLocaleString()}`;
+    const subtitle = `${r.customer_name} · ${r.status} · ${formatCurrency(Number(r.total_amount), currencySymbol)}`;
     return {
       type: 'quotation',
       id: r.id,
@@ -482,7 +513,12 @@ export function searchQuotations(query: string, limit: number, ctx: PermissionCo
   });
 }
 
-export function searchSalesOrders(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
+export function searchSalesOrders(
+  query: string,
+  limit: number,
+  ctx: PermissionContext,
+  currencySymbol = 'Rs.',
+): SearchResult[] {
   const q = `%${query}%`;
   const rows = db
     .prepare(
@@ -504,7 +540,7 @@ export function searchSalesOrders(query: string, limit: number, ctx: PermissionC
     }>;
 
   return rows.map((r) => {
-    const subtitle = `${r.customer_name} · ${r.status} · Rs. ${Number(r.total_amount).toLocaleString()}`;
+    const subtitle = `${r.customer_name} · ${r.status} · ${formatCurrency(Number(r.total_amount), currencySymbol)}`;
     return {
       type: 'sales_order',
       id: r.id,
@@ -521,7 +557,12 @@ export function searchSalesOrders(query: string, limit: number, ctx: PermissionC
   });
 }
 
-export function searchPayments(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
+export function searchPayments(
+  query: string,
+  limit: number,
+  ctx: PermissionContext,
+  currencySymbol = 'Rs.',
+): SearchResult[] {
   const q = `%${query}%`;
   const rows = db
     .prepare(
@@ -550,7 +591,7 @@ export function searchPayments(query: string, limit: number, ctx: PermissionCont
 
   return rows.map((r) => {
     const partyName = r.customer_name ?? r.supplier_name ?? '—';
-    const subtitle = `${partyName} · Rs. ${Number(r.amount).toLocaleString()} · ${r.payment_method ?? '—'}`;
+    const subtitle = `${partyName} · ${formatCurrency(Number(r.amount), currencySymbol)} · ${r.payment_method ?? '—'}`;
     return {
       type: 'payment',
       id: r.id,
@@ -567,7 +608,12 @@ export function searchPayments(query: string, limit: number, ctx: PermissionCont
   });
 }
 
-export function searchExpenses(query: string, limit: number, ctx: PermissionContext): SearchResult[] {
+export function searchExpenses(
+  query: string,
+  limit: number,
+  ctx: PermissionContext,
+  currencySymbol = 'Rs.',
+): SearchResult[] {
   const q = `%${query}%`;
   const rows = db
     .prepare(
@@ -587,7 +633,7 @@ export function searchExpenses(query: string, limit: number, ctx: PermissionCont
     }>;
 
   return rows.map((r) => {
-    const subtitle = `${r.expense_category} · Rs. ${Number(r.amount).toLocaleString()}`;
+    const subtitle = `${r.expense_category} · ${formatCurrency(Number(r.amount), currencySymbol)}`;
     return {
       type: 'expense',
       id: r.id,
@@ -812,18 +858,19 @@ export function search(query: string, limit: number, userId: number): SearchResp
   // holds its module read permission. Rows were previously returned to
   // ANY authenticated user regardless of permissions.
   const ctx = resolvePermissionContext(userId);
+  const currencySymbol = getCurrencySymbol(db);
   const gate = (perm: string): boolean => ctx.isAdmin || ctx.allowed.has(perm);
 
   const results: SearchResult[] = [
-    ...(gate('customers:read') ? searchCustomers(trimmed, limit, ctx) : []),
-    ...(gate('suppliers:read') ? searchSuppliers(trimmed, limit, ctx) : []),
-    ...(gate('inventory:read') ? searchProducts(trimmed, limit, ctx) : []),
-    ...(gate('invoices:read') ? searchInvoices(trimmed, limit, ctx) : []),
-    ...(gate('purchase_orders:read') ? searchPurchaseOrders(trimmed, limit, ctx) : []),
-    ...(gate('quotations:read') ? searchQuotations(trimmed, limit, ctx) : []),
-    ...(gate('sales_orders:read') ? searchSalesOrders(trimmed, limit, ctx) : []),
-    ...(gate('payments:read') ? searchPayments(trimmed, limit, ctx) : []),
-    ...(gate('expenses:read') ? searchExpenses(trimmed, limit, ctx) : []),
+    ...(gate('customers:read') ? searchCustomers(trimmed, limit, ctx, currencySymbol) : []),
+    ...(gate('suppliers:read') ? searchSuppliers(trimmed, limit, ctx, currencySymbol) : []),
+    ...(gate('inventory:read') ? searchProducts(trimmed, limit, ctx, currencySymbol) : []),
+    ...(gate('invoices:read') ? searchInvoices(trimmed, limit, ctx, currencySymbol) : []),
+    ...(gate('purchase_orders:read') ? searchPurchaseOrders(trimmed, limit, ctx, currencySymbol) : []),
+    ...(gate('quotations:read') ? searchQuotations(trimmed, limit, ctx, currencySymbol) : []),
+    ...(gate('sales_orders:read') ? searchSalesOrders(trimmed, limit, ctx, currencySymbol) : []),
+    ...(gate('payments:read') ? searchPayments(trimmed, limit, ctx, currencySymbol) : []),
+    ...(gate('expenses:read') ? searchExpenses(trimmed, limit, ctx, currencySymbol) : []),
     ...(gate('inventory:read') ? searchWarehouses(trimmed, limit, ctx) : []),
     ...(gate('employees:read') ? searchEmployees(trimmed, limit, ctx) : []),
     ...(gate('production:read') ? searchProductions(trimmed, limit, ctx) : []),

@@ -96,7 +96,6 @@ describe('H4 AR surfaces keep partially-returned debt', () => {
     const customerId = await createCustomer('H4 Partial Return', token);
     const { invoiceId, invoiceItemIds } = await seedInvoice(customerId);
 
-    // 1800 owed; the GL and ledger both carry it before any return
     expect(getInvoiceRow(invoiceId).balance_amount).toBeCloseTo(1800, 2);
     expect(customerLedgerNet(customerId)).toBeCloseTo(1800, 2);
 
@@ -106,30 +105,22 @@ describe('H4 AR surfaces keep partially-returned debt', () => {
     }, token);
     expect(ret.status).toBe(200);
 
-    // status moved to the returned vocabulary, balance moved to 600
     const row = getInvoiceRow(invoiceId);
     expect(row.status).toBe('Partially Returned');
     expect(row.balance_amount).toBeCloseTo(600, 2);
 
-    // H4: the debt is still in AR aging, at exactly the remaining balance
     const mine = agingRow('H4 Partial Return');
     expect(mine).toBeTruthy();
     expect(mine?.total_outstanding).toBeCloseTo(600, 2);
 
-    // top debtors agrees, ledger agrees, GL AR dropped by exactly the
-    // returned amount — all four surfaces foot
     const debtors = Reports.getTopDebtors(db, 500) as Array<{ customer_name: string; total_outstanding: number }>;
     expect((debtors.find((d) => d.customer_name === 'H4 Partial Return'))?.total_outstanding).toBeCloseTo(600, 2);
     expect(customerLedgerNet(customerId)).toBeCloseTo(600, 2);
     expect(glAR()).toBeCloseTo(arBefore - 1200, 2);
 
-    // receivables summary: the returned-status bucket carries it
     const summary = Reports.getReceivablesSummary(db, AS_OF);
     expect(summary.statusBreakdown.partiallyReturned.amount).toBeGreaterThanOrEqual(600);
     expect(summary.statusBreakdown.partiallyReturned.count).toBeGreaterThanOrEqual(1);
-    // breakdown foots to the total (modulo rows outside this file's data
-    // is impossible only if every AR row maps to exactly one bucket —
-    // assert the global identity instead of a fixed value)
     const parts = summary.statusBreakdown;
     const sum = parts.unpaid.amount + parts.partiallyPaid.amount + parts.overdue.amount
       + parts.sent.amount + parts.partiallyReturned.amount + parts.returned.amount;

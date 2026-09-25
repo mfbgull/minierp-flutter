@@ -92,20 +92,91 @@ function createItem(req: AuthRequest, res: Response): void {
       return;
     }
 
-    const itemId = ItemModel.create(req.body, req.user!.id, db);
+    const hasCurrentStock = Object.prototype.hasOwnProperty.call(req.body, 'current_stock');
+    const rawCurrentStock = req.body.current_stock;
+    let openingQty = 0;
+    if (hasCurrentStock) {
+      if (
+        (typeof rawCurrentStock !== 'number' && typeof rawCurrentStock !== 'string') ||
+        rawCurrentStock === ''
+      ) {
+        res.status(400).json({ error: 'current_stock must be a non-negative number' });
+        return;
+      }
+      openingQty = Number(rawCurrentStock);
+      if (!Number.isFinite(openingQty) || openingQty < 0) {
+        res.status(400).json({ error: 'current_stock must be a non-negative number' });
+        return;
+      }
+    }
 
-    // H10 fix: when current_stock is supplied on creation, create an OPENING
-    // batch so the initial stock has an identifiable cost layer for FIFO.
-    const openingQty = Number(req.body.current_stock) || 0;
+    const hasStandardCost = Object.prototype.hasOwnProperty.call(req.body, 'standard_cost');
+    const rawStandardCost = req.body.standard_cost;
+    let standardCost: number | undefined;
+    if (hasStandardCost) {
+      if (
+        (typeof rawStandardCost !== 'number' && typeof rawStandardCost !== 'string') ||
+        rawStandardCost === ''
+      ) {
+        res.status(400).json({ error: 'standard_cost must be a non-negative number' });
+        return;
+      }
+      standardCost = Number(rawStandardCost);
+      if (!Number.isFinite(standardCost) || standardCost < 0) {
+        res.status(400).json({ error: 'standard_cost must be a non-negative number' });
+        return;
+      }
+    }
+
+    if (openingQty > 0 && (standardCost === undefined || standardCost <= 0)) {
+      res.status(400).json({ error: 'standard_cost must be greater than 0 when current_stock is greater than 0' });
+      return;
+    }
+
+    let openingWarehouseId: number | undefined;
     if (openingQty > 0) {
-      const warehouseId = req.body.warehouse_id
-        || (WarehouseModel.getDefaultWarehouse(db))?.id;
-      if (warehouseId) {
+      const rawWarehouseId = req.body.warehouse_id;
+      if (rawWarehouseId !== undefined && rawWarehouseId !== null && rawWarehouseId !== '') {
+        if (typeof rawWarehouseId !== 'number' && typeof rawWarehouseId !== 'string') {
+          res.status(400).json({ error: 'warehouse_id must be a positive integer' });
+          return;
+        }
+        const warehouseId = Number(rawWarehouseId);
+        const warehouse = Number.isInteger(warehouseId) && warehouseId > 0
+          ? WarehouseModel.getById(db, warehouseId)
+          : undefined;
+        if (!warehouse || warehouse.is_active === 0) {
+          res.status(400).json({ error: 'warehouse_id must reference an active warehouse' });
+          return;
+        }
+        openingWarehouseId = warehouseId;
+      } else {
+        openingWarehouseId = WarehouseModel.getDefaultWarehouse(db)?.id;
+      }
+      if (openingWarehouseId === undefined) {
+        res.status(400).json({ error: 'An active warehouse is required when current_stock is greater than 0' });
+        return;
+      }
+    }
+
+    const itemData = {
+      ...req.body,
+      ...(hasCurrentStock ? { current_stock: openingQty } : {}),
+      ...(standardCost !== undefined ? { standard_cost: standardCost } : {}),
+      ...(openingWarehouseId !== undefined ? { warehouse_id: openingWarehouseId } : {}),
+    };
+
+    const create = db.transaction(() => {
+      const itemId = ItemModel.create(itemData, req.user!.id, db);
+      if (openingQty > 0) {
+        if (openingWarehouseId === undefined) {
+          throw new Error('Opening stock warehouse was not resolved');
+        }
         StockMovementModel.recordMovement({
           item_id: itemId,
-          warehouse_id: warehouseId,
+          warehouse_id: openingWarehouseId,
           quantity: openingQty,
-          unit_cost: req.body.standard_cost || 0,
+          unit_cost: standardCost,
           movement_type: 'OPENING',
           reference_doctype: 'ITEM_CREATE',
           reference_docno: item_code,
@@ -113,7 +184,9 @@ function createItem(req: AuthRequest, res: Response): void {
           movement_date: new Date().toISOString().split('T')[0],
         }, req.user!.id, db);
       }
-    }
+      return itemId;
+    });
+    const itemId = create();
 
     logCRUD(ActionType.ITEM_CREATE, 'Item', itemId, `Created item: ${item_name}`, req.user!.id, {
       item_code,

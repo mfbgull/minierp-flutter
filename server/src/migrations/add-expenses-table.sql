@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS expenses (
     reference_no VARCHAR(100), -- Receipt number, check number, etc.
     vendor_name VARCHAR(200), -- Name of vendor/supplier
     project VARCHAR(100), -- Project or department associated with expense
-    status VARCHAR(20) DEFAULT 'Approved', -- Draft, Submitted, Approved, Paid, Cancelled
+    status VARCHAR(20) DEFAULT 'Draft', -- Draft, Recorded, Cancelled (TASK 25 Option A)
     created_by INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

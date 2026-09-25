@@ -6,7 +6,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../types';
 import { InvoiceReturnService, ReturnError, type SettlementInput } from '../services/invoiceReturnService';
-import logger from '../utils/logger';
+import { handleBusinessError } from '../utils/businessRuleError';
 
 function settleReturn(req: AuthRequest, res: Response): Response | void {
   try {
@@ -21,8 +21,8 @@ function settleReturn(req: AuthRequest, res: Response): Response | void {
     if (error instanceof ReturnError) {
       return res.status(error.status).json({ error: error.message });
     }
-    logger.error('Settle return error:', { error });
-    return res.status(500).json({ error: 'Failed to settle the return' });
+    handleBusinessError(res, error, 'Settle return', 'Failed to settle the return');
+    return;
   }
 }
 
@@ -40,8 +40,8 @@ function voidReturn(req: AuthRequest, res: Response): Response | void {
     if (errorMessage.includes('inside closed accounting period')) {
       return res.status(409).json({ error: errorMessage });
     }
-    logger.error('Void return error:', { error });
-    return res.status(500).json({ error: 'Failed to void the return' });
+    handleBusinessError(res, error, 'Void return', 'Failed to void the return');
+    return;
   }
 }
 
@@ -59,8 +59,8 @@ function voidSettlement(req: AuthRequest, res: Response): Response | void {
     if (errorMessage.includes('inside closed accounting period')) {
       return res.status(409).json({ error: errorMessage });
     }
-    logger.error('Void settlement error:', { error });
-    return res.status(500).json({ error: 'Failed to void the settlement' });
+    handleBusinessError(res, error, 'Void settlement', 'Failed to void the settlement');
+    return;
   }
 }
 

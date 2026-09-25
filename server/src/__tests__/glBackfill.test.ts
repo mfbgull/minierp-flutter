@@ -95,7 +95,7 @@ describe('GL backfill for pre-posting documents', () => {
     db.prepare(`INSERT INTO payments (payment_no, customer_id, payment_date, amount, payment_method, created_by)
                 VALUES ('PAY-C1', 1, '2026-08-21', 100, 'Easypaisa', 1)`).run();
     db.prepare(`INSERT INTO expenses (expense_no, expense_category, amount, expense_date, status, payment_method, created_by)
-                VALUES ('EXP-X', 'Meals', 40, '2026-08-22', 'Approved', 'Cash', 1)`).run();
+                VALUES ('EXP-X', 'Meals', 40, '2026-08-22', 'Recorded', 'Cash', 1)`).run();
     db.prepare(`INSERT INTO opening_balances (account_key, amount) VALUES ('cash', 5000)
                 ON CONFLICT(account_key) DO UPDATE SET amount = 5000`).run();
 

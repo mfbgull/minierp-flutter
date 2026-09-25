@@ -194,3 +194,111 @@ describe('Insufficient stock edge cases', () => {
     expect(qtyLessThan(stock, required)).toBe(false);
   });
 });
+
+describe('Model-level regression: Invoice return-ratio arithmetic', () => {
+  it('return ratio rounds correctly for fractional quantities', () => {
+    const totalSold = roundQty(0.3 + 0.7);
+    const effectiveQty = roundQty(0.1);
+    const ratio = roundQty(effectiveQty / totalSold);
+    const restoreQty = roundQty(effectiveQty * ratio);
+    expect(ratio).toBe(0.1);
+    expect(restoreQty).toBe(0.01);
+    expect(qtyEquals(restoreQty, 0.01)).toBe(true);
+  });
+
+  it('cost accumulation stays clean across 7 fractional items', () => {
+    const costs = [0.1, 0.2, 0.3, 0.15, 0.25, 0.35, 0.05];
+    let totalCost = 0;
+    let totalQty = 0;
+    for (const cost of costs) {
+      const qty = roundQty(cost);
+      totalCost = roundQty(totalCost + roundQty(qty * 2.5));
+      totalQty = roundQty(totalQty + qty);
+    }
+    const avgCost = roundQty(totalCost / totalQty);
+    expect(isFinite(avgCost)).toBe(true);
+    expect(avgCost).toBeGreaterThan(0);
+  });
+});
+
+describe('Model-level regression: PurchaseOrder pending quantity', () => {
+  it('pending quantity stays clean after multi-step receipt', () => {
+    const ordered = roundQty(1.0);
+    let received = 0;
+    for (let i = 0; i < 3; i++) {
+      received = roundQty(received + 0.3);
+    }
+    const pending = roundQty(ordered - received);
+    expect(pending).toBe(0.1);
+    expect(qtyEquals(pending, 0.1)).toBe(true);
+  });
+
+  it('newReceived accumulation stays clean across 5 receipts', () => {
+    let newReceived = 0;
+    const increments = [0.1, 0.2, 0.3, 0.15, 0.25];
+    for (const inc of increments) {
+      newReceived = roundQty(newReceived + inc);
+    }
+    expect(newReceived).toBe(1.0);
+    expect(qtyEquals(newReceived, 1.0)).toBe(true);
+  });
+});
+
+describe('Model-level regression: Production cost-per-unit', () => {
+  it('cost division stays clean for fractional total costs', () => {
+    const totalBatchCost = roundQty(0.1 + 0.2 + 0.3);
+    const outputQuantity = roundQty(3.0);
+    const costPerUnit = roundQty(totalBatchCost / outputQuantity);
+    expect(costPerUnit).toBe(0.2);
+    expect(isFinite(costPerUnit)).toBe(true);
+  });
+
+  it('accumulated material costs divided by output produce no dust', () => {
+    let totalMaterialCost = 0;
+    for (let i = 0; i < 10; i++) {
+      totalMaterialCost = roundQty(totalMaterialCost + roundQty(0.1 * 2.0));
+    }
+    const outputQty = 5.0;
+    const costPerUnit = roundQty(totalMaterialCost / outputQty);
+    expect(costPerUnit).toBe(0.4);
+    expect(qtyEquals(costPerUnit, 0.4)).toBe(true);
+  });
+});
+
+describe('Model-level regression: Stock balance accumulation', () => {
+  it('100 incremental +0.1 stock movements accumulate to exactly 10.0', () => {
+    let stock = 0;
+    for (let i = 0; i < 100; i++) {
+      stock = roundQty(stock + 0.1);
+    }
+    expect(stock).toBe(10.0);
+  });
+
+  it('alternating buy/sell produces no dust residue', () => {
+    let stock = 0;
+    stock = roundQty(stock + 0.3);
+    stock = roundQty(stock - 0.1);
+    stock = roundQty(stock - 0.1);
+    stock = roundQty(stock - 0.1);
+    expect(stock).toBe(0);
+    expect(qtyZero(stock)).toBe(true);
+  });
+
+  it('batch consumption guard uses epsilon correctly', () => {
+    const batchRemaining = roundQty(0.3 - 0.1);
+    const batchOriginal = roundQty(0.3);
+    expect(batchRemaining).toBe(0.2);
+    expect(batchOriginal).toBe(0.3);
+    const consumed = batchRemaining < roundQty(batchOriginal) - qtyEpsilon();
+    expect(consumed).toBe(true);
+  });
+
+  it('unconsumed batch not falsely flagged by IEEE residue', () => {
+    const batchOriginal = 0.3;
+    const batchRemaining = 0.3;
+    const cleanRemaining = roundQty(batchRemaining);
+    const cleanOriginal = roundQty(batchOriginal);
+    const consumed = cleanRemaining < cleanOriginal - qtyEpsilon();
+    expect(consumed).toBe(false);
+  });
+});

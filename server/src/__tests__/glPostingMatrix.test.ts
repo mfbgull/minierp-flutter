@@ -203,7 +203,7 @@ describe('GL posting matrix', () => {
 
     const submitted = await request(app).put(`/api/expenses/${expenseId}`)
       .set('Cookie', authCookie)
-      .send({ status: 'Submitted' });
+      .send({ status: 'Recorded' });
     expect(submitted.status).toBe(200);
 
     lines = linesFor('EXPENSE', expenseId);

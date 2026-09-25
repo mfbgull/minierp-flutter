@@ -189,10 +189,9 @@ function getReceivablesSummary(db: Database.Database, asOfDate: string = new Dat
         ELSE 0
       END), 0) as bucket_over_90,
 
-      -- Per-status counts and totals, unchanged in spirit but
-      -- separated from the aging buckets. H4: partial returns keep
-      -- their (reduced) outstanding, so they get their own bucket —
-      -- the breakdown must still foot to total_outstanding.
+      -- Per-status counts and totals, keyed on the single merged status
+      -- column so every invoice lands in exactly one bucket (H4: return
+      -- status and payment status must not double-count).
       COALESCE(SUM(CASE WHEN status = 'Unpaid' THEN balance_amount ELSE 0 END), 0) as unpaid_amount,
       COALESCE(SUM(CASE WHEN status = 'Partially Paid' THEN balance_amount ELSE 0 END), 0) as partially_paid_amount,
       COALESCE(SUM(CASE WHEN status = 'Overdue' THEN balance_amount ELSE 0 END), 0) as overdue_amount,

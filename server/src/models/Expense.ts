@@ -176,11 +176,11 @@ function update(db: Database.Database, id: number, data: UpdateExpenseDTO, opts?
     newMethod !== String(existing.payment_method ?? '');
 
   db.transaction(() => {
-    // GL lifecycle: the flows treat every non-Draft/Cancelled expense as a
-    // cash outflow, so the GL must mirror that exactly. Void active EXPENSE
-    // lines whenever the row leaves (or never reaches) GL-worthiness, and
-    // (re)post on status transitions and money-field edits. The void-then-
-    // repost also cleans up lines legacy Draft rows may already carry.
+    // GL lifecycle: Draft/Cancelled have no financial effect; every other
+    // status (Recorded) is GL-worthiness. Void active EXPENSE lines whenever
+    // the row leaves (or never reaches) GL-worthiness, and (re)post on
+    // status transitions and money-field edits. The void-then-repost also
+    // cleans up lines legacy Draft rows may already carry.
     if (!willBeGlWorthy) {
       AccountingService.voidJournalLinesByReference(db, 'EXPENSE', id, {
         voidedBy: opts?.userId ?? null,
@@ -188,7 +188,7 @@ function update(db: Database.Database, id: number, data: UpdateExpenseDTO, opts?
       });
     } else {
       const needsPosting =
-        (!wasGlWorthy && willBeGlWorthy) || // Draft → Submitted/Approved/Paid
+        (!wasGlWorthy && willBeGlWorthy) || // Draft → Recorded
         (wasGlWorthy && willBeGlWorthy && moneyChanged); // edit while GL-worthy
       if (needsPosting) {
         AccountingService.voidJournalLinesByReference(db, 'EXPENSE', id, {
@@ -334,12 +334,11 @@ function deleteCategory(db: Database.Database, id: number): void {
 }
 
 function getStatusOptions() {
+  // TASK 25 Option A: Draft → Recorded → Cancelled (GL posts on leave-Draft).
   return [
     { value: 'Draft', label: 'Draft' },
-    { value: 'Submitted', label: 'Submitted' },
-    { value: 'Approved', label: 'Approved' },
-    { value: 'Paid', label: 'Paid' },
-    { value: 'Cancelled', label: 'Cancelled' }
+    { value: 'Recorded', label: 'Recorded' },
+    { value: 'Cancelled', label: 'Cancelled' },
   ];
 }
 
@@ -354,7 +353,6 @@ function getPaymentMethodOptions() {
     { value: 'Credit Card', label: 'Credit Card' },
     { value: 'Debit Card', label: 'Debit Card' },
     { value: 'Online Transfer', label: 'Online Transfer' },
-    { value: 'Other', label: 'Other' }
   ];
 }
 

@@ -8,12 +8,13 @@ import StockMovementModel from './StockMovement';
 import AccountingService from '../services/accountingService';
 import InvoiceReturnModel from './InvoiceReturn';
 import { isFeatureEnabled } from '../utils/featureFlags';
+import { roundQty } from '../utils/quantity';
 
 /**
  * Reversal-rules guard rejection (rule 4/5: paid + returned documents
  * lock). Thrown by cancelInvoiceInternal for states the API caller can
  * correct (payments/returns present) — the controller maps it to HTTP
- * 400 rather than a 500 server fault.
+ * 409 rather than a 500 server fault.
  */
 export class InvoiceCancellationGuardError extends Error {
   constructor(message: string) {
@@ -33,6 +34,8 @@ export interface Invoice {
   invoice_date: string;
   due_date?: string;
   status: 'Draft' | 'Sent' | 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled' | 'Returned' | 'Partially Returned';
+  payment_status: 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overpaid' | 'Overdue';
+  return_status: 'None' | 'Partially Returned' | 'Fully Returned';
   total_amount: number;
   paid_amount: number;
   balance_amount: number;
@@ -156,6 +159,8 @@ const INVOICE_SORT_COLUMN_MAP: Record<string, string> = {
   invoice_date: 'i.invoice_date',
   customer_name: 'COALESCE(c.customer_name, i.customer_name)',
   status: 'i.status',
+  payment_status: 'i.payment_status',
+  return_status: 'i.return_status',
   total_amount: 'i.total_amount',
   paid_amount: 'i.paid_amount',
   balance_amount: 'i.balance_amount',
@@ -603,10 +608,10 @@ class InvoiceModel {
         WHERE item_id = ? AND reference_docno = ? AND movement_type = 'ADJUSTMENT' AND reference_doctype = 'RETURN'
       `).get(item.item_id, invoiceNo) as { total_returned: number };
 
-      const totalSold = saleMovements.reduce((sum, m) => sum + Math.abs(m.quantity), 0);
-      const totalToReturn = Math.abs(item.quantity);
-      const alreadyReturnedQty = Math.abs(alreadyReturned.total_returned);
-      const remainingToReturn = Math.max(0, totalToReturn - alreadyReturnedQty);
+      const totalSold = roundQty(saleMovements.reduce((sum, m) => sum + Math.abs(m.quantity), 0));
+      const totalToReturn = roundQty(Math.abs(item.quantity));
+      const alreadyReturnedQty = roundQty(Math.abs(alreadyReturned.total_returned));
+      const remainingToReturn = roundQty(Math.max(0, totalToReturn - alreadyReturnedQty));
 
       // For the return path, each call carries this return's quantity only,
       // so the effective remaining is the full totalToReturn. For cancel/delete
@@ -624,12 +629,12 @@ class InvoiceModel {
       // otherwise subsequent partial returns under-restock physical stock
       // while the GL already posted the full return value.
       const effectiveQty = referenceDoctype === 'RETURN' ? totalToReturn : remainingToReturn;
-      const ratio = Math.abs(totalSold) < 0.001 ? 1 : Math.min(effectiveQty / totalSold, 1);
+      const ratio = Math.abs(totalSold) < 0.001 ? 1 : Math.min(roundQty(effectiveQty / totalSold), 1);
 
       // Restore quantity on each consumed batch (new path: batch_stock_by_location)
       for (const movement of saleMovements) {
         if (movement.batch_id !== null) {
-          const restoreQty = Math.abs(movement.quantity) * ratio;
+          const restoreQty = roundQty(Math.abs(movement.quantity) * ratio);
           if (isFeatureEnabled(db, 'feature_batch_locations')) {
             // Restore to target warehouse default location (explicit or original)
             const targetWarehouseId = explicitWarehouseId ?? movement.warehouse_id;
@@ -671,11 +676,11 @@ class InvoiceModel {
       let totalActualCost = 0;
       let totalQty = 0;
       for (const movement of saleMovements) {
-        const absQty = Math.abs(movement.quantity);
-        totalActualCost += absQty * movement.unit_cost;
+        const absQty = roundQty(Math.abs(movement.quantity));
+        totalActualCost += roundQty(absQty * movement.unit_cost);
         totalQty += absQty;
       }
-      const avgUnitCost = totalQty > 0 ? totalActualCost / totalQty : item.unit_price;
+      const avgUnitCost = totalQty > 0 ? roundQty(totalActualCost / totalQty) : item.unit_price;
 
       // Add stock back (positive quantity to reverse the sale).
       // For returns, the caller supplies this return's quantity only,
@@ -740,17 +745,22 @@ class InvoiceModel {
     const result = db.prepare(`
       INSERT INTO invoices (
         invoice_no, customer_id, invoice_date, due_date, status,
+        payment_status, return_status,
         total_amount, paid_amount, balance_amount, notes,
         discount_scope, discount_type, discount_value, terms, created_by,
         source_type, credit_offset
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.invoice_no || null,
       data.customer_id,
       data.invoice_date,
       data.due_date || null,
       data.status || 'Unpaid',
+      (data.status === 'Paid' || (data.paid_amount ?? 0) >= (data.total_amount ?? 0)) ? 'Paid'
+        : data.status === 'Partially Paid' ? 'Partially Paid'
+        : 'Unpaid',
+      'None',
       totalAmount,
       paidAmount,
       balanceAmount,
@@ -898,6 +908,8 @@ class InvoiceModel {
     paid_amount: number; 
     balance_amount: number; 
     status: string; 
+    payment_status?: string;
+    return_status?: string;
     notes?: string; 
     discount_scope?: string; 
     discount_type?: string; 
@@ -908,7 +920,8 @@ class InvoiceModel {
       UPDATE invoices
       SET
         invoice_no = ?, customer_id = ?, invoice_date = ?, due_date = ?,
-        status = ?, total_amount = ?, paid_amount = ?, balance_amount = ?, notes = ?,
+        status = ?, payment_status = ?, return_status = ?,
+        total_amount = ?, paid_amount = ?, balance_amount = ?, notes = ?,
         discount_scope = ?, discount_type = ?, discount_value = ?, terms = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
@@ -918,6 +931,8 @@ class InvoiceModel {
       data.invoice_date,
       data.due_date,
       data.status,
+      data.payment_status || 'Unpaid',
+      data.return_status || 'None',
       data.total_amount,
       data.paid_amount,
       data.balance_amount,
@@ -1084,7 +1099,7 @@ class InvoiceModel {
 
     // ---- 5. Status stamp ----
     db.prepare(`
-      UPDATE invoices SET status = 'Cancelled', updated_at = CURRENT_TIMESTAMP
+      UPDATE invoices SET status = 'Cancelled', payment_status = 'Unpaid', return_status = 'None', updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(invoice.id);
   }

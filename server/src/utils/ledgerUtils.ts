@@ -140,8 +140,8 @@ function reverseLedgerEntry(
 
 
 
-function calculateInvoiceBalance(invoiceId: number): number {
-  const invoice = db.prepare('SELECT total_amount, returned_amount, return_fee, credit_offset FROM invoices WHERE id = ?').get(invoiceId) as { total_amount: number; returned_amount?: number; return_fee?: number; credit_offset?: number } | undefined;
+function calculateInvoiceBalance(invoiceId: number, conn: typeof db = db): number {
+  const invoice = conn.prepare('SELECT total_amount, returned_amount, return_fee, credit_offset FROM invoices WHERE id = ?').get(invoiceId) as { total_amount: number; returned_amount?: number; return_fee?: number; credit_offset?: number } | undefined;
 
   if (!invoice) {
     throw new Error(`Invoice ${invoiceId} not found`);
@@ -151,7 +151,7 @@ function calculateInvoiceBalance(invoiceId: number): number {
   // credit offset applied at sale time. Negative allocations are refund
   // OUT-flows — counting them as "paid" would shrink the collected base
   // (spec §3.2 / scenario 10: two refunds leave totalPaid unchanged).
-  const paidResult = db.prepare(`
+  const paidResult = conn.prepare(`
     SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS total_paid
     FROM payment_allocations
     WHERE invoice_id = ? AND voided_at IS NULL
@@ -177,14 +177,14 @@ function calculateInvoiceBalance(invoiceId: number): number {
 
   // paid_amount stores the gross collected base (the same figure the
   // position reports as totalPaid), not the net of refunds.
-  db.prepare('UPDATE invoices SET paid_amount = ?, balance_amount = ? WHERE id = ?')
+  conn.prepare('UPDATE invoices SET paid_amount = ?, balance_amount = ? WHERE id = ?')
     .run(collections, newBalance, invoiceId);
 
   return newBalance;
 }
 
-function updateInvoiceStatus(invoiceId: number): string {
-  const invoice = db.prepare('SELECT balance_amount, total_amount, paid_amount, due_date, returned_amount, status FROM invoices WHERE id = ?')
+function updateInvoiceStatus(invoiceId: number, conn: typeof db = db): string {
+  const invoice = conn.prepare('SELECT balance_amount, total_amount, paid_amount, due_date, returned_amount, status FROM invoices WHERE id = ?')
     .get(invoiceId) as { balance_amount: number; total_amount: number; paid_amount: number; due_date: string | null; returned_amount?: number; status?: string } | undefined;
 
   if (!invoice) {
@@ -193,34 +193,67 @@ function updateInvoiceStatus(invoiceId: number): string {
 
   const balance = parseCurrency(invoice.balance_amount);
   const total = parseCurrency(invoice.total_amount);
+  const paid = parseCurrency(invoice.paid_amount || 0);
   const returned = parseCurrency(invoice.returned_amount || 0);
   const currentStatus = String(invoice.status || '');
 
-  let newStatus = 'Unpaid';
+  let paymentStatus = 'Unpaid';
+  let returnStatus = 'None';
+  let combinedStatus = 'Unpaid';
 
   if (currentStatus === 'Cancelled') {
-    newStatus = 'Cancelled';
-  } else if (returned >= total && total > 0) {
-    // All items returned
-    newStatus = 'Returned';
-  } else if (returned > 0 && total > 0) {
-    // Some items returned, some remain
-    newStatus = 'Partially Returned';
-  } else if (balance <= 0 && total > 0) {
-    newStatus = 'Paid';
-  } else if (balance < total && balance > 0) {
-    newStatus = 'Partially Paid';
-  } else if (balance >= total && total > 0) {
-    newStatus = 'Unpaid';
+    paymentStatus = 'Unpaid';
+    returnStatus = 'None';
+    combinedStatus = 'Cancelled';
+  } else {
+    // Derive return_status
+    if (returned >= total && total > 0) {
+      returnStatus = 'Fully Returned';
+    } else if (returned > 0 && total > 0) {
+      returnStatus = 'Partially Returned';
+    } else {
+      returnStatus = 'None';
+    }
+
+    // Derive payment_status
+    if (paid >= total && total > 0 && returnStatus === 'None') {
+      paymentStatus = paid > total ? 'Overpaid' : 'Paid';
+    } else if (paid > 0 && balance > 0 && returnStatus === 'None') {
+      paymentStatus = 'Partially Paid';
+    } else if (balance <= 0 && total > 0) {
+      paymentStatus = 'Paid';
+    } else {
+      paymentStatus = 'Unpaid';
+    }
+
+    // Overdue: not in a terminal state and past due date
+    const isTerminal = paymentStatus === 'Paid' || returnStatus === 'Fully Returned' || returnStatus === 'Partially Returned';
+    if (!isTerminal && invoice.due_date && new Date(invoice.due_date) < new Date()) {
+      paymentStatus = 'Overdue';
+    }
+
+    // Derive combined legacy status for backward compatibility
+    if (returnStatus === 'Fully Returned') {
+      combinedStatus = 'Returned';
+    } else if (returnStatus === 'Partially Returned') {
+      combinedStatus = 'Partially Returned';
+    } else if (paymentStatus === 'Paid') {
+      combinedStatus = 'Paid';
+    } else if (paymentStatus === 'Overpaid') {
+      combinedStatus = 'Paid';
+    } else if (paymentStatus === 'Partially Paid') {
+      combinedStatus = 'Partially Paid';
+    } else if (paymentStatus === 'Overdue') {
+      combinedStatus = 'Overdue';
+    } else {
+      combinedStatus = 'Unpaid';
+    }
   }
 
-  if (newStatus !== 'Paid' && newStatus !== 'Returned' && newStatus !== 'Partially Returned' && invoice.due_date && new Date(invoice.due_date) < new Date()) {
-    newStatus = 'Overdue';
-  }
+  conn.prepare('UPDATE invoices SET status = ?, payment_status = ?, return_status = ? WHERE id = ?')
+    .run(combinedStatus, paymentStatus, returnStatus, invoiceId);
 
-  db.prepare('UPDATE invoices SET status = ? WHERE id = ?').run(newStatus, invoiceId);
-
-  return newStatus;
+  return combinedStatus;
 }
 
 function rebuildLedgerBalances(customerId: number): void {
@@ -287,16 +320,16 @@ function updateBalancesFrom(customerId: number, fromEntryId: number): void {
  * Single authoritative customer-balance writer (ACC-13): the ledger sum
  * over non-voided rows, not an open-invoice status heuristic.
  */
-function recalcCustomerBalanceFromLedger(customerId: number): number {
-  return db.transaction(() => {
-    const row = db.prepare(`
+function recalcCustomerBalanceFromLedger(customerId: number, conn: typeof db = db): number {
+  return conn.transaction(() => {
+    const row = conn.prepare(`
       SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS net
       FROM customer_ledger
       WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL
     `).get(customerId) as { net: number };
 
     const newBalance = parseCurrency(row.net);
-    db.prepare('UPDATE customers SET current_balance = ? WHERE id = ?').run(newBalance, customerId);
+    conn.prepare('UPDATE customers SET current_balance = ? WHERE id = ?').run(newBalance, customerId);
     return newBalance;
   })();
 }

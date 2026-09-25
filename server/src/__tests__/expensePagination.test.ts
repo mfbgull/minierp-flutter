@@ -31,12 +31,12 @@ describe('ExpenseModel pagination + sort', () => {
       `INSERT INTO expenses (expense_no, expense_category, description, amount,
                             expense_date, status, created_by, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('E1', 'Fuel', 'Gas', 100, '2026-08-20', 'Paid', 1, '2026-08-20', '2026-08-20');
+    ).run('E1', 'Fuel', 'Gas', 100, '2026-08-20', 'Recorded', 1, '2026-08-20', '2026-08-20');
     db.prepare(
       `INSERT INTO expenses (expense_no, expense_category, description, amount,
                             expense_date, status, created_by, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run('E2', 'Food', 'Lunch', 50, '2026-08-22', 'Paid', 1, '2026-08-22', '2026-08-22');
+    ).run('E2', 'Food', 'Lunch', 50, '2026-08-22', 'Recorded', 1, '2026-08-22', '2026-08-22');
     db.prepare(
       `INSERT INTO expenses (expense_no, expense_category, description, amount,
                             expense_date, status, created_by, created_at, updated_at)
