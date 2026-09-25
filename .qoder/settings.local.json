@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(test \"${HERDR_ENV:-}\" = 1 && echo \"in herdr\" || echo \"not in herdr\"; herdr agent list 2>&1)",
+      "Bash(herdr agent:*)",
+      "Bash(herdr pane:*)",
+      "Bash(herdr pane list --workspace w4; herdr tab list --workspace w4)",
+      "Bash(herdr agent wait w4:p1 --until blocked --timeout 240000 2>&1 || true)",
+      "Bash(herdr agent wait w4:p1 --timeout 600000 2>&1 | tail -5)",
+      "Bash(herdr agent list | tr ',' '\\\\n' | grep -A0 agent_status; herdr pane read w4:p1 --source recent-unwrapped --lines 40)",
+      "Bash(herdr agent list | tr ',' '\\\\n' | grep agent_status; herdr pane read w4:p1 --source recent-unwrapped --lines 60)",
+      "Bash(git -C /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter status --short | head -20; git -C /media/fawad/26F2EFA7F2EF7987/D/minierp-flutter diff --stat server/src/models/Payment.ts)",
+      "Bash(sleep 45; herdr pane read w4:p3 --source recent-unwrapped --lines 15)",
+      "Bash(git:*)",
+      "Bash(sleep 60; herdr pane read w4:p3 --source recent-unwrapped --lines 35)",
+      "Bash(herdr pane wait-output w4:p3 --match \"FULL_RUN_DONE\" --timeout 590000 >/dev/null; sleep 2; herdr pane read w4:p3 --source recent-unwrapped --lines 14)",
+      "Bash(for i in $\\(seq 1 10\\); do sleep 60; out=$\\(herdr pane read w4:p3 --source recent-unwrapped --lines 10 2>/dev/null\\); if echo \"$out\" | grep -q \"Test Suites: *[0-9]* passed, 8[0-9]\"; then echo \"$out\"; break; fi; if echo \"$out\" | grep -qE \"failed\"; then echo \"$out\"; break; fi; done; echo POLL_END)",
+      "Bash(test \"${HERDR_ENV:-}\" = 1 && echo in-herdr || echo not-in-herdr)",
+      "Bash(test \"${HERDR_ENV:-}\" = 1 && echo inside || echo outside)"
+    ]
+  }
+}
