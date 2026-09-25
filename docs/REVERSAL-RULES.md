@@ -417,6 +417,29 @@ active stock relationship
 
 This invariant must be enforced both by reversal logic and by reporting/query filters.
 
+## 1.15 Stock-movement reference keys must be the document NUMBER
+
+`stock_movements.reference_docno` is a **string key, not a numeric id**.
+Every consumer that resolves a document's stock effect — the reversal
+primitive (`InvoiceModel.reverseStockForItems`), the soft-delete restore
+endpoint, and the return-history report joins — matches
+`reference_docno = <document number>`. A write path that keys the
+movement to the database id (e.g. `String(invoiceId)`) makes those
+lookups find nothing, so the reversal silently skips the batch restore
+and leaves stock permanently reduced while the GL and subledger legs
+already reversed.
+
+Rule: **every** write path (desktop invoice, mobile invoice, POS, return,
+delete, transfer) must key `reference_docno` to the same document number
+it stores in the parent table — never to the row id.
+
+Historical databases whose mobile SALE movements were keyed to the invoice
+id are repaired once at boot by `fn.backfillMobileInvoiceStockReference`
+(re-key to the invoice number, plus the stock leg the buggy cancellation
+skipped). The repair is idempotent and scoped to the mobile write path by
+its `remarks` prefix (`Batch: …` is produced only by
+`StockMovementModel.recordBatchMovement`).
+
 ---
 
 # 2. Reference pattern (`Purchase.void` shape)

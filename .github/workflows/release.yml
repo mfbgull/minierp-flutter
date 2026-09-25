@@ -49,6 +49,12 @@ jobs:
       - name: Build Linux release
         run: flutter build linux --release
 
+      - name: Build server and create .run installer
+        shell: bash
+        run: |
+          cd server && npm run build && cd ..
+          ./tool/make_linux_setup.sh --no-build --out "dist/MiniERP-${VERSION}-linux-x64.run"
+
       - name: Package Debian
         shell: bash
         run: |
@@ -141,6 +147,12 @@ jobs:
         with:
           name: minierp-linux-appimage
           path: MiniERP-${{ env.VERSION }}-linux-x64.AppImage
+
+      - name: Upload .run installer artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: minierp-linux-run
+          path: dist/MiniERP-${{ env.VERSION }}-linux-x64.run
 
   build-windows:
     runs-on: windows-latest
@@ -284,12 +296,12 @@ jobs:
           merge-multiple: true
           path: release-assets
 
-      - name: Assert four release assets
+      - name: Assert five release assets
         shell: bash
         run: |
           count=$(find release-assets -maxdepth 1 -type f | wc -l)
-          if [ "$count" -ne 4 ]; then
-            echo "Expected 4 release assets, found $count" >&2
+          if [ "$count" -ne 5 ]; then
+            echo "Expected 5 release assets, found $count" >&2
             find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
             exit 1
           fi
