@@ -13,6 +13,7 @@ import 'package:flutter/painting.dart' show Color;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../core/utils/pdf_fonts.dart';
+import '../../core/utils/formatters.dart';
 import 'package:qr_flutter/qr_flutter.dart' as qr;
 
 import 'pos_models.dart';
@@ -21,11 +22,16 @@ import 'pos_models.dart';
 const double _kPosThermalWidth = 226.77;
 
 /// Builds the POS thermal receipt PDF bytes for [sale].
-Future<Uint8List> buildPosThermalReceiptPdf(PosSale sale) async {
+Future<Uint8List> buildPosThermalReceiptPdf(
+  PosSale sale, {
+  CurrencyFormatter? formatter,
+}) async {
+  final usedFormatter =
+      formatter ?? CurrencyFormatter(CurrencyConfigStore.current);
   final qrData =
-      'POS:${sale.transactionNo}|TOTAL:${_fmtCurrency(sale.total)}|'
-      'CASH:${_fmtCurrency(sale.cashReceived)}|'
-      'CHANGE:${_fmtCurrency(sale.change)}';
+      'POS:${sale.transactionNo}|TOTAL:${_fmtCurrency(sale.total, usedFormatter)}|'
+      'CASH:${_fmtCurrency(sale.cashReceived, usedFormatter)}|'
+      'CHANGE:${_fmtCurrency(sale.change, usedFormatter)}';
   final qrImage = await _generateQrImage(qrData);
 
   final doc = pw.Document(theme: await PdfFonts.theme());
@@ -45,9 +51,9 @@ Future<Uint8List> buildPosThermalReceiptPdf(PosSale sale) async {
         _buildDivider(),
         _buildCustomerInfo(sale),
         _buildDivider(),
-        _buildItemsTable(sale),
+        _buildItemsTable(sale, usedFormatter),
         _buildDivider(),
-        _buildTotals(sale),
+        _buildTotals(sale, usedFormatter),
         _buildQr(qrImage),
         _buildDivider(),
         _buildFooter(),
@@ -59,193 +65,168 @@ Future<Uint8List> buildPosThermalReceiptPdf(PosSale sale) async {
 }
 
 pw.Widget _buildHeader() => pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.center,
-      children: [
-        pw.Text(
-          'MINIERP',
-          style: pw.TextStyle(
-            fontSize: 16,
-            fontWeight: pw.FontWeight.bold,
-          ),
-        ),
-        pw.Text(
-          'Point of Sale Receipt',
-          style: pw.TextStyle(fontSize: 10),
-        ),
-      ],
-    );
+  crossAxisAlignment: pw.CrossAxisAlignment.center,
+  children: [
+    pw.Text(
+      'MINIERP',
+      style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+    ),
+    pw.Text('Point of Sale Receipt', style: pw.TextStyle(fontSize: 10)),
+  ],
+);
 
 pw.Widget _buildDivider() => pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 4),
-      child: pw.Container(
-        height: 0.5,
-        color: PdfColors.grey400,
-      ),
-    );
+  padding: const pw.EdgeInsets.symmetric(vertical: 4),
+  child: pw.Container(height: 0.5, color: PdfColors.grey400),
+);
 
 pw.Widget _buildTransactionInfo(PosSale sale) => pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        _infoLine('Transaction: ${sale.transactionNo}'),
-        _infoLine('Date: ${sale.saleDate}'),
-        _infoLine('Warehouse: ${sale.warehouseName}'),
-      ],
-    );
+  crossAxisAlignment: pw.CrossAxisAlignment.start,
+  children: [
+    _infoLine('Transaction: ${sale.transactionNo}'),
+    _infoLine('Date: ${sale.saleDate}'),
+    _infoLine('Warehouse: ${sale.warehouseName}'),
+  ],
+);
 
 pw.Widget _buildCustomerInfo(PosSale sale) => _infoLine(
-      'Customer: ${sale.customerName.isEmpty ? "Walk-in" : sale.customerName}',
-    );
+  'Customer: ${sale.customerName.isEmpty ? "Walk-in" : sale.customerName}',
+);
 
-pw.Widget _buildItemsTable(PosSale sale) => pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
+pw.Widget _buildItemsTable(
+  PosSale sale,
+  CurrencyFormatter formatter,
+) => pw.Column(
+  crossAxisAlignment: pw.CrossAxisAlignment.start,
+  children: [
+    pw.Row(
       children: [
-        pw.Row(
-          children: [
-            pw.Expanded(
-              flex: 4,
-              child: pw.Text(
-                'ITEM',
-                style: pw.TextStyle(
-                  fontSize: 8,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-            ),
-            pw.Expanded(
-              flex: 1,
-              child: pw.Text(
-                'QTY',
-                style: pw.TextStyle(
-                  fontSize: 8,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-                textAlign: pw.TextAlign.right,
-              ),
-            ),
-            pw.Expanded(
-              flex: 2,
-              child: pw.Text(
-                'AMOUNT',
-                style: pw.TextStyle(
-                  fontSize: 8,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-                textAlign: pw.TextAlign.right,
-              ),
-            ),
-          ],
-        ),
-        pw.SizedBox(height: 2),
-        for (final line in sale.items)
-          pw.Row(
-            children: [
-              pw.Expanded(
-                flex: 4,
-                child: pw.Text(
-                  line.itemName,
-                  style: const pw.TextStyle(fontSize: 9),
-                  maxLines: 2,
-                  overflow: pw.TextOverflow.clip,
-                ),
-              ),
-              pw.Expanded(
-                flex: 1,
-                child: pw.Text(
-                  '${line.quantity}',
-                  style: const pw.TextStyle(fontSize: 9),
-                  textAlign: pw.TextAlign.right,
-                ),
-              ),
-              pw.Expanded(
-                flex: 2,
-                child: pw.Text(
-                  _fmtCurrency(line.lineTotal),
-                  style: const pw.TextStyle(fontSize: 9),
-                  textAlign: pw.TextAlign.right,
-                ),
-              ),
-            ],
+        pw.Expanded(
+          flex: 4,
+          child: pw.Text(
+            'ITEM',
+            style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
           ),
+        ),
+        pw.Expanded(
+          flex: 1,
+          child: pw.Text(
+            'QTY',
+            style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+            textAlign: pw.TextAlign.right,
+          ),
+        ),
+        pw.Expanded(
+          flex: 2,
+          child: pw.Text(
+            'AMOUNT',
+            style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+            textAlign: pw.TextAlign.right,
+          ),
+        ),
       ],
-    );
+    ),
+    pw.SizedBox(height: 2),
+    for (final line in sale.items)
+      pw.Row(
+        children: [
+          pw.Expanded(
+            flex: 4,
+            child: pw.Text(
+              line.itemName,
+              style: const pw.TextStyle(fontSize: 9),
+              maxLines: 2,
+              overflow: pw.TextOverflow.clip,
+            ),
+          ),
+          pw.Expanded(
+            flex: 1,
+            child: pw.Text(
+              '${line.quantity}',
+              style: const pw.TextStyle(fontSize: 9),
+              textAlign: pw.TextAlign.right,
+            ),
+          ),
+          pw.Expanded(
+            flex: 2,
+            child: pw.Text(
+              _fmtCurrency(line.lineTotal, formatter),
+              style: const pw.TextStyle(fontSize: 9),
+              textAlign: pw.TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+  ],
+);
 
-pw.Widget _buildTotals(PosSale sale) => pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        _totalRow('Subtotal', _fmtCurrency(sale.subtotal)),
-        _totalRowBold('Total', _fmtCurrency(sale.total)),
-        _totalRow('Cash Received', _fmtCurrency(sale.cashReceived)),
-        _totalRowBold('Change', _fmtCurrency(sale.change)),
-      ],
-    );
+pw.Widget _buildTotals(PosSale sale, CurrencyFormatter formatter) => pw.Column(
+  crossAxisAlignment: pw.CrossAxisAlignment.start,
+  children: [
+    _totalRow('Subtotal', _fmtCurrency(sale.subtotal, formatter)),
+    _totalRowBold('Total', _fmtCurrency(sale.total, formatter)),
+    _totalRow('Cash Received', _fmtCurrency(sale.cashReceived, formatter)),
+    _totalRowBold('Change', _fmtCurrency(sale.change, formatter)),
+  ],
+);
 
 pw.Widget _buildQr(pw.MemoryImage? qrImage) => pw.Center(
-      child: qrImage != null
-          ? pw.Column(
-              children: [
-                pw.SizedBox(height: 4),
-                pw.Image(qrImage, width: 50, height: 50),
-              ],
-            )
-          : pw.SizedBox(),
-    );
+  child: qrImage != null
+      ? pw.Column(
+          children: [
+            pw.SizedBox(height: 4),
+            pw.Image(qrImage, width: 50, height: 50),
+          ],
+        )
+      : pw.SizedBox(),
+);
 
 pw.Widget _buildFooter() => pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.center,
-      children: [
-        pw.Text(
-          'Thank you for your purchase',
-          style: pw.TextStyle(
-            fontSize: 9,
-            fontWeight: pw.FontWeight.bold,
-          ),
-          textAlign: pw.TextAlign.center,
-        ),
-        pw.SizedBox(height: 2),
-        pw.Text(
-          'Returns accepted within 7 days with receipt',
-          style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
-          textAlign: pw.TextAlign.center,
-        ),
-      ],
-    );
+  crossAxisAlignment: pw.CrossAxisAlignment.center,
+  children: [
+    pw.Text(
+      'Thank you for your purchase',
+      style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+      textAlign: pw.TextAlign.center,
+    ),
+    pw.SizedBox(height: 2),
+    pw.Text(
+      'Returns accepted within 7 days with receipt',
+      style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
+      textAlign: pw.TextAlign.center,
+    ),
+  ],
+);
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-pw.Widget _infoLine(String text) => pw.Text(
-      text,
-      style: const pw.TextStyle(fontSize: 9),
-    );
+pw.Widget _infoLine(String text) =>
+    pw.Text(text, style: const pw.TextStyle(fontSize: 9));
 
 pw.Widget _totalRow(String label, String value) => pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-      children: [
-        pw.Text(label, style: const pw.TextStyle(fontSize: 9)),
-        pw.Text(value, style: const pw.TextStyle(fontSize: 9)),
-      ],
-    );
+  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+  children: [
+    pw.Text(label, style: const pw.TextStyle(fontSize: 9)),
+    pw.Text(value, style: const pw.TextStyle(fontSize: 9)),
+  ],
+);
 
 pw.Widget _totalRowBold(String label, String value) => pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-      children: [
-        pw.Text(
-          label,
-          style: pw.TextStyle(
-            fontSize: 10,
-            fontWeight: pw.FontWeight.bold,
-          ),
-        ),
-        pw.Text(
-          value,
-          style: pw.TextStyle(
-            fontSize: 10,
-            fontWeight: pw.FontWeight.bold,
-          ),
-        ),
-      ],
-    );
+  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+  children: [
+    pw.Text(
+      label,
+      style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+    ),
+    pw.Text(
+      value,
+      style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+    ),
+  ],
+);
 
-String _fmtCurrency(num value) => '\$${value.toStringAsFixed(2)}';
+String _fmtCurrency(num value, CurrencyFormatter formatter) =>
+    formatter.format(value);
 
 /// Generate QR code as a PNG image for embedding in PDF.
 Future<pw.MemoryImage?> _generateQrImage(String data) async {

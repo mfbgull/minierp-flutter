@@ -2490,6 +2490,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statusDraft => 'Draft';
 
   @override
+  String get statusRecorded => 'Recorded';
+
+  @override
   String get statusPaid => 'Paid';
 
   @override

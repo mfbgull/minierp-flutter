@@ -6,8 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/auth/auth_notifier.dart';
 import '../../core/i18n/locale_provider.dart';
 import '../../data/models/auth_user.dart';
-import '../../core/router/module_registry.dart'
-    show shellDestinations;
+import '../../core/router/module_registry.dart' show shellDestinations;
 import '../../core/router/shell_destination.dart' show ShellDestination;
 import '../../core/theme/breakpoints.dart' show Breakpoints;
 import '../../core/theme/theme_mode_provider.dart';
@@ -15,11 +14,10 @@ import '../../features/search/global_search_dialog.dart'
     show showGlobalSearchDialog;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/screen_shortcuts.dart';
-import '../preferences/preference_providers.dart'
-    show userPreferencesProvider;
+import '../preferences/preference_providers.dart' show userPreferencesProvider;
+import '../settings/settings_providers.dart' show currencyConfigProvider;
 import 'deferred_branch.dart' show BranchVisibility;
 import 'module_refresh.dart' show moduleRefreshOnVisit;
-
 
 /// Authenticated shell — navigation rail + shared app bar wrapping the
 /// current branch (PORTING.md §5). Hosted by `StatefulShellRoute` so each
@@ -39,6 +37,7 @@ class AppShell extends ConsumerWidget {
     // server when it resolves (date-range-picker-spec.md §6.2). The
     // shell only renders once authenticated, so the JWT is in place.
     ref.watch(userPreferencesProvider);
+    ref.watch(currencyConfigProvider);
     final isAdmin = auth.user?.isAdmin ?? false;
     final visible = [
       for (final dest in shellDestinations)
@@ -49,56 +48,57 @@ class AppShell extends ConsumerWidget {
 
     return _GlobalSearchHotkey(
       child: Scaffold(
-      appBar: AppBar(
-        title: Text((current.title ?? current.label)(l10n)),
-        actions: [
-          IconButton(
-            tooltip: 'Search (Ctrl+K)',
-            icon: const Icon(Icons.search),
-            onPressed: () => showGlobalSearchDialog(context),
-          ),
-          if (auth.user != null) _UserMenu(user: auth.user!),
-          const SizedBox(width: 4),
-        ],
-      ),
-      // Screen-level keyboard shortcuts (Ctrl+F focus search, Ctrl+N new
-      // record): the scope resolves the visible branch's toolbar at
-      // keypress time and dispatches the keys from anywhere on screen.
-      body: ScreenShortcutScope(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _NavRail(
-              destinations: visible,
-              selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
-              onSelect: (index) {
-                final dest = visible[index];
-                final branchIndex = shellDestinations.indexOf(dest);
-                // Refresh the selected module's data on every visit:
-                // the StatefulShellRoute keeps every branch alive, so
-                // its providers would otherwise serve data cached at
-                // the first visit (module_refresh.dart). Re-clicking
-                // the current module refreshes it too.
-                moduleRefreshOnVisit[dest.path]?.call(ref);
-                navigationShell.goBranch(
-                  branchIndex,
-                  initialLocation: branchIndex == navigationShell.currentIndex,
-                );
-              },
+        appBar: AppBar(
+          title: Text((current.title ?? current.label)(l10n)),
+          actions: [
+            IconButton(
+              tooltip: 'Search (Ctrl+K)',
+              icon: const Icon(Icons.search),
+              onPressed: () => showGlobalSearchDialog(context),
             ),
-            const VerticalDivider(width: 1, thickness: 1),
-            // Expose the visible branch to the DeferredBranch hosts so
-            // each module materializes (and fetches) on first visit.
-            Expanded(
-              child: BranchVisibility(
-                currentPath: current.path,
-                child: navigationShell,
-              ),
-            ),
+            if (auth.user != null) _UserMenu(user: auth.user!),
+            const SizedBox(width: 4),
           ],
         ),
+        // Screen-level keyboard shortcuts (Ctrl+F focus search, Ctrl+N new
+        // record): the scope resolves the visible branch's toolbar at
+        // keypress time and dispatches the keys from anywhere on screen.
+        body: ScreenShortcutScope(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _NavRail(
+                destinations: visible,
+                selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
+                onSelect: (index) {
+                  final dest = visible[index];
+                  final branchIndex = shellDestinations.indexOf(dest);
+                  // Refresh the selected module's data on every visit:
+                  // the StatefulShellRoute keeps every branch alive, so
+                  // its providers would otherwise serve data cached at
+                  // the first visit (module_refresh.dart). Re-clicking
+                  // the current module refreshes it too.
+                  moduleRefreshOnVisit[dest.path]?.call(ref);
+                  navigationShell.goBranch(
+                    branchIndex,
+                    initialLocation:
+                        branchIndex == navigationShell.currentIndex,
+                  );
+                },
+              ),
+              const VerticalDivider(width: 1, thickness: 1),
+              // Expose the visible branch to the DeferredBranch hosts so
+              // each module materializes (and fetches) on first visit.
+              Expanded(
+                child: BranchVisibility(
+                  currentPath: current.path,
+                  child: navigationShell,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-    ),
     );
   }
 }
@@ -135,21 +135,21 @@ class _NavRail extends StatelessWidget {
       selectedIndex: selectedIndex,
       onDestinationSelected: onSelect,
       leading: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: extended
-              ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.inventory_2, color: scheme.primary),
-                    const SizedBox(width: 10),
-                    Text(
-                      'MiniERP',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ],
-                )
-              : Icon(Icons.inventory_2, color: scheme.primary),
-        ),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: extended
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.inventory_2, color: scheme.primary),
+                  const SizedBox(width: 10),
+                  Text(
+                    'MiniERP',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ],
+              )
+            : Icon(Icons.inventory_2, color: scheme.primary),
+      ),
       destinations: [
         for (final dest in destinations)
           NavigationRailDestination(
@@ -212,7 +212,6 @@ class _GlobalSearchHotkeyState extends ConsumerState<_GlobalSearchHotkey> {
   @override
   Widget build(BuildContext context) => widget.child;
 }
-
 
 /// Confirmation dialog + logout. Shared by the shell and the user menu
 /// (spec 3.3) — both live in this file.
@@ -293,8 +292,8 @@ class _UserMenu extends ConsumerWidget {
     final effective = Theme.of(context).brightness == Brightness.dark;
     // System mode follows the OS; picking a mode in the menu pins an
     // explicit choice so the toggle has immediate effect.
-    final isDark = mode == ThemeMode.dark ||
-        (mode == ThemeMode.system && effective);
+    final isDark =
+        mode == ThemeMode.dark || (mode == ThemeMode.system && effective);
     final scheme = Theme.of(context).colorScheme;
 
     return PopupMenuButton<_UserMenuAction>(
@@ -406,7 +405,10 @@ class _UserMenu extends ConsumerWidget {
           children: [
             const Icon(Icons.account_circle_outlined),
             const SizedBox(width: 4),
-            Text(user.displayName, style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              user.displayName,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             const Icon(Icons.arrow_drop_down),
           ],
         ),

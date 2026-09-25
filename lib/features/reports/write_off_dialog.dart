@@ -184,7 +184,7 @@ class _WriteOffDialogState extends ConsumerState<_WriteOffDialog> {
             const SizedBox(height: 12),
             // GL Account
             DropdownButtonFormField<String>(
-              value: _glAccount,
+              initialValue: _glAccount,
               decoration: InputDecoration(
                 labelText: l10n.writeOffGlAccount,
                 border: const OutlineInputBorder(),

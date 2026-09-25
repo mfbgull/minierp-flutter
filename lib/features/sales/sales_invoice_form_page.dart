@@ -16,6 +16,8 @@
 // `POST /payments`.
 
 import 'dart:async';
+import 'dart:convert' show jsonEncode;
+import 'dart:math' show Random;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -135,6 +137,26 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   DiscountScope _scope = DiscountScope.item;
 
   bool _submitting = false;
+
+  // P11: idempotent create. The key is bound to the exact submitted body:
+  // an unchanged resubmit (the retry after a lost response) reuses it and
+  // the server replays the original invoice, while any edit rotates it so
+  // the new payload legitimately creates a new invoice. The `_submitting`
+  // guard alone cannot survive the timeout/retry window.
+  String? _createIdemKey;
+  String? _createIdemKeyBody;
+  static final Random _idemRandom = Random();
+
+  String _createIdempotencyKeyFor(Map<String, dynamic> body) {
+    final encoded = jsonEncode(body);
+    if (_createIdemKey == null || _createIdemKeyBody != encoded) {
+      _createIdemKey =
+          'inv-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
+          '-${_idemRandom.nextInt(1 << 32).toRadixString(36)}';
+      _createIdemKeyBody = encoded;
+    }
+    return _createIdemKey!;
+  }
   bool _printing = false;
   String? _error;
 
@@ -1014,9 +1036,13 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     Invoice? savedInvoice;
     try {
       final invRepo = ref.read(invoiceRepositoryProvider);
+      final body = _buildBody();
       final result = _isEdit
-          ? await invRepo.update(widget.invoice!.id, _buildBody())
-          : await invRepo.create(_buildBody());
+          ? await invRepo.update(widget.invoice!.id, body)
+          : await invRepo.create(
+              body,
+              idempotencyKey: _createIdempotencyKeyFor(body),
+            );
       if (!mounted) return null;
 
       switch (result) {

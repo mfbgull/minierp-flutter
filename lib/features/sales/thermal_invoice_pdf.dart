@@ -18,6 +18,7 @@ import 'package:flutter/painting.dart' show Color;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../core/utils/pdf_fonts.dart';
+import '../../core/utils/formatters.dart';
 import 'package:qr_flutter/qr_flutter.dart' as qr;
 import 'dart:ui' as ui;
 
@@ -33,11 +34,15 @@ const double _kThermalWidth = 226.77; // 80mm in points
 Future<Uint8List> buildThermalInvoicePdf({
   required Invoice invoice,
   CompanyInfo? company,
+  CurrencyFormatter? formatter,
 }) async {
   final usedCompany = company ?? invoice.company ?? defaultCompany;
+  final usedFormatter =
+      formatter ?? CurrencyFormatter(CurrencyConfigStore.current);
 
   // Pre-generate QR code image before building the document
-  final qrData = 'INV:${invoice.invoiceNo}|TOTAL:${_fmtCurrency(invoice.totalAmount)}|';
+  final qrData =
+      'INV:${invoice.invoiceNo}|TOTAL:${_fmtCurrency(invoice.totalAmount, usedFormatter)}|';
   final qrImage = await _generateQrImage(qrData);
 
   final doc = pw.Document(theme: await PdfFonts.theme());
@@ -57,9 +62,9 @@ Future<Uint8List> buildThermalInvoicePdf({
         _buildDivider(),
         _buildCustomerInfo(invoice),
         _buildDivider(),
-        _buildItemsTable(invoice),
+        _buildItemsTable(invoice, usedFormatter),
         _buildDivider(),
-        _buildTotals(invoice),
+        _buildTotals(invoice, usedFormatter),
         _buildQrSection(invoice, qrImage),
         _buildDividerDouble(),
         _buildFooter(usedCompany, invoice),
@@ -79,17 +84,15 @@ pw.Widget _buildHeader(CompanyInfo company) {
     children: [
       pw.Text(
         name,
-        style: pw.TextStyle(
-          fontSize: 14,
-          fontWeight: pw.FontWeight.bold,
-        ),
+        style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
         textAlign: pw.TextAlign.center,
       ),
       if (company.phone.trim().isNotEmpty || company.email.trim().isNotEmpty)
         pw.Text(
-          [company.phone, company.email]
-              .where((s) => s.trim().isNotEmpty)
-              .join(' · '),
+          [
+            company.phone,
+            company.email,
+          ].where((s) => s.trim().isNotEmpty).join(' · '),
           style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
           textAlign: pw.TextAlign.center,
         ),
@@ -128,7 +131,7 @@ pw.Widget _buildCustomerInfo(Invoice invoice) {
 
 // ── Items Table ─────────────────────────────────────────────────────
 
-pw.Widget _buildItemsTable(Invoice invoice) {
+pw.Widget _buildItemsTable(Invoice invoice, CurrencyFormatter formatter) {
   final items = invoice.items ?? [];
   if (items.isEmpty) {
     return pw.Padding(
@@ -197,7 +200,7 @@ pw.Widget _buildItemsTable(Invoice invoice) {
             pw.Expanded(
               flex: 2,
               child: pw.Text(
-                _fmtCurrency(item.amount),
+                _fmtCurrency(item.amount, formatter),
                 style: pw.TextStyle(fontSize: 9),
                 textAlign: pw.TextAlign.right,
               ),
@@ -210,7 +213,7 @@ pw.Widget _buildItemsTable(Invoice invoice) {
 
 // ── Totals ──────────────────────────────────────────────────────────
 
-pw.Widget _buildTotals(Invoice invoice) {
+pw.Widget _buildTotals(Invoice invoice, CurrencyFormatter formatter) {
   final items = invoice.items ?? [];
   final subtotal = items.fold<num>(0, (s, i) => s + i.amount);
   final total = invoice.totalAmount;
@@ -223,29 +226,30 @@ pw.Widget _buildTotals(Invoice invoice) {
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
-      _totalRow('Subtotal', _fmtCurrency(subtotal)),
+      _totalRow('Subtotal', _fmtCurrency(subtotal, formatter)),
       if (hasTax) ...[
         // Compute total tax for display
         _totalRow(
           'Tax',
           _fmtCurrency(
-            items.fold<num>(
-              0,
-              (s, i) => s + (i.amount * i.taxRate / 100),
-            ),
+            items.fold<num>(0, (s, i) => s + (i.amount * i.taxRate / 100)),
+            formatter,
           ),
         ),
       ],
-      _totalRowBold('Total', _fmtCurrency(total)),
+      _totalRowBold('Total', _fmtCurrency(total, formatter)),
       if (cashPaid > 0) ...[
-        _totalRow('Paid', _fmtCurrency(cashPaid)),
+        _totalRow('Paid', _fmtCurrency(cashPaid, formatter)),
         if (invoice.returnedAmount > 0)
-          _totalRow('Returned', _fmtCurrency(invoice.returnedAmount)),
+          _totalRow(
+            'Returned',
+            _fmtCurrency(invoice.returnedAmount, formatter),
+          ),
       ],
       if (creditOffset > 0)
-        _totalRow('Cr Used', _fmtCurrency(creditOffset)),
+        _totalRow('Cr Used', _fmtCurrency(creditOffset, formatter)),
       if (cashPaid > 0 || creditOffset > 0)
-        _totalRowBold('Balance Due', _fmtCurrency(balance)),
+        _totalRowBold('Balance Due', _fmtCurrency(balance, formatter)),
     ],
   );
 }
@@ -332,17 +336,12 @@ pw.Widget _buildFooter(CompanyInfo company, Invoice invoice) {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-pw.Widget _infoLine(String text) => pw.Text(
-  text,
-  style: pw.TextStyle(fontSize: 9),
-);
+pw.Widget _infoLine(String text) =>
+    pw.Text(text, style: pw.TextStyle(fontSize: 9));
 
 pw.Widget _buildDivider() => pw.Padding(
   padding: const pw.EdgeInsets.symmetric(vertical: 4),
-  child: pw.Container(
-    height: 0.5,
-    color: PdfColors.grey400,
-  ),
+  child: pw.Container(height: 0.5, color: PdfColors.grey400),
 );
 
 pw.Widget _buildDividerDouble() => pw.Padding(
@@ -381,12 +380,25 @@ pw.Widget _totalRowBold(String label, String value) => pw.Row(
 String _fmtDate(String iso) {
   final parsed = DateTime.tryParse(iso);
   if (parsed == null) return iso;
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
   return '${months[parsed.month - 1]} ${parsed.day}, ${parsed.year}';
 }
 
-String _fmtCurrency(num value) {
-  return '\$${value.toStringAsFixed(2)}';
+String _fmtCurrency(num value, CurrencyFormatter formatter) {
+  return formatter.format(value);
 }
 
 String _fmtNum(num value) {

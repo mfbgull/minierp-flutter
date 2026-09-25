@@ -96,11 +96,7 @@ bool _isNumberingKey(String key) =>
     key.endsWith('_last_no') || RegExp(r'_last_no_\d{4}$').hasMatch(key);
 
 class _Section {
-  const _Section({
-    required this.id,
-    required this.icon,
-    required this.keys,
-  });
+  const _Section({required this.id, required this.icon, required this.keys});
 
   final String id;
   final IconData icon;
@@ -180,11 +176,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   List<_Section> _buildSections(Iterable<String> keys) {
-    final known = <String>[
-      ..._companyKeys,
-      ..._currencyKeys,
-      ..._taxKeys,
-    ];
+    final known = <String>[..._companyKeys, ..._currencyKeys, ..._taxKeys];
     final numbering = [
       for (final key in keys)
         if (_isNumberingKey(key) && !_integrationKeys.contains(key)) key,
@@ -212,17 +204,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (keys.any(_taxKeys.contains))
         const _Section(id: 'tax', icon: Icons.percent_outlined, keys: _taxKeys),
       if (numbering.isNotEmpty)
-        _Section(
-          id: 'numbering',
-          icon: Icons.tag_outlined,
-          keys: numbering,
-        ),
+        _Section(id: 'numbering', icon: Icons.tag_outlined, keys: numbering),
       if (other.isNotEmpty)
-        _Section(
-          id: 'other',
-          icon: Icons.tune_outlined,
-          keys: other,
-        ),
+        _Section(id: 'other', icon: Icons.tune_outlined, keys: other),
     ];
   }
 
@@ -260,6 +244,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             for (final entry in data.entries) entry.key: entry.value.value,
           };
         });
+        ref.invalidate(settingsProvider);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(l10n.settingsSaved)));
@@ -453,8 +438,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton.tonalIcon(
-              onPressed:
-                  saving || !dirty ? null : () => _saveSection(section),
+              onPressed: saving || !dirty ? null : () => _saveSection(section),
               icon: saving
                   ? const SizedBox(
                       width: 16,
@@ -501,7 +485,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
-        leading: Icon(Icons.date_range_outlined, size: 20, color: scheme.primary),
+        leading: Icon(
+          Icons.date_range_outlined,
+          size: 20,
+          color: scheme.primary,
+        ),
         initiallyExpanded: false,
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         title: Text(
@@ -622,17 +610,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return null;
   }
 
-  String _presetLabel(AppLocalizations l10n, DatePreset preset) => switch (preset) {
-    DatePreset.today => l10n.drpPresetToday,
-    DatePreset.yesterday => l10n.drpPresetYesterday,
-    DatePreset.thisWeek => l10n.drpPresetThisWeek,
-    DatePreset.lastWeek => l10n.drpPresetLastWeek,
-    DatePreset.last7 => l10n.drpPresetLast7,
-    DatePreset.last30 => l10n.drpPresetLast30,
-    DatePreset.last90 => l10n.drpPresetLast90,
-    DatePreset.thisMonth => l10n.drpPresetThisMonth,
-    DatePreset.lastMonth => l10n.drpPresetLastMonth,
-  };
+  String _presetLabel(AppLocalizations l10n, DatePreset preset) =>
+      switch (preset) {
+        DatePreset.today => l10n.drpPresetToday,
+        DatePreset.yesterday => l10n.drpPresetYesterday,
+        DatePreset.thisWeek => l10n.drpPresetThisWeek,
+        DatePreset.lastWeek => l10n.drpPresetLastWeek,
+        DatePreset.last7 => l10n.drpPresetLast7,
+        DatePreset.last30 => l10n.drpPresetLast30,
+        DatePreset.last90 => l10n.drpPresetLast90,
+        DatePreset.thisMonth => l10n.drpPresetThisMonth,
+        DatePreset.lastMonth => l10n.drpPresetLastMonth,
+      };
 
   // ── Database Backup section (/admin/backup) ──────────────────────────
   Widget _backupSection(AppLocalizations l10n) {
@@ -745,9 +734,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         alignment: Alignment.centerLeft,
         child: Text(
           l10n.settingsBackupEmpty,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
         ),
       );
     }
@@ -787,8 +776,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(Icons.description_outlined,
-              size: 18, color: scheme.onSurfaceVariant),
+          Icon(
+            Icons.description_outlined,
+            size: 18,
+            color: scheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -844,9 +836,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _creatingBackup = false);
     _showSnack(switch (result) {
       ApiSuccess() => l10n.settingsBackupSuccess,
-      ApiFailure(:final error) => error.message.isEmpty
-          ? l10n.settingsBackupFailed
-          : error.message,
+      ApiFailure(:final error) =>
+        error.message.isEmpty ? l10n.settingsBackupFailed : error.message,
     });
     if (result is ApiSuccess<String>) _loadBackups();
   }
@@ -856,28 +847,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final l10n = AppLocalizations.of(context)!;
     setState(() => _downloadingFiles.add(file.name));
     try {
-      final result =
-          await ref.read(backupRepositoryProvider).downloadBytes(file.name);
+      final result = await ref
+          .read(backupRepositoryProvider)
+          .downloadBytes(file.name);
       if (!mounted) return;
-      await result.fold<Future<void>>(onSuccess: (bytes) async {
-        try {
-          final path = await FilePicker.saveFile(
-            dialogTitle: file.name,
-            fileName: file.name,
-            bytes: bytes,
+      await result.fold<Future<void>>(
+        onSuccess: (bytes) async {
+          try {
+            final path = await FilePicker.saveFile(
+              dialogTitle: file.name,
+              fileName: file.name,
+              bytes: bytes,
+            );
+            if (path == null || !mounted) return; // dialog cancelled
+            await File(path).writeAsBytes(bytes, flush: true);
+            if (!mounted) return;
+            _showSnack(l10n.settingsBackupDownloaded);
+          } catch (_) {
+            if (mounted) _showSnack(l10n.settingsBackupDownloadFailed);
+          }
+        },
+        onFailure: (error) async {
+          _showSnack(
+            error.message.isEmpty
+                ? l10n.settingsBackupDownloadFailed
+                : error.message,
           );
-          if (path == null || !mounted) return; // dialog cancelled
-          await File(path).writeAsBytes(bytes, flush: true);
-          if (!mounted) return;
-          _showSnack(l10n.settingsBackupDownloaded);
-        } catch (_) {
-          if (mounted) _showSnack(l10n.settingsBackupDownloadFailed);
-        }
-      }, onFailure: (error) async {
-        _showSnack(error.message.isEmpty
-            ? l10n.settingsBackupDownloadFailed
-            : error.message);
-      });
+        },
+      );
     } finally {
       if (mounted) setState(() => _downloadingFiles.remove(file.name));
     }
@@ -901,15 +898,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _deletingFiles.remove(file.name));
     _showSnack(switch (result) {
       ApiSuccess() => l10n.settingsBackupDeleted,
-      ApiFailure(:final error) => error.message.isEmpty
-          ? l10n.settingsBackupDeleteFailed
-          : error.message,
+      ApiFailure(:final error) =>
+        error.message.isEmpty ? l10n.settingsBackupDeleteFailed : error.message,
     });
     if (result is ApiSuccess<void>) _loadBackups();
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   static String _formatDateTime(String iso) {

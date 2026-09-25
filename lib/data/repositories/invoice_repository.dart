@@ -184,9 +184,18 @@ class InvoiceRepository {
         ItemPriceHistory.fromJson(json as Map<String, dynamic>),
   );
 
-  Future<ApiResult<Invoice>> create(Map<String, dynamic> body) => _api.postRaw(
+  /// `POST /invoices`. [idempotencyKey] makes the create safely
+  /// retryable (P11): the server replays the original invoice for a
+  /// repeated key + payload instead of creating a second one.
+  Future<ApiResult<Invoice>> create(
+    Map<String, dynamic> body, {
+    String? idempotencyKey,
+  }) => _api.postRaw(
     ApiEndpoints.invoices,
     body: body,
+    headers: idempotencyKey == null
+        ? null
+        : {'Idempotency-Key': idempotencyKey},
     parse: (Object? json) => Invoice.fromJson(json as Map<String, dynamic>),
   );
 
@@ -276,9 +285,9 @@ class InvoiceRepository {
     '${ApiEndpoints.invoices}/$id/return',
     body: {
       'items': items,
-      if (feeType != null) 'fee_type': feeType,
-      if (feeValue != null) 'fee_value': feeValue,
-      if (returnDate != null) 'return_date': returnDate,
+      'fee_type': ?feeType,
+      'fee_value': ?feeValue,
+      'return_date': ?returnDate,
       if (reason != null && reason.isNotEmpty) 'reason': reason,
       'warehouse_id': ?warehouseId,
       'settlements': ?settlements,

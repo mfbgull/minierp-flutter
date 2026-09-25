@@ -36,7 +36,7 @@ class Expense {
     referenceNo: asString(json['reference_no']),
     vendorName: asString(json['vendor_name']),
     project: asString(json['project']),
-    status: asString(json['status']) ?? 'Approved',
+    status: asString(json['status']) ?? 'Draft',
     createdAt: asString(json['created_at']),
     updatedAt: asString(json['updated_at']),
     createdByName: asString(json['created_by_name']),
@@ -57,7 +57,7 @@ class Expense {
   final String? vendorName;
   final String? project;
 
-  /// Draft | Submitted | Approved | Paid | Cancelled.
+  /// Draft | Recorded | Cancelled.
   final String status;
   final String? createdAt;
   final String? updatedAt;

@@ -16,6 +16,7 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../core/utils/pdf_fonts.dart';
+import '../../core/utils/formatters.dart';
 
 import '../../data/models/invoice.dart' show CompanyInfo;
 import '../../data/models/payment.dart' show Payment;
@@ -37,8 +38,11 @@ Future<Uint8List> buildThermalPaymentReceiptPdf(
   String? entityName,
   num previousBalance = 0,
   List<PaymentAllocation>? allocations,
+  CurrencyFormatter? formatter,
 }) async {
   final usedCompany = company ?? defaultCompany;
+  final usedFormatter =
+      formatter ?? CurrencyFormatter(CurrencyConfigStore.current);
   final doc = pw.Document(theme: await PdfFonts.theme());
 
   doc.addPage(
@@ -56,12 +60,12 @@ Future<Uint8List> buildThermalPaymentReceiptPdf(
         _buildDivider(),
         _buildCustomerInfo(payment, entityName),
         _buildDivider(),
-        _buildBalanceTrail(payment, previousBalance),
+        _buildBalanceTrail(payment, previousBalance, usedFormatter),
         _buildDivider(),
         _buildPaymentDetails(payment),
         if (allocations != null && allocations.isNotEmpty) ...[
           _buildDivider(),
-          _buildAllocations(allocations, payment),
+          _buildAllocations(allocations, payment, usedFormatter),
         ],
         _buildDividerDouble(),
         _buildFooter(usedCompany, payment),
@@ -74,10 +78,7 @@ Future<Uint8List> buildThermalPaymentReceiptPdf(
 
 /// Invoice allocation line.
 class PaymentAllocation {
-  const PaymentAllocation({
-    required this.invoiceNo,
-    required this.amount,
-  });
+  const PaymentAllocation({required this.invoiceNo, required this.amount});
 
   final String invoiceNo;
   final num amount;
@@ -92,17 +93,15 @@ pw.Widget _buildHeader(CompanyInfo company) {
     children: [
       pw.Text(
         name,
-        style: pw.TextStyle(
-          fontSize: 14,
-          fontWeight: pw.FontWeight.bold,
-        ),
+        style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
         textAlign: pw.TextAlign.center,
       ),
       if (company.phone.trim().isNotEmpty || company.email.trim().isNotEmpty)
         pw.Text(
-          [company.phone, company.email]
-              .where((s) => s.trim().isNotEmpty)
-              .join(' · '),
+          [
+            company.phone,
+            company.email,
+          ].where((s) => s.trim().isNotEmpty).join(' · '),
           style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
           textAlign: pw.TextAlign.center,
         ),
@@ -128,7 +127,9 @@ pw.Widget _buildReceiptInfo(Payment payment) {
         ),
       ),
       pw.SizedBox(height: 4),
-      _infoLine('Receipt: ${payment.paymentNo.isEmpty ? 'N/A' : payment.paymentNo}'),
+      _infoLine(
+        'Receipt: ${payment.paymentNo.isEmpty ? 'N/A' : payment.paymentNo}',
+      ),
       _infoLine('Date: ${_fmtDate(payment.paymentDate)}'),
     ],
   );
@@ -141,12 +142,12 @@ pw.Widget _buildCustomerInfo(Payment payment, String? entityName) {
   final resolvedName = entityName?.trim().isNotEmpty == true
       ? entityName!
       : isSupplier
-          ? (payment.supplierName?.trim().isNotEmpty == true
-              ? payment.supplierName!
-              : 'Supplier #${payment.supplierId}')
-          : payment.customerName?.trim().isNotEmpty == true
-              ? payment.customerName!
-              : 'Customer #${payment.customerId}';
+      ? (payment.supplierName?.trim().isNotEmpty == true
+            ? payment.supplierName!
+            : 'Supplier #${payment.supplierId}')
+      : payment.customerName?.trim().isNotEmpty == true
+      ? payment.customerName!
+      : 'Customer #${payment.customerId}';
 
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -161,16 +162,20 @@ pw.Widget _buildCustomerInfo(Payment payment, String? entityName) {
 
 // ── Balance Trail ───────────────────────────────────────────────────
 
-pw.Widget _buildBalanceTrail(Payment payment, num previousBalance) {
+pw.Widget _buildBalanceTrail(
+  Payment payment,
+  num previousBalance,
+  CurrencyFormatter formatter,
+) {
   final paymentAmount = payment.amount;
   final currentBalance = previousBalance - paymentAmount;
 
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
-      _totalRow('Prev Balance', _fmtCurrency(previousBalance)),
-      _totalRow('Payment', '-${_fmtCurrency(paymentAmount)}'),
-      _totalRowBold('New Balance', _fmtCurrency(currentBalance)),
+      _totalRow('Prev Balance', _fmtCurrency(previousBalance, formatter)),
+      _totalRow('Payment', '-${_fmtCurrency(paymentAmount, formatter)}'),
+      _totalRowBold('New Balance', _fmtCurrency(currentBalance, formatter)),
     ],
   );
 }
@@ -190,7 +195,11 @@ pw.Widget _buildPaymentDetails(Payment payment) {
 
 // ── Allocations ─────────────────────────────────────────────────────
 
-pw.Widget _buildAllocations(List<PaymentAllocation> allocations, Payment payment) {
+pw.Widget _buildAllocations(
+  List<PaymentAllocation> allocations,
+  Payment payment,
+  CurrencyFormatter formatter,
+) {
   final isSupplier = payment.supplierId != null;
   final label = isSupplier ? 'PO' : 'INVOICE';
   final totalAmount = allocations.fold<num>(0, (s, a) => s + a.amount);
@@ -225,15 +234,12 @@ pw.Widget _buildAllocations(List<PaymentAllocation> allocations, Payment payment
           children: [
             pw.Expanded(
               flex: 3,
-              child: pw.Text(
-                a.invoiceNo,
-                style: pw.TextStyle(fontSize: 9),
-              ),
+              child: pw.Text(a.invoiceNo, style: pw.TextStyle(fontSize: 9)),
             ),
             pw.Expanded(
               flex: 2,
               child: pw.Text(
-                _fmtCurrency(a.amount),
+                _fmtCurrency(a.amount, formatter),
                 style: pw.TextStyle(fontSize: 9),
                 textAlign: pw.TextAlign.right,
               ),
@@ -241,7 +247,7 @@ pw.Widget _buildAllocations(List<PaymentAllocation> allocations, Payment payment
           ],
         ),
       pw.SizedBox(height: 2),
-      _totalRowBold('Total', _fmtCurrency(totalAmount)),
+      _totalRowBold('Total', _fmtCurrency(totalAmount, formatter)),
     ],
   );
 }
@@ -276,17 +282,12 @@ pw.Widget _buildFooter(CompanyInfo company, Payment payment) {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-pw.Widget _infoLine(String text) => pw.Text(
-  text,
-  style: pw.TextStyle(fontSize: 9),
-);
+pw.Widget _infoLine(String text) =>
+    pw.Text(text, style: pw.TextStyle(fontSize: 9));
 
 pw.Widget _buildDivider() => pw.Padding(
   padding: const pw.EdgeInsets.symmetric(vertical: 4),
-  child: pw.Container(
-    height: 0.5,
-    color: PdfColors.grey400,
-  ),
+  child: pw.Container(height: 0.5, color: PdfColors.grey400),
 );
 
 pw.Widget _buildDividerDouble() => pw.Padding(
@@ -325,10 +326,23 @@ pw.Widget _totalRowBold(String label, String value) => pw.Row(
 String _fmtDate(String iso) {
   final parsed = DateTime.tryParse(iso);
   if (parsed == null) return iso;
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
   return '${months[parsed.month - 1]} ${parsed.day}, ${parsed.year}';
 }
 
-String _fmtCurrency(num value) {
-  return '\$${value.toStringAsFixed(2)}';
+String _fmtCurrency(num value, CurrencyFormatter formatter) {
+  return formatter.format(value);
 }

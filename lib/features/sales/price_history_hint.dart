@@ -130,21 +130,39 @@ class PriceHistoryHint extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 1),
     child: Row(
       children: [
-        Text(label, style: const TextStyle(fontSize: 11)),
-        if (subtitle != null && subtitle.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(left: 4),
-            child: Text(
-              Formatters.date(subtitle),
-              style: const TextStyle(fontSize: 9, color: Colors.black54),
-            ),
+        Expanded(
+          child: Text(
+            subtitle != null && subtitle.isNotEmpty
+                ? '$label · ${Formatters.date(subtitle)}'
+                : label,
+            style: const TextStyle(fontSize: 11),
+            overflow: TextOverflow.ellipsis,
           ),
-        const Spacer(),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
         ),
-        if (trailing != null) ...[const SizedBox(width: 6), trailing],
+        const SizedBox(width: 6),
+        Flexible(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Flexible(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: 6),
+                Flexible(child: trailing),
+              ],
+            ],
+          ),
+        ),
       ],
     ),
   );

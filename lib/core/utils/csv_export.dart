@@ -1104,10 +1104,11 @@ String buildInvoicesCsv(AppLocalizations l10n, List<Invoice> invoices) {
       sanitizeCsvCell(
         (i.customerName?.isEmpty ?? true) ? '—' : i.customerName!,
       ),
-      sanitizeCsvCell(invoiceStatusLabel(l10n, i.status)),
-      Formatters.currency(i.paidAmount),
-      Formatters.currency(i.balanceAmount),
-      sanitizeCsvCell(
+       sanitizeCsvCell(invoiceStatusLabel(l10n, i.status)),
+       Formatters.currency(i.totalAmount),
+       Formatters.currency(i.paidAmount),
+       Formatters.currency(i.balanceAmount),
+       sanitizeCsvCell(
         (i.createdByUsername?.isEmpty ?? true) ? '—' : i.createdByUsername!,
       ),
     ],

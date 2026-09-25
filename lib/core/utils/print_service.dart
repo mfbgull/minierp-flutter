@@ -17,19 +17,23 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../data/models/invoice.dart' show CompanyInfo, Invoice, InvoicePaymentRecord;
+import '../../data/models/invoice.dart'
+    show CompanyInfo, Invoice, InvoicePaymentRecord;
+import 'formatters.dart';
 import '../../data/models/payment.dart' show Payment;
 import '../../features/customers/thermal_payment_receipt_pdf.dart'
     show buildThermalPaymentReceiptPdf, PaymentAllocation;
 import '../../features/owner_equity/personal_loan_models.dart'
     show PersonalLoan, PersonalLoanRepayment;
-import '../../widgets/payment_receipt_pdf.dart'
-    show buildPaymentReceiptPdf;
+import '../../widgets/payment_receipt_pdf.dart' show buildPaymentReceiptPdf;
 import '../../features/quotations/quotation_pdf.dart' show buildA4QuotationPdf;
 import '../../features/sales/invoice_pdf.dart' show buildA4InvoicePdf;
-import '../../features/sales/thermal_invoice_pdf.dart' show buildThermalInvoicePdf;
-import '../../features/sales_orders/sales_order_pdf.dart' show buildA4SalesOrderPdf;
-import '../../features/purchase_orders/purchase_order_pdf.dart' show buildA4PurchaseOrderPdf;
+import '../../features/sales/thermal_invoice_pdf.dart'
+    show buildThermalInvoicePdf;
+import '../../features/sales_orders/sales_order_pdf.dart'
+    show buildA4SalesOrderPdf;
+import '../../features/purchase_orders/purchase_order_pdf.dart'
+    show buildA4PurchaseOrderPdf;
 import '../../features/owner_equity/thermal_repayment_receipt_pdf.dart'
     show buildThermalRepaymentReceiptPdf;
 import '../../features/sales/pos_thermal_receipt_pdf.dart'
@@ -145,9 +149,9 @@ class PrintService {
         title: const Text('Print Options'),
         children: [
           SimpleDialogOption(
-            onPressed: () => Navigator.of(context).pop(
-              _FormatChoice(PrintFormat.a4, viewPdf: true),
-            ),
+            onPressed: () => Navigator.of(
+              context,
+            ).pop(_FormatChoice(PrintFormat.a4, viewPdf: true)),
             child: const Row(
               children: [
                 Icon(Icons.preview_outlined, size: 20),
@@ -157,9 +161,9 @@ class PrintService {
             ),
           ),
           SimpleDialogOption(
-            onPressed: () => Navigator.of(context).pop(
-              _FormatChoice(PrintFormat.a4, viewPdf: false),
-            ),
+            onPressed: () => Navigator.of(
+              context,
+            ).pop(_FormatChoice(PrintFormat.a4, viewPdf: false)),
             child: const Row(
               children: [
                 Icon(Icons.description_outlined, size: 20),
@@ -169,9 +173,9 @@ class PrintService {
             ),
           ),
           SimpleDialogOption(
-            onPressed: () => Navigator.of(context).pop(
-              _FormatChoice(PrintFormat.thermal, viewPdf: false),
-            ),
+            onPressed: () => Navigator.of(
+              context,
+            ).pop(_FormatChoice(PrintFormat.thermal, viewPdf: false)),
             child: const Row(
               children: [
                 Icon(Icons.receipt_long_outlined, size: 20),
@@ -196,17 +200,19 @@ class PrintService {
     List<InvoicePaymentRecord> payments = const [],
     CompanyInfo? company,
     PrintFormat format = PrintFormat.a4,
+    CurrencyFormatter? formatter,
   }) async {
     final bytes = switch (format) {
       PrintFormat.a4 => await buildA4InvoicePdf(
-          invoice: invoice,
-          payments: payments,
-          company: company,
-        ),
+        invoice: invoice,
+        payments: payments,
+        company: company,
+      ),
       PrintFormat.thermal => await buildThermalInvoicePdf(
-          invoice: invoice,
-          company: company,
-        ),
+        invoice: invoice,
+        company: company,
+        formatter: formatter,
+      ),
     };
     final suffix = format == PrintFormat.thermal ? '-thermal' : '';
     await _printBytes(bytes, '${invoice.invoiceNo}$suffix.pdf');
@@ -220,20 +226,23 @@ class PrintService {
     num previousBalance = 0,
     List<PaymentAllocation>? allocations,
     PrintFormat format = PrintFormat.a4,
+    CurrencyFormatter? formatter,
   }) async {
     final bytes = switch (format) {
       PrintFormat.a4 => await buildPaymentReceiptPdf(
-          payment,
-          company: company,
-          entityName: entityName,
-        ),
+        payment,
+        company: company,
+        entityName: entityName,
+        formatter: formatter,
+      ),
       PrintFormat.thermal => await buildThermalPaymentReceiptPdf(
-          payment,
-          company: company,
-          entityName: entityName,
-          previousBalance: previousBalance,
-          allocations: allocations,
-        ),
+        payment,
+        company: company,
+        entityName: entityName,
+        previousBalance: previousBalance,
+        allocations: allocations,
+        formatter: formatter,
+      ),
     };
     final suffix = format == PrintFormat.thermal ? '-thermal' : '';
     final name = payment.paymentNo.isEmpty ? 'receipt' : payment.paymentNo;
@@ -266,8 +275,9 @@ class PrintService {
   Future<void> printPosReceipt(
     dynamic sale, {
     CompanyInfo? company,
+    CurrencyFormatter? formatter,
   }) async {
-    final bytes = await buildPosThermalReceiptPdf(sale);
+    final bytes = await buildPosThermalReceiptPdf(sale, formatter: formatter);
     await _printBytes(bytes, '${sale.transactionNo}-pos.pdf');
   }
 
@@ -277,12 +287,14 @@ class PrintService {
     PersonalLoanRepayment repayment, {
     CompanyInfo? company,
     List<PersonalLoanRepayment>? allRepayments,
+    CurrencyFormatter? formatter,
   }) async {
     final bytes = await buildThermalRepaymentReceiptPdf(
       loan,
       repayment,
       company: company,
       allRepayments: allRepayments,
+      formatter: formatter,
     );
     await _printBytes(bytes, '${loan.loanNo}-receipt.pdf');
   }

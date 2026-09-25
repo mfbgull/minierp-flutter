@@ -760,6 +760,7 @@
   "statusCompleted": "مکمل",
   "statusCancelled": "منسوخ",
   "statusDraft": "مسودہ",
+  "statusRecorded": "ریکارڈ شدہ",
   "statusPaid": "ادا شدہ",
   "statusUnpaid": "ادا نہیں",
   "statusPartial": "جزوی",

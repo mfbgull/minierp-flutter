@@ -4,8 +4,6 @@
 
 import 'dart:math' as math;
 
-import 'package:intl/intl.dart';
-
 import '../../../core/utils/formatters.dart' show Formatters;
 import '../../../data/models/customer.dart' show Customer;
 import '../../../data/models/invoice.dart' show Invoice;
@@ -112,8 +110,7 @@ num calculateCurrentBalance(num totalDebit, num totalCredit) {
 /// chargeable, mirroring the server's invoice-balance formula).
 num calculateTotalInvoiced(List<Invoice> invoices) {
   return invoices.fold<num>(0, (sum, inv) {
-    final net =
-        inv.totalAmount - inv.returnedAmount + (inv.returnFee ?? 0);
+    final net = inv.totalAmount - inv.returnedAmount + (inv.returnFee ?? 0);
     return sum + (net > 0 ? net : 0);
   });
 }
@@ -233,16 +230,13 @@ CustomerMetrics computeCustomerMetrics(
 
 /* ── Legacy display helpers (customer Overview/Invoices/Payments tabs) ── */
 
-/// Format a value as USD currency (legacy `$`-prefixed string used by the
-/// customer Overview/Invoices/Payments tabs). For app-wide currency-aware
-/// formatting use `core/utils/formatters.dart` (`Formatters.currency`) —
-/// the settings-driven symbol is applied by the UI layer.
+/// Legacy customer display helper. It now delegates to the shared
+/// settings-backed formatter instead of hard-coding a USD symbol.
 String formatAsCurrency(Object? value) {
   final parsed = value is num
       ? value
       : double.tryParse(value?.toString() ?? '');
-  if (parsed == null) return r'$0.00';
-  return NumberFormat.currency(locale: 'en_US', symbol: r'$').format(parsed);
+  return Formatters.currency(parsed ?? 0);
 }
 
 /// Format a number with simple 2-decimal formatting (legacy ledger totals).

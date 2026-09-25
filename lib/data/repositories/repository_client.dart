@@ -206,10 +206,17 @@ class RepositoryClient {
   Future<ApiResult<T>> postEnvelope<T>(
     String path, {
     Object? body,
+    Map<String, dynamic>? headers,
     required T Function(Map<String, dynamic> envelope) parse,
   }) async {
     unawaited(_invalidateFor(path));
-    final guarded = await _guard(() => _dio.post(path, data: body));
+    final guarded = await _guard(
+      () => _dio.post(
+        path,
+        data: body,
+        options: headers == null ? null : Options(headers: headers),
+      ),
+    );
     try {
       return guarded.map((response) {
         final raw = response.data;
@@ -278,13 +285,25 @@ class RepositoryClient {
   );
 
   /// POST returning the created object directly (item create).
+  /// [headers] carries per-request metadata such as the P11
+  /// `Idempotency-Key` used by the invoice create retry guard.
   Future<ApiResult<T>> postRaw<T>(
     String path, {
     Object? body,
+    Map<String, dynamic>? headers,
     required T Function(Object?) parse,
   }) async {
     unawaited(_invalidateFor(path));
-    return _parseRaw(_guard(() => _dio.post(path, data: body)), parse);
+    return _parseRaw(
+      _guard(
+        () => _dio.post(
+          path,
+          data: body,
+          options: headers == null ? null : Options(headers: headers),
+        ),
+      ),
+      parse,
+    );
   }
 
   /// PUT returning the updated object directly (item update).

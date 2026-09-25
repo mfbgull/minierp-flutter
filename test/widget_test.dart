@@ -41,9 +41,7 @@ import 'package:minierp_app/features/quotations/quotation_providers.dart'
 import 'package:minierp_app/features/purchases/purchase_providers.dart'
     show purchasesFromDateProvider, purchasesToDateProvider;
 import 'package:minierp_app/features/purchases/purchase_return_providers.dart'
-    show
-        purchaseReturnsFromDateProvider,
-        purchaseReturnsToDateProvider;
+    show purchaseReturnsFromDateProvider, purchaseReturnsToDateProvider;
 import 'package:minierp_app/features/purchases/purchase_returns_screen.dart'
     show PurchaseReturnsScreen;
 import 'package:minierp_app/features/purchase_orders/purchase_order_providers.dart'
@@ -55,7 +53,9 @@ import 'package:minierp_app/features/reports/report_providers.dart'
     show globalReportFromDateProvider, globalReportToDateProvider;
 import 'package:minierp_app/features/reports/reports_dashboard_screen.dart';
 import 'package:minierp_app/widgets/bulk_operations.dart' show BulkPacing;
-import 'package:minierp_app/widgets/date_range_picker.dart' show DateRangeFilter;
+import 'package:minierp_app/widgets/form_field.dart';
+import 'package:minierp_app/widgets/date_range_picker.dart'
+    show DateRangeFilter;
 import 'package:minierp_app/core/utils/date_range_math.dart'
     show DatePreset, WeekStart, presetRange;
 import 'package:minierp_app/core/utils/date_utils.dart' show isoDate;
@@ -336,7 +336,8 @@ List<Map<String, dynamic>> _customer1Payments() => [
       'payment_method': i.isEven ? 'Cash' : 'Bank Transfer',
       'reference_no': null,
       'notes': null,
-      'created_at': '2026-06-${(1 + i * 2).toString().padLeft(2, '0')} 10:00:00',
+      'created_at':
+          '2026-06-${(1 + i * 2).toString().padLeft(2, '0')} 10:00:00',
     },
 ];
 
@@ -387,9 +388,27 @@ List<Map<String, dynamic>> _supplier1Pos(String po1Status) {
       total: 1500,
       status: po1Status,
     ),
-    po(id: 3, poNo: 'PO-2026-003', poDate: '2026-01-05', total: 1000, status: 'Submitted'),
-    po(id: 4, poNo: 'PO-2026-004', poDate: '2026-01-28', total: 2500, status: 'Partially Received'),
-    po(id: 5, poNo: 'PO-2026-005', poDate: '2026-01-12', total: 4000, status: 'Completed'),
+    po(
+      id: 3,
+      poNo: 'PO-2026-003',
+      poDate: '2026-01-05',
+      total: 1000,
+      status: 'Submitted',
+    ),
+    po(
+      id: 4,
+      poNo: 'PO-2026-004',
+      poDate: '2026-01-28',
+      total: 2500,
+      status: 'Partially Received',
+    ),
+    po(
+      id: 5,
+      poNo: 'PO-2026-005',
+      poDate: '2026-01-12',
+      total: 4000,
+      status: 'Completed',
+    ),
     for (var i = 0; i < 12; i++)
       po(
         id: 6 + i,
@@ -438,7 +457,8 @@ List<Map<String, dynamic>> _supplier1Payments() => [
       'payment_method': i.isEven ? 'Cash' : 'Bank Transfer',
       'reference_no': null,
       'notes': null,
-      'created_at': '2026-06-${(1 + i * 2).toString().padLeft(2, '0')} 10:00:00',
+      'created_at':
+          '2026-06-${(1 + i * 2).toString().padLeft(2, '0')} 10:00:00',
     },
 ];
 
@@ -1424,9 +1444,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       }
       if (to != null && to.isNotEmpty) {
         rows = rows
-            .where(
-              (r) => (r['transaction_date'] as String).compareTo(to) <= 0,
-            )
+            .where((r) => (r['transaction_date'] as String).compareTo(to) <= 0)
             .toList();
       }
       return _json({'success': true, 'data': rows});
@@ -1470,15 +1488,17 @@ class _AuthFakeAdapter implements HttpClientAdapter {
               (t) =>
                   (from == null ||
                       from.isEmpty ||
-                      (t['transaction_date'] as String).compareTo(from) >=
-                          0) &&
+                      (t['transaction_date'] as String).compareTo(from) >= 0) &&
                   (to == null ||
                       to.isEmpty ||
                       (t['transaction_date'] as String).compareTo(to) <= 0),
             )
             .toList();
       }
-      final debit = transactions.fold<num>(0, (s, t) => s + (t['debit'] as num));
+      final debit = transactions.fold<num>(
+        0,
+        (s, t) => s + (t['debit'] as num),
+      );
       final credit = transactions.fold<num>(
         0,
         (s, t) => s + (t['credit'] as num),
@@ -1644,9 +1664,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       }
       if (to != null && to.isNotEmpty) {
         rows = rows
-            .where(
-              (r) => (r['transaction_date'] as String).compareTo(to) <= 0,
-            )
+            .where((r) => (r['transaction_date'] as String).compareTo(to) <= 0)
             .toList();
       }
       return _json({'success': true, 'data': rows});
@@ -1690,15 +1708,17 @@ class _AuthFakeAdapter implements HttpClientAdapter {
               (t) =>
                   (from == null ||
                       from.isEmpty ||
-                      (t['transaction_date'] as String).compareTo(from) >=
-                          0) &&
+                      (t['transaction_date'] as String).compareTo(from) >= 0) &&
                   (to == null ||
                       to.isEmpty ||
                       (t['transaction_date'] as String).compareTo(to) <= 0),
             )
             .toList();
       }
-      final debit = transactions.fold<num>(0, (s, t) => s + (t['debit'] as num));
+      final debit = transactions.fold<num>(
+        0,
+        (s, t) => s + (t['debit'] as num),
+      );
       final credit = transactions.fold<num>(
         0,
         (s, t) => s + (t['credit'] as num),
@@ -1748,7 +1768,10 @@ class _AuthFakeAdapter implements HttpClientAdapter {
                     (po['po_date'] as String).compareTo(end) <= 0),
           )
           .toList();
-      final totalValue = rows.fold<num>(0, (s, po) => s + (po['total_amount'] as num));
+      final totalValue = rows.fold<num>(
+        0,
+        (s, po) => s + (po['total_amount'] as num),
+      );
       return _json({
         'total_pos': rows.length,
         'total_value': totalValue,
@@ -1768,7 +1791,9 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       // the module grid does not (and keeps the two base rows).
       // Dio keeps int params as ints — stringify before comparing.
       var rows = '${q['supplier_id']}' == '1'
-          ? (emptySupplier1Pos ? <Map<String, dynamic>>[] : _supplier1Pos(po1Status))
+          ? (emptySupplier1Pos
+                ? <Map<String, dynamic>>[]
+                : _supplier1Pos(po1Status))
           : [
               {
                 'id': 1,
@@ -1921,7 +1946,9 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           });
         }
         // PO 2 is Completed — the Draft-only guard 400s it (D18).
-        return _json({'error': 'Only Draft Purchase Orders can be deleted'}, status: 400);
+        return _json({
+          'error': 'Only Draft Purchase Orders can be deleted',
+        }, status: 400);
       }
     }
     if (options.path == '/purchase-orders/1/items' &&
@@ -1991,13 +2018,17 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       final body = options.data as Map<String, dynamic>;
       lastPoReceiptBody = body;
       if (rejectPoReceipt) {
-        return _json({'error': 'Cannot receive more than pending quantity'}, status: 400);
+        return _json({
+          'error': 'Cannot receive more than pending quantity',
+        }, status: 400);
       }
       // Bare 201 — the real createGoodsReceipt shape (receipt no
       // generated server-side; the quantity/value aggregates echo the
       // posted lines like the SQL SUM does).
-      final qty = (body['items'] as List)
-          .fold<num>(0, (sum, item) => sum + (item['received_quantity'] as num));
+      final qty = (body['items'] as List).fold<num>(
+        0,
+        (sum, item) => sum + (item['received_quantity'] as num),
+      );
       final receipt = {
         'id': 10,
         'receipt_no': 'GR-2026-001',
@@ -2072,8 +2103,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       if (startDate.isNotEmpty) {
         rows = rows
             .where(
-              (p) =>
-                  (p['purchase_date'] as String).compareTo(startDate) >= 0,
+              (p) => (p['purchase_date'] as String).compareTo(startDate) >= 0,
             )
             .toList();
       }
@@ -2254,14 +2284,13 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       final startDate = q['start_date'] as String?;
       final endDate = q['end_date'] as String?;
       if (startDate != null || endDate != null) {
-        rows = rows
-            .where((r) {
-              final date = r['return_date'] as String;
-              final afterStart = startDate == null || date.compareTo(startDate) >= 0;
-              final beforeEnd = endDate == null || date.compareTo(endDate) <= 0;
-              return afterStart && beforeEnd;
-            })
-            .toList();
+        rows = rows.where((r) {
+          final date = r['return_date'] as String;
+          final afterStart =
+              startDate == null || date.compareTo(startDate) >= 0;
+          final beforeEnd = endDate == null || date.compareTo(endDate) <= 0;
+          return afterStart && beforeEnd;
+        }).toList();
       }
       final page = int.tryParse('${q['page']}') ?? 1;
       final limit = int.tryParse('${q['limit']}') ?? 10;
@@ -2332,15 +2361,13 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'message': 'Supplier created successfully',
       }, status: 201);
     }
-    if (options.path.startsWith('/suppliers/') &&
-        options.method == 'DELETE') {
+    if (options.path.startsWith('/suppliers/') && options.method == 'DELETE') {
       final deleteId = int.tryParse(options.path.split('/').last);
       if (deleteId != null) {
         if (failSupplierDeleteFor.contains(deleteId)) {
-          return _json(
-            {'error': 'Supplier has purchase orders and cannot be deleted'},
-            status: 400,
-          );
+          return _json({
+            'error': 'Supplier has purchase orders and cannot be deleted',
+          }, status: 400);
         }
         bulkDeletedSupplierIds.add(deleteId);
         // The legacy row-menu tests assert on supplierDeleteCount for
@@ -2433,6 +2460,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'category': 'Parts',
           'unit_of_measure': 'pcs',
           'current_stock': 5,
+          'sellable_qty': 5,
           'reorder_level': 10,
           'standard_cost': 25.0,
           'standard_selling_price': 45.0,
@@ -2447,6 +2475,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'category': 'Raw',
           'unit_of_measure': 'box',
           'current_stock': 120,
+          'sellable_qty': 120,
           'reorder_level': 50,
           'standard_cost': 2.5,
           'standard_selling_price': 5.0,
@@ -2461,6 +2490,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'category': 'Parts',
           'unit_of_measure': 'pcs',
           'current_stock': 0,
+          'sellable_qty': 0,
           'reorder_level': null,
           'is_raw_material': 0,
           'is_finished_good': 1,
@@ -2475,6 +2505,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'category': 'Raw',
           'unit_of_measure': 'kg',
           'current_stock': 30,
+          'sellable_qty': 30,
           'reorder_level': 0,
           'standard_cost': 10.0,
           'standard_selling_price': 14.0,
@@ -2489,6 +2520,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'category': 'Parts',
           'unit_of_measure': 'pcs',
           'current_stock': 8,
+          'sellable_qty': 8,
           'reorder_level': 0,
           'standard_cost': 40.0,
           'standard_selling_price': 60.0,
@@ -2502,23 +2534,21 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       final q = options.queryParameters;
       final search = (q['search'] as String?) ?? '';
       final lowStock = q['low_stock'] == '1';
-      final filtered = allItems
-          .where((i) {
-            final matchesSearch =
-                search.isEmpty ||
-                (i['item_code'] as String).toLowerCase().contains(
-                  search.toLowerCase(),
-                ) ||
-                (i['item_name'] as String).toLowerCase().contains(
-                  search.toLowerCase(),
-                );
-            if (!matchesSearch) return false;
-            if (!lowStock) return true;
-            final stock = i['current_stock'] as num;
-            final reorder = i['reorder_level'] as num?;
-            return reorder != null && reorder > 0 && stock <= reorder;
-          })
-          .toList();
+      final filtered = allItems.where((i) {
+        final matchesSearch =
+            search.isEmpty ||
+            (i['item_code'] as String).toLowerCase().contains(
+              search.toLowerCase(),
+            ) ||
+            (i['item_name'] as String).toLowerCase().contains(
+              search.toLowerCase(),
+            );
+        if (!matchesSearch) return false;
+        if (!lowStock) return true;
+        final stock = i['current_stock'] as num;
+        final reorder = i['reorder_level'] as num?;
+        return reorder != null && reorder > 0 && stock <= reorder;
+      }).toList();
       final limit = int.tryParse('${q['limit']}') ?? 10;
       final page = int.tryParse('${q['page']}') ?? 1;
       final totalPages = (filtered.length / limit).ceil();
@@ -2627,6 +2657,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'category': 'Parts',
         'unit_of_measure': 'pcs',
         'current_stock': 5,
+        'sellable_qty': 5,
         'reorder_level': 10,
         'standard_cost': 25.0,
         'standard_selling_price': 45.0,
@@ -2900,9 +2931,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       final body = options.data as Map<String, dynamic>;
       lastTransferPostBody = body;
       if (rejectTransferCreate) {
-        return _json({
-          'error': 'Insufficient stock for transfer',
-        }, status: 400);
+        return _json({'error': 'Insufficient stock for transfer'}, status: 400);
       }
       return _json({
         'id': 10,
@@ -3466,7 +3495,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
               'reference_no': 'TRF-2231',
               'vendor_name': 'LESCO',
               'project': 'Head Office',
-              'status': 'Approved',
+              'status': 'Recorded',
             },
             {
               'id': 4,
@@ -3699,7 +3728,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'amount': body['amount'],
           'expense_date': body['expense_date'],
           'payment_method': body['payment_method'],
-          'status': body['status'],
+          'status': 'Draft',
         },
       }, status: 201);
     }
@@ -3716,7 +3745,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'description': body['description'] ?? '',
           'amount': body['amount'],
           'expense_date': body['expense_date'],
-          'status': body['status'] ?? 'Approved',
+          'status': body['status'] ?? 'Recorded',
         },
       });
     }
@@ -3741,7 +3770,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'reference_no': '34f3f33',
           'vendor_name': 'abc',
           'project': null,
-          'status': 'Approved',
+          'status': 'Recorded',
           'created_at': '2026-05-22 15:55:17',
           'created_by_name': 'Fawad',
         },
@@ -3818,9 +3847,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'success': true,
         'data': [
           {'value': 'Draft', 'label': 'Draft'},
-          {'value': 'Submitted', 'label': 'Submitted'},
-          {'value': 'Approved', 'label': 'Approved'},
-          {'value': 'Paid', 'label': 'Paid'},
+          {'value': 'Recorded', 'label': 'Recorded'},
           {'value': 'Cancelled', 'label': 'Cancelled'},
         ],
       });
@@ -4121,9 +4148,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       }
       if (toDate.isNotEmpty) {
         all = all
-            .where(
-              (p) => (p['payment_date'] as String).compareTo(toDate) <= 0,
-            )
+            .where((p) => (p['payment_date'] as String).compareTo(toDate) <= 0)
             .toList();
       }
       // Full-list consumers (no page param) get every row; only paged
@@ -4336,9 +4361,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       }
       if (endDate.isNotEmpty) {
         rows = rows
-            .where(
-              (i) => (i['invoice_date'] as String).compareTo(endDate) <= 0,
-            )
+            .where((i) => (i['invoice_date'] as String).compareTo(endDate) <= 0)
             .toList();
       }
       // Every /invoices consumer is server-paginated now (the grid's
@@ -4518,16 +4541,14 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'total_amount': 0,
       });
     }
-    if (options.method == 'DELETE' &&
-        options.path.startsWith('/quotations/')) {
+    if (options.method == 'DELETE' && options.path.startsWith('/quotations/')) {
       final deleteId = int.tryParse(options.path.split('/').last);
       if (deleteId != null) {
         // Server guard fixture (D18): Converted quotations 400.
         if (failQuotationDeleteFor.contains(deleteId)) {
-          return _json(
-            {'error': 'Cannot delete a converted quotation'},
-            status: 400,
-          );
+          return _json({
+            'error': 'Cannot delete a converted quotation',
+          }, status: 400);
         }
         bulkDeletedQuotationIds.add(deleteId);
         return _json({
@@ -4676,10 +4697,9 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       if (deleteId != null) {
         // Server guard fixture (D18): Completed/Invoiced orders 400.
         if (failSoDeleteFor.contains(deleteId)) {
-          return _json(
-            {'error': 'Cannot delete a sales order that has been invoiced'},
-            status: 400,
-          );
+          return _json({
+            'error': 'Cannot delete a sales order that has been invoiced',
+          }, status: 400);
         }
         bulkDeletedSoIds.add(deleteId);
         return _json({'message': 'Sales order deleted successfully'});
@@ -4752,14 +4772,15 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       dashboardBootCalls++;
       lastBootQuery = options.queryParameters;
       if (failDashboardBoot) {
-        return _json({'error': 'Failed to fetch dashboard boot data'}, status: 500);
+        return _json({
+          'error': 'Failed to fetch dashboard boot data',
+        }, status: 500);
       }
-      final metrics =
-          (options.queryParameters['metrics'] ?? '')
-              .toString()
-              .split(',')
-              .where((m) => m.isNotEmpty)
-              .toList();
+      final metrics = (options.queryParameters['metrics'] ?? '')
+          .toString()
+          .split(',')
+          .where((m) => m.isNotEmpty)
+          .toList();
       return _json({
         'success': true,
         'data': {
@@ -4776,6 +4797,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
                 'item_code': 'ITM001',
                 'item_name': 'Widget',
                 'current_stock': 5,
+                'sellable_qty': 5,
                 'reorder_level': 10,
                 'category': 'Parts',
               },
@@ -4839,10 +4861,46 @@ class _AuthFakeAdapter implements HttpClientAdapter {
                   },
                 ],
               },
-              {'key': 'bank', 'name': 'Bank', 'balance': 180000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
-              {'key': 'easypaisa', 'name': 'Easypaisa', 'balance': 45000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
-              {'key': 'jazzcash', 'name': 'JazzCash', 'balance': 15000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
-              {'key': 'upaisa', 'name': 'UPaisa', 'balance': 8000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
+              {
+                'key': 'bank',
+                'name': 'Bank',
+                'balance': 180000.0,
+                'opening': 0,
+                'inflow': 0,
+                'outflow': 0,
+                'net': 0,
+                'transactions': [],
+              },
+              {
+                'key': 'easypaisa',
+                'name': 'Easypaisa',
+                'balance': 45000.0,
+                'opening': 0,
+                'inflow': 0,
+                'outflow': 0,
+                'net': 0,
+                'transactions': [],
+              },
+              {
+                'key': 'jazzcash',
+                'name': 'JazzCash',
+                'balance': 15000.0,
+                'opening': 0,
+                'inflow': 0,
+                'outflow': 0,
+                'net': 0,
+                'transactions': [],
+              },
+              {
+                'key': 'upaisa',
+                'name': 'UPaisa',
+                'balance': 8000.0,
+                'opening': 0,
+                'inflow': 0,
+                'outflow': 0,
+                'net': 0,
+                'transactions': [],
+              },
             ],
             'total': 273000.0,
           },
@@ -4875,12 +4933,11 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       // Batched KPI values (spec 7.3: the strip fetches every visible
       // card's metric in one call). Same figures as the summary fixture
       // above so the strip and panels agree.
-      final metrics =
-          (options.queryParameters['metrics'] ?? '')
-              .toString()
-              .split(',')
-              .where((m) => m.isNotEmpty)
-              .toList();
+      final metrics = (options.queryParameters['metrics'] ?? '')
+          .toString()
+          .split(',')
+          .where((m) => m.isNotEmpty)
+          .toList();
       return _json({
         'success': true,
         'data': {
@@ -5032,10 +5089,46 @@ class _AuthFakeAdapter implements HttpClientAdapter {
                 },
               ],
             },
-            {'key': 'bank', 'name': 'Bank', 'balance': 180000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
-            {'key': 'easypaisa', 'name': 'Easypaisa', 'balance': 45000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
-            {'key': 'jazzcash', 'name': 'JazzCash', 'balance': 15000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
-            {'key': 'upaisa', 'name': 'UPaisa', 'balance': 8000.0, 'opening': 0, 'inflow': 0, 'outflow': 0, 'net': 0, 'transactions': []},
+            {
+              'key': 'bank',
+              'name': 'Bank',
+              'balance': 180000.0,
+              'opening': 0,
+              'inflow': 0,
+              'outflow': 0,
+              'net': 0,
+              'transactions': [],
+            },
+            {
+              'key': 'easypaisa',
+              'name': 'Easypaisa',
+              'balance': 45000.0,
+              'opening': 0,
+              'inflow': 0,
+              'outflow': 0,
+              'net': 0,
+              'transactions': [],
+            },
+            {
+              'key': 'jazzcash',
+              'name': 'JazzCash',
+              'balance': 15000.0,
+              'opening': 0,
+              'inflow': 0,
+              'outflow': 0,
+              'net': 0,
+              'transactions': [],
+            },
+            {
+              'key': 'upaisa',
+              'name': 'UPaisa',
+              'balance': 8000.0,
+              'opening': 0,
+              'inflow': 0,
+              'outflow': 0,
+              'net': 0,
+              'transactions': [],
+            },
           ],
           'total': 273000.0,
         },
@@ -5550,7 +5643,11 @@ class _AuthFakeAdapter implements HttpClientAdapter {
               'itemName': 'Gadget',
               'category': 'Assemblies',
               'currentStock': 90,
-              'predictedDemand': {'nextWeek': 5, 'nextMonth': 10, 'nextQuarter': 30},
+              'predictedDemand': {
+                'nextWeek': 5,
+                'nextMonth': 10,
+                'nextQuarter': 30,
+              },
               'trend': 'declining',
               'trendPercentage': 12.0,
               'confidence': 70,
@@ -5569,7 +5666,10 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       if (failForecastDemand) {
         return _json({
           'success': false,
-          'error': {'code': 'SERVER_ERROR', 'message': 'Failed to fetch forecasts'},
+          'error': {
+            'code': 'SERVER_ERROR',
+            'message': 'Failed to fetch forecasts',
+          },
         }, status: 500);
       }
       const demandRows = [
@@ -5579,7 +5679,11 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'itemName': 'Widget A',
           'category': 'Parts',
           'currentStock': 5,
-          'predictedDemand': {'nextWeek': 12, 'nextMonth': 60, 'nextQuarter': 180},
+          'predictedDemand': {
+            'nextWeek': 12,
+            'nextMonth': 60,
+            'nextQuarter': 180,
+          },
           'trend': 'growing',
           'trendPercentage': 42.0,
           'confidence': 82,
@@ -5594,7 +5698,11 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           'itemName': 'Bolt',
           'category': 'Raw',
           'currentStock': 40,
-          'predictedDemand': {'nextWeek': 4, 'nextMonth': 20, 'nextQuarter': 60},
+          'predictedDemand': {
+            'nextWeek': 4,
+            'nextMonth': 20,
+            'nextQuarter': 60,
+          },
           'trend': 'stable',
           'trendPercentage': 0,
           'confidence': 91,
@@ -5608,8 +5716,7 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       var rows = category == 'Parts' ? [demandRows.first] : demandRows;
       // Server-side search (item code / name) + filter-then-slice paging.
       final search =
-          (lastForecastDemandQuery?['search'] as String?)?.toLowerCase() ??
-          '';
+          (lastForecastDemandQuery?['search'] as String?)?.toLowerCase() ?? '';
       if (search.isNotEmpty) {
         rows = rows
             .where(
@@ -5641,10 +5748,30 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         'success': true,
         'data': {
           'historicalTrends': [
-            {'month': '2026-01', 'actual': 120, 'movingAvg': 112.0, 'predicted': null},
-            {'month': '2026-02', 'actual': 135, 'movingAvg': 122.0, 'predicted': null},
-            {'month': '2026-03', 'actual': null, 'movingAvg': 128.0, 'predicted': 150},
-            {'month': '2026-04', 'actual': null, 'movingAvg': null, 'predicted': 162},
+            {
+              'month': '2026-01',
+              'actual': 120,
+              'movingAvg': 112.0,
+              'predicted': null,
+            },
+            {
+              'month': '2026-02',
+              'actual': 135,
+              'movingAvg': 122.0,
+              'predicted': null,
+            },
+            {
+              'month': '2026-03',
+              'actual': null,
+              'movingAvg': 128.0,
+              'predicted': 150,
+            },
+            {
+              'month': '2026-04',
+              'actual': null,
+              'movingAvg': null,
+              'predicted': 162,
+            },
           ],
           'itemBreakdown': [
             {'itemName': 'Widget A', 'totalSold': 420, 'trend': 'growing'},
@@ -5658,7 +5785,10 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       if (failForecastAccuracy) {
         return _json({
           'success': false,
-          'error': {'code': 'SERVER_ERROR', 'message': 'Failed to fetch accuracy'},
+          'error': {
+            'code': 'SERVER_ERROR',
+            'message': 'Failed to fetch accuracy',
+          },
         }, status: 500);
       }
       return _json({
@@ -5706,11 +5836,32 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       final itemId = int.parse(options.path.split('/').last);
       final points = itemId == 1
           ? [
-              {'forecastDate': '2026-04', 'period': 'next_month', 'predicted': 150, 'actual': 141, 'mape': 6.0, 'mae': 9.0},
-              {'forecastDate': '2026-05', 'period': 'next_month', 'predicted': 162, 'actual': 158, 'mape': 2.5, 'mae': 4.0},
+              {
+                'forecastDate': '2026-04',
+                'period': 'next_month',
+                'predicted': 150,
+                'actual': 141,
+                'mape': 6.0,
+                'mae': 9.0,
+              },
+              {
+                'forecastDate': '2026-05',
+                'period': 'next_month',
+                'predicted': 162,
+                'actual': 158,
+                'mape': 2.5,
+                'mae': 4.0,
+              },
             ]
           : [
-              {'forecastDate': '2026-04', 'period': 'next_month', 'predicted': 80, 'actual': 95, 'mape': 18.8, 'mae': 15.0},
+              {
+                'forecastDate': '2026-04',
+                'period': 'next_month',
+                'predicted': 80,
+                'actual': 95,
+                'mape': 18.8,
+                'mae': 15.0,
+              },
             ];
       return _json({'success': true, 'data': points});
     }
@@ -5756,7 +5907,10 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       if (failEmployees) {
         return _json({
           'success': false,
-          'error': {'code': 'SERVER_ERROR', 'message': 'Failed to fetch employees'},
+          'error': {
+            'code': 'SERVER_ERROR',
+            'message': 'Failed to fetch employees',
+          },
         }, status: 500);
       }
       lastEmployeesQuery = options.queryParameters;
@@ -5807,19 +5961,20 @@ class _AuthFakeAdapter implements HttpClientAdapter {
           .where(
             (e) =>
                 search.isEmpty ||
-                (e['first_name'] as String)
-                        .toLowerCase()
-                        .contains(search.toLowerCase()) ||
-                (e['last_name'] as String)
-                    .toLowerCase()
-                    .contains(search.toLowerCase()),
+                (e['first_name'] as String).toLowerCase().contains(
+                  search.toLowerCase(),
+                ) ||
+                (e['last_name'] as String).toLowerCase().contains(
+                  search.toLowerCase(),
+                ),
           )
           .where((e) => department == null || e['department'] == department)
           .where((e) {
-        if (status == 'inactive') return e['is_active'] == 0;
-        if (status == 'active') return e['is_active'] == 1;
-        return e['is_active'] == 1; // server default: active list
-      }).toList();
+            if (status == 'inactive') return e['is_active'] == 0;
+            if (status == 'active') return e['is_active'] == 1;
+            return e['is_active'] == 1; // server default: active list
+          })
+          .toList();
       final limit = int.tryParse('${q['limit']}') ?? 10;
       final page = int.tryParse('${q['page']}') ?? 1;
       final totalPages = (rows.length / limit).ceil();
@@ -5841,7 +5996,10 @@ class _AuthFakeAdapter implements HttpClientAdapter {
     }
     if (options.path == '/employees/next-code' && options.method == 'GET') {
       employeeNextCodeFetchCount++;
-      return _json({'success': true, 'data': {'code': 'EMP-004'}});
+      return _json({
+        'success': true,
+        'data': {'code': 'EMP-004'},
+      });
     }
     if (options.path == '/employees' && options.method == 'POST') {
       final body = options.data as Map<String, dynamic>;
@@ -5975,8 +6133,9 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         for (final entry in form.fields) entry.key: entry.value,
       };
       lastDocumentPostHasFile = form.files.isNotEmpty;
-      lastDocumentPostFileName =
-          form.files.isEmpty ? null : form.files.single.value.filename;
+      lastDocumentPostFileName = form.files.isEmpty
+          ? null
+          : form.files.single.value.filename;
       if (rejectDocumentUpload) {
         return _json({
           'error': 'File type text/x-custom is not allowed',
@@ -6039,21 +6198,24 @@ class _AuthFakeAdapter implements HttpClientAdapter {
       final active = q['is_active'];
       final rows = allUsers
           .where((u) {
-        if (role == null) return true;
-        return u['role'] == role;
-      }).where((u) {
-        if (active == null) return true;
-        return u['is_active'] == (active == 1 || active == '1');
-      }).where(
-        (u) =>
-            search.isEmpty ||
-            (u['username'] as String)
-                .toLowerCase()
-                .contains(search.toLowerCase()) ||
-            (u['full_name'] as String)
-                .toLowerCase()
-                .contains(search.toLowerCase()),
-      ).toList();
+            if (role == null) return true;
+            return u['role'] == role;
+          })
+          .where((u) {
+            if (active == null) return true;
+            return u['is_active'] == (active == 1 || active == '1');
+          })
+          .where(
+            (u) =>
+                search.isEmpty ||
+                (u['username'] as String).toLowerCase().contains(
+                  search.toLowerCase(),
+                ) ||
+                (u['full_name'] as String).toLowerCase().contains(
+                  search.toLowerCase(),
+                ),
+          )
+          .toList();
       return _json({'success': true, 'data': rows});
     }
     if (options.path == '/users' && options.method == 'POST') {
@@ -6156,21 +6318,50 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         return _json({
           'success': true,
           'data': [
-            {'id': 1, 'permission_name': 'View Users', 'module': 'users', 'action': 'read', 'assigned': 1},
-            {'id': 2, 'permission_name': 'Create Users', 'module': 'users', 'action': 'create', 'assigned': 0},
-            {'id': 3, 'permission_name': 'View Invoices', 'module': 'invoices', 'action': 'read', 'assigned': 1},
-            {'id': 4, 'permission_name': 'Create Invoices', 'module': 'invoices', 'action': 'create', 'assigned': 0},
+            {
+              'id': 1,
+              'permission_name': 'View Users',
+              'module': 'users',
+              'action': 'read',
+              'assigned': 1,
+            },
+            {
+              'id': 2,
+              'permission_name': 'Create Users',
+              'module': 'users',
+              'action': 'create',
+              'assigned': 0,
+            },
+            {
+              'id': 3,
+              'permission_name': 'View Invoices',
+              'module': 'invoices',
+              'action': 'read',
+              'assigned': 1,
+            },
+            {
+              'id': 4,
+              'permission_name': 'Create Invoices',
+              'module': 'invoices',
+              'action': 'create',
+              'assigned': 0,
+            },
           ],
         });
       }
       if (options.method == 'PUT') {
         final body = options.data as Map<String, dynamic>;
-        lastRolePermissionsIds =
-            (body['permissions'] as List).cast<num>().map((n) => n.toInt()).toList();
+        lastRolePermissionsIds = (body['permissions'] as List)
+            .cast<num>()
+            .map((n) => n.toInt())
+            .toList();
         if (rejectRolePermissionsSave) {
           return _json({'error': 'Role not found'}, status: 404);
         }
-        return _json({'success': true, 'message': 'Permissions updated successfully'});
+        return _json({
+          'success': true,
+          'message': 'Permissions updated successfully',
+        });
       }
     }
     if (options.path == '/roles' && options.method == 'POST') {
@@ -6253,13 +6444,13 @@ class _AuthFakeAdapter implements HttpClientAdapter {
         return _json({'success': true, 'message': 'Item restored'});
       }
     }
-    if (options.method == 'DELETE' &&
-        options.path.startsWith('/invoices/')) {
+    if (options.method == 'DELETE' && options.path.startsWith('/invoices/')) {
       final id = int.tryParse(options.path.split('/').last);
       if (id != null) {
         if (failInvoiceDeleteFor.contains(id)) {
           return _json({
-            'error': 'Cannot delete this invoice. Only unpaid/draft invoices '
+            'error':
+                'Cannot delete this invoice. Only unpaid/draft invoices '
                 'with no payments or returns can be deleted.',
           }, status: 400);
         }
@@ -6302,8 +6493,8 @@ class _AuthFakeAdapter implements HttpClientAdapter {
 /// 1×1 page; `printPdf` completes the job as printed.
 void _mockPrintingChannel() {
   const channel = MethodChannel('net.nfet.printing');
-  final messenger = TestDefaultBinaryMessengerBinding
-      .instance.defaultBinaryMessenger;
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   messenger.setMockMethodCallHandler(channel, (call) async {
     switch (call.method) {
       case 'printingInfo':
@@ -6335,7 +6526,11 @@ void _mockPrintingChannel() {
         await messenger.handlePlatformMessage(
           'net.nfet.printing',
           const StandardMethodCodec().encodeMethodCall(
-            MethodCall('onCompleted', {'job': job, 'completed': true, 'error': null}),
+            MethodCall('onCompleted', {
+              'job': job,
+              'completed': true,
+              'error': null,
+            }),
           ),
           (_) {},
         );
@@ -6438,7 +6633,7 @@ void main() {
     // authProvider flipped to authenticated → router redirects to the
     // authenticated shell ('/'), which loads the dashboard summary.
     expect(find.text('Dashboard'), findsWidgets); // rail item + app bar title
-    expect(find.text('890,000.00'), findsOneWidget); // sales revenue KPI
+    expect(find.text('Rs. 890,000.00'), findsOneWidget); // sales revenue KPI
     expect(find.text('Fawad'), findsOneWidget); // logged-in user shown
     expect(
       find.byIcon(Icons.account_circle_outlined),
@@ -6448,8 +6643,8 @@ void main() {
 
     // The layout-driven KPI strip (curated default: Stock Value, Sales
     // Revenue, Gross Profit, PO's) + the stock-by-category donut legend.
-    expect(find.text('245,000.50'), findsOneWidget); // stock value KPI
-    expect(find.text('560,000.00'), findsOneWidget); // PO's KPI
+    expect(find.text('Rs. 245,000.50'), findsOneWidget); // stock value KPI
+    expect(find.text('Rs. 560,000.00'), findsOneWidget); // PO's KPI
     expect(find.text('Stock by Category'), findsOneWidget);
     expect(find.text('Parts'), findsOneWidget); // legend category
     expect(find.text('500 (100%)'), findsOneWidget); // total + share
@@ -6458,7 +6653,7 @@ void main() {
     // render their data next to the summary-driven panels.
     expect(find.text('AR Summary'), findsOneWidget);
     // 420,000.00 appears twice: the AR KPI card + the AR summary total.
-    expect(find.text('420,000.00'), findsNWidgets(2)); // total AR
+    expect(find.text('Rs. 420,000.00'), findsNWidgets(2)); // total AR
     expect(find.text('25 customers'), findsOneWidget);
     expect(find.text('Top Customers'), findsOneWidget);
     expect(find.text('Acme Corp'), findsOneWidget); // top customer row
@@ -6546,11 +6741,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Transactions'), findsOneWidget);
-    expect(find.text('20,000.00'), findsOneWidget); // opening
+    expect(find.text('Rs. 20,000.00'), findsOneWidget); // opening
     // +/− amounts appear twice each: the summary row and its matching
     // transaction row.
-    expect(find.text('+12,000.00'), findsNWidgets(2)); // inflow
-    expect(find.text('−4,000.00'), findsNWidgets(2)); // outflow
+    expect(find.text('+Rs. 12,000.00'), findsNWidgets(2)); // inflow
+    expect(find.text('−Rs. 4,000.00'), findsNWidgets(2)); // outflow
     expect(find.text('Payment Received'), findsOneWidget);
     expect(find.textContaining('PAY002'), findsOneWidget);
     expect(find.text('Supplier Payment'), findsOneWidget);
@@ -6559,14 +6754,19 @@ void main() {
     // never mistaken for a payment out.
     expect(find.text('Refund'), findsOneWidget);
     expect(find.textContaining('PAY004'), findsOneWidget);
-    expect(find.textContaining('Refund for return on INV-2026-152278'),
-        findsOneWidget);
+    expect(
+      find.textContaining('Refund for return on INV-2026-152278'),
+      findsOneWidget,
+    );
   });
 
   // Dashboard customizer (spec §10 client widget tests): 404 → curated
   // default, dialog toggle → strip updates live, and the all-hidden
   // empty state.
-  Future<void> bootDashboard(WidgetTester tester, _AuthFakeAdapter adapter) async {
+  Future<void> bootDashboard(
+    WidgetTester tester,
+    _AuthFakeAdapter adapter,
+  ) async {
     tester.view.physicalSize = const Size(2000, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -6593,15 +6793,15 @@ void main() {
 
     // Curated default (§3): 4 KPI cards + 3 panels + cash strip — and
     // the off-by-default cards (Total Items, W.H Stock, AR) absent.
-    expect(find.text('245,000.50'), findsOneWidget); // Stock Value
-    expect(find.text('890,000.00'), findsOneWidget); // Sales Revenue
-    expect(find.text('330,000.00'), findsOneWidget); // Gross Profit
-    expect(find.text('560,000.00'), findsOneWidget); // PO's
+    expect(find.text('Rs. 245,000.50'), findsOneWidget); // Stock Value
+    expect(find.text('Rs. 890,000.00'), findsOneWidget); // Sales Revenue
+    expect(find.text('Rs. 330,000.00'), findsOneWidget); // Gross Profit
+    expect(find.text('Rs. 560,000.00'), findsOneWidget); // PO's
     expect(find.text('Total Items'), findsNothing);
     expect(find.text('W.H Stock'), findsNothing);
     // AR KPI card off by default → its 420,000.00 only appears once,
     // inside the AR Aging panel (on by default, §4.2).
-    expect(find.text('420,000.00'), findsOneWidget);
+    expect(find.text('Rs. 420,000.00'), findsOneWidget);
     // Panels: Sales vs Purchases + AR Aging + Low Stock on; the other
     // two off.
     expect(find.text('Low Stock Alerts'), findsOneWidget);
@@ -6620,7 +6820,7 @@ void main() {
 
     // All blocks visible (fixture) — every KPI card renders, including
     // the AR card's 420,000.00.
-    expect(find.text('420,000.00'), findsNWidgets(2)); // AR card + AR panel
+    expect(find.text('Rs. 420,000.00'), findsNWidgets(2)); // AR card + AR panel
 
     // Open the customizer (toolbar Customize button).
     await tester.tap(find.widgetWithText(TextButton, 'Customize'));
@@ -6628,10 +6828,9 @@ void main() {
 
     // The dialog lists the AR card in the KPI Cards section — untick it
     // (live preview: the strip behind the dialog updates immediately).
-    final arTile = find.ancestor(
-      of: find.text('AR'),
-      matching: find.byType(ListTile),
-    ).first;
+    final arTile = find
+        .ancestor(of: find.text('AR'), matching: find.byType(ListTile))
+        .first;
     await tester.tap(arTile);
     await tester.pumpAndSettle();
 
@@ -6639,7 +6838,7 @@ void main() {
     // working state, and the AR card is gone from the strip.
     await tester.tap(find.widgetWithText(TextButton, 'Done'));
     await tester.pumpAndSettle();
-    expect(find.text('420,000.00'), findsOneWidget); // only the AR panel
+    expect(find.text('Rs. 420,000.00'), findsOneWidget); // only the AR panel
     expect(find.text('AR'), findsNothing);
   });
 
@@ -6665,9 +6864,7 @@ void main() {
     expect(find.text('Cash / Bank Position'), findsNothing);
   });
 
-  testWidgets('opening balance editor saves the starting cash', (
-    tester,
-  ) async {
+  testWidgets('opening balance editor saves the starting cash', (tester) async {
     // Wide surface so every KPI card and the cash strip are built.
     tester.view.physicalSize = const Size(2000, 900);
     tester.view.devicePixelRatio = 1.0;
@@ -6708,7 +6905,8 @@ void main() {
     // the confirmation snackbar appeared.
     final body = adapter.lastOpeningBalancesPutBody;
     expect(body, isNotNull);
-    final cashEntry = (body!['accounts'] as List).cast<Map<String, dynamic>>()
+    final cashEntry = (body!['accounts'] as List)
+        .cast<Map<String, dynamic>>()
         .firstWhere((a) => a['key'] == 'cash');
     expect(cashEntry['amount'], 25000);
     expect(find.byKey(const Key('confirm_dialog')), findsNothing);
@@ -6751,8 +6949,6 @@ void main() {
     expect(find.byIcon(Icons.refresh), findsOneWidget);
   });
 
-
-
   testWidgets('dashboard refresh button reloads every block', (tester) async {
     tester.view.physicalSize = const Size(2000, 900);
     tester.view.devicePixelRatio = 1.0;
@@ -6784,8 +6980,9 @@ void main() {
     expect(adapter.dashboardSummaryCalls, 0);
   });
 
-  testWidgets('dashboard boot failure shows the error panel with retry',
-      (tester) async {
+  testWidgets('dashboard boot failure shows the error panel with retry', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(2000, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -6819,7 +7016,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(adapter.dashboardBootCalls, 2);
-    expect(find.text('890,000.00'), findsOneWidget); // sales revenue KPI
+    expect(find.text('Rs. 890,000.00'), findsOneWidget); // sales revenue KPI
   });
 
   testWidgets('stored token + valid /auth/me restores the session at boot', (
@@ -6842,7 +7039,7 @@ void main() {
 
     // Splash → restore → authenticated → straight to the shell dashboard.
     expect(find.text('Dashboard'), findsWidgets);
-    expect(find.text('890,000.00'), findsOneWidget);
+    expect(find.text('Rs. 890,000.00'), findsOneWidget);
     expect(find.text('Fawad'), findsOneWidget);
   });
 
@@ -6919,7 +7116,7 @@ void main() {
 
     // Success snackbar, popped back to the dashboard, session kept.
     expect(find.text('Password changed successfully'), findsOneWidget);
-    expect(find.text('890,000.00'), findsOneWidget);
+    expect(find.text('Rs. 890,000.00'), findsOneWidget);
     expect(storage.token, 'test-token');
   });
 
@@ -7039,9 +7236,7 @@ void main() {
     expect(find.text('120'), findsOneWidget);
   });
 
-  testWidgets('items screen shows the server pagination bar', (
-    tester,
-  ) async {
+  testWidgets('items screen shows the server pagination bar', (tester) async {
     useWideSurface(tester);
     await bootToItems(tester);
 
@@ -7144,76 +7339,75 @@ void main() {
     expect(adapter.bulkRestoredItemIds, [1]);
   });
 
-  testWidgets('items screen bulk delete with failures shows the D11 dialog and undo restores only succeeded', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    BulkPacing.disableForTests();
-    addTearDown(() {
-      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
-      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
-    });
-    final adapter = _AuthFakeAdapter()..failItemDeleteFor.add(2);
-    await bootToItems(tester, adapter: adapter);
+  testWidgets(
+    'items screen bulk delete with failures shows the D11 dialog and undo restores only succeeded',
+    (tester) async {
+      useWideSurface(tester);
+      BulkPacing.disableForTests();
+      addTearDown(() {
+        BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+        BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+      });
+      final adapter = _AuthFakeAdapter()..failItemDeleteFor.add(2);
+      await bootToItems(tester, adapter: adapter);
 
-    // Select all → delete: item 2 fails (fixture), the rest succeed.
-    await tester.tap(find.byType(Checkbox).last);
-    await tester.pumpAndSettle();
-    expect(find.text('5 selected'), findsOneWidget);
+      // Select all → delete: item 2 fails (fixture), the rest succeed.
+      await tester.tap(find.byType(Checkbox).last);
+      await tester.pumpAndSettle();
+      expect(find.text('5 selected'), findsOneWidget);
 
-    await tester.tap(find.text('Delete selected'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete selected'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
 
-    // 4 deleted, 1 failed with the server's reason.
-    expect(adapter.bulkDeletedItemIds.length, 4);
-    expect(adapter.bulkDeletedItemIds, isNot(contains(2)));
-    expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
-    expect(find.text('4 done, 1 failed'), findsOneWidget);
-    expect(
-      find.textContaining('Item has stock movements'),
-      findsOneWidget,
-    );
-    await tester.tap(
-      find.descendant(
-        of: find.byKey(const Key('bulk_failure_dialog')),
-        matching: find.widgetWithText(FilledButton, 'Close'),
-      ),
-    );
-    await tester.pumpAndSettle();
+      // 4 deleted, 1 failed with the server's reason.
+      expect(adapter.bulkDeletedItemIds.length, 4);
+      expect(adapter.bulkDeletedItemIds, isNot(contains(2)));
+      expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
+      expect(find.text('4 done, 1 failed'), findsOneWidget);
+      expect(find.textContaining('Item has stock movements'), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const Key('bulk_failure_dialog')),
+          matching: find.widgetWithText(FilledButton, 'Close'),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    // The undo toast covers only the succeeded ids — Undo restores 4,
-    // not the failed one.
-    expect(find.text('4 deleted'), findsOneWidget);
-    await tester.tap(find.text('Undo'));
-    await tester.pumpAndSettle();
-    expect(adapter.bulkRestoredItemIds.length, 4);
-    expect(adapter.bulkRestoredItemIds, isNot(contains(2)));
-  });
+      // The undo toast covers only the succeeded ids — Undo restores 4,
+      // not the failed one.
+      expect(find.text('4 deleted'), findsOneWidget);
+      await tester.tap(find.text('Undo'));
+      await tester.pumpAndSettle();
+      expect(adapter.bulkRestoredItemIds.length, 4);
+      expect(adapter.bulkRestoredItemIds, isNot(contains(2)));
+    },
+  );
 
-  testWidgets('items screen bulk delete retries a 429 rate-limited record once', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter()..rateLimitItemDeletes = true;
-    await bootToItems(tester, adapter: adapter);
+  testWidgets(
+    'items screen bulk delete retries a 429 rate-limited record once',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter()..rateLimitItemDeletes = true;
+      await bootToItems(tester, adapter: adapter);
 
-    // Select the first row → delete: the first DELETE 429s, the executor
-    // waits and retries (D22) — the delete still lands.
-    await tester.tap(find.byType(Checkbox).first);
-    await tester.pump(const Duration(milliseconds: 350));
-    await tester.pumpAndSettle();
-    expect(find.text('1 selected'), findsOneWidget);
+      // Select the first row → delete: the first DELETE 429s, the executor
+      // waits and retries (D22) — the delete still lands.
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+      expect(find.text('1 selected'), findsOneWidget);
 
-    await tester.tap(find.text('Delete selected'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete selected'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
 
-    expect(adapter.bulkDeletedItemIds, [1]);
-    expect(find.text('1 deleted'), findsOneWidget);
-  });
+      expect(adapter.bulkDeletedItemIds, [1]);
+      expect(find.text('1 deleted'), findsOneWidget);
+    },
+  );
 
   testWidgets('items screen error shows a retry and recovers', (tester) async {
     useWideSurface(tester);
@@ -7277,7 +7471,7 @@ void main() {
     // Low Stock badge (the grid's Low Stock FilterChip also matches);
     // 25.00 appears in both the grid's cost column and the dialog tile.
     expect(find.text('Low Stock'), findsWidgets);
-    expect(find.text('25.00'), findsWidgets);
+    expect(find.text('Rs. 25.00'), findsWidgets);
 
     // Close returns to the grid.
     await tester.tap(find.widgetWithText(TextButton, 'Close'));
@@ -7573,9 +7767,7 @@ void main() {
     await tester.pump();
 
     // Sanity: focus is on the grid, not the toolbar search field.
-    final searchField = tester.widget<TextField>(
-      find.byType(TextField).first,
-    );
+    final searchField = tester.widget<TextField>(find.byType(TextField).first);
     expect(FocusManager.instance.primaryFocus, isNot(searchField.focusNode));
 
     // Ctrl+F from a grid cell must focus the visible screen's search —
@@ -7701,10 +7893,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Expenses'));
     await tester.pumpAndSettle();
-    clearScreenDates(
-      tester,
-      [expensesFromDateProvider, expensesToDateProvider],
-    );
+    clearScreenDates(tester, [
+      expensesFromDateProvider,
+      expensesToDateProvider,
+    ]);
     await tester.pumpAndSettle();
   }
 
@@ -7721,10 +7913,10 @@ void main() {
     expect(find.text('Expense No'), findsOneWidget);
     expect(find.text('Payment Method'), findsOneWidget);
     // Status badges map to localized labels.
-    expect(find.text('Approved'), findsOneWidget);
+    expect(find.text('Recorded'), findsOneWidget);
     expect(find.text('Draft'), findsOneWidget);
     // Summary strip totals the loaded rows (1000 + 500.5).
-    expect(find.text('1,500.50'), findsOneWidget);
+    expect(find.text('Rs. 1,500.50'), findsOneWidget);
     expect(find.text('2 expenses'), findsOneWidget);
   });
 
@@ -7774,7 +7966,7 @@ void main() {
     expect(content, contains('Expense No'));
     expect(content, contains('EXP-2605-0001'));
     expect(content, contains('Generator diesel'));
-    expect(content, contains('Approved'));
+    expect(content, contains('Recorded'));
     expect(content, contains('1,000.00'));
   });
 
@@ -8146,7 +8338,10 @@ void main() {
     expect(find.widgetWithText(TextFormField, 'Mini ERP'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'PKR'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, '0'), findsOneWidget); // tax_rate
-    expect(find.widgetWithText(TextFormField, '114'), findsOneWidget); // STK counter
+    expect(
+      find.widgetWithText(TextFormField, '114'),
+      findsOneWidget,
+    ); // STK counter
   });
 
   testWidgets('settings screen posts bulk save for changed fields only', (
@@ -8244,7 +8439,6 @@ void main() {
 
   // Reports module — hub + the first report screens (PORTING.md §11).
 
-
   testWidgets('reports hub navigates to the AR aging grid', (tester) async {
     useWideSurface(tester);
     await bootToReports(tester);
@@ -8265,35 +8459,9 @@ void main() {
     expect(find.text('Acme Corp'), findsOneWidget);
     expect(find.text('Beta Ltd'), findsOneWidget);
     expect(find.text('1-30 Days'), findsNWidgets(2));
-    expect(find.text('420.50'), findsOneWidget); // total receivables
-    expect(find.text('70.50'), findsNWidgets(2)); // strip + Acme cell
+    expect(find.text('Rs. 420.50'), findsOneWidget); // total receivables
+    expect(find.text('Rs. 70.50'), findsNWidgets(2)); // strip + Acme cell
   });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   testWidgets('DSO report renders the metric cards and exports', (
     tester,
@@ -8307,7 +8475,7 @@ void main() {
     // Headline DSO card + the three metric cards.
     expect(find.text('18.65 days'), findsOneWidget);
     expect(find.text('Total AR'), findsOneWidget);
-    expect(find.text('50,000.00'), findsOneWidget); // total AR value
+    expect(find.text('Rs. 50,000.00'), findsOneWidget); // total AR value
 
     final target = '${Directory.systemTemp.path}/minierp-dso-test.csv';
     final targetFile = File(target);
@@ -8354,9 +8522,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Total Cash Inflow'), findsOneWidget);
-    expect(find.text('52,895.00'), findsOneWidget); // inflow value
-    expect(find.text('1,000.00'), findsOneWidget); // outflow value
-    expect(find.text('51,895.00'), findsOneWidget); // net cash flow
+    expect(find.text('Rs. 52,895.00'), findsOneWidget); // inflow value
+    expect(find.text('Rs. 1,000.00'), findsOneWidget); // outflow value
+    expect(find.text('Rs. 51,895.00'), findsOneWidget); // net cash flow
     // Positive-flow analysis note.
     expect(find.textContaining('positive cash flow'), findsOneWidget);
   });
@@ -8371,10 +8539,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Total Revenue'), findsOneWidget);
-    expect(find.text('101,895.00'), findsOneWidget); // revenue value
+    expect(find.text('Rs. 101,895.00'), findsOneWidget); // revenue value
     expect(find.text('Cost of Goods Sold (COGS)'), findsOneWidget);
     expect(find.text('Net Profit'), findsOneWidget);
-    expect(find.text('-171,420.50'), findsOneWidget); // net profit
+    expect(find.text('-Rs. 171,420.50'), findsOneWidget); // net profit
     // Margins combo card renders both percentages.
     expect(find.textContaining('-166.27%'), findsOneWidget);
     expect(find.textContaining('-168.23%'), findsOneWidget);
@@ -8382,13 +8550,8 @@ void main() {
     // appears twice (Total Expenses card + Marketing breakdown row).
     expect(find.text('Expenses by Category'), findsOneWidget);
     expect(find.text('Marketing'), findsOneWidget);
-    expect(find.text('2,000.00'), findsNWidgets(2)); // expenses card + row
+    expect(find.text('Rs. 2,000.00'), findsNWidgets(2)); // expenses card + row
   });
-
-
-
-
-
 
   testWidgets('top debtors report renders debtor rows', (tester) async {
     useWideSurface(tester);
@@ -8451,11 +8614,6 @@ void main() {
     expect(content, contains('120.50')); // Acme total outstanding
     expect(content, contains('200.00')); // Beta 90+ bucket
   });
-
-
-
-
-
 
   testWidgets('expenses screen search sends the server search param', (
     tester,
@@ -8526,7 +8684,10 @@ void main() {
     expect(find.widgetWithText(Dialog, 'New Expense'), findsNothing);
     expect(adapter.lastExpensePostBody?['expense_category'], 'Fuel');
     expect(adapter.lastExpensePostBody?['amount'], 750.25);
-    expect(adapter.lastExpensePostBody?['status'], isNull); // omitted — server defaults to Draft (EXP-03)
+    expect(
+      adapter.lastExpensePostBody?['status'],
+      isNull,
+    ); // omitted — server defaults to Draft (EXP-03)
     expect(adapter.lastExpensePostBody?['expense_date'], isNotEmpty);
     expect(adapter.lastExpensePostBody?['description'], isNull); // omitted
   });
@@ -8599,10 +8760,10 @@ void main() {
     // by its unique icon instead.
     await tester.tap(find.byIcon(Icons.point_of_sale_outlined));
     await tester.pumpAndSettle();
-    clearScreenDates(
-      tester,
-      [invoicesFromDateProvider, invoicesToDateProvider],
-    );
+    clearScreenDates(tester, [
+      invoicesFromDateProvider,
+      invoicesToDateProvider,
+    ]);
     await tester.pumpAndSettle();
   }
 
@@ -8637,9 +8798,9 @@ void main() {
     expect(find.text('Overdue'), findsOneWidget);
     // Summary strip: totals of the loaded rows (1500+800+300, 0+800+100,
     // 1500+0+200).
-    expect(find.text('2,600.00'), findsOneWidget);
-    expect(find.text('900.00'), findsOneWidget);
-    expect(find.text('1,700.00'), findsOneWidget);
+    expect(find.text('Rs. 2,600.00'), findsOneWidget);
+    expect(find.text('Rs. 900.00'), findsOneWidget);
+    expect(find.text('Rs. 1,700.00'), findsOneWidget);
   });
 
   testWidgets('sales grid exports the rows to CSV', (tester) async {
@@ -8808,9 +8969,7 @@ void main() {
     expect(adapter.bulkRestoredInvoiceIds, [2]);
   });
 
-  testWidgets('sales screen search refetches from the server', (
-    tester,
-  ) async {
+  testWidgets('sales screen search refetches from the server', (tester) async {
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
     await bootToSales(tester, adapter);
@@ -8825,8 +8984,8 @@ void main() {
     expect(find.text('INV-2026-440955'), findsOneWidget);
     expect(find.text('INV-2026-440956'), findsNothing);
     // Summary re-totals over the server-filtered rows.
-    expect(find.text('1,500.00'), findsWidgets);
-    expect(find.text('2,600.00'), findsNothing);
+    expect(find.text('Rs. 1,500.00'), findsWidgets);
+    expect(find.text('Rs. 2,600.00'), findsNothing);
   });
 
   testWidgets('sales screen status filter sends the CSV server param', (
@@ -9001,10 +9160,10 @@ void main() {
     // Switch the sales shell to the returns tab (invoices is default).
     await tester.tap(find.text('Invoice Returns'));
     await tester.pumpAndSettle();
-    clearScreenDates(
-      tester,
-      [invoiceReturnsFromDateProvider, invoiceReturnsToDateProvider],
-    );
+    clearScreenDates(tester, [
+      invoiceReturnsFromDateProvider,
+      invoiceReturnsToDateProvider,
+    ]);
     await tester.pumpAndSettle();
   }
 
@@ -9022,10 +9181,10 @@ void main() {
     // This test lands on the returns tab itself (not via the
     // bootToInvoiceReturns helper) — reset its seeded date range so the
     // older fixture rows are all visible.
-    clearScreenDates(
-      tester,
-      [invoiceReturnsFromDateProvider, invoiceReturnsToDateProvider],
-    );
+    clearScreenDates(tester, [
+      invoiceReturnsFromDateProvider,
+      invoiceReturnsToDateProvider,
+    ]);
     await tester.pumpAndSettle();
 
     // Rows from the bare-array fake: return no, item, qty magnitudes and
@@ -9038,71 +9197,72 @@ void main() {
     // Row 2's serial `#` is also rendered as '2', so the qty assert
     // matches the serial cell too.
     expect(find.text('2'), findsNWidgets(2)); // qty, row 2 + serial #2
-    expect(find.text('100.00'), findsOneWidget); // unit cost, row 1
-    expect(find.text('400.00'), findsOneWidget); // 4 × 100 return value
-    expect(find.text('45.00'), findsOneWidget); // unit cost, row 2
-    expect(find.text('90.00'), findsOneWidget); // 2 × 45 return value
+    expect(find.text('Rs. 100.00'), findsOneWidget); // unit cost, row 1
+    expect(find.text('Rs. 400.00'), findsOneWidget); // 4 × 100 return value
+    expect(find.text('Rs. 45.00'), findsOneWidget); // unit cost, row 2
+    expect(find.text('Rs. 90.00'), findsOneWidget); // 2 × 45 return value
     // Grid column headers.
     expect(find.text('Return No'), findsOneWidget);
     expect(find.text('Return Date'), findsOneWidget);
     expect(find.text('Return Qty'), findsOneWidget);
   });
 
-  testWidgets('invoice returns shows compact cards under the mobile breakpoint', (
-    tester,
-  ) async {
-    // Pump the screen directly at a sub-768px width (the full app's
-    // shell keeps the desktop dashboard alive, which overflows at narrow
-    // widths — not this screen's concern). Same pattern as the purchase
-    // returns mobile test.
-    tester.view.physicalSize = const Size(600, 900);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-    final adapter = _AuthFakeAdapter();
-    final storage = _FakeTokenStorage()..token = 'test-token';
-    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
-    dio.httpClientAdapter = adapter;
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          tokenStorageProvider.overrideWithValue(storage),
-          dioProvider.overrideWithValue(dio),
-        ],
-        child: const MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: InvoiceReturnsScreen()),
+  testWidgets(
+    'invoice returns shows compact cards under the mobile breakpoint',
+    (tester) async {
+      // Pump the screen directly at a sub-768px width (the full app's
+      // shell keeps the desktop dashboard alive, which overflows at narrow
+      // widths — not this screen's concern). Same pattern as the purchase
+      // returns mobile test.
+      tester.view.physicalSize = const Size(600, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final adapter = _AuthFakeAdapter();
+      final storage = _FakeTokenStorage()..token = 'test-token';
+      final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+      dio.httpClientAdapter = adapter;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tokenStorageProvider.overrideWithValue(storage),
+            dioProvider.overrideWithValue(dio),
+          ],
+          child: const MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: InvoiceReturnsScreen()),
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    // The screen seeds a date range from the preferences — clear it so
-    // the fixture rows (May 2026) are all visible.
-    clearScreenDates(
-      tester,
-      [invoiceReturnsFromDateProvider, invoiceReturnsToDateProvider],
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
+      // The screen seeds a date range from the preferences — clear it so
+      // the fixture rows (May 2026) are all visible.
+      clearScreenDates(tester, [
+        invoiceReturnsFromDateProvider,
+        invoiceReturnsToDateProvider,
+      ]);
+      await tester.pumpAndSettle();
 
-    // Cards (no Pluto grid) render both fixture rows with their item,
-    // return no, stats and customer/warehouse meta.
-    expect(find.byType(PlutoGrid), findsNothing);
-    expect(find.text('Widget A'), findsOneWidget);
-    expect(find.text('Widget B'), findsOneWidget);
-    expect(find.textContaining('SM-2026-0031'), findsOneWidget);
-    expect(find.text('400.00'), findsOneWidget); // 4 × 100 return value
-    expect(find.text('90.00'), findsOneWidget); // 2 × 45 return value
-    expect(find.text('Main Warehouse'), findsOneWidget);
-    expect(find.text('Acme Corp'), findsOneWidget);
-    expect(find.text('Damaged on delivery'), findsOneWidget);
+      // Cards (no Pluto grid) render both fixture rows with their item,
+      // return no, stats and customer/warehouse meta.
+      expect(find.byType(PlutoGrid), findsNothing);
+      expect(find.text('Widget A'), findsOneWidget);
+      expect(find.text('Widget B'), findsOneWidget);
+      expect(find.textContaining('SM-2026-0031'), findsOneWidget);
+      expect(find.text('Rs. 400.00'), findsOneWidget); // 4 × 100 return value
+      expect(find.text('Rs. 90.00'), findsOneWidget); // 2 × 45 return value
+      expect(find.text('Main Warehouse'), findsOneWidget);
+      expect(find.text('Acme Corp'), findsOneWidget);
+      expect(find.text('Damaged on delivery'), findsOneWidget);
 
-    // Tapping a card opens the detail modal (Close button is dialog-only).
-    await tester.tap(find.text('Widget A'));
-    await tester.pumpAndSettle();
-    expect(find.widgetWithText(TextButton, 'Close'), findsOneWidget);
-    await tester.tap(find.widgetWithText(TextButton, 'Close'));
-    await tester.pumpAndSettle();
-  });
+      // Tapping a card opens the detail modal (Close button is dialog-only).
+      await tester.tap(find.text('Widget A'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(TextButton, 'Close'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Close'));
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets('invoice returns screen F2 opens the return detail dialog', (
     tester,
@@ -9146,7 +9306,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: dialog, matching: find.text('400.00')),
+      find.descendant(of: dialog, matching: find.text('Rs. 400.00')),
       findsOneWidget,
     );
 
@@ -9233,7 +9393,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // The dialog fetches fresh detail (qty 10, returned 0 → 10 available)
-    // and defaults the disposition to credit (balance still owed).
+    // and records the return without a settlement by default.
     expect(find.text('Invoice Return'), findsOneWidget);
     expect(
       find.descendant(of: find.byType(Dialog), matching: find.text('Widget A')),
@@ -9253,12 +9413,15 @@ void main() {
     await tester.tap(find.text('Main Warehouse').last);
     await tester.pumpAndSettle();
 
-    final dialogFields = find.descendant(
-      of: find.byType(Dialog),
+    Finder fieldForLabel(String label) => find.descendant(
+      of: find.byWidgetPredicate(
+        (widget) => widget is FormFieldShell && widget.label == label,
+      ),
       matching: find.byType(TextFormField),
     );
-    await tester.enterText(dialogFields.first, '4');
-    await tester.enterText(dialogFields.at(1), 'Damaged');
+    await tester.enterText(fieldForLabel('Return Quantity'), '4');
+    await tester.enterText(fieldForLabel('Reason for Return'), 'Damaged');
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Return'));
     await tester.tap(find.widgetWithText(FilledButton, 'Return'));
     await tester.pumpAndSettle();
 
@@ -9267,7 +9430,8 @@ void main() {
     expect((items.single as Map)['invoice_item_id'], 10);
     expect((items.single as Map)['return_quantity'], 4);
     expect(body['reason'], 'Damaged');
-    expect(body['disposition'], 'credit');
+    expect(body['settlements'], isEmpty);
+    expect(body.containsKey('disposition'), isFalse);
     expect(body['warehouse_id'], 1);
     // Toast with the net return from the enveloped data payload; the
     // dialog popped itself.
@@ -9380,7 +9544,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // The dialog fetches fresh detail (qty 10, returned 0 → 10 available)
-    // and defaults the disposition to credit (balance still owed).
+    // and records the return without a settlement by default.
     expect(find.text('Invoice Return'), findsOneWidget);
     expect(
       find.descendant(of: find.byType(Dialog), matching: find.text('Widget A')),
@@ -9393,13 +9557,11 @@ void main() {
       matching: find.byType(TextFormField),
     );
     await tester.enterText(dialogFields.first, '4');
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Return'));
     await tester.tap(find.widgetWithText(FilledButton, 'Return'));
     await tester.pumpAndSettle();
     // The message appears twice: the picker's hint + the error banner.
-    expect(
-      find.text('Select a warehouse to restock into'),
-      findsNWidgets(2),
-    );
+    expect(find.text('Select a warehouse to restock into'), findsNWidgets(2));
     expect(adapter.lastInvoiceReturnBody, isNull);
 
     // Pick the restock warehouse and submit successfully.
@@ -9414,6 +9576,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(dialogFields.at(1), 'Damaged');
+    await tester.ensureVisible(find.widgetWithText(FilledButton, 'Return'));
     await tester.tap(find.widgetWithText(FilledButton, 'Return'));
     await tester.pumpAndSettle();
 
@@ -9421,7 +9584,8 @@ void main() {
     expect((body['items'] as List).single['invoice_item_id'], 10);
     expect((body['items'] as List).single['return_quantity'], 4);
     expect(body['reason'], 'Damaged');
-    expect(body['disposition'], 'credit');
+    expect(body['settlements'], isEmpty);
+    expect(body.containsKey('disposition'), isFalse);
     expect(body['warehouse_id'], 1);
     expect(
       find.textContaining('Return processed successfully'),
@@ -9478,10 +9642,13 @@ void main() {
     expect(find.text('Acme Corp'), findsOneWidget);
     expect(find.text('Beta Ltd'), findsOneWidget);
     // Amount column adds +/- prefix based on direction.
-    expect(find.textContaining('+ 500.00'), findsOneWidget);
-    expect(find.textContaining('+ 800.00'), findsOneWidget);
+    expect(find.textContaining('+ Rs. 500.00'), findsOneWidget);
+    expect(find.textContaining('+ Rs. 800.00'), findsOneWidget);
     expect(find.text('Cash'), findsOneWidget);
-    expect(find.text('Bank'), findsOneWidget); // method label is 'Bank', not 'Bank Transfer'
+    expect(
+      find.text('Bank'),
+      findsOneWidget,
+    ); // method label is 'Bank', not 'Bank Transfer'
     expect(find.text('Payment No'), findsOneWidget); // column header
     // Server pagination block → bar (2 payments at limit 10 = 1 page).
     expect(find.text('Page 1 of 1'), findsOneWidget);
@@ -9520,7 +9687,7 @@ void main() {
       findsWidgets,
     );
     expect(
-      find.descendant(of: dialog, matching: find.text('500.00')),
+      find.descendant(of: dialog, matching: find.text('Rs. 500.00')),
       findsWidgets, // amount may appear as '500.00' or '+ 500.00'
     );
 
@@ -9556,7 +9723,7 @@ void main() {
     // (150.00 balance; INV-JUN-001 is Paid and filtered out).
     expect(find.text('INV-JUN-002'), findsOneWidget);
     expect(find.text('INV-JUN-003'), findsOneWidget);
-    expect(find.textContaining('200.00'), findsWidgets); // line balance
+    expect(find.textContaining('Rs. 200.00'), findsWidgets); // line balance
 
     // Allocate 200 to the first line, 150 to the second — the amount
     // fields are the first two TextFormFields in the dialog.
@@ -9567,7 +9734,7 @@ void main() {
     await tester.enterText(fields.at(0), '200');
     await tester.enterText(fields.at(1), '150');
     await tester.pump();
-    expect(find.text('Total Allocated: 350.00'), findsOneWidget);
+    expect(find.text('Total Allocated: Rs. 350.00'), findsOneWidget);
 
     // The submit button sits at the bottom of the dialog's scrollable
     // body — bring it into view before tapping.
@@ -9632,7 +9799,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Payment exceeds the remaining balance of 200.00'),
+      find.text('Payment exceeds the remaining balance of Rs. 200.00'),
       findsOneWidget,
     );
     expect(adapter.lastPaymentPostBody, isNull);
@@ -9721,10 +9888,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    clearScreenDates(
-      tester,
-      [salesOrdersFromDateProvider, salesOrdersToDateProvider],
-    );
+    clearScreenDates(tester, [
+      salesOrdersFromDateProvider,
+      salesOrdersToDateProvider,
+    ]);
     await tester.pumpAndSettle();
   }
 
@@ -9769,9 +9936,9 @@ void main() {
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text('Invoiced'), findsOneWidget);
     // Totals via the shared currency formatter.
-    expect(find.text('1,500.00'), findsOneWidget);
-    expect(find.text('2,500.00'), findsOneWidget);
-    expect(find.text('800.00'), findsOneWidget);
+    expect(find.text('Rs. 1,500.00'), findsOneWidget);
+    expect(find.text('Rs. 2,500.00'), findsOneWidget);
+    expect(find.text('Rs. 800.00'), findsOneWidget);
   });
 
   testWidgets('sales orders grid exports the rows to CSV', (tester) async {
@@ -9830,70 +9997,71 @@ void main() {
     if (file.existsSync()) file.deleteSync();
   });
 
-  testWidgets('sales orders screen bulk delete confirms and calls DELETE per id', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    BulkPacing.disableForTests();
-    addTearDown(() {
-      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
-      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
-    });
-    final adapter = _AuthFakeAdapter();
-    await bootToSalesOrders(tester, adapter);
+  testWidgets(
+    'sales orders screen bulk delete confirms and calls DELETE per id',
+    (tester) async {
+      useWideSurface(tester);
+      BulkPacing.disableForTests();
+      addTearDown(() {
+        BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+        BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+      });
+      final adapter = _AuthFakeAdapter();
+      await bootToSalesOrders(tester, adapter);
 
-    // Select the first data row (not the header select-all). The cell's
-    // double-tap recognizer holds the gesture arena for ~300ms, so
-    // advance fake time past it before asserting.
-    await tester.tap(find.byType(Checkbox).first);
-    await tester.pump(const Duration(milliseconds: 350));
-    await tester.pumpAndSettle();
-    expect(find.text('1 selected'), findsOneWidget);
+      // Select the first data row (not the header select-all). The cell's
+      // double-tap recognizer holds the gesture arena for ~300ms, so
+      // advance fake time past it before asserting.
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+      expect(find.text('1 selected'), findsOneWidget);
 
-    // Delete selected → confirm dialog → hard delete fires for id 1.
-    await tester.tap(find.text('Delete selected'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
-    await tester.pumpAndSettle();
-    expect(adapter.bulkDeletedSoIds, [1]);
-    // Hard delete — no undo (D3).
-    expect(find.text('1 deleted'), findsOneWidget);
-  });
+      // Delete selected → confirm dialog → hard delete fires for id 1.
+      await tester.tap(find.text('Delete selected'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
+      await tester.pumpAndSettle();
+      expect(adapter.bulkDeletedSoIds, [1]);
+      // Hard delete — no undo (D3).
+      expect(find.text('1 deleted'), findsOneWidget);
+    },
+  );
 
-  testWidgets('sales orders screen bulk delete with failures shows the D11 dialog', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    BulkPacing.disableForTests();
-    addTearDown(() {
-      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
-      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
-    });
-    // Server guard fixture (D18): Completed (2) and Invoiced (3) orders
-    // are rejected; Confirmed (1) deletes.
-    final adapter = _AuthFakeAdapter()
-      ..failSoDeleteFor.addAll([2, 3]);
-    await bootToSalesOrders(tester, adapter);
+  testWidgets(
+    'sales orders screen bulk delete with failures shows the D11 dialog',
+    (tester) async {
+      useWideSurface(tester);
+      BulkPacing.disableForTests();
+      addTearDown(() {
+        BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+        BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+      });
+      // Server guard fixture (D18): Completed (2) and Invoiced (3) orders
+      // are rejected; Confirmed (1) deletes.
+      final adapter = _AuthFakeAdapter()..failSoDeleteFor.addAll([2, 3]);
+      await bootToSalesOrders(tester, adapter);
 
-    // Select all → delete: SO 1 succeeds, SOs 2/3 fail with reasons.
-    await tester.tap(find.byType(Checkbox).last);
-    await tester.pumpAndSettle();
-    expect(find.text('3 selected'), findsOneWidget);
+      // Select all → delete: SO 1 succeeds, SOs 2/3 fail with reasons.
+      await tester.tap(find.byType(Checkbox).last);
+      await tester.pumpAndSettle();
+      expect(find.text('3 selected'), findsOneWidget);
 
-    await tester.tap(find.text('Delete selected'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete selected'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
+      await tester.pumpAndSettle();
 
-    expect(adapter.bulkDeletedSoIds, [1]);
-    expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
-    expect(find.text('1 done, 2 failed'), findsOneWidget);
-    expect(
-      find.textContaining('Cannot delete a sales order'),
-      findsNWidgets(2),
-    );
-  });
+      expect(adapter.bulkDeletedSoIds, [1]);
+      expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
+      expect(find.text('1 done, 2 failed'), findsOneWidget);
+      expect(
+        find.textContaining('Cannot delete a sales order'),
+        findsNWidgets(2),
+      );
+    },
+  );
 
   testWidgets('sales orders screen F2 opens the SO detail dialog', (
     tester,
@@ -9921,7 +10089,7 @@ void main() {
     expect(find.text('Sales Order Details'), findsOneWidget);
     expect(find.text('Widget A'), findsOneWidget);
     expect(find.text('FG001'), findsOneWidget);
-    expect(find.text('1,500.00'), findsWidgets); // total tile + amounts
+    expect(find.text('Rs. 1,500.00'), findsWidgets); // total tile + amounts
 
     // Close returns to the grid.
     await tester.tap(find.widgetWithText(TextButton, 'Close'));
@@ -10076,10 +10244,7 @@ void main() {
     expect(find.text('Sales Order Details'), findsOneWidget);
     // Print A4 sits in the footer regardless of status.
     expect(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Print A4'),
-      ),
+      find.descendant(of: find.byType(Dialog), matching: find.text('Print A4')),
       findsOneWidget,
     );
 
@@ -10092,17 +10257,11 @@ void main() {
     await tester.tap(find.text('SO-2026-001'));
     await tester.pumpAndSettle();
     expect(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Print A4'),
-      ),
+      find.descendant(of: find.byType(Dialog), matching: find.text('Print A4')),
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Edit'),
-      ),
+      find.descendant(of: find.byType(Dialog), matching: find.text('Edit')),
       findsOneWidget,
     );
   });
@@ -10183,10 +10342,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    clearScreenDates(
-      tester,
-      [quotationsFromDateProvider, quotationsToDateProvider],
-    );
+    clearScreenDates(tester, [
+      quotationsFromDateProvider,
+      quotationsToDateProvider,
+    ]);
     await tester.pumpAndSettle();
   }
 
@@ -10209,9 +10368,9 @@ void main() {
     expect(find.text('Draft'), findsOneWidget);
     expect(find.text('Accepted'), findsOneWidget);
     // Totals via the shared currency formatter.
-    expect(find.text('1,200.00'), findsOneWidget);
-    expect(find.text('900.00'), findsOneWidget);
-    expect(find.text('700.00'), findsOneWidget);
+    expect(find.text('Rs. 1,200.00'), findsOneWidget);
+    expect(find.text('Rs. 900.00'), findsOneWidget);
+    expect(find.text('Rs. 700.00'), findsOneWidget);
   });
 
   testWidgets('quotations grid exports the rows to CSV', (tester) async {
@@ -10269,69 +10428,71 @@ void main() {
     if (file.existsSync()) file.deleteSync();
   });
 
-  testWidgets('quotations screen bulk delete confirms and calls DELETE per id', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    BulkPacing.disableForTests();
-    addTearDown(() {
-      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
-      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
-    });
-    final adapter = _AuthFakeAdapter();
-    await bootToQuotations(tester, adapter);
+  testWidgets(
+    'quotations screen bulk delete confirms and calls DELETE per id',
+    (tester) async {
+      useWideSurface(tester);
+      BulkPacing.disableForTests();
+      addTearDown(() {
+        BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+        BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+      });
+      final adapter = _AuthFakeAdapter();
+      await bootToQuotations(tester, adapter);
 
-    // Select the first data row (not the header select-all). The cell's
-    // double-tap recognizer holds the gesture arena for ~300ms, so
-    // advance fake time past it before asserting.
-    await tester.tap(find.byType(Checkbox).first);
-    await tester.pump(const Duration(milliseconds: 350));
-    await tester.pumpAndSettle();
-    expect(find.text('1 selected'), findsOneWidget);
+      // Select the first data row (not the header select-all). The cell's
+      // double-tap recognizer holds the gesture arena for ~300ms, so
+      // advance fake time past it before asserting.
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+      expect(find.text('1 selected'), findsOneWidget);
 
-    // Delete selected → confirm dialog → hard delete fires for id 1.
-    await tester.tap(find.text('Delete selected'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
-    await tester.pumpAndSettle();
-    expect(adapter.bulkDeletedQuotationIds, [1]);
-    // Hard delete — no undo (D3).
-    expect(find.text('1 deleted'), findsOneWidget);
-  });
+      // Delete selected → confirm dialog → hard delete fires for id 1.
+      await tester.tap(find.text('Delete selected'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('confirm_dialog')), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
+      await tester.pumpAndSettle();
+      expect(adapter.bulkDeletedQuotationIds, [1]);
+      // Hard delete — no undo (D3).
+      expect(find.text('1 deleted'), findsOneWidget);
+    },
+  );
 
-  testWidgets('quotations screen bulk delete with failures shows the D11 dialog', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    BulkPacing.disableForTests();
-    addTearDown(() {
-      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
-      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
-    });
-    final adapter = _AuthFakeAdapter()..failQuotationDeleteFor.add(2);
-    await bootToQuotations(tester, adapter);
+  testWidgets(
+    'quotations screen bulk delete with failures shows the D11 dialog',
+    (tester) async {
+      useWideSurface(tester);
+      BulkPacing.disableForTests();
+      addTearDown(() {
+        BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+        BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+      });
+      final adapter = _AuthFakeAdapter()..failQuotationDeleteFor.add(2);
+      await bootToQuotations(tester, adapter);
 
-    // Select all → delete: quotation 2 fails (fixture), the rest succeed.
-    await tester.tap(find.byType(Checkbox).last);
-    await tester.pumpAndSettle();
-    expect(find.text('3 selected'), findsOneWidget);
+      // Select all → delete: quotation 2 fails (fixture), the rest succeed.
+      await tester.tap(find.byType(Checkbox).last);
+      await tester.pumpAndSettle();
+      expect(find.text('3 selected'), findsOneWidget);
 
-    await tester.tap(find.text('Delete selected'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete selected'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
+      await tester.pumpAndSettle();
 
-    // 2 deleted, 1 failed with the server's reason.
-    expect(adapter.bulkDeletedQuotationIds.length, 2);
-    expect(adapter.bulkDeletedQuotationIds, isNot(contains(2)));
-    expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
-    expect(find.text('2 done, 1 failed'), findsOneWidget);
-    expect(
-      find.textContaining('Cannot delete a converted quotation'),
-      findsOneWidget,
-    );
-  });
+      // 2 deleted, 1 failed with the server's reason.
+      expect(adapter.bulkDeletedQuotationIds.length, 2);
+      expect(adapter.bulkDeletedQuotationIds, isNot(contains(2)));
+      expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
+      expect(find.text('2 done, 1 failed'), findsOneWidget);
+      expect(
+        find.textContaining('Cannot delete a converted quotation'),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('quotations screen F2 opens the quotation detail dialog', (
     tester,
@@ -10359,7 +10520,7 @@ void main() {
     expect(find.text('Quotation Details'), findsOneWidget);
     expect(find.text('Widget A'), findsOneWidget);
     expect(find.text('FG001'), findsOneWidget);
-    expect(find.text('1,200.00'), findsWidgets); // total tile + amounts
+    expect(find.text('Rs. 1,200.00'), findsWidgets); // total tile + amounts
 
     // Close returns to the grid.
     await tester.tap(find.widgetWithText(TextButton, 'Close'));
@@ -10508,10 +10669,7 @@ void main() {
     expect(find.text('Quotation Details'), findsOneWidget);
     // Print A4 sits in the footer regardless of status.
     expect(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Print A4'),
-      ),
+      find.descendant(of: find.byType(Dialog), matching: find.text('Print A4')),
       findsOneWidget,
     );
 
@@ -10524,17 +10682,11 @@ void main() {
     await tester.tap(find.text('QT-2026-001'));
     await tester.pumpAndSettle();
     expect(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Print A4'),
-      ),
+      find.descendant(of: find.byType(Dialog), matching: find.text('Print A4')),
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Edit'),
-      ),
+      find.descendant(of: find.byType(Dialog), matching: find.text('Edit')),
       findsOneWidget,
     );
   });
@@ -10638,15 +10790,12 @@ void main() {
     // the expenses/sales-orders boots do. The shell's IndexedStack keeps
     // the direct-purchases tab alive too, so clear its range as well or
     // the January fixtures are filtered out of the purchases grid.
-    clearScreenDates(
-      tester,
-      [
-        purchaseOrdersFromDateProvider,
-        purchaseOrdersToDateProvider,
-        purchasesFromDateProvider,
-        purchasesToDateProvider,
-      ],
-    );
+    clearScreenDates(tester, [
+      purchaseOrdersFromDateProvider,
+      purchaseOrdersToDateProvider,
+      purchasesFromDateProvider,
+      purchasesToDateProvider,
+    ]);
     await tester.pumpAndSettle();
   }
 
@@ -10660,13 +10809,10 @@ void main() {
     await tester.pumpAndSettle();
     // Same IndexedStack rationale — the returns grid (Feb fixtures) is
     // also alive from the first module pump with a this-month default.
-    clearScreenDates(
-      tester,
-      [
-        purchaseReturnsFromDateProvider,
-        purchaseReturnsToDateProvider,
-      ],
-    );
+    clearScreenDates(tester, [
+      purchaseReturnsFromDateProvider,
+      purchaseReturnsToDateProvider,
+    ]);
     await tester.pumpAndSettle();
   }
 
@@ -10683,7 +10829,7 @@ void main() {
     // Rows + column headers from the fake /suppliers payload.
     expect(find.text('SUP001'), findsOneWidget);
     expect(find.text('Alpha Traders'), findsOneWidget);
-    expect(find.text('250.00'), findsOneWidget); // balance formatted
+    expect(find.text('Rs. 250.00'), findsOneWidget); // balance formatted
     expect(find.text('Supplier Code'), findsOneWidget); // column header
     // Gamma Goods' badge + the toolbar's Inactive status-filter segment.
     expect(find.text('Inactive'), findsNWidgets(2));
@@ -10728,42 +10874,43 @@ void main() {
     expect(find.text('1 deleted'), findsOneWidget);
   });
 
-  testWidgets('suppliers screen bulk delete with failures shows the D11 dialog', (
-    tester,
-  ) async {
-    // Wide surface: 4-action bulk bar (same as the customers bulk tests).
-    tester.view.physicalSize = const Size(2200, 900);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-    BulkPacing.disableForTests();
-    addTearDown(() {
-      BulkPacing.interCallDelay = const Duration(milliseconds: 150);
-      BulkPacing.maxRetryDelay = const Duration(seconds: 65);
-    });
-    final adapter = _AuthFakeAdapter()..failSupplierDeleteFor.add(2);
-    await bootToSuppliers(tester, adapter);
+  testWidgets(
+    'suppliers screen bulk delete with failures shows the D11 dialog',
+    (tester) async {
+      // Wide surface: 4-action bulk bar (same as the customers bulk tests).
+      tester.view.physicalSize = const Size(2200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      BulkPacing.disableForTests();
+      addTearDown(() {
+        BulkPacing.interCallDelay = const Duration(milliseconds: 150);
+        BulkPacing.maxRetryDelay = const Duration(seconds: 65);
+      });
+      final adapter = _AuthFakeAdapter()..failSupplierDeleteFor.add(2);
+      await bootToSuppliers(tester, adapter);
 
-    // Select all → delete: supplier 2 fails (fixture), the rest of the
-    // page-1 rows (10 at the default limit) succeed.
-    await tester.tap(find.byType(Checkbox).last);
-    await tester.pumpAndSettle();
-    expect(find.text('10 selected'), findsOneWidget);
+      // Select all → delete: supplier 2 fails (fixture), the rest of the
+      // page-1 rows (10 at the default limit) succeed.
+      await tester.tap(find.byType(Checkbox).last);
+      await tester.pumpAndSettle();
+      expect(find.text('10 selected'), findsOneWidget);
 
-    await tester.tap(find.text('Delete selected'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete selected'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete').last);
+      await tester.pumpAndSettle();
 
-    // 9 deleted, 1 failed with the server's reason.
-    expect(adapter.bulkDeletedSupplierIds.length, 9);
-    expect(adapter.bulkDeletedSupplierIds, isNot(contains(2)));
-    expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
-    expect(find.text('9 done, 1 failed'), findsOneWidget);
-    expect(
-      find.textContaining('Supplier has purchase orders'),
-      findsOneWidget,
-    );
-  });
+      // 9 deleted, 1 failed with the server's reason.
+      expect(adapter.bulkDeletedSupplierIds.length, 9);
+      expect(adapter.bulkDeletedSupplierIds, isNot(contains(2)));
+      expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
+      expect(find.text('9 done, 1 failed'), findsOneWidget);
+      expect(
+        find.textContaining('Supplier has purchase orders'),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('suppliers screen bulk activate/deactivate PUTs is_active', (
     tester,
@@ -10810,7 +10957,7 @@ void main() {
 
     expect(find.text('CUST001'), findsOneWidget);
     expect(find.text('Acme Corp'), findsOneWidget);
-    expect(find.text('120.50'), findsOneWidget); // balance formatted
+    expect(find.text('Rs. 120.50'), findsOneWidget); // balance formatted
     expect(find.text('Customer Code'), findsOneWidget); // column header
     // Gamma Inc's badge + the toolbar's Inactive status-filter segment.
     expect(find.text('Inactive'), findsNWidgets(2));
@@ -11101,7 +11248,7 @@ void main() {
     // quick stats (credit limit stat), Record Payment + the 5 tabs.
     expect(find.text('Acme Corp'), findsOneWidget);
     expect(find.text('(Jane Doe)'), findsOneWidget);
-    expect(find.text('5,000.00'), findsOneWidget); // credit-limit stat
+    expect(find.text('Rs. 5,000.00'), findsOneWidget); // credit-limit stat
     expect(find.text('Record Payment'), findsOneWidget);
     expect(find.text('Overview'), findsOneWidget);
     expect(find.text('Invoices'), findsOneWidget);
@@ -11273,16 +11420,19 @@ void main() {
     expect(find.text('INV-2026-001'), findsOneWidget); // reference col
     // Header summary (collapsed): 1 payment · Balance: 300.00; the
     // child payment is hidden until expanded.
-    expect(find.textContaining('1 payments · Balance: 300.00'), findsOneWidget);
-    expect(find.text('500.00'), findsWidgets); // header debit
+    expect(
+      find.textContaining('1 payments · Balance: Rs. 300.00'),
+      findsOneWidget,
+    );
+    expect(find.text('Rs. 500.00'), findsWidgets); // header debit
     expect(find.text('Payment received'), findsNothing); // child hidden
     // Totals footer: balance = debit 500 − credit 200 = 300 (also shown
     // in the page's quick-stat Balance, so multiple matches).
-    expect(find.text('300.00'), findsWidgets);
+    expect(find.text('Rs. 300.00'), findsWidgets);
 
     // Expanding the group reveals the payment row, indented with the
     // web's "—" child marker.
-    await tester.tap(find.textContaining('1 payments · Balance: 300.00'));
+    await tester.tap(find.textContaining('1 payments · Balance: Rs. 300.00'));
     await tester.pumpAndSettle();
     expect(find.text('Payment received'), findsOneWidget);
     expect(find.text('—'), findsOneWidget); // child indent marker
@@ -11313,7 +11463,7 @@ void main() {
     // quick stats, Record Payment + the 5 tabs.
     expect(find.text('Alpha Traders'), findsOneWidget);
     expect(find.text('(Ali Raza)'), findsOneWidget);
-    expect(find.text('250.00'), findsWidgets); // balance quick-stat
+    expect(find.text('Rs. 250.00'), findsWidgets); // balance quick-stat
     expect(find.text('Record Payment'), findsOneWidget);
     expect(find.text('Overview'), findsOneWidget);
     expect(find.text('POs'), findsOneWidget);
@@ -11442,10 +11592,7 @@ void main() {
     await tester.pump();
     final addInPoRow = find.descendant(
       of: find
-          .ancestor(
-            of: find.text('PO-2026-001'),
-            matching: find.byType(Row),
-          )
+          .ancestor(of: find.text('PO-2026-001'), matching: find.byType(Row))
           .first,
       matching: find.text('+ Add'),
     );
@@ -11455,10 +11602,7 @@ void main() {
     // Submit posts the supplier-shaped body with po_allocations — the
     // submit button sits below the modal's fold, so scroll to it.
     final dialogScrollable = find
-        .descendant(
-          of: find.byType(Dialog),
-          matching: find.byType(Scrollable),
-        )
+        .descendant(of: find.byType(Dialog), matching: find.byType(Scrollable))
         .first;
     final submitBtn = find.widgetWithText(FilledButton, 'Record Payment').last;
     await tester.scrollUntilVisible(
@@ -11512,12 +11656,12 @@ void main() {
     // formatted and zero cells are blank — raw numbers (500.0 / 200.0)
     // and "0.00" placeholders must not appear. The formatted amounts
     // show in both the grid cells and the totals footer.
-    expect(find.text('500.00'), findsWidgets);
-    expect(find.text('200.00'), findsWidgets);
-    expect(find.text('120.50'), findsWidgets);
+    expect(find.text('Rs. 500.00'), findsWidgets);
+    expect(find.text('Rs. 200.00'), findsWidgets);
+    expect(find.text('Rs. 120.50'), findsWidgets);
     expect(find.text('500.0'), findsNothing);
     expect(find.text('200.0'), findsNothing);
-    expect(find.text('0.00'), findsNothing);
+    expect(find.text('Rs. 0.00'), findsNothing);
   });
 
   testWidgets('supplier detail Statement tab shows the running balance', (
@@ -11554,10 +11698,10 @@ void main() {
     expect(find.text('Payment made'), findsOneWidget);
     // opening: tile + row; total debit 500 = entry + totals; total credit
     // 200 = entry + totals; closing 400 = tile + entry-2 balance + totals.
-    expect(find.text('100.00'), findsNWidgets(2));
-    expect(find.text('500.00'), findsNWidgets(2));
-    expect(find.text('200.00'), findsNWidgets(2));
-    expect(find.text('400.00'), findsNWidgets(3));
+    expect(find.text('Rs. 100.00'), findsNWidgets(2));
+    expect(find.text('Rs. 500.00'), findsNWidgets(2));
+    expect(find.text('Rs. 200.00'), findsNWidgets(2));
+    expect(find.text('Rs. 400.00'), findsNWidgets(3));
   });
 
   // ── Unified detail-page date range — Phase 8 acceptance tests ──────
@@ -11578,222 +11722,219 @@ void main() {
   ];
 
   testWidgets(
-      'customer detail pill seeds from the global range and drives every tab',
-      (tester) async {
+    'customer detail pill seeds from the global range and drives every tab',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToCustomers(tester, adapter, overrides: juneRangeOverrides());
+      await _openFirstRowDetail(tester);
+
+      // The pill bar shows the seeded global range (snapshot-on-open, §3.2);
+      // the Overview cards add their own "Jun 1, 2026 – Jun 30, 2026"
+      // period annotations, so assert the pill's exact compact text.
+      expect(find.byType(DateRangeFilter), findsOneWidget);
+      expect(find.text('Jun 1–30, 2026'), findsOneWidget);
+
+      // Overview's feeds are deliberately unfiltered (standing metrics, §6.1).
+      expect(adapter.lastInvoicesQuery?['start_date'], isNull);
+      expect(adapter.lastCustomerLedgerQuery?['fromDate'], isNull);
+
+      // Invoices tab — the endpoint's own param names (start_date/end_date)
+      // carry the page range; 14 June fixtures → two pages.
+      await _tapDetailTab(tester, 'Invoices');
+      expect(adapter.lastInvoicesQuery?['start_date'], '2026-06-01');
+      expect(adapter.lastInvoicesQuery?['end_date'], '2026-06-30');
+      expect(find.text('INV-JUN-001'), findsOneWidget);
+      expect(find.text('Page 1 of 2'), findsOneWidget);
+
+      // Ledger tab — fromDate/toDate on the ranged feed.
+      await _tapDetailTab(tester, 'Ledger');
+      expect(adapter.lastCustomerLedgerQuery?['fromDate'], '2026-06-01');
+      expect(adapter.lastCustomerLedgerQuery?['toDate'], '2026-06-30');
+
+      // Payments tab — fromDate/toDate.
+      await _tapDetailTab(tester, 'Payments');
+      expect(adapter.lastPaymentsQuery?['fromDate'], '2026-06-01');
+      expect(adapter.lastPaymentsQuery?['toDate'], '2026-06-30');
+
+      // Statement tab — fromDate/toDate; June has no statement rows so the
+      // filtered-empty copy shows, and the header pill is the only picker
+      // on the page (no tab-local picker, §14 Rule 1).
+      await _tapDetailTab(tester, 'Statement');
+      expect(adapter.lastCustomerStatementQuery?['fromDate'], '2026-06-01');
+      expect(adapter.lastCustomerStatementQuery?['toDate'], '2026-06-30');
+      expect(find.text('No records in the selected period'), findsOneWidget);
+      expect(find.byType(DateRangeFilter), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'customer detail All dates is page-local and refetches full history',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToCustomers(tester, adapter, overrides: juneRangeOverrides());
+      await _openFirstRowDetail(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(DateRangeFilter)),
+      );
+
+      await _pillAllDates(tester);
+      expect(find.text('All dates'), findsOneWidget); // pill bar
+
+      // Page-local only: the global range keeps its June value (D5).
+      expect(
+        container.read(globalReportFromDateProvider),
+        DateTime(2026, 6, 1),
+      );
+      expect(container.read(globalReportToDateProvider), DateTime(2026, 6, 30));
+
+      // Statement = full-history framing with both date parameters omitted
+      // (opening row + tiles + both transactions, §6.5).
+      await _tapDetailTab(tester, 'Statement');
+      expect(adapter.lastCustomerStatementQuery?['fromDate'], isNull);
+      expect(adapter.lastCustomerStatementQuery?['toDate'], isNull);
+      // The customer statement shows the label 3×: summary tile row +
+      // opening row's reference cell + its description cell.
+      expect(find.text('Opening Balance'), findsNWidgets(3));
+      expect(find.text('Closing Balance'), findsNWidgets(3));
+      // The transaction rows sit below the viewport fold inside the
+      // statement's scroll view, so assert with skipOffstage: false.
+      expect(
+        find.text('Invoice for goods', skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Payment received', skipOffstage: false),
+        findsOneWidget,
+      );
+
+      // Ledger also omits the date parameters and shows full history — the
+      // January invoice renders as a group header carrying its reference.
+      await _tapDetailTab(tester, 'Ledger');
+      expect(adapter.lastCustomerLedgerQuery?['fromDate'], isNull);
+      expect(adapter.lastCustomerLedgerQuery?['toDate'], isNull);
+      expect(find.text('INV-2026-001'), findsOneWidget);
+
+      // Invoices omit the date parameters and page through ALL rows.
+      await _tapDetailTab(tester, 'Invoices');
+      expect(adapter.lastInvoicesQuery?['start_date'], isNull);
+      expect(adapter.lastInvoicesQuery?['end_date'], isNull);
+      expect(find.text('Page 1 of 2'), findsOneWidget); // 19 fixtures
+      await tester.tap(find.byTooltip('Next'));
+      await tester.pumpAndSettle();
+      expect(find.text('INV-JAN-001'), findsOneWidget); // off-month row
+    },
+  );
+
+  testWidgets(
+    'customer detail pill custom range and preset commit page and global',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToCustomers(tester, adapter, overrides: juneRangeOverrides());
+      await _openFirstRowDetail(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(DateRangeFilter)),
+      );
+
+      // Custom range through the calendar: start Jun 5, end Jun 8 (the
+      // picker's instant-apply two-click state machine).
+      await _openPill(tester);
+      await tester.tap(find.byKey(const ValueKey('drp-day-2026-06-05')));
+      await tester.pumpAndSettle();
+      expect(find.text('Pick an end date'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('drp-day-2026-06-08')));
+      await tester.pumpAndSettle();
+
+      // The commit reaches the global range (D4) and the Overview cohort
+      // reacts: Jun 6 + Jun 8 invoices → 300+400 / 150+400.
+      expect(
+        container.read(globalReportFromDateProvider),
+        DateTime(2026, 6, 5),
+      );
+      expect(container.read(globalReportToDateProvider), DateTime(2026, 6, 8));
+      expect(find.text('Rs. 700.00'), findsOneWidget);
+      expect(find.text('Rs. 550.00'), findsOneWidget);
+
+      // The ledger refetches with the committed range.
+      await _tapDetailTab(tester, 'Ledger');
+      expect(adapter.lastCustomerLedgerQuery?['fromDate'], '2026-06-05');
+      expect(adapter.lastCustomerLedgerQuery?['toDate'], '2026-06-08');
+
+      // A preset commit (This month, relative to the machine's clock) also
+      // lands on the page + global pairs.
+      await _tapDetailTab(tester, 'Overview');
+      await _openPill(tester);
+      await tester.tap(find.text('This month').last);
+      await tester.pumpAndSettle();
+      final today = DateTime.now();
+      final expected = presetRange(
+        DatePreset.thisMonth,
+        DateTime(today.year, today.month, today.day),
+        WeekStart.monday,
+      );
+      expect(container.read(globalReportFromDateProvider), expected.from);
+      expect(container.read(globalReportToDateProvider), expected.to);
+    },
+  );
+
+  testWidgets(
+    'customer detail Overview cohort math keeps standing metrics lifetime',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToCustomers(tester, adapter, overrides: juneRangeOverrides());
+      await _openFirstRowDetail(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(DateRangeFilter)),
+      );
+
+      // June cohort: Total Invoiced 10,500 / Total Received 4,150; the
+      // standing figures (Outstanding 7,475, Avg. Days 0.0) are lifetime.
+      expect(find.text('Rs. 10,500.00'), findsOneWidget);
+      expect(find.text('Rs. 4,150.00'), findsOneWidget);
+      expect(find.text('Rs. 7,475.00'), findsOneWidget);
+      expect(find.text('0.0'), findsOneWidget);
+
+      // ‹ shifts the custom 30-day range back 30 days → May 2–31 (custom
+      // ranges shift by their own length): only the May 5 invoice is in the
+      // cohort (450 / 225) and the global range follows.
+      await _pillShiftPrev(tester);
+      expect(find.text('Rs. 450.00'), findsOneWidget);
+      expect(find.text('Rs. 225.00'), findsOneWidget);
+      expect(find.text('Rs. 7,475.00'), findsOneWidget); // standing unchanged
+      expect(
+        container.read(globalReportFromDateProvider),
+        DateTime(2026, 5, 2),
+      );
+      expect(container.read(globalReportToDateProvider), DateTime(2026, 5, 31));
+
+      // Second ‹ → Apr 2–May 1: empty cohort → both cards 0.00 + the
+      // compact filtered-empty line (title only — no hint, §10.2).
+      await _pillShiftPrev(tester);
+      expect(find.text('Rs. 0.00'), findsNWidgets(2));
+      expect(find.text('No records in the selected period'), findsOneWidget);
+      expect(
+        find.text('Try a wider date range or choose All dates'),
+        findsNothing,
+      );
+      expect(find.text('Rs. 7,475.00'), findsOneWidget);
+
+      // All dates → full-history cohort: 12,750 / 5,275; standing unchanged.
+      await _pillAllDates(tester);
+      expect(find.text('Rs. 12,750.00'), findsOneWidget);
+      expect(find.text('Rs. 5,275.00'), findsOneWidget);
+      expect(find.text('Rs. 7,475.00'), findsOneWidget);
+    },
+  );
+
+  testWidgets('customer detail paged tabs reset to page 1 on range change', (
+    tester,
+  ) async {
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
-    await bootToCustomers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
-    await _openFirstRowDetail(tester);
-
-    // The pill bar shows the seeded global range (snapshot-on-open, §3.2);
-    // the Overview cards add their own "Jun 1, 2026 – Jun 30, 2026"
-    // period annotations, so assert the pill's exact compact text.
-    expect(find.byType(DateRangeFilter), findsOneWidget);
-    expect(find.text('Jun 1–30, 2026'), findsOneWidget);
-
-    // Overview's feeds are deliberately unfiltered (standing metrics, §6.1).
-    expect(adapter.lastInvoicesQuery?['start_date'], isNull);
-    expect(adapter.lastCustomerLedgerQuery?['fromDate'], isNull);
-
-    // Invoices tab — the endpoint's own param names (start_date/end_date)
-    // carry the page range; 14 June fixtures → two pages.
-    await _tapDetailTab(tester, 'Invoices');
-    expect(adapter.lastInvoicesQuery?['start_date'], '2026-06-01');
-    expect(adapter.lastInvoicesQuery?['end_date'], '2026-06-30');
-    expect(find.text('INV-JUN-001'), findsOneWidget);
-    expect(find.text('Page 1 of 2'), findsOneWidget);
-
-    // Ledger tab — fromDate/toDate on the ranged feed.
-    await _tapDetailTab(tester, 'Ledger');
-    expect(adapter.lastCustomerLedgerQuery?['fromDate'], '2026-06-01');
-    expect(adapter.lastCustomerLedgerQuery?['toDate'], '2026-06-30');
-
-    // Payments tab — fromDate/toDate.
-    await _tapDetailTab(tester, 'Payments');
-    expect(adapter.lastPaymentsQuery?['fromDate'], '2026-06-01');
-    expect(adapter.lastPaymentsQuery?['toDate'], '2026-06-30');
-
-    // Statement tab — fromDate/toDate; June has no statement rows so the
-    // filtered-empty copy shows, and the header pill is the only picker
-    // on the page (no tab-local picker, §14 Rule 1).
-    await _tapDetailTab(tester, 'Statement');
-    expect(adapter.lastCustomerStatementQuery?['fromDate'], '2026-06-01');
-    expect(adapter.lastCustomerStatementQuery?['toDate'], '2026-06-30');
-    expect(find.text('No records in the selected period'), findsOneWidget);
-    expect(find.byType(DateRangeFilter), findsOneWidget);
-  });
-
-  testWidgets('customer detail All dates is page-local and refetches full history',
-      (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToCustomers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
-    await _openFirstRowDetail(tester);
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(DateRangeFilter)),
-    );
-
-    await _pillAllDates(tester);
-    expect(find.text('All dates'), findsOneWidget); // pill bar
-
-    // Page-local only: the global range keeps its June value (D5).
-    expect(container.read(globalReportFromDateProvider), DateTime(2026, 6, 1));
-    expect(container.read(globalReportToDateProvider), DateTime(2026, 6, 30));
-
-    // Statement = full-history framing with both date parameters omitted
-    // (opening row + tiles + both transactions, §6.5).
-    await _tapDetailTab(tester, 'Statement');
-    expect(adapter.lastCustomerStatementQuery?['fromDate'], isNull);
-    expect(adapter.lastCustomerStatementQuery?['toDate'], isNull);
-    // The customer statement shows the label 3×: summary tile row +
-    // opening row's reference cell + its description cell.
-    expect(find.text('Opening Balance'), findsNWidgets(3));
-    expect(find.text('Closing Balance'), findsNWidgets(3));
-    // The transaction rows sit below the viewport fold inside the
-    // statement's scroll view, so assert with skipOffstage: false.
-    expect(
-      find.text('Invoice for goods', skipOffstage: false),
-      findsOneWidget,
-    );
-    expect(
-      find.text('Payment received', skipOffstage: false),
-      findsOneWidget,
-    );
-
-    // Ledger also omits the date parameters and shows full history — the
-    // January invoice renders as a group header carrying its reference.
-    await _tapDetailTab(tester, 'Ledger');
-    expect(adapter.lastCustomerLedgerQuery?['fromDate'], isNull);
-    expect(adapter.lastCustomerLedgerQuery?['toDate'], isNull);
-    expect(find.text('INV-2026-001'), findsOneWidget);
-
-    // Invoices omit the date parameters and page through ALL rows.
-    await _tapDetailTab(tester, 'Invoices');
-    expect(adapter.lastInvoicesQuery?['start_date'], isNull);
-    expect(adapter.lastInvoicesQuery?['end_date'], isNull);
-    expect(find.text('Page 1 of 2'), findsOneWidget); // 19 fixtures
-    await tester.tap(find.byTooltip('Next'));
-    await tester.pumpAndSettle();
-    expect(find.text('INV-JAN-001'), findsOneWidget); // off-month row
-  });
-
-  testWidgets('customer detail pill custom range and preset commit page and global',
-      (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToCustomers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
-    await _openFirstRowDetail(tester);
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(DateRangeFilter)),
-    );
-
-    // Custom range through the calendar: start Jun 5, end Jun 8 (the
-    // picker's instant-apply two-click state machine).
-    await _openPill(tester);
-    await tester.tap(find.byKey(const ValueKey('drp-day-2026-06-05')));
-    await tester.pumpAndSettle();
-    expect(find.text('Pick an end date'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('drp-day-2026-06-08')));
-    await tester.pumpAndSettle();
-
-    // The commit reaches the global range (D4) and the Overview cohort
-    // reacts: Jun 6 + Jun 8 invoices → 300+400 / 150+400.
-    expect(container.read(globalReportFromDateProvider), DateTime(2026, 6, 5));
-    expect(container.read(globalReportToDateProvider), DateTime(2026, 6, 8));
-    expect(find.text('700.00'), findsOneWidget);
-    expect(find.text('550.00'), findsOneWidget);
-
-    // The ledger refetches with the committed range.
-    await _tapDetailTab(tester, 'Ledger');
-    expect(adapter.lastCustomerLedgerQuery?['fromDate'], '2026-06-05');
-    expect(adapter.lastCustomerLedgerQuery?['toDate'], '2026-06-08');
-
-    // A preset commit (This month, relative to the machine's clock) also
-    // lands on the page + global pairs.
-    await _tapDetailTab(tester, 'Overview');
-    await _openPill(tester);
-    await tester.tap(find.text('This month').last);
-    await tester.pumpAndSettle();
-    final today = DateTime.now();
-    final expected = presetRange(
-      DatePreset.thisMonth,
-      DateTime(today.year, today.month, today.day),
-      WeekStart.monday,
-    );
-    expect(container.read(globalReportFromDateProvider), expected.from);
-    expect(container.read(globalReportToDateProvider), expected.to);
-  });
-
-  testWidgets('customer detail Overview cohort math keeps standing metrics lifetime',
-      (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToCustomers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
-    await _openFirstRowDetail(tester);
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(DateRangeFilter)),
-    );
-
-    // June cohort: Total Invoiced 10,500 / Total Received 4,150; the
-    // standing figures (Outstanding 7,475, Avg. Days 0.0) are lifetime.
-    expect(find.text('10,500.00'), findsOneWidget);
-    expect(find.text('4,150.00'), findsOneWidget);
-    expect(find.text('7,475.00'), findsOneWidget);
-    expect(find.text('0.0'), findsOneWidget);
-
-    // ‹ shifts the custom 30-day range back 30 days → May 2–31 (custom
-    // ranges shift by their own length): only the May 5 invoice is in the
-    // cohort (450 / 225) and the global range follows.
-    await _pillShiftPrev(tester);
-    expect(find.text('450.00'), findsOneWidget);
-    expect(find.text('225.00'), findsOneWidget);
-    expect(find.text('7,475.00'), findsOneWidget); // standing unchanged
-    expect(container.read(globalReportFromDateProvider), DateTime(2026, 5, 2));
-    expect(container.read(globalReportToDateProvider), DateTime(2026, 5, 31));
-
-    // Second ‹ → Apr 2–May 1: empty cohort → both cards 0.00 + the
-    // compact filtered-empty line (title only — no hint, §10.2).
-    await _pillShiftPrev(tester);
-    expect(find.text('0.00'), findsNWidgets(2));
-    expect(find.text('No records in the selected period'), findsOneWidget);
-    expect(
-      find.text('Try a wider date range or choose All dates'),
-      findsNothing,
-    );
-    expect(find.text('7,475.00'), findsOneWidget);
-
-    // All dates → full-history cohort: 12,750 / 5,275; standing unchanged.
-    await _pillAllDates(tester);
-    expect(find.text('12,750.00'), findsOneWidget);
-    expect(find.text('5,275.00'), findsOneWidget);
-    expect(find.text('7,475.00'), findsOneWidget);
-  });
-
-  testWidgets('customer detail paged tabs reset to page 1 on range change',
-      (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToCustomers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
+    await bootToCustomers(tester, adapter, overrides: juneRangeOverrides());
     await _openFirstRowDetail(tester);
 
     // Invoices: 14 June rows → 2 pages; page 2, then All dates re-keys
@@ -11810,96 +11951,86 @@ void main() {
     expect(adapter.lastInvoicesQuery?['end_date'], isNull);
   });
 
-  testWidgets('customer detail Payments tab resets to page 1 when the range shifts',
-      (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToCustomers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
-    await _openFirstRowDetail(tester);
+  testWidgets(
+    'customer detail Payments tab resets to page 1 when the range shifts',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToCustomers(tester, adapter, overrides: juneRangeOverrides());
+      await _openFirstRowDetail(tester);
 
-    // Payments: 12 June rows → 2 pages; page 2, then the ‹ arrow commits
-    // May 2–31 and the tab must refetch page 1 with the new dates.
-    await _tapDetailTab(tester, 'Payments');
-    expect(find.text('Page 1 of 2'), findsOneWidget);
-    await tester.tap(find.byTooltip('Next'));
-    await tester.pumpAndSettle();
-    expect(adapter.lastPaymentsQuery?['page'], 2);
-    await _pillShiftPrev(tester);
-    expect(adapter.lastPaymentsQuery?['page'], 1);
-    expect(adapter.lastPaymentsQuery?['fromDate'], '2026-05-02');
-    expect(adapter.lastPaymentsQuery?['toDate'], '2026-05-31');
-  });
+      // Payments: 12 June rows → 2 pages; page 2, then the ‹ arrow commits
+      // May 2–31 and the tab must refetch page 1 with the new dates.
+      await _tapDetailTab(tester, 'Payments');
+      expect(find.text('Page 1 of 2'), findsOneWidget);
+      await tester.tap(find.byTooltip('Next'));
+      await tester.pumpAndSettle();
+      expect(adapter.lastPaymentsQuery?['page'], 2);
+      await _pillShiftPrev(tester);
+      expect(adapter.lastPaymentsQuery?['page'], 1);
+      expect(adapter.lastPaymentsQuery?['fromDate'], '2026-05-02');
+      expect(adapter.lastPaymentsQuery?['toDate'], '2026-05-31');
+    },
+  );
 
-  testWidgets('customer detail empty states split filtered-empty from true-no-data',
-      (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter()..emptyCustomer1Invoices = true;
-    await bootToCustomers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
-    await _openFirstRowDetail(tester);
+  testWidgets(
+    'customer detail empty states split filtered-empty from true-no-data',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter()..emptyCustomer1Invoices = true;
+      await bootToCustomers(tester, adapter, overrides: juneRangeOverrides());
+      await _openFirstRowDetail(tester);
 
-    // All dates + genuinely no invoices → the module's true-no-data copy,
-    // never the filtered-period message (§10.1).
-    await _pillAllDates(tester);
-    await _tapDetailTab(tester, 'Invoices');
-    expect(find.text('No invoices found'), findsOneWidget);
-    expect(find.text('No records in the selected period'), findsNothing);
-  });
+      // All dates + genuinely no invoices → the module's true-no-data copy,
+      // never the filtered-period message (§10.1).
+      await _pillAllDates(tester);
+      await _tapDetailTab(tester, 'Invoices');
+      expect(find.text('No invoices found'), findsOneWidget);
+      expect(find.text('No records in the selected period'), findsNothing);
+    },
+  );
 
-  testWidgets('customer detail header places the date pill right of Record Payment',
-      (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter()
-      ..customer1NameOverride =
-          'Acme Corporation International Trading Company Limited';
-    await bootToCustomers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
-    await _openFirstRowDetail(tester);
+  testWidgets(
+    'customer detail header places the date pill right of Record Payment',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter()
+        ..customer1NameOverride =
+            'Acme Corporation International Trading Company Limited';
+      await bootToCustomers(tester, adapter, overrides: juneRangeOverrides());
+      await _openFirstRowDetail(tester);
 
-    // Geometry: the pill sits strictly right of Record Payment (D2) and
-    // both controls stay fully on-screen.
-    final pillRect = tester.getRect(find.byType(DateRangeFilter));
-    final buttonRect = tester.getRect(
-      find.widgetWithText(FilledButton, 'Record Payment'),
-    );
-    expect(pillRect.left, greaterThanOrEqualTo(buttonRect.right));
-    expect(pillRect.right, lessThanOrEqualTo(1600));
-    expect(buttonRect.right, lessThanOrEqualTo(1600));
+      // Geometry: the pill sits strictly right of Record Payment (D2) and
+      // both controls stay fully on-screen.
+      final pillRect = tester.getRect(find.byType(DateRangeFilter));
+      final buttonRect = tester.getRect(
+        find.widgetWithText(FilledButton, 'Record Payment'),
+      );
+      expect(pillRect.left, greaterThanOrEqualTo(buttonRect.right));
+      expect(pillRect.right, lessThanOrEqualTo(1600));
+      expect(buttonRect.right, lessThanOrEqualTo(1600));
 
-    // The long identity truncates with ellipsis instead of overflowing.
-    final nameText = tester.widget<Text>(
-      find.text('Acme Corporation International Trading Company Limited'),
-    );
-    expect(nameText.overflow, TextOverflow.ellipsis);
-  });
+      // The long identity truncates with ellipsis instead of overflowing.
+      final nameText = tester.widget<Text>(
+        find.text('Acme Corporation International Trading Company Limited'),
+      );
+      expect(nameText.overflow, TextOverflow.ellipsis);
+    },
+  );
 
   testWidgets('supplier detail pill drives every tab fetch params', (
     tester,
   ) async {
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
-    await bootToSuppliers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
+    await bootToSuppliers(tester, adapter, overrides: juneRangeOverrides());
     await _openFirstRowDetail(tester);
 
     // Overview's PO summary is range-scoped (start_date/end_date, §7.1):
     // June cohort = 12 POs / 7,800.
     expect(adapter.lastSupplierPoSummaryQuery?['start_date'], '2026-06-01');
     expect(adapter.lastSupplierPoSummaryQuery?['end_date'], '2026-06-30');
-    expect(find.text('7,800.00'), findsOneWidget);
+    expect(find.text('Rs. 7,800.00'), findsOneWidget);
 
     // POs tab — the PO convention (start_date/end_date); 12 June rows.
     await _tapDetailTab(tester, 'POs');
@@ -11932,51 +12063,48 @@ void main() {
     expect(find.byType(DateRangeFilter), findsOneWidget);
   });
 
-  testWidgets('supplier detail Overview filters PO metrics but keeps Current Balance',
-      (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToSuppliers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
-    await _openFirstRowDetail(tester);
+  testWidgets(
+    'supplier detail Overview filters PO metrics but keeps Current Balance',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToSuppliers(tester, adapter, overrides: juneRangeOverrides());
+      await _openFirstRowDetail(tester);
 
-    // June cohort: 12 POs / 7,800; Current Balance stays 250 (as-of-now,
-    // §7.1).
-    expect(find.text('7,800.00'), findsOneWidget);
-    expect(find.text('250.00'), findsWidgets);
+      // June cohort: 12 POs / 7,800; Current Balance stays 250 (as-of-now,
+      // §7.1).
+      expect(find.text('Rs. 7,800.00'), findsOneWidget);
+      expect(find.text('Rs. 250.00'), findsWidgets);
 
-    // Two ‹ shifts → Apr 2–May 1: zero-PO period — PO values zeroed,
-    // Current Balance unchanged, §10.3 line without the hint.
-    await _pillShiftPrev(tester);
-    await _pillShiftPrev(tester);
-    expect(find.text('0.00'), findsOneWidget); // Total PO Value
-    expect(find.text('No records in the selected period'), findsOneWidget);
-    expect(
-      find.text('Try a wider date range or choose All dates'),
-      findsNothing,
-    );
-    expect(find.text('250.00'), findsWidgets); // Current Balance unchanged
+      // Two ‹ shifts → Apr 2–May 1: zero-PO period — PO values zeroed,
+      // Current Balance unchanged, §10.3 line without the hint.
+      await _pillShiftPrev(tester);
+      await _pillShiftPrev(tester);
+      expect(find.text('Rs. 0.00'), findsOneWidget); // Total PO Value
+      expect(find.text('No records in the selected period'), findsOneWidget);
+      expect(
+        find.text('Try a wider date range or choose All dates'),
+        findsNothing,
+      );
+      expect(
+        find.text('Rs. 250.00'),
+        findsWidgets,
+      ); // Current Balance unchanged
 
-    // All dates → lifetime summary: 16 POs / 16,800 (9,000 Jan + 7,800
-    // June — the pre-existing 4-PO/9,000 summary preserved, §7.1).
-    await _pillAllDates(tester);
-    expect(find.text('16,800.00'), findsOneWidget);
-    expect(find.text('250.00'), findsWidgets);
-  });
+      // All dates → lifetime summary: 16 POs / 16,800 (9,000 Jan + 7,800
+      // June — the pre-existing 4-PO/9,000 summary preserved, §7.1).
+      await _pillAllDates(tester);
+      expect(find.text('Rs. 16,800.00'), findsOneWidget);
+      expect(find.text('Rs. 250.00'), findsWidgets);
+    },
+  );
 
   testWidgets('supplier detail POs tab resets to page 1 on All dates', (
     tester,
   ) async {
     useWideSurface(tester);
     final adapter = _AuthFakeAdapter();
-    await bootToSuppliers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
+    await bootToSuppliers(tester, adapter, overrides: juneRangeOverrides());
     await _openFirstRowDetail(tester);
 
     // POs: 12 June rows → 2 pages; page 2, then All dates resets to 1.
@@ -11991,88 +12119,82 @@ void main() {
     expect(adapter.lastSupplierPoListQuery?['end_date'], isNull);
   });
 
-  testWidgets('supplier detail Purchases tab resets to page 1 when the range shifts',
-      (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToSuppliers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
-    await _openFirstRowDetail(tester);
+  testWidgets(
+    'supplier detail Purchases tab resets to page 1 when the range shifts',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToSuppliers(tester, adapter, overrides: juneRangeOverrides());
+      await _openFirstRowDetail(tester);
 
-    // Purchases: 12 June rows → 2 pages; page 2, then ‹ commits May 2–31
-    // and the tab refetches page 1 with the new range.
-    await _tapDetailTab(tester, 'Purchases');
-    expect(find.text('Page 1 of 2'), findsOneWidget);
-    await tester.tap(find.byTooltip('Next'));
-    await tester.pumpAndSettle();
-    expect(adapter.lastSupplierPurchasesQuery?['page'], 2);
-    await _pillShiftPrev(tester);
-    expect(adapter.lastSupplierPurchasesQuery?['page'], 1);
-    expect(adapter.lastSupplierPurchasesQuery?['start_date'], '2026-05-02');
-    expect(adapter.lastSupplierPurchasesQuery?['end_date'], '2026-05-31');
-  });
+      // Purchases: 12 June rows → 2 pages; page 2, then ‹ commits May 2–31
+      // and the tab refetches page 1 with the new range.
+      await _tapDetailTab(tester, 'Purchases');
+      expect(find.text('Page 1 of 2'), findsOneWidget);
+      await tester.tap(find.byTooltip('Next'));
+      await tester.pumpAndSettle();
+      expect(adapter.lastSupplierPurchasesQuery?['page'], 2);
+      await _pillShiftPrev(tester);
+      expect(adapter.lastSupplierPurchasesQuery?['page'], 1);
+      expect(adapter.lastSupplierPurchasesQuery?['start_date'], '2026-05-02');
+      expect(adapter.lastSupplierPurchasesQuery?['end_date'], '2026-05-31');
+    },
+  );
 
-  testWidgets('supplier detail empty states split filtered-empty from true-no-data',
-      (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter()..emptySupplier1Pos = true;
-    await bootToSuppliers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
-    await _openFirstRowDetail(tester);
+  testWidgets(
+    'supplier detail empty states split filtered-empty from true-no-data',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter()..emptySupplier1Pos = true;
+      await bootToSuppliers(tester, adapter, overrides: juneRangeOverrides());
+      await _openFirstRowDetail(tester);
 
-    // All dates + genuinely no POs → the module's true-no-data copy.
-    await _pillAllDates(tester);
-    await _tapDetailTab(tester, 'POs');
-    expect(find.text('No purchase orders found'), findsOneWidget);
-    expect(find.text('No records in the selected period'), findsNothing);
-  });
+      // All dates + genuinely no POs → the module's true-no-data copy.
+      await _pillAllDates(tester);
+      await _tapDetailTab(tester, 'POs');
+      expect(find.text('No purchase orders found'), findsOneWidget);
+      expect(find.text('No records in the selected period'), findsNothing);
+    },
+  );
 
-  testWidgets('supplier detail Urdu RTL keeps Record Payment and the pill intact',
-      (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToSuppliers(
-      tester,
-      adapter,
-      overrides: juneRangeOverrides(),
-    );
-    await _openFirstRowDetail(tester);
+  testWidgets(
+    'supplier detail Urdu RTL keeps Record Payment and the pill intact',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToSuppliers(tester, adapter, overrides: juneRangeOverrides());
+      await _openFirstRowDetail(tester);
 
-    // Switch the app language through the real user menu (spec 3.3).
-    await tester.tap(find.byIcon(Icons.account_circle_outlined));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Language'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('اردو'));
-    await tester.pumpAndSettle();
+      // Switch the app language through the real user menu (spec 3.3).
+      await tester.tap(find.byIcon(Icons.account_circle_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Language'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('اردو'));
+      await tester.pumpAndSettle();
 
-    // Urdu labels render and the whole tree is RTL.
-    expect(find.text('ادائیگی ریکارڈ کریں'), findsOneWidget);
-    expect(
-      Directionality.of(tester.element(find.byType(DateRangeFilter))),
-      TextDirection.rtl,
-    );
+      // Urdu labels render and the whole tree is RTL.
+      expect(find.text('ادائیگی ریکارڈ کریں'), findsOneWidget);
+      expect(
+        Directionality.of(tester.element(find.byType(DateRangeFilter))),
+        TextDirection.rtl,
+      );
 
-    // RTL mirrors the header row (the pill renders LEFT of the button);
-    // both controls stay on-screen and never overlap.
-    final pillRect = tester.getRect(find.byType(DateRangeFilter));
-    final buttonRect = tester.getRect(
-      find.widgetWithText(FilledButton, 'ادائیگی ریکارڈ کریں'),
-    );
-    expect(pillRect.overlaps(buttonRect), isFalse);
-    expect(pillRect.left, greaterThanOrEqualTo(0));
-    expect(buttonRect.left, greaterThanOrEqualTo(0));
+      // RTL mirrors the header row (the pill renders LEFT of the button);
+      // both controls stay on-screen and never overlap.
+      final pillRect = tester.getRect(find.byType(DateRangeFilter));
+      final buttonRect = tester.getRect(
+        find.widgetWithText(FilledButton, 'ادائیگی ریکارڈ کریں'),
+      );
+      expect(pillRect.overlaps(buttonRect), isFalse);
+      expect(pillRect.left, greaterThanOrEqualTo(0));
+      expect(buttonRect.left, greaterThanOrEqualTo(0));
 
-    // The locale choice persists to the (in-file shared) SharedPreferences
-    // mock — reset it so later tests boot back into English.
-    addTearDown(() => SharedPreferences.setMockInitialValues({}));
-  });
+      // The locale choice persists to the (in-file shared) SharedPreferences
+      // mock — reset it so later tests boot back into English.
+      addTearDown(() => SharedPreferences.setMockInitialValues({}));
+    },
+  );
 
   testWidgets('supplier form: create posts the schema-shaped body', (
     tester,
@@ -12174,8 +12296,8 @@ void main() {
     expect(find.text('Beta Suppliers'), findsOneWidget);
     expect(find.text('Draft'), findsOneWidget); // status badge
     expect(find.text('Completed'), findsOneWidget);
-    expect(find.text('1,500.00'), findsOneWidget); // total column
-    expect(find.text('2,500.00'), findsOneWidget);
+    expect(find.text('Rs. 1,500.00'), findsOneWidget); // total column
+    expect(find.text('Rs. 2,500.00'), findsOneWidget);
     // Grid column headers.
     expect(find.text('PO No'), findsOneWidget);
     expect(find.text('Status'), findsOneWidget);
@@ -12264,7 +12386,10 @@ void main() {
     expect(find.text('Purchase Order Details'), findsOneWidget);
     expect(find.text('Raw Material A'), findsOneWidget);
     expect(find.text('RM001'), findsOneWidget);
-    expect(find.text('1,500.00'), findsWidgets); // total tile + item amounts
+    expect(
+      find.text('Rs. 1,500.00'),
+      findsWidgets,
+    ); // total tile + item amounts
 
     // Close returns to the grid.
     await tester.tap(find.widgetWithText(TextButton, 'Close'));
@@ -12311,9 +12436,9 @@ void main() {
     expect(find.text('Purchase Return'), findsOneWidget); // type badge
     expect(find.text('PO Return'), findsOneWidget);
     expect(find.text('5'), findsOneWidget); // total qty of row 1
-    expect(find.text('50.00'), findsOneWidget); // total amount, row 1
+    expect(find.text('Rs. 50.00'), findsOneWidget); // total amount, row 1
     expect(find.text('2'), findsWidgets); // total qty of row 2
-    expect(find.text('80.00'), findsOneWidget); // total amount, row 2
+    expect(find.text('Rs. 80.00'), findsOneWidget); // total amount, row 2
     // Status column badges — row 1 Posted, row 2 Voided (fixture).
     expect(find.text('Posted'), findsOneWidget);
     expect(find.text('Voided'), findsOneWidget);
@@ -12369,11 +12494,17 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(PurchaseReturnsScreen)),
     );
-    container.read(purchaseReturnsFromDateProvider.notifier).state =
-        DateTime(2026, 2, 11);
+    container.read(purchaseReturnsFromDateProvider.notifier).state = DateTime(
+      2026,
+      2,
+      11,
+    );
     await tester.pumpAndSettle();
-    container.read(purchaseReturnsToDateProvider.notifier).state =
-        DateTime(2026, 2, 12);
+    container.read(purchaseReturnsToDateProvider.notifier).state = DateTime(
+      2026,
+      2,
+      12,
+    );
     await tester.pumpAndSettle();
 
     expect(adapter.lastPurchaseReturnsQuery?['start_date'], '2026-02-11');
@@ -12435,80 +12566,81 @@ void main() {
     expect(find.text('Posted'), findsNothing);
   });
 
-  testWidgets('purchase returns shows compact cards under the mobile breakpoint', (
-    tester,
-  ) async {
-    // Pump the returns screen directly at a sub-768px width (the full
-    // app's shell keeps the desktop dashboard alive, which overflows at
-    // narrow widths — not this screen's concern).
-    tester.view.physicalSize = const Size(600, 900);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-    final adapter = _AuthFakeAdapter();
-    final storage = _FakeTokenStorage()..token = 'test-token';
-    final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
-    dio.httpClientAdapter = adapter;
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          tokenStorageProvider.overrideWithValue(storage),
-          dioProvider.overrideWithValue(dio),
-        ],
-        child: const MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: PurchaseReturnsScreen()),
+  testWidgets(
+    'purchase returns shows compact cards under the mobile breakpoint',
+    (tester) async {
+      // Pump the returns screen directly at a sub-768px width (the full
+      // app's shell keeps the desktop dashboard alive, which overflows at
+      // narrow widths — not this screen's concern).
+      tester.view.physicalSize = const Size(600, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      final adapter = _AuthFakeAdapter();
+      final storage = _FakeTokenStorage()..token = 'test-token';
+      final dio = Dio(BaseOptions(baseUrl: ApiClient.baseUrl));
+      dio.httpClientAdapter = adapter;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            tokenStorageProvider.overrideWithValue(storage),
+            dioProvider.overrideWithValue(dio),
+          ],
+          child: const MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: PurchaseReturnsScreen()),
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    // The screen's pill defaults to this-month; the fixtures are Feb
-    // 2026, so drop the range (same pattern as bootToPurchaseReturns).
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(PurchaseReturnsScreen)),
-    );
-    container.read(purchaseReturnsFromDateProvider.notifier).state = null;
-    container.read(purchaseReturnsToDateProvider.notifier).state = null;
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
+      // The screen's pill defaults to this-month; the fixtures are Feb
+      // 2026, so drop the range (same pattern as bootToPurchaseReturns).
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(PurchaseReturnsScreen)),
+      );
+      container.read(purchaseReturnsFromDateProvider.notifier).state = null;
+      container.read(purchaseReturnsToDateProvider.notifier).state = null;
+      await tester.pumpAndSettle();
 
-    // Cards (no Pluto grid) render both fixture headers with their
-    // badges, reference docs, stats and row 1's reason.
-    expect(find.byType(PlutoGrid), findsNothing);
-    expect(find.text('PR-2026-0001'), findsOneWidget);
-    expect(find.text('PR-2026-0002'), findsOneWidget);
-    expect(find.textContaining('PUR-2026-011'), findsOneWidget);
-    expect(find.text('Posted'), findsOneWidget);
-    expect(find.text('Voided'), findsOneWidget);
-    expect(find.text('Purchase Return'), findsOneWidget); // type badge
-    expect(find.text('PO Return'), findsOneWidget);
-    expect(find.text('5'), findsOneWidget); // total qty of row 1
-    expect(find.text('50.00'), findsOneWidget); // total amount, row 1
-    expect(find.text('80.00'), findsOneWidget); // total amount, row 2
-    expect(find.text('Damaged on delivery'), findsOneWidget);
+      // Cards (no Pluto grid) render both fixture headers with their
+      // badges, reference docs, stats and row 1's reason.
+      expect(find.byType(PlutoGrid), findsNothing);
+      expect(find.text('PR-2026-0001'), findsOneWidget);
+      expect(find.text('PR-2026-0002'), findsOneWidget);
+      expect(find.textContaining('PUR-2026-011'), findsOneWidget);
+      expect(find.text('Posted'), findsOneWidget);
+      expect(find.text('Voided'), findsOneWidget);
+      expect(find.text('Purchase Return'), findsOneWidget); // type badge
+      expect(find.text('PO Return'), findsOneWidget);
+      expect(find.text('5'), findsOneWidget); // total qty of row 1
+      expect(find.text('Rs. 50.00'), findsOneWidget); // total amount, row 1
+      expect(find.text('Rs. 80.00'), findsOneWidget); // total amount, row 2
+      expect(find.text('Damaged on delivery'), findsOneWidget);
 
-    // Tapping a card opens the detail modal (Close button is dialog-only).
-    await tester.tap(find.text('PR-2026-0001'));
-    await tester.pumpAndSettle();
-    expect(find.widgetWithText(TextButton, 'Close'), findsOneWidget);
-    await tester.tap(find.widgetWithText(TextButton, 'Close'));
-    await tester.pumpAndSettle();
+      // Tapping a card opens the detail modal (Close button is dialog-only).
+      await tester.tap(find.text('PR-2026-0001'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(TextButton, 'Close'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Close'));
+      await tester.pumpAndSettle();
 
-    // The posted card's ⋮ menu offers Void; voiding flips the badge.
-    await tester.tap(find.byIcon(Icons.more_vert).first);
-    await tester.pumpAndSettle();
-    expect(find.text('Void'), findsOneWidget);
-    await tester.tap(find.text('Void'));
-    await tester.pumpAndSettle();
-    expect(find.text('Void Return'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Void'));
-    await tester.pumpAndSettle();
+      // The posted card's ⋮ menu offers Void; voiding flips the badge.
+      await tester.tap(find.byIcon(Icons.more_vert).first);
+      await tester.pumpAndSettle();
+      expect(find.text('Void'), findsOneWidget);
+      await tester.tap(find.text('Void'));
+      await tester.pumpAndSettle();
+      expect(find.text('Void Return'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Void'));
+      await tester.pumpAndSettle();
 
-    expect(adapter.lastPurchaseReturnVoidId, 1);
-    expect(find.text('Return voided successfully'), findsOneWidget);
-    // Both cards now voided after the refetch.
-    expect(find.text('Voided'), findsNWidgets(2));
-    expect(find.text('Posted'), findsNothing);
-  });
+      expect(adapter.lastPurchaseReturnVoidId, 1);
+      expect(find.text('Return voided successfully'), findsOneWidget);
+      // Both cards now voided after the refetch.
+      expect(find.text('Voided'), findsNWidgets(2));
+      expect(find.text('Posted'), findsNothing);
+    },
+  );
 
   testWidgets('purchase returns grid exports the rows to CSV', (tester) async {
     useWideSurface(tester);
@@ -12936,10 +13068,7 @@ void main() {
     expect(find.text('Purchase Order Details'), findsOneWidget);
     // Print A4 sits in the footer regardless of status.
     expect(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Print A4'),
-      ),
+      find.descendant(of: find.byType(Dialog), matching: find.text('Print A4')),
       findsOneWidget,
     );
 
@@ -12952,10 +13081,7 @@ void main() {
     await tester.tap(find.text('PO-2026-001'));
     await tester.pumpAndSettle();
     expect(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Print A4'),
-      ),
+      find.descendant(of: find.byType(Dialog), matching: find.text('Print A4')),
       findsOneWidget,
     );
     expect(
@@ -13144,7 +13270,10 @@ void main() {
     // refreshed underneath (PO 1 badge flipped).
     expect(find.byKey(const Key('bulk_failure_dialog')), findsOneWidget);
     expect(find.text('1 done, 1 failed'), findsOneWidget);
-    expect(find.textContaining('Cannot transition from Completed'), findsOneWidget);
+    expect(
+      find.textContaining('Cannot transition from Completed'),
+      findsOneWidget,
+    );
     await tester.tap(
       find.descendant(
         of: find.byKey(const Key('bulk_failure_dialog')),
@@ -13157,125 +13286,125 @@ void main() {
     expect(find.text('Set status'), findsNothing);
   });
 
-  testWidgets('purchase order: receive goods posts the receipt and shows history',
+  testWidgets(
+    'purchase order: receive goods posts the receipt and shows history',
     (tester) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToPurchaseOrders(tester, adapter);
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToPurchaseOrders(tester, adapter);
 
-    // Open the detail dialog for PO-2026-001 and submit it first (the
-    // Receive Goods action only exists on non-Draft POs).
-    await tester.tap(find.text('PO-2026-001'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('PO-2026-001'));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(of: find.byType(Dialog), matching: find.text('Submit')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byKey(const Key('confirm_dialog')),
-        matching: find.widgetWithText(FilledButton, 'Submit'),
-      ),
-    );
-    await tester.pumpAndSettle();
+      // Open the detail dialog for PO-2026-001 and submit it first (the
+      // Receive Goods action only exists on non-Draft POs).
+      await tester.tap(find.text('PO-2026-001'));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text('PO-2026-001'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(of: find.byType(Dialog), matching: find.text('Submit')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const Key('confirm_dialog')),
+          matching: find.widgetWithText(FilledButton, 'Submit'),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    // Submitted → the footer gains Receive Goods (Submit/Edit gone).
-    expect(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Receive Goods'),
-      ),
-      findsOneWidget,
-    );
+      // Submitted → the footer gains Receive Goods (Submit/Edit gone).
+      expect(
+        find.descendant(
+          of: find.byType(Dialog),
+          matching: find.text('Receive Goods'),
+        ),
+        findsOneWidget,
+      );
 
-    await tester.tap(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('Receive Goods'),
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(Dialog),
+          matching: find.text('Receive Goods'),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    // The form: warehouse pre-filled from the PO, the receivable line
-    // (item 2 is fully received → no line), qty pre-filled to pending.
-    // Scope to the top dialog — the detail beneath also shows the item.
-    final dialog = find.byType(Dialog).last;
-    expect(find.text('Receive Goods'), findsWidgets); // title + button
-    expect(
-      find.descendant(
-        of: dialog,
-        matching: find.text('WH-MAIN — Main Warehouse'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: dialog, matching: find.text('Raw Material A')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: dialog, matching: find.text('Ordered: 100')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: dialog, matching: find.text('Pending: 100')),
-      findsOneWidget,
-    );
+      // The form: warehouse pre-filled from the PO, the receivable line
+      // (item 2 is fully received → no line), qty pre-filled to pending.
+      // Scope to the top dialog — the detail beneath also shows the item.
+      final dialog = find.byType(Dialog).last;
+      expect(find.text('Receive Goods'), findsWidgets); // title + button
+      expect(
+        find.descendant(
+          of: dialog,
+          matching: find.text('WH-MAIN — Main Warehouse'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: dialog, matching: find.text('Raw Material A')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: dialog, matching: find.text('Ordered: 100')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: dialog, matching: find.text('Pending: 100')),
+        findsOneWidget,
+      );
 
-    // The dialog autofocuses its primary input — the first received-qty
-    // cell — so the user can adjust quantities (or Enter to receive all)
-    // without clicking. Verify via the focus manager that the focus
-    // actually landed there: the closed dialog's only EditableTexts are
-    // the notes field and the qty cell, so `.last` is the qty field.
-    final qtyEditable = tester.widget<EditableText>(
-      find
-          .descendant(of: dialog, matching: find.byType(EditableText))
-          .last,
-    );
-    expect(FocusManager.instance.primaryFocus, qtyEditable.focusNode);
+      // The dialog autofocuses its primary input — the first received-qty
+      // cell — so the user can adjust quantities (or Enter to receive all)
+      // without clicking. Verify via the focus manager that the focus
+      // actually landed there: the closed dialog's only EditableTexts are
+      // the notes field and the qty cell, so `.last` is the qty field.
+      final qtyEditable = tester.widget<EditableText>(
+        find.descendant(of: dialog, matching: find.byType(EditableText)).last,
+      );
+      expect(FocusManager.instance.primaryFocus, qtyEditable.focusNode);
 
-    // Receive 60 of the 100 pending — exercises the editable qty (and
-    // leaves 40 pending, so the PO stays Partially Received). Notes is
-    // the first TextFormField in the dialog; the qty field is the second.
-    await tester.enterText(find.byType(TextFormField).last, '60');
-    await tester.pump();
+      // Receive 60 of the 100 pending — exercises the editable qty (and
+      // leaves 40 pending, so the PO stays Partially Received). Notes is
+      // the first TextFormField in the dialog; the qty field is the second.
+      await tester.enterText(find.byType(TextFormField).last, '60');
+      await tester.pump();
 
-    // Record the receipt. Scope to the top dialog: the detail dialog's
-    // tonal Receive Goods footer button is still mounted beneath it.
-    await tester.tap(
-      find.descendant(
-        of: dialog,
-        matching: find.widgetWithText(FilledButton, 'Receive Goods'),
-      ),
-    );
-    await tester.pumpAndSettle();
+      // Record the receipt. Scope to the top dialog: the detail dialog's
+      // tonal Receive Goods footer button is still mounted beneath it.
+      await tester.tap(
+        find.descendant(
+          of: dialog,
+          matching: find.widgetWithText(FilledButton, 'Receive Goods'),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    // Receive dialog closed (only the detail dialog remains) + POST body
-    // matches the createGoodsReceipt schema.
-    expect(find.byType(Dialog), findsOneWidget);
-    expect(adapter.lastPoReceiptBody?['warehouse_id'], 1);
-    expect(adapter.lastPoReceiptBody?['items'], [
-      {'po_item_id': 1, 'received_quantity': 60},
-    ]);
+      // Receive dialog closed (only the detail dialog remains) + POST body
+      // matches the createGoodsReceipt schema.
+      expect(find.byType(Dialog), findsOneWidget);
+      expect(adapter.lastPoReceiptBody?['warehouse_id'], 1);
+      expect(adapter.lastPoReceiptBody?['items'], [
+        {'po_item_id': 1, 'received_quantity': 60},
+      ]);
 
-    // The detail beneath refetched and now shows the receipt in history
-    // (60 received of 100 — the only '60' in the dialog is the receipt
-    // row's qty; the items table still lists the ordered 100).
-    final detailDialog = find.byType(Dialog);
-    expect(
-      find.descendant(of: detailDialog, matching: find.text('Receipts')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: detailDialog, matching: find.text('GR-2026-001')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: detailDialog, matching: find.text('60')),
-      findsOneWidget,
-    );
-  });
+      // The detail beneath refetched and now shows the receipt in history
+      // (60 received of 100 — the only '60' in the dialog is the receipt
+      // row's qty; the items table still lists the ordered 100).
+      final detailDialog = find.byType(Dialog);
+      expect(
+        find.descendant(of: detailDialog, matching: find.text('Receipts')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: detailDialog, matching: find.text('GR-2026-001')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: detailDialog, matching: find.text('60')),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('purchase order form: delete confirms and pops both dialogs', (
     tester,
@@ -14633,7 +14762,10 @@ void main() {
     // The list refetched with the movement_type query param (plus the
     // paged request's page/limit/sortOrder) and now shows only the
     // adjustment row.
-    expect(adapter.lastMovementQuery, containsPair('movement_type', 'ADJUSTMENT'));
+    expect(
+      adapter.lastMovementQuery,
+      containsPair('movement_type', 'ADJUSTMENT'),
+    );
     expect(find.text('SM-2026-0102'), findsOneWidget);
     expect(find.text('SM-2026-0100'), findsNothing);
     expect(find.text('SM-2026-0101'), findsNothing);
@@ -14656,7 +14788,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Adjustment').last);
     await tester.pumpAndSettle();
-    expect(adapter.lastMovementQuery, containsPair('movement_type', 'ADJUSTMENT'));
+    expect(
+      adapter.lastMovementQuery,
+      containsPair('movement_type', 'ADJUSTMENT'),
+    );
 
     // Back to All — the refetch drops the query param.
     await tester.tap(find.byType(SearchableSelect<String>));
@@ -15089,9 +15224,18 @@ void main() {
     // because the dashboard tab (alive in the IndexedStack) also shows
     // Widget A and Bolt in its alerts list.
     final grid = find.byType(PlutoGrid);
-    expect(find.descendant(of: grid, matching: find.text('Widget A')), findsOneWidget);
-    expect(find.descendant(of: grid, matching: find.text('Bolt')), findsOneWidget);
-    expect(find.descendant(of: grid, matching: find.text('FG001')), findsOneWidget);
+    expect(
+      find.descendant(of: grid, matching: find.text('Widget A')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: grid, matching: find.text('Bolt')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: grid, matching: find.text('FG001')),
+      findsOneWidget,
+    );
     // Filter bar selects present.
     expect(find.text('All Categories'), findsOneWidget);
     expect(find.text('All Trends'), findsOneWidget);
@@ -15106,8 +15250,14 @@ void main() {
 
     expect(adapter.lastForecastDemandQuery?['category'], 'Parts');
     // Bolt (Raw category) disappears from the grid; Widget A stays.
-    expect(find.descendant(of: grid, matching: find.text('Widget A')), findsOneWidget);
-    expect(find.descendant(of: grid, matching: find.text('Bolt')), findsNothing);
+    expect(
+      find.descendant(of: grid, matching: find.text('Widget A')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: grid, matching: find.text('Bolt')),
+      findsNothing,
+    );
   });
 
   testWidgets('forecast demand reset button clears active filters', (
@@ -15118,10 +15268,7 @@ void main() {
     await bootToForecasts(tester, adapter: adapter, tab: 1);
 
     // The reset button is hidden until a filter is active.
-    expect(
-      find.byKey(const ValueKey('forecast-reset-filters')),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey('forecast-reset-filters')), findsNothing);
 
     // Apply the category filter, then reset.
     await tester.tap(find.byType(SearchableSelect<String?>).at(0));
@@ -15136,54 +15283,53 @@ void main() {
     // The refetch dropped the category; both rows are back and the
     // button hides again.
     expect(adapter.lastForecastDemandQuery?['category'], isNull);
-    expect(
-      find.byKey(const ValueKey('forecast-reset-filters')),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey('forecast-reset-filters')), findsNothing);
     final grid = find.byType(PlutoGrid);
     expect(
       find.descendant(of: grid, matching: find.text('Widget A')),
       findsOneWidget,
     );
-    expect(find.descendant(of: grid, matching: find.text('Bolt')), findsOneWidget);
-  });
-
-  testWidgets('forecast dashboard view all resets filters and opens the demand tab', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToForecasts(tester, adapter: adapter, tab: 1);
-
-    // Leave a category filter active on the demand tab.
-    await tester.tap(find.byType(SearchableSelect<String?>).at(0));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Parts').last);
-    await tester.pumpAndSettle();
-    expect(adapter.lastForecastDemandQuery?['category'], 'Parts');
-
-    // Jump back to the dashboard tab (nav rail of the forecast shell).
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.text('Dashboard'),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // View All from the alerts header — clears the demand filters and
-    // switches to the demand tab.
-    await tester.tap(find.text('View All'));
-    await tester.pumpAndSettle();
-
-    expect(adapter.lastForecastDemandQuery?['category'], isNull);
     expect(
-      tester
-          .widget<NavigationBar>(find.byType(NavigationBar))
-          .selectedIndex,
-      1,
+      find.descendant(of: grid, matching: find.text('Bolt')),
+      findsOneWidget,
     );
   });
+
+  testWidgets(
+    'forecast dashboard view all resets filters and opens the demand tab',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToForecasts(tester, adapter: adapter, tab: 1);
+
+      // Leave a category filter active on the demand tab.
+      await tester.tap(find.byType(SearchableSelect<String?>).at(0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Parts').last);
+      await tester.pumpAndSettle();
+      expect(adapter.lastForecastDemandQuery?['category'], 'Parts');
+
+      // Jump back to the dashboard tab (nav rail of the forecast shell).
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text('Dashboard'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // View All from the alerts header — clears the demand filters and
+      // switches to the demand tab.
+      await tester.tap(find.text('View All'));
+      await tester.pumpAndSettle();
+
+      expect(adapter.lastForecastDemandQuery?['category'], isNull);
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        1,
+      );
+    },
+  );
 
   testWidgets('forecast accuracy computes and posts to the server', (
     tester,
@@ -15246,70 +15392,69 @@ void main() {
       matching: find.byType(Card),
     );
     expect(
-      tester.widget<SwitchListTile>(
-        find.descendant(
-          of: emailCard,
-          matching: find.byType(SwitchListTile),
-        ),
-      ).value,
+      tester
+          .widget<SwitchListTile>(
+            find.descendant(
+              of: emailCard,
+              matching: find.byType(SwitchListTile),
+            ),
+          )
+          .value,
       isFalse,
     );
     expect(
-      tester.widget<SwitchListTile>(
-        find.descendant(
-          of: notificationsCard,
-          matching: find.byType(SwitchListTile),
-        ),
-      ).value,
+      tester
+          .widget<SwitchListTile>(
+            find.descendant(
+              of: notificationsCard,
+              matching: find.byType(SwitchListTile),
+            ),
+          )
+          .value,
       isTrue,
     );
   });
 
-  testWidgets('integrations screen posts a per-service update for changed fields', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToIntegrations(tester, adapter: adapter);
+  testWidgets(
+    'integrations screen posts a per-service update for changed fields',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToIntegrations(tester, adapter: adapter);
 
-    // Enable email, type an API key, and save — only non-blank fields
-    // travel with the PUT.
-    final emailCard = find.ancestor(
-      of: find.text('Email (SendGrid)'),
-      matching: find.byType(Card),
-    );
-    await tester.tap(
-      find.descendant(
-        of: emailCard,
-        matching: find.byType(SwitchListTile),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find
-          .descendant(
-            of: emailCard,
-            matching: find.byType(TextFormField),
-          )
-          .first,
-      'SG.abcdef123456',
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: emailCard,
-        matching: find.widgetWithText(FilledButton, 'Save'),
-      ),
-    );
-    await tester.pumpAndSettle();
+      // Enable email, type an API key, and save — only non-blank fields
+      // travel with the PUT.
+      final emailCard = find.ancestor(
+        of: find.text('Email (SendGrid)'),
+        matching: find.byType(Card),
+      );
+      await tester.tap(
+        find.descendant(of: emailCard, matching: find.byType(SwitchListTile)),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find
+            .descendant(of: emailCard, matching: find.byType(TextFormField))
+            .first,
+        'SG.abcdef123456',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: emailCard,
+          matching: find.widgetWithText(FilledButton, 'Save'),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(adapter.lastIntegrationPutService, 'email');
-    expect(adapter.lastIntegrationPutBody, {
-      'enabled': true,
-      'apiKey': 'SG.abcdef123456',
-    });
-    expect(find.text('Integration settings saved'), findsOneWidget);
-  });
+      expect(adapter.lastIntegrationPutService, 'email');
+      expect(adapter.lastIntegrationPutBody, {
+        'enabled': true,
+        'apiKey': 'SG.abcdef123456',
+      });
+      expect(find.text('Integration settings saved'), findsOneWidget);
+    },
+  );
 
   testWidgets('integrations screen surfaces a failed save', (tester) async {
     useWideSurface(tester);
@@ -15322,10 +15467,7 @@ void main() {
     );
     await tester.enterText(
       find
-          .descendant(
-            of: weatherCard,
-            matching: find.byType(TextFormField),
-          )
+          .descendant(of: weatherCard, matching: find.byType(TextFormField))
           .first,
       'ws-key',
     );
@@ -15365,7 +15507,7 @@ void main() {
     // 45,000 + 35,000 = 80,000.
     expect(find.text('2 employees'), findsOneWidget);
     expect(find.text('2 Active'), findsOneWidget);
-    expect(find.text('80,000.00'), findsOneWidget);
+    expect(find.text('Rs. 80,000.00'), findsOneWidget);
 
     // Status badges render for both rows.
     expect(
@@ -15491,35 +15633,36 @@ void main() {
     expect(find.byType(Dialog), findsNWidgets(2));
   });
 
-  testWidgets('employees screen opens the detail with salary history and documents', (
-    tester,
-  ) async {
-    useWideSurface(tester);
-    final adapter = _AuthFakeAdapter();
-    await bootToEmployees(tester, adapter: adapter);
+  testWidgets(
+    'employees screen opens the detail with salary history and documents',
+    (tester) async {
+      useWideSurface(tester);
+      final adapter = _AuthFakeAdapter();
+      await bootToEmployees(tester, adapter: adapter);
 
-    // Double-tap the first row to open the detail dialog.
-    await tester.tap(find.text('Ali Khan'));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('Ali Khan'));
-    await tester.pumpAndSettle();
+      // Double-tap the first row to open the detail dialog.
+      await tester.tap(find.text('Ali Khan'));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text('Ali Khan'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('EMP-001 · Ali Khan'), findsOneWidget);
-    expect(find.text('Operator · Production'), findsOneWidget);
+      expect(find.text('EMP-001 · Ali Khan'), findsOneWidget);
+      expect(find.text('Operator · Production'), findsOneWidget);
 
-    // Salary History tab shows the fetched monthly aggregated row.
-    await tester.tap(find.text('Salary History'));
-    await tester.pumpAndSettle();
-    expect(adapter.salaryHistoryFetchCount, greaterThanOrEqualTo(1));
-    expect(find.text('August 2026'), findsOneWidget);
-    expect(find.text('Paid'), findsOneWidget);
+      // Salary History tab shows the fetched monthly aggregated row.
+      await tester.tap(find.text('Salary History'));
+      await tester.pumpAndSettle();
+      expect(adapter.salaryHistoryFetchCount, greaterThanOrEqualTo(1));
+      expect(find.text('August 2026'), findsOneWidget);
+      expect(find.text('Paid'), findsOneWidget);
 
-    // Documents tab lists the fetched document.
-    await tester.tap(find.text('Documents'));
-    await tester.pumpAndSettle();
-    expect(find.text('CNIC Copy'), findsOneWidget);
-    expect(find.text('ID · 42101-1234567-1'), findsOneWidget);
-  });
+      // Documents tab lists the fetched document.
+      await tester.tap(find.text('Documents'));
+      await tester.pumpAndSettle();
+      expect(find.text('CNIC Copy'), findsOneWidget);
+      expect(find.text('ID · 42101-1234567-1'), findsOneWidget);
+    },
+  );
 
   testWidgets('employees screen uploads a document through multipart', (
     tester,
@@ -15568,10 +15711,12 @@ void main() {
 
     // Fill the required name and pick the file.
     await tester.enterText(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.byType(TextFormField),
-      ).first,
+      find
+          .descendant(
+            of: find.byType(Dialog),
+            matching: find.byType(TextFormField),
+          )
+          .first,
       'Passport Copy',
     );
     await tester.tap(find.widgetWithText(OutlinedButton, 'Select File'));
@@ -15631,10 +15776,12 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Add Document'));
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.descendant(
-        of: find.byType(Dialog),
-        matching: find.byType(TextFormField),
-      ).first,
+      find
+          .descendant(
+            of: find.byType(Dialog),
+            matching: find.byType(TextFormField),
+          )
+          .first,
       'Passport Copy',
     );
     await tester.tap(find.widgetWithText(OutlinedButton, 'Select File'));
@@ -15825,10 +15972,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Save'));
     await tester.pumpAndSettle();
 
-    expect(
-      adapter.lastRolePermissionsIds,
-      containsAll(<int>[1, 2, 3]),
-    );
+    expect(adapter.lastRolePermissionsIds, containsAll(<int>[1, 2, 3]));
     expect(find.text('Permissions updated'), findsOneWidget);
   });
 }

@@ -12,6 +12,7 @@ import '../core/utils/print_utils.dart' show printPdfBytes;
 import '../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../data/repositories/invoice_repository.dart'
     show invoiceRepositoryProvider;
+import '../features/settings/settings_providers.dart';
 import '../l10n/app_localizations.dart';
 import 'app_toast.dart';
 import 'payment_receipt_pdf.dart' show buildPaymentReceiptPdf;
@@ -47,6 +48,7 @@ class PaymentSuccessScreen extends ConsumerWidget {
       final bytes = await buildPaymentReceiptPdf(
         payment,
         entityName: entityName,
+        formatter: ref.read(currencyFormatterProvider),
       );
       if (!context.mounted) return;
       await printPdfBytes(bytes, 'receipt-$paymentId.pdf', context);

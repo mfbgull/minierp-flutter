@@ -50,4 +50,40 @@ void main() {
       );
     });
   });
+
+  group('CurrencyFormatter', () {
+    test('uses the default configured symbol', () {
+      expect(
+        const CurrencyFormatter(CurrencyConfig.defaults).format(1234.5),
+        'Rs. 1,234.50',
+      );
+    });
+
+    test('uses a custom symbol and preserves two decimals', () {
+      const formatter = CurrencyFormatter(
+        CurrencyConfig(symbol: r'$', code: 'USD'),
+      );
+      expect(formatter.format(1234.5), r'$ 1,234.50');
+    });
+
+    test('blank settings fall back to the default config', () {
+      final config = CurrencyConfig.fromValues(symbol: ' ', code: '');
+      expect(config.symbol, 'Rs.');
+      expect(config.code, 'PKR');
+    });
+
+    test('formats negative values with the configured symbol', () {
+      final output = const CurrencyFormatter(
+        CurrencyConfig.defaults,
+      ).format(-1234.5);
+      expect(output, contains('Rs.'));
+      expect(output, contains('1,234.50'));
+    });
+
+    test('Formatters.currency uses the active config', () {
+      addTearDown(CurrencyConfigStore.reset);
+      CurrencyConfigStore.set(const CurrencyConfig(symbol: r'$', code: 'USD'));
+      expect(Formatters.currency(1234.5), r'$ 1,234.50');
+    });
+  });
 }

@@ -9,6 +9,8 @@ import 'package:minierp_app/data/models/purchase_order.dart';
 import 'package:minierp_app/features/purchase_orders/purchase_order_pdf.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUpAll(() async {
     // Formatters.date needs the intl date symbols for the en locale.
     await initializeDateFormatting('en');

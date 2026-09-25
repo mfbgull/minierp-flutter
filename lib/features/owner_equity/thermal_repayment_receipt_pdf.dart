@@ -15,6 +15,7 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../core/utils/pdf_fonts.dart';
+import '../../core/utils/formatters.dart';
 
 import '../../data/models/invoice.dart' show CompanyInfo;
 import '../../features/sales/models/sales_forms.dart' show defaultCompany;
@@ -35,8 +36,11 @@ Future<Uint8List> buildThermalRepaymentReceiptPdf(
   PersonalLoanRepayment repayment, {
   CompanyInfo? company,
   List<PersonalLoanRepayment>? allRepayments,
+  CurrencyFormatter? formatter,
 }) async {
   final usedCompany = company ?? defaultCompany;
+  final usedFormatter =
+      formatter ?? CurrencyFormatter(CurrencyConfigStore.current);
   final history = allRepayments ?? <PersonalLoanRepayment>[repayment];
   final totals = _historyTotals(loan, history);
   final doc = pw.Document(theme: await PdfFonts.theme());
@@ -56,11 +60,11 @@ Future<Uint8List> buildThermalRepaymentReceiptPdf(
         _buildDivider(),
         _buildBorrowerInfo(loan),
         _buildDivider(),
-        _buildPaymentHistory(loan, repayment, history),
+        _buildPaymentHistory(loan, repayment, history, usedFormatter),
         _buildDivider(),
-        _buildTotals(totals, loan.amount),
+        _buildTotals(totals, loan.amount, usedFormatter),
         _buildDivider(),
-        _buildNewBalance(totals.newBalance),
+        _buildNewBalance(totals.newBalance, usedFormatter),
         _buildDividerDouble(),
         _buildFooter(usedCompany),
       ],
@@ -118,9 +122,10 @@ pw.Widget _buildHeader(CompanyInfo company) {
       ),
       if (company.phone.trim().isNotEmpty || company.email.trim().isNotEmpty)
         pw.Text(
-          [company.phone, company.email]
-              .where((s) => s.trim().isNotEmpty)
-              .join(' · '),
+          [
+            company.phone,
+            company.email,
+          ].where((s) => s.trim().isNotEmpty).join(' · '),
           style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
           textAlign: pw.TextAlign.center,
         ),
@@ -175,6 +180,7 @@ pw.Widget _buildPaymentHistory(
   PersonalLoan loan,
   PersonalLoanRepayment repayment,
   List<PersonalLoanRepayment> allRepayments,
+  CurrencyFormatter formatter,
 ) {
   final header = pw.Row(
     children: [
@@ -232,7 +238,7 @@ pw.Widget _buildPaymentHistory(
           pw.Expanded(
             flex: 2,
             child: pw.Text(
-              _fmtCurrency(r.amount),
+              _fmtCurrency(r.amount, formatter),
               style: pw.TextStyle(
                 fontSize: 9,
                 fontWeight: isCurrent ? pw.FontWeight.bold : null,
@@ -259,17 +265,21 @@ pw.Widget _buildPaymentHistory(
   );
 }
 
-pw.Widget _buildTotals(_HistoryTotals totals, num borrowed) {
+pw.Widget _buildTotals(
+  _HistoryTotals totals,
+  num borrowed,
+  CurrencyFormatter formatter,
+) {
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
-      _totalRow('Total Paid', _fmtCurrency(totals.totalPaid)),
-      _totalRow('Total Borrowed', _fmtCurrency(-borrowed)),
+      _totalRow('Total Paid', _fmtCurrency(totals.totalPaid, formatter)),
+      _totalRow('Total Borrowed', _fmtCurrency(-borrowed, formatter)),
     ],
   );
 }
 
-pw.Widget _buildNewBalance(num newBalance) {
+pw.Widget _buildNewBalance(num newBalance, CurrencyFormatter formatter) {
   return pw.Row(
     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
     children: [
@@ -278,7 +288,7 @@ pw.Widget _buildNewBalance(num newBalance) {
         style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
       ),
       pw.Text(
-        _fmtCurrency(newBalance),
+        _fmtCurrency(newBalance, formatter),
         style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
       ),
     ],
@@ -312,10 +322,8 @@ pw.Widget _buildFooter(CompanyInfo company) {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-pw.Widget _infoLine(String text) => pw.Text(
-  text,
-  style: pw.TextStyle(fontSize: 9),
-);
+pw.Widget _infoLine(String text) =>
+    pw.Text(text, style: pw.TextStyle(fontSize: 9));
 
 pw.Widget _buildDivider() => pw.Padding(
   padding: const pw.EdgeInsets.symmetric(vertical: 4),
@@ -347,9 +355,6 @@ String _fmtDateShort(String iso) {
   return '${parsed.month}-${parsed.day}-${parsed.year}';
 }
 
-String _fmtCurrency(num value) {
-  final symbol = 'Rs.';
-  final text = value.abs().toStringAsFixed(2);
-  final padded = text.padLeft(10);
-  return value < 0 ? '-$symbol $padded' : '$symbol $padded';
+String _fmtCurrency(num value, CurrencyFormatter formatter) {
+  return formatter.format(value);
 }
