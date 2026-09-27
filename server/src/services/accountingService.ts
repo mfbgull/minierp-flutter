@@ -168,6 +168,54 @@ export class AccountingService {
     return accounts.map(a => AccountingService.getAccountBalance(db, a.id, asOfDate));
   }
 
+  /**
+   * Period movement for a set of accounts, read from journal_lines only.
+   *
+   * TASK 34: period statements (the income statement) must derive from the
+   * same authoritative store as as-of balances, instead of re-deriving
+   * revenue/COGS/expense from the operational tables. Voided lines are
+   * excluded, exactly as in getAccountBalance, and an unknown code is a
+   * hard error rather than a silent zero.
+   */
+  static getPeriodMovement(
+    db: Database.Database,
+    args: { accountCodes: readonly string[]; startDate: string; endDate: string },
+  ): { total_debit: number; total_credit: number } {
+    if (args.accountCodes.length === 0) return { total_debit: 0, total_credit: 0 };
+
+    const placeholders = args.accountCodes.map(() => '?').join(', ');
+    const known = db.prepare(`
+      SELECT code FROM chart_of_accounts WHERE code IN (${placeholders})
+    `).all(...args.accountCodes) as Array<{ code: string }>;
+    const missing = args.accountCodes.filter((code) => !known.some((k) => k.code === code));
+    if (missing.length > 0) {
+      throw new Error(`Chart of accounts is missing required account(s): ${missing.join(', ')}`);
+    }
+
+    const rows = db.prepare(`
+      SELECT coa.code AS code,
+             COALESCE(SUM(jl.debit), 0) AS total_debit,
+             COALESCE(SUM(jl.credit), 0) AS total_credit
+      FROM journal_lines jl
+      JOIN chart_of_accounts coa ON coa.id = jl.account_id
+      WHERE coa.code IN (${placeholders})
+        AND jl.voided = 0
+        AND jl.line_date BETWEEN ? AND ?
+      GROUP BY coa.code
+    `).all(...args.accountCodes, args.startDate, args.endDate) as Array<{
+      code: string; total_debit: number; total_credit: number;
+    }>;
+
+    // An account with no movement in the window contributes zero.
+    return rows.reduce(
+      (sum, r) => ({
+        total_debit: sum.total_debit + Number(r.total_debit),
+        total_credit: sum.total_credit + Number(r.total_credit),
+      }),
+      { total_debit: 0, total_credit: 0 },
+    );
+  }
+
   // ------------------------------------------------------------------
   // Posting (multi-line, double-entry)
   // ------------------------------------------------------------------
@@ -1329,6 +1377,46 @@ export class AccountingService {
       attribution?.voidReason ?? null,
       referenceType,
       referenceId
+    );
+    return result.changes;
+  }
+
+  /**
+   * Un-void journal lines for a reference — the inverse of
+   * voidJournalLinesByReference, used when a delete is rolled back.
+   *
+   * TASK 34: this used to be a raw UPDATE in the invoice controller, the only
+   * production path mutating journal_lines without this service, so it got
+   * none of the service's guarantees. Return groups are keyed to the RETURN
+   * document while legacy groups are keyed to the invoice, and those id spaces
+   * collide, so pass owningInvoiceId to exclude a same-numbered return that
+   * belongs to a different invoice.
+   *
+   * No-op when nothing matches. Returns the number of lines restored.
+   */
+  static restoreJournalLinesByReference(
+    db: Database.Database,
+    referenceType: string,
+    referenceId: number,
+    options?: { owningInvoiceId?: number }
+  ): number {
+    const owningInvoiceId = options?.owningInvoiceId;
+    const result = db.prepare(`
+      UPDATE journal_lines
+      SET voided = 0, voided_by = NULL, void_reason = NULL
+      WHERE reference_type = ?
+        AND reference_id = ?
+        AND voided = 1
+        ${owningInvoiceId === undefined ? '' : `
+          AND NOT EXISTS (
+            SELECT 1 FROM invoice_returns other_returns
+            WHERE other_returns.id = journal_lines.reference_id
+              AND other_returns.invoice_id <> ?
+          )`}
+    `).run(
+      referenceType,
+      referenceId,
+      ...(owningInvoiceId === undefined ? [] : [owningInvoiceId]),
     );
     return result.changes;
   }

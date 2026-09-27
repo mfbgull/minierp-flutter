@@ -404,6 +404,7 @@ function getAPAgingReport(asOfDate: string, db: Database.Database) {
 }
 
 function getProfitLossReport(startDate: string, endDate: string, db: Database.Database) {
+  const round2 = (v: number): number => Math.round(v * 100) / 100;
   // MAJOR-3 audit note: the original P&L formula here is correct
   //   gross_profit = revenue - cogs
   //   net_profit   = gross_profit - expenses
@@ -412,22 +413,32 @@ function getProfitLossReport(startDate: string, endDate: string, db: Database.Da
   // SALE stock_movements may have unit_cost = sale_price (see MAJOR-6
   // in the audit), so COGS will be slightly off until that flow is
   // also fixed; the SQL itself is correct.
-  const revenue = db.prepare(`
-    SELECT ${netRevenueSum()} as total FROM invoices
-    WHERE invoice_date BETWEEN ? AND ?
-      AND ${NET_REVENUE_STATUS()}
-  `).get(startDate, endDate) as { total: number };
+  // TASK 34: revenue, COGS and operating expenses are now read from
+  // journal_lines through the accounting service, the same authoritative
+  // store the trial balance and balance sheet use — so the income
+  // statement and the balance sheet cannot disagree by construction.
+  // 4100 Sales Returns is debit-normal contra revenue, so net revenue is
+  // credits minus debits across 4000 + 4100.
+  const revenueMovement = AccountingService.getPeriodMovement(db, {
+    accountCodes: ['4000', '4100'], startDate, endDate,
+  });
+  const cogsMovement = AccountingService.getPeriodMovement(db, {
+    accountCodes: ['5000'], startDate, endDate,
+  });
+  const opexMovement = AccountingService.getPeriodMovement(db, {
+    accountCodes: ['6000'], startDate, endDate,
+  });
 
-  // COGS via the shared helper (report-query-integrity): nets SALE
-  // movements against their stock reversals so returned sales stop
-  // counting as cost of goods sold.
-  const cogs = { total: cogsForPeriod(db, startDate, endDate) };
+  const revenue = { total: round2(revenueMovement.total_credit - revenueMovement.total_debit) };
+  const cogs = { total: round2(cogsMovement.total_debit - cogsMovement.total_credit) };
 
-  // H5: expenses must follow the same GL-worthiness rule the journal and
-  // cash flows use — Draft rows never post, Cancelled rows are voided.
+  // The per-category split has no dimension in the GL (6000 postings carry
+  // only a description), so the breakdown stays operational while the
+  // authoritative total comes from the journal. glAuthority.test.ts fails
+  // if the two ever diverge.
   const expenses = db.prepare(`SELECT expense_category, SUM(amount) as total FROM expenses WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date BETWEEN ? AND ? GROUP BY expense_category ORDER BY total DESC`).all(startDate, endDate) as Array<{ expense_category: string; total: number }>;
 
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.total, 0);
+  const totalExpenses = round2(opexMovement.total_debit - opexMovement.total_credit);
   const grossProfit = revenue.total - cogs.total;
   const netProfit = grossProfit - totalExpenses;
   const grossProfitMargin = revenue.total > 0 ? (grossProfit / revenue.total) * 100 : 0;
@@ -437,11 +448,13 @@ function getProfitLossReport(startDate: string, endDate: string, db: Database.Da
 }
 
 function getBalanceSheet(asOfDate: string, db: Database.Database) {
-  // reporting-search-remediation: the sheet is now fully GL-derived.
-  // Every section reads AccountingService.getAllAccountBalances — the
-  // same journal_lines ∪ legacy journal_entries source the trial
-  // balance uses — so the two statements report identical account
-  // balances by construction. With complete document posting
+  // reporting-search-remediation, TASK 34: the sheet is fully GL-derived.
+  // Every section reads AccountingService.getAllAccountBalances — the same
+  // journal_lines-only source the trial balance uses — so the two
+  // statements report identical account balances by construction. The
+  // income statement now reads the same store for revenue, COGS and
+  // operating expenses, so the accounting identity holds across
+  // statements too. With complete document posting
   // (migrations/backfillGlPreposting.ts) every flow hits both an
   // asset/liability and a revenue/expense/equity account, so
   // assets − liabilities == equity holds through the double-entry
@@ -557,10 +570,11 @@ function getIncomeStatement(startDate: string, endDate: string, db: Database.Dat
 }
 
 function getTrialBalance(asOfDate: string, db: Database.Database) {
-  // MAJOR-1 fix (Phase 2 — GL refactor): now backed by
-  // AccountingService.getAllAccountBalances which reads from
-  // journal_lines (multi-line, account_id) UNION journal_entries
-  // (legacy, text_code) and rolls them up per chart_of_accounts row.
+  // MAJOR-1 fix (Phase 2 — GL refactor), TASK 34: backed by
+  // AccountingService.getAllAccountBalances, i.e. journal_lines only
+  // (account_id keyed). Legacy text_code-keyed journal_entries rows are
+  // migrated into journal_lines at boot, so they are never summed here —
+  // doing both would double-count.
   //
   // The output includes every account from chart_of_accounts, even
   // those with a zero balance, so the report shows the full account
@@ -591,10 +605,11 @@ function getTrialBalance(asOfDate: string, db: Database.Database) {
     total_debit: totalDebit,
     total_credit: totalCredit,
     balanced,
-    note: 'Built from chart_of_accounts joined to journal_lines (canonical) ' +
-          'and journal_entries (legacy, matched by text_code). ' +
-          'New postings should use AccountingService.postEntry so they ' +
-          'land in journal_lines with a proper account_id.'
+    note: 'Built from chart_of_accounts joined to journal_lines, the ' +
+          'authoritative double-entry record. Legacy text_code-keyed ' +
+          'journal_entries rows are migrated into journal_lines at boot ' +
+          'and are not summed separately. New postings go through ' +
+          'AccountingService.postEntry.'
   };
 }
 
