@@ -4963,6 +4963,9 @@ class AppLocalizationsUr extends AppLocalizations {
   String get salesAvailablecredit => 'دستیاب کریڈٹ';
 
   @override
+  String get salesCreditremaining => 'باقی کریڈٹ';
+
+  @override
   String get salesPeritem => 'فی آئٹم';
 
   @override

@@ -102,6 +102,40 @@ class PaymentPanelState extends State<PaymentPanel> {
   final Map<int, FocusNode> _amountFocusNodes = {};
   final TextEditingController _notes = TextEditingController();
 
+  /// Credit-offset amount. A text field rather than the checkbox this
+  /// replaced, so a payment can settle PART of the customer's credit
+  /// pool instead of being forced to take all of it (task 41).
+  final TextEditingController _credit = TextEditingController();
+  final FocusNode _creditFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _syncCreditField();
+  }
+
+  @override
+  void didUpdateWidget(covariant PaymentPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.creditOffset != widget.creditOffset) {
+      _syncCreditField();
+    }
+  }
+
+  /// Mirrors the applied offset into the text field. Skipped while the
+  /// field holds focus so typing "5" is not rewritten to "5.00" halfway
+  /// through the keystroke.
+  void _syncCreditField() {
+    if (_creditFocus.hasFocus) return;
+    final text =
+        widget.creditOffset > 0 ? widget.creditOffset.toStringAsFixed(2) : '';
+    if (_credit.text == text) return;
+    _credit.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+
   @override
   void dispose() {
     for (final c in _amountControllers.values) {
@@ -114,6 +148,8 @@ class PaymentPanelState extends State<PaymentPanel> {
       n.dispose();
     }
     _notes.dispose();
+    _credit.dispose();
+    _creditFocus.dispose();
     super.dispose();
   }
 
@@ -275,12 +311,6 @@ class PaymentPanelState extends State<PaymentPanel> {
           widget.paidAmount - widget.creditOffset,
           const Color(0xff16a34a),
         ),
-        if (widget.creditOffset > 0)
-          _summaryLine(
-            'Cr Used',
-            widget.creditOffset,
-            const Color(0xff16a34a),
-          ),
         _summaryLine(
           l10n.salesBalance,
           widget.balance,
@@ -413,25 +443,51 @@ class PaymentPanelState extends State<PaymentPanel> {
         for (final m in widget.methods) _methodRow(l10n, m),
         const SizedBox(height: 6),
         _summaryLine(l10n.salesPaymenttotal, _paymentSum, null),
-        if (widget.creditOffset > 0)
-          _summaryLine(l10n.salesCreditoffset, widget.creditOffset, null),
         _summaryLine(l10n.salesBalance, widget.balance, null),
         if (widget.availableCredit > 0) ...[
           const SizedBox(height: 6),
+          // The three figures the task requires, all visible at once so a
+          // part-applied offset can never hide behind a checkbox.
+          _summaryLine(
+            l10n.salesAvailablecredit,
+            widget.availableCredit,
+            null,
+          ),
+          _summaryLine(
+            l10n.salesCreditoffset,
+            widget.creditOffset,
+            widget.creditOffset > 0 ? const Color(0xff16a34a) : null,
+          ),
+          _summaryLine(
+            l10n.salesCreditremaining,
+            widget.availableCredit - widget.creditOffset,
+            null,
+          ),
+          const SizedBox(height: 4),
           Row(
             children: [
-              Checkbox(
-                value: widget.creditOffset > 0,
-                onChanged: widget.saving
-                    ? null
-                    : (v) => widget.onCreditOffsetChanged(
-                          v == true ? widget.availableCredit : 0,
-                        ),
-              ),
               Expanded(
-                child: Text(
-                  '${l10n.salesCreditoffset} (${l10n.salesAvailablecredit}: ${Formatters.currency(widget.availableCredit)})',
+                child: TextField(
+                  controller: _credit,
+                  focusNode: _creditFocus,
+                  enabled: !widget.saving,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   style: const TextStyle(fontSize: 12),
+                  decoration: _fieldDecoration(l10n.salesCreditoffset),
+                  onChanged: (v) =>
+                      widget.onCreditOffsetChanged(num.tryParse(v.trim()) ?? 0),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // Cap hint doubles as the "apply it all" affordance the
+              // checkbox used to provide; the server re-validates anyway.
+              Text(
+                '≤ ${Formatters.currency(widget.availableCredit)}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.outline,
                 ),
               ),
             ],
