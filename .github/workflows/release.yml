@@ -55,6 +55,71 @@ jobs:
           cd server && npm run build && cd ..
           ./tool/make_linux_setup.sh --no-build --out "dist/MiniERP-${VERSION}-linux-x64.run"
 
+      # H13 / task 40: the .deb, AppImage, Windows and macOS artifacts are
+      # client-only, so the documented "install the server separately" path was
+      # not satisfiable from the release page — it told users to clone the repo.
+      # Ship a server bundle so that path works from the download alone.
+      # node_modules is deliberately NOT included: better-sqlite3 is a native
+      # module and must be compiled on the target platform, so the bundle
+      # carries the lockfile and the user installs with `npm ci --omit=dev`.
+      - name: Package server bundle for separate-install platforms
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ env.VERSION }}"
+          STAGE="dist/server-bundle"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE/server"
+          cp -a server/dist "$STAGE/server/dist"
+          find "$STAGE/server/dist" \( -name '*.map' -o -name '*.ts' \) -delete
+          cp server/package.json server/package-lock.json "$STAGE/server/"
+          mkdir -p "$STAGE/server/uploads" "$STAGE/server/logs"
+          cat > "$STAGE/INSTALL.txt" <<'EOF'
+          MiniERP server — separate-install bundle
+          ==========================================
+          This is the backend for the client-only Desktop, AppImage and macOS
+          builds. It is not required for the Linux .run installer, which already
+          bundles and launches the server for you.
+
+          Requirements: Node.js 18 or newer.
+
+          Install and run:
+            cd server
+            npm ci --omit=dev
+            npm start
+
+          Required environment variables (these guards are intentional):
+            JWT_SECRET             openssl rand -base64 64
+            DEFAULT_ADMIN_PASSWORD the initial admin login password
+            ALLOWED_ORIGINS        comma-separated origins, e.g.
+                                    http://localhost:3011,http://127.0.0.1:3011
+            NODE_ENV=production    optional, recommended
+            PORT / HOST            optional, default 3011 / 0.0.0.0
+
+          ALLOWED_ORIGINS is the one that surprises people: without it the
+          server still starts and logs "Server Started", but every request
+          fails with HTTP 500. Set it before first run.
+
+          The database is created and migrated automatically on first start and
+          lives in server/database/erp.db. Back it up from the Dashboard
+          (Database -> Backup) or copy that file while the server is stopped.
+
+          The client connects to http://localhost:3011 by default. Override it
+          with API_BASE_URL at build time, or change PORT/HOST in the
+          environment before starting the server.
+          EOF
+          (cd "$STAGE" && zip -qr "../MiniERP-${VERSION}-server.zip" .)
+          rm -rf "$STAGE"
+
+      - name: Verify server bundle contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -l "dist/MiniERP-${VERSION}-server.zip" > /dev/null
+          unzip -l "dist/MiniERP-${VERSION}-server.zip" | grep -q "server/package-lock.json"
+          unzip -l "dist/MiniERP-${VERSION}-server.zip" | grep -q "INSTALL.txt"
+          test -d server/dist/migrations
+
       - name: Package Debian
         shell: bash
         run: |
@@ -153,6 +218,12 @@ jobs:
         with:
           name: minierp-linux-run
           path: dist/MiniERP-${{ env.VERSION }}-linux-x64.run
+
+      - name: Upload server bundle artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: minierp-server-bundle
+          path: dist/MiniERP-${{ env.VERSION }}-server.zip
 
   build-windows:
     runs-on: windows-latest
@@ -296,12 +367,12 @@ jobs:
           merge-multiple: true
           path: release-assets
 
-      - name: Assert five release assets
+      - name: Assert six release assets
         shell: bash
         run: |
           count=$(find release-assets -maxdepth 1 -type f | wc -l)
-          if [ "$count" -ne 5 ]; then
-            echo "Expected 5 release assets, found $count" >&2
+          if [ "$count" -ne 6 ]; then
+            echo "Expected 6 release assets, found $count" >&2
             find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
             exit 1
           fi
