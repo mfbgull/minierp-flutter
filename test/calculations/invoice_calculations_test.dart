@@ -102,4 +102,50 @@ void main() {
       10,
     );
   });
+
+  // Task 41 — the credit-offset ceiling. The panel emits whatever the user
+  // types; this clamp is what stops over-application and negative credit
+  // before the value ever reaches the server.
+  group('clampCreditOffset', () {
+    num clamp(num requested, {num available = 250, num total = 1000}) =>
+        clampCreditOffset(
+          requested: requested,
+          available: available,
+          total: total,
+        );
+
+    test('keeps a partial amount as requested', () {
+      expect(clamp(75), 75);
+    });
+
+    test('keeps the full pool when it fits the invoice', () {
+      expect(clamp(250), 250);
+    });
+
+    test('caps at the available pool — no over-application', () {
+      expect(clamp(300), 250);
+    });
+
+    test('caps at the invoice total even when credit is plentiful', () {
+      expect(clamp(1000, available: 5000, total: 400), 400);
+    });
+
+    test('collapses a negative request to zero', () {
+      expect(clamp(-50), 0);
+    });
+
+    test('zero credit and zero total yield zero', () {
+      expect(clamp(100, available: 0, total: 100), 0);
+      expect(clamp(100, available: 100, total: 0), 0);
+    });
+
+    test('never returns more than the pool or the total', () {
+      for (final requested in <num>[-100, 0, 1, 99, 250, 251, 1000, 99999]) {
+        final result = clamp(requested);
+        expect(result, greaterThanOrEqualTo(0));
+        expect(result, lessThanOrEqualTo(250));
+        expect(result, lessThanOrEqualTo(1000));
+      }
+    });
+  });
 }

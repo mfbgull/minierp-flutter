@@ -60,7 +60,8 @@ import 'calculations/invoice_calculations.dart'
         calculateDiscount,
         calculateSubtotal,
         calculateTax,
-        calculateTotal;
+        calculateTotal,
+        clampCreditOffset;
 import 'calculations/invoice_rules.dart'
     show doesPaymentExceedBalance, isValidPaymentAmount;
 import 'invoice_providers.dart';
@@ -1655,7 +1656,17 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   void _applyCreditOffset(num creditOffset) {
     final total = calculateTotal(_filledLines, _scope, _invoiceDiscount);
     final available = _availableCustomerCredit;
-    final effectiveOffset = creditOffset > 0 ? available : 0;
+    // Honour the amount actually entered — a part-applied offset is valid —
+    // but clamp to the pool size and the invoice total, which is the same
+    // ceiling the server enforces. This line previously forced the whole
+    // balance (`creditOffset > 0 ? available : 0`), making partial use
+    // impossible and letting a typed amount silently inflate to full credit.
+    final requested = creditOffset < 0 ? 0 : creditOffset;
+    final effectiveOffset = clampCreditOffset(
+      requested: requested,
+      available: available,
+      total: total,
+    );
     setState(() {
       _creditOffset = effectiveOffset;
       if (effectiveOffset > 0 && total > effectiveOffset) {

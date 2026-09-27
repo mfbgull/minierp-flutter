@@ -4966,6 +4966,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get salesAvailablecredit => 'Available credit';
 
   @override
+  String get salesCreditremaining => 'Credit remaining';
+
+  @override
   String get salesPeritem => 'Per Item';
 
   @override

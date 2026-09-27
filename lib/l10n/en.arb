@@ -1608,6 +1608,7 @@
   "salesPaymentupdated": "Payment updated",
   "salesCreditoffset": "Credit Offset",
   "salesAvailablecredit": "Available credit",
+  "salesCreditremaining": "Credit remaining",
   "salesPeritem": "Per Item",
   "salesRate": "Rate",
   "salesRecordpaymentnow": "Record payment now",

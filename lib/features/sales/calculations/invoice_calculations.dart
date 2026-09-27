@@ -129,6 +129,20 @@ num calculateTotal(
       calculateDiscount(items, discountScope, invoiceDiscount);
 }
 
+/// Clamps a requested credit offset into the range that is actually
+/// applicable during invoice settlement (task 41).
+///
+/// A partial offset is legitimate and is returned as-is; the ceiling is the
+/// customer's credit pool and, separately, the invoice total — a credit can
+/// never exceed either, and a negative request collapses to zero. This is
+/// the same ceiling the server enforces, kept here as a pure function so the
+/// rules are testable without booting the form.
+num clampCreditOffset({required num requested, required num available, required num total}) {
+  final notNegative = requested < 0 ? 0 : requested;
+  final poolCapped = notNegative > available ? available : notNegative;
+  return poolCapped > total ? total : poolCapped;
+}
+
 /* ── Field navigation ───────────────────────────────────────────── */
 
 const List<String> _fieldOrderItem = [

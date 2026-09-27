@@ -9746,6 +9746,12 @@ abstract class AppLocalizations {
   /// **'Available credit'**
   String get salesAvailablecredit;
 
+  /// No description provided for @salesCreditremaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit remaining'**
+  String get salesCreditremaining;
+
   /// No description provided for @salesPeritem.
   ///
   /// In en, this message translates to:

@@ -1555,6 +1555,7 @@
   "salesPaymentupdated": "ادائیگی اپڈیٹ ہو گئی",
   "salesCreditoffset": "کریڈٹ افسیٹ",
   "salesAvailablecredit": "دستیاب کریڈٹ",
+  "salesCreditremaining": "باقی کریڈٹ",
   "salesPeritem": "فی آئٹم",
   "salesRate": "ریٹ",
   "salesRecordpaymentnow": "ابھی ادائیگی درج کریں",
