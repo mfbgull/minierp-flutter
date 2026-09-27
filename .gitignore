@@ -64,3 +64,18 @@ server/uploads/
 
 # Server build output (tsc dist) — never tracked
 server/dist/
+
+# ── Agent / tooling residue (audit task 39) ───────────────────────────
+# Generated tool output and vendored agent runtime state. Untracked rather
+# than deleted so local runs keep working; regenerate freely.
+graphify-out/
+.mimosa/
+.pi/
+.spynel/
+
+# Stray root-level SQLite databases. The nested patterns below only covered
+# server/database and database/, which is how sqlite_mcp_server.db slipped in.
+/*.db
+/*.db-journal
+/*.db-shm
+/*.db-wal
