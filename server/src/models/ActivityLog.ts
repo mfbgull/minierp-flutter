@@ -354,19 +354,6 @@ class ActivityLogModel {
   }
 
   /**
-   * Delete a specific log entry
-   */
-  delete(id: number): boolean {
-    try {
-      const result = db.prepare('DELETE FROM activity_log WHERE id = ?').run(id);
-      return result.changes > 0;
-    } catch (error: any) {
-      logger.error('[ActivityLogModel] Delete failed:', error.message);
-      return false;
-    }
-  }
-
-  /**
    * Export logs to CSV format
    */
   exportToCSV(filters: ActivityLogFilters): string {
