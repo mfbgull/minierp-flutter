@@ -15,6 +15,21 @@ MiniERP is a **two-component application**:
 1. **Flutter Desktop Client** — UI for inventory, sales, purchases, production
 2. **Node.js Server** — API backend with SQLite database
 
+Each release ships both halves, packaged differently:
+
+| Artifact | Client | Server | You run |
+|---|---|---|---|
+| Linux `.run` | yes | **bundled + auto-started** | one installer |
+| Linux `.deb` / AppImage | yes | separate | installer + server bundle |
+| Windows `.exe` | yes | separate | installer + server bundle |
+| macOS `.dmg` | yes | separate | app + server bundle |
+
+**Only the Linux `.run` is a true one-app install** — it carries the Node
+runtime and the backend, starts the server for you and stops it on exit. Every
+other artifact needs the server installed separately from the
+`MiniERP-<version>-server.zip` attached to the same release. No accounting
+logic differs between them; they are the same build.
+
 ### Linux (Recommended)
 
 The Linux release includes a **self-contained .run installer** that bundles both client and server:
@@ -35,23 +50,27 @@ This installs to `~/.local/share/minierp/` and includes:
 - `.deb` package — install with `dpkg -i`
 - `.AppImage` — portable, no installation required
 
-### Windows
+### Client-only platforms (Windows, macOS, .deb, AppImage)
 
-The Windows installer includes the **client only**. You must run the server separately:
+These artifacts contain the desktop client only. Download
+`MiniERP-<version>-server.zip` from the same release page — it contains the
+compiled backend, its migrations and the lockfile — and run it once:
 
-1. Install Node.js (v18+)
-2. Clone or download the server from `server/`
-3. Run `npm install && npm run build && npm start`
-4. Launch MiniERP — it connects to `localhost:3011`
+1. Install Node.js 18 or newer (`brew install node` on macOS).
+2. Unzip `MiniERP-<version>-server.zip` and `cd server`.
+3. Install dependencies: `npm ci --omit=dev`.
+4. Set the required environment variables (below).
+5. Start it: `npm start`.
+6. Launch MiniERP — it connects to `localhost:3011`.
 
-### macOS
+The database is created and migrated automatically on first start, at
+`server/database/erp.db`. It is not needed on the `.run` installer, which
+already bundles and launches the server.
 
-The macOS DMG includes the **client only**. You must run the server separately:
-
-1. Install Node.js (v18+) via Homebrew: `brew install node`
-2. Clone or download the server from `server/`
-3. Run `npm install && npm run build && npm start`
-4. Launch MiniERP — it connects to `localhost:3011`
+**Required environment variables.** `JWT_SECRET`, `DEFAULT_ADMIN_PASSWORD` and
+`ALLOWED_ORIGINS` are all mandatory; the server refuses to start without
+`JWT_SECRET`, and without `ALLOWED_ORIGINS` it starts but answers every request
+with HTTP 500. Copy `INSTALL.txt` from the zip for the exact list.
 
 ## Server Configuration
 
