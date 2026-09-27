@@ -3,6 +3,7 @@ import { getQueryParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
 import AccountingService from '../services/accountingService';
+import { PaymentRecordingService } from '../services/PaymentRecordingService';
 import db from '../config/database';
 import { getRouteParam } from '../utils/queryUtils';
 import { PAYMENT_SORT_COLUMNS } from '../utils/sqlSanitizer';
@@ -10,7 +11,6 @@ import logger from '../utils/logger';
 import { parseCurrency } from '../utils/currency';
 import PaymentModel from '../models/Payment';
 import CustomerModel from '../models/Customer';
-import ledgerUtils from '../utils/ledgerUtils';
 import InvoiceModel from '../models/Invoice';
 import SupplierModel from '../models/Supplier';
 import { handleBusinessError } from '../utils/businessRuleError';
@@ -428,65 +428,32 @@ function allocatePaymentToInvoice(req: AuthRequest, res: Response): void {
       return;
     }
 
-    const paymentAmount = parseCurrency(payment.amount);
-
-    // Currently allocated total for THIS payment.
-    const currentRows = db.prepare(
-      'SELECT COALESCE(SUM(amount), 0) AS total FROM payment_allocations WHERE payment_id = ? AND voided_at IS NULL'
-    ).get(id) as { total: number };
-    const currentlyAllocated = parseCurrency(currentRows.total);
-    const unallocated = paymentAmount - currentlyAllocated;
-
-    let newTotal = 0;
     for (const alloc of allocations) {
-      const parsedInvoiceId = parseInt(alloc.invoice_id as string, 10);
-      if (isNaN(parsedInvoiceId)) {
+      if (isNaN(parseInt(alloc.invoice_id as string, 10))) {
         res.status(400).json({ success: false, error: `Invalid invoice ID: ${alloc.invoice_id}` });
         return;
       }
-      const amount = parseCurrency(alloc.amount);
-      if (amount <= 0) {
-        res.status(400).json({ success: false, error: `Allocation amount for invoice ${parsedInvoiceId} must be greater than 0` });
-        return;
-      }
-      const invoice = InvoiceModel.getById(parsedInvoiceId, db);
-      if (!invoice) {
-        res.status(404).json({ success: false, error: `Invoice ${parsedInvoiceId} not found` });
-        return;
-      }
-      if (Number(invoice.customer_id) !== Number(payment.customer_id)) {
-        res.status(400).json({ success: false, error: `Invoice ${parsedInvoiceId} does not belong to this payment's customer` });
-        return;
-      }
-      if (amount > parseCurrency(invoice.balance_amount) + 0.01) {
-        res.status(400).json({
-          success: false,
-          error: `Allocation (${amount.toFixed(2)}) exceeds invoice ${parsedInvoiceId} balance (${parseCurrency(invoice.balance_amount).toFixed(2)})`,
-        });
-        return;
-      }
-      newTotal += amount;
     }
 
-    if (Math.abs(newTotal - unallocated) > 0.01) {
-      res.status(400).json({
-        success: false,
-        error: `Allocations total (${newTotal.toFixed(2)}) must equal the unallocated remainder (${unallocated.toFixed(2)})`,
-      });
-      return;
-    }
+    // TASK 33: the per-invoice ceiling, the remainder match and the
+    // allocation writes belong to the single payment writer, so this path
+    // validates identically to an up-front allocation.
+    const allocatedTotal = parseCurrency(payment.amount) - parseCurrency(
+      (db.prepare(
+        'SELECT COALESCE(SUM(amount), 0) AS total FROM payment_allocations WHERE payment_id = ? AND voided_at IS NULL'
+      ).get(id) as { total: number }).total,
+    );
 
-    db.transaction(() => {
-      const insert = db.prepare('INSERT INTO payment_allocations (payment_id, invoice_id, amount) VALUES (?, ?, ?)');
-      for (const alloc of allocations) {
-        insert.run(id, parseInt(alloc.invoice_id as string, 10), parseCurrency(alloc.amount));
-      }
-      for (const alloc of allocations) {
-        const invoiceId = parseInt(alloc.invoice_id as string, 10);
-        ledgerUtils.calculateInvoiceBalance(invoiceId);
-        ledgerUtils.updateInvoiceStatus(invoiceId);
-      }
-    })();
+    new PaymentRecordingService(db).allocateExistingPayment({
+      paymentId: id,
+      customerId: Number(payment.customer_id),
+      allocations: allocations.map((alloc) => ({
+        invoiceId: parseInt(alloc.invoice_id as string, 10),
+        amount: parseCurrency(alloc.amount),
+      })),
+    });
+
+    const newTotal = parseCurrency(payment.amount) - allocatedTotal;
 
     logCRUD(ActionType.PAYMENT_UPDATE, 'Payment', id, `Allocated ${newTotal.toFixed(2)} of ${payment.payment_no} across ${allocations.length} invoice(s)`, req.user!.id, { payment_no: payment.payment_no, allocated: newTotal });
     req.activityLogged = true;
