@@ -395,15 +395,7 @@ class PhysicalCountModel {
         }
 
         // Update items.current_stock
-        db.prepare(`
-          UPDATE items
-          SET current_stock = (
-            SELECT COALESCE(SUM(quantity), 0)
-            FROM stock_balances
-            WHERE item_id = ?
-          )
-          WHERE id = ?
-        `).run(item.item_id, item.item_id);
+        StockMovementModel.refreshItemStockMirror(item.item_id, db);
 
         // Mark adjustment as posted
         db.prepare(`
@@ -706,15 +698,7 @@ class PhysicalCountModel {
           WHERE item_id = ? AND warehouse_id = ?
         `).run(correctedVariance, item.item_id, count.warehouse_id);
 
-        db.prepare(`
-          UPDATE items
-          SET current_stock = (
-            SELECT COALESCE(SUM(quantity), 0)
-            FROM stock_balances
-            WHERE item_id = ?
-          )
-          WHERE id = ?
-        `).run(item.item_id, item.item_id);
+        StockMovementModel.refreshItemStockMirror(item.item_id, db);
 
         db.prepare(`
           UPDATE physical_count_items

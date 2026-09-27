@@ -760,15 +760,7 @@ class PurchaseOrderModel {
 
       // Rebuild item current_stock from balances.
       for (const item of items) {
-        db.prepare(`
-          UPDATE items
-          SET current_stock = (
-            SELECT COALESCE(SUM(quantity), 0)
-            FROM stock_balances
-            WHERE item_id = ?
-          )
-          WHERE id = ?
-        `).run(item.item_id, item.item_id);
+        StockMovementModel.refreshItemStockMirror(item.item_id, db);
       }
 
       // Void the receipt's own GL group (Dr Inventory / Cr AP posted at
@@ -1071,15 +1063,7 @@ class PurchaseOrderModel {
           SELECT item_id FROM purchase_order_items WHERE id = ?
         `).get(receiptItem.po_item_id) as { item_id: number };
 
-        db.prepare(`
-          UPDATE items
-          SET current_stock = (
-            SELECT COALESCE(SUM(quantity), 0)
-            FROM stock_balances
-            WHERE item_id = ?
-          )
-          WHERE id = ?
-        `).run(poItem.item_id, poItem.item_id);
+        StockMovementModel.refreshItemStockMirror(poItem.item_id, db);
       }
 
       // Calculate and update PO status
