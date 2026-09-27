@@ -812,27 +812,12 @@ function restoreInvoice(req: AuthRequest, res: Response): Response | void {
 
       // 2. Un-void the journal lines the delete voided (GL is restored to
       //    its pre-delete state — no new posting, no double counting).
-      //    Scoped exactly like the void side (InvoiceModel.voidOwnReturnJournalLines):
-      //    return GL groups are keyed to the RETURN document, not the invoice,
-      //    so a bare invoice id on INVOICE_RETURN would resurrect lines that
-      //    belong to another invoice's return carrying the same numeric id.
-      db.prepare(`
-        UPDATE journal_lines
-        SET voided = 0, voided_by = NULL, void_reason = NULL
-        WHERE reference_type = 'INVOICE'
-          AND reference_id = ? AND voided = 1
-      `).run(invoiceId);
-      db.prepare(`
-        UPDATE journal_lines
-        SET voided = 0, voided_by = NULL, void_reason = NULL
-        WHERE reference_type = 'INVOICE_RETURN'
-          AND reference_id = ? AND voided = 1
-          AND NOT EXISTS (
-            SELECT 1 FROM invoice_returns other_returns
-            WHERE other_returns.id = journal_lines.reference_id
-              AND other_returns.invoice_id <> ?
-          )
-      `).run(invoiceId, invoiceId);
+      //    TASK 34: scoped by the accounting service, exactly like the void
+      //    side, so no path mutates journal_lines behind the GL authority.
+      AccountingService.restoreJournalLinesByReference(db, 'INVOICE', invoiceId);
+      AccountingService.restoreJournalLinesByReference(db, 'INVOICE_RETURN', invoiceId, {
+        owningInvoiceId: invoiceId,
+      });
 
       // 3. Undo the customer-ledger reversal created by
       //    deleteLedgerEntryByReference: drop the REVERSAL row and
