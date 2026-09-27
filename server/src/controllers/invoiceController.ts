@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import db from '../config/database';
-import { AuthRequest, Invoice, InvoiceItemDTO, PaymentDTO, InvoiceStatus, SellableStockUnavailableError } from '../types';
+import { AuthRequest, CreateInvoiceDTO, Invoice, InvoiceItemDTO, PaymentDTO, InvoiceStatus, SellableStockUnavailableError } from '../types';
 import StockMovementModel from '../models/StockMovement';
 import InvoiceModel from '../models/Invoice';
 import { InvoiceCancellationGuardError } from '../models/Invoice';
@@ -20,6 +20,14 @@ import {
 import { isValidPaymentMethod } from '../services/cashService';
 import { handleBusinessError } from '../utils/businessRuleError';
 import { generateDocNo } from '../utils/sequence';
+import {
+  InvoiceCreationCreditError,
+  InvoiceCreationIdempotencyError,
+  InvoiceCreationOffsetError,
+  InvoiceCreationPaymentMethodError,
+  InvoiceCreationService,
+  InvoiceCreationTotalMismatchError,
+} from '../services/InvoiceCreationService';
 import {
   IDEMPOTENCY_KEY_HEADER,
   INVOICE_CREATE_SCOPE,
@@ -201,420 +209,75 @@ function getInvoice(req: AuthRequest, res: Response): Response | void {
  * and customer balance updates all happen inside a single transaction.
  */
 function createInvoice(req: AuthRequest, res: Response): Response | void {
+  if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+
   try {
-    const {
-      invoice_no,
-      customer_id,
-      invoice_date,
-      due_date,
-      status = 'Unpaid' as InvoiceStatus,
-      discount_scope,
-      discount_type,
-      discount_value,
-      items,
-      notes,
-      terms,
-      total_amount,
-      record_payment,
-      payment,
-      credit_offset,
-    } = req.body as {
-      invoice_no?: string;
-      customer_id: number | string;
-      invoice_date: string;
-      due_date: string;
-      status?: InvoiceStatus;
-      discount_scope?: string;
-      discount_type?: string;
-      discount_value?: number;
-      items: InvoiceItemDTO[];
-      notes?: string;
-      terms?: string;
-      total_amount: number | string;
-      record_payment?: boolean;
-      payment?: PaymentDTO;
-      credit_offset?: number;
-    };
-
-    if (!customer_id || !invoice_date || !items || items.length === 0) {
-      return res.status(400).json({ error: 'Customer, date, and items are required' });
-    }
-
-    // 3.4: legacy clients may still send expired_batch_overrides. The
-    // override flow is removed — expired stock is never sellable — so
-    // the field is inert. Log for observability, do not act on it.
-    if ('expired_batch_overrides' in req.body) {
-      logger.warn('Ignoring removed expired_batch_overrides payload on invoice create', {
-        keys: Object.keys(req.body.expired_batch_overrides ?? {}).length
-      });
-    }
-
-    const parsedCustomerId = parseInt(String(customer_id), 10);
-    const userId = req.user!.id;
-
-    // P11: idempotent create. A retry after a client-side timeout must
-    // replay the original invoice, never double-create (stock/GL/ledger).
-    // Requests without the header keep the legacy (unguarded) behavior.
+    const body = req.body as CreateInvoiceDTO;
     let idemKey: string | null;
     try {
       idemKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
     } catch (keyError) {
       return res.status(400).json({ error: (keyError as Error).message });
     }
-    const idemHash = idemKey ? hashRequestPayload(req.body) : '';
-    if (idemKey) {
-      const existing = findIdempotencyRecord(db, INVOICE_CREATE_SCOPE, idemKey);
-      if (existing) {
-        if (existing.request_hash !== idemHash) {
-          return res.status(409).json({
-            error: 'Idempotency-Key was already used with a different request payload',
-          });
-        }
-        if (existing.resource_id != null) {
-          const original = InvoiceModel.getWithCustomer(existing.resource_id, db);
-          if (original) {
-            res.set('X-Idempotent-Replay', 'true');
-            return res.status(201).json(original);
-          }
-        }
-      }
-    }
 
-    // === ENTIRE operation inside one transaction ===
-    const transaction = db.transaction(() => {
-      // ACC-18 interim: the server is authoritative over invoice money.
-      // Header total = Σ of server-computed line amounts minus an
-      // invoice-scope header discount — the same grand total the form
-      // displays. A client-supplied total differing by more than 0.01
-      // is rejected with nothing written.
-      const computedTotal = computeInvoiceGrandTotal(items, {
-        discount_scope,
-        discount_type,
-        discount_value,
-      });
-      const totalAmountNum = computedTotal;
-      if (total_amount !== undefined && total_amount !== null) {
-        const clientTotal = parseCurrency(total_amount);
-        if (Math.abs(clientTotal - computedTotal) > 0.01) {
-          throw new TotalMismatchError(clientTotal, computedTotal);
-        }
-      }
-      const paymentAmountNum = record_payment && payment
-        ? parseCurrency(payment.amount)
-        : 0;
-
-    // Determine initial paid/balance/status
-    const creditOffsetNum = credit_offset ? parseCurrency(credit_offset) : 0;
-    const initialPaidAmount = paymentAmountNum + creditOffsetNum;
-    const initialBalanceAmount = subtractCurrency(totalAmountNum, initialPaidAmount);
-
-    // Guard: payment + credit offset cannot exceed the invoice total
-    if (record_payment && payment && (paymentAmountNum + creditOffsetNum) > totalAmountNum) {
-      throw new OffsetExceedsTotalError(paymentAmountNum + creditOffsetNum, totalAmountNum);
-    }
-
-    // Guard: credit offset cannot exceed available credit (H9). Available
-    // credit has TWO non-overlapping representations:
-    //   1. the explicit store-credit pool (customers.credit_balance) —
-    //      created by a 'credit' return settlement, which also moves the
-    //      ledger credit OFF customer_ledger, and
-    //   2. legacy ledger credit, which shows as a negative current_balance.
-    // A settlement consumes the pool FIRST; the pool half is mirrored by a
-    // customer_ledger CREDIT entry below (its credit lives in the column,
-    // not the ledger — unlike the AGENTS.md CREDIT_OFFSET case, where the
-    // RETURN credit row already carries it and a second row would
-    // double-count).
-    let poolCreditApplied = 0;
-    if (creditOffsetNum > 0) {
-      const customerRow = db.prepare(
-        'SELECT current_balance, COALESCE(credit_balance, 0) as credit_balance FROM customers WHERE id = ?'
-      ).get(parsedCustomerId) as { current_balance: number; credit_balance: number } | undefined;
-      const pool = Math.max(0, customerRow?.credit_balance ?? 0);
-      const ledgerCredit = Math.abs(Math.min(0, customerRow?.current_balance ?? 0));
-      const availableCredit = pool + ledgerCredit;
-      if (creditOffsetNum > availableCredit + 0.005) {
-        throw new InsufficientCreditError(creditOffsetNum, availableCredit);
-      }
-      poolCreditApplied = Math.min(creditOffsetNum, pool);
-    }
-
-    // Same whitelist as PaymentModel — inline payments reached the GL
-    // before this even when their method was unrecognized.
-    if (record_payment && payment && paymentAmountNum > 0 && !isValidPaymentMethod(payment.payment_method)) {
-      throw new InvalidPaymentMethodError(payment.payment_method);
-    }
-
-    let initialStatus: InvoiceStatus;
-    if (record_payment && payment && paymentAmountNum > 0) {
-      initialStatus = paymentAmountNum >= totalAmountNum ? 'Paid' : 'Partially Paid';
-    } else if (creditOffsetNum > 0) {
-      // H9: a credit offset settles the invoice just like cash — reflect
-      // that in the status instead of leaving a paid-in-full 'Unpaid'.
-      initialStatus = initialBalanceAmount <= 0.005 ? 'Paid' : 'Partially Paid';
-    } else {
-      initialStatus = status || 'Unpaid';
-    }
-
-    // Default due_date to 15 days after invoice_date when not provided.
-    const resolvedDueDate = due_date || (() => {
-      const d = new Date(invoice_date);
-      d.setDate(d.getDate() + 15);
-      return d.toISOString().slice(0, 10);
-    })();
-
-    // Insert invoice
-    // CRITICAL-1 fix: pass the controller-computed initial paid and
-    // balance through to the model so the monetary columns on the
-    // invoice header match the payment that is about to be recorded
-    // below. Previously these were hard-coded to 0/total, leaving
-    // the A/R ledger inconsistent with payment_allocations.
-    const resolvedInvoiceNo = invoice_no || generateDocNo(db, 'INV', 5);
-    // H2: persist the invoice-scope header discount and notes. They were
-    // read from the request and used to compute the grand total, but
-    // never forwarded to the model — so a discounted invoice stored
-    // discount_value 0 and lost its notes, and the return path had no
-    // discount to give back (updateInvoice already persists these).
-    const invoiceId = InvoiceModel.createInvoice(db, {
-      invoice_no: resolvedInvoiceNo,
-      customer_id: parsedCustomerId,
-      invoice_date,
-      due_date: resolvedDueDate,
-      status: initialStatus as InvoiceStatus,
-      total_amount: totalAmountNum,
-      paid_amount: initialPaidAmount,
-      balance_amount: initialBalanceAmount,
-      credit_offset: creditOffsetNum,
-      terms,
-      notes,
-      discount_scope,
-      discount_type,
-      discount_value,
-      items,
-    }, userId);
-
-    // P11: claim the idempotency key inside this same transaction — the
-    // (key → invoice) row persists if and only if the invoice creation
-    // commits, so a rolled-back attempt leaves no trace and a retry runs
-    // normally, while a post-commit client timeout replays this invoice.
-    if (idemKey) {
-      claimIdempotencyKey(db, INVOICE_CREATE_SCOPE, idemKey, idemHash, invoiceId);
-    }
-
-    let cogsTotal = 0;
-    const consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }> = [];
-    for (const item of items) {
-      const warehouseId = InvoiceModel.findWarehouseForItem(
-        db,
-        item.item_id,
-        item.quantity,
-        item.warehouse_id
-      );
-
-      InvoiceModel.createInvoiceItem(db, invoiceId, {
-        item_id: item.item_id,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        tax_rate: item.tax_rate,
-        discount_type: item.discount_type,
-        discount_value: item.discount_value,
-        amount: item.amount
-      });
-
-      // FIFO consumption from oldest batches
-      const consumption = InvoiceModel.consumeFromOldestBatches(
-        item.item_id,
-        warehouseId,
-        item.quantity,
-        db
-      );
-
-      // Create one stock movement per consumed batch with actual COGS
-      for (const entry of consumption) {
-        const batchLabel = entry.batchId ? `(batch ${entry.batchId})` : '(legacy stock)';
-        StockMovementModel.recordMovement(
-          {
-            item_id: item.item_id,
-            warehouse_id: warehouseId,
-            movement_type: 'SALE',
-            quantity: -entry.consumed,
-            unit_cost: entry.unitCost,
-            reference_doctype: 'INVOICE',
-            reference_docno: resolvedInvoiceNo,
-            remarks: `Sold via Invoice ${resolvedInvoiceNo} ${batchLabel}`,
-            movement_date: invoice_date,
-            batch_id: entry.batchId ?? undefined,
-          },
-          userId,
-          db
-        );
-        cogsTotal += entry.consumed * entry.unitCost;
-      }
-
-      // Track consumption for expiry denormalization
-      consumptions.push({ itemId: item.item_id, consumption });
-    }
-    // Denormalize expiry info onto invoice items (kept for near-expiry
-    // display; expired batches can no longer be consumed, so no
-    // is_expired_at_sale marking or override merging happens here).
-    InvoiceModel.denormalizeExpiryInfo(invoiceId, consumptions, db);
-
-      // Create customer ledger entry (debit to increase AR)
-      createLedgerEntry(
-        parsedCustomerId,
-        invoice_date,
-        'INVOICE',
-        resolvedInvoiceNo,
-        totalAmountNum, // debit
-        0,              // credit
-        `Invoice ${resolvedInvoiceNo}`
-      );
-
-      // Post the sales invoice to the GL (Dr AR / Cr Sales Revenue net / Cr Tax Payable).
-      // GL Phase-2 wiring: every new invoice auto-posts a journal
-      // entry. This brings the new TB and BS into alignment over
-      // time as new activity flows through.
-      // MAJOR-5 fix: tax is now split out into a separate Tax Payable line
-      // when items have tax_rate > 0.
-      // H3: the posted tax is READ from the stored invoice_items rows
-      // (the same columns the tax report and return math use) instead of
-      // being recomputed from gross qty × price, which ignored discounts
-      // and per-line rounding and diverged from the stored tax.
-      const computedTaxAmount = InvoiceModel.getInvoiceTaxTotal(db, invoiceId);
-      AccountingService.postInvoiceEntry(db, {
-        invoiceId,
-        invoiceNo: resolvedInvoiceNo,
-        totalAmount: totalAmountNum,
-        invoiceDate: invoice_date,
-        userId,
-        taxAmount: computedTaxAmount,
-      });
-
-      // Post COGS: Dr COGS, Cr Inventory Asset at actual FIFO cost
-      if (cogsTotal > 0) {
-        AccountingService.postCOGSEntry(db, {
-          invoiceId,
-          invoiceNo: resolvedInvoiceNo,
-          cogsAmount: parseCurrency(cogsTotal),
-          invoiceDate: invoice_date,
-          userId,
-        });
-      }
-
-    // --- FIX #2: Payment recording INSIDE transaction ---
-    if (record_payment && payment && paymentAmountNum > 0) {
-      // FIX #5: Atomic payment number generation
-      const newPaymentNo = InvoiceModel.generatePaymentNoAtomic(db);
-
-      const paymentId = InvoiceModel.createPayment(db, newPaymentNo, parsedCustomerId, payment.payment_date, paymentAmountNum, payment.payment_method, payment.reference_no, payment.notes);
-
-      // Payment allocation
-      InvoiceModel.createPaymentAllocation(db, paymentId, invoiceId, paymentAmountNum);
-
-      // Ledger entry for payment (credit to reduce AR)
-      InvoiceModel.createLedgerEntry(db, parsedCustomerId, 'PAYMENT', newPaymentNo, payment.payment_date, 0, paymentAmountNum, `Payment ${newPaymentNo} for Invoice ${invoice_no}`);
-
-      // Post the payment to the GL (Dr Cash / Cr AR). Cash vs Bank
-      // is determined by payment_method.
-      AccountingService.postPaymentEntry(db, {
-        paymentId,
-        paymentNo: newPaymentNo,
-        amount: paymentAmountNum,
-        paymentDate: payment.payment_date,
-        paymentMethod: payment.payment_method,
-        customerId: parsedCustomerId,
-        userId,
-      });
-    }
-
-    // --- Credit offset recording INSIDE transaction ---
-    if (creditOffsetNum > 0) {
-      const creditRefNo = `CREDIT-${resolvedInvoiceNo}`;
-
-      // Post credit offset to GL (Dr Customer Credit / Cr AR)
-      AccountingService.postCreditOffsetEntry(db, {
-        invoiceId,
-        invoiceNo: resolvedInvoiceNo,
-        amount: creditOffsetNum,
-        invoiceDate: invoice_date,
-        customerId: parsedCustomerId,
-        userId,
-      });
-
-      // H9: consume the store-credit pool half. The pool lives in
-      // customers.credit_balance and is deliberately absent from
-      // customer_ledger (its applying debit was posted when the credit
-      // settlement moved it there), so the ledger needs its own credit row
-      // here to offset the full-value INVOICE debit — otherwise the
-      // customer would show receivable they already paid with credit.
-      if (poolCreditApplied > 0) {
-        db.prepare('UPDATE customers SET credit_balance = MAX(0, credit_balance - ?) WHERE id = ?')
-          .run(poolCreditApplied, parsedCustomerId);
-        createLedgerEntry(
-          parsedCustomerId,
-          invoice_date,
-          'CREDIT',
-          creditRefNo,
-          0,
-          poolCreditApplied,
-          `Store credit applied to Invoice ${resolvedInvoiceNo}`
-        );
-      }
-    }
-
-    // --- FIX #6: Customer balance update inside transaction ---
-    ledgerUtils.recalcCustomerBalanceFromLedger(parsedCustomerId);
-
-      return invoiceId;
+    const service = new InvoiceCreationService(db);
+    const result = service.create({
+      source: 'DIRECT',
+      userId: req.user.id,
+      customerId: Number(body.customer_id),
+      invoiceDate: body.invoice_date,
+      dueDate: body.due_date,
+      status: body.status,
+      notes: body.notes,
+      terms: body.terms,
+      items: body.items,
+      discountScope: body.discount_scope,
+      discountType: body.discount_type,
+      discountValue: body.discount_value,
+      totalAmount: body.total_amount === undefined ? undefined : parseCurrency(body.total_amount),
+      recordPayment: body.record_payment,
+      payment: body.payment,
+      creditOffset: body.credit_offset,
+      idempotency: idemKey
+        ? { scope: INVOICE_CREATE_SCOPE, key: idemKey, hash: hashRequestPayload(req.body) }
+        : undefined,
     });
 
-    const invoiceId = transaction();
-
-    const createdInvoice = InvoiceModel.getWithCustomer(invoiceId, db) as InvoiceRow;
-
-    const corrCreate = newCorrelationId();
-    logCRUD(ActionType.INVOICE_CREATE, 'Invoice', createdInvoice.id,
-      `Invoice ${createdInvoice.invoice_no} created (${createdInvoice.status})`, req.user!.id,
+    if (result.replayed) res.set('X-Idempotent-Replay', 'true');
+    const createdInvoice = InvoiceModel.getWithCustomer(result.invoiceId, db) as InvoiceRow;
+    logCRUD(
+      ActionType.INVOICE_CREATE,
+      'Invoice',
+      createdInvoice.id,
+      `Invoice ${createdInvoice.invoice_no} created (${createdInvoice.status})`,
+      req.user.id,
       { total_amount: createdInvoice.total_amount, customer_id: createdInvoice.customer_id },
-      { newValue: createdInvoice, correlationId: corrCreate });
-    res.status(201).json(createdInvoice);
+      { newValue: createdInvoice, correlationId: newCorrelationId() },
+    );
+    return res.status(201).json(createdInvoice);
   } catch (error: unknown) {
-    // Expired/blocked stock is a client-recoverable error, not a 500
     if (error instanceof SellableStockUnavailableError) {
-      logger.warn('Create invoice rejected:', { error: error.message });
-      res.status(400).json({ error: error.message });
-      return;
+      return res.status(400).json({ error: error.message });
     }
-    // ACC-18 interim: client total disagrees with line items → 400
-    if (error instanceof TotalMismatchError) {
-      logger.warn('Create invoice rejected:', { error: error.message });
-      res.status(400).json({ error: 'total_amount disagrees with line items' });
-      return;
+    if (error instanceof InvoiceCreationTotalMismatchError) {
+      return res.status(400).json({ error: 'total_amount disagrees with line items' });
     }
-    if (error instanceof InvalidPaymentMethodError) {
-      logger.warn('Create invoice rejected:', { error: error.message });
-      res.status(400).json({ error: error.message });
-      return;
+    if (error instanceof InvoiceCreationPaymentMethodError) {
+      return res.status(400).json({ error: error.message });
     }
-    if (error instanceof InsufficientCreditError) {
-      logger.warn('Create invoice rejected:', { error: error.message });
-      res.status(400).json({ error: error.message });
-      return;
+    if (error instanceof InvoiceCreationCreditError) {
+      return res.status(400).json({ error: error.message });
     }
-    if (error instanceof OffsetExceedsTotalError) {
-      logger.warn('Create invoice rejected:', { error: error.message });
-      res.status(400).json({ error: error.message });
-      return;
+    if (error instanceof InvoiceCreationOffsetError) {
+      return res.status(400).json({ error: error.message });
     }
-    handleBusinessError(res, error, 'Create invoice', 'Failed to create invoice');
+    if (error instanceof InvoiceCreationIdempotencyError) {
+      return res.status(409).json({ error: error.message });
+    }
+    return handleBusinessError(res, error, 'Create invoice', 'Failed to create invoice');
   }
 }
 
-/**
- * PUT /api/invoices/:id
- * Update an existing invoice. Reverses old stock movements before
- * applying new ones. Payment changes and customer balance updates
- * are all inside the transaction.
- */
 function updateInvoice(req: AuthRequest, res: Response): Response | void {
   try {
     const { id } = req.params;
