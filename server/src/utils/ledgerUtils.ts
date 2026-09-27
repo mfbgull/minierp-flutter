@@ -18,13 +18,14 @@ function createLedgerEntry(
   referenceNo: string,
   debit: number,
   credit: number,
-  description: string
+  description: string,
+  conn: typeof db = db
 ): number {
-  const insertEntry = db.transaction(() => {
+  const insertEntry = conn.transaction(() => {
     // ACC-12: the prior balance for a (possibly backdated) insert is the
     // latest row at or BEFORE the new row's position in
     // (transaction_date, id) order — never simply the newest row.
-    const priorResult = db.prepare(`
+    const priorResult = conn.prepare(`
       SELECT balance FROM customer_ledger
       WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL AND transaction_date <= ?
       ORDER BY transaction_date DESC, id DESC
@@ -36,7 +37,7 @@ function createLedgerEntry(
     const safeCredit = parseCurrency(credit);
     const newBalance = subtractCurrency(addCurrency(lastBalance, safeDebit), safeCredit);
 
-    const result = db.prepare(`
+    const result = conn.prepare(`
       INSERT INTO customer_ledger (
         customer_id, transaction_date, transaction_type, reference_no,
         debit, credit, balance, description
@@ -55,7 +56,7 @@ function createLedgerEntry(
 
     // Rows positioned after the insert are stale; rebuild the whole chain
     // in date order so every stored balance stays consistent.
-    rebuildLedgerBalances(customerId);
+    rebuildLedgerBalances(customerId, conn);
 
     return newRowId;
   });
@@ -256,19 +257,19 @@ function updateInvoiceStatus(invoiceId: number, conn: typeof db = db): string {
   return combinedStatus;
 }
 
-function rebuildLedgerBalances(customerId: number): void {
-  db.transaction(() => {
+function rebuildLedgerBalances(customerId: number, conn: typeof db = db): void {
+  conn.transaction(() => {
     // ACC-14: voided rows are out; a REVERSAL row (reversed_by set) is
     // also excluded — its voided original is already gone, so keeping the
     // active half of the pair would double-count the correction.
-    const entries = db.prepare(`
+    const entries = conn.prepare(`
       SELECT id, debit, credit FROM customer_ledger
       WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL
       ORDER BY transaction_date ASC, id ASC
     `).all(customerId) as Array<{ id: number; debit: number; credit: number }>;
 
     let runningBalance = 0;
-    const updateStmt = db.prepare('UPDATE customer_ledger SET balance = ? WHERE id = ?');
+    const updateStmt = conn.prepare('UPDATE customer_ledger SET balance = ? WHERE id = ?');
 
     for (const entry of entries) {
       runningBalance = addCurrency(subtractCurrency(runningBalance, entry.credit), entry.debit);
