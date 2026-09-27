@@ -11,6 +11,40 @@ The server runs an in-process backup scheduler:
 
 Manual backup: `cd server && npm run db:backup`
 
+## Historical data-integrity scan (audit-remediation task 30)
+
+Run the report-only C1/C2/C3/H10 scanner against the configured database:
+
+```bash
+cd server
+npm run data:integrity
+# or: npm run data:integrity -- /path/to/erp.db
+```
+
+The scanner opens SQLite read-only, uses `query_only`, and runs its checks in a
+consistent read transaction. It never modifies historical data and does not
+provide a repair mode. Exit code `1` means findings were reported; exit code `0`
+means no findings were detected. JSON output includes each finding's document,
+reference, affected quantity, affected amount, expected value, actual value,
+proposed repair, and an audit log. Create a backup with `npm run db:backup`
+before implementing or applying any future repair.
+
+## Deprecated mobile invoice API
+
+`/api/mobile-invoices/*` is retained for compatibility but is deprecated. Use
+`/api/invoices/*` for new clients. Every mobile response carries:
+
+- `Deprecation: true`
+- `Warning: 299 mini-erp "..."`
+- `Link: </api/invoices>; rel="successor-version"`
+- `X-Deprecated-Endpoint: /api/mobile-invoices`
+
+The deprecation middleware does not change response bodies or status codes.
+Existing clients may continue using the mobile routes during the compatibility
+window. Before removal, confirm that no external or mobile consumers remain,
+migrate them to `/api/invoices/*`, and preserve the historical mobile migration
+and backfill paths needed by existing databases.
+
 ## Restore procedure
 
 1. **Stop the server**
