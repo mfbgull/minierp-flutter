@@ -259,15 +259,7 @@ class ProductionModel {
           `).run(input.item_id, materialsWarehouseId, -input.quantity);
         }
 
-        db.prepare(`
-          UPDATE items
-          SET current_stock = (
-            SELECT COALESCE(SUM(quantity), 0)
-            FROM stock_balances
-            WHERE item_id = ?
-          )
-          WHERE id = ?
-        `).run(input.item_id, input.item_id);
+        StockMovementModel.refreshItemStockMirror(input.item_id, db);
       }
 
       // Calculate total batch cost from actual FIFO consumption
@@ -370,15 +362,7 @@ class ProductionModel {
         `).run(output_item_id, warehouse_id, output_quantity);
       }
 
-      db.prepare(`
-        UPDATE items
-        SET current_stock = (
-          SELECT COALESCE(SUM(quantity), 0)
-          FROM stock_balances
-          WHERE item_id = ?
-        )
-        WHERE id = ?
-      `).run(output_item_id, output_item_id);
+      StockMovementModel.refreshItemStockMirror(output_item_id, db);
 
       db.prepare(`
         INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)

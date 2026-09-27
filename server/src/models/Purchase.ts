@@ -271,15 +271,7 @@ class PurchaseModel {
       `).run(item_id, warehouse_id, quantity);
     }
 
-    db.prepare(`
-      UPDATE items
-      SET current_stock = (
-        SELECT COALESCE(SUM(quantity), 0)
-        FROM stock_balances
-        WHERE item_id = ?
-      )
-      WHERE id = ?
-    `).run(item_id, item_id);
+    StockMovementModel.refreshItemStockMirror(item_id, db);
 
     // Supplier AP entry: a linked purchase increases the supplier's
     // payable balance (mirrors the PO submit flow's PURCHASE_ORDER

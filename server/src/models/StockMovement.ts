@@ -200,15 +200,7 @@ class StockMovementModel {
         this.syncStockBalancesExtension(data.item_id, data.warehouse_id, db);
       }
 
-      db.prepare(`
-        UPDATE items
-        SET current_stock = (
-          SELECT COALESCE(SUM(quantity), 0)
-          FROM stock_balances
-          WHERE item_id = ?
-        )
-        WHERE id = ?
-      `).run(data.item_id, data.item_id);
+      this.refreshItemStockMirror(data.item_id, db);
 
       // Post financial entry for ADJUSTMENT movements
       const movementId = result.lastInsertRowid as number;
@@ -630,6 +622,36 @@ class StockMovementModel {
    *     this case implies a partial migration or a stale batch, neither
    *     of which should be silently papered over.
    */
+  /**
+   * Refresh the denormalized items.current_stock mirror from the
+   * authoritative stock_balances quantity.
+   *
+   * TASK 35: this SQL was duplicated across eight write sites. Any writer of
+   * stock_balances.quantity that forgot its copy left the mirror stale, and
+   * the mirror is what the reorder alerts and the GL reconciliation fallback
+   * for batch-less items read. stockAuthority.test.ts pins the equality.
+   */
+  /**
+   * Refresh the denormalized items.current_stock mirror from the
+   * authoritative stock_balances quantity.
+   *
+   * TASK 35: this SQL was duplicated across eight write sites. Any writer of
+   * stock_balances.quantity that forgot its copy left the mirror stale, and
+   * the mirror is what the reorder alerts and the GL reconciliation fallback
+   * for batch-less items read. stockAuthority.test.ts pins the equality.
+   */
+  static refreshItemStockMirror(itemId: number, db: Database.Database): void {
+    db.prepare(`
+      UPDATE items
+      SET current_stock = (
+        SELECT COALESCE(SUM(quantity), 0)
+        FROM stock_balances
+        WHERE item_id = ?
+      )
+      WHERE id = ?
+    `).run(itemId, itemId);
+  }
+
   static syncBatchStockByLocationForNewBatch(batchId: number, warehouseId: number, quantity: number, db: Database.Database): void {
     if (!isFeatureEnabled(db, 'feature_batch_locations')) return;
     const locRow = db.prepare(`
