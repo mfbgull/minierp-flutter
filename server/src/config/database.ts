@@ -64,7 +64,7 @@ function addColumnIfMissing(table: string, columnDef: string): void {
 // ── Migration ledger (schema_migrations) ──────────────────────────────
 // Single canonical migrations path; resolves under ts-node (src/config/..)
 // and dist (dist/src/config/..).
-const MIGRATIONS_DIR = path.resolve(__dirname, '../migrations');
+export const MIGRATIONS_DIR = path.resolve(__dirname, '../migrations');
 
 function ensureMigrationsTable(): void {
   db.exec(`
@@ -76,9 +76,13 @@ function ensureMigrationsTable(): void {
   `);
 }
 
-function fileChecksum(filename: string): string {
+// Hash primitive: absolute path -> first 16 hex of sha256, or 'inline' when
+// the file cannot be read (missing file / unreadable). Every ledger row is
+// stamped with this value at apply time by BOTH recording paths in
+// runLedgered, so verification must compare against the exact same digest.
+function checksumOfFile(absolutePath: string): string {
   try {
-    return crypto.createHash('sha256').update(fs.readFileSync(path.join(MIGRATIONS_DIR, filename))).digest('hex').slice(0, 16);
+    return crypto.createHash('sha256').update(fs.readFileSync(absolutePath)).digest('hex').slice(0, 16);
   } catch {
     return 'inline';
   }
@@ -92,7 +96,7 @@ function fileChecksum(filename: string): string {
 function runLedgered(key: string, fn?: () => void, opts?: { noTxn?: boolean }): void {
   ensureMigrationsTable();
   if (db.prepare('SELECT 1 FROM schema_migrations WHERE filename = ?').get(key)) return;
-  const checksum = fileChecksum(key);
+  const checksum = checksumOfFile(path.join(MIGRATIONS_DIR, key));
   try {
     if (fn) {
       if (opts?.noTxn) {
@@ -134,6 +138,58 @@ function runLedgered(key: string, fn?: () => void, opts?: { noTxn?: boolean }): 
   } catch (err: any) {
     logger.error(`FATAL: migration '${key}' failed: ${err.message}`);
     process.exit(1);
+  }
+}
+
+/**
+ * Boot integrity gate (audit-remediation task 37): every migration recorded
+ * in schema_migrations must still carry the file checksum it was applied
+ * with. runLedgered stamps each row with checksumOfFile() at apply time, so
+ * a stored hash that no longer matches the file on disk means a historical
+ * migration was edited after it ran — the schema can then no longer be
+ * reproduced from source, so the boot must stop.
+ *
+ * Never auto-repairs and never touches the database: on mismatch it throws,
+ * and the boot sequence converts that into the same logger.error +
+ * process.exit(1) a failing migration produces, i.e. at import time and
+ * therefore before HTTP listen. Cheap — one SELECT per boot, and only files
+ * that exist on disk are hashed.
+ *
+ * Edge cases (chosen deliberately):
+ *  - checksum 'inline' → registered from an in-memory fn with no file on
+ *    disk; nothing to compare, skipped (otherwise every boot would break).
+ *  - real hash recorded but the file is now missing → the migration ran from
+ *    a real file whose source was later removed. The applied schema is still
+ *    internally consistent, so this only warns; a content *edit* aborts.
+ *  - no schema_migrations table / no rows → brand-new database, no-op.
+ */
+export function verifyMigrationChecksums(database: Database.Database, migrationsDir: string): void {
+  const ledgerExists = database
+    .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'")
+    .get();
+  if (!ledgerExists) return; // brand-new database: nothing applied yet
+
+  const rows = database
+    .prepare('SELECT filename, checksum FROM schema_migrations ORDER BY filename')
+    .all() as { filename: string; checksum: string }[];
+  for (const { filename, checksum } of rows) {
+    if (checksum === 'inline') continue; // inline migration: no file to compare
+    const current = checksumOfFile(path.join(migrationsDir, filename));
+    if (current === 'inline') {
+      logger.warn(
+        `migration '${filename}' was applied from a file that no longer exists in ${migrationsDir}; the ledger row is kept as-is (no content change detected).`
+      );
+      continue;
+    }
+    if (current !== checksum) {
+      throw new Error(
+        `FATAL: migration '${filename}' was modified after it was applied.\n` +
+        `  recorded checksum: ${checksum}\n` +
+        `  current checksum:  ${current}\n` +
+        `A historical migration file was edited, so the schema_migrations ledger no longer matches the file on disk and the schema can no longer be reproduced from source.\n` +
+        `Remedy: restore the original file, or create a NEW migration that expresses the change. Do NOT reset, drop or recreate the database — the applied schema is still valid.`
+      );
+    }
   }
 }
 
@@ -1525,6 +1581,19 @@ function runGLVoidAttributionMigration(): void {
 // Boot migration sequence - each entry recorded in schema_migrations.
 // Historical guards inside each runner make first-boot backfill safe:
 // already-applied work no-ops and gets registered without re-executing bodies.
+// Audit-remediation task 37: abort BEFORE the sequence if any recorded
+// migration no longer matches the checksum it was applied with (an edited
+// historical migration). One pass per boot over the whole ledger; fails
+// exactly like runLedgered — logger.error + process.exit(1) at import time,
+// i.e. before HTTP listen — and never writes to the database.
+try {
+  ensureMigrationsTable();
+  verifyMigrationChecksums(db, MIGRATIONS_DIR);
+} catch (err: unknown) {
+  logger.error(err instanceof Error ? err.message : String(err));
+  process.exit(1);
+}
+
 runLedgered('fn.initializeDatabase', initializeDatabase);
 runLedgered('fn.runExpensesMigration', runExpensesMigration);
 runLedgered('fn.runPurchasesMigration', runPurchasesMigration);
