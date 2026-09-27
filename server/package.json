@@ -21,7 +21,8 @@
     "repair": "ts-node scripts/repair-stock.ts all",
     "repair:ledger": "ts-node scripts/repair-orphaned-ledger.ts",
     "repair:salary-gl": "ts-node scripts/void-orphaned-salary-gl.ts",
-    "gl:check": "ts-node scripts/check-gl-integrity.ts"
+    "gl:check": "ts-node scripts/check-gl-integrity.ts",
+    "data:integrity": "ts-node scripts/check-historical-data-integrity.ts"
   },
   "keywords": [
     "erp",
