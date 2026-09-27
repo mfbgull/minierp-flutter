@@ -1,12 +1,6 @@
 import Database from 'better-sqlite3';
-import StockMovementModel from './StockMovement';
-import { initializeSequenceFromMax, getNextSequenceNumber, generateDocNo } from '../utils/sequence';
-import ledgerUtils from '../utils/ledgerUtils';
-import AccountingService from '../services/accountingService';
-import InvoiceModel from './Invoice';
-import { parseCurrency, computeInvoiceTotal, decomposeLineAmount } from '../utils/currency';
-import { isValidPaymentMethod } from '../services/cashService';
-import { claimIdempotencyKey, MOBILE_INVOICE_CREATE_SCOPE } from '../utils/idempotency';
+import { MOBILE_INVOICE_CREATE_SCOPE } from '../utils/idempotency';
+import { InvoiceCreationService } from '../services/InvoiceCreationService';
 
 interface DraftRecord {
   id: number;
@@ -177,215 +171,52 @@ function getPaymentTerms(db: Database.Database) {
   `).all();
 }
 
-function findWarehouseForItem(db: Database.Database, itemId: number, quantity: number): number {
-  // SELLABLE stock (non-expired, non-halted, ACTIVE batches) — same
-  // rules as the allocator. stock_balances.quantity counts expired
-  // stock, so it must not drive warehouse selection.
-  const sellable = StockMovementModel.getSellableAvailability(itemId, null, db);
-  const sufficient = sellable.find(w => w.sellable_qty >= quantity);
-  if (sufficient) return sufficient.warehouse_id;
-
-  if (sellable.length > 0) {
-    return sellable.reduce((a, b) => (b.sellable_qty > a.sellable_qty ? b : a)).warehouse_id;
+function toInvoiceStatus(value: string | undefined): 'Draft' | 'Sent' | 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled' | 'Returned' | 'Partially Returned' | undefined {
+  switch (value) {
+    case 'Draft':
+    case 'Sent':
+    case 'Unpaid':
+    case 'Partially Paid':
+    case 'Paid':
+    case 'Overdue':
+    case 'Cancelled':
+    case 'Returned':
+    case 'Partially Returned':
+      return value;
+    default:
+      return undefined;
   }
-
-  const defaultWh = db.prepare(
-    'SELECT id FROM warehouses WHERE warehouse_code = ? AND is_active = 1'
-  ).get('WH-001') as { id: number } | undefined;
-
-  return defaultWh?.id || 1;
 }
 
 function submitInvoice(db: Database.Database, data: SubmitInvoiceDTO): number {
-  if (!data.customer_id || data.customer_id <= 0) throw new Error('Invalid customer_id');
-  if (!data.invoice_date) throw new Error('invoice_date is required');
-  if (!data.items || data.items.length === 0) throw new Error('At least one invoice item is required');
-  for (const item of data.items) {
-    if (!item.item_id || item.item_id <= 0) throw new Error('Invalid item_id in invoice items');
-    if (!item.quantity || item.quantity <= 0) throw new Error('Invalid quantity in invoice items');
-    if (item.unit_price === undefined || item.unit_price < 0) throw new Error('Invalid unit_price in invoice items');
-  }
-
-  return db.transaction(() => {
-    // ACC-18 interim: server-authoritative money — each line is
-    // round(qty × price − discount) with tax at the line boundary; the
-    // header total is the sum of those lines.
-    const totalAmount = computeInvoiceTotal(data.items);
-    // H3: the GL tax is read from the stored invoice_items rows below
-    // (InvoiceModel.getInvoiceTaxTotal) so it can never diverge from the
-    // stored tax. Recomputing from gross ignored discounts + rounding.
-
-    // TASK 17: the stock-movement reference is the invoice NUMBER, exactly
-    // like the desktop invoice path — every reversal consumer
-    // (InvoiceModel.reverseStockForItems for cancel/delete/update/return,
-    // restoreInvoice, the return-report joins) resolves SALE movements by
-    // reference_docno = invoice_no. Keying to the numeric id made those
-    // lookups find nothing, so a cancelled mobile invoice left stock
-    // permanently reduced. Derive the number once, before the insert, so
-    // the stored value and every downstream key are the same string.
-    const invoiceNo = data.invoice_no || generateDocNo(db, 'INV', 5);
-
-    const invoiceResult = db.prepare(`
-      INSERT INTO invoices (
-        invoice_no, customer_id, invoice_date, due_date, status,
-        total_amount, paid_amount, balance_amount, notes, terms, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      invoiceNo,
-      data.customer_id,
-      data.invoice_date,
-      data.due_date || data.invoice_date,
-      data.status || 'Unpaid',
-      totalAmount,
-      0,
-      totalAmount,
-      data.notes || null,
-      data.terms || null,
-      data.userId
-    );
-
-    const invoiceId = invoiceResult.lastInsertRowid as number;
-    // P11: claim the idempotency key inside this transaction — the
-    // (key → invoice) row persists if and only if the submit commits,
-    // so a rolled-back attempt leaves no trace and the retry runs
-    // normally, while a post-commit client timeout replays this invoice.
-    if (data.idempotency) {
-      claimIdempotencyKey(db, MOBILE_INVOICE_CREATE_SCOPE, data.idempotency.key, data.idempotency.hash, invoiceId);
-    }
-
-
-    for (const item of data.items) {
-      const { amount, netAmount, taxAmount } = decomposeLineAmount(item);
-      db.prepare(`
-        INSERT INTO invoice_items (
-          invoice_id, item_id, quantity, unit_price, amount, tax_rate, discount_type, discount_value,
-          net_amount, tax_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(invoiceId, item.item_id, item.quantity, item.unit_price, amount, item.tax_rate || 0, item.discount_type || 'percentage', item.discount_value || 0, netAmount, taxAmount);
-
-      const warehouseId = item.warehouse_id || findWarehouseForItem(db, item.item_id, item.quantity);
-
-      // INV-03: mobile sales go through the SAME guarded, batch-consuming
-      // path as desktop invoices — availability is enforced inside the
-      // transaction and FIFO cost layers are consumed (no balance-only
-      // writes, no unbatched rows). GL posting happens below.
-      const movements = StockMovementModel.recordBatchMovement({
-        item_id: item.item_id,
-        warehouse_id: warehouseId,
-        movement_type: 'SALE',
-        quantity: -item.quantity,
-        unit_cost: item.unit_price,
-        reference_doctype: 'INVOICE',
-        reference_docno: invoiceNo,
-        remarks: `Sold via Invoice ${invoiceNo}`,
-        movement_date: data.invoice_date,
-      }, data.userId, db);
-
-    }
-
-
-    if (data.record_payment && data.payment) {
-      const paymentAmount = data.payment.amount || 0;
-      if (paymentAmount > 0 && !isValidPaymentMethod(data.payment.payment_method || 'Cash')) {
-        throw new Error(`Invalid payment_method "${data.payment.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
-      }
-      initializeSequenceFromMax(db, 'PAY_last_no', 'payments', 'payment_no', 'PAY');
-      const nextPaymentNo = getNextSequenceNumber(db, 'PAY_last_no');
-      const now = new Date();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const year = String(now.getFullYear()).slice(-2);
-      const paymentNo = `PAY-${month}${year}-${String(nextPaymentNo).padStart(5, '0')}`;
-
-      const paymentResult = db.prepare(`
-        INSERT INTO payments (
-          payment_no, customer_id, invoice_id, payment_date,
-          amount, payment_method, reference_no, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        paymentNo,
-        data.customer_id,
-        invoiceId,
-        data.payment.payment_date || data.invoice_date,
-        paymentAmount,
-        data.payment.payment_method || 'Cash',
-        data.payment.reference_no || null,
-        data.payment.notes || null,
-        data.userId
-      );
-
-      const paymentId = paymentResult.lastInsertRowid as number;
-
-      db.prepare('INSERT INTO payment_allocations (payment_id, invoice_id, amount) VALUES (?, ?, ?)').run(paymentId, invoiceId, paymentAmount);
-
-      db.prepare(`
-        UPDATE invoices SET paid_amount = ?, balance_amount = ?, status = ? WHERE id = ?
-      `).run(paymentAmount, totalAmount - paymentAmount, paymentAmount >= totalAmount ? 'Paid' : 'Partially Paid', invoiceId);
-
-      // Create ledger entry for payment (credit to reduce AR)
-      ledgerUtils.createLedgerEntry(data.customer_id, data.payment.payment_date || data.invoice_date, 'PAYMENT', paymentNo, 0, paymentAmount, `Payment ${paymentNo} for Invoice ${invoiceId}`);
-    }
-
-    // Create customer ledger entry for the invoice (debit to increase AR)
-    ledgerUtils.createLedgerEntry(data.customer_id, data.invoice_date, 'INVOICE', invoiceNo, totalAmount, 0, `Invoice ${invoiceNo}`);
-
-    // GL postings (ACC-06): mobile invoices previously posted nothing.
-    // Same sequence as the standard invoice path — revenue entry with the
-    // computed tax split, COGS at recorded unit cost, and the payment
-    // entry when one was recorded inline.
-    AccountingService.postInvoiceEntry(db, {
-      invoiceId,
-      invoiceNo,
-      totalAmount,
-      invoiceDate: data.invoice_date,
-      userId: data.userId,
-      // H3: posted tax = Σ stored invoice_items.tax_amount (the same
-      // columns the tax report / return math read), not a gross-based
-      // recomputation.
-      taxAmount: InvoiceModel.getInvoiceTaxTotal(db, invoiceId),
-    });
-
-    const cogsRows = db.prepare(`
-      SELECT quantity * unit_cost AS line_cogs FROM stock_movements
-      WHERE reference_doctype = 'INVOICE' AND reference_docno = ?
-        AND movement_type = 'SALE'
-    `).all(invoiceNo) as Array<{ line_cogs: number }>;
-    const cogsTotal = cogsRows.reduce((s, r) => s + Math.abs(Number(r.line_cogs)), 0);
-    if (cogsTotal > 0) {
-      AccountingService.postCOGSEntry(db, {
-        invoiceId,
-        invoiceNo,
-        cogsAmount: parseCurrency(cogsTotal),
-        invoiceDate: data.invoice_date,
-        userId: data.userId,
-      });
-    }
-
-    if (data.record_payment && data.payment && (data.payment.amount || 0) > 0) {
-      const payRow = db.prepare(
-        'SELECT id, payment_no, amount, payment_date, payment_method FROM payments WHERE invoice_id = ? ORDER BY id DESC LIMIT 1'
-      ).get(invoiceId) as { id: number; payment_no: string; amount: number; payment_date: string; payment_method: string } | undefined;
-      if (payRow) {
-        AccountingService.postPaymentEntry(db, {
-          paymentId: payRow.id,
-          paymentNo: payRow.payment_no,
-          amount: Number(payRow.amount),
-          paymentDate: payRow.payment_date,
-          paymentMethod: payRow.payment_method,
-          customerId: data.customer_id,
-          userId: data.userId,
-        });
-      }
-    }
-
-    // Update customer balance
-    ledgerUtils.recalcCustomerBalanceFromLedger(data.customer_id);
-
-    if (data.draft_id) {
-      db.prepare('DELETE FROM invoice_drafts WHERE id = ?').run(data.draft_id);
-    }
-
-    return invoiceId;
-  })();
+  const service = new InvoiceCreationService(db);
+  const result = service.create({
+    source: 'MOBILE',
+    userId: data.userId,
+    customerId: data.customer_id,
+    invoiceNo: data.invoice_no,
+    invoiceDate: data.invoice_date,
+    dueDate: data.due_date,
+    status: toInvoiceStatus(data.status),
+    notes: data.notes,
+    terms: data.terms,
+    items: data.items.map((item) => ({
+      item_id: item.item_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      tax_rate: item.tax_rate,
+      discount_type: item.discount_type === 'flat' ? 'flat' : item.discount_type === 'percentage' ? 'percentage' : 'none',
+      discount_value: item.discount_value,
+      warehouse_id: item.warehouse_id,
+    })),
+    recordPayment: data.record_payment,
+    payment: data.payment,
+    draftId: data.draft_id,
+    idempotency: data.idempotency
+      ? { scope: MOBILE_INVOICE_CREATE_SCOPE, key: data.idempotency.key, hash: data.idempotency.hash }
+      : undefined,
+  });
+  return result.invoiceId;
 }
 
 function getInvoiceWithCustomer(db: Database.Database, invoiceId: number) {

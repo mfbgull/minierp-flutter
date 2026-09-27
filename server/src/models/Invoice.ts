@@ -78,7 +78,7 @@ export interface CreateInvoiceDTO {
   customer_id: number;
   customer_name?: string;
   so_id?: number;
-  source_type?: 'SALES_ORDER' | 'DIRECT' | 'POS' | null;
+  source_type?: 'SALES_ORDER' | 'DIRECT' | 'MOBILE' | 'POS' | null;
   quotation_id?: number;
   invoice_date: string;
   due_date?: string;
@@ -744,16 +744,19 @@ class InvoiceModel {
 
     const result = db.prepare(`
       INSERT INTO invoices (
-        invoice_no, customer_id, invoice_date, due_date, status,
-        payment_status, return_status,
+        invoice_no, customer_id, customer_name, so_id, source_type, quotation_id,
+        invoice_date, due_date, status, payment_status, return_status,
         total_amount, paid_amount, balance_amount, notes,
-        discount_scope, discount_type, discount_value, terms, created_by,
-        source_type, credit_offset
+        discount_scope, discount_type, discount_value, terms, created_by, credit_offset
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.invoice_no || null,
       data.customer_id,
+      data.customer_name || null,
+      data.so_id || null,
+      data.source_type || null,
+      data.quotation_id || null,
       data.invoice_date,
       data.due_date || null,
       data.status || 'Unpaid',
@@ -770,7 +773,6 @@ class InvoiceModel {
       data.discount_value || 0,
       data.terms || null,
       userId,
-      data.source_type || null,
       creditOffset
     );
     return result.lastInsertRowid as number;

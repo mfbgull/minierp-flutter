@@ -1,13 +1,9 @@
 import Database from 'better-sqlite3';
 import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, SALES_ORDER_SORT_COLUMNS } from '../utils/sqlSanitizer';
-import { QuotationWithWarehouse, InvoiceWithUsername, SellableStockUnavailableError } from '../types';
+import { QuotationWithWarehouse, InvoiceWithUsername } from '../types';
 import InvoiceModel from './Invoice';
-import StockMovementModel from './StockMovement';
-import ledgerUtils from '../utils/ledgerUtils';
-import AccountingService from '../services/accountingService';
-import { parseCurrency } from '../utils/currency';
-import { roundQty } from '../utils/quantity';
+import { InvoiceCreationService } from '../services/InvoiceCreationService';
 
 export interface SalesOrder {
   id: number;
@@ -626,228 +622,53 @@ class SalesOrderModel {
     notes?: string;
   }): { invoiceId: number; invoiceNo: string } {
     const salesOrder = this.getById(id, db);
-    if (!salesOrder) {
-      throw new Error('Sales order not found');
-    }
-
-    if (salesOrder.status === 'Cancelled') {
-      throw new Error('Cannot convert cancelled sales order');
-    }
-
+    if (!salesOrder) throw new Error('Sales order not found');
+    if (salesOrder.status === 'Cancelled') throw new Error('Cannot convert cancelled sales order');
     if (salesOrder.status === 'Invoiced' || salesOrder.status === 'Completed') {
       throw new Error(`Sales order already ${salesOrder.status}`);
     }
 
-    const transaction = db.transaction(() => {
-      // Validate SELLABLE stock availability (non-expired, non-halted,
-      // ACTIVE batches — same rules as the allocator). stock_balances
-      // .quantity counts expired stock, so it must not gate conversion.
-      for (const item of salesOrder.items || []) {
-        const sellable = StockMovementModel.getSellableAvailability(item.item_id, salesOrder.warehouse_id, db)[0];
-        const availableSellable = roundQty(sellable ? sellable.sellable_qty : 0);
-        const requiredQty = roundQty(item.quantity);
-        if (availableSellable < requiredQty) {
-          const itemRow = db.prepare('SELECT item_name FROM items WHERE id = ?').get(item.item_id) as { item_name: string } | undefined;
-          throw new SellableStockUnavailableError(
-            itemRow?.item_name || item.item_code || `item ${item.item_id}`,
-            requiredQty,
-            availableSellable
-          );
+    const invoiceDate = invoiceData?.invoice_date || new Date().toISOString().split('T')[0];
+    const quotationId = salesOrder.source_type === 'QUOTATION' && salesOrder.source_id
+      ? (db.prepare('SELECT id FROM quotations WHERE id = ?').get(salesOrder.source_id) as { id: number } | undefined)?.id ?? null
+      : null;
+    const service = new InvoiceCreationService(db);
+    const result = service.create({
+      source: 'SALES_ORDER',
+      userId,
+      customerId: salesOrder.customer_id,
+      customerName: salesOrder.customer_name,
+      soId: id,
+      quotationId: quotationId ?? undefined,
+      invoiceDate,
+      dueDate: invoiceData?.due_date ?? null,
+      status: 'Unpaid',
+      notes: invoiceData?.notes || salesOrder.notes,
+      warehouseId: salesOrder.warehouse_id,
+      items: (salesOrder.items || []).map((item) => ({
+        item_id: item.item_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        amount: item.amount,
+        discount_type: 'none' as const,
+      })),
+      totalAmount: salesOrder.total_amount,
+      afterCreate: (invoiceId, invoiceNo) => {
+        db.prepare("UPDATE sales_orders SET status = 'Invoiced', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
+        for (const item of salesOrder.items || []) {
+          db.prepare('UPDATE sales_order_items SET delivered_quantity = quantity WHERE so_id = ? AND item_id = ?').run(id, item.item_id);
         }
-      }
-
-      // Generate invoice number
-      const invoiceNo = this.generateInvoiceNo(db);
-
-      const invoiceDate = invoiceData?.invoice_date || new Date().toISOString().split('T')[0];
-
-      // Create invoice
-      const invoiceStmt = db.prepare(`
-        INSERT INTO invoices (
-          invoice_no, customer_id, customer_name, so_id, source_type, quotation_id,
-          invoice_date, due_date, status, total_amount, paid_amount, balance_amount, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      // Get quotation_id if source is quotation
-      let quotationId: number | null = null;
-      if (salesOrder.source_type === 'QUOTATION' && salesOrder.source_id) {
-        const quotation = db.prepare('SELECT id FROM quotations WHERE id = ?').get(salesOrder.source_id) as { id: number } | undefined;
-        quotationId = quotation ? quotation.id : null;
-      }
-
-      const result = invoiceStmt.run(
-        invoiceNo,
-        salesOrder.customer_id,
-        salesOrder.customer_name,
-        id,
-        'SALES_ORDER',
-        quotationId,
-        invoiceDate,
-        invoiceData?.due_date || null,
-        'Unpaid',
-        salesOrder.total_amount,
-        0,
-        salesOrder.total_amount,
-        invoiceData?.notes || salesOrder.notes || null,
-        userId
-      );
-
-      const invoiceId = result.lastInsertRowid as number;
-
-       // Create invoice items. SO lines carry a precomputed amount with no
-       // discount/tax breakdown, so net = amount and tax = 0 (consistent
-       // with the line's default tax_rate of 0).
-       const invoiceItemStmt = db.prepare(`
-         INSERT INTO invoice_items (invoice_id, item_id, quantity, unit_price, amount, net_amount, tax_amount)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-       `);
-
-       for (const item of salesOrder.items || []) {
-         invoiceItemStmt.run(
-           invoiceId,
-           item.item_id,
-           item.quantity,
-           item.unit_price,
-           item.amount,
-           item.amount,
-           0
-         );
-      }
-
-      // Deduct inventory using FIFO batch consumption
-      const movementDate = invoiceDate;
-      for (const item of salesOrder.items || []) {
-        const effectiveWarehouseId = salesOrder.warehouse_id || 1;
-        // FIFO consumption from oldest batches
-        const consumption = InvoiceModel.consumeFromOldestBatches(
-          item.item_id,
-          effectiveWarehouseId,
-          item.quantity,
-          db
-        );
-
-        // Create one stock movement per consumed batch for full traceability
-        let totalConsumed = 0;
-        for (const entry of consumption) {
-          const movementNo = this.generateMovementNo(db);
-          const batchLabel = entry.batchId ? `(batch ${entry.batchId})` : '(legacy stock)';
-          db.prepare(`
-            INSERT INTO stock_movements (
-              movement_no, item_id, warehouse_id, movement_type,
-              quantity, unit_cost, reference_doctype, reference_docno,
-              remarks, movement_date, created_by, batch_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            movementNo,
-            item.item_id,
-            effectiveWarehouseId,
-            'SALE',
-            -entry.consumed,
-            entry.unitCost,
-            'Invoice',
-            invoiceNo,
-            `Invoice ${invoiceNo} from SO ${salesOrder.so_no} ${batchLabel}`,
-            movementDate,
-            userId,
-            entry.batchId
-          );
-          totalConsumed += entry.consumed;
-        }
-
-        // Update stock balance once per item (total consumed)
         db.prepare(`
-          UPDATE stock_balances
-          SET quantity = quantity + ?,
-              last_updated = CURRENT_TIMESTAMP
-          WHERE item_id = ? AND warehouse_id = ?
-        `).run(-totalConsumed, item.item_id, effectiveWarehouseId);
-
-        // Update item current_stock
+          INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
+          VALUES (?, 'CREATE', 'Invoice', ?, ?)
+        `).run(userId, invoiceId, `Created invoice ${invoiceNo} from sales order ${salesOrder.so_no}`);
         db.prepare(`
-          UPDATE items
-          SET current_stock = (
-            SELECT COALESCE(SUM(quantity), 0)
-            FROM stock_balances
-            WHERE item_id = ?
-          )
-          WHERE id = ?
-        `).run(item.item_id, item.item_id);
-      }
-
-      // Update sales order status
-      db.prepare('UPDATE sales_orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .run('Invoiced', id);
-
-      // Update delivered quantity
-      for (const item of salesOrder.items || []) {
-        db.prepare(`
-          UPDATE sales_order_items
-          SET delivered_quantity = quantity
-          WHERE so_id = ? AND item_id = ?
-        `).run(id, item.item_id);
-      }
-
-      // ACC-07: the converted invoice previously appeared in NO subledger
-      // and NO journal. Add the customer_ledger row and the standard GL
-      // trio so statements, aging, and the trial balance all see it.
-      ledgerUtils.createLedgerEntry(salesOrder.customer_id, invoiceDate, 'INVOICE', invoiceNo, salesOrder.total_amount, 0, `Invoice ${invoiceNo} from SO ${salesOrder.so_no}`);
-
-      const cogsRows = db.prepare(`
-        SELECT quantity * unit_cost AS line_cogs FROM stock_movements
-        WHERE reference_doctype = 'Invoice' AND reference_docno = ?
-          AND movement_type = 'SALE'
-      `).all(invoiceNo) as Array<{ line_cogs: number }>;
-      const cogsTotal = cogsRows.reduce((s, r) => s + Math.abs(Number(r.line_cogs)), 0);
-
-      // H3: posted tax must equal the stored invoice tax. SO lines store
-      // tax_amount = 0 (no breakdown carried), so this reads 0 today —
-      // reading the stored rows keeps the GL right if that ever changes.
-      AccountingService.postInvoiceEntry(db, {
-        invoiceId,
-        invoiceNo,
-        totalAmount: salesOrder.total_amount,
-        invoiceDate,
-        userId,
-        taxAmount: InvoiceModel.getInvoiceTaxTotal(db, invoiceId),
-      });
-
-      if (cogsTotal > 0) {
-        AccountingService.postCOGSEntry(db, {
-          invoiceId,
-          invoiceNo,
-          cogsAmount: parseCurrency(cogsTotal),
-          invoiceDate,
-          userId,
-        });
-      }
-
-      // Log activity
-      db.prepare(`
-        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(
-        userId,
-        'CREATE',
-        'Invoice',
-        invoiceId,
-        `Created invoice ${invoiceNo} from sales order ${salesOrder.so_no}`
-      );
-      db.prepare(`
-        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(
-        userId,
-        'UPDATE',
-        'SalesOrder',
-        id,
-        `Sales order ${salesOrder.so_no} invoiced as ${invoiceNo}`
-      );
-
-      return { invoiceId, invoiceNo };
+          INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
+          VALUES (?, 'UPDATE', 'SalesOrder', ?, ?)
+        `).run(userId, id, `Sales order ${salesOrder.so_no} invoiced as ${invoiceNo}`);
+      },
     });
-
-    return transaction();
+    return { invoiceId: result.invoiceId, invoiceNo: result.invoiceNo };
   }
 
   /**
@@ -895,14 +716,6 @@ class SalesOrderModel {
    */
   private static generateSalesOrderNo(db: Database.Database): string {
     return generateDocNo(db, 'SO');
-  }
-
-  private static generateInvoiceNo(db: Database.Database): string {
-    return generateDocNo(db, 'INV', 5);
-  }
-
-  private static generateMovementNo(db: Database.Database): string {
-    return generateDocNo(db, 'MOV', 5);
   }
 }
 
