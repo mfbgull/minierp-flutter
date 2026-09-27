@@ -2,9 +2,12 @@ import Database from 'better-sqlite3';
 import { getNextSequenceNumber } from '../utils/sequence';
 import ledgerUtils from '../utils/ledgerUtils';
 import AccountingService from '../services/accountingService';
-import { parseCurrency, subtractCurrency } from '../utils/currency';
+import { parseCurrency } from '../utils/currency';
 import SupplierLedgerModel from './SupplierLedger';
 import { isValidPaymentMethod } from '../services/cashService';
+import { PaymentRecordingService } from '../services/PaymentRecordingService';
+import { SupplierPaymentService } from '../services/SupplierPaymentService';
+import type { SupplierPaymentAllocation } from '../services/paymentRecordingTypes';
 
 interface PaymentFilters {
   search?: string;
@@ -313,280 +316,59 @@ export class PaymentModel {
   }
 
   /**
-   * Create a new payment
+   * Customer payment against one or more invoices.
+   *
+   * TASK 33: the writes live in PaymentRecordingService — this stays as the
+   * model-level entry point the payments controller already calls.
    */
   static create(db: Database.Database, data: CreatePaymentDTO): number {
-    return db.transaction(() => {
-      // Input validation
-      if (!data.customer_id || data.customer_id <= 0) {
-        throw new Error('Valid customer_id is required');
-      }
-      if (!data.amount || data.amount <= 0) {
-        throw new Error('Payment amount must be greater than 0');
-      }
-      if (!data.payment_date) {
-        throw new Error('Payment date is required');
-      }
-      // CASH-02 (task 1.4): reject unrecognized payment methods outright
-      if (!isValidPaymentMethod(data.payment_method)) {
-        throw new Error(`Invalid payment_method "${data.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
-      }
-      if (!data.invoice_allocations || data.invoice_allocations.length === 0) {
-        throw new Error('At least one invoice allocation is required');
-      }
-
-      // Validate customer exists
-      const customer = db.prepare('SELECT id FROM customers WHERE id = ?').get(data.customer_id);
-      if (!customer) {
-        throw new Error(`Customer ${data.customer_id} not found`);
-      }
-
-      // Validate each allocated invoice exists
-      for (const alloc of data.invoice_allocations) {
-        const invoiceId = parseInt(alloc.invoice_id, 10);
-        const invoice = db.prepare('SELECT id, customer_id FROM invoices WHERE id = ?').get(invoiceId) as { id: number; customer_id: number } | undefined;
-        if (!invoice) {
-          throw new Error(`Invoice ${invoiceId} not found`);
-        }
-        if (invoice.customer_id !== data.customer_id) {
-          throw new Error(`Invoice ${invoiceId} does not belong to customer ${data.customer_id}`);
-        }
-        if (!alloc.amount || alloc.amount <= 0) {
-          throw new Error(`Allocation amount for invoice ${invoiceId} must be greater than 0`);
-        }
-      }
-
-      const paymentNo = this.generatePaymentNo(db);
-
-      const paymentResult = db.prepare(`
-        INSERT INTO payments (payment_no, customer_id, payment_date, amount, payment_method, reference_no, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(paymentNo, data.customer_id, data.payment_date, data.amount, data.payment_method || 'Cash', data.reference_no || '', data.notes || '');
-
-      const paymentId = paymentResult.lastInsertRowid as number;
-
-      for (const alloc of data.invoice_allocations) {
-        const invoiceId = parseInt(alloc.invoice_id, 10);
-        db.prepare('INSERT INTO payment_allocations (payment_id, invoice_id, amount) VALUES (?, ?, ?)').run(paymentId, invoiceId, alloc.amount);
-        ledgerUtils.calculateInvoiceBalance(invoiceId, db);
-        ledgerUtils.updateInvoiceStatus(invoiceId, db);
-      }
-
-      const currentBalance = db.prepare('SELECT current_balance FROM customers WHERE id = ?').get(data.customer_id) as { current_balance: number };
-      const newBalance = subtractCurrency(parseCurrency(currentBalance.current_balance), parseCurrency(data.amount));
-
-      const invoiceNumbers = data.invoice_allocations.map((alloc) => {
-        const invoiceId = parseInt(alloc.invoice_id, 10);
-        const inv = db.prepare('SELECT invoice_no FROM invoices WHERE id = ?').get(invoiceId) as { invoice_no: string } | undefined;
-        return inv?.invoice_no || `Invoice #${invoiceId}`;
-      });
-
-      db.prepare(`
-        INSERT INTO customer_ledger (customer_id, transaction_date, transaction_type, reference_no, debit, credit, balance, description)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(data.customer_id, data.payment_date, 'PAYMENT', paymentNo, 0, data.amount, newBalance, `Payment against ${invoiceNumbers.join(', ')}`);
-
-      // GL Phase-2 wiring: post the payment to the journal so the
-      // new TB and BS pick it up. The customer_ledger above is the
-      // sub-ledger; this is the GL posting. Both must happen in the
-      // same transaction for atomicity.
-      AccountingService.postPaymentEntry(db, {
-        paymentId,
-        paymentNo,
-        amount: parseCurrency(data.amount),
-        paymentDate: data.payment_date,
-        paymentMethod: data.payment_method,
-        customerId: data.customer_id,
-        userId: data.userId,
-      });
-
-      ledgerUtils.recalcCustomerBalanceFromLedger(data.customer_id, db);
-
-      return paymentId;
-    })();
+    return new PaymentRecordingService(db).recordCustomerPayment({
+      mode: 'RECEIPT',
+      customerId: data.customer_id,
+      paymentDate: data.payment_date,
+      amount: data.amount,
+      paymentMethod: data.payment_method || 'Cash',
+      referenceNo: data.reference_no,
+      notes: data.notes,
+      userId: data.userId,
+      allocations: data.invoice_allocations.map((alloc) => ({
+        invoiceId: parseInt(String(alloc.invoice_id), 10),
+        amount: alloc.amount,
+      })),
+    }).paymentId;
   }
 
+  /**
+   * Supplier payout against POs and/or purchases.
+   *
+   * TASK 33: routed through PaymentRecordingService so the H7 full-allocation
+   * rule, the cash funds guard, the AP journal entry and the closed-period
+   * guard are decided in one place.
+   */
   static createSupplierPayment(db: Database.Database, data: CreateSupplierPaymentDTO): number {
-    return db.transaction(() => {
-      if (!data.supplier_id || data.supplier_id <= 0) {
-        throw new Error('Valid supplier_id is required');
-      }
-      if (!data.amount || data.amount <= 0) {
-        throw new Error('Payment amount must be greater than 0');
-      }
-      if (!data.payment_date) {
-        throw new Error('Payment date is required');
-      }
-      // CASH-02 (task 1.4): same method whitelist as the customer path.
-      if (!isValidPaymentMethod(data.payment_method)) {
-        throw new Error(`Invalid payment_method "${data.payment_method ?? ''}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`);
-      }
-      const poAllocs = data.po_allocations || [];
-      const purchaseAllocs = data.purchase_allocations || [];
-      if (poAllocs.length === 0 && purchaseAllocs.length === 0) {
-        throw new Error('At least one PO or purchase allocation is required');
-      }
+    const allocations: SupplierPaymentAllocation[] = [
+      ...(data.po_allocations || []).map((alloc) => ({
+        kind: 'purchase_order' as const,
+        id: parseInt(String(alloc.po_id), 10),
+        amount: alloc.amount,
+      })),
+      ...(data.purchase_allocations || []).map((alloc) => ({
+        kind: 'purchase' as const,
+        id: parseInt(String(alloc.purchase_id), 10),
+        amount: alloc.amount,
+      })),
+    ];
 
-      const supplier = db.prepare('SELECT id FROM suppliers WHERE id = ?').get(data.supplier_id);
-      if (!supplier) {
-        throw new Error(`Supplier ${data.supplier_id} not found`);
-      }
-
-      for (const alloc of poAllocs) {
-        const poId = parseInt(alloc.po_id, 10);
-        const po = db.prepare(`
-          SELECT po.id, po.supplier_id, po.total_amount, COALESCE(SUM(pa.amount), 0) as paid_amount
-          FROM purchase_orders po
-          LEFT JOIN po_allocations pa ON pa.po_id = po.id AND pa.voided_at IS NULL
-          WHERE po.id = ? GROUP BY po.id
-        `).get(poId) as { id: number; supplier_id: number; total_amount: number; paid_amount: number } | undefined;
-        if (!po) {
-          throw new Error(`Purchase order ${poId} not found`);
-        }
-        if (po.supplier_id !== data.supplier_id) {
-          throw new Error(`PO ${poId} does not belong to supplier ${data.supplier_id}`);
-        }
-        if (!alloc.amount || alloc.amount <= 0) {
-          throw new Error(`Allocation amount for PO ${poId} must be greater than 0`);
-        }
-        const remainingBalance = Math.max(0, parseCurrency(po.total_amount) - parseCurrency(po.paid_amount));
-        if (parseCurrency(alloc.amount) > remainingBalance) {
-          throw new Error(
-            `Allocation amount (${parseCurrency(alloc.amount).toFixed(2)}) for PO ${poId} exceeds the remaining balance (${remainingBalance.toFixed(2)})`
-          );
-        }
-      }
-
-      for (const alloc of purchaseAllocs) {
-        const purchaseId = parseInt(alloc.purchase_id, 10);
-        const purchase = db.prepare(`
-          SELECT p.id, p.supplier_id, p.total_cost, COALESCE(SUM(pa.amount), 0) as paid_amount
-          FROM purchases p
-          LEFT JOIN purchase_allocations pa ON pa.purchase_id = p.id AND pa.voided_at IS NULL
-          WHERE p.id = ? GROUP BY p.id
-        `).get(purchaseId) as { id: number; supplier_id: number | null; total_cost: number; paid_amount: number } | undefined;
-        if (!purchase) {
-          throw new Error(`Purchase ${purchaseId} not found`);
-        }
-        if (!purchase.supplier_id || purchase.supplier_id !== data.supplier_id) {
-          throw new Error(`Purchase ${purchaseId} does not belong to supplier ${data.supplier_id}`);
-        }
-        if (!alloc.amount || alloc.amount <= 0) {
-          throw new Error(`Allocation amount for purchase ${purchaseId} must be greater than 0`);
-        }
-        const remainingBalance = Math.max(0, parseCurrency(purchase.total_cost) - parseCurrency(purchase.paid_amount));
-        if (parseCurrency(alloc.amount) > remainingBalance) {
-          throw new Error(
-            `Allocation amount (${parseCurrency(alloc.amount).toFixed(2)}) for purchase ${purchaseId} exceeds the remaining balance (${remainingBalance.toFixed(2)})`
-          );
-        }
-      }
-
-      // H7: the payment must be fully allocated. A payment of 1000 accepted
-      // with a single 100 allocation left the supplier balance debited by
-      // 1000 while the purchase balances only dropped by 100 (and the GL
-      // cash posting paid out the full 1000). There is no supplier-advance /
-      // unallocated-payment concept in this system (advances exist only on
-      // the employee-salary side), so the allocation total must equal the
-      // payment amount exactly. Checked here — inside the transaction and
-      // before the first INSERT — so a rejected payment changes nothing.
-      const allocatedTotal = [...poAllocs, ...purchaseAllocs].reduce(
-        (sum, alloc) => sum + parseCurrency(alloc.amount), 0,
-      );
-      const paymentTotal = parseCurrency(data.amount);
-      if (Math.abs(allocatedTotal - paymentTotal) > 0.01) {
-        throw new Error(
-          `Allocation total (${allocatedTotal.toFixed(2)}) does not match the payment amount ` +
-          `(${paymentTotal.toFixed(2)}) — the full payment amount is required to be allocated across ` +
-          `the selected PO(s) / purchase(s); unallocated supplier payments are not supported`
-        );
-      }
-
-      const paymentNo = this.generatePaymentNo(db);
-
-      // When the payment settles exactly one PO (and no purchases), reflect it on
-      // the denormalized payments.purchase_order_id so PO-level reporting joins
-      // correctly. Multi-PO / mixed allocations stay NULL — the column is
-      // single-valued and po_allocations remains the authoritative record.
-      const singlePoId =
-        poAllocs.length === 1 && purchaseAllocs.length === 0
-          ? parseInt(poAllocs[0].po_id, 10)
-          : null;
-
-      const paymentResult = db.prepare(`
-        INSERT INTO payments (payment_no, supplier_id, payment_date, amount, payment_method, reference_no, notes, purchase_order_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        paymentNo,
-        data.supplier_id,
-        data.payment_date,
-        data.amount,
-        data.payment_method || 'Cash',
-        data.reference_no || '',
-        data.notes || '',
-        singlePoId,
-      );
-
-      const paymentId = paymentResult.lastInsertRowid as number;
-
-      for (const alloc of poAllocs) {
-        const poId = parseInt(alloc.po_id, 10);
-        db.prepare('INSERT INTO po_allocations (payment_id, po_id, amount) VALUES (?, ?, ?)').run(paymentId, poId, alloc.amount);
-      }
-
-      for (const alloc of purchaseAllocs) {
-        const purchaseId = parseInt(alloc.purchase_id, 10);
-        db.prepare('INSERT INTO purchase_allocations (payment_id, purchase_id, amount) VALUES (?, ?, ?)').run(paymentId, purchaseId, alloc.amount);
-      }
-
-      const currentBalance = SupplierLedgerModel.getBalance(data.supplier_id, db);
-      const newBalance = currentBalance - parseCurrency(data.amount);
-
-      const poNumbers = poAllocs.map((alloc) => {
-        const poId = parseInt(alloc.po_id, 10);
-        const po = db.prepare('SELECT po_no FROM purchase_orders WHERE id = ?').get(poId) as { po_no: string } | undefined;
-        return po?.po_no || `PO #${poId}`;
-      });
-      const purchaseNumbers = purchaseAllocs.map((alloc) => {
-        const purchaseId = parseInt(alloc.purchase_id, 10);
-        const p = db.prepare('SELECT purchase_no FROM purchases WHERE id = ?').get(purchaseId) as { purchase_no: string } | undefined;
-        return p?.purchase_no || `Purchase #${purchaseId}`;
-      });
-      const references = [...poNumbers, ...purchaseNumbers];
-
-      db.prepare(`
-        INSERT INTO supplier_ledger (supplier_id, transaction_date, transaction_type, reference_no, debit, credit, balance, description)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(data.supplier_id, data.payment_date, 'PAYMENT', paymentNo, 0, data.amount, newBalance, `Payment against ${references.join(', ')}`);
-
-      db.prepare('UPDATE suppliers SET current_balance = ? WHERE id = ?').run(newBalance, data.supplier_id);
-
-      // GL posting (ACC-03): Dr 2000 AP / Cr cash-per-method. Without this
-      // the cash the business paid out never leaves GL account 1000.
-      // Funds guard: reject payouts that would overdraw the selected
-      // account as of the payment date.
-      const fundsCashCode = AccountingService._cashOrBankAccountCode(data.payment_method);
-      const fundsAccount = AccountingService.getAccountByCode(db, fundsCashCode);
-      if (!fundsAccount) {
-        throw new Error(`Chart of accounts is missing required account: ${fundsCashCode}`);
-      }
-      AccountingService.assertSufficientFunds(db, {
-        accountId: fundsAccount.id,
-        amount: parseCurrency(data.amount),
-        asOfDate: data.payment_date,
-        label: `supplier payment ${paymentNo}`,
-      });
-      AccountingService.postSupplierPaymentEntry(db, {
-        paymentId,
-        paymentNo,
-        amount: parseCurrency(data.amount),
-        paymentDate: data.payment_date,
-        paymentMethod: data.payment_method,
-        userId: data.userId,
-      });
-
-      return paymentId;
-    })();
+    return new SupplierPaymentService(db).recordSupplierPayment({
+      supplierId: data.supplier_id,
+      paymentDate: data.payment_date,
+      amount: data.amount,
+      paymentMethod: data.payment_method || 'Cash',
+      referenceNo: data.reference_no,
+      notes: data.notes,
+      userId: data.userId,
+      allocations,
+    }).paymentId;
   }
 
   /**

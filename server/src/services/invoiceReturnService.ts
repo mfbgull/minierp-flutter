@@ -29,6 +29,7 @@
 import type Database from 'better-sqlite3';
 import db from '../config/database';
 import { AccountingService } from './accountingService';
+import { PaymentRecordingService } from './PaymentRecordingService';
 import {
   computeReturnedLine,
   allocateHeaderDiscount,
@@ -970,66 +971,21 @@ export class InvoiceReturnService {
   ): PostedSettlement {
     const today = todayLocal();
     const { userId } = args;
-    const refundPaymentNo = InvoiceModel.generatePaymentNoAtomic(dbArg);
-
-    const refundPaymentId = InvoiceModel.createPayment(
-      dbArg,
-      refundPaymentNo,
-      args.customerId,
-      today,
-      -args.amount,
-      args.method,
-      null,
-      `Refund for return ${args.returnHeader.return_no} on Invoice ${args.invoiceNo}`,
-    );
-    InvoiceModel.createPaymentAllocation(
-      dbArg,
-      refundPaymentId,
-      args.returnHeader.invoice_id,
-      -args.amount,
-    );
-
-    createLedgerEntry(
-      args.customerId,
-      today,
-      'REFUND',
-      refundPaymentNo,
-      args.amount,
-      0,
-      `Refund ${refundPaymentNo} for return ${args.returnHeader.return_no} on Invoice ${args.invoiceNo}`,
-    );
-
-    // The refund leaves the till: Dr AR / Cr <Cash|Bank> (D8). Only the
-    // Cash account is guarded in real time — a drawer must actually hold
-    // the money being handed back. Bank/Card refunds post for external
-    // reconciliation, so their balance is not blocking. A shortfall is a
-    // client error (400), never a 500.
-    const cashCode = AccountingService._cashOrBankAccountCode(args.method);
-    const cashAccount = AccountingService.getAccountByCode(dbArg, cashCode);
-    if (!cashAccount) {
-      throw new ReturnError(500, `Chart of accounts is missing required account: ${cashCode}`);
-    }
-    if (args.method.toLowerCase() === 'cash') {
-      try {
-        AccountingService.assertSufficientFunds(dbArg, {
-          accountId: cashAccount.id,
-          amount: args.amount,
-          asOfDate: today,
-          label: `refund ${refundPaymentNo}`,
-        });
-      } catch (err: unknown) {
-        throw new ReturnError(400, (err as Error).message);
-      }
-    }
-    AccountingService.postRefundEntry(dbArg, {
-      refundPaymentId,
-      refundPaymentNo,
-      amount: args.amount,
-      refundDate: today,
-      paymentMethod: args.method,
+    // TASK 33: negative payment, negative allocation, the REFUND ledger row,
+    // the cash-only funds guard and the Dr AR / Cr cash journal entry are all
+    // decided by the single payment writer.
+    const refund = new PaymentRecordingService(dbArg).recordCustomerPayment({
+      mode: 'REFUND',
       customerId: args.customerId,
+      paymentDate: today,
+      amount: args.amount,
+      paymentMethod: args.method,
+      notes: `Refund for return ${args.returnHeader.return_no} on Invoice ${args.invoiceNo}`,
       userId,
+      allocations: [{ invoiceId: args.returnHeader.invoice_id, amount: args.amount }],
     });
+    const refundPaymentNo = refund.paymentNo;
+    const refundPaymentId = refund.paymentId;
 
     const record = InvoiceReturnModel.createSettlement(dbArg, {
       return_id: args.returnHeader.id,
@@ -1129,20 +1085,19 @@ export class InvoiceReturnService {
     );
 
     if (applied > 0) {
-      const adjustPaymentNo = InvoiceModel.generatePaymentNoAtomic(dbArg);
-      const adjustPaymentId = InvoiceModel.createPayment(
-        dbArg,
-        adjustPaymentNo,
-        args.customerId,
-        today,
-        applied,
-        'Credit',
-        null,
-        `Return credit from ${args.returnHeader.return_no} applied to Invoice ${target.invoice_no}`,
-      );
-      InvoiceModel.createPaymentAllocation(dbArg, adjustPaymentId, target.id, applied);
-      calculateInvoiceBalance(target.id);
-      updateInvoiceStatus(target.id);
+      // TASK 33: the credit application is recorded by the single payment
+      // writer, which also posts the Dr 1110 / Cr 1100 CREDIT_OFFSET entry
+      // this path was previously missing.
+      new PaymentRecordingService(dbArg).recordCustomerPayment({
+        mode: 'CREDIT_APPLICATION',
+        customerId: args.customerId,
+        paymentDate: today,
+        amount: applied,
+        paymentMethod: 'Credit',
+        notes: `Return credit from ${args.returnHeader.return_no} applied to Invoice ${target.invoice_no}`,
+        userId,
+        allocations: [{ invoiceId: target.id, amount: applied }],
+      });
     }
 
     const record = InvoiceReturnModel.createSettlement(dbArg, {
@@ -1230,20 +1185,16 @@ export class InvoiceReturnService {
       if (!target || Number(target.balance_amount) <= 0) continue;
 
       const applied = roundCurrency(Math.min(remaining, Number(target.balance_amount)));
-      const adjustPaymentNo = InvoiceModel.generatePaymentNoAtomic(dbArg);
-      const adjustPaymentId = InvoiceModel.createPayment(
-        dbArg,
-        adjustPaymentNo,
-        args.customerId,
-        todayLocal(),
-        applied,
-        'Credit',
-        null,
-        `Return credit from ${args.invoiceNo} applied to Invoice ${target.invoice_no}`,
-      );
-      InvoiceModel.createPaymentAllocation(dbArg, adjustPaymentId, target.id, applied);
-      calculateInvoiceBalance(target.id);
-      updateInvoiceStatus(target.id);
+      const adjustPaymentId = new PaymentRecordingService(dbArg).recordCustomerPayment({
+        mode: 'CREDIT_APPLICATION',
+        customerId: args.customerId,
+        paymentDate: todayLocal(),
+        amount: applied,
+        paymentMethod: 'Credit',
+        notes: `Return credit from ${args.invoiceNo} applied to Invoice ${target.invoice_no}`,
+        userId: args.userId,
+        allocations: [{ invoiceId: target.id, amount: applied }],
+      }).paymentId;
 
       posted.push({
         record: InvoiceReturnModel.createSettlement(dbArg, {
