@@ -4,6 +4,12 @@ import mobileInvoiceController from '../controllers/mobileInvoiceController';
 import { authenticateToken } from '../middleware/auth';
 import { requirePermission } from '../middleware/requirePermission';
 import { validateZodBody, zodBodySchemas } from '../middleware/validation';
+import { markMobileInvoiceApiDeprecated } from '../middleware/mobileInvoiceDeprecation';
+
+// Keep the legacy surface available for compatibility while directing clients
+// to the authoritative invoice API. This runs before authentication so every
+// response from this router carries the migration signal.
+router.use(markMobileInvoiceApiDeprecated);
 
 // All routes require authentication
 router.use(authenticateToken);
