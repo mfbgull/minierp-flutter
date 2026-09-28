@@ -1233,7 +1233,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     if (columns == null) {
       // Fills whatever height the layout gives it — Expanded on wide
       // screens, SizedBox(height: 320) in the stacked layout.
-      return Container(
+    return Container(
         alignment: Alignment.center,
         decoration: BoxDecoration(
           border: Border.all(
@@ -1300,6 +1300,22 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
 
     if (_columns == null && items.isNotEmpty) {
       _columns = _buildColumns(l10n);
+    }
+
+    // Edit mode preselects the customer by id on load, but nothing ever
+    // resolved that id into the object (that only happened in
+    // _onCustomerChanged, i.e. once the user re-picked them). Every
+    // credit-dependent read then saw a 0 pool for an existing invoice —
+    // silently hiding available credit on exactly the invoices that had
+    // it. Resolve once the list arrives, in the same lazy-init style as
+    // _columns above; the rest of this build reads the resolved value.
+    if (_selectedCustomer == null && _customerId != null) {
+      _selectedCustomer = (customers.valueOrNull ?? const <Customer>[])
+          .cast<Customer?>()
+          .firstWhere(
+            (c) => c != null && c.id == _customerId,
+            orElse: () => null,
+          );
     }
 
     final filled = _filledLines;
@@ -1453,6 +1469,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     );
 
     return Container(
+      key: const Key('invoice-totals-card'),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Theme.of(
@@ -1512,6 +1529,24 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                 totalsRow(l10n.salesTax, tax),
                 const Divider(height: 10),
                 totalsRow(l10n.salesGrandtotal, total, bold: true),
+                // Credit is a *payment*, not a discount, so it deliberately
+                // stays out of the subtotal/discount/tax arithmetic above.
+                // It gets its own block so an applied offset is visible next
+                // to the grand total and cannot hide in the payment panel.
+                if (_availableCustomerCredit > 0) ...[
+                  const Divider(height: 10),
+                  totalsRow(
+                    l10n.salesAvailablecredit,
+                    _availableCustomerCredit,
+                  ),
+                  const SizedBox(height: 4),
+                  totalsRow(l10n.salesCreditoffset, _creditOffset),
+                  const SizedBox(height: 4),
+                  totalsRow(
+                    l10n.salesCreditremaining,
+                    _availableCustomerCredit - _creditOffset,
+                  ),
+                ],
                 if (_detail?.position != null) ...[
                   const Divider(height: 10),
                   ..._buildPositionRows(l10n, _detail!.position!, totalsRow),
