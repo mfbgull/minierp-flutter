@@ -161,6 +161,10 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   bool _printing = false;
   String? _error;
 
+  /// The current [_error] came from a request whose outcome is unknown, so
+  /// the banner stays until the user retries or dismisses it (task 42).
+  bool _errorRetryable = false;
+
   // Payment state. Matches the reference create page: new invoices start
   // with "Record payment now" checked and one default Cash method row so
   // the amount field is visible without clicking "Add method".
@@ -585,11 +589,26 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   /// Shows the error banner and auto-dismisses it after 5 seconds.
   /// Re-triggering restarts the window; the timer is cancelled on
   /// dispose (spec §4.5).
-  void _showError(String message) {
+  ///
+  /// [retryable] is for an *outcome-unknown* failure (task 42): the request
+  /// reached the server but no response came back, so it may already have
+  /// been applied. That banner does NOT auto-dismiss and offers a retry that
+  /// reuses the same idempotency key — dismissing it would leave the user
+  /// believing a write that may have succeeded had failed.
+  void _showError(String message, {bool retryable = false}) {
     _errorTimer?.cancel();
-    setState(() => _error = message);
+    setState(() {
+      _error = message;
+      _errorRetryable = retryable;
+    });
+    if (retryable) return;
     _errorTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted) setState(() => _error = null);
+      if (mounted) {
+        setState(() {
+          _error = null;
+          _errorRetryable = false;
+        });
+      }
     });
   }
 
@@ -1065,7 +1084,17 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
           break;
         case ApiFailure(:final error):
           setState(() => _submitting = false);
-          _showError(error.message);
+          // Create only: a timed-out create may have been committed, so it
+          // must not be reported as a plain failure. Retrying reuses
+          // _createIdemKey (the body is unchanged) and the server replays
+          // the original result — which is also how the user retrieves the
+          // existing invoice. Update/delete are not idempotent-keyed, so
+          // they keep the honest failure message.
+          final ambiguous = !_isEdit && error.outcomeUnknown;
+          _showError(
+            ambiguous ? l10n.errorsOutcomeUnknown : error.message,
+            retryable: ambiguous,
+          );
           return null;
       }
     } finally {
@@ -1616,9 +1645,38 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         ).colorScheme.errorContainer.withValues(alpha: 0.6),
         borderRadius: AppBorderRadius.smRadius,
       ),
-      child: Text(
-        _error!,
-        style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _error!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+            ),
+          ),
+          // An outcome-unknown failure must be actionable and must not
+          // vanish on its own (task 42): the write may already have landed.
+          if (_errorRetryable) ...[
+            const SizedBox(width: 12),
+            FilledButton(
+              onPressed: _submitting ? null : _submit,
+              child: Text(l10n.commonRetry),
+            ),
+            IconButton(
+              onPressed: () {
+                _errorTimer?.cancel();
+                setState(() {
+                  _error = null;
+                  _errorRetryable = false;
+                });
+              },
+              icon: const Icon(Icons.close, size: 18),
+              tooltip: l10n.commonClose,
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ],
+        ],
       ),
     );
   }

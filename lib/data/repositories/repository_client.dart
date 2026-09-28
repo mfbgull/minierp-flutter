@@ -546,10 +546,21 @@ class RepositoryClient {
       DioExceptionType.transformTimeout => true,
       _ => false,
     };
+    // A timeout is only ambiguous when the request actually went out. A
+    // connection error/timeout never reached the server, so nothing can
+    // have been written — that is a definite failure and the caller should
+    // not be told the operation "may have completed" (task 42).
+    final outcomeUnknown = switch (e.type) {
+      DioExceptionType.sendTimeout ||
+      DioExceptionType.receiveTimeout ||
+      DioExceptionType.transformTimeout => true,
+      _ => false,
+    };
     return ApiError(
       message: mapError(e),
       statusCode: e.response?.statusCode,
       isNetwork: isNetwork,
+      outcomeUnknown: outcomeUnknown,
     );
   }
 

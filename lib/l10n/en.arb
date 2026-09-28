@@ -2106,5 +2106,6 @@
   "equityPersonalLoanFilterWithLoans": "With Active Loans",
   "equityPersonalLoanFilterCustomers": "Customers Only",
   "equityPersonalLoanFilterSuppliers": "Suppliers Only",
-  "equityPersonalLoanFilterPersonal": "Personal Contacts"
+  "equityPersonalLoanFilterPersonal": "Personal Contacts",
+  "errorsOutcomeUnknown": "No response from the server in time. This operation may already have completed — press Retry to confirm; retrying is safe and will not create a duplicate."
 }
