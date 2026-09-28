@@ -17,6 +17,7 @@ import 'package:minierp_app/data/models/price_history.dart'
 import 'package:minierp_app/data/repositories/api_result.dart';
 import 'package:minierp_app/data/repositories/invoice_repository.dart';
 import 'package:minierp_app/data/repositories/repository_client.dart';
+import 'package:minierp_app/core/utils/formatters.dart';
 import 'package:minierp_app/features/sales/invoice_providers.dart';
 import 'package:minierp_app/features/sales/line_cells.dart'
     show DescriptionCell, LineCell;
@@ -155,6 +156,7 @@ Future<void> _pumpPage(
   Invoice? invoice,
   Future<List<Item>>? itemsFuture,
   bool settle = true,
+  List<Customer>? customers,
 }) async {
   // The form (grid + always-visible payment panel) is taller than the
   // default 800×600 test surface — give the panel enough room.
@@ -164,7 +166,7 @@ Future<void> _pumpPage(
 
   final repository = repo ?? _FakeInvoiceRepository();
 
-  final customers = [
+  final defaultCustomers = [
     Customer(
       id: 1,
       customerCode: 'C1',
@@ -179,12 +181,16 @@ Future<void> _pumpPage(
       currentBalance: 0,
     ),
   ];
+  // Task 41: callers inject a pool-holding customer to exercise credit.
+  final customersToShow = customers ?? defaultCustomers;
   final items = _testItemPool();
 
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        invoiceCustomersProvider.overrideWith((ref) async => customers),
+        invoiceCustomersProvider.overrideWith(
+          (ref) async => customersToShow,
+        ),
         invoiceItemsProvider.overrideWith(
           (ref) => itemsFuture ?? Future.value(items),
         ),
@@ -1771,4 +1777,169 @@ void main() {
       );
     },
   );
+
+  // Task 41 follow-up: the credit figures must also be readable in the
+  // totals card, not only in the payment panel. Credit is a payment, so it
+  // must NOT be folded into the subtotal/discount/tax rows above it.
+  group('totals card credit block', () {
+    final Finder card = find.byKey(const Key('invoice-totals-card'));
+
+    Finder row(String label) =>
+        find.descendant(of: card, matching: find.text(label));
+
+    Finder amount(num value) => find.descendant(
+      of: card,
+      matching: find.text(Formatters.currency(value)),
+    );
+
+    Customer creditCustomer({num pool = 250, num ledger = 0}) => Customer(
+      id: 1,
+      customerCode: 'C1',
+      customerName: 'Acme Corp',
+      currentBalance: ledger,
+      creditBalance: pool,
+    );
+
+    testWidgets('hidden until a customer with credit is selected', (
+      tester,
+    ) async {
+      await _pumpPage(tester);
+
+      // No customer selected → no pool → the whole block stays out.
+      expect(row('Available credit'), findsNothing);
+      expect(row('Credit remaining'), findsNothing);
+    });
+
+    testWidgets('shows all three figures once a credit pool exists', (
+      tester,
+    ) async {
+      await _pumpPage(tester, customers: [creditCustomer()]);
+      await tester.tap(find.text('Acme Corp').last);
+      await tester.pumpAndSettle();
+
+      expect(row('Available credit'), findsOneWidget);
+      expect(row('Credit Offset'), findsOneWidget);
+      expect(row('Credit remaining'), findsOneWidget);
+      // Nothing applied yet, so available == remaining == the whole pool.
+      // (The "used" row is 0, but the card's subtotal/discount/tax rows are
+      // 0 too in create mode, so a zero amount is not uniquely assertable
+      // here — the applied-offset tests cover the used figure instead.)
+      expect(amount(250), findsNWidgets(2));
+    });
+
+    testWidgets('stays out of the total arithmetic', (tester) async {
+      await _pumpPage(tester, customers: [creditCustomer(pool: 250)]);
+      await tester.tap(find.text('Acme Corp').last);
+      await tester.pumpAndSettle();
+
+      // The grand total is unchanged by the presence of a credit pool —
+      // credit settles the invoice, it does not discount it.
+      expect(row('Grand Total'), findsOneWidget);
+      expect(row('Available credit'), findsOneWidget);
+    });
+
+    testWidgets('applied offset updates used and remaining', (tester) async {
+      // Edit mode with a 1,000 total: credit cannot be applied against a
+      // zero-total invoice, so these need a real amount to settle.
+      await _pumpPage(
+        tester,
+        invoice: _editInvoice(),
+        customers: [creditCustomer(pool: 250)],
+      );
+      await tester.tap(find.text('Acme Corp').last);
+      await tester.pumpAndSettle();
+
+      final creditField = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == 'Credit Offset',
+      );
+      expect(creditField, findsOneWidget);
+      await tester.enterText(creditField, '75');
+      await tester.pumpAndSettle();
+
+      expect(amount(75), findsOneWidget); // used
+      expect(amount(175), findsOneWidget); // remaining
+      expect(amount(250), findsOneWidget); // available, unchanged
+    });
+
+    testWidgets('full use leaves zero remaining', (tester) async {
+      await _pumpPage(
+        tester,
+        invoice: _editInvoice(),
+        customers: [creditCustomer(pool: 250)],
+      );
+      await tester.tap(find.text('Acme Corp').last);
+      await tester.pumpAndSettle();
+
+      final creditField = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == 'Credit Offset',
+      );
+      await tester.enterText(creditField, '250');
+      await tester.pumpAndSettle();
+
+      expect(amount(250), findsNWidgets(2)); // available + used
+      expect(amount(0), findsWidgets); // remaining hits zero
+    });
+
+    testWidgets('legacy negative ledger credit counts toward the pool', (
+      tester,
+    ) async {
+      // H9: available credit = explicit pool + any legacy negative AR.
+      await _pumpPage(
+        tester,
+        customers: [creditCustomer(pool: 100, ledger: -50)],
+      );
+      await tester.tap(find.text('Acme Corp').last);
+      await tester.pumpAndSettle();
+
+      // 100 pool + 50 legacy credit = 150 available == 150 remaining.
+      expect(amount(150), findsNWidgets(2));
+    });
+
+    testWidgets('over-application is capped, remaining never goes negative', (
+      tester,
+    ) async {
+      await _pumpPage(
+        tester,
+        invoice: _editInvoice(),
+        customers: [creditCustomer(pool: 250)],
+      );
+      await tester.tap(find.text('Acme Corp').last);
+      await tester.pumpAndSettle();
+
+      final creditField = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == 'Credit Offset',
+      );
+      // Type far more than the pool holds.
+      await tester.enterText(creditField, '9999');
+      await tester.pumpAndSettle();
+
+      expect(amount(250), findsNWidgets(2)); // available + capped used
+      expect(amount(0), findsWidgets); // remaining floors at zero
+      expect(
+        amount(-9749),
+        findsNothing,
+        reason: 'remaining credit must not go negative',
+      );
+    });
+
+    testWidgets('credit cannot be applied to a zero-total invoice', (
+      tester,
+    ) async {
+      // Create mode starts with an empty line, so the total is 0. The clamp
+      // must not let a credit pool inflate a nonexistent invoice.
+      await _pumpPage(tester, customers: [creditCustomer(pool: 250)]);
+      await tester.tap(find.text('Acme Corp').last);
+      await tester.pumpAndSettle();
+
+      final creditField = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == 'Credit Offset',
+      );
+      await tester.enterText(creditField, '75');
+      await tester.pumpAndSettle();
+
+      // Pool is shown, but nothing can be applied against a 0 total.
+      expect(amount(250), findsNWidgets(2)); // available == remaining
+      expect(amount(75), findsNothing);
+    });
+  });
 }
