@@ -65,6 +65,12 @@ class _FakeInvoiceRepository extends InvoiceRepository {
   /// whose retry must replay, not duplicate — P11).
   String? failCreateWith;
 
+  /// Task 42: when true, the first [create] returns an *outcome-unknown*
+  /// failure (request delivered, no response — the server may have already
+  /// committed) and every subsequent call succeeds, modelling a delayed
+  /// response the client gave up on.
+  bool timeOutFirstCreate = false;
+
   /// Last body passed to [update] (edit-mode in-flight-commit assertions).
   Map<String, dynamic>? lastUpdateBody;
 
@@ -75,6 +81,15 @@ class _FakeInvoiceRepository extends InvoiceRepository {
   }) async {
     lastCreateBody = body;
     createKeys.add(idempotencyKey);
+    if (timeOutFirstCreate && createKeys.length == 1) {
+      return ApiFailure(
+        ApiError(
+          message: 'No response from the server in time.',
+          isNetwork: true,
+          outcomeUnknown: true,
+        ),
+      );
+    }
     if (failCreateWith != null) {
       return ApiFailure(ApiError(message: failCreateWith!, isNetwork: true));
     }
@@ -1393,6 +1408,118 @@ void main() {
       7,
       reason: 'the in-flight quantity is committed before saving',
     );
+  });
+
+  // Task 42 — "a timeout does not mean the transaction failed". The server
+  // may have committed before the client heard back, so the UI must not
+  // report a plain failure and the retry must reuse the same key.
+  group('task 42: outcome-unknown write failures', () {
+    /// Fills one invoice line so the form passes its validation gate.
+    Future<void> fillLine(WidgetTester tester) async {
+      await tester.tap(find.text('Acme Corp').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'Wid');
+      await tester.pump();
+      await tester.tap(find.text('Widget').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(gridEditor(), '7');
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> save(WidgetTester tester) async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a timed-out create offers retry and reuses the same key', (
+      tester,
+    ) async {
+      final repo = _FakeInvoiceRepository()..timeOutFirstCreate = true;
+      await _pumpPage(tester, repo: repo);
+      await fillLine(tester);
+
+      await save(tester);
+      expect(repo.createKeys, hasLength(1));
+
+      // The banner must NOT claim the write failed, and must stay put
+      // rather than auto-dismissing into a false "it didn't save".
+      expect(
+        find.textContaining('may already have completed'),
+        findsOneWidget,
+      );
+      expect(find.text('Retry'), findsOneWidget);
+
+      // Retry goes through the same idempotency key, so the server replays
+      // instead of creating a second invoice.
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(repo.createKeys, hasLength(2));
+      expect(
+        repo.createKeys[1],
+        repo.createKeys[0],
+        reason: 'the retry must reuse the key or a duplicate invoice is created',
+      );
+    });
+
+    testWidgets('the outcome-unknown banner does not auto-dismiss', (
+      tester,
+    ) async {
+      final repo = _FakeInvoiceRepository()..timeOutFirstCreate = true;
+      await _pumpPage(tester, repo: repo);
+      await fillLine(tester);
+
+      await save(tester);
+      expect(find.text('Retry'), findsOneWidget);
+
+      // Past the 5s window a normal error would have vanished. This one is
+      // the user's only signal that the save may have succeeded.
+      await tester.pump(const Duration(seconds: 6));
+      expect(
+        find.text('Retry'),
+        findsOneWidget,
+        reason: 'an ambiguous outcome must not silently disappear',
+      );
+    });
+
+    testWidgets('retry can be dismissed explicitly', (tester) async {
+      final repo = _FakeInvoiceRepository()..timeOutFirstCreate = true;
+      await _pumpPage(tester, repo: repo);
+      await fillLine(tester);
+
+      await save(tester);
+      expect(find.text('Retry'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.close).last);
+      await tester.pumpAndSettle();
+      expect(find.text('Retry'), findsNothing);
+      expect(
+        repo.createKeys,
+        hasLength(1),
+        reason: 'dismissing must not itself resend the request',
+      );
+    });
+
+    testWidgets('a definite connection failure is not labelled ambiguous', (
+      tester,
+    ) async {
+      // Nothing reached the server, so there is nothing to retry and no
+      // reason to suggest the write may have landed.
+      final repo = _FakeInvoiceRepository()
+        ..failCreateWith = 'Cannot reach the server. Nothing was sent.';
+      await _pumpPage(tester, repo: repo);
+      await fillLine(tester);
+
+      await save(tester);
+      expect(repo.createKeys, hasLength(1));
+      expect(
+        find.textContaining('may already have completed'),
+        findsNothing,
+      );
+      expect(find.text('Retry'), findsNothing);
+    });
   });
 
   testWidgets('P11: unchanged resubmit reuses the Idempotency-Key', (

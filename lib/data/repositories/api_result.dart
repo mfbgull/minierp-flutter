@@ -80,13 +80,29 @@ class ApiError {
     required this.message,
     this.statusCode,
     this.isNetwork = false,
+    this.outcomeUnknown = false,
   });
 
   final String message;
   final int? statusCode;
   final bool isNetwork;
 
+  /// The request may already have been applied server-side, so a *write*
+  /// must not be reported as a plain failure and must not be blindly
+  /// repeated. True only for timeouts that happen after the bytes were
+  /// handed to the socket (`sendTimeout`/`receiveTimeout`) — a
+  /// `connectionTimeout`/`connectionError` means the request was never
+  /// delivered and is therefore a definite failure, not an unknown one.
+  ///
+  /// Retrying such a request is safe only with the same idempotency key
+  /// (P11): a fresh key would create a second document.
+  final bool outcomeUnknown;
+
+  /// Convenience for call sites deciding whether to offer a safe retry.
+  bool get isRetryableWrite => outcomeUnknown;
+
   @override
   String toString() =>
-      'ApiError(${statusCode ?? 'no-status'}, network=$isNetwork): $message';
+      'ApiError(${statusCode ?? 'no-status'}, network=$isNetwork, '
+      'outcomeUnknown=$outcomeUnknown): $message';
 }

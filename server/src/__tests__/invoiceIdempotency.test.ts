@@ -55,7 +55,8 @@ describe('P11: idempotent invoice creation', () => {
     const wh = db.prepare('SELECT id FROM warehouses ORDER BY id LIMIT 1').get() as { id: number };
     warehouseId = wh.id;
     itemId = await createItem('Widget P11', authCookie);
-    await purchaseStock(itemId, warehouseId, 10, 10, authCookie);
+    // 30, not 10: all tests in this block share one batch and 10 ran dry.
+    await purchaseStock(itemId, warehouseId, 30, 30, authCookie);
     customerId = await createCustomer('P11 Customer', authCookie);
   });
 
@@ -97,6 +98,64 @@ describe('P11: idempotent invoice creation', () => {
     expect(retry.body.paid_amount).toBe(first.body.paid_amount);
   });
 
+  it('a retry after the response was lost commits exactly one transaction', async () => {
+    // Dedicated customer/item: the tests below assert cumulative invoice
+    // counts for the shared pair, so a new invoice here would shift them.
+    const lostCustomerId = await createCustomer('P11 Lost Response', authCookie);
+    const lostItemId = await createItem('Widget P11 Lost', authCookie);
+    await purchaseStock(lostItemId, warehouseId, 10, 10, authCookie);
+    const lostKey = `p11-${runId}-lost`;
+    const lostBody = () => ({
+      customer_id: lostCustomerId,
+      invoice_date: '2026-09-05',
+      due_date: '2026-09-19',
+      items: [{
+        item_id: lostItemId,
+        description: 'P11 Lost Item',
+        quantity: 3,
+        unit_price: 100,
+        tax_rate: 0,
+        discount_type: 'none',
+        discount_value: 0,
+      }],
+      total_amount: 300,
+      record_payment: true,
+      payment: { payment_date: '2026-09-05', amount: 300, payment_method: 'Cash' },
+    });
+
+    const first = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', lostKey)
+      .set('Cookie', authCookie)
+      .send(lostBody());
+    expect(first.status).toBe(201);
+    const lostInvoiceId: number = first.body.id;
+    const lostInvoiceNo: string = first.body.invoice_no;
+
+    const invoicesAfterFirst = count('SELECT COUNT(*) as c FROM invoices WHERE customer_id = ?', lostCustomerId);
+    const stockAfterFirst = stockOnHand(lostItemId);
+    const glAfterFirst = count("SELECT COUNT(*) as c FROM journal_lines WHERE reference_type = 'INVOICE' AND reference_id = ? AND voided = 0", lostInvoiceId);
+    const paymentsAfterFirst = count('SELECT COUNT(*) as c FROM payments p JOIN payment_allocations pa ON pa.payment_id = p.id WHERE pa.invoice_id = ? AND pa.voided_at IS NULL', lostInvoiceId);
+    const movementsAfterFirst = count('SELECT COUNT(*) as c FROM stock_movements WHERE reference_doctype = ? AND reference_docno = ?', 'INVOICE', lostInvoiceNo);
+    const ledgerAfterFirst = count('SELECT COUNT(*) as c FROM customer_ledger WHERE reference_no = ? AND transaction_type = ?', lostInvoiceNo, 'INVOICE');
+
+    const retry = await request(app).post('/api/invoices')
+      .set('Idempotency-Key', lostKey)
+      .set('Cookie', authCookie)
+      .send(lostBody());
+
+    expect(retry.status).toBe(201);
+    expect(retry.body.id).toBe(lostInvoiceId);
+    expect(retry.body.invoice_no).toBe(lostInvoiceNo);
+    expect(retry.headers['x-idempotent-replay']).toBe('true');
+
+    expect(count('SELECT COUNT(*) as c FROM invoices WHERE customer_id = ?', lostCustomerId)).toBe(invoicesAfterFirst);
+    expect(stockOnHand(lostItemId)).toBe(stockAfterFirst);
+    expect(count("SELECT COUNT(*) as c FROM journal_lines WHERE reference_type = 'INVOICE' AND reference_id = ? AND voided = 0", lostInvoiceId)).toBe(glAfterFirst);
+    expect(count('SELECT COUNT(*) as c FROM payments p JOIN payment_allocations pa ON pa.payment_id = p.id WHERE pa.invoice_id = ? AND pa.voided_at IS NULL', lostInvoiceId)).toBe(paymentsAfterFirst);
+    expect(count('SELECT COUNT(*) as c FROM stock_movements WHERE reference_doctype = ? AND reference_docno = ?', 'INVOICE', lostInvoiceNo)).toBe(movementsAfterFirst);
+    expect(count('SELECT COUNT(*) as c FROM customer_ledger WHERE reference_no = ? AND transaction_type = ?', lostInvoiceNo, 'INVOICE')).toBe(ledgerAfterFirst);
+  });
+
   it('rejects the same key with a materially different payload', async () => {
     const res = await request(app).post('/api/invoices')
       .set('Idempotency-Key', key1)
@@ -104,7 +163,7 @@ describe('P11: idempotent invoice creation', () => {
       .send(body(3));
     expect(res.status).toBe(409);
     expect(String(res.body.error)).toMatch(/idempotency/i);
-    // Nothing created.
+    // Nothing created — key1 already produced exactly one invoice above.
     expect(count('SELECT COUNT(*) as c FROM invoices WHERE customer_id = ?', customerId)).toBe(1);
   });
 

@@ -12645,6 +12645,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Personal Contacts'**
   String get equityPersonalLoanFilterPersonal;
+
+  /// No description provided for @errorsOutcomeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'No response from the server in time. This operation may already have completed — press Retry to confirm; retrying is safe and will not create a duplicate.'**
+  String get errorsOutcomeUnknown;
 }
 
 class _AppLocalizationsDelegate

@@ -6491,4 +6491,8 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get equityPersonalLoanFilterPersonal => 'ذاتی رشتہ دار';
+
+  @override
+  String get errorsOutcomeUnknown =>
+      'سرور کا جواب در مت نہیں آیا؛ ہوسا انجام ہو چکا ہے — دوبارہ کوشش دبائیں، یہ محفوظ ہے اور کوئی نقل نہیں بنے گی۔';
 }

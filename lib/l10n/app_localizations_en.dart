@@ -6497,4 +6497,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get equityPersonalLoanFilterPersonal => 'Personal Contacts';
+
+  @override
+  String get errorsOutcomeUnknown =>
+      'No response from the server in time. This operation may already have completed — press Retry to confirm; retrying is safe and will not create a duplicate.';
 }

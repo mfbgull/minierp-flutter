@@ -2053,5 +2053,6 @@
   "equityPersonalLoanFilterWithLoans": "فعال قرضوں والے",
   "equityPersonalLoanFilterCustomers": "صرف گاہک",
   "equityPersonalLoanFilterSuppliers": "صرف سپلائر",
-  "equityPersonalLoanFilterPersonal": "ذاتی رشتہ دار"
+  "equityPersonalLoanFilterPersonal": "ذاتی رشتہ دار",
+  "errorsOutcomeUnknown": "سرور کا جواب در مت نہیں آیا؛ ہوسا انجام ہو چکا ہے — دوبارہ کوشش دبائیں، یہ محفوظ ہے اور کوئی نقل نہیں بنے گی۔"
 }

@@ -49,6 +49,8 @@ class FakeHttpAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+Object _identity(Object? v) => v!;
+
 ResponseBody jsonBody(Object body, {int status = 200}) =>
     ResponseBody.fromString(
       jsonEncode(body),
@@ -196,6 +198,76 @@ void main() {
       final failure = result as ApiFailure<Object>;
       expect(failure.error.isNetwork, true);
       expect(failure.error.statusCode, null);
+    });
+
+    // Task 42: a timeout after the request went out is NOT a failure the
+    // caller may act on as if nothing happened — the write may already have
+    // committed. The distinction is the whole point of outcomeUnknown.
+    group('task 42: timeout outcome classification', () {
+      const parse = _identity;
+
+      for (final type in <DioExceptionType>[
+        DioExceptionType.sendTimeout,
+        DioExceptionType.receiveTimeout,
+        DioExceptionType.transformTimeout,
+      ]) {
+        test('$type is outcome-unknown (request may have committed)', () async {
+          handler = (o) => throw DioException(
+            requestOptions: o,
+            type: type,
+            message: 'delayed response',
+          );
+          final result = await api.get<Object>('/invoices', parse: parse);
+          final failure = result as ApiFailure<Object>;
+          expect(failure.error.isNetwork, true);
+          expect(
+            failure.error.outcomeUnknown,
+            true,
+            reason: 'a write that timed out after sending must not be '
+                'reported as a definite failure',
+          );
+          expect(failure.error.isRetryableWrite, true);
+          expect(
+            failure.error.message.toLowerCase(),
+            contains('may'),
+            reason: 'the message must not imply the operation failed',
+          );
+        });
+      }
+
+      for (final type in <DioExceptionType>[
+        DioExceptionType.connectionTimeout,
+        DioExceptionType.connectionError,
+      ]) {
+        test('$type is a definite failure (nothing was sent)', () async {
+          handler = (o) => throw DioException(
+            requestOptions: o,
+            type: type,
+            message: 'no route to host',
+          );
+          final result = await api.get<Object>('/invoices', parse: parse);
+          final failure = result as ApiFailure<Object>;
+          expect(failure.error.isNetwork, true);
+          expect(
+            failure.error.outcomeUnknown,
+            false,
+            reason: 'the request never reached the server, so nothing can '
+                'have been written',
+          );
+          expect(failure.error.isRetryableWrite, false);
+        });
+      }
+
+      test('a server error response is not outcome-unknown', () async {
+        handler = (o) => jsonBody(
+          {'success': false, 'error': 'Bad request'},
+          status: 400,
+        );
+        final result = await api.get<Object>('/invoices', parse: parse);
+        final failure = result as ApiFailure<Object>;
+        expect(failure.error.outcomeUnknown, false);
+        expect(failure.error.statusCode, 400);
+      });
     });
 
     test('delete accepts {success: true, message}', () async {

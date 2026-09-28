@@ -10,13 +10,20 @@ import '../api/api_client.dart';
 String mapError(Object error) {
   if (error is DioException) {
     switch (error.type) {
-      case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
       case DioExceptionType.transformTimeout:
-        return 'Request timed out. Check the server at ${ApiClient.baseUrl}.';
+        // Deliberately does NOT say "failed": these timeouts happen after
+        // the request went out, so the server may have applied it (task 42).
+        // Retrying with the same idempotency key is safe and is how the
+        // caller both recovers and retrieves the existing result.
+        return 'No response from the server in time. This request may still '
+            'have been saved — retry to confirm safely.';
+      case DioExceptionType.connectionTimeout:
+        // Never reached the server: nothing could have been written.
+        return 'Could not reach ${ApiClient.baseUrl} in time. Nothing was sent.';
       case DioExceptionType.connectionError:
-        return 'Cannot reach the server. Is it running?';
+        return 'Cannot reach ${ApiClient.baseUrl}. Nothing was sent.';
       case DioExceptionType.badResponse:
         final status = error.response?.statusCode;
         final body = error.response?.data;
