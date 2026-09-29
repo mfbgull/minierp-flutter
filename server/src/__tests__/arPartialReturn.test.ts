@@ -36,11 +36,13 @@ if (!TEST_PASSWORD) {
 
 // Covers all fixture dates AND today's return postings: returns post at
 // todayLocal(), so a fixed calendar date stops covering them the day the
-// suite runs past it. Derive the as-of from the current date (last day of
-// the current month) instead of hardcoding one.
+// suite runs past it. The LAST day of the current month is always >= today,
+// so it brackets today's postings whatever the calendar day — unlike a
+// hardcoded day 28, which silently drops the return on the 29th–31st.
 const AS_OF = (() => {
   const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-28`;
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 })();
 const INVOICE_DATE = '2026-06-10';  // helper pins due_date to 2026-09-30
 
