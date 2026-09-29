@@ -201,30 +201,34 @@ function createPostedInvoice(invoiceNo: string, qty: number, unitPrice: number):
     "SELECT credit FROM customer_ledger WHERE transaction_type = 'CANCELLATION' AND voided = 0"
   ).get() as { credit: number }) !== undefined, 'CANCELLATION ledger row exists');
 
-  // ---------- C3 case 6: PO cancel reverses AP ----------
-  console.log('C3 case 6 — PO cancel reverses AP debit');
+  // ---------- C3 case 6: submit/cancel leave the supplier ledger at net 0 ----------
+  console.log('C3 case 6 — PO cancel leaves supplier ledger at net 0');
   const po = PurchaseOrderModel.create({
     supplier_id: supplierId, po_date: '2026-08-10',
     items: [{ item_id: itemId, quantity: 5, unit_price: 20 }],
   } as never, 1, db);
   PurchaseOrderModel.updateStatus(po.id, 'Submitted', 1, db);
   const poNo = (db.prepare('SELECT po_no FROM purchase_orders WHERE id = ?').get(po.id) as { po_no: string }).po_no;
-  const submitDebit = db.prepare(
-    "SELECT debit FROM supplier_ledger WHERE reference_no = ? AND transaction_type = 'PURCHASE_ORDER' AND voided = 0"
-  ).get(poNo) as { debit: number };
-  assertClose(Number(submitDebit.debit), 100, 'submission posted AP debit 100');
+  // ACC-16 (b9046c1b): submission posts no supplier debit — the goods
+  // receipt creates the liability instead.
+  const submitRows = db.prepare(
+    'SELECT COUNT(*) AS c FROM supplier_ledger WHERE reference_no = ?'
+  ).get(poNo) as { c: number };
+  assert(submitRows.c === 0, 'submission posted no supplier-ledger row');
 
+  const supplierBalanceBefore = (db.prepare(
+    'SELECT current_balance FROM suppliers WHERE id = ?'
+  ).get(supplierId) as { current_balance: number }).current_balance;
   PurchaseOrderModel.updateStatus(po.id, 'Cancelled', 1, db);
   const poRows = db.prepare(
     'SELECT transaction_type, debit, credit FROM supplier_ledger WHERE reference_no = ? AND voided = 0 ORDER BY id'
   ).all(poNo) as Array<{ transaction_type: string; debit: number; credit: number }>;
-  assert(poRows.length === 2, 'ledger has exactly 2 rows (debit + cancellation credit)');
-  assert(poRows[1].transaction_type === 'PURCHASE_ORDER_CANCEL', 'second row is PURCHASE_ORDER_CANCEL');
-  assertClose(Number(poRows[1].credit), 100, 'cancellation credit 100');
+  // Nothing was owed at submit, so cancel must not append a reversing credit.
+  assert(poRows.length === 0, 'cancel wrote no supplier-ledger rows');
   assertClose(poRows.reduce((s, r) => s + Number(r.debit) - Number(r.credit), 0), 0, 'net AP effect 0');
   assertClose(
     (db.prepare('SELECT current_balance FROM suppliers WHERE id = ?').get(supplierId) as { current_balance: number }).current_balance,
-    0, 'supplier balance back to 0');
+    Number(supplierBalanceBefore), 'supplier balance unchanged by cancel');
 
   // ---------- C3 case 7: Cancelled → Submitted blocked ----------
   console.log('C3 case 7 — Cancelled → Submitted blocked');
@@ -233,9 +237,9 @@ function createPostedInvoice(invoiceNo: string, qty: number, unitPrice: number):
   catch { resubmitBlocked = true; }
   assert(resubmitBlocked, 'state machine rejected Cancelled → Submitted');
   const activePoRows = db.prepare(
-    "SELECT COUNT(*) AS c FROM supplier_ledger WHERE reference_no = ? AND transaction_type = 'PURCHASE_ORDER' AND voided = 0"
+    'SELECT COUNT(*) AS c FROM supplier_ledger WHERE reference_no = ?'
   ).get(poNo) as { c: number };
-  assert(activePoRows.c === 1, 'exactly one active PURCHASE_ORDER row');
+  assert(activePoRows.c === 0, 'no supplier-ledger rows after blocked resubmit');
 
   // ---------- C2 case 8: production delete voids canonical GL ----------
   console.log('C2 case 8 — production delete voids canonical GL');
