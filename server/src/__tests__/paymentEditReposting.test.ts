@@ -485,6 +485,11 @@ describe('H8 payment date/method edit reposting', () => {
     expect(paymentRow(paymentId).amount).toBe(200);
   });
 
+  function lastDayOfMonth(ymd: string): string {
+    const [y, m] = ymd.split('-').map(Number);
+    return `${ymd.slice(0, 7)}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+  }
+
   // A refund settlement creates a NEGATIVE payments row whose GL is keyed
   // PAYMENT/refundPaymentId but posted by postRefundEntry (Dr AR / Cr
   // Cash). postPaymentEntry ignores amounts ≤ 0, so an edit that voids and
@@ -518,19 +523,19 @@ describe('H8 payment date/method edit reposting', () => {
     expect(activeBefore.map((l) => `${l.account_code}:${l.debit}-${l.credit}`).sort()).toEqual(REFUND_LEGS);
 
     const originalDate = row.payment_date;
-    // Move within the same month, staying ≤ day 28 so one as-of date can
-    // bracket the whole edit. Day +3 wraps to day −3 near month end —
-    // capping at 28 would make day 28 a no-op move and trip the guard below.
+    // Move within the same month — the as-of is that month's last day, so
+    // it brackets both the original and the new date. +3 crosses into the
+    // next month near month end, so wrap to −3 rather than clamping at 28,
+    // which would leave day 28 unchanged and trip the guard below.
     const originalDay = Number(originalDate.slice(8, 10));
     const newDay = originalDay + 3 > 28 ? originalDay - 3 : originalDay + 3;
     const newDate = `${originalDate.slice(0, 8)}${String(newDay).padStart(2, '0')}`;
     expect(newDate).not.toBe(originalDate);
 
     // The refund's GL posts at todayLocal() — the payment row's own date —
-    // so derive the balance as-of from the row instead of a hardcoded
-    // calendar date (which silently drops the refund from every read once
-    // the suite runs past it).
-    const asOf = `${originalDate.slice(0, 7)}-28`;
+    // so read balances at that month's last day: every date in the row's
+    // month is <= month end, so the refund is never dropped from the read.
+    const asOf = lastDayOfMonth(originalDate);
 
     const custBalanceBefore = (db.prepare('SELECT current_balance FROM customers WHERE id = ?').get(customerId) as { current_balance: number }).current_balance;
     const arBefore = glBalance(AR_CODE, asOf);
@@ -564,9 +569,9 @@ describe('H8 payment date/method edit reposting', () => {
     const refundId = await createRefundPayment(customerId, 200);
 
     // Same as-of derivation as the date-edit test: the refund posts at
-    // todayLocal(), so read balances at that row's own month (day 28 ≥
-    // every date this test can touch).
-    const asOf = `${paymentRow(refundId).payment_date.slice(0, 7)}-28`;
+    // todayLocal(), so read balances at that row's month end (>= every
+    // date in the row's month).
+    const asOf = lastDayOfMonth(paymentRow(refundId).payment_date);
     const cashBefore = glBalance('1000', asOf);
     const bankBefore = glBalance('1010', asOf);
 
