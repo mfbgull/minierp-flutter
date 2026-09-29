@@ -131,8 +131,14 @@ export function collectFlows(
   // per-method GROUP BYs below only touch the bounded, indexed range.
   const preFloor = db.prepare(`
     SELECT payment_method,
-      COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as inflow,
-      COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as outflow
+      COALESCE(SUM(CASE
+        WHEN supplier_id IS NOT NULL THEN 0
+        WHEN amount > 0 THEN amount
+        ELSE 0 END), 0) as inflow,
+      COALESCE(SUM(CASE
+        WHEN supplier_id IS NOT NULL THEN amount
+        WHEN amount < 0 THEN ABS(amount)
+        ELSE 0 END), 0) as outflow
     FROM payments
     WHERE voided_at IS NULL AND payment_date < ? AND payment_date <= ?
     GROUP BY payment_method

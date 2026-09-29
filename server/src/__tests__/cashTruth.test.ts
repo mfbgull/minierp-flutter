@@ -97,6 +97,28 @@ function ensureJournalEntriesHeader(db: Database.Database): void {
 }
 
 describe('unpaid purchase moves no cash (CASH-01)', () => {
+  it('a supplier payment older than the 90-day fold floor stays an outflow', () => {
+    // Regression: the pre-floor fold classified every positive `payments`
+    // row as an inflow, ignoring the counterparty split the in-window
+    // queries use. A supplier payment older than the floor therefore
+    // counted as money coming IN, overstating the till by 2x the payment
+    // and desynchronising the GL cash reconciliation.
+    const db = fixtureDb();
+    rebuildPaymentsTable(db);
+    db.prepare(`INSERT INTO suppliers (supplier_code, supplier_name) VALUES ('S1','Acme')`).run();
+
+    const recent = collectFlows(db, '2026-08-31');
+    db.prepare(`
+      INSERT INTO payments (payment_no, supplier_id, payment_date, amount, payment_method)
+      VALUES ('PAY-OLD', 1, '2026-03-01', 500, 'Cash')
+    `).run();
+    const old = collectFlows(db, '2026-08-31');
+
+    expect((old.get('cash')?.inflow ?? 0) - (recent.get('cash')?.inflow ?? 0)).toBe(0);
+    expect((old.get('cash')?.outflow ?? 0) - (recent.get('cash')?.outflow ?? 0)).toBe(500);
+    db.close();
+  });
+
   it('an unpaid purchase contributes nothing to the till; its supplier payment is the only outflow', () => {
     const db = fixtureDb();
     rebuildPaymentsTable(db);
