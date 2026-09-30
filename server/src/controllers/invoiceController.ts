@@ -13,6 +13,7 @@ import logger from '../utils/logger';
 import { log, logCRUD, ActionType, newCorrelationId } from '../services/activityLogger';
 import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import {
+  addCurrency,
   parseCurrency,
   subtractCurrency,
   computeInvoiceGrandTotal,
@@ -71,13 +72,19 @@ class InsufficientCreditError extends Error {
 }
 
 /**
- * H9: payment + credit offset exceeds the invoice total (entitlement) —
- * a client error (400), not a server fault.
+ * An edit tried to change an invoice's applied store credit. Changing it
+ * means reversing part of an existing GL offset entry, which this path
+ * does not do; the client re-sending the unchanged value is a no-op and
+ * is accepted so ordinary edits of a credited invoice keep working.
  */
-class OffsetExceedsTotalError extends Error {
-  constructor(applied: number, total: number) {
-    super(`Payment + credit offset (${applied.toFixed(2)}) exceeds invoice total (${total.toFixed(2)})`);
-    this.name = 'OffsetExceedsTotalError';
+class CreditOffsetChangeNotSupportedError extends Error {
+  constructor(applied: number, requested: number) {
+    super(
+      `Applied credit is ${applied.toFixed(2)} and cannot be changed to ` +
+      `${requested.toFixed(2)} by editing the invoice. Settle or refund ` +
+      `the difference through the payment or return flow instead.`
+    );
+    this.name = 'CreditOffsetChangeNotSupportedError';
   }
 }
 
@@ -100,6 +107,7 @@ interface InvoiceRow {
   total_amount: number;
   paid_amount: number;
   balance_amount: number;
+  credit_offset?: number;
   discount_scope?: string;
   discount_type?: string;
   discount_value?: number;
@@ -299,6 +307,7 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
       deleted_payments,
       record_payment,
       payment,
+      credit_offset,
     } = req.body as {
       invoice_no: string;
       customer_id: number | string;
@@ -315,6 +324,7 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
       deleted_payments?: number[];
       record_payment?: boolean;
       payment?: PaymentDTO;
+      credit_offset?: number | string;
     };
 
     if (!customer_id || !invoice_date || !items || items.length === 0) {
@@ -336,6 +346,19 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         if (!originalInvoice) throw new Error('Invoice not found');
 
         AccountingService.assertPeriodNotClosed(db, originalInvoice.invoice_date, `Invoice ${originalInvoice.invoice_no}`);
+
+        // The Flutter form re-sends the invoice's existing credit_offset on
+        // every edit, so an unchanged value must stay acceptable. A changed
+        // one cannot be honoured here — it would need a partial reversal of
+        // the posted offset entry — and silently ignoring it would leave the
+        // user believing credit was applied when it was not.
+        const appliedCreditOnInvoice = parseCurrency(originalInvoice.credit_offset || 0);
+        if (credit_offset !== undefined && credit_offset !== null) {
+            const requestedCredit = parseCurrency(credit_offset);
+            if (Math.abs(requestedCredit - appliedCreditOnInvoice) > 0.005) {
+                throw new CreditOffsetChangeNotSupportedError(appliedCreditOnInvoice, requestedCredit);
+            }
+        }
 
         // ACC-18 interim: server-authoritative totals on update too.
         const computedTotal = computeInvoiceGrandTotal(items, {
@@ -458,7 +481,12 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // === Recalculate paid/balance (accounting for returned_amount) ===
         const paidResult = PaymentModel.getTotalPaidByInvoiceId(db, invoiceId);
 
-        const totalPaid = parseCurrency(paidResult);
+        // Applied store credit counts toward paid, exactly as the create
+        // path does. Summing payments alone would wipe an applied credit
+        // off the invoice on any edit while its GL entry and the
+        // customer's decremented credit_balance both survive — AR would
+        // silently drift upward by that amount.
+        const totalPaid = addCurrency(parseCurrency(paidResult), appliedCreditOnInvoice);
         const returnedAmt = parseCurrency(originalInvoice?.returned_amount || 0);
         const newBalanceAmount = Math.max(0, subtractCurrency(subtractCurrency(totalAmountNum, totalPaid), returnedAmt));
 
@@ -635,6 +663,11 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
       return;
     }
     if (error instanceof InvoiceCreationOffsetError) {
+      logger.warn('Update invoice rejected:', { error: error.message });
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error instanceof CreditOffsetChangeNotSupportedError) {
       logger.warn('Update invoice rejected:', { error: error.message });
       res.status(400).json({ error: error.message });
       return;

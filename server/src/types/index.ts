@@ -121,6 +121,7 @@ export interface Invoice {
   total_amount: number;
   paid_amount: number;
   balance_amount: number;
+  credit_offset?: number;
   discount_scope?: string;
   discount_type?: string;
   discount_value?: number;

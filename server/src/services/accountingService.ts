@@ -24,6 +24,7 @@
 
 import Database from 'better-sqlite3';
 import logger from '../utils/logger';
+import { roundCurrency, toMinorUnits } from '../utils/currency';
 import activityLogger, { ActionType, LogLevel } from './activityLogger';
 
 /** First line with a positive debit — used for the legacy header's debit_account column. */
@@ -224,8 +225,13 @@ export class AccountingService {
    * Post a multi-line journal entry. Validates:
    *   - at least 2 lines
    *   - every line has positive debit XOR positive credit
-   *   - total debits == total credits
+   *   - total debits == total credits exactly, in integer minor units
    *   - entry_date falls within an open accounting period
+   *
+   * Line amounts are normalized to the currency minor unit (see
+   * `roundCurrency`), which is the project's stated monetary rounding
+   * policy. The balance check itself admits no tolerance: it compares
+   * integer minor units so float summation cannot mask a real drift.
    *
    * Returns the new journal_entry_id (logical grouping) and totals.
    */
@@ -237,12 +243,22 @@ export class AccountingService {
       throw new Error('entry_date is required');
     }
 
-    // Validate every line
-    let totalDebit = 0;
-    let totalCredit = 0;
+    // Validate every line. Amounts are normalized to the currency minor
+    // unit first, so validation, the balance check and the stored rows
+    // all speak the same precision. Callers already pass 2dp values, so
+    // roundCurrency is identity for them; this only strips sub-paisa
+    // noise, which must never reach journal_lines.
+    const normalizedLines: Array<{
+      account_id: number;
+      debit: number;
+      credit: number;
+      description?: string | null;
+    }> = [];
+    let totalDebitMinor = 0;
+    let totalCreditMinor = 0;
     for (const line of input.lines) {
-      const debit = Number(line.debit || 0);
-      const credit = Number(line.credit || 0);
+      const debit = roundCurrency(Number(line.debit || 0));
+      const credit = roundCurrency(Number(line.credit || 0));
       if (debit < 0 || credit < 0) {
         throw new Error(`Line amounts must be non-negative (account ${line.account_id})`);
       }
@@ -252,8 +268,14 @@ export class AccountingService {
       if (debit === 0 && credit === 0) {
         throw new Error(`Line must have a non-zero amount (account ${line.account_id})`);
       }
-      totalDebit += debit;
-      totalCredit += credit;
+      totalDebitMinor += toMinorUnits(debit);
+      totalCreditMinor += toMinorUnits(credit);
+      normalizedLines.push({
+        account_id: line.account_id,
+        debit,
+        credit,
+        description: line.description,
+      });
 
       // Verify the account exists
       const exists = db.prepare(`SELECT 1 FROM chart_of_accounts WHERE id = ?`).get(line.account_id);
@@ -262,8 +284,13 @@ export class AccountingService {
       }
     }
 
-    // Reject unbalanced entries (within rounding tolerance)
-    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+    const totalDebit = totalDebitMinor / 100;
+    const totalCredit = totalCreditMinor / 100;
+
+    // Exact double-entry invariant: total debits === total credits.
+    // Compared as integer minor units, so this admits no epsilon and
+    // cannot be satisfied by a float-summation artefact.
+    if (totalDebitMinor !== totalCreditMinor) {
       throw new Error(
         `Unbalanced journal entry: total debit ${totalDebit.toFixed(2)} != ` +
         `total credit ${totalCredit.toFixed(2)}`
@@ -352,12 +379,12 @@ export class AccountingService {
           line_date, reference_type, reference_id, created_by
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      for (const line of input.lines) {
+      for (const line of normalizedLines) {
         insertLine.run(
           entryId,
           line.account_id,
-          Number(line.debit || 0),
-          Number(line.credit || 0),
+          line.debit,
+          line.credit,
           line.description || null,
           input.entry_date,
           referenceType,

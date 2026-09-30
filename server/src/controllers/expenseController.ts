@@ -9,6 +9,7 @@ import { sanitizeSortParams, EXPENSE_SORT_COLUMNS } from '../utils/sqlSanitizer'
 import ExpenseModel from '../models/Expense';
 import { isValidPaymentMethod } from '../services/cashService';
 import { handleBusinessError } from '../utils/businessRuleError';
+import { formatCurrency, getCurrencySymbol } from '../utils/displayCurrency';
 
 function createExpense(req: AuthRequest, res: Response): void {
   try {
@@ -60,7 +61,7 @@ function createExpense(req: AuthRequest, res: Response): void {
       });
     })();
 
-    logCRUD(ActionType.EXPENSE_CREATE, 'Expense', expenseId!, `Created expense: ${expenseNo!} - ${expense_category} ($${parsedAmount})`, userId, { expense_no: expenseNo!, expense_category, amount: parsedAmount, vendor_name });
+    logCRUD(ActionType.EXPENSE_CREATE, 'Expense', expenseId!, `Created expense: ${expenseNo!} - ${expense_category} (${formatCurrency(parsedAmount, getCurrencySymbol(db))})`, userId, { expense_no: expenseNo!, expense_category, amount: parsedAmount, vendor_name });
     req.activityLogged = true;
 
     res.status(201).json({
