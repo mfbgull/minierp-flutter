@@ -19,6 +19,13 @@ import {
   hashRequestPayload,
   findIdempotencyRecord,
 } from '../utils/idempotency';
+import {
+  InvoiceCreationCreditError,
+  InvoiceCreationIdempotencyError,
+  InvoiceCreationOffsetError,
+  InvoiceCreationPaymentMethodError,
+  InvoiceCreationTotalMismatchError,
+} from '../services/InvoiceCreationService';
 
 export async function createDraft(req: AuthRequest, res: Response) {
   try {
@@ -198,6 +205,21 @@ export async function submitInvoice(req: AuthRequest, res: Response) {
       // Keep the mobile error envelope ({success: false}); the message
       // names the item and shortfall.
       res.status(400).json({ success: false, error: error.message });
+      return;
+    }
+    if (
+      error instanceof InvoiceCreationTotalMismatchError ||
+      error instanceof InvoiceCreationPaymentMethodError ||
+      error instanceof InvoiceCreationCreditError ||
+      error instanceof InvoiceCreationOffsetError
+    ) {
+      logger.warn('Submit invoice rejected:', { error: error.message });
+      res.status(400).json({ success: false, error: error.message });
+      return;
+    }
+    if (error instanceof InvoiceCreationIdempotencyError) {
+      logger.warn('Submit invoice idempotency conflict:', { error: error.message });
+      res.status(409).json({ success: false, error: error.message });
       return;
     }
     logger.error('Submit invoice error:', error);

@@ -113,4 +113,35 @@ describe('invoice creation endpoint matrix', () => {
       expectSharedAccountingSemantics(latestInvoice(sourceType));
     }
   });
+
+  it('rejects an overpaying recorded payment on standard creation with 400', async () => {
+    const res = await request(app)
+      .post('/api/invoices')
+      .set('Cookie', authCookie)
+      .send({
+        customer_id: customerId,
+        invoice_date: '2026-09-25',
+        warehouse_id: warehouseId,
+        items: [{ item_id: itemId, quantity: 1, unit_price: 100, tax_rate: 0 }],
+        record_payment: true,
+        payment: { payment_date: '2026-09-25', amount: 150, payment_method: 'Cash' },
+      });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toMatch(/exceeds invoice total/i);
+  });
+
+  it('rejects an overpaying recorded payment on mobile submission with 400', async () => {
+    const res = await request(app)
+      .post('/api/mobile-invoices/submit')
+      .set('Cookie', authCookie)
+      .send({
+        customer_id: customerId,
+        invoice_date: '2026-09-25',
+        items: [{ item_id: itemId, quantity: 1, unit_price: 100, tax_rate: 0 }],
+        record_payment: true,
+        payment: { payment_date: '2026-09-25', amount: 150, payment_method: 'Cash' },
+      });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toMatch(/exceeds invoice total/i);
+  });
 });
