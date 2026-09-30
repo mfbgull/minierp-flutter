@@ -19,6 +19,7 @@
  * collectors are exported for targeted assertions.
  */
 import db from '../../config/database';
+import { collectFlows, CASH_ACCOUNTS, CASH_GL_CODES } from '../../services/cashService';
 
 export interface Violation {
   label: string;
@@ -189,24 +190,23 @@ export function inventoryImbalances(): Violation[] {
   return [];
 }
 
-/** Invariant I: GL Cash accounts == operational cash balances. */
+/** Invariant I: GL Cash accounts == operational cash balances.
+ *
+ * Operational side is collectFlows (business rows + opening seed), never
+ * journal_lines — the pre-audit version compared GL against itself and
+ * could not fail. Explicit floor/upto bounds put every row in the main
+ * queries so the seed is counted exactly once; 'unclassified' has no GL
+ * account and is skipped. */
 export function cashImbalances(): Violation[] {
-  const CASH_CODES: Array<{ code: string; name: string }> = [
-    { code: '1000', name: 'Cash' },
-    { code: '1010', name: 'Bank' },
-    { code: '1020', name: 'Easypaisa' },
-    { code: '1030', name: 'JazzCash' },
-    { code: '1040', name: 'UPaisa' },
-  ];
+  const flows = collectFlows(db, '9999-12-31', '1970-01-01');
   const violations: Violation[] = [];
-  for (const { code, name } of CASH_CODES) {
-    const glBalance = R2(GL_BALANCE(code));
-    const acctId = GL_ACCOUNT_ID(code);
+  for (const { key, name } of CASH_ACCOUNTS) {
+    const code = CASH_GL_CODES[key];
+    const acctId = code ? GL_ACCOUNT_ID(code) : undefined;
     if (!acctId) continue;
-    const row = db.prepare(
-      'SELECT COALESCE(SUM(debit) - SUM(credit), 0) AS balance FROM journal_lines WHERE account_id = ? AND voided = 0'
-    ).get(acctId) as { balance: number };
-    const opBalance = R2(row.balance);
+    const flow = flows.get(key);
+    const opBalance = R2((flow?.inflow ?? 0) - (flow?.outflow ?? 0));
+    const glBalance = R2(GL_BALANCE(code));
     if (Math.abs(glBalance - opBalance) > 0.005) {
       violations.push({ label: `GL Cash (${name}) vs operational`, diff: R2(glBalance - opBalance), account: code, expected: opBalance, actual: glBalance });
     }
