@@ -213,4 +213,27 @@ describe('GL lifecycle: update/delete voiding', () => {
     const activeDebit = active.reduce((s, l) => s + Number(l.debit), 0);
     expect(activeDebit).toBeCloseTo(50, 2);
   });
+
+  it('update-path payment exceeding the invoice total is rejected with 400 and writes nothing', async () => {
+    const { invoiceId } = await createInvoice(100);
+    const paymentsBefore = db.prepare('SELECT COUNT(*) AS c FROM payments').get() as { c: number };
+
+    const put = await request(app).put(`/api/invoices/${invoiceId}`)
+      .set('Cookie', authCookie)
+      .send(fullUpdateBody(invoiceId, {
+        total_amount: 100,
+        items: [{ item_id: itemId, quantity: 1, unit_price: 100, warehouse_id: warehouseId }],
+        record_payment: true,
+        payment: { amount: 150, payment_date: '2026-08-12', payment_method: 'Cash' },
+      }));
+    expect(put.status).toBe(400);
+    expect(JSON.stringify(put.body)).toMatch(/exceeds invoice total/i);
+
+    const paymentsAfter = db.prepare('SELECT COUNT(*) AS c FROM payments').get() as { c: number };
+    expect(Number(paymentsAfter.c)).toBe(Number(paymentsBefore.c));
+    const alloc = db.prepare(
+      'SELECT COUNT(*) AS c FROM payment_allocations WHERE invoice_id = ?'
+    ).get(invoiceId) as { c: number };
+    expect(Number(alloc.c)).toBe(0);
+  });
 });

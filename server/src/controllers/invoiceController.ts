@@ -420,6 +420,17 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
                 throw new InvalidPaymentMethodError(payment.payment_method);
             }
 
+            AccountingService.assertPeriodNotClosed(db, payment.payment_date, `Payment for Invoice ${resolvedInvoiceNo}`);
+
+            const paidSoFar = parseCurrency(PaymentModel.getTotalPaidByInvoiceId(db, invoiceId));
+            const returnedForGuard = parseCurrency(originalInvoice?.returned_amount || 0);
+            if (paidSoFar + newPaymentAmount + returnedForGuard > totalAmountNum + 0.01) {
+                throw new InvoiceCreationOffsetError(
+                    paidSoFar + newPaymentAmount + returnedForGuard,
+                    totalAmountNum,
+                );
+            }
+
             // FIX #5: Atomic payment number generation
             const newPaymentNo = InvoiceModel.generatePaymentNoAtomic(db);
 
@@ -619,6 +630,11 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
       return;
     }
     if (error instanceof InvalidPaymentMethodError) {
+      logger.warn('Update invoice rejected:', { error: error.message });
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error instanceof InvoiceCreationOffsetError) {
       logger.warn('Update invoice rejected:', { error: error.message });
       res.status(400).json({ error: error.message });
       return;
