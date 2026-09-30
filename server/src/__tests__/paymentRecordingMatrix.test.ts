@@ -289,6 +289,36 @@ describe('payment recording matrix', () => {
     expect(Number(after.count)).toBe(Number(before.count));
   });
 
+  it('rejects a payment_date inside a closed period on invoice update and writes nothing', async () => {
+    const invoice = await createInvoice(
+      { customerId, itemId, lines: [{ quantity: 1, unitPrice: 100 }] },
+      authCookie,
+    );
+    closePeriod(closedPeriod, '2026-03-01', '2026-03-31');
+
+    const before = db.prepare('SELECT COUNT(*) AS count FROM payments').get() as { count: number };
+
+    const rejected = await request(app).put(`/api/invoices/${invoice.invoiceId}`)
+      .set('Cookie', authCookie)
+      .send({
+        customer_id: customerId,
+        invoice_date: '2026-09-15',
+        due_date: '2026-09-30',
+        items: [{ item_id: itemId, quantity: 1, unit_price: 100, tax_rate: 0 }],
+        record_payment: true,
+        payment: { payment_date: '2026-03-15', amount: 100, payment_method: 'Cash' },
+      });
+    expect(rejected.status).toBe(409);
+    expect(JSON.stringify(rejected.body)).toMatch(/inside closed accounting period/i);
+
+    const after = db.prepare('SELECT COUNT(*) AS count FROM payments').get() as { count: number };
+    expect(Number(after.count)).toBe(Number(before.count));
+    const alloc = db.prepare(
+      'SELECT COUNT(*) AS c FROM payment_allocations WHERE invoice_id = ?'
+    ).get(invoice.invoiceId) as { c: number };
+    expect(Number(alloc.c)).toBe(0);
+  });
+
   it('records a supplier payment against AP with a cash funds guard', async () => {
     const supplier = await request(app).post('/api/suppliers')
       .set('Cookie', authCookie)
