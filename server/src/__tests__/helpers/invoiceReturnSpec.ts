@@ -23,6 +23,14 @@ import db from '../../config/database';
 export const FEE_INCOME_ACCOUNT_CODE = '4150'; // Restocking Fee Income (add-gl-foundation.sql)
 export const EPSILON = 0.01; // currency rounding tolerance (parseCurrency convention)
 
+// Run-date-immune due date: a pinned literal rots into 'Overdue' the day
+// the calendar passes it, flipping any status assertion.
+export const FUTURE_DUE_DATE = (() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+})();
+
 export interface Position {
   originalTotal: number;
   totalReturned: number;
@@ -152,7 +160,7 @@ export async function createInvoice(
     .send({
       customer_id: opts.customerId,
       invoice_date: opts.invoiceDate ?? '2026-09-15',
-      due_date: '2026-09-30',
+      due_date: FUTURE_DUE_DATE,
       items: opts.lines.map((l) => ({
         item_id: opts.itemId,
         quantity: l.quantity,

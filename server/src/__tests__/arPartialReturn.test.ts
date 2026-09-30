@@ -44,7 +44,7 @@ const AS_OF = (() => {
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 })();
-const INVOICE_DATE = '2026-06-10';  // helper pins due_date to 2026-09-30
+const INVOICE_DATE = '2026-06-10';  // helper defaults due_date to today+30 (FUTURE_DUE_DATE)
 
 let token: string;
 let warehouseId: number;

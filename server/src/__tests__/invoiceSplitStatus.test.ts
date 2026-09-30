@@ -1,7 +1,7 @@
 import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
-import { getAuthCookie, createItem, purchaseStock } from './helpers/invoiceReturnSpec';
+import { getAuthCookie, createItem, purchaseStock, FUTURE_DUE_DATE } from './helpers/invoiceReturnSpec';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
@@ -36,7 +36,7 @@ async function createInvoiceWithPayment(
       invoice_no: invNo,
       customer_id: customerId,
       invoice_date: '2026-09-15',
-      due_date: '2026-09-30',
+      due_date: FUTURE_DUE_DATE,
       total_amount: opts.total_amount,
       record_payment: (opts.paid_amount ?? 0) > 0,
       payment: (opts.paid_amount ?? 0) > 0
