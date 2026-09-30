@@ -150,14 +150,14 @@ export function collectFlows(
   // Owner equity (pre-floor fold): capital in / cash withdrawals out,
   // folded like payments so balances stay exact below the scan floor.
   const ownerPreFloor = db.prepare(`
-    SELECT payment_method,
+    SELECT COALESCE(payment_method, 'Cash') AS payment_method,
       COALESCE(SUM(amount), 0) as inflow
     FROM owner_capital
     WHERE status = 'posted' AND capital_date < ? AND capital_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number }>;
   const ownerWdPreFloor = db.prepare(`
-    SELECT payment_method,
+    SELECT COALESCE(payment_method, 'Cash') AS payment_method,
       COALESCE(SUM(amount), 0) as outflow
     FROM owner_withdrawals
     WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date < ? AND withdrawal_date <= ?
@@ -256,7 +256,7 @@ export function collectFlows(
   // withdrawals are money out (goods withdrawals move no cash). Voided
   // rows are excluded so the till matches the GL.
   const ownerCapital = db.prepare(`
-    SELECT payment_method, COALESCE(SUM(amount), 0) as inflow
+    SELECT COALESCE(payment_method, 'Cash') AS payment_method, COALESCE(SUM(amount), 0) as inflow
     FROM owner_capital
     WHERE status = 'posted' AND capital_date > ? AND capital_date <= ?
     GROUP BY payment_method
@@ -266,7 +266,7 @@ export function collectFlows(
   }
 
   const ownerCashOut = db.prepare(`
-    SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
+    SELECT COALESCE(payment_method, 'Cash') AS payment_method, COALESCE(SUM(amount), 0) as outflow
     FROM owner_withdrawals
     WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date > ? AND withdrawal_date <= ?
     GROUP BY payment_method

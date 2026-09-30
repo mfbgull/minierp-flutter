@@ -947,3 +947,38 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     expect(apSnapshot()).toEqual(apBefore);
   });
 });
+
+describe('cashImbalances detects planted GL-only drift', () => {
+  it('flags a balanced journal pair moving cash outside business flows, then clears on cleanup', () => {
+    expect(cashImbalances()).toEqual([]);
+
+    const cash = AccountingService.getAccountByCode(db, '1000');
+    const capital = AccountingService.getAccountByCode(db, '3200');
+    if (!cash || !capital) throw new Error('Chart of accounts is missing 1000 or 3200');
+
+    const planted = AccountingService.postEntry(db, {
+      entry_date: '2026-09-01',
+      description: 'Planted GL-only cash drift (test)',
+      reference_type: 'TEST_DRIFT',
+      reference_id: null,
+      lines: [
+        { account_id: cash.id, debit: 7.77, description: 'planted cash drift' },
+        { account_id: capital.id, credit: 7.77, description: 'planted cash drift' },
+      ],
+    });
+
+    try {
+      const violations = cashImbalances();
+      expect(violations).toHaveLength(1);
+      expect(violations[0].account).toBe('1000');
+      expect(violations[0].diff).toBeCloseTo(7.77, 2);
+      expect(violations[0].actual).toBeCloseTo((violations[0].expected ?? 0) + 7.77, 2);
+      expect(planted.total_debit).toBeCloseTo(7.77, 2);
+    } finally {
+      db.prepare(`DELETE FROM journal_lines WHERE reference_type = 'TEST_DRIFT'`).run();
+      db.prepare(`DELETE FROM journal_entries WHERE reference_type = 'TEST_DRIFT'`).run();
+    }
+
+    expect(cashImbalances()).toEqual([]);
+  });
+});
