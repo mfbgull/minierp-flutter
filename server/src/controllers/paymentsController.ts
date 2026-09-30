@@ -14,6 +14,7 @@ import CustomerModel from '../models/Customer';
 import InvoiceModel from '../models/Invoice';
 import SupplierModel from '../models/Supplier';
 import { handleBusinessError } from '../utils/businessRuleError';
+import { formatCurrency, getCurrencySymbol } from '../utils/displayCurrency';
 
 function getPayments(req: Request, res: Response): void {
   try {
@@ -105,6 +106,8 @@ function createPayment(req: AuthRequest, res: Response): void {
 
     const parsedAmount = parseCurrency(amount);
 
+    const currency = getCurrencySymbol(db);
+
     if (customer_id) {
       const parsedCustomerId = parseInt(customer_id, 10);
       if (!invoice_allocations || !Array.isArray(invoice_allocations) || invoice_allocations.length === 0) {
@@ -161,7 +164,7 @@ function createPayment(req: AuthRequest, res: Response): void {
       });
 
       const customer = CustomerModel.getById(parsedCustomerId, db);
-      logCRUD(ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created payment - $${parsedAmount} from ${customer?.customer_name || 'Unknown'}`, req.user!.id, { customer_id: parsedCustomerId, amount: parsedAmount, payment_method, invoice_allocations: invoice_allocations.length });
+      logCRUD(ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created payment - ${formatCurrency(parsedAmount, currency)} from ${customer?.customer_name || 'Unknown'}`, req.user!.id, { customer_id: parsedCustomerId, amount: parsedAmount, payment_method, invoice_allocations: invoice_allocations.length });
       req.activityLogged = true;
 
       res.status(201).json({ success: true, data: PaymentModel.getById(db, paymentId) });
@@ -195,7 +198,7 @@ function createPayment(req: AuthRequest, res: Response): void {
       });
 
       const supplier = SupplierModel.getById(parsedSupplierId, db);
-      logCRUD(ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created supplier payment - $${parsedAmount} to ${supplier?.supplier_name || 'Unknown'}`, req.user!.id, { supplier_id: parsedSupplierId, amount: parsedAmount, payment_method, allocation_count: (po_allocations || []).length + (purchase_allocations || []).length });
+      logCRUD(ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created supplier payment - ${formatCurrency(parsedAmount, currency)} to ${supplier?.supplier_name || 'Unknown'}`, req.user!.id, { supplier_id: parsedSupplierId, amount: parsedAmount, payment_method, allocation_count: (po_allocations || []).length + (purchase_allocations || []).length });
       req.activityLogged = true;
 
       res.status(201).json({ success: true, data: PaymentModel.getById(db, paymentId) });
@@ -249,7 +252,7 @@ function deletePayment(req: AuthRequest, res: Response): void {
     // hard-deleted once they have moved money.
     PaymentModel.void(db, id, req.user?.id ?? null, `Payment voided: ${existing.payment_no}`);
 
-    logCRUD(ActionType.PAYMENT_DELETE, 'Payment', id, `Voided payment: ${existing.payment_no} - $${existing.amount}`, req.user!.id, { payment_no: existing.payment_no, amount: existing.amount });
+    logCRUD(ActionType.PAYMENT_DELETE, 'Payment', id, `Voided payment: ${existing.payment_no} - ${formatCurrency(Number(existing.amount), getCurrencySymbol(db))}`, req.user!.id, { payment_no: existing.payment_no, amount: existing.amount });
     req.activityLogged = true;
 
     res.json({ success: true, message: 'Payment voided successfully' });

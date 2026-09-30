@@ -18,11 +18,13 @@ helpers used by the customer Overview/Invoices/Payments tabs.
   (`inMilliseconds / (86.4e6)`) so fractional days are preserved before
   the final `.round()`, and `DateTime.parse` on `YYYY-MM-DD` behaves like
   `new Date(...)`.
-- **`formatAsCurrency`** replicates JS `toLocaleString(undefined,
-  {min/max 2})` for en-US via `NumberFormat.currency`. It is deliberately
-  USD/`$`-fixed (the legacy customer-tab format); shared/currency-aware
-  formatting lives in `core/utils/formatters.dart` (the settings-driven
-  symbol is applied by the UI layer).
+- **`formatAsCurrency`** delegates to `Formatters.currency`
+  (`core/utils/formatters.dart`), which applies the settings-driven
+  business symbol. It is kept as a named alias only so the existing
+  customer Overview/Invoices/Payments call sites stay unchanged; it is no
+  longer a USD/`$`-fixed legacy format.
+- **`formatAsFixed`** is the remaining legacy helper: plain 2-decimal
+  formatting with no symbol, used for ledger totals.
 - **`formatDateString`** delegates to `Formatters.date` (the Flutter
   equivalent of `toLocaleDateString()`); unparseable input returns `''`
   like TS.

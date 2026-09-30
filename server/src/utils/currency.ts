@@ -152,6 +152,21 @@ export function computeInvoiceGrandTotal(
 }
 
 /**
+ * Exact integer minor units (paisa) for a currency amount.
+ *
+ * Doubles cannot represent most 2-decimal values exactly, so summing
+ * them and testing the result against an epsilon admits real drift.
+ * Converting to integers first makes the arithmetic exact (integer sums
+ * are exact well past any monetary magnitude) so the GL can assert
+ * total debits === total credits with no tolerance at all.
+ *
+ * Round-trip: `fromMinorUnits(toMinorUnits(x)) === roundCurrency(x)`.
+ */
+export function toMinorUnits(value: number): number {
+  return Math.round(roundCurrency(value) * 100);
+}
+
+/**
  * Safely parse a value to a currency number.
  * Returns 0 for null, undefined, NaN, or non-numeric strings.
  */
