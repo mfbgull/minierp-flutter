@@ -6,6 +6,7 @@
  */
 import db from '../config/database';
 import InvoiceReturnModel from '../models/InvoiceReturn';
+import InvoiceModel from '../models/Invoice';
 
 function tableExists(name: string): boolean {
   const row = db.prepare(
@@ -155,8 +156,6 @@ describe('InvoiceReturnModel (Milestone 1)', () => {
     // reset the sequence to maxNo instead of max(maxNo, current)+1 — and
     // worse, a sync after an increment reset it to the stale max. These
     // assertions exercise sync → increment → sync with the SAME DB rows.
-    const { default: InvoiceModel } = require('../models/Invoice');
-
     // Reset sequence keys first — earlier tests in this file (and other
     // suites on the shared DB) may already have created them.
     db.prepare("DELETE FROM settings WHERE key IN ('PAY_last_no', 'RET_last_no')").run();

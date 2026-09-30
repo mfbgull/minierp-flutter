@@ -198,9 +198,9 @@ function updateInvoiceStatus(invoiceId: number, conn: typeof db = db): string {
   const returned = parseCurrency(invoice.returned_amount || 0);
   const currentStatus = String(invoice.status || '');
 
-  let paymentStatus = 'Unpaid';
-  let returnStatus = 'None';
-  let combinedStatus = 'Unpaid';
+  let paymentStatus: string;
+  let returnStatus: string;
+  let combinedStatus: string;
 
   if (currentStatus === 'Cancelled') {
     paymentStatus = 'Unpaid';
