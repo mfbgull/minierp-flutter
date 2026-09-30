@@ -227,9 +227,12 @@ function updateInvoiceStatus(invoiceId: number, conn: typeof db = db): string {
       paymentStatus = 'Unpaid';
     }
 
-    // Overdue: not in a terminal state and past due date
+    // Overdue: not in a terminal state and the due date has fully
+    // elapsed — an invoice due today stays payable through end of today.
     const isTerminal = paymentStatus === 'Paid' || returnStatus === 'Fully Returned' || returnStatus === 'Partially Returned';
-    if (!isTerminal && invoice.due_date && new Date(invoice.due_date) < new Date()) {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    if (!isTerminal && invoice.due_date && invoice.due_date.slice(0, 10) < today) {
       paymentStatus = 'Overdue';
     }
 
