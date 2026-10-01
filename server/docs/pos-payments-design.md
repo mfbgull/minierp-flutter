@@ -436,6 +436,28 @@ and change, byte-identical on idempotent retry.
 
 ## 10. Open decisions requiring sign-off
 
+### As approved (2026-10-01)
+
+All eight were reviewed one at a time and approved as recommended. Status shows
+what actually shipped.
+
+| # | Decision | Approved | Shipped |
+|---|---|---|---|
+| 10.1 | Route A vs Route B | **Route A** | Yes — `InvoiceCreationInput.payments`, one `recordCustomerPayment` call per leg |
+| 10.2 | Closed-period guard on creation | **Add it** | Yes — `getClosedPeriodCovering` pre-check → 409, plus a message-based catch-arm as backstop |
+| 10.3 | Legacy `cash_received` coercion | **Preserve** | Yes — legacy branch keeps `parseFloat(x) \|\| total` *and* the cash guard; the legs branch never reads the field |
+| 10.4 | Store-credit offset at the POS | **Deferred** | No — out of scope for v1 |
+| 10.5 | Tax-presets endpoint permission | **New `GET /pos/tax-rates` under `pos:read`** | Yes — mobile route untouched behind `invoices:read` |
+| 10.6 | Replay `line_total` from stored `amount` | **Accept as a bug fix** | Yes — and legs are read back from `payment_allocations` rather than echoed from the request |
+| 10.7 | Per-line discount/tax + `z.strict` | **Both deferred** | No — `posSale` keeps `.passthrough()`; per-line discount/tax is a follow-up once Flutter ships those header fields |
+| 10.8 | Payment methods offered | **All 8, no filtering** | Yes — server already accepted all 8 via the bank fall-through; no whitelist was narrowed |
+
+**Consequence of 10.3 worth keeping in view:** because the coercion is preserved on
+the legacy branch only, the two payload shapes keep different behaviour for blank or
+zero cash. That is deliberate, and it is also exactly why 10.4 was deferred — a
+future credit-only POS sale has no cash tendered at all, which is the case that
+coercion would mask. Revisit 10.3 before adding credit at the till.
+
 1. **Route A vs Route B** (§3.1). Recommendation: **Route A** — service-owned
    `payments[]` with pre-transaction validation. Alternative B (zero contract change
    via `afterCreate`) fails later and dirtier (500s, transient status).
@@ -467,23 +489,31 @@ and change, byte-identical on idempotent retry.
 
 ---
 
-## 11. Suggested implementation order
+## 11. Implementation record
 
-Only once §10 is approved.
+Implemented 2026-10-01 in the order the plan set out. Steps 1–5 shipped; step 6
+shipped in part; step 7 is the regression suite.
 
-1. **Service (Route A)** — add optional `payments[]` to `InvoiceCreationInput`;
-   generalize the pre-transaction validation (Σ legs, per-leg method) and the
-   recording block at `InvoiceCreationService.ts:200-215` to loop the legs; keep the
-   legacy `payment` path byte-identical when `payments` is absent.
-2. **Controller adapter** — forward `discount_*`, `tax`/line fields, `customer_id`,
-   `payments`; switch the total to `computeInvoiceGrandTotal`; drop
-   `status: 'Paid'`; add the closed-period pre-check; add the §6.2 error arms.
-3. **Replay** — read `line_total` from stored `ii.amount`; echo legs/discount/change
-   so the replayed response is byte-equivalent (`posController.ts:48-82`).
-4. **zod schema** — replace `validation.ts:174-177` with §4.1.
-5. **Endpoint** — `GET /pos/tax-rates` (§4.4), registered beside the existing POS
-   routes (`routes/pos.ts`).
-6. **Flutter** — §8: payment legs, cash/change vs cash leg, discount, tax presets,
-   customer picker, credit toggle; remove the `pos_screen.dart:240` guard.
-7. **Tests** — one per row of §9, run against a fresh DB
-   (`DATABASE_PATH=$(mktemp -d) NODE_ENV=test npx jest`), plus `npm run typecheck`.
+| Step | Status | Notes |
+|---|---|---|
+| 1. Service (Route A) | **Done** | `payments[]` added to `InvoiceCreationInput`; validation generalized to Σ legs with a per-leg method check. The leg sum uses `addCurrency`, not `+=` — summing several 2dp legs in floating point can land a cent low and flip a fully-settled invoice to `Partially Paid` |
+| 2. Controller adapter | **Done** | Forwards `discount_*`, per-line `tax_rate`, `customer_id` and `payments`; total switched to `computeInvoiceGrandTotal`; `status: 'Paid'` removed so the service derives it; closed-period pre-check and the §6.2 error arms added |
+| 3. Replay | **Done** | `line_total` reads `ii.amount`; legs are read back from `payment_allocations` so the replay is server-authoritative |
+| 4. zod schema | **Done** | `items` moved off `z.any()` to the typed line contract; `.passthrough()` retained per 10.7 |
+| 5. `GET /pos/tax-rates` | **Done** | Reuses the existing `tax_rates` query; registered under `pos:read` |
+| 6. Flutter | **Partial** | Payment legs, charge-later, invoice-scope discount, tax preset chips and `customer_id` shipped; the client-side `cashReceived < _subtotal` block was removed because it would deadlock a charge-later sale. Per-line discount/tax columns are 10.7's follow-up |
+| 7. Tests | **Done** | 20 tests in `posPayments.test.ts` covering R1–R13, R16–R21 and R25 |
+
+**Verification:** server 108 suites / 926 tests, reversal gate 79/0, typecheck
+clean, eslint 0 errors, `flutter analyze` clean, `flutter test` 773 passed.
+
+### Behaviour notes for whoever picks this up
+
+- **`status` for a partial sale.** POS sets `due_date = sale_date`, so a dated sale
+  becomes `Overdue` once its day passes rather than staying `Partially Paid`. That
+  is the existing overdue rule working, not a POS bug — the test asserts the
+  settlement split and accepts either word deliberately.
+- **`change` is display-only** and is computed against the cash leg, never posted.
+  A credit sale has no cash leg, so change is 0.
+- **Credit at the till is still not available** (10.4). The `Charge later` switch
+  sends `payments: []`, which is a sale on account, not a store-credit offset.

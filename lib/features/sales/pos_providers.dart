@@ -93,6 +93,27 @@ final posCashReceivedProvider = StateProvider<double>((ref) => 0);
 /// Customer name override (defaults to the walk-in customer on the server).
 final posCustomerNameProvider = StateProvider<String>((ref) => '');
 
+/// Invoice-scope header discount applied to the whole POS sale.
+final posDiscountValueProvider = StateProvider<double>((ref) => 0);
+final posDiscountTypeProvider =
+    StateProvider<String>((ref) => 'flat');
+
+/// Tax rate fanned out to every line, 0 for none.
+final posTaxRateProvider = StateProvider<double>((ref) => 0);
+
+/// Sends `payments: []` so the server records the sale as Unpaid instead of
+/// demanding cash up front.
+final posChargeLaterProvider = StateProvider<bool>((ref) => false);
+
+/// Active tax presets from `GET /api/pos/tax-rates`.
+final posTaxRatesProvider = FutureProvider<List<PosTaxRate>>((ref) async {
+  final result = await ref.watch(posRepositoryProvider).listTaxRates();
+  return switch (result) {
+    ApiSuccess(:final data) => data,
+    ApiFailure() => const <PosTaxRate>[],
+  };
+});
+
 /// Whether the sale commit is in flight.
 final posSubmittingProvider = StateProvider<bool>((ref) => false);
 

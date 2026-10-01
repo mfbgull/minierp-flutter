@@ -48,6 +48,12 @@ export type InvoiceCreationInput = {
   readonly totalAmount?: number;
   readonly recordPayment?: boolean;
   readonly payment?: InvoiceCreationPayment;
+  /**
+   * N payment legs for a split settlement. Present (even as `[]`) selects
+   * the multi-leg path; absent keeps the single `payment` field, which is
+   * what every existing caller sends.
+   */
+  readonly payments?: readonly InvoiceCreationPayment[];
   readonly creditOffset?: number;
   readonly draftId?: number;
   readonly afterCreate?: (invoiceId: number, invoiceNo: string) => void;

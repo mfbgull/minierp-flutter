@@ -220,14 +220,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     ref.read(posCustomerNameProvider.notifier).state = '';
   }
 
-  num get _subtotal =>
-      ref.read(posCartProvider).fold(0, (sum, c) => sum + c.lineTotal);
-
   // ── Sale commit ────────────────────────────────────────────────────────
 
   Future<void> _commitSale() async {      final cart = ref.read(posCartProvider);
     final warehouseId = ref.read(posWarehouseProvider);
-    final cashReceived = ref.read(posCashReceivedProvider);
 
     if (cart.isEmpty) {
       showAppToast(context, 'Cart is empty', isError: true);
@@ -237,25 +233,39 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       showAppToast(context, 'Select a warehouse', isError: true);
       return;
     }
-    if (cashReceived < _subtotal) {
-      showAppToast(context, 'Cash received is less than total', isError: true);
-      return;
-    }
-
+    // The old `cashReceived < _subtotal` block is gone: it would deadlock a
+    // charge-later or split-tender sale, and the server now validates the
+    // settlement against the total and returns a readable 400.
     ref.read(posSubmittingProvider.notifier).state = true;
     try {
       final repo = ref.watch(posRepositoryProvider);
       final saleDate = ref.watch(posSaleDateProvider) ?? DateTime.now();
       final saleDateStr = DateFormat('yyyy-MM-dd').format(saleDate);
       final customerName = ref.read(posCustomerNameProvider);
+      final discountValue = ref.read(posDiscountValueProvider);
+      final discountType = ref.read(posDiscountTypeProvider);
+      final taxRate = ref.read(posTaxRateProvider);
+      final chargeLater = ref.read(posChargeLaterProvider);
+      final tendered = ref.read(posCashReceivedProvider);
       final saleItems = [
         for (final c in cart)
           {
             'item_id': c.item.id,
             'quantity': c.quantity,
             'unit_price': c.unitPrice,
+            if (taxRate > 0) 'tax_rate': taxRate,
           },
       ];
+
+      // `payments` present selects the split-tender path server-side, where
+      // the sum of legs may be less than the total. Absent keeps the legacy
+      // cash-only payload, which the server still guards.
+      final legs = <Map<String, dynamic>>[
+        if (!chargeLater && tendered > 0)
+          {'amount': tendered, 'payment_method': 'Cash'},
+      ];
+      final useLegs = chargeLater || tendered > 0;
+
       // P11: the key is derived from the exact body being sent, so an
       // unchanged retry reuses it (server replays) while any cart change
       // rotates it (new sale).
@@ -263,13 +273,20 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         warehouseId: warehouseId,
         saleDate: saleDateStr,
         items: saleItems,
-        cashReceived: cashReceived,
+        cashReceived: useLegs ? null : tendered,
         customerName: customerName,
+        paymentLegs: useLegs ? legs : null,
+        discountValue: discountValue,
+        discountType: discountType,
         idempotencyKey: _idempotencyKeyFor(<String, dynamic>{
           'warehouse_id': warehouseId,
           'sale_date': saleDateStr,
           'items': saleItems,
-          'cash_received': cashReceived,
+          'cash_received': useLegs ? null : tendered,
+          'payments': useLegs ? legs : null,
+          'discount_scope': discountValue > 0 ? 'invoice' : null,
+          'discount_type': discountValue > 0 ? discountType : null,
+          'discount_value': discountValue > 0 ? discountValue : null,
           if (customerName.isNotEmpty) 'customer_name': customerName,
         }),
       );
@@ -566,8 +583,74 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                 children: [
                   _totalRow('Subtotal', Formatters.currency(total)),
                   const SizedBox(height: 8),
+                  // Tax presets from GET /api/pos/tax-rates.
+                  Consumer(builder: (context, ref, _) {
+                    final rates = ref.watch(posTaxRatesProvider).valueOrNull ?? const <PosTaxRate>[];
+                    if (rates.isEmpty) return const SizedBox.shrink();
+                    final selected = ref.watch(posTaxRateProvider);
+                    return Wrap(
+                      spacing: 6,
+                      children: [
+                        for (final r in rates)
+                          ChoiceChip(
+                            label: Text('${r.name} ${_trimRate(r.rate)}%'),
+                            selected: selected == r.rate,
+                            onSelected: (_) => ref
+                                .read(posTaxRateProvider.notifier)
+                                .state = selected == r.rate ? 0 : r.rate,
+                          ),
+                      ],
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: ref.read(posDiscountValueProvider) == 0
+                            ? ''
+                            : '${ref.read(posDiscountValueProvider)}',
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: 'Invoice discount',
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onChanged: (v) => ref
+                            .read(posDiscountValueProvider.notifier)
+                            .state = double.tryParse(v) ?? 0,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: 'flat', label: Text('Flat')),
+                        ButtonSegment(value: 'percentage', label: Text('%')),
+                      ],
+                      selected: {
+                        ref.read(posDiscountTypeProvider)
+                      },
+                      onSelectionChanged: (s) => ref
+                          .read(posDiscountTypeProvider.notifier)
+                          .state = s.first,
+                    ),
+                  ]),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Charge later'),
+                    subtitle: const Text('Record the sale unpaid'),
+                    value: ref.watch(posChargeLaterProvider),
+                    onChanged: (v) => ref
+                        .read(posChargeLaterProvider.notifier)
+                        .state = v,
+                  ),
                   TextField(
                     keyboardType: TextInputType.number,
+                    enabled: !ref.watch(posChargeLaterProvider),
                     decoration: InputDecoration(
                       hintText: 'Cash received',
                       prefixIcon: const Icon(Icons.payments_outlined, size: 20),
@@ -827,3 +910,8 @@ class _DateField extends ConsumerWidget {
     );
   }
 }
+
+/// Drops a trailing `.0` so a preset reads "5%" rather than "5.0%".
+String _trimRate(double rate) =>
+    rate == rate.roundToDouble() ? rate.toStringAsFixed(0) : '$rate';
+

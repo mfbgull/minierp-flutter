@@ -1,14 +1,19 @@
 import { Request, Response } from 'express';
 import { AuthRequest, SellableStockUnavailableError } from '../types';
 import db from '../config/database';
+import AccountingService from '../services/accountingService';
 import logger from '../utils/logger';
 import WarehouseModel from '../models/Warehouse';
+import MobileInvoiceModel from '../models/MobileInvoice';
 import { ActionType, newCorrelationId, logCRUD } from '../services/activityLogger';
-import { computeInvoiceTotal } from '../utils/currency';
+import { computeInvoiceGrandTotal, parseCurrency } from '../utils/currency';
 import {
+  InvoiceCreationCreditError,
   InvoiceCreationIdempotencyError,
+  InvoiceCreationOffsetError,
   InvoiceCreationPaymentMethodError,
   InvoiceCreationService,
+  InvoiceCreationTotalMismatchError,
 } from '../services/InvoiceCreationService';
 import {
   IDEMPOTENCY_KEY_HEADER,
@@ -47,13 +52,16 @@ function ensureWalkinCustomer(): number {
  */
 function replayPosSaleResult(invoiceId: number, reqBody: Record<string, unknown>): Record<string, unknown> | undefined {
   const inv = db.prepare(
-    'SELECT invoice_no, total_amount, customer_name, invoice_date FROM invoices WHERE id = ? AND source_type = ?'
-  ).get(invoiceId, 'POS') as { invoice_no: string; total_amount: number; customer_name: string | null; invoice_date: string } | undefined;
+    'SELECT invoice_no, total_amount, customer_name, invoice_date, discount_scope, discount_type, discount_value FROM invoices WHERE id = ? AND source_type = ?'
+  ).get(invoiceId, 'POS') as { invoice_no: string; total_amount: number; customer_name: string | null; invoice_date: string; discount_scope: string | null; discount_type: string | null; discount_value: number | null } | undefined;
   if (!inv) return undefined;
 
+  // line_total is the STORED amount, not quantity * unit_price: a
+  // discounted or taxed line stores something else, and a replay that
+  // recomputed it would disagree with the invoice it is replaying.
   const itemDetails = db.prepare(`
     SELECT ? AS sale_id, ? AS sale_no, ii.item_id, i.item_code, i.item_name, i.unit_of_measure,
-           ii.quantity, ii.unit_price, ii.quantity * ii.unit_price AS line_total
+           ii.quantity, ii.unit_price, ii.amount AS line_total
     FROM invoice_items ii
     JOIN items i ON i.id = ii.item_id
     WHERE ii.invoice_id = ?
@@ -61,21 +69,43 @@ function replayPosSaleResult(invoiceId: number, reqBody: Record<string, unknown>
   `).all(invoiceId, inv.invoice_no, invoiceId) as Array<Record<string, unknown>>;
   if (itemDetails.length === 0) return undefined;
 
+  // Legs are read back from the payments this sale actually recorded, so
+  // the replay is server-authoritative rather than an echo of the request.
+  const storedLegs = db.prepare(`
+    SELECT p.payment_method, p.amount
+    FROM payment_allocations pa
+    JOIN payments p ON p.id = pa.payment_id
+    WHERE pa.invoice_id = ? AND p.voided_at IS NULL
+    ORDER BY p.id
+  `).all(invoiceId) as Array<{ payment_method: string; amount: number }>;
+
   const total = Number(inv.total_amount);
-  const cashReceived = parseFloat(String(reqBody.cash_received ?? '')) || total;
+  const usesLegs = Array.isArray(reqBody.payments);
   const warehouse = WarehouseModel.getById(db, Number(reqBody.warehouse_id));
+
+  const cashLeg = storedLegs
+    .filter((leg) => leg.payment_method.toLowerCase() === 'cash')
+    .reduce((sum, leg) => sum + Number(leg.amount), 0);
+  const cashReceived = usesLegs
+    ? cashLeg
+    : parseFloat(String(reqBody.cash_received ?? '')) || total;
 
   return {
     transaction_no: inv.invoice_no,
     sale_date: inv.invoice_date,
     warehouse_id: reqBody.warehouse_id,
     warehouse_name: warehouse?.warehouse_name,
+    customer_id: reqBody.customer_id,
     customer_name: inv.customer_name || customerNameOrDefault(reqBody.customer_name),
     items: itemDetails,
+    discount_scope: inv.discount_scope,
+    discount_type: inv.discount_type,
+    discount_value: Number(inv.discount_value ?? 0),
+    payments: storedLegs,
     subtotal: total,
     total,
     cash_received: cashReceived,
-    change: cashReceived - total,
+    change: Math.max(0, cashReceived - cashLeg),
     items_count: itemDetails.length,
     sale_ids: [invoiceId],
   };
@@ -87,6 +117,35 @@ function customerNameOrDefault(raw: unknown): string {
 }
 
 
+type PosSaleItem = {
+  item_id: number;
+  quantity: number;
+  unit_price: number;
+  tax_rate?: number;
+  discount_type?: 'none' | 'percentage' | 'flat';
+  discount_value?: number;
+};
+
+type PosPaymentLeg = {
+  amount: number;
+  payment_method: string;
+  payment_date?: string;
+};
+
+type PosSaleBody = {
+  warehouse_id: number;
+  sale_date: string;
+  items: PosSaleItem[];
+  cash_received?: number;
+  customer_id?: number;
+  customer_name?: string;
+  discount_scope?: string;
+  discount_type?: string;
+  discount_value?: number;
+  total_amount?: number;
+  payments?: PosPaymentLeg[];
+};
+
 function createPOSSale(req: AuthRequest, res: Response): void {
   if (!req.user) {
     res.status(401).json({ error: 'Authentication required' });
@@ -94,13 +153,7 @@ function createPOSSale(req: AuthRequest, res: Response): void {
   }
 
   try {
-    const body = req.body as {
-      warehouse_id: number;
-      sale_date: string;
-      items: Array<{ item_id: number; quantity: number; unit_price: number }>;
-      cash_received: number;
-      customer_name?: string;
-    };
+    const body = req.body as PosSaleBody;
     if (!body.warehouse_id) {
       res.status(400).json({ error: 'Warehouse is required' });
       return;
@@ -119,10 +172,48 @@ function createPOSSale(req: AuthRequest, res: Response): void {
       return;
     }
 
-    const total = computeInvoiceTotal(body.items);
-    const cashReceived = parseFloat(String(body.cash_received)) || total;
-    if (cashReceived < total) {
-      res.status(400).json({ error: `Insufficient cash. Total: ${total.toFixed(2)}, Received: ${cashReceived.toFixed(2)}` });
+    // Presence of `payments` — even as an empty array — selects the split
+    // path. Its absence is the legacy payload, which keeps the cash guard
+    // below so an old client cannot silently turn into a credit sale.
+    const usesLegs = Array.isArray(body.payments);
+
+    // The same function the service validates against, so a header discount
+    // cannot make the client's total disagree with ours.
+    const total = computeInvoiceGrandTotal(body.items, {
+      discount_scope: body.discount_scope,
+      discount_type: body.discount_type,
+      discount_value: body.discount_value,
+    });
+
+    const legs: PosPaymentLeg[] = usesLegs
+      ? body.payments!
+      : [{ amount: 0, payment_method: 'Cash' }];
+
+    if (!usesLegs) {
+      const cashReceived = parseFloat(String(body.cash_received)) || total;
+      if (cashReceived < total) {
+        res.status(400).json({ error: `Insufficient cash. Total: ${total.toFixed(2)}, Received: ${cashReceived.toFixed(2)}` });
+        return;
+      }
+      legs[0] = {
+        amount: Math.min(cashReceived, total),
+        payment_method: 'Cash',
+        payment_date: body.sale_date,
+      };
+    } else {
+      for (const leg of legs) {
+        if (!leg.payment_date) leg.payment_date = body.sale_date;
+      }
+    }
+
+    // H6: a closed period must not gain new money movements. A POS sale
+    // posts a new AR entry dated sale_date, so refuse before any write
+    // rather than letting the service's own period check surface it late.
+    const closedPeriod = AccountingService.getClosedPeriodCovering(db, body.sale_date);
+    if (closedPeriod) {
+      res.status(409).json({
+        error: `POS sale is dated ${body.sale_date} inside closed accounting period '${closedPeriod.period_name}' — edit/delete blocked`,
+      });
       return;
     }
 
@@ -134,22 +225,29 @@ function createPOSSale(req: AuthRequest, res: Response): void {
       return;
     }
 
-    const walkinCustomerId = ensureWalkinCustomer();
+    const customerId = body.customer_id && body.customer_id > 0
+      ? body.customer_id
+      : ensureWalkinCustomer();
+    const customerName = body.customer_id
+      ? undefined
+      : body.customer_name || 'Walk-in Customer';
+
     const service = new InvoiceCreationService(db);
     const result = service.create({
       source: 'POS',
       userId: req.user.id,
-      customerId: walkinCustomerId,
-      customerName: body.customer_name || 'Walk-in Customer',
+      customerId,
+      customerName,
       invoiceDate: body.sale_date,
       dueDate: body.sale_date,
-      status: 'Paid',
       notes: 'POS sale',
       warehouseId: body.warehouse_id,
       items: body.items,
-      totalAmount: total,
-      recordPayment: cashReceived > 0,
-      payment: { amount: Math.min(cashReceived, total), payment_date: body.sale_date, payment_method: 'Cash' },
+      discountScope: body.discount_scope as 'item' | 'invoice' | undefined,
+      discountType: body.discount_type as 'flat' | 'percentage' | undefined,
+      discountValue: body.discount_value,
+      totalAmount: body.total_amount === undefined ? undefined : parseCurrency(body.total_amount),
+      payments: legs,
       idempotency: idemKey
         ? { scope: POS_SALE_SCOPE, key: idemKey, hash: hashRequestPayload(req.body) }
         : undefined,
@@ -176,9 +274,34 @@ function createPOSSale(req: AuthRequest, res: Response): void {
       res.status(409).json({ error: error.message });
       return;
     }
+    if (error instanceof InvoiceCreationTotalMismatchError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error instanceof InvoiceCreationOffsetError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error instanceof InvoiceCreationCreditError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
     const message = error instanceof Error ? error.message : 'Failed to process POS sale';
+    if (message.includes('inside closed accounting period')) {
+      res.status(409).json({ error: message });
+      return;
+    }
     logger.error('POS Sale Error:', { error: message });
     res.status(500).json({ error: message });
+  }
+}
+
+function getPOSTaxRates(req: Request, res: Response): void {
+  try {
+    res.json({ success: true, data: MobileInvoiceModel.getTaxRates(db) });
+  } catch (error) {
+    logger.error('Get POS tax rates error:', error);
+    res.status(500).json({ error: 'Failed to get tax rates' });
   }
 }
 
@@ -241,5 +364,6 @@ function getPOSTransactions(req: Request, res: Response): void {
 
 export default {
   createPOSSale,
-  getPOSTransactions
+  getPOSTransactions,
+  getPOSTaxRates
 };
