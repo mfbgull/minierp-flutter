@@ -7,6 +7,7 @@
 import db from '../config/database';
 import logger from '../utils/logger';
 import { ActivityLogDbEntry } from '../types';
+import { errorMessage } from '../utils/errorMessage';
 
 // Activity types enumeration
 export enum ActionType {
@@ -307,10 +308,10 @@ class ActivityLoggerService {
           entry.correlationId || null
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Task 4.7: re-queue so nothing is silently lost; caller can detect failure.
       this.logQueue.unshift(...batch);
-      logger.error('[ActivityLogger] Failed to flush logs:', { error: error.message });
+      logger.error('[ActivityLogger] Failed to flush logs:', { error: errorMessage(error) });
       return false;
       // Re-add failed entries to queue
       this.logQueue.unshift(...batch);
@@ -331,8 +332,8 @@ class ActivityLoggerService {
         ORDER BY al.created_at DESC
         LIMIT ?
       `).all(limit) as ActivityLogDbEntry[];
-    } catch (error: any) {
-      logger.error('[ActivityLogger] Failed to get recent logs:', { error: error.message });
+    } catch (error: unknown) {
+      logger.error('[ActivityLogger] Failed to get recent logs:', { error: errorMessage(error) });
       return [];
     }
   }
@@ -350,8 +351,8 @@ class ActivityLoggerService {
         ORDER BY al.created_at DESC
         LIMIT ?
       `).all(userId, limit) as ActivityLogDbEntry[];
-    } catch (error: any) {
-      logger.error('[ActivityLogger] Failed to get user logs:', { error: error.message });
+    } catch (error: unknown) {
+      logger.error('[ActivityLogger] Failed to get user logs:', { error: errorMessage(error) });
       return [];
     }
   }
@@ -369,8 +370,8 @@ class ActivityLoggerService {
         ORDER BY al.created_at DESC
         LIMIT ?
       `).all(entityType, entityId, limit) as ActivityLogDbEntry[];
-    } catch (error: any) {
-      logger.error('[ActivityLogger] Failed to get entity logs:', { error: error.message });
+    } catch (error: unknown) {
+      logger.error('[ActivityLogger] Failed to get entity logs:', { error: errorMessage(error) });
       return [];
     }
   }
@@ -397,8 +398,8 @@ class ActivityLoggerService {
         logger.info(`[ActivityLogger] Cleaned up ${result.changes} old log entries`);
       }
       return result.changes;
-    } catch (error: any) {
-      logger.error('[ActivityLogger] Failed to cleanup logs:', { error: error.message });
+    } catch (error: unknown) {
+      logger.error('[ActivityLogger] Failed to cleanup logs:', { error: errorMessage(error) });
       return 0;
     }
   }

@@ -11,6 +11,7 @@ import { executeReport } from '../services/reportQueryEngine';
 import type { ReportConfig } from '../services/reportQueryEngine';
 import { validateConfigExpressions, ExpressionValidationError } from '../services/expressionValidator';
 import logger from '../utils/logger';
+import { errorMessage } from '../utils/errorMessage';
 
 // ── Config Validation ────────────────────────────────────────
 
@@ -118,8 +119,8 @@ function listReports(req: AuthRequest, res: Response): void {
     const userId = req.user!.id;
     const reports = CustomReport.findByUser(userId);
     res.json({ success: true, data: reports });
-  } catch (error: any) {
-    logger.error('List custom reports error:', error.message);
+  } catch (error: unknown) {
+    logger.error('List custom reports error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to list reports' });
   }
 }
@@ -146,8 +147,8 @@ function getReport(req: AuthRequest, res: Response): void {
     };
 
     res.json({ success: true, data: parsed });
-  } catch (error: any) {
-    logger.error('Get custom report error:', error.message);
+  } catch (error: unknown) {
+    logger.error('Get custom report error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to get report' });
   }
 }
@@ -188,8 +189,8 @@ function createReport(req: AuthRequest, res: Response): void {
     });
 
     res.status(201).json({ success: true, data: report });
-  } catch (error: any) {
-    logger.error('Create custom report error:', error.message);
+  } catch (error: unknown) {
+    logger.error('Create custom report error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to create report' });
   }
 }
@@ -237,8 +238,8 @@ function updateReport(req: AuthRequest, res: Response): void {
     const parsed = report ? { ...report, config: JSON.parse(report.config) } : null;
 
     res.json({ success: true, data: parsed });
-  } catch (error: any) {
-    logger.error('Update custom report error:', error.message);
+  } catch (error: unknown) {
+    logger.error('Update custom report error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to update report' });
   }
 }
@@ -260,8 +261,8 @@ function deleteReport(req: AuthRequest, res: Response): void {
     }
 
     res.json({ success: true, message: 'Report deleted' });
-  } catch (error: any) {
-    logger.error('Delete custom report error:', error.message);
+  } catch (error: unknown) {
+    logger.error('Delete custom report error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to delete report' });
   }
 }
@@ -283,8 +284,8 @@ function duplicateReport(req: AuthRequest, res: Response): void {
     }
 
     res.status(201).json({ success: true, data: newReport });
-  } catch (error: any) {
-    logger.error('Duplicate custom report error:', error.message);
+  } catch (error: unknown) {
+    logger.error('Duplicate custom report error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to duplicate report' });
   }
 }
@@ -349,8 +350,8 @@ function listEntities(_req: Request, res: Response): void {
   try {
     const entities = getAllEntities();
     res.json({ success: true, data: entities });
-  } catch (error: any) {
-    logger.error('List entities error:', error.message);
+  } catch (error: unknown) {
+    logger.error('List entities error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to list entities' });
   }
 }
@@ -368,8 +369,8 @@ function getEntityDetail(req: Request, res: Response): void {
       return;
     }
     res.json({ success: true, data: entity });
-  } catch (error: any) {
-    logger.error('Get entity error:', error.message);
+  } catch (error: unknown) {
+    logger.error('Get entity error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to get entity' });
   }
 }
@@ -455,8 +456,8 @@ function listTemplates(_req: Request, res: Response): void {
       config: JSON.parse(t.config),
     }));
     res.json({ success: true, data: parsed });
-  } catch (error: any) {
-    logger.error('List templates error:', error.message);
+  } catch (error: unknown) {
+    logger.error('List templates error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to list templates' });
   }
 }

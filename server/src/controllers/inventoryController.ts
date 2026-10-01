@@ -9,6 +9,7 @@ import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
 import db from '../config/database';
 import logger from '../utils/logger';
+import { errorMessage } from '../utils/errorMessage';
 
 function getItems(req: Request, res: Response): void {
   try {
@@ -888,9 +889,9 @@ function recordPhysicalCountItem(req: AuthRequest, res: Response): void {
 
     const item = PhysicalCountModel.getItems(countId, db).find(i => i.item_id === item_id);
     res.json(item);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Record physical count item error:', error);
-    res.status(500).json({ error: error.message || 'Failed to record count' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to record count' });
   }
 }
 
@@ -904,9 +905,9 @@ function completePhysicalCount(req: AuthRequest, res: Response): void {
 
     const count = PhysicalCountModel.getById(countId, db);
     res.json(count);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Complete physical count error:', error);
-    res.status(500).json({ error: error.message || 'Failed to complete count' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to complete count' });
   }
 }
 
@@ -920,9 +921,9 @@ function cancelPhysicalCount(req: AuthRequest, res: Response): void {
 
     const count = PhysicalCountModel.getById(countId, db);
     res.json(count);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Cancel physical count error:', error);
-    res.status(500).json({ error: error.message || 'Failed to cancel count' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to cancel count' });
   }
 }
 
@@ -959,8 +960,8 @@ function correctPhysicalCount(req: AuthRequest, res: Response): void {
 
     const count = PhysicalCountModel.getById(countId, db);
     res.json(count);
-  } catch (error: any) {
-    const message = error?.message || String(error);
+  } catch (error: unknown) {
+    const message = errorMessage(error) || String(error);
     if (
       message.includes('not found') ||
       message.includes('Only Completed') ||
@@ -986,9 +987,9 @@ function deletePhysicalCount(req: AuthRequest, res: Response): void {
     req.activityLogged = true;
 
     res.json({ success: true, message: 'Physical count deleted' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Delete physical count error:', error);
-    res.status(500).json({ error: error.message || 'Failed to delete count' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to delete count' });
   }
 }
 
@@ -1207,9 +1208,9 @@ export function getBatchReconciliation(req: AuthRequest, res: Response): Respons
 
     // Bare array: the client's getRawList parses a top-level JSON list.
     return res.json(drifts);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('[BatchReconciliation] get failed:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: errorMessage(error) });
   }
 }
 
@@ -1309,9 +1310,9 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
     })();
 
     return res.json({ success: true, batch_id, location_id, old_quantity: oldQty, new_quantity: newQty, diff });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('[BatchReconciliation] correct failed:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: errorMessage(error) });
   }
 }
 
@@ -1338,9 +1339,9 @@ export function updateBatchStatus(req: AuthRequest, res: Response): Response | v
     `).run(statusOverride, batchId, locationId);
 
     return res.json({ success: true, batch_id: batchId, location_id: locationId, status_override: statusOverride });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('[BatchStatus] update failed:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: errorMessage(error) });
   }
 }
 
@@ -1364,9 +1365,9 @@ export function createReservation(req: AuthRequest, res: Response): Response | v
     }
 
     return res.status(201).json(reservation);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('[Reservation] create failed:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: errorMessage(error) });
   }
 }
 
@@ -1399,9 +1400,9 @@ export function releaseReservation(req: AuthRequest, res: Response): Response | 
     }
 
     return res.json(released);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('[Reservation] release failed:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: errorMessage(error) });
   }
 }
 
@@ -1418,8 +1419,8 @@ export function getReservations(req: AuthRequest, res: Response): Response | voi
 
     // Bare array: the client's getRawList parses a top-level JSON list.
     return res.json(reservations);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('[Reservation] list failed:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: errorMessage(error) });
   }
 }

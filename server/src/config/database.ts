@@ -13,6 +13,7 @@ import { runBackfillInvoiceTaxGl } from '../migrations/backfillInvoiceTaxGl';
 import { runBackfillMobileInvoiceStockReference } from '../migrations/backfillMobileInvoiceStockReference';
 import { runBackfillInvoiceHeaderDiscount } from '../migrations/backfillInvoiceHeaderDiscount';
 import { runBackfillBatchLocations } from "../migrations/backfillBatchLocations";
+import { errorMessage } from '../utils/errorMessage';
 
 // Fail-closed: tests must never fall through to a shared dev DB by accident
 if (process.env.NODE_ENV === 'test' && !process.env.DATABASE_PATH) {
@@ -135,8 +136,8 @@ function runLedgered(key: string, fn?: () => void, opts?: { noTxn?: boolean }): 
     const n = (db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get() as { n: number }).n;
     db.pragma(`user_version = ${n}`);
     logger.info(`✅ migration applied: ${key}`);
-  } catch (err: any) {
-    logger.error(`FATAL: migration '${key}' failed: ${err.message}`);
+  } catch (err: unknown) {
+    logger.error(`FATAL: migration '${key}' failed: ${errorMessage(err)}`);
     process.exit(1);
   }
 }
@@ -315,8 +316,8 @@ function runInvoiceMigration(): void {
 
       logger.info('✅ Invoice discount/tax migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Invoice migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Invoice migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -412,8 +413,8 @@ function runCustomerARMigrations(): void {
     // Task 3.3: payment-ledger description rewrite also moved to the gated
     // repair path (`npm run repair` / fn.paymentLedgerDescriptions backfill).
 
-  } catch (error: any) {
-    throw new Error('Customer AR migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Customer AR migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -477,8 +478,8 @@ function runExpensesMigration(): void {
 
       logger.info('✅ Expense categories migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Expenses migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Expenses migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -501,8 +502,8 @@ function runPurchasesMigration(): void {
 
       logger.info('✅ Purchases migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Purchases migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Purchases migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -552,8 +553,8 @@ function runPurchaseSupplierPaymentMigration(): void {
       `);
       logger.info('✅ purchase_allocations table added');
     }
-  } catch (error: any) {
-    throw new Error('Purchase supplier/payment migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Purchase supplier/payment migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -578,8 +579,8 @@ function runPurchaseReturnMigration(): void {
     } else {
       logger.info('✅ Purchase return fields already applied.');
     }
-  } catch (error: any) {
-    throw new Error('Purchase return fields migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Purchase return fields migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -614,8 +615,8 @@ function runPurchaseReturnsTablesMigration(): void {
         logger.info('✅ stock_movements.purchase_return_id column added');
       }
     }
-  } catch (error: any) {
-    throw new Error('Purchase returns tables migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Purchase returns tables migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -629,8 +630,8 @@ function runPurchaseReturnsBackfill(): void {
     if (count > 0) {
       logger.info(`✅ Backfilled ${count} purchase returns from legacy movements`);
     }
-  } catch (error: any) {
-    throw new Error('Purchase returns backfill error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Purchase returns backfill error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -653,8 +654,8 @@ function runProductionsMigration(): void {
 
       logger.info('✅ Productions migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Productions migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Productions migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -693,8 +694,8 @@ function runBOMMigration(): void {
 
       logger.info('✅ BOM migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('BOM migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('BOM migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -726,8 +727,8 @@ function runBOMItemsColumnMigration(): void {
     logger.info('Renaming bom_items.raw_material_id → item_id...');
     db.exec('ALTER TABLE bom_items RENAME COLUMN raw_material_id TO item_id');
     logger.info('✅ bom_items.raw_material_id renamed to item_id');
-  } catch (error: any) {
-    throw new Error('BOM items column migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('BOM items column migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -793,12 +794,12 @@ function runSalesMigration(): void {
         addColumnIfMissing('invoices', 'customer_name VARCHAR(200)');
 
         logger.info('✅ Sales cycle migration completed!');
-      } catch (migrationError: any) {
-        throw new Error('Sales cycle migration error:: ' + migrationError.message, { cause: migrationError });
+      } catch (migrationError: unknown) {
+        throw new Error('Sales cycle migration error:: ' + errorMessage(migrationError), { cause: migrationError });
         }
     }
-  } catch (error: any) {
-    throw new Error('Sales migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Sales migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -821,8 +822,8 @@ function runSupplierLedgerMigration(): void {
 
       logger.info('✅ Supplier ledger migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Supplier ledger migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Supplier ledger migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -853,8 +854,8 @@ function runActivityLogMigration(): void {
 
       logger.info('✅ Activity log enhancement migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Activity log migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Activity log migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -888,8 +889,8 @@ function runSupplierPaymentMigration(): void {
     if (notNullCheck.count > 0) {
       logger.info('payments.customer_id nullable rebuild pending (runs as its own ledger step)...');
     }
-  } catch (error: any) {
-    throw new Error('Supplier payment migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Supplier payment migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1277,8 +1278,8 @@ function runPaymentsPurchaseOrderIdMigration(): void {
       db.exec(sql);
       logger.info('✅ Payments purchase_order_id migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Payments purchase_order_id migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Payments purchase_order_id migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1306,8 +1307,8 @@ function runSupplierBalanceMigration(): void {
       )
     `);
     logger.info('✅ Suppliers current_balance column ensured');
-  } catch (error: any) {
-    throw new Error('Supplier balance migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Supplier balance migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1330,8 +1331,8 @@ function runRawMaterialsWarehouseMigration(): void {
 
       logger.info('✅ Raw materials warehouse migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Raw materials warehouse migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Raw materials warehouse migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1354,8 +1355,8 @@ function runProductionInputsWarehouseMigration(): void {
 
       logger.info('✅ Production inputs warehouse migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Production inputs warehouse migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Production inputs warehouse migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1378,8 +1379,8 @@ function runMobileInvoiceMigration(): void {
 
       logger.info('✅ Mobile invoice tables migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Mobile invoice migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Mobile invoice migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1402,8 +1403,8 @@ function runPerformanceIndexesMigration(): void {
 
       logger.info('✅ Performance indexes migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Performance indexes migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Performance indexes migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1426,8 +1427,8 @@ function runMissingIndexesMigration(): void {
 
       logger.info('✅ Missing indexes migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Missing indexes migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Missing indexes migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1452,8 +1453,8 @@ function runMissingFKIndexesMigration(): void {
 
       logger.info('✅ Missing FK indexes migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Missing FK indexes migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Missing FK indexes migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1477,8 +1478,8 @@ function runExpiryTrackingMigration(): void {
 
       logger.info('✅ Item expiry tracking migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Expiry tracking migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Expiry tracking migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1497,8 +1498,8 @@ function runOverrideSaleMigration(): void {
       db.exec(sql);
       logger.info('✅ Override sale column migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Override sale migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Override sale migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1524,8 +1525,8 @@ function runBatchHaltColumnsRepairMigration(): void {
     if (!cols.includes('halted_reason')) {
       db.exec('ALTER TABLE stock_batches ADD COLUMN halted_reason TEXT');
     }
-  } catch (error: any) {
-    throw new Error('Batch halt columns repair error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Batch halt columns repair error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1548,8 +1549,8 @@ function runPurchaseReturnBatchesLocationMigration(): void {
     } else if (cols.includes('location_id')) {
       db.exec('CREATE INDEX IF NOT EXISTS idx_purchase_return_batches_location ON purchase_return_batches(location_id)');
     }
-  } catch (error: any) {
-    throw new Error('purchase_return_batches location migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('purchase_return_batches location migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1573,8 +1574,8 @@ function runGLVoidAttributionMigration(): void {
       db.exec(sql);
       logger.info('✅ GL void-attribution migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('GL void-attribution migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('GL void-attribution migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1878,8 +1879,8 @@ function runDispositionAndSupplierRefundsMigration(): void {
     );
     db.exec(migrationSQL);
     logger.info('✅ disposition + supplier_refunds migration applied');
-  } catch (error: any) {
-    throw new Error('disposition + supplier_refunds migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('disposition + supplier_refunds migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1893,8 +1894,8 @@ function runProductionBOMIdMigration(): void {
       db.prepare(`ALTER TABLE productions ADD COLUMN bom_id INTEGER REFERENCES boms(id)`).run();
       logger.info('✅ Production bom_id migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Production bom_id migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Production bom_id migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1908,8 +1909,8 @@ function runProductionOverheadMigration(): void {
       db.prepare(`ALTER TABLE productions ADD COLUMN overhead_cost DECIMAL(15,2) DEFAULT 0`).run();
       logger.info('✅ Production overhead_cost migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Production overhead migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Production overhead migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -1935,8 +1936,8 @@ function runRolesPermissionsMigration(): void {
 
     // Always seed — backfills missing permissions for existing databases
     seedDefaultPermissions();
-  } catch (error: any) {
-    throw new Error('Roles and permissions migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Roles and permissions migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2146,8 +2147,8 @@ function seedDefaultPermissions(): void {
       }
     }
     logger.info('✅ Default permissions seeded successfully!');
-  } catch (error: any) {
-    throw new Error('Seed default permissions error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Seed default permissions error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2206,8 +2207,8 @@ function runStockAdjustmentFinancialMigration(): void {
         logger.info('journal_entry_id column added');
       }
     }
-  } catch (error: any) {
-    throw new Error('Stock adjustment financial migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Stock adjustment financial migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2222,8 +2223,8 @@ function runGLFoundationMigration(): void {
     );
     db.exec(migrationSQL);
     logger.info('✅ GL foundation migration applied (chart_of_accounts, journal_lines, accounting_periods)');
-  } catch (error: any) {
-    throw new Error('GL foundation migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('GL foundation migration error:: ' + errorMessage(error), { cause: error });
   }
 
   // Add returned_amount column to invoices (idempotent – added in v3.1)
@@ -2235,8 +2236,8 @@ function runGLFoundationMigration(): void {
       db.exec("ALTER TABLE invoices ADD COLUMN returned_amount DECIMAL(15,2) NOT NULL DEFAULT 0");
       logger.info('✅ returned_amount column added to invoices');
     }
-  } catch (error: any) {
-    throw new Error('returned_amount migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('returned_amount migration error:: ' + errorMessage(error), { cause: error });
   }
 
   // Add return_fee column to invoices (idempotent — restocking fee tracking)
@@ -2248,8 +2249,8 @@ function runGLFoundationMigration(): void {
       db.exec("ALTER TABLE invoices ADD COLUMN return_fee DECIMAL(15,2) NOT NULL DEFAULT 0");
       logger.info('✅ return_fee column added to invoices');
     }
-  } catch (error: any) {
-    throw new Error('return_fee migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('return_fee migration error:: ' + errorMessage(error), { cause: error });
   }
 
   // Add returned_qty column to invoice_items (per-item return tracking)
@@ -2261,8 +2262,8 @@ function runGLFoundationMigration(): void {
       db.exec("ALTER TABLE invoice_items ADD COLUMN returned_qty DECIMAL(15,3) NOT NULL DEFAULT 0");
       logger.info('✅ returned_qty column added to invoice_items');
     }
-  } catch (error: any) {
-    throw new Error('returned_qty migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('returned_qty migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2323,8 +2324,8 @@ function runBatchCostingMigration(): void {
     }
 
     logger.info('✅ Batch costing migration completed!');
-  } catch (error: any) {
-    throw new Error('Batch costing migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Batch costing migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2347,8 +2348,8 @@ function runCreditBalanceMigration(): void {
 
       logger.info('✅ Credit balance column added to customers table!');
     }
-  } catch (error: any) {
-    throw new Error('Credit balance migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Credit balance migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2371,8 +2372,8 @@ function runForecastsMigration(): void {
 
       logger.info('✅ Demand forecasts migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Demand forecasts migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Demand forecasts migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2395,8 +2396,8 @@ function runEmployeesMigration(): void {
 
       logger.info('✅ Employees migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Employees migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Employees migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2419,8 +2420,8 @@ function runSalaryPaymentsMigration(): void {
 
       logger.info('✅ Salary payments migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Salary payments migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Salary payments migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2443,8 +2444,8 @@ function runPhysicalCountsMigration(): void {
 
       logger.info('✅ Physical counts migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Physical counts migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Physical counts migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2470,8 +2471,8 @@ function runCustomReportsMigration(): void {
       // Seed 5 report templates
       seedReportTemplates();
     }
-  } catch (error: any) {
-    throw new Error('Custom reports migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Custom reports migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2584,8 +2585,8 @@ function seedReportTemplates(): void {
     }
 
     logger.info('✅ Report templates seeded!');
-  } catch (error: any) {
-    throw new Error('Seed report templates error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Seed report templates error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2609,8 +2610,8 @@ function runForecastEnhancementsMigration(): void {
 
       logger.info('✅ Forecast enhancements migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Forecast enhancements migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Forecast enhancements migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2633,8 +2634,8 @@ function runDashboardLayoutsMigration(): void {
 
       logger.info('✅ Dashboard layouts migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Dashboard layouts migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Dashboard layouts migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2649,8 +2650,8 @@ function runCashAccountsMigration(): void {
     );
     db.exec(migrationSQL);
     logger.info('✅ Cash accounts migration applied (Easypaisa/JazzCash/UPaisa accounts + cash_reconciliations)');
-  } catch (error: any) {
-    throw new Error('Cash accounts migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Cash accounts migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2664,8 +2665,8 @@ function runOpeningBalancesMigration(): void {
     );
     db.exec(migrationSQL);
     logger.info('✅ Opening balances migration applied (per-account seed balances)');
-  } catch (error: any) {
-    throw new Error('Opening balances migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Opening balances migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2688,8 +2689,8 @@ function runLooseItemMigration(): void {
 
       logger.info('✅ Loose item support migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Loose item support migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Loose item support migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2714,8 +2715,8 @@ function runUserPreferencesMigration(): void {
 
       logger.info('✅ User preferences migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('User preferences migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('User preferences migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2738,8 +2739,8 @@ function runEmployeeLoansMigration(): void {
 
       logger.info('✅ Employee loans migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Employee loans migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Employee loans migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2762,8 +2763,8 @@ function runOwnerPersonalLoansMigration(): void {
 
       logger.info('✅ Owner personal loans migration completed!');
     }
-  } catch (error: any) {
-    throw new Error('Owner personal loans migration error:: ' + error.message, { cause: error });
+  } catch (error: unknown) {
+    throw new Error('Owner personal loans migration error:: ' + errorMessage(error), { cause: error });
   }
 }
 
@@ -2998,8 +2999,8 @@ function runRollback(migrationName: string): void {
     const rollbackSQL = fs.readFileSync(rollbackFile, 'utf8');
     db.exec(rollbackSQL);
     logger.info(`✅ Rollback completed for: ${migrationName}`);
-  } catch (error: any) {
-    logger.error(`Rollback error for ${migrationName}:`, error.message);
+  } catch (error: unknown) {
+    logger.error(`Rollback error for ${migrationName}:`, errorMessage(error));
     process.exit(1);
   }
 }
@@ -3019,8 +3020,8 @@ function runRollbackAll(): void {
       const rollbackSQL = fs.readFileSync(path.join(rollbacksDir, file), 'utf8');
       db.exec(rollbackSQL);
       logger.info(`✅ Rolled back: ${migrationName}`);
-    } catch (error: any) {
-      logger.error(`Rollback error for ${migrationName}:`, error.message);
+    } catch (error: unknown) {
+      logger.error(`Rollback error for ${migrationName}:`, errorMessage(error));
     }
   }
   logger.info('✅ All rollbacks completed');

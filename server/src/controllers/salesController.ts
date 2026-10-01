@@ -7,6 +7,7 @@ import InvoiceModel from '../models/Invoice';
 import db from '../config/database';
 import logger from '../utils/logger';
 import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
+import { errorMessage } from '../utils/errorMessage';
 
 function parseIdParam(req: Request, res: Response): number | null {
   const id = Number(req.params.id);
@@ -63,9 +64,9 @@ function createQuotation(req: AuthRequest, res: Response): void {
     }, req.user!.id, db);
 
     res.status(201).json(quotation);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Create quotation error:', error);
-    res.status(400).json({ error: error.message || 'Failed to create quotation' });
+    res.status(400).json({ error: errorMessage(error) || 'Failed to create quotation' });
   }
 }
 
@@ -106,7 +107,7 @@ function getQuotations(req: Request, res: Response): void {
         hasPrev: pageNum > 1
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get quotations error:', error);
     res.status(500).json({ error: 'Failed to fetch quotations' });
   }
@@ -124,7 +125,7 @@ function getQuotation(req: Request, res: Response): void {
     }
 
     res.json(quotation);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get quotation error:', error);
     res.status(500).json({ error: 'Failed to fetch quotation' });
   }
@@ -137,9 +138,9 @@ function updateQuotation(req: AuthRequest, res: Response): void {
 
     const quotation = QuotationModel.update(Number(id), data, req.user!.id, db);
     res.json(quotation);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Update quotation error:', error);
-    res.status(400).json({ error: error.message || 'Failed to update quotation' });
+    res.status(400).json({ error: errorMessage(error) || 'Failed to update quotation' });
   }
 }
 
@@ -149,9 +150,9 @@ function deleteQuotation(req: AuthRequest, res: Response): void {
     if (!id) return;
     QuotationModel.delete(id, req.user!.id, db);
     res.json({ success: true, message: 'Quotation deleted successfully' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Delete quotation error:', error);
-    res.status(500).json({ error: error.message || 'Failed to delete quotation' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to delete quotation' });
   }
 }
 
@@ -184,9 +185,9 @@ function convertQuotationToSalesOrder(req: AuthRequest, res: Response): void {
       message: 'Quotation converted to sales order',
       ...result
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Convert quotation to SO error:', error);
-    res.status(400).json({ error: error.message || 'Failed to convert quotation' });
+    res.status(400).json({ error: errorMessage(error) || 'Failed to convert quotation' });
   }
 }
 
@@ -196,7 +197,7 @@ function getQuotationCycleChain(req: Request, res: Response): void {
     if (!id) return;
     const chain = QuotationModel.getSalesCycleChain(id, db);
     res.json(chain);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get quotation cycle chain error:', error);
     res.status(500).json({ error: 'Failed to fetch cycle chain' });
   }
@@ -248,9 +249,9 @@ function createSalesOrder(req: AuthRequest, res: Response): void {
     }, req.user!.id, db);
 
     res.status(201).json(salesOrder);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Create sales order error:', error);
-    res.status(400).json({ error: error.message || 'Failed to create sales order' });
+    res.status(400).json({ error: errorMessage(error) || 'Failed to create sales order' });
   }
 }
 
@@ -292,7 +293,7 @@ function getSalesOrders(req: Request, res: Response): void {
         hasPrev: pageNum > 1
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get sales orders error:', error);
     res.status(500).json({ error: 'Failed to fetch sales orders' });
   }
@@ -310,7 +311,7 @@ function getSalesOrder(req: Request, res: Response): void {
     }
 
     res.json(salesOrder);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get sales order error:', error);
     res.status(500).json({ error: 'Failed to fetch sales order' });
   }
@@ -323,9 +324,9 @@ function updateSalesOrder(req: AuthRequest, res: Response): void {
 
     const salesOrder = SalesOrderModel.update(Number(id), data, req.user!.id, db);
     res.json(salesOrder);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Update sales order error:', error);
-    res.status(400).json({ error: error.message || 'Failed to update sales order' });
+    res.status(400).json({ error: errorMessage(error) || 'Failed to update sales order' });
   }
 }
 
@@ -335,9 +336,9 @@ function deleteSalesOrder(req: AuthRequest, res: Response): void {
     if (!id) return;
     SalesOrderModel.delete(id, req.user!.id, db);
     res.json({ success: true, message: 'Sales order deleted successfully' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Delete sales order error:', error);
-    res.status(500).json({ error: error.message || 'Failed to delete sales order' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to delete sales order' });
   }
 }
 
@@ -347,13 +348,13 @@ function cancelSalesOrder(req: AuthRequest, res: Response): void {
     if (!id) return;
     const result = SalesOrderModel.cancel(id, req.user!.id, db);
     res.json({ success: true, message: 'Sales order cancelled successfully', ...result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof InvoiceCancellationGuardError) {
       res.status(409).json({ error: error.message });
       return;
     }
     logger.error('Cancel sales order error:', error);
-    res.status(500).json({ error: error.message || 'Failed to cancel sales order' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to cancel sales order' });
   }
 }
 
@@ -388,9 +389,9 @@ function convertSalesOrderToInvoice(req: AuthRequest, res: Response): void {
       message: 'Sales order converted to invoice',
       ...result
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Convert SO to invoice error:', error);
-    res.status(400).json({ error: error.message || 'Failed to convert sales order' });
+    res.status(400).json({ error: errorMessage(error) || 'Failed to convert sales order' });
   }
 }
 
@@ -400,7 +401,7 @@ function getSalesOrderCycleChain(req: Request, res: Response): void {
     if (!id) return;
     const chain = SalesOrderModel.getSalesCycleChain(id, db);
     res.json(chain);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get sales order cycle chain error:', error);
     res.status(500).json({ error: 'Failed to fetch cycle chain' });
   }
@@ -414,7 +415,7 @@ function getInvoicesBySalesOrder(req: Request, res: Response): void {
     if (!id) return;
     const invoices = InvoiceModel.getBySalesOrderId(id, db);
     res.json(invoices);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get invoices by SO error:', error);
     res.status(500).json({ error: 'Failed to fetch invoices' });
   }
@@ -426,7 +427,7 @@ function getInvoicesByQuotation(req: Request, res: Response): void {
     if (!id) return;
     const invoices = InvoiceModel.getByQuotationId(id, db);
     res.json(invoices);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get invoices by quotation error:', error);
     res.status(500).json({ error: 'Failed to fetch invoices' });
   }
@@ -494,7 +495,7 @@ function getSalesDashboard(_req: Request, res: Response): void {
     };
 
     res.json(dashboard);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get sales dashboard error:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard' });
   }
@@ -511,7 +512,7 @@ function getSalesSummaryByDateRange(req: Request, res: Response): void {
 
     const stats = InvoiceModel.getStatsByDateRange(start_date as string, end_date as string, db);
     res.json(stats);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get sales summary by date range error:', error);
     res.status(500).json({ error: 'Failed to get sales summary' });
   }

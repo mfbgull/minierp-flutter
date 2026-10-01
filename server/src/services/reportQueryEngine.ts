@@ -11,6 +11,7 @@ import { getEntity } from './entityRegistry';
 import type { EntityDefinition } from './entityRegistry';
 import logger from '../utils/logger';
 import { validateConfigExpressions, ExpressionValidationError } from './expressionValidator';
+import { errorMessage } from '../utils/errorMessage';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -263,9 +264,9 @@ export function executeReport(config: ReportConfig): QueryResult {
       totalCount,
       elapsedMs,
     };
-  } catch (error: any) {
-    logger.error('Report query execution error:', { sql, error: error.message });
-    throw new Error(`Query execution failed: ${error.message}`, { cause: error });
+  } catch (error: unknown) {
+    logger.error('Report query execution error:', { sql, error: errorMessage(error) });
+    throw new Error(`Query execution failed: ${errorMessage(error)}`, { cause: error });
   }
 }
 

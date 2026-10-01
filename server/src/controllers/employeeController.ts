@@ -17,6 +17,8 @@ import {
   startIdempotentRequest,
 } from '../utils/idempotency';
 
+import { errorMessage, errorCode } from '../utils/errorMessage';
+
 function getEmployees(req: Request, res: Response): void {
   try {
     const { search, department, status, sortBy, sortOrder, page, limit } = req.query;
@@ -121,9 +123,9 @@ function createEmployee(req: Request, res: Response): void {
 
     const employee = EmployeeModel.getById(id, db);
     res.status(201).json({ success: true, data: employee });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error creating employee:', error);
-    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (errorCode(error) === 'SQLITE_CONSTRAINT_UNIQUE') {
       res.status(409).json({ success: false, error: 'Employee code already exists' });
     } else {
       res.status(500).json({ success: false, error: 'Failed to create employee' });
@@ -306,8 +308,8 @@ function paySalary(req: Request, res: Response): void {
           userId: authReq.user?.id,
         });
         if (result) journalEntryId = result.journal_entry_id;
-      } catch (glError: any) {
-        throw new Error(`GL posting failed: ${glError.message}`, { cause: glError });
+      } catch (glError: unknown) {
+        throw new Error(`GL posting failed: ${errorMessage(glError)}`, { cause: glError });
       }
 
       if (journalEntryId) {
@@ -376,9 +378,9 @@ function paySalary(req: Request, res: Response): void {
       success: true,
       data: { id: result.paymentId, journal_entry_id: result.journalEntryId, advance_created: result.advanceCreated },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error paying salary:', error);
-    res.status(500).json({ success: false, error: error.message || 'Failed to process salary payment' });
+    res.status(500).json({ success: false, error: errorMessage(error) || 'Failed to process salary payment' });
   }
 }
 
@@ -481,8 +483,8 @@ function deleteSalaryPayment(req: Request, res: Response): void {
 
     trx();
     res.status(204).send();
-  } catch (error: any) {
-    const message = error?.message || 'Failed to delete salary payment';
+  } catch (error: unknown) {
+    const message = errorMessage(error) || 'Failed to delete salary payment';
     if (message.includes('inside closed accounting period')) {
       res.status(409).json({ success: false, error: message });
       return;
@@ -613,7 +615,7 @@ function getLoans(req: Request, res: Response): void {
         summary,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get loans error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch loans' });
   }
@@ -674,8 +676,8 @@ function createLoan(req: Request, res: Response): void {
           userId: authReq.user?.id,
         });
         if (result) journalEntryId = result.journal_entry_id;
-      } catch (glError: any) {
-        throw new Error(`GL posting failed: ${glError.message}`, { cause: glError });
+      } catch (glError: unknown) {
+        throw new Error(`GL posting failed: ${errorMessage(glError)}`, { cause: glError });
       }
 
       if (journalEntryId) {
@@ -687,9 +689,9 @@ function createLoan(req: Request, res: Response): void {
     });
 
     trx();
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Create loan error:', error);
-    res.status(500).json({ success: false, error: error.message || 'Failed to create loan' });
+    res.status(500).json({ success: false, error: errorMessage(error) || 'Failed to create loan' });
   }
 }
 
@@ -710,7 +712,7 @@ function getLoanDetail(req: Request, res: Response): void {
       success: true,
       data: { ...loan, repayments },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get loan detail error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch loan detail' });
   }
@@ -791,8 +793,8 @@ function repayLoan(req: Request, res: Response): void {
             userId: authReq.user?.id,
           });
           if (result) journalEntryId = result.journal_entry_id;
-        } catch (glError: any) {
-          throw new Error(`GL posting failed: ${glError.message}`, { cause: glError });
+        } catch (glError: unknown) {
+          throw new Error(`GL posting failed: ${errorMessage(glError)}`, { cause: glError });
         }
       }
 
@@ -814,9 +816,9 @@ function repayLoan(req: Request, res: Response): void {
     });
 
     trx();
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Repay loan error:', error);
-    res.status(500).json({ success: false, error: error.message || 'Failed to record repayment' });
+    res.status(500).json({ success: false, error: errorMessage(error) || 'Failed to record repayment' });
   }
 }
 
@@ -856,8 +858,8 @@ function writeOffLoan(req: Request, res: Response): void {
             userId: authReq.user?.id,
           });
           if (result) journalEntryId = result.journal_entry_id;
-        } catch (glError: any) {
-          throw new Error(`GL posting failed: ${glError.message}`, { cause: glError });
+        } catch (glError: unknown) {
+          throw new Error(`GL posting failed: ${errorMessage(glError)}`, { cause: glError });
         }
       }
 
@@ -879,9 +881,9 @@ function writeOffLoan(req: Request, res: Response): void {
     });
 
     trx();
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Write off loan error:', error);
-    res.status(500).json({ success: false, error: error.message || 'Failed to write off loan' });
+    res.status(500).json({ success: false, error: errorMessage(error) || 'Failed to write off loan' });
   }
 }
 
@@ -920,7 +922,7 @@ function deleteLoan(req: Request, res: Response): void {
     });
 
     trx();
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Delete loan error:', error);
     res.status(500).json({ success: false, error: 'Failed to delete loan' });
   }
@@ -975,8 +977,8 @@ function voidLoanRepayment(req: Request, res: Response): void {
     });
 
     trx();
-  } catch (error: any) {
-    const message = error?.message || 'Failed to void repayment';
+  } catch (error: unknown) {
+    const message = errorMessage(error) || 'Failed to void repayment';
     if (message.includes('inside closed accounting period')) {
       res.status(409).json({ success: false, error: message });
       return;
