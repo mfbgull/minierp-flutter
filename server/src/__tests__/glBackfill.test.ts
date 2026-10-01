@@ -33,7 +33,7 @@ const MIGRATIONS = [
 function insertItem(db: Database.Database, code: string): number {
   db.prepare(`INSERT INTO items (item_code,item_name,unit_of_measure,standard_cost,is_purchased,is_active)
               VALUES (?, 'Thing', 'Nos', 50, 1, 1)`).run(code);
-  return (db.prepare(`SELECT id FROM items WHERE item_code = ?`).get(code) as any).id;
+  return (db.prepare(`SELECT id FROM items WHERE item_code = ?`).get(code) as { id: number }).id;
 }
 
 function createFixture(): Database.Database {
@@ -84,7 +84,7 @@ describe('GL backfill for pre-posting documents', () => {
     const itemId = insertItem(db, 'IT-X');
     db.prepare(`INSERT INTO suppliers (supplier_code,supplier_name,is_active) VALUES ('S1','Acme',1)`).run();
     db.prepare(`INSERT INTO warehouses (warehouse_code,warehouse_name,is_active) VALUES ('W1','Main',1)`).run();
-    const whId = (db.prepare(`SELECT id FROM warehouses WHERE warehouse_code='W1'`).get() as any).id;
+    const whId = (db.prepare(`SELECT id FROM warehouses WHERE warehouse_code='W1'`).get() as { id: number }).id;
 
     db.prepare(`INSERT INTO purchases (
         purchase_no, item_id, warehouse_id, quantity, unit_cost, total_cost,
@@ -102,7 +102,7 @@ describe('GL backfill for pre-posting documents', () => {
     runBackfillGlPreposting(db);
 
     const byRef = (t: string): number =>
-      (db.prepare(`SELECT COUNT(*) n FROM journal_lines WHERE reference_type = ? AND voided = 0`).get(t) as any).n;
+      (db.prepare(`SELECT COUNT(*) n FROM journal_lines WHERE reference_type = ? AND voided = 0`).get(t) as { n: number }).n;
     expect(byRef('PURCHASE')).toBe(2);       // Dr 1200 / Cr 2000
     expect(byRef('PAYMENT')).toBe(4);        // supplier + customer entries
     expect(byRef('EXPENSE')).toBe(2);        // Dr 6000 / Cr 1000
@@ -127,7 +127,7 @@ describe('GL backfill for pre-posting documents', () => {
     const db = createFixture();
     const itemId2 = insertItem(db, 'IT-Y');
     db.prepare(`INSERT INTO warehouses (warehouse_code,warehouse_name,is_active) VALUES ('W1','Main',1)`).run();
-    const whId2 = (db.prepare(`SELECT id FROM warehouses WHERE warehouse_code='W1'`).get() as any).id;
+    const whId2 = (db.prepare(`SELECT id FROM warehouses WHERE warehouse_code='W1'`).get() as { id: number }).id;
     db.prepare(`INSERT INTO purchases (
         purchase_no, item_id, warehouse_id, quantity, unit_cost, total_cost,
         supplier_name, purchase_date, created_by
@@ -152,7 +152,7 @@ describe('invoice item tax decomposition backfill', () => {
     addTaxColumns(db);
     db.prepare(`INSERT INTO invoices (invoice_no, customer_id, invoice_date, total_amount, created_by)
                 VALUES ('INV-A', 1, '2026-08-01', 110, 1)`).run();
-    const invId = (db.prepare(`SELECT id FROM invoices WHERE invoice_no='INV-A'`).get() as any).id;
+    const invId = (db.prepare(`SELECT id FROM invoices WHERE invoice_no='INV-A'`).get() as { id: number }).id;
     const itemId3 = insertItem(db, 'IT-Z');
 
     // qty 1 @ 100 with 10% tax → stored amount 110 (inclusive).

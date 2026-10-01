@@ -98,7 +98,7 @@ describe('7.1 batch_stock_by_location CRUD & computed quantity_available', () =>
 
     const row = db
       .prepare(`SELECT * FROM batch_stock_by_location WHERE batch_id = ?`)
-      .get(batchId) as any;
+      .get(batchId) as { location_id: number; quantity_available: number; quantity_physical: number; quantity_reserved: number };
     expect(row.quantity_physical).toBe(30);
     expect(row.quantity_reserved).toBe(0);
     expect(row.quantity_available).toBe(30);
@@ -112,7 +112,7 @@ describe('7.1 batch_stock_by_location CRUD & computed quantity_available', () =>
     ).run(batchId);
     const updated = db
       .prepare(`SELECT * FROM batch_stock_by_location WHERE batch_id = ?`)
-      .get(batchId) as any;
+      .get(batchId) as { quantity_available: number; quantity_reserved: number };
     expect(updated.quantity_reserved).toBe(5);
     expect(updated.quantity_available).toBe(25);
 
@@ -126,8 +126,8 @@ describe('7.1 batch_stock_by_location CRUD & computed quantity_available', () =>
   it('a batch can hold rows in multiple locations of the same warehouse', () => {
     const db = createFixture();
     db.prepare(`INSERT INTO locations (warehouse_id,location_code,location_name) VALUES (1,'RACK-A','Rack A')`).run();
-    const defaultLoc = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='DEFAULT'`).get() as any).id;
-    const rackA = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='RACK-A'`).get() as any).id;
+    const defaultLoc = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='DEFAULT'`).get() as { id: number }).id;
+    const rackA = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='RACK-A'`).get() as { id: number }).id;
 
     const batchId = seedBatch(db, { batchNo: 'B1', qty: 10, locationId: defaultLoc });
     db.prepare(
@@ -137,7 +137,7 @@ describe('7.1 batch_stock_by_location CRUD & computed quantity_available', () =>
 
     const total = db
       .prepare(`SELECT SUM(quantity_physical) AS t FROM batch_stock_by_location WHERE batch_id = ?`)
-      .get(batchId) as any;
+      .get(batchId) as { t: string };
     expect(total.t).toBe(16);
   });
 });
@@ -161,7 +161,7 @@ describe('7.2 reservation create/release/consume idempotency', () => {
       db
     );
     expect(r2.id).toBe(r1.id);
-    const count = (db.prepare(`SELECT COUNT(*) AS c FROM stock_reservations`).get() as any).c;
+    const count = (db.prepare(`SELECT COUNT(*) AS c FROM stock_reservations`).get() as { c: number }).c;
     expect(count).toBe(1);
 
     // Release → RELEASED with released_at
@@ -180,7 +180,7 @@ describe('7.2 reservation create/release/consume idempotency', () => {
     expect(r3.id).toBe(r1.id);
     expect(r3.status).toBe('ACTIVE');
     expect(r3.quantity_reserved).toBe(7);
-    const count2 = (db.prepare(`SELECT COUNT(*) AS c FROM stock_reservations`).get() as any).c;
+    const count2 = (db.prepare(`SELECT COUNT(*) AS c FROM stock_reservations`).get() as { c: number }).c;
     expect(count2).toBe(1);
   });
 
@@ -234,7 +234,7 @@ describe('7.3 batch status derivation and overrides', () => {
   it('ACTIVE by default; BLOCKED when halted; override wins except EXPIRED', () => {
     const db = createFixture();
     const batchId = seedBatch(db, { batchNo: 'B1', qty: 10 });
-    const locId = (db.prepare(`SELECT location_id FROM batch_stock_by_location WHERE batch_id=?`).get(batchId) as any).location_id;
+    const locId = (db.prepare(`SELECT location_id FROM batch_stock_by_location WHERE batch_id=?`).get(batchId) as { location_id: number }).location_id;
 
     expect(getEffectiveBatchStatus(db, batchId, locId)).toBe('ACTIVE');
 
@@ -264,8 +264,8 @@ describe('7.3 batch status derivation and overrides', () => {
   it('per-location override: same batch QUARANTINED in one location, ACTIVE in another', () => {
     const db = createFixture();
     db.prepare(`INSERT INTO locations (warehouse_id,location_code,location_name) VALUES (1,'RACK-A','Rack A')`).run();
-    const defaultLoc = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='DEFAULT'`).get() as any).id;
-    const rackA = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='RACK-A'`).get() as any).id;
+    const defaultLoc = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='DEFAULT'`).get() as { id: number }).id;
+    const rackA = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='RACK-A'`).get() as { id: number }).id;
 
     const batchId = seedBatch(db, { batchNo: 'B1', qty: 10 });
     db.prepare(
@@ -283,8 +283,8 @@ describe('7.4 FEFO/FIFO skips non-ACTIVE locations', () => {
     const db = createFixture();
     setFeatureEnabled(db, 'feature_batch_locations', true);
     db.prepare(`INSERT INTO locations (warehouse_id,location_code,location_name) VALUES (1,'RACK-A','Rack A')`).run();
-    const defaultLoc = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='DEFAULT'`).get() as any).id;
-    const rackA = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='RACK-A'`).get() as any).id;
+    const defaultLoc = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='DEFAULT'`).get() as { id: number }).id;
+    const rackA = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='RACK-A'`).get() as { id: number }).id;
 
     // Batch B1 (older) entirely quarantined in DEFAULT; B2 (newer) ACTIVE in DEFAULT + RACK-A
     const b1 = seedBatch(db, { batchNo: 'B1', qty: 10, cost: 5, received: '2026-01-01', locationId: defaultLoc });
@@ -309,13 +309,13 @@ describe('7.4 FEFO/FIFO skips non-ACTIVE locations', () => {
 
     const rows = db
       .prepare(`SELECT bsl.quantity_physical, bsl.quantity_available, l.location_code FROM batch_stock_by_location bsl JOIN locations l ON bsl.location_id=l.id WHERE bsl.batch_id=? ORDER BY l.location_code`)
-      .all(b2) as any[];
+      .all(b2) as { location_code: string; quantity_physical: number; quantity_available: number }[];
     const byCode = Object.fromEntries(rows.map((r) => [r.location_code, r]));
     // DEFAULT (older location) covers all 7; RACK-A untouched.
     expect(byCode['DEFAULT'].quantity_physical).toBe(13);
     expect(byCode['RACK-A'].quantity_physical).toBe(5);
     // Quarantined B1 untouched
-    const b1row = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=?`).get(b1) as any;
+    const b1row = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=?`).get(b1) as { quantity_physical: number };
     expect(b1row.quantity_physical).toBe(10);
   });
 });
@@ -339,7 +339,7 @@ describe('7.9 backfill: one location row per existing batch', () => {
 
     const rows = db
       .prepare(`SELECT sb.batch_no, l.location_code, bsl.quantity_physical, bsl.quantity_available FROM batch_stock_by_location bsl JOIN stock_batches sb ON sb.id=bsl.batch_id JOIN locations l ON l.id=bsl.location_id ORDER BY sb.batch_no`)
-      .all() as any[];
+      .all() as { batch_no: string; location_code: string; quantity_physical: number; quantity_available: number }[];
     expect(rows).toHaveLength(2);
     expect(rows[0].location_code).toBe('DEFAULT');
     expect(rows[0].quantity_physical).toBe(20);
@@ -347,7 +347,7 @@ describe('7.9 backfill: one location row per existing batch', () => {
     expect(rows[1].quantity_physical).toBe(30);
 
     // stock_balances extension columns synced
-    const bal = db.prepare(`SELECT quantity_physical, quantity_reserved, quantity_available FROM stock_balances WHERE item_id=1 AND warehouse_id=1`).get() as any;
+    const bal = db.prepare(`SELECT quantity_physical, quantity_reserved, quantity_available FROM stock_balances WHERE item_id=1 AND warehouse_id=1`).get() as { quantity_physical: number; quantity_reserved: number; quantity_available: number };
     expect(bal.quantity_physical).toBe(50);
     expect(bal.quantity_available).toBe(50);
     expect(bal.quantity_reserved).toBe(0);
@@ -355,7 +355,7 @@ describe('7.9 backfill: one location row per existing batch', () => {
     // Idempotent: second run inserts nothing
     const inserted2 = runBackfillBatchLocations(db);
     expect(inserted2).toBe(0);
-    const count = (db.prepare(`SELECT COUNT(*) AS c FROM batch_stock_by_location`).get() as any).c;
+    const count = (db.prepare(`SELECT COUNT(*) AS c FROM batch_stock_by_location`).get() as { c: number }).c;
     expect(count).toBe(2);
   });
 });
@@ -372,9 +372,9 @@ describe('7.10 feature flag off vs on behavior', () => {
     // Legacy path returns the batch too (single path both ways) — but
     // batch_stock_by_location is NOT consumed
     expect(consumption.length).toBeGreaterThan(0);
-    const locRow = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=?`).get(batchId) as any;
+    const locRow = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=?`).get(batchId) as { quantity_physical: number };
     // Legacy path only decrements stock_batches.quantity_remaining
-    const master = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id=?`).get(batchId) as any;
+    const master = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id=?`).get(batchId) as { quantity_remaining: number };
     expect(master.quantity_remaining).toBe(40);
     expect(() =>
       StockReservationModel.create(
@@ -398,9 +398,9 @@ describe('7.10 feature flag off vs on behavior', () => {
     const consumption = StockMovementModel.consumeFromOldestBatches(1, 1, 10, db);
     expect(consumption[0].batchId).toBe(batchId);
 
-    const locRow = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=?`).get(batchId) as any;
+    const locRow = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=?`).get(batchId) as { quantity_physical: number };
     expect(locRow.quantity_physical).toBe(40); // location row consumed
-    const master = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id=?`).get(batchId) as any;
+    const master = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id=?`).get(batchId) as { quantity_remaining: number };
     expect(master.quantity_remaining).toBe(40); // master synced too
 
     const r = StockReservationModel.create(

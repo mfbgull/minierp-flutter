@@ -56,9 +56,9 @@ describe('PAY-07: AP reports execute on the live schema', () => {
                 VALUES ('S1','Acme',1)`).run();
     db.prepare(`INSERT INTO items (item_code, item_name, unit_of_measure, standard_cost, is_purchased, is_active)
                 VALUES ('IT-X','Thing','Nos',50,1,1)`).run();
-    const itemId = (db.prepare(`SELECT id FROM items WHERE item_code='IT-X'`).get() as any).id;
+    const itemId = (db.prepare(`SELECT id FROM items WHERE item_code='IT-X'`).get() as { id: number }).id;
     db.prepare(`INSERT INTO warehouses (warehouse_code, warehouse_name, is_active) VALUES ('W1','Main',1)`).run();
-    const whId = (db.prepare(`SELECT id FROM warehouses WHERE warehouse_code='W1'`).get() as any).id;
+    const whId = (db.prepare(`SELECT id FROM warehouses WHERE warehouse_code='W1'`).get() as { id: number }).id;
     db.prepare(`INSERT INTO purchases (
         purchase_no, item_id, warehouse_id, quantity, unit_cost, total_cost,
         supplier_id, purchase_date, created_by

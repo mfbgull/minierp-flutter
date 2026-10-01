@@ -247,35 +247,35 @@ describe('PurchaseReturnModel', () => {
       expect(result.credit_no).toMatch(/^CN-\d{4}-\d{4}$/);
 
       // Header row persisted
-      const header = db.prepare('SELECT * FROM purchase_returns WHERE id = ?').get(result.id) as any;
+      const header = db.prepare('SELECT * FROM purchase_returns WHERE id = ?').get(result.id) as { credit_note_id: number; status: string };
       expect(header.status).toBe('POSTED');
       expect(header.credit_note_id).not.toBeNull();
 
       // Stock reduced: 10 - 4 = 6
-      const balance = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = 1 AND warehouse_id = 1').get() as any;
+      const balance = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = 1 AND warehouse_id = 1').get() as { quantity: number };
       expect(balance.quantity).toBe(6);
 
       // Source returned_quantity tracked
-      const purchase = db.prepare('SELECT returned_quantity FROM purchases WHERE id = ?').get(purchaseId) as any;
+      const purchase = db.prepare('SELECT returned_quantity FROM purchases WHERE id = ?').get(purchaseId) as { returned_quantity: number };
       expect(purchase.returned_quantity).toBe(4);
 
       // Negative movement linked to the header
-      const movement = db.prepare(`SELECT * FROM stock_movements WHERE purchase_return_id = ?`).get(result.id) as any;
+      const movement = db.prepare(`SELECT * FROM stock_movements WHERE purchase_return_id = ?`).get(result.id) as { quantity: number };
       expect(movement).toBeDefined();
       expect(movement.quantity).toBe(-4);
 
       // Credit note + supplier ledger entry posted
-      const creditNote = db.prepare('SELECT * FROM credit_notes WHERE id = ?').get(header.credit_note_id) as any;
+      const creditNote = db.prepare('SELECT * FROM credit_notes WHERE id = ?').get(header.credit_note_id) as { amount: number; credit_no: string; supplier_id: number };
       expect(creditNote.supplier_id).toBe(1);
       expect(creditNote.amount).toBe(40);
-      const ledger = db.prepare(`SELECT * FROM supplier_ledger WHERE reference_no = ?`).get(creditNote.credit_no) as any;
+      const ledger = db.prepare(`SELECT * FROM supplier_ledger WHERE reference_no = ?`).get(creditNote.credit_no) as { credit: number; transaction_type: string };
       expect(ledger.transaction_type).toBe('CREDIT_NOTE');
       expect(ledger.credit).toBe(40);
 
       // GL reversal posted against the return id
       const journal = db.prepare(`
         SELECT * FROM journal_lines WHERE reference_type = 'PURCHASE_RETURN' AND reference_id = ?
-      `).all(result.id) as any[];
+      `).all(result.id) as Record<string, unknown>[];
       expect(journal.length).toBe(2);
     });
 
@@ -353,12 +353,12 @@ describe('PurchaseReturnModel', () => {
       expect(result.total_qty).toBe(8);
       expect(result.return_type).toBe('PO_RETURN');
 
-      const poItem = db.prepare('SELECT returned_quantity FROM purchase_order_items WHERE id = ?').get(poItemId) as any;
+      const poItem = db.prepare('SELECT returned_quantity FROM purchase_order_items WHERE id = ?').get(poItemId) as { returned_quantity: number };
       expect(poItem.returned_quantity).toBe(8);
 
       // Credit note supplier resolved from the PO's supplier_id.
-      const header = db.prepare('SELECT credit_note_id FROM purchase_returns WHERE id = ?').get(result.id) as any;
-      const creditNote = db.prepare('SELECT supplier_id FROM credit_notes WHERE id = ?').get(header.credit_note_id) as any;
+      const header = db.prepare('SELECT credit_note_id FROM purchase_returns WHERE id = ?').get(result.id) as { credit_note_id: number };
+      const creditNote = db.prepare('SELECT supplier_id FROM credit_notes WHERE id = ?').get(header.credit_note_id) as { supplier_id: number };
       expect(creditNote.supplier_id).toBe(1);
     });
 
@@ -386,7 +386,7 @@ describe('PurchaseReturnModel', () => {
     it('restores stock, GL, credit note + ledger, and marks the header VOIDED', () => {
       const db = createFixture();
       const purchaseId = seedPurchase(db, { quantity: 10 });
-      const purchaseRow = db.prepare('SELECT item_id FROM purchases WHERE id = ?').get(purchaseId) as any;
+      const purchaseRow = db.prepare('SELECT item_id FROM purchases WHERE id = ?').get(purchaseId) as { item_id: number };
       const itemId = purchaseRow.item_id;
 
       const created = PurchaseReturnModel.create(
@@ -407,33 +407,33 @@ describe('PurchaseReturnModel', () => {
       expect(voided.voided_reason).toBe('Wrong stock');
 
       // Stock restored: back to 10
-      const balance = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = 1').get(itemId) as any;
+      const balance = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = 1').get(itemId) as { quantity: number };
       expect(balance.quantity).toBe(10);
 
       // Source returned_quantity reset
-      const purchase = db.prepare('SELECT returned_quantity FROM purchases WHERE id = ?').get(purchaseId) as any;
+      const purchase = db.prepare('SELECT returned_quantity FROM purchases WHERE id = ?').get(purchaseId) as { returned_quantity: number };
       expect(purchase.returned_quantity).toBe(0);
 
       // Credit note voided + reversing ledger entry posted
-      const header = db.prepare('SELECT credit_note_id FROM purchase_returns WHERE id = ?').get(created.id) as any;
-      const creditNote = db.prepare('SELECT * FROM credit_notes WHERE id = ?').get(header.credit_note_id) as any;
+      const header = db.prepare('SELECT credit_note_id FROM purchase_returns WHERE id = ?').get(created.id) as { credit_note_id: number };
+      const creditNote = db.prepare('SELECT * FROM credit_notes WHERE id = ?').get(header.credit_note_id) as { status: string; voided: number };
       expect(creditNote.status).toBe('VOIDED');
       const reversal = db.prepare(`
         SELECT * FROM supplier_ledger WHERE transaction_type = 'CREDIT_NOTE_VOID'
-      `).get() as any;
+      `).get() as { debit: number; voided: number };
       expect(reversal.debit).toBe(40);
 
       // GL journal lines voided
       const journal = db.prepare(`
         SELECT * FROM journal_lines WHERE reference_type = 'PURCHASE_RETURN' AND reference_id = ?
-      `).all(created.id) as any[];
+      `).all(created.id) as { voided: number }[];
       expect(journal.length).toBe(2);
-      expect(journal.every((j: any) => j.voided === 1)).toBe(true);
+      expect(journal.every((j) => j.voided === 1)).toBe(true);
 
       // Positive reversal movement exists
       const reversalMovement = db.prepare(`
         SELECT * FROM stock_movements WHERE purchase_return_id = ? AND quantity > 0
-      `).get(created.id) as any;
+      `).get(created.id) as { quantity: number };
       expect(reversalMovement).toBeDefined();
       expect(reversalMovement.quantity).toBe(4);
     });
@@ -495,7 +495,7 @@ describe('PurchaseReturnModel', () => {
       // PO header: both movements land in one header, 8 units total.
       const poHeaders = db.prepare(`
         SELECT * FROM purchase_returns WHERE return_type = 'PO_RETURN'
-      `).all() as any[];
+      `).all() as { id: number; source_no: string; source_id: number; total_qty: number; total_amount: number; status: string; credit_note_id: number | null }[];
       expect(poHeaders).toHaveLength(1);
       expect(poHeaders[0].source_no).toBe('PO-LEGACY');
       expect(poHeaders[0].source_id).toBe(poId);
@@ -506,14 +506,14 @@ describe('PurchaseReturnModel', () => {
 
       const poLines = db.prepare(`
         SELECT * FROM purchase_return_items WHERE purchase_return_id = ?
-      `).all(poHeaders[0].id) as any[];
+      `).all(poHeaders[0].id) as { id: number; source_item_id: number }[];
       expect(poLines).toHaveLength(2);
-      expect(poLines.map((l: any) => l.source_item_id)).toEqual([poItemId, poItemId]);
+      expect(poLines.map((l) => l.source_item_id)).toEqual([poItemId, poItemId]);
 
       // Purchase header resolves source doc by purchase_no.
       const purchaseHeaders = db.prepare(`
         SELECT * FROM purchase_returns WHERE return_type = 'PURCHASE_RETURN'
-      `).all() as any[];
+      `).all() as { source_id: number; total_qty: number }[];
       expect(purchaseHeaders).toHaveLength(1);
       expect(purchaseHeaders[0].source_id).toBe(purchaseId);
       expect(purchaseHeaders[0].total_qty).toBe(2);
@@ -521,13 +521,13 @@ describe('PurchaseReturnModel', () => {
       // Movements back-linked; nothing left orphaned.
       const linked = db.prepare(`
         SELECT COUNT(*) as c FROM stock_movements WHERE purchase_return_id IS NOT NULL
-      `).get() as any;
+      `).get() as { c: number };
       expect(linked.c).toBe(3);
       const orphaned = db.prepare(`
         SELECT COUNT(*) as c FROM stock_movements
         WHERE reference_doctype IN ('PURCHASE_RETURN', 'PO_RETURN') AND quantity < 0
           AND purchase_return_id IS NULL
-      `).get() as any;
+      `).get() as { c: number };
       expect(orphaned.c).toBe(0);
     });
 
@@ -544,7 +544,7 @@ describe('PurchaseReturnModel', () => {
       expect(backfillPurchaseReturns(db)).toBe(1);
       expect(backfillPurchaseReturns(db)).toBe(0); // no-op on re-run
 
-      const headers = db.prepare('SELECT COUNT(*) as c FROM purchase_returns').get() as any;
+      const headers = db.prepare('SELECT COUNT(*) as c FROM purchase_returns').get() as { c: number };
       expect(headers.c).toBe(1);
     });
   });
@@ -573,8 +573,8 @@ describe('PurchaseReturnModel', () => {
       ).toThrow(/exceeds remaining available/);
 
       // Nothing was written on the failed attempt.
-      expect((db.prepare('SELECT COUNT(*) c FROM purchase_returns').get() as any).c).toBe(0);
-      expect((db.prepare('SELECT returned_quantity q FROM purchases WHERE id = ?').get(purchaseId) as any).q ?? 0).toBeLessThanOrEqual(50);
+      expect((db.prepare('SELECT COUNT(*) c FROM purchase_returns').get() as { c: number }).c).toBe(0);
+      expect((db.prepare('SELECT returned_quantity q FROM purchases WHERE id = ?').get(purchaseId) as { q: number }).q ?? 0).toBeLessThanOrEqual(50);
       db.close();
     });
 
@@ -597,7 +597,7 @@ describe('PurchaseReturnModel', () => {
         db
       );
       expect(result.total_qty).toBe(70);
-      const p = db.prepare('SELECT returned_quantity q FROM purchases WHERE id = ?').get(purchaseId) as any;
+      const p = db.prepare('SELECT returned_quantity q FROM purchases WHERE id = ?').get(purchaseId) as { q: string };
       expect(Number(p.q)).toBe(70);
       db.close();
     });
@@ -605,7 +605,7 @@ describe('PurchaseReturnModel', () => {
     it('PRET-02: a full return after most stock was sold fails loudly (no silent short-consume)', () => {
       const db = createFixture();
       const purchaseId = seedPurchase(db, { quantity: 10 });
-      const itemRow = db.prepare('SELECT item_id FROM purchases WHERE id = ?').get(purchaseId) as any;
+      const itemRow = db.prepare('SELECT item_id FROM purchases WHERE id = ?').get(purchaseId) as { item_id: number };
 
       // Simulate 8 of the 10 units already sold out of the batch.
       db.prepare('UPDATE stock_batches SET quantity_remaining = 2 WHERE source_type = ? AND source_id = ?')
@@ -690,7 +690,7 @@ describe('PurchaseReturnModel', () => {
         INSERT INTO payments (payment_no, supplier_id, payment_date, amount, payment_method)
         VALUES ('PAYD1', 1, '2026-07-15', 100, 'Cash')
       `).run();
-      const payId = (db.prepare(`SELECT id FROM payments WHERE payment_no='PAYD1'`).get() as any).id;
+      const payId = (db.prepare(`SELECT id FROM payments WHERE payment_no='PAYD1'`).get() as { id: number }).id;
       // The RENAME retargeted purchase_allocations' payment FK to
       // payments_old; repoint it at the rebuilt payments table.
       db.exec('DROP TABLE purchase_allocations');

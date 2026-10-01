@@ -119,25 +119,25 @@ describe('7.5 purchase return consumes and voids per-location quantities', () =>
     }, 1, db);
 
     // Location row consumed, master batch synced, balance updated
-    let loc = db.prepare(`SELECT quantity_physical, quantity_available FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, locId) as any;
+    let loc = db.prepare(`SELECT quantity_physical, quantity_available FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, locId) as { quantity_physical: number; quantity_available: number };
     expect(loc.quantity_physical).toBe(6);
-    let master = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id=?`).get(batchId) as any;
+    let master = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id=?`).get(batchId) as { quantity_remaining: number };
     expect(master.quantity_remaining).toBe(6);
-    let bal = db.prepare(`SELECT quantity, quantity_available FROM stock_balances WHERE item_id=1 AND warehouse_id=1`).get() as any;
+    let bal = db.prepare(`SELECT quantity, quantity_available FROM stock_balances WHERE item_id=1 AND warehouse_id=1`).get() as { quantity: number; quantity_available: number };
     expect(bal.quantity).toBe(6);
 
     // location_id recorded in the consumption ledger
-    const prb = db.prepare(`SELECT location_id, quantity FROM purchase_return_batches WHERE batch_id=?`).get(batchId) as any;
+    const prb = db.prepare(`SELECT location_id, quantity FROM purchase_return_batches WHERE batch_id=?`).get(batchId) as { location_id: number; quantity: number };
     expect(prb.location_id).toBe(locId);
     expect(prb.quantity).toBe(4);
 
     // Void restores the exact location row
     PurchaseReturnModel.voidReturn(ret.id, 1, 'wrong item', db);
-    loc = db.prepare(`SELECT quantity_physical, quantity_available FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, locId) as any;
+    loc = db.prepare(`SELECT quantity_physical, quantity_available FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, locId) as { quantity_physical: number; quantity_available: number };
     expect(loc.quantity_physical).toBe(10);
-    master = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id=?`).get(batchId) as any;
+    master = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id=?`).get(batchId) as { quantity_remaining: number };
     expect(master.quantity_remaining).toBe(10);
-    bal = db.prepare(`SELECT quantity, quantity_available FROM stock_balances WHERE item_id=1 AND warehouse_id=1`).get() as any;
+    bal = db.prepare(`SELECT quantity, quantity_available FROM stock_balances WHERE item_id=1 AND warehouse_id=1`).get() as { quantity: number; quantity_available: number };
     expect(bal.quantity).toBe(10);
   });
 });
@@ -165,10 +165,10 @@ describe('7.6 invoice return restores per-location quantities', () => {
       1 // restock warehouse
     );
 
-    const loc = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, locId) as any;
+    const loc = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, locId) as { quantity_physical: number };
     expect(loc.quantity_physical).toBe(10);
 
-    const irb = db.prepare(`SELECT location_id, quantity, reference_doctype FROM invoice_return_batches WHERE batch_id=?`).get(batchId) as any;
+    const irb = db.prepare(`SELECT location_id, quantity, reference_doctype FROM invoice_return_batches WHERE batch_id=?`).get(batchId) as { location_id: number; quantity: number; reference_doctype: string };
     expect(irb).toBeTruthy();
     expect(irb.location_id).toBe(locId);
     expect(irb.quantity).toBe(4);
@@ -200,9 +200,9 @@ describe('7.7 transfer void restores source and destination locations', () => {
 
     StockMovementModel.voidTransfer({ outMovementNo: 'MV-OUT' }, 1, db);
 
-    const src = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, srcLoc) as any;
+    const src = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, srcLoc) as { quantity_physical: number };
     expect(src.quantity_physical).toBe(10);
-    const dst = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, dstLoc) as any;
+    const dst = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, dstLoc) as { quantity_physical: number };
     expect(dst.quantity_physical).toBe(0);
   });
 });
@@ -213,21 +213,21 @@ describe('7.8 physical count correction updates location quantities', () => {
     const batchId = seedStock(db, 10);
     const locId = (db.prepare(`SELECT id FROM locations WHERE warehouse_id=1 AND location_code='DEFAULT'`).get() as { id: number }).id;
 
-    const countId = PhysicalCountModel.create({ warehouse_id: 1, count_date: '2026-07-04' } as any, 1, db);
+    const countId = PhysicalCountModel.create({ warehouse_id: 1, count_date: '2026-07-04' } as Parameters<typeof PhysicalCountModel.create>[0], 1, db);
     PhysicalCountModel.recordCount(countId, 1, 8, 1, null, db); // shortage 2
     PhysicalCountModel.completeCount(countId, 1, db);
 
-    let loc = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, locId) as any;
+    let loc = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, locId) as { quantity_physical: number };
     expect(loc.quantity_physical).toBe(8);
-    let bal = db.prepare(`SELECT quantity FROM stock_balances WHERE item_id=1 AND warehouse_id=1`).get() as any;
+    let bal = db.prepare(`SELECT quantity FROM stock_balances WHERE item_id=1 AND warehouse_id=1`).get() as { quantity: number };
     expect(bal.quantity).toBe(8);
 
     // Correct the count upward: 10 counted → surplus 2 restored
     PhysicalCountModel.correctCount({ countId, corrections: [{ item_id: 1, counted_quantity: 10 }] }, 1, db);
 
-    loc = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, locId) as any;
+    loc = db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id=? AND location_id=?`).get(batchId, locId) as { quantity_physical: number };
     expect(loc.quantity_physical).toBe(10);
-    bal = db.prepare(`SELECT quantity FROM stock_balances WHERE item_id=1 AND warehouse_id=1`).get() as any;
+    bal = db.prepare(`SELECT quantity FROM stock_balances WHERE item_id=1 AND warehouse_id=1`).get() as { quantity: number };
     expect(bal.quantity).toBe(10);
   });
 });

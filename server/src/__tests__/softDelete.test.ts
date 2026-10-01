@@ -40,7 +40,7 @@ describe('Customer soft-delete and restore', () => {
       .get('/api/customers?search=Test+Customer+SD')
       .set('Authorization', `Bearer ${authToken}`);
     expect(res.status).toBe(200);
-    const names = res.body.data.map((c: any) => c.customer_name);
+    const names = res.body.data.map((c: { customer_name: string }) => c.customer_name);
     expect(names).not.toContain('Test Customer SD');
   });
 
@@ -57,7 +57,7 @@ describe('Customer soft-delete and restore', () => {
       .get('/api/customers?search=Test+Customer+SD')
       .set('Authorization', `Bearer ${authToken}`);
     expect(res.status).toBe(200);
-    const names = res.body.data.map((c: any) => c.customer_name);
+    const names = res.body.data.map((c: { customer_name: string }) => c.customer_name);
     expect(names).toContain('Test Customer SD');
   });
 });

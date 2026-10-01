@@ -41,8 +41,8 @@ function expectClose(actual: number, expected: number, tolerance = 0.01): void {
   expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance);
 }
 
-async function api(method: 'get' | 'post' | 'put' | 'delete', url: string, body?: unknown) {
-  let r = (request(app) as any)[method](url);
+async function api(method: 'get' | 'post' | 'put' | 'delete', url: string, body?: Record<string, unknown>) {
+  let r = request(app)[method](url);
   if (authCookie) r = r.set('Cookie', authCookie);
   if (body !== undefined) r = r.send(body);
   return r;
@@ -152,7 +152,7 @@ async function sellAndReturn(
   });
   if (inv.status !== 201) throw new Error(`createInvoice failed: ${inv.status} ${JSON.stringify(inv.body)}`);
   const invoiceId = inv.body.id;
-  const invoiceItemIds: number[] = (inv.body.items ?? []).map((i: any) => i.id);
+  const invoiceItemIds: number[] = (inv.body.items ?? []).map((i: { id: number }) => i.id);
   if (invoiceItemIds.length === 0) {
     const row = db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ?').get(invoiceId) as { id: number };
     invoiceItemIds.push(row.id);
@@ -346,7 +346,7 @@ describe('C2 scenario 5: attempted over-return', () => {
     expect(inv.status).toBe(201);
     const invoiceId = inv.body.id;
     const invoiceItemId = (inv.body.items ?? [])[0]?.id
-      ?? (db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ?').get(invoiceId) as any).id;
+      ?? (db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ?').get(invoiceId) as { id: number }).id;
 
     // First return: 2
     const r1 = await api('post', `/api/invoices/${invoiceId}/return`, {
@@ -474,7 +474,7 @@ describe('C2 scenario 7: sequential partial returns', () => {
     expect(inv.status).toBe(201);
     const invoiceId = inv.body.id;
     const invoiceItemId = (inv.body.items ?? [])[0]?.id
-      ?? (db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ?').get(invoiceId) as any).id;
+      ?? (db.prepare('SELECT id FROM invoice_items WHERE invoice_id = ?').get(invoiceId) as { id: number }).id;
 
     // Return 1: 2 units
     const r1 = await api('post', `/api/invoices/${invoiceId}/return`, {
