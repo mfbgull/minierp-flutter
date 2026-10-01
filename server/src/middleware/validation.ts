@@ -173,7 +173,27 @@ export const zodBodySchemas = {
   // POS
   posSale: z.object({
     warehouse_id: z.union([z.number(), z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
-    items: z.array(z.any()).min(1),
+    sale_date: z.string().min(1),
+    items: z.array(z.object({
+      item_id: z.number().int().positive(),
+      quantity: z.number().positive(),
+      unit_price: z.number().min(0),
+      tax_rate: z.number().min(0).max(100).optional(),
+      discount_type: z.enum(['none', 'percentage', 'flat']).optional(),
+      discount_value: z.number().min(0).optional(),
+    })).min(1),
+    customer_id: z.number().int().positive().optional(),
+    customer_name: z.string().optional(),
+    discount_scope: z.enum(['item', 'invoice']).optional(),
+    discount_type: z.enum(['flat', 'percentage']).optional(),
+    discount_value: z.number().min(0).optional(),
+    total_amount: z.number().optional(),
+    cash_received: z.number().min(0).optional(),
+    payments: z.array(z.object({
+      amount: z.number().positive(),
+      payment_method: z.string(),
+      payment_date: z.string().optional(),
+    })).max(10).optional(),
   }).passthrough(),
 
   // Production

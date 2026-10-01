@@ -4,13 +4,14 @@ import InvoiceModel from '../models/Invoice';
 import StockMovementModel from '../models/StockMovement';
 import ledgerUtils from '../utils/ledgerUtils';
 import { PaymentRecordingService } from './PaymentRecordingService';
-import { computeInvoiceGrandTotal, parseCurrency, subtractCurrency } from '../utils/currency';
+import { addCurrency, computeInvoiceGrandTotal, parseCurrency, subtractCurrency } from '../utils/currency';
 import { isValidPaymentMethod } from './cashService';
 import { claimIdempotencyKey, findIdempotencyRecord } from '../utils/idempotency';
 import { generateDocNo } from '../utils/sequence';
 import type {
   InvoiceCreationInput,
   InvoiceCreationItemResult,
+  InvoiceCreationPayment,
   InvoiceCreationResult,
 } from './invoiceCreationTypes';
 
@@ -89,17 +90,32 @@ export class InvoiceCreationService {
       throw new InvoiceCreationTotalMismatchError(input.totalAmount, totalAmount);
     }
 
-    const paymentAmount = input.recordPayment && input.payment ? parseCurrency(input.payment.amount) : 0;
-    const creditOffset = parseCurrency(input.creditOffset);
-    if (paymentAmount < 0 || creditOffset < 0) throw new Error('Payment and credit offset must be non-negative');
-    if (paymentAmount > 0 && input.payment && !isValidPaymentMethod(input.payment.payment_method ?? 'Cash')) {
-      throw new InvoiceCreationPaymentMethodError(input.payment.payment_method);
-    }
-    if (paymentAmount + creditOffset > totalAmount + 0.01) {
-      throw new InvoiceCreationOffsetError(paymentAmount + creditOffset, totalAmount);
+    const legs: readonly InvoiceCreationPayment[] = input.payments !== undefined
+      ? input.payments
+      : input.recordPayment && input.payment
+        ? [input.payment]
+        : [];
+
+    let legsTotal = 0;
+    for (const leg of legs) {
+      const legAmount = parseCurrency(leg.amount);
+      if (legAmount < 0) throw new Error('Payment amounts must be non-negative');
+      if (legAmount > 0 && !isValidPaymentMethod(leg.payment_method ?? 'Cash')) {
+        throw new InvoiceCreationPaymentMethodError(leg.payment_method);
+      }
+      // addCurrency, not `+=`: summing several 2dp legs in floating point
+      // can land a cent low and flip a fully-settled invoice to
+      // 'Partially Paid'.
+      legsTotal = addCurrency(legsTotal, legAmount);
     }
 
-    const paidAmount = paymentAmount + creditOffset;
+    const creditOffset = parseCurrency(input.creditOffset);
+    if (creditOffset < 0) throw new Error('Credit offset must be non-negative');
+    if (legsTotal + creditOffset > totalAmount + 0.01) {
+      throw new InvoiceCreationOffsetError(legsTotal + creditOffset, totalAmount);
+    }
+
+    const paidAmount = addCurrency(legsTotal, creditOffset);
     const balanceAmount = subtractCurrency(totalAmount, paidAmount);
     const status = input.status ?? (paidAmount >= totalAmount ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Unpaid');
     const dueDate = input.dueDate === undefined ? defaultDueDate(input.invoiceDate) : input.dueDate;
@@ -199,20 +215,25 @@ export class InvoiceCreationService {
 
       let paymentId: number | null = null;
       let paymentNo: string | null = null;
-      if (paymentAmount > 0 && input.payment) {
+      // One entry per leg, each through the single existing recording path
+      // so the method whitelist, period guard, allocation, status refresh
+      // and GL posting stay in one place.
+      for (const leg of legs) {
+        const legAmount = parseCurrency(leg.amount);
+        if (legAmount <= 0) continue;
         const recorded = new PaymentRecordingService(this.db).recordCustomerPayment({
           mode: 'INVOICE_SETTLEMENT',
           customerId: input.customerId,
-          paymentDate: input.payment.payment_date || input.invoiceDate,
-          amount: paymentAmount,
-          paymentMethod: input.payment.payment_method || 'Cash',
-          referenceNo: input.payment.reference_no,
-          notes: input.payment.notes,
+          paymentDate: leg.payment_date || input.invoiceDate,
+          amount: legAmount,
+          paymentMethod: leg.payment_method || 'Cash',
+          referenceNo: leg.reference_no,
+          notes: leg.notes,
           userId: input.userId,
-          allocations: [{ invoiceId, amount: paymentAmount }],
+          allocations: [{ invoiceId, amount: legAmount }],
         });
-        paymentId = recorded.paymentId;
-        paymentNo = recorded.paymentNo;
+        paymentId = paymentId ?? recorded.paymentId;
+        paymentNo = paymentNo ?? recorded.paymentNo;
       }
       if (creditOffset > 0) {
         AccountingService.postCreditOffsetEntry(this.db, { invoiceId, invoiceNo, amount: creditOffset, invoiceDate: input.invoiceDate, customerId: input.customerId, userId: input.userId });

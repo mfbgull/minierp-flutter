@@ -218,3 +218,29 @@ class PosTransaction {
   final double paidAmount;
   final double balanceAmount;
 }
+
+/// An active tax preset from `GET /api/pos/tax-rates`.
+class PosTaxRate {
+  const PosTaxRate({required this.id, required this.name, required this.rate});
+
+  factory PosTaxRate.fromJson(Map<String, dynamic> json) => PosTaxRate(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        name: (json['name'] as String?) ?? '',
+        rate: (json['rate'] as num?)?.toDouble() ?? 0,
+      );
+
+  final int id;
+  final String name;
+  final double rate;
+}
+
+/// One tendered leg of a POS settlement.
+class PosPaymentLeg {
+  const PosPaymentLeg({required this.method, required this.amount});
+
+  final String method;
+  final double amount;
+
+  Map<String, dynamic> toJson() =>
+      <String, dynamic>{'amount': amount, 'payment_method': method};
+}
