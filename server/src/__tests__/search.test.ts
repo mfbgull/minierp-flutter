@@ -3,6 +3,7 @@ import app from '../app';
 import db from '../config/database';
 import fs from 'fs';
 import path from 'path';
+import type { SearchResult } from '../types/search';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
@@ -208,12 +209,12 @@ describe('Search API', () => {
       expect(res.body.data.query).toBe('ali');
       expect(res.body.data.results.length).toBeGreaterThan(0);
 
-      const customers = res.body.data.results.filter((r: any) => r.type === 'customer');
+      const customers = res.body.data.results.filter((r: SearchResult) => r.type === 'customer');
       expect(customers.length).toBeGreaterThan(0);
-      const titles = customers.map((c: any) => c.title);
+      const titles = customers.map((c: SearchResult) => c.title);
       expect(titles).toContain('Ali Khan');
       expect(titles.some((t: string) => t === 'Ali & Sons' || t === 'Ali Khan')).toBe(true);
-      const aliKhan = customers.find((c: any) => c.title === 'Ali Khan');
+      const aliKhan = customers.find((c: SearchResult) => c.title === 'Ali Khan');
       expect(aliKhan).toBeDefined();
       expect(aliKhan.subtitle).toContain('CUST-001');
     });
@@ -259,7 +260,7 @@ describe('Search API', () => {
         .get('/api/search?q=Inactive Customer')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const inactive = res.body.data.results.filter((r: any) => r.title === 'Inactive Customer');
+      const inactive = res.body.data.results.filter((r: SearchResult) => r.title === 'Inactive Customer');
       expect(inactive.length).toBe(0);
     });
 
@@ -268,7 +269,7 @@ describe('Search API', () => {
         .get('/api/search?q=Ali Traders')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const suppliers = res.body.data.results.filter((r: any) => r.type === 'supplier');
+      const suppliers = res.body.data.results.filter((r: SearchResult) => r.type === 'supplier');
       expect(suppliers.length).toBe(1);
       expect(suppliers[0].title).toBe('Ali Traders');
       expect(suppliers[0].subtitle).toContain('SUP-001');
@@ -279,7 +280,7 @@ describe('Search API', () => {
         .get('/api/search?q=Test Soap')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const products = res.body.data.results.filter((r: any) => r.type === 'product');
+      const products = res.body.data.results.filter((r: SearchResult) => r.type === 'product');
       expect(products.length).toBe(1);
       expect(products[0].title).toBe('Test Soap');
     });
@@ -289,7 +290,7 @@ describe('Search API', () => {
         .get('/api/search?q=INV-001')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const invoices = res.body.data.results.filter((r: any) => r.type === 'invoice');
+      const invoices = res.body.data.results.filter((r: SearchResult) => r.type === 'invoice');
       expect(invoices.length).toBe(1);
       expect(invoices[0].title).toBe('INV-001');
       expect(invoices[0].metadata.status).toBe('Unpaid');
@@ -300,7 +301,7 @@ describe('Search API', () => {
         .get('/api/search?q=PO-001')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const po = res.body.data.results.filter((r: any) => r.type === 'purchase_order');
+      const po = res.body.data.results.filter((r: SearchResult) => r.type === 'purchase_order');
       expect(po.length).toBe(1);
       expect(po[0].title).toBe('PO-001');
     });
@@ -311,7 +312,7 @@ describe('Search API', () => {
       .set('Cookie', authCookie);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.results.some((r: any) => r.type === 'quotation')).toBe(true);
+    expect(res.body.data.results.some((r: SearchResult) => r.type === 'quotation')).toBe(true);
   });
 
     it('returns sales orders', async () => {
@@ -319,7 +320,7 @@ describe('Search API', () => {
         .get('/api/search?q=SO-001')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const so = res.body.data.results.filter((r: any) => r.type === 'sales_order');
+      const so = res.body.data.results.filter((r: SearchResult) => r.type === 'sales_order');
       expect(so.length).toBe(1);
     });
 
@@ -328,7 +329,7 @@ describe('Search API', () => {
         .get('/api/search?q=PAY-001')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const pay = res.body.data.results.filter((r: any) => r.type === 'payment');
+      const pay = res.body.data.results.filter((r: SearchResult) => r.type === 'payment');
       expect(pay.length).toBe(1);
     });
 
@@ -337,7 +338,7 @@ describe('Search API', () => {
         .get('/api/search?q=Office rent')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const exp = res.body.data.results.filter((r: any) => r.type === 'expense');
+      const exp = res.body.data.results.filter((r: SearchResult) => r.type === 'expense');
       expect(exp.length).toBe(1);
     });
 
@@ -346,7 +347,7 @@ describe('Search API', () => {
         .get('/api/search?q=Main Warehouse')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const wh = res.body.data.results.filter((r: any) => r.type === 'warehouse');
+      const wh = res.body.data.results.filter((r: SearchResult) => r.type === 'warehouse');
       expect(wh.length).toBe(1);
       expect(wh[0].title).toBe('Main Warehouse');
     });
@@ -356,7 +357,7 @@ describe('Search API', () => {
         .get('/api/search?q=Ahmed')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const emp = res.body.data.results.filter((r: any) => r.type === 'employee');
+      const emp = res.body.data.results.filter((r: SearchResult) => r.type === 'employee');
       expect(emp.length).toBe(1);
       expect(emp[0].title).toContain('Ahmed');
     });
@@ -366,7 +367,7 @@ describe('Search API', () => {
         .get('/api/search?q=PRD-001')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const prod = res.body.data.results.filter((r: any) => r.type === 'production');
+      const prod = res.body.data.results.filter((r: SearchResult) => r.type === 'production');
       expect(prod.length).toBe(1);
     });
 
@@ -375,7 +376,7 @@ describe('Search API', () => {
         .get('/api/search?q=BOM-001')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const bom = res.body.data.results.filter((r: any) => r.type === 'bom');
+      const bom = res.body.data.results.filter((r: SearchResult) => r.type === 'bom');
       expect(bom.length).toBe(1);
       expect(bom[0].title).toBe('BOM-001');
       // bom_items not seeded, so component_count is 0
@@ -387,10 +388,10 @@ describe('Search API', () => {
         .get('/api/search?q=Ali')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const customers = res.body.data.results.filter((r: any) => r.type === 'customer');
+      const customers = res.body.data.results.filter((r: SearchResult) => r.type === 'customer');
       expect(customers.length).toBeGreaterThan(0);
       // Both "Ali Khan" and "Ali & Sons" should be in top results (both start with "Ali")
-      const titles = customers.map((c: any) => c.title);
+      const titles = customers.map((c: SearchResult) => c.title);
       expect(titles).toContain('Ali Khan');
       expect(titles).toContain('Ali & Sons');
     });
@@ -402,7 +403,7 @@ describe('Search API', () => {
       expect(res.status).toBe(200);
       // limit is applied per entity type, so total may exceed limit
       // but no single entity type should exceed limit
-      const customers = res.body.data.results.filter((r: any) => r.type === 'customer');
+      const customers = res.body.data.results.filter((r: SearchResult) => r.type === 'customer');
       expect(customers.length).toBeLessThanOrEqual(1);
     });
 
@@ -411,11 +412,11 @@ describe('Search API', () => {
         .get('/api/search?q=ali&limit=1')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const customers = res.body.data.results.filter((r: any) => r.type === 'customer');
+      const customers = res.body.data.results.filter((r: SearchResult) => r.type === 'customer');
       expect(customers.length).toBe(1);
       expect(Array.isArray(customers[0].actions)).toBe(true);
       expect(customers[0].actions.length).toBeGreaterThan(0);
-      expect(customers[0].actions.some((a: any) => a.id === 'open')).toBe(true);
+      expect(customers[0].actions.some((a: SearchResult) => a.id === 'open')).toBe(true);
     });
 
     it('filters actions based on invoice status', async () => {
@@ -423,11 +424,11 @@ describe('Search API', () => {
         .get('/api/search?q=INV-002')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const invoices = res.body.data.results.filter((r: any) => r.type === 'invoice');
+      const invoices = res.body.data.results.filter((r: SearchResult) => r.type === 'invoice');
       expect(invoices.length).toBe(1);
       const actions = invoices[0].actions;
       // Paid invoice should NOT have record_payment action
-      const hasRecordPayment = actions.some((a: any) => a.id === 'record_payment');
+      const hasRecordPayment = actions.some((a: SearchResult) => a.id === 'record_payment');
       expect(hasRecordPayment).toBe(false);
     });
 
@@ -445,9 +446,9 @@ describe('Search API', () => {
         .get('/api/search?q=inventory')
         .set('Cookie', authCookie);
       expect(res.status).toBe(200);
-      const pages = res.body.data.results.filter((r: any) => r.type === 'page');
+      const pages = res.body.data.results.filter((r: SearchResult) => r.type === 'page');
       expect(pages.length).toBeGreaterThan(0);
-      expect(pages.some((p: any) => p.id === 'inventory')).toBe(true);
+      expect(pages.some((p: SearchResult) => p.id === 'inventory')).toBe(true);
     });
   });
 });

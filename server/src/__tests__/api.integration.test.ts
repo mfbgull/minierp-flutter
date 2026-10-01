@@ -609,38 +609,38 @@ describe('Purchase Returns Endpoints (full flow)', () => {
     returnNo = res.body.data.return_no;
 
     // Header + line persisted.
-    const header = db.prepare('SELECT * FROM purchase_returns WHERE id = ?').get(returnId) as any;
+    const header = db.prepare('SELECT * FROM purchase_returns WHERE id = ?').get(returnId) as { source_id: number; status: string; warehouse_id: number };
     expect(header.status).toBe('POSTED');
     expect(header.source_id).toBe(purchaseId);
     expect(header.warehouse_id).toBe(warehouseId);
-    const line = db.prepare('SELECT * FROM purchase_return_items WHERE purchase_return_id = ?').get(returnId) as any;
+    const line = db.prepare('SELECT * FROM purchase_return_items WHERE purchase_return_id = ?').get(returnId) as { amount: number; item_id: number; quantity: number };
     expect(line.item_id).toBe(itemId);
     expect(line.quantity).toBe(4);
     expect(line.amount).toBe(40);
 
     // Stock reduced 10 → 6 and the negative movement is back-linked.
-    const balance = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?').get(itemId, warehouseId) as any;
+    const balance = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?').get(itemId, warehouseId) as { quantity: number };
     expect(balance.quantity).toBe(6);
     const movement = db.prepare(`
       SELECT * FROM stock_movements WHERE purchase_return_id = ? AND quantity < 0
-    `).get(returnId) as any;
+    `).get(returnId) as { quantity: number; reference_docno: string };
     expect(movement.quantity).toBe(-4);
     expect(movement.reference_docno).toBe(returnNo);
 
     // Source returned_quantity tracked.
-    const purchase = db.prepare('SELECT returned_quantity FROM purchases WHERE id = ?').get(purchaseId) as any;
+    const purchase = db.prepare('SELECT returned_quantity FROM purchases WHERE id = ?').get(purchaseId) as { returned_quantity: number };
     expect(purchase.returned_quantity).toBe(4);
 
     // Credit note resolved the supplier by name + posted the ledger entry.
     const creditNote = db.prepare(`
       SELECT * FROM credit_notes WHERE source_id = ? AND source_type = 'PURCHASE_RETURN'
-    `).get(returnId) as any;
+    `).get(returnId) as { amount: number; credit_no: string; status: string; supplier_id: number; voided: number };
     expect(creditNote.supplier_id).toBe(supplierId);
     expect(creditNote.amount).toBe(40);
     expect(creditNote.status).toBe('POSTED');
     const ledger = db.prepare(`
       SELECT * FROM supplier_ledger WHERE transaction_type = 'CREDIT_NOTE' AND reference_no = ?
-    `).get(creditNote.credit_no) as any;
+    `).get(creditNote.credit_no) as { credit: number; debit: number; supplier_id: number; voided: number };
     expect(ledger.supplier_id).toBe(supplierId);
     expect(ledger.credit).toBe(40);
     expect(ledger.debit).toBe(0);
@@ -648,9 +648,9 @@ describe('Purchase Returns Endpoints (full flow)', () => {
     // GL reversal (Dr AP / Cr Inventory) keyed to the return header.
     const journal = db.prepare(`
       SELECT * FROM journal_lines WHERE reference_type = 'PURCHASE_RETURN' AND reference_id = ?
-    `).all(returnId) as any[];
+    `).all(returnId) as { voided: number }[];
     expect(journal).toHaveLength(2);
-    expect(journal.every((j: any) => j.voided === 0)).toBe(true);
+    expect(journal.every((j) => j.voided === 0)).toBe(true);
   });
 
   it('rejects a return above the remaining returnable quantity (cap)', async () => {
@@ -679,34 +679,34 @@ describe('Purchase Returns Endpoints (full flow)', () => {
     expect(res.body.data.status).toBe('VOIDED');
     expect(res.body.data.voided_reason).toBe('Wrong stock');
 
-    const header = db.prepare('SELECT status FROM purchase_returns WHERE id = ?').get(returnId) as any;
+    const header = db.prepare('SELECT status FROM purchase_returns WHERE id = ?').get(returnId) as { status: string };
     expect(header.status).toBe('VOIDED');
 
     // Stock back to 10; source returned_quantity reset.
-    const balance = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?').get(itemId, warehouseId) as any;
+    const balance = db.prepare('SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?').get(itemId, warehouseId) as { quantity: number };
     expect(balance.quantity).toBe(10);
-    const purchase = db.prepare('SELECT returned_quantity FROM purchases WHERE id = ?').get(purchaseId) as any;
+    const purchase = db.prepare('SELECT returned_quantity FROM purchases WHERE id = ?').get(purchaseId) as { returned_quantity: number };
     expect(purchase.returned_quantity).toBe(0);
 
     // Credit note voided + reversing ledger entry (debit restores balance).
     const creditNote = db.prepare(`
       SELECT * FROM credit_notes WHERE source_id = ? AND source_type = 'PURCHASE_RETURN'
-    `).get(returnId) as any;
+    `).get(returnId) as { credit_no: string; status: string; voided: number };
     expect(creditNote.status).toBe('VOIDED');
     const reversal = db.prepare(`
       SELECT * FROM supplier_ledger WHERE transaction_type = 'CREDIT_NOTE_VOID'
-    `).get() as any;
+    `).get() as { debit: number; reference_no: string; voided: number };
     expect(reversal.debit).toBe(40);
     expect(reversal.reference_no).toBe(creditNote.credit_no);
 
     // GL lines voided; positive reversal movement back-linked.
     const journal = db.prepare(`
       SELECT * FROM journal_lines WHERE reference_type = 'PURCHASE_RETURN' AND reference_id = ?
-    `).all(returnId) as any[];
-    expect(journal.every((j: any) => j.voided === 1)).toBe(true);
+    `).all(returnId) as { voided: number }[];
+    expect(journal.every((j) => j.voided === 1)).toBe(true);
     const reversalMovement = db.prepare(`
       SELECT * FROM stock_movements WHERE purchase_return_id = ? AND quantity > 0
-    `).get(returnId) as any;
+    `).get(returnId) as { quantity: number };
     expect(reversalMovement.quantity).toBe(4);
   });
 
@@ -876,7 +876,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
       SELECT * FROM stock_movements
       WHERE item_id = ? AND reference_docno = ? AND movement_type = 'ADJUSTMENT'
         AND reference_doctype = 'RETURN'
-    `).get(itemId, invoiceNo) as any;
+    `).get(itemId, invoiceNo) as { quantity: number; warehouse_id: number };
     expect(movement).toBeTruthy();
     expect(movement.warehouse_id).toBe(restockWarehouseId);
     expect(movement.quantity).toBe(2);
@@ -885,11 +885,11 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
     // the restock warehouse (which started at 0).
     const saleBalance = db.prepare(
       'SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?'
-    ).get(itemId, saleWarehouseId) as any;
+    ).get(itemId, saleWarehouseId) as { quantity: number };
     expect(saleBalance.quantity).toBe(7);
     const restockBalance = db.prepare(
       'SELECT quantity FROM stock_balances WHERE item_id = ? AND warehouse_id = ?'
-    ).get(itemId, restockWarehouseId) as any;
+    ).get(itemId, restockWarehouseId) as { quantity: number };
     expect(restockBalance.quantity).toBe(2);
   });
 
@@ -911,7 +911,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
       SELECT * FROM stock_movements
       WHERE item_id = ? AND reference_docno = ? AND movement_type = 'ADJUSTMENT'
         AND reference_doctype = 'RETURN'
-    `).get(itemId, invoiceNo) as any;
+    `).get(itemId, invoiceNo) as { warehouse_id: number };
     expect(movement.warehouse_id).toBe(saleWarehouseId);
   });
 

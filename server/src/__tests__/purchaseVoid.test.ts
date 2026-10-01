@@ -167,7 +167,7 @@ describe('task 3.6: purchase void lifecycle', () => {
     const db = createFixture();
     // A decoy GR batch whose source_id equals the NEXT purchase's id — the
     // old re-query could match this one instead of the new purchase's batch.
-    const nextId = ((db.prepare('SELECT COALESCE(MAX(id),0)+1 n FROM purchases').get() as any).n);
+    const nextId = ((db.prepare('SELECT COALESCE(MAX(id),0)+1 n FROM purchases').get() as { COALESCE_MAX_id_: string; n: string }).n);
     // Warehouse 1 must exist for the decoy batch.
     if (!db.prepare('SELECT id FROM warehouses WHERE id = 1').get()) {
       db.prepare(`INSERT INTO warehouses (id, warehouse_code, warehouse_name, is_active)
