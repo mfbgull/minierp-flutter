@@ -34,6 +34,7 @@ import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'payments_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:minierp_app/widgets/movable_dialog.dart';
+import '../../core/utils/idempotency_key.dart';
 
 /// Opens the Record Payment dialog (customer + allocations).
 Future<void> showRecordPaymentDialog(BuildContext context) {
@@ -53,6 +54,7 @@ class RecordPaymentDialog extends ConsumerStatefulWidget {
 
 class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _idemKeys = IdempotencyKeyCache(prefix: 'pay');
 
   int? _customerId;
   late DateTime _paymentDate;
@@ -167,23 +169,25 @@ class _RecordPaymentDialogState extends ConsumerState<RecordPaymentDialog> {
       _error = null;
     });
 
+    final body = {
+      'customer_id': _customerId,
+      'payment_date': isoDate(_paymentDate),
+      'amount': _totalAllocated,
+      'payment_method': _paymentMethod,
+      if (_referenceController.text.trim().isNotEmpty)
+        'reference_no': _referenceController.text.trim(),
+      if (_notesController.text.trim().isNotEmpty)
+        'notes': _notesController.text.trim(),
+      'invoice_allocations': allocations,
+    };
     final result = await ref
         .read(invoiceRepositoryProvider)
-        .createInvoicePayment({
-          'customer_id': _customerId,
-          'payment_date': isoDate(_paymentDate),
-          'amount': _totalAllocated,
-          'payment_method': _paymentMethod,
-          if (_referenceController.text.trim().isNotEmpty)
-            'reference_no': _referenceController.text.trim(),
-          if (_notesController.text.trim().isNotEmpty)
-            'notes': _notesController.text.trim(),
-          'invoice_allocations': allocations,
-        });
+        .createInvoicePayment(body, idempotencyKey: _idemKeys.keyFor(body));
     if (!mounted) return;
 
     switch (result) {
       case ApiSuccess():
+        _idemKeys.reset();
         ref.invalidate(paymentsProvider);
         ref.invalidate(invoicesProvider);
         showAppToast(

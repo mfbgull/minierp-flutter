@@ -107,9 +107,18 @@ class ExpenseRepository {
       );
 
   /// `POST /expenses` — body keys per the controller's createExpense DTO.
-  Future<ApiResult<Expense>> create(Map<String, dynamic> body) => _client.post(
+  ///
+  /// [idempotencyKey] makes a retry after a lost response replay the original
+  /// expense rather than expensing the cash twice (audit-3 task 08).
+  Future<ApiResult<Expense>> create(
+    Map<String, dynamic> body, {
+    String? idempotencyKey,
+  }) => _client.post(
     ApiEndpoints.expenses,
     body: body,
+    headers: idempotencyKey == null
+        ? null
+        : <String, dynamic>{'Idempotency-Key': idempotencyKey},
     parse: (Object? json) => Expense.fromJson(json! as Map<String, dynamic>),
   );
 

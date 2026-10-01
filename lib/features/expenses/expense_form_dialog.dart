@@ -33,6 +33,7 @@ import 'expense_category_dialog.dart';
 import 'expense_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:minierp_app/widgets/movable_dialog.dart';
+import '../../core/utils/idempotency_key.dart';
 
 /// Opens the create ([expense] == null) or edit form dialog.
 Future<void> showExpenseFormDialog(BuildContext context, {Expense? expense}) {
@@ -54,6 +55,7 @@ class ExpenseFormDialog extends ConsumerStatefulWidget {
 
 class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _idemKeys = IdempotencyKeyCache(prefix: 'exp');
 
   late final TextEditingController _descriptionController;
   late final TextEditingController _amountController;
@@ -178,13 +180,19 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
       _error = null;
     });
     final repo = ref.read(expenseRepositoryProvider);
+    // audit-3 task 08: the key is derived from the exact body, so an
+    // unchanged retry after a lost response replays the original expense
+    // instead of expensing the cash twice. Only create is keyed — update
+    // has no server-side idempotency scope.
+    final body = _buildBody();
     final result = _isEdit
-        ? await repo.update(widget.expense!.id, _buildBody())
-        : await repo.create(_buildBody());
+        ? await repo.update(widget.expense!.id, body)
+        : await repo.create(body, idempotencyKey: _idemKeys.keyFor(body));
     if (!mounted) return;
 
     switch (result) {
       case ApiSuccess():
+        if (!_isEdit) _idemKeys.reset();
         ref.invalidate(expensesProvider);
         Navigator.of(context).pop();
       case ApiFailure(:final error):

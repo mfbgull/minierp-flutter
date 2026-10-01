@@ -31,11 +31,13 @@ import {
 } from '../services/InvoiceCreationService';
 import {
   IDEMPOTENCY_KEY_HEADER,
+  IDEMPOTENCY_SCOPES,
   INVOICE_CREATE_SCOPE,
   normalizeIdempotencyKey,
   hashRequestPayload,
   findIdempotencyRecord,
   claimIdempotencyKey,
+  startIdempotentRequest,
 } from '../utils/idempotency';
 
 /**
@@ -1032,6 +1034,18 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
     const legacyReason = items.length > 0 ? String((items[0] as Record<string, unknown>)?.reason ?? '') : '';
     const reason = body.reason ? String(body.reason) : legacyReason || null;
 
+    // audit-3 task 08: a sales return puts stock back and may refund or
+    // credit, so a retry must replay rather than return the goods twice.
+    const idemHash = hashRequestPayload(req.body);
+    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.INVOICE_RETURN, idemHash);
+    if (start.kind === 'error') {
+      return res.status(start.status).json({ error: start.message });
+    }
+    if (start.kind === 'replay') {
+      res.set('X-Idempotent-Replay', 'true');
+      return res.json({ success: true, message: 'Return processed successfully', idempotentReplay: true, data: { returnId: start.resourceId } });
+    }
+
     const result = InvoiceReturnService.processReturn({
       invoiceId,
       items,
@@ -1052,6 +1066,10 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
       deductionValue: body.deduction_value !== undefined ? Number(body.deduction_value) : undefined,
       userId,
     });
+
+    if (start.key) {
+      claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.INVOICE_RETURN, start.key, idemHash, result.returnId);
+    }
 
     return res.json({ success: true, message: 'Return processed successfully', data: result });
   } catch (error: unknown) {

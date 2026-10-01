@@ -23,6 +23,7 @@ import '../payments/payments_providers.dart' show paymentsProvider;
 import 'invoice_providers.dart' show invoicesProvider;
 import 'payment_panel.dart' show kPaymentMethods;
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import '../../core/utils/idempotency_key.dart';
 
 /// Opens the record-payment dialog for one invoice.
 Future<void> showInvoicePaymentDialog(
@@ -47,6 +48,7 @@ class InvoicePaymentDialog extends ConsumerStatefulWidget {
 
 class _InvoicePaymentDialogState extends ConsumerState<InvoicePaymentDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _idemKeys = IdempotencyKeyCache(prefix: 'pay');
   late DateTime _paymentDate;
   final _amountController = TextEditingController();
   final _referenceController = TextEditingController();
@@ -97,26 +99,28 @@ class _InvoicePaymentDialogState extends ConsumerState<InvoicePaymentDialog> {
     });
 
     final invoice = widget.invoice;
+    final body = {
+      'customer_id': invoice.customerId,
+      'payment_date': isoDate(_paymentDate),
+      'amount': amount,
+      'payment_method': _paymentMethod,
+      if (_referenceController.text.trim().isNotEmpty)
+        'reference_no': _referenceController.text.trim(),
+      if (_notesController.text.trim().isNotEmpty)
+        'notes': _notesController.text.trim(),
+      'description': 'Payment for ${invoice.invoiceNo}',
+      'invoice_allocations': [
+        {'invoice_id': invoice.id, 'amount': amount},
+      ],
+    };
     final result = await ref
         .read(invoiceRepositoryProvider)
-        .createInvoicePayment({
-          'customer_id': invoice.customerId,
-          'payment_date': isoDate(_paymentDate),
-          'amount': amount,
-          'payment_method': _paymentMethod,
-          if (_referenceController.text.trim().isNotEmpty)
-            'reference_no': _referenceController.text.trim(),
-          if (_notesController.text.trim().isNotEmpty)
-            'notes': _notesController.text.trim(),
-          'description': 'Payment for ${invoice.invoiceNo}',
-          'invoice_allocations': [
-            {'invoice_id': invoice.id, 'amount': amount},
-          ],
-        });
+        .createInvoicePayment(body, idempotencyKey: _idemKeys.keyFor(body));
     if (!mounted) return;
 
     switch (result) {
       case ApiSuccess():
+        _idemKeys.reset();
         ref.invalidate(paymentsProvider);
         ref.invalidate(invoicesProvider);
         showAppToast(

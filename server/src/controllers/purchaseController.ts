@@ -1,3 +1,12 @@
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  IDEMPOTENCY_SCOPES,
+  IdempotencyConflictError,
+  beginIdempotentWrite,
+  claimIdempotencyKey,
+  hashRequestPayload,
+  normalizeIdempotencyKey,
+} from '../utils/idempotency';
 import { Request, Response } from 'express';
 import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
@@ -9,6 +18,25 @@ import { handleBusinessError } from '../utils/businessRuleError';
 
 function recordPurchase(req: AuthRequest, res: Response): void {
   try {
+    // audit-3 task 08: a purchase is the widest blast radius of any keyed
+    // write — rows, stock batches, movements, AP, the ledger and the GL all
+    // land together — so a retry after a lost response must replay rather
+    // than duplicate the lot.
+    let idemKey: string | null;
+    try {
+      idemKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
+    } catch (keyError) {
+      res.status(400).json({ error: (keyError as Error).message });
+      return;
+    }
+    const hash = hashRequestPayload(req.body);
+    const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.PURCHASE_RECORD, idemKey, hash);
+    if (replayId !== null) {
+      if (idemKey) res.set('X-Idempotent-Replay', 'true');
+      res.status(201).json(Purchase.getById(replayId, db));
+      return;
+    }
+
     // Multi-item payload (Record Purchase form's line items): one
     // transaction creates one purchases row per item. The flat
     // single-item body remains the legacy path.
@@ -39,7 +67,13 @@ function recordPurchase(req: AuthRequest, res: Response): void {
         }
       }
 
-      const created = Purchase.recordPurchaseMulti(req.body, req.user!.id, db);
+      const created = db.transaction(() => {
+        const rows = Purchase.recordPurchaseMulti(req.body, req.user!.id, db);
+        if (idemKey) {
+          claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PURCHASE_RECORD, idemKey, hash, rows[0].id);
+        }
+        return rows;
+      })();
       res.status(201).json(created);
       return;
     }
@@ -69,11 +103,21 @@ function recordPurchase(req: AuthRequest, res: Response): void {
       return;
     }
 
-    const purchase = Purchase.recordPurchase(req.body, req.user!.id, db);
+    const purchase = db.transaction(() => {
+      const row = Purchase.recordPurchase(req.body, req.user!.id, db);
+      if (idemKey) {
+        claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PURCHASE_RECORD, idemKey, hash, row.id);
+      }
+      return row;
+    })();
 
     res.status(201).json(purchase);
   } catch (error: any) {
     logger.error('Record purchase error:', error);
+    if (error instanceof IdempotencyConflictError) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
     handleBusinessError(res, error, 'Record purchase', 'Failed to record purchase');
   }
 }

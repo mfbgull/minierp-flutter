@@ -7,6 +7,13 @@ import { Response } from 'express';
 import { AuthRequest } from '../types';
 import { InvoiceReturnService, ReturnError, type SettlementInput } from '../services/invoiceReturnService';
 import { handleBusinessError } from '../utils/businessRuleError';
+import db from '../config/database';
+import {
+  IDEMPOTENCY_SCOPES,
+  claimIdempotencyKey,
+  hashRequestPayload,
+  startIdempotentRequest,
+} from '../utils/idempotency';
 
 function settleReturn(req: AuthRequest, res: Response): Response | void {
   try {
@@ -15,7 +22,23 @@ function settleReturn(req: AuthRequest, res: Response): Response | void {
     if (!Array.isArray(allocations) || allocations.length === 0) {
       return res.status(400).json({ error: 'Invalid request: allocations must be a non-empty array' });
     }
+    // audit-3 task 08: settling issues the refund or credit, so a retry must
+    // replay rather than pay the customer twice. The claim is keyed on the
+    // return being settled, which is the operation's resource identity.
+    const hash = hashRequestPayload(req.body);
+    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.INVOICE_RETURN_SETTLE, hash);
+    if (start.kind === 'error') {
+      return res.status(start.status).json({ error: start.message });
+    }
+    if (start.kind === 'replay') {
+      res.set('X-Idempotent-Replay', 'true');
+      return res.json({ success: true, message: 'Return settled successfully', idempotentReplay: true, data: { returnId: start.resourceId } });
+    }
+
     const result = InvoiceReturnService.settleReturn(returnId, allocations, req.user!.id);
+    if (start.key) {
+      claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.INVOICE_RETURN_SETTLE, start.key, hash, returnId);
+    }
     return res.json({ success: true, message: 'Return settled successfully', data: result });
   } catch (error: unknown) {
     if (error instanceof ReturnError) {

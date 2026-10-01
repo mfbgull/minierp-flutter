@@ -20,6 +20,7 @@ import ledgerUtils from '../utils/ledgerUtils';
 import { parseCurrency, subtractCurrency } from '../utils/currency';
 import { validateCustomerPayment } from './paymentValidation';
 import { assertPaymentMethod, assertPeriodOpen, insertPaymentRow } from './paymentWriterCore';
+import { beginIdempotentWrite, claimIdempotencyKey } from '../utils/idempotency';
 import type {
   CustomerPaymentInput,
   ExistingPaymentAllocationInput,
@@ -32,6 +33,23 @@ export class PaymentRecordingService {
 
   recordCustomerPayment(input: CustomerPaymentInput): PaymentRecordingResult {
     return this.db.transaction(() => {
+      // audit-3 task 08: a retry of an already-committed payment replays
+      // rather than recording the cash a second time. Checked here, inside
+      // the transaction, so a rolled-back attempt leaves no claim behind.
+      if (input.idempotency) {
+        const { replayId } = beginIdempotentWrite(
+          this.db, input.idempotency.scope, input.idempotency.key, input.idempotency.hash,
+        );
+        if (replayId !== null) {
+          const prior = this.db.prepare('SELECT payment_no FROM payments WHERE id = ?')
+            .get(replayId) as { payment_no: string } | undefined;
+          return {
+            paymentId: replayId,
+            paymentNo: prior?.payment_no ?? '',
+            amount: 0,
+          };
+        }
+      }
       validateCustomerPayment(this.db, input);
       // CREDIT_APPLICATION moves no cash: its stored method is the "Credit"
       // marker, not a cash account, so the cash whitelist must not apply.
@@ -57,6 +75,10 @@ export class PaymentRecordingService {
       this.insertAllocations(paymentId, input.allocations, isRefund ? -1 : 1, !isRefund);
       this.postAccounting(paymentId, paymentNo, input, signedAmount);
 
+      if (input.idempotency) {
+        claimIdempotencyKey(this.db, input.idempotency.scope, input.idempotency.key, input.idempotency.hash, paymentId);
+      }
+
       return { paymentId, paymentNo, amount: signedAmount };
     })();
   }
@@ -66,6 +88,12 @@ export class PaymentRecordingService {
     if (input.allocations.length === 0) throw new Error('At least one allocation is required');
 
     this.db.transaction(() => {
+      // audit-3 task 08: allocation re-points money across invoices, so a
+      // retry after a lost response would double-allocate. The claim
+      // records the payment it settled against and replays instead.
+      if (input.idempotency) {
+        beginIdempotentWrite(this.db, input.idempotency.scope, input.idempotency.key, input.idempotency.hash);
+      }
       const payment = this.db.prepare('SELECT amount, customer_id FROM payments WHERE id = ?')
         .get(input.paymentId) as { amount: number; customer_id: number | null } | undefined;
       if (!payment) throw new Error('Payment not found');
@@ -90,6 +118,10 @@ export class PaymentRecordingService {
       }
 
       this.insertAllocations(input.paymentId, input.allocations, 1, true);
+
+      if (input.idempotency) {
+        claimIdempotencyKey(this.db, input.idempotency.scope, input.idempotency.key, input.idempotency.hash, input.paymentId);
+      }
     })();
   }
 

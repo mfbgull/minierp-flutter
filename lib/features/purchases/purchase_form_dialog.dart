@@ -41,6 +41,7 @@ import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'purchase_providers.dart' show purchasesProvider;
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:minierp_app/widgets/movable_dialog.dart';
+import '../../core/utils/idempotency_key.dart';
 
 /// Opens the new-purchase dialog (create only).
 Future<void> showPurchaseFormDialog(BuildContext context) {
@@ -82,6 +83,7 @@ class _PurchaseFormDialog extends ConsumerStatefulWidget {
 
 class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _idemKeys = IdempotencyKeyCache(prefix: 'pur');
 
   // Document.
   int? _supplierId;
@@ -193,6 +195,38 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
       _error = null;
     });
 
+    final lines = [
+      for (final line in filled)
+        (
+          itemId: line.itemId!,
+          quantity: line.quantity,
+          unitCost: line.unitCost,
+          expiryDate:
+              line.expiryDate != null ? isoDate(line.expiryDate!) : null,
+        ),
+    ];
+    // audit-3 task 08: a purchase is the widest blast radius of a keyed
+    // write — rows, batches, movements, AP and the GL all land together — so
+    // an unchanged retry after a lost response must replay. The server
+    // treats the key as opaque and hashes the body itself, so deriving it
+    // from these inputs is enough to keep it stable per payload.
+    final idemKey = _idemKeys.keyFor({
+      'warehouse_id': _warehouseId,
+      'purchase_date': isoDate(_purchaseDate),
+      'supplier_id': _supplierId,
+      'invoice_no': _invoiceNoController.text,
+      'remarks': _remarksController.text,
+      'items': [
+        for (final l in lines)
+          {
+            'item_id': l.itemId,
+            'quantity': l.quantity,
+            'unit_cost': l.unitCost,
+            'expiry_date': l.expiryDate,
+          },
+      ],
+    });
+
     final result = await ref
         .read(purchaseRepositoryProvider)
         .createMulti(
@@ -201,16 +235,8 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
           supplierId: _supplierId,
           invoiceNo: _invoiceNoController.text,
           remarks: _remarksController.text,
-          items: [
-            for (final line in filled)
-              (
-                itemId: line.itemId!,
-                quantity: line.quantity,
-                unitCost: line.unitCost,
-                expiryDate:
-                    line.expiryDate != null ? isoDate(line.expiryDate!) : null,
-              ),
-          ],
+          items: lines,
+          idempotencyKey: idemKey,
         );
     if (!mounted) return;
 
@@ -221,6 +247,7 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
           _error = error.message;
         });
       case ApiSuccess(:final data):
+        _idemKeys.reset();
         ref.invalidate(purchasesProvider);
         if (_recordPayment && _canPay) {
           // Spread the payment across the created rows in order, capped

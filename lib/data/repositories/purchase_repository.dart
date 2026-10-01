@@ -68,6 +68,9 @@ class PurchaseRepository {
   /// purchase (bare object). [purchaseDate] is ISO `yyyy-MM-dd`;
   /// [supplierId] links the purchase to a supplier (the server resolves
   /// the name and posts the AP ledger entry).
+  /// [idempotencyKey] makes a retry after a lost response replay the original
+  /// purchase instead of duplicating its rows, batches and GL (audit-3 task
+  /// 08). Derive it from the same body with `IdempotencyKeyCache`.
   Future<ApiResult<Purchase>> create({
     required int itemId,
     required int warehouseId,
@@ -78,6 +81,7 @@ class PurchaseRepository {
     String? invoiceNo,
     String? remarks,
     String? expiryDate,
+    String? idempotencyKey,
   }) => _api.post(
     ApiEndpoints.purchases,
     body: {
@@ -93,6 +97,9 @@ class PurchaseRepository {
         'remarks': remarks.trim(),
       'expiry_date': ?expiryDate,
     },
+    headers: idempotencyKey == null
+        ? null
+        : <String, dynamic>{'Idempotency-Key': idempotencyKey},
     parse: (Object? json) => Purchase.fromJson(json as Map<String, dynamic>),
   );
 
@@ -102,6 +109,9 @@ class PurchaseRepository {
   /// entries — atomically in one transaction, and returns the created
   /// rows as a **bare array** (order matches [items]). Header fields
   /// apply to every line.
+  ///
+  /// [idempotencyKey] makes a retry after a lost response replay rather than
+  /// duplicating every line's purchase, batch, movement and GL entry.
   Future<ApiResult<List<Purchase>>> createMulti({
     required int warehouseId,
     required String purchaseDate,
@@ -109,6 +119,7 @@ class PurchaseRepository {
     String? invoiceNo,
     String? remarks,
     required List<({int itemId, num quantity, num unitCost, String? expiryDate})> items,
+    String? idempotencyKey,
   }) => _api.postRaw<List<Purchase>>(
     ApiEndpoints.purchases,
     body: {
@@ -129,6 +140,9 @@ class PurchaseRepository {
           },
       ],
     },
+    headers: idempotencyKey == null
+        ? null
+        : <String, dynamic>{'Idempotency-Key': idempotencyKey},
     parse: (Object? json) => [
       for (final row in json! as List<dynamic>)
         Purchase.fromJson(row as Map<String, dynamic>),

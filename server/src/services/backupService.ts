@@ -11,6 +11,7 @@ import Database from 'better-sqlite3';
 import db from '../config/database';
 import logger from '../utils/logger';
 import { ActionType } from './activityLogger';
+import { pruneIdempotencyKeys } from '../utils/idempotency';
 
 // DATABASE_PATH is the database *directory* (see config/database.ts);
 // backups live alongside erp.db inside <db-dir>/backups.
@@ -178,4 +179,17 @@ export function startBackupScheduler(): void {
     setTimeout(() => runBackup(), 10_000); // shortly after listen
   }
   setInterval(() => runBackup(), INTERVAL_MS).unref();
+  // Idempotency keys past the 30-day retention window (decision 8.4) are
+  // swept in the same nightly window, so the table cannot grow unbounded
+  // without adding a second scheduler.
+  setInterval(() => pruneKeys(), INTERVAL_MS).unref();
+}
+
+function pruneKeys(): void {
+  try {
+    const pruned = pruneIdempotencyKeys(db);
+    if (pruned > 0) logger.info(`[Idempotency] pruned ${pruned} key(s) past retention`);
+  } catch (err) {
+    logger.error('[Idempotency] key retention sweep failed', { error: (err as Error).message });
+  }
 }

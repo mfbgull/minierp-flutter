@@ -5,6 +5,12 @@ import PurchaseOrderModel from '../models/PurchaseOrder';
 import SupplierLedgerModel from '../models/SupplierLedger';
 import db from '../config/database';
 import logger from '../utils/logger';
+import {
+  IDEMPOTENCY_SCOPES,
+  claimIdempotencyKey,
+  hashRequestPayload,
+  startIdempotentRequest,
+} from '../utils/idempotency';
 
 function createPurchaseOrder(req: AuthRequest, res: Response): void {
   try {
@@ -378,17 +384,38 @@ function createGoodsReceipt(req: AuthRequest, res: Response): void {
       }
     }
 
-    const receipt = PurchaseOrderModel.addReceipt(
-      {
-        po_id: Number(req.params.id),
-        receipt_date,
-        warehouse_id,
-        remarks,
-        items
-      },
-      req.user!.id,
-      db
-    );
+    // audit-3 task 08: a goods receipt brings stock IN and a payable with
+    // it, so a retry after a lost response must replay rather than receive
+    // the same goods twice.
+    const hash = hashRequestPayload(req.body);
+    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.PURCHASE_ORDER_RECEIPT, hash);
+    if (start.kind === 'error') {
+      res.status(start.status).json({ error: start.message });
+      return;
+    }
+    if (start.kind === 'replay') {
+      res.set('X-Idempotent-Replay', 'true');
+      res.status(201).json({ success: true, idempotentReplay: true, data: { id: start.resourceId } });
+      return;
+    }
+
+    const receipt = db.transaction(() => {
+      const created = PurchaseOrderModel.addReceipt(
+        {
+          po_id: Number(req.params.id),
+          receipt_date,
+          warehouse_id,
+          remarks,
+          items
+        },
+        req.user!.id,
+        db
+      );
+      if (start.key) {
+        claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PURCHASE_ORDER_RECEIPT, start.key, hash, created.id);
+      }
+      return created;
+    })();
 
     res.status(201).json(receipt);
   } catch (error: any) {

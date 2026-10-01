@@ -73,6 +73,7 @@ import 'payment_panel.dart'
     show PaymentPanel, PaymentPanelState, kPaymentMethods;
 import 'price_history_hint.dart' show PriceHistoryHint;
 import 'package:minierp_app/core/theme/app_border_radius.dart';
+import '../../core/utils/idempotency_key.dart';
 
 /// Create ([invoice] == null) or edit page for an invoice.
 class SalesInvoiceFormPage extends ConsumerStatefulWidget {
@@ -147,6 +148,10 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   String? _createIdemKey;
   String? _createIdemKeyBody;
   static final Random _idemRandom = Random();
+
+  /// One key per distinct payment body, so re-running [_postPaymentBodies]
+  /// replays instead of duplicating every payment but the last.
+  final _paymentIdemKeys = IdempotencyKeyCache(prefix: 'pay');
 
   String _createIdempotencyKeyFor(Map<String, dynamic> body) {
     final encoded = jsonEncode(body);
@@ -757,7 +762,13 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     final repo = ref.read(invoiceRepositoryProvider);
     var ok = true;
     for (final body in bodies) {
-      final result = await repo.createInvoicePayment(body);
+      // audit-3 task 08: stableKeyFor, not keyFor — this loop posts several
+      // bodies and a single-slot key would rotate on every iteration, so a
+      // retry of the whole loop would duplicate all but the last payment.
+      final result = await repo.createInvoicePayment(
+        body,
+        idempotencyKey: _paymentIdemKeys.stableKeyFor(body),
+      );
       if (result case ApiFailure(:final error)) {
         ok = false;
         if (mounted) showAppToast(context, error.message);
