@@ -5,6 +5,7 @@
 
 import db from '../config/database';
 import logger from '../utils/logger';
+import { errorMessage } from '../utils/errorMessage';
 
 // Activity log query filters
 export interface ActivityLogFilters {
@@ -98,8 +99,8 @@ class ActivityLogModel {
       );
 
       return result.lastInsertRowid as number;
-    } catch (error: any) {
-      logger.error('[ActivityLogModel] Insert failed:', error.message);
+    } catch (error: unknown) {
+      logger.error('[ActivityLogModel] Insert failed:', errorMessage(error));
       return 0;
     }
   }
@@ -175,8 +176,8 @@ class ActivityLogModel {
       `).all(...params, limit, offset) as ActivityLogWithUser[];
 
       return { data, total: countResult.total };
-    } catch (error: any) {
-      logger.error('[ActivityLogModel] Find failed:', error.message);
+    } catch (error: unknown) {
+      logger.error('[ActivityLogModel] Find failed:', errorMessage(error));
       return { data: [], total: 0 };
     }
   }
@@ -194,8 +195,8 @@ class ActivityLogModel {
         ORDER BY al.created_at DESC
         LIMIT ?
       `).all(userId, limit) as ActivityLogWithUser[];
-    } catch (error: any) {
-      logger.error('[ActivityLogModel] Find by user failed:', error.message);
+    } catch (error: unknown) {
+      logger.error('[ActivityLogModel] Find by user failed:', errorMessage(error));
       return [];
     }
   }
@@ -213,8 +214,8 @@ class ActivityLogModel {
         ORDER BY al.created_at DESC
         LIMIT ?
       `).all(entityType, entityId, limit) as ActivityLogWithUser[];
-    } catch (error: any) {
-      logger.error('[ActivityLogModel] Find by entity failed:', error.message);
+    } catch (error: unknown) {
+      logger.error('[ActivityLogModel] Find by entity failed:', errorMessage(error));
       return [];
     }
   }
@@ -231,8 +232,8 @@ class ActivityLogModel {
         ORDER BY al.created_at DESC
         LIMIT ?
       `).all(limit) as ActivityLogWithUser[];
-    } catch (error: any) {
-      logger.error('[ActivityLogModel] Find recent failed:', error.message);
+    } catch (error: unknown) {
+      logger.error('[ActivityLogModel] Find recent failed:', errorMessage(error));
       return [];
     }
   }
@@ -294,8 +295,8 @@ class ActivityLogModel {
       `).get(...params) as { total: number };
 
       return { actions, users, dailyActivity, totalLogs: totalResult.total };
-    } catch (error: any) {
-      logger.error('[ActivityLogModel] Get stats failed:', error.message);
+    } catch (error: unknown) {
+      logger.error('[ActivityLogModel] Get stats failed:', errorMessage(error));
       return { actions: [], users: [], dailyActivity: [], totalLogs: 0 };
     }
   }
@@ -312,8 +313,8 @@ class ActivityLogModel {
       `).all() as { entity_type: string }[];
 
       return results.map(r => r.entity_type);
-    } catch (error: any) {
-      logger.error('[ActivityLogModel] Get entity types failed:', error.message);
+    } catch (error: unknown) {
+      logger.error('[ActivityLogModel] Get entity types failed:', errorMessage(error));
       return [];
     }
   }
@@ -330,8 +331,8 @@ class ActivityLogModel {
       `).all() as { action: string }[];
 
       return results.map(r => r.action);
-    } catch (error: any) {
-      logger.error('[ActivityLogModel] Get actions failed:', error.message);
+    } catch (error: unknown) {
+      logger.error('[ActivityLogModel] Get actions failed:', errorMessage(error));
       return [];
     }
   }
@@ -347,8 +348,8 @@ class ActivityLogModel {
       `).run(days);
 
       return result.changes;
-    } catch (error: any) {
-      logger.error('[ActivityLogModel] Delete older than failed:', error.message);
+    } catch (error: unknown) {
+      logger.error('[ActivityLogModel] Delete older than failed:', errorMessage(error));
       return 0;
     }
   }

@@ -11,6 +11,7 @@ import {
   hashRequestPayload,
   startIdempotentRequest,
 } from '../utils/idempotency';
+import { errorMessage } from '../utils/errorMessage';
 
 function createPurchaseOrder(req: AuthRequest, res: Response): void {
   try {
@@ -62,9 +63,9 @@ function createPurchaseOrder(req: AuthRequest, res: Response): void {
     const po = PurchaseOrderModel.create(req.body, req.user!.id, db);
 
     res.status(201).json(po);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Create PO error:', error);
-    res.status(500).json({ error: error.message || 'Failed to create purchase order' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to create purchase order' });
   }
 }
 
@@ -156,9 +157,9 @@ function updatePurchaseOrder(req: AuthRequest, res: Response): void {
     );
 
     res.json(po);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Update PO error:', error);
-    res.status(500).json({ error: error.message || 'Failed to update purchase order' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to update purchase order' });
   }
 }
 
@@ -167,9 +168,9 @@ function deletePurchaseOrder(req: AuthRequest, res: Response): void {
     PurchaseOrderModel.delete(Number(req.params.id), req.user!.id, db);
 
     res.json({ success: true, message: 'Purchase order deleted successfully' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Delete PO error:', error);
-    res.status(500).json({ error: error.message || 'Failed to delete purchase order' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to delete purchase order' });
   }
 }
 
@@ -201,9 +202,9 @@ function addLineItem(req: AuthRequest, res: Response): void {
     );
 
     res.status(201).json(item);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Add PO item error:', error);
-    res.status(500).json({ error: error.message || 'Failed to add line item' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to add line item' });
   }
 }
 
@@ -235,9 +236,9 @@ function updateLineItem(req: Request, res: Response): void {
     );
 
     res.json(item);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Update PO item error:', error);
-    res.status(500).json({ error: error.message || 'Failed to update line item' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to update line item' });
   }
 }
 
@@ -246,9 +247,9 @@ function deleteLineItem(req: Request, res: Response): void {
     PurchaseOrderModel.removeItem(Number(req.params.itemId), db);
 
     res.json({ success: true, message: 'Line item deleted successfully' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Delete PO item error:', error);
-    res.status(500).json({ error: error.message || 'Failed to delete line item' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to delete line item' });
   }
 }
 
@@ -270,8 +271,8 @@ function updateStatus(req: AuthRequest, res: Response): void {
     const po = PurchaseOrderModel.updateStatus(Number(req.params.id), status, req.user!.id, db);
 
     res.json(po);
-  } catch (error: any) {
-    const message = error?.message || String(error);
+  } catch (error: unknown) {
+    const message = errorMessage(error) || String(error);
     // Status-machine violations (illegal transition / terminal-state lock /
     // unknown PO) are client errors — a double-fire or stale UI must get a
     // 4xx, not a 500 (Phase 5).
@@ -418,9 +419,9 @@ function createGoodsReceipt(req: AuthRequest, res: Response): void {
     })();
 
     res.status(201).json(receipt);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Create goods receipt error:', error);
-    res.status(500).json({ error: error.message || 'Failed to create goods receipt' });
+    res.status(500).json({ error: errorMessage(error) || 'Failed to create goods receipt' });
   }
 }
 

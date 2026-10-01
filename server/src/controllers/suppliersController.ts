@@ -10,6 +10,8 @@ import logger from '../utils/logger';
 import { parsePageParams, envelope } from '../utils/paginate';
 import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/sequence';
 
+import { errorMessage, errorCode } from '../utils/errorMessage';
+
 function getSuppliers(req: Request, res: Response): void {
   try {
     const pageParam = getQueryParam(req.query.page);
@@ -112,9 +114,9 @@ function createSupplier(req: Request, res: Response): void {
         payment_terms
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error creating supplier:', error);
-    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (errorCode(error) === 'SQLITE_CONSTRAINT_UNIQUE') {
       res.status(400).json({
         success: false,
         error: 'Supplier code already exists'

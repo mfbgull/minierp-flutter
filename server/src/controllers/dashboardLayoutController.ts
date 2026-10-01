@@ -12,6 +12,8 @@ import { AuthRequest } from '../types';
 import logger from '../utils/logger';
 import DashboardLayoutModel from '../models/DashboardLayout';
 
+import { errorMessage, errorCode } from '../utils/errorMessage';
+
 // ═══════════════════════════════════════════════════════════════
 //  LAYOUT CRUD
 // ═══════════════════════════════════════════════════════════════
@@ -59,9 +61,9 @@ function createLayout(req: AuthRequest, res: Response): void {
     );
 
     res.status(201).json({ success: true, data: layout });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Handle UNIQUE constraint violation (duplicate layout name)
-    if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (errorCode(error) === 'SQLITE_CONSTRAINT_UNIQUE') {
       res.status(409).json({ error: 'A layout with this name already exists' });
       return;
     }
@@ -122,8 +124,8 @@ function renameLayout(req: AuthRequest, res: Response): void {
     }
 
     res.json({ success: true, message: 'Layout renamed' });
-  } catch (error: any) {
-    if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+  } catch (error: unknown) {
+    if (errorCode(error) === 'SQLITE_CONSTRAINT_UNIQUE') {
       res.status(409).json({ error: 'A layout with this name already exists' });
       return;
     }

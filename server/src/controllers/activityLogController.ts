@@ -10,6 +10,7 @@ import { logCRUD, ActionType } from '../services/activityLogger';
 import { AuthRequest } from '../types';
 import { getQueryInteger, getRouteParam } from '../utils/queryUtils';
 import logger from '../utils/logger';
+import { errorMessage } from '../utils/errorMessage';
 
 /**
  * Get activity logs with filters and pagination
@@ -52,8 +53,8 @@ export function getActivityLogs(req: Request, res: Response): void {
       limit: filters.limit,
       offset: filters.offset
     });
-  } catch (error: any) {
-    logger.error('[ActivityLogController] Get logs error:', error.message);
+  } catch (error: unknown) {
+    logger.error('[ActivityLogController] Get logs error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to fetch activity logs' });
   }
 }
@@ -75,8 +76,8 @@ export function getActivityStats(req: Request, res: Response): void {
       success: true,
       data: stats
     });
-  } catch (error: any) {
-    logger.error('[ActivityLogController] Get stats error:', error.message);
+  } catch (error: unknown) {
+    logger.error('[ActivityLogController] Get stats error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to fetch activity statistics' });
   }
 }
@@ -102,8 +103,8 @@ export function getUserActivity(req: Request, res: Response): void {
       data: logs,
       total: logs.length
     });
-  } catch (error: any) {
-    logger.error('[ActivityLogController] Get user activity error:', error.message);
+  } catch (error: unknown) {
+    logger.error('[ActivityLogController] Get user activity error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to fetch user activity' });
   }
 }
@@ -131,8 +132,8 @@ export function getEntityActivity(req: Request, res: Response): void {
       data: logs,
       total: logs.length
     });
-  } catch (error: any) {
-    logger.error('[ActivityLogController] Get entity activity error:', error.message);
+  } catch (error: unknown) {
+    logger.error('[ActivityLogController] Get entity activity error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to fetch entity activity' });
   }
 }
@@ -151,8 +152,8 @@ export function getRecentActivity(req: Request, res: Response): void {
       success: true,
       data: logs
     });
-  } catch (error: any) {
-    logger.error('[ActivityLogController] Get recent activity error:', error.message);
+  } catch (error: unknown) {
+    logger.error('[ActivityLogController] Get recent activity error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to fetch recent activity' });
   }
 }
@@ -169,8 +170,8 @@ export function getEntityTypes(req: Request, res: Response): void {
       success: true,
       data: entityTypes
     });
-  } catch (error: any) {
-    logger.error('[ActivityLogController] Get entity types error:', error.message);
+  } catch (error: unknown) {
+    logger.error('[ActivityLogController] Get entity types error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to fetch entity types' });
   }
 }
@@ -187,8 +188,8 @@ export function getActions(req: Request, res: Response): void {
       success: true,
       data: actions
     });
-  } catch (error: any) {
-    logger.error('[ActivityLogController] Get actions error:', error.message);
+  } catch (error: unknown) {
+    logger.error('[ActivityLogController] Get actions error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to fetch actions' });
   }
 }
@@ -228,8 +229,8 @@ export function exportLogs(req: Request, res: Response): void {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename=activity-logs-${Date.now()}.csv`);
     res.send(csv);
-  } catch (error: any) {
-    logger.error('[ActivityLogController] Export logs error:', error.message);
+  } catch (error: unknown) {
+    logger.error('[ActivityLogController] Export logs error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to export activity logs' });
   }
 }
@@ -267,8 +268,8 @@ export function cleanupLogs(req: AuthRequest, res: Response): void {
       message: `Cleaned up ${deletedCount} old log entries`,
       deletedCount
     });
-  } catch (error: any) {
-    logger.error('[ActivityLogController] Cleanup logs error:', error.message);
+  } catch (error: unknown) {
+    logger.error('[ActivityLogController] Cleanup logs error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to cleanup activity logs' });
   }
 }
@@ -281,8 +282,8 @@ export function getUsers(req: Request, res: Response): void {
   try {
     const users = activityLogModel.getUsers();
     res.json({ success: true, data: users });
-  } catch (error: any) {
-    logger.error('[ActivityLogController] Get users error:', error.message);
+  } catch (error: unknown) {
+    logger.error('[ActivityLogController] Get users error:', errorMessage(error));
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 }

@@ -46,6 +46,7 @@ import searchRoutes from './routes/search';
 import stockBatchesRoutes, { initStockBatchesRoutes } from './routes/stockBatches';
 import path from 'path';
 import fs from 'fs';
+import { errorMessage } from './utils/errorMessage';
 
 // Create Express app
 const app: Express = express();
@@ -156,8 +157,8 @@ function checkDatabaseHealth(): Array<{ name: string; status: 'ok' | 'fail'; det
     } else {
       results.push({ name: 'database_connectivity', status: 'fail', detail: 'Unexpected result from probe query' });
     }
-  } catch (error: any) {
-    results.push({ name: 'database_connectivity', status: 'fail', detail: error.message });
+  } catch (error: unknown) {
+    results.push({ name: 'database_connectivity', status: 'fail', detail: errorMessage(error) });
   }
 
   // Check 2: Critical tables exist
@@ -173,8 +174,8 @@ function checkDatabaseHealth(): Array<{ name: string; status: 'ok' | 'fail'; det
       } else {
         results.push({ name: `table_${tableName}`, status: 'fail', detail: `Table '${tableName}' does not exist` });
       }
-    } catch (error: any) {
-      results.push({ name: `table_${tableName}`, status: 'fail', detail: error.message });
+    } catch (error: unknown) {
+      results.push({ name: `table_${tableName}`, status: 'fail', detail: errorMessage(error) });
     }
   }
 

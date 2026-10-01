@@ -4,6 +4,7 @@ import {
   ForecastModelType, ForecastModelConfig, SeasonalEvent, ForecastAccuracy,
   SafetyStockResult, ItemAccuracy, AccuracyDataPoint, ForecastOverrideRequest
 } from '../types';
+import { errorMessage } from '../utils/errorMessage';
 
 // ============================================================
 // 1. CONFIG & HELPERS
@@ -781,12 +782,12 @@ export function generateAllForecasts(): ForecastResult[] {
     `).run(forecasts.length, runId);
 
     return forecasts;
-  } catch (error: any) {
+  } catch (error: unknown) {
     db.prepare(`
       UPDATE forecast_runs
       SET status = 'failed', errors = errors + 1, error_message = ?, completed_at = datetime('now')
       WHERE run_id = ?
-    `).run(String(error.message || error), runId);
+    `).run(String(errorMessage(error) || error), runId);
 
     throw error;
   }
@@ -1017,7 +1018,7 @@ export function computeForecastAccuracy(): { computed: number; errors: number } 
       `).run(actualQty, Math.round(mape * 100) / 100, Math.round(mae * 100) / 100, Math.round(smape * 100) / 100, record.id);
 
       computed++;
-    } catch (error: any) {
+    } catch (error: unknown) {
       errors++;
     }
   }

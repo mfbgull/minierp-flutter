@@ -41,7 +41,7 @@ function recordProduction(req: AuthRequest, res: Response): void {
     req.activityLogged = true;
 
     res.status(201).json(production);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Record production error:', error);
     res.status(500).json({ error: 'Failed to record production' });
   }
@@ -133,7 +133,7 @@ function deleteProduction(req: AuthRequest, res: Response): void {
     }
 
     res.json({ success: true, message: 'Production deleted successfully' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Delete production error:', error);
     res.status(500).json({ error: 'Failed to delete production' });
   }

@@ -15,6 +15,7 @@ import AccountingService from '../services/accountingService';
 import db from '../config/database';
 import logger from '../utils/logger';
 import { handleBusinessError } from '../utils/businessRuleError';
+import { errorMessage } from '../utils/errorMessage';
 
 function recordPurchase(req: AuthRequest, res: Response): void {
   try {
@@ -112,7 +113,7 @@ function recordPurchase(req: AuthRequest, res: Response): void {
     })();
 
     res.status(201).json(purchase);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Record purchase error:', error);
     if (error instanceof IdempotencyConflictError) {
       res.status(409).json({ error: error.message });
@@ -269,8 +270,8 @@ function voidPurchase(req: AuthRequest, res: Response): void {
     Purchase.void(id, req.user!.id, reason, db);
 
     res.json({ success: true, message: 'Purchase voided successfully' });
-  } catch (error: any) {
-    const message = error?.message || 'Failed to void purchase';
+  } catch (error: unknown) {
+    const message = errorMessage(error) || 'Failed to void purchase';
     // Guard rejections are client errors — surface the reason.
     const isClientError = /Cannot void|already voided|not found|reason is required/i.test(message);
     const isClosedPeriod = /inside closed accounting period/i.test(message);

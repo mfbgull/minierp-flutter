@@ -116,7 +116,7 @@ router.get('/stock-batches', requirePermission('inventory', 'read'), (req, res) 
       }
       res.json(batches);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Get stock batches error:', error);
     res.status(500).json({ error: 'Failed to fetch stock batches' });
   }
@@ -156,7 +156,7 @@ router.patch('/stock-batches/:id', requirePermission('inventory', 'write'), vali
 
     const updated = db.prepare('SELECT * FROM stock_batches WHERE id = ?').get(batchId);
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Update batch expiry error:', error);
     res.status(500).json({ error: 'Failed to update batch expiry date' });
   }
@@ -190,7 +190,7 @@ router.patch('/stock-batches/:id/halt', requirePermission('inventory', 'write'),
 
     const updated = db.prepare('SELECT * FROM stock_batches WHERE id = ?').get(batchId);
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Halt batch error:', error);
     res.status(500).json({ error: 'Failed to halt batch' });
   }
@@ -223,7 +223,7 @@ router.patch('/stock-batches/:id/unhalt', requirePermission('inventory', 'write'
 
     const updated = db.prepare('SELECT * FROM stock_batches WHERE id = ?').get(batchId);
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Unhalt batch error:', error);
     res.status(500).json({ error: 'Failed to unhalt batch' });
   }
