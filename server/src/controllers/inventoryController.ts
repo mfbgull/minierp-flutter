@@ -4,12 +4,13 @@ import ItemModel from '../models/Item';
 import WarehouseModel from '../models/Warehouse';
 import StockMovementModel from '../models/StockMovement';
 import PhysicalCountModel from '../models/PhysicalCount';
-import { StockReservationModel } from '../models/StockReservation';
+import { StockReservationModel, type StockReservation } from '../models/StockReservation';
 import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
 import db from '../config/database';
 import logger from '../utils/logger';
 import { errorMessage } from '../utils/errorMessage';
+import { SqlParam } from '../utils/sqlTypes';
 
 function getItems(req: Request, res: Response): void {
   try {
@@ -1178,7 +1179,7 @@ export function getBatchReconciliation(req: AuthRequest, res: Response): Respons
         const { item_id, warehouse_id } = req.query as any;
 
     let where = 'WHERE 1=1';
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (item_id) {
       where += ' AND sb.item_id = ?';
@@ -1410,9 +1411,9 @@ export function getReservations(req: AuthRequest, res: Response): Response | voi
   try {
         const { doctype, docno } = req.query as any;
 
-    let reservations: any[];
+    let reservations: StockReservation[];
     if (doctype && docno) {
-      reservations = StockReservationModel.getByReference(doctype as string, docno as string, db);
+      reservations = StockReservationModel.getByReference(doctype, docno, db);
     } else {
       reservations = StockReservationModel.getAll(db);
     }

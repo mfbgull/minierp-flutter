@@ -111,6 +111,29 @@ export interface EmployeeDocument {
   updated_at?: string;
 }
 
+type SalaryHistoryDbRow = {
+  pay_period: string;
+  total_paid: number;
+  payment_count: number;
+  auto_advance_amount: number;
+  advance_reference: string | null;
+  first_payment_date: string;
+  last_payment_date: string;
+};
+
+export type SalaryHistoryRow = {
+  pay_period: string;
+  employee_salary: number;
+  total_paid: number;
+  remaining: number;
+  status: string;
+  payment_count: number;
+  advance_carryover: number;
+  advance_source_period: string | null;
+  first_payment_date: string;
+  last_payment_date: string;
+};
+
 class EmployeeModel {
   static getAll(
     db: Database.Database,
@@ -316,7 +339,7 @@ class EmployeeModel {
    * Aggregated salary history — one row per pay_period (month).
    * Returns: pay_period, employee_salary, total_paid, status, payment_count.
    */
-  static getSalaryHistory(employeeId: number, db: Database.Database): any[] {
+  static getSalaryHistory(employeeId: number, db: Database.Database): SalaryHistoryRow[] {
     const employee = db.prepare('SELECT salary FROM employees WHERE id = ?').get(employeeId) as { salary: number } | undefined;
     const salary = employee?.salary ?? 0;
 
@@ -333,15 +356,7 @@ class EmployeeModel {
       WHERE employee_id = ? AND voided_at IS NULL
       GROUP BY pay_period
       ORDER BY pay_period DESC
-    `).all(employeeId) as Array<{
-      pay_period: string;
-      total_paid: number;
-      payment_count: number;
-      auto_advance_amount: number;
-      advance_reference: string | null;
-      first_payment_date: string;
-      last_payment_date: string;
-    }>;
+    `).all(employeeId) as SalaryHistoryDbRow[];
 
     return rows.map((r) => {
       let status: string;

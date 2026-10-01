@@ -61,6 +61,23 @@ interface CreateSupplierPaymentDTO {
 }
 
 // Static class for Payment model operations
+export type UnifiedPaymentRow = {
+  source: string;
+  source_id: number;
+  ref_no: string;
+  date: string;
+  amount: number;
+  method: string | null;
+  type: string;
+  party: string | null;
+  party_id: number | null;
+  party_type: string | null;
+  status: string;
+  description: string | null;
+  sort_created_at: string;
+  direction: 'in' | 'out' | 'unknown';
+};
+
 export class PaymentModel {
   /**
    * Generate payment number using sequence utility.
@@ -229,7 +246,7 @@ export class PaymentModel {
    *  - Sorting appends a deterministic tie-breaker (sort_created_at, source,
    *    source_id) for stable server-side pagination.
    */
-  static getUnifiedPayments(db: Database.Database, filters: UnifiedPaymentFilters = {}): { payments: any[]; total: number; pageNum: number; limitNum: number } {
+  static getUnifiedPayments(db: Database.Database, filters: UnifiedPaymentFilters = {}): { payments: UnifiedPaymentRow[]; total: number; pageNum: number; limitNum: number } {
     const pageNum = filters.page || 1;
     const limitNum = filters.limit || 10;
 
@@ -307,7 +324,7 @@ export class PaymentModel {
     const ctes = `WITH unified_raw AS (${rawCte}), unified AS (SELECT *, ${directionSql} direction FROM unified_raw)`;
 
     const rows = db.prepare(`${ctes} SELECT * FROM unified ${whereSql} ${orderSql} LIMIT ? OFFSET ?`)
-      .all(...params, limitNum, (pageNum - 1) * limitNum) as any[];
+      .all(...params, limitNum, (pageNum - 1) * limitNum) as UnifiedPaymentRow[];
 
     const totalRow = db.prepare(`${ctes} SELECT COUNT(*) AS total FROM unified ${whereSql}`)
       .get(...params) as { total: number };

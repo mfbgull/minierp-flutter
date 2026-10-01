@@ -5,6 +5,7 @@ import {
   SafetyStockResult, ItemAccuracy, AccuracyDataPoint, ForecastOverrideRequest
 } from '../types';
 import { errorMessage } from '../utils/errorMessage';
+import { SqlParam } from '../utils/sqlTypes';
 
 // ============================================================
 // 1. CONFIG & HELPERS
@@ -1035,7 +1036,7 @@ export function computeForecastAccuracy(): { computed: number; errors: number } 
  */
 export function getAccuracy(itemId?: number): ItemAccuracy[] {
   let query: string;
-  const params: any[] = [];
+  const params: SqlParam[] = [];
 
   if (itemId) {
     query = `
@@ -1164,7 +1165,7 @@ export function setModelConfig(config: Partial<ForecastModelConfig> & { item_id:
 
   if (existing) {
     const sets: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     for (const [key, value] of Object.entries(config)) {
       if (key !== 'item_id' && key !== 'id') {

@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { sanitizeSortParams, ITEM_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
+import { SqlParam } from '../utils/sqlTypes';
 
 interface Item {
   id: number;
@@ -112,7 +113,7 @@ class ItemModel {
     // at/below the reorder level with a positive threshold. `reorder_level 0`
     // (or null) means no reorder threshold.
     const conditions: string[] = ['i.is_active = 1', 'i.deleted_at IS NULL'];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (filters.category) {
       conditions.push('i.category = ?');

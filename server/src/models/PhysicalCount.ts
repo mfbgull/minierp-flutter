@@ -3,6 +3,7 @@ import { sanitizeSortParams, PHYSICAL_COUNT_SORT_COLUMNS } from '../utils/sqlSan
 import StockMovementModel from './StockMovement';
 import AccountingService from '../services/accountingService';
 import { isFeatureEnabled } from '../utils/featureFlags';
+import { SqlParam } from '../utils/sqlTypes';
 
 /** Next sequence number for ADJUSTMENT-sourced batch numbers. */
 function getNextBatchSequence(db: Database.Database): number {
@@ -204,7 +205,7 @@ class PhysicalCountModel {
       WHERE 1=1
     `;
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (filters.search) {
       conditions.push(

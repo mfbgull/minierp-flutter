@@ -8,6 +8,7 @@ import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, PURCHASE_RETURN_HEADER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { roundQty } from '../utils/quantity';
+import { SqlParam } from '../utils/sqlTypes';
 
 /**
  * PurchaseReturnModel — the redesigned, first-class purchase return document.
@@ -152,7 +153,7 @@ class PurchaseReturnModel {
     const limitNum = filters.limit || 10;
 
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (filters.search) {
       conditions.push(

@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import logger from '../utils/logger';
 import { isFeatureEnabled } from '../utils/featureFlags';
 
-interface StockReservation {
+export interface StockReservation {
   id: number;
   item_id: number;
   warehouse_id: number;

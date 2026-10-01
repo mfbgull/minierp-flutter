@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, BOM_SORT_COLUMNS } from '../utils/sqlSanitizer';
+import { SqlParam } from '../utils/sqlTypes';
 
 interface BOM {
   id: number;
@@ -171,7 +172,7 @@ class BOMModel {
     `;
 
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (filters.search) {
       conditions.push(

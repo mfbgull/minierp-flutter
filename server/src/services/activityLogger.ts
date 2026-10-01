@@ -323,7 +323,7 @@ class ActivityLoggerService {
   /**
    * Get recent activity logs
    */
-  getRecent(limit: number = 50): any[] {
+  getRecent(limit: number = 50): ActivityLogDbEntry[] {
     try {
       return db.prepare(`
         SELECT al.*, u.username
@@ -341,7 +341,7 @@ class ActivityLoggerService {
   /**
    * Get activity logs by user
    */
-  getByUser(userId: number, limit: number = 100): any[] {
+  getByUser(userId: number, limit: number = 100): ActivityLogDbEntry[] {
     try {
       return db.prepare(`
         SELECT al.*, u.username
@@ -360,7 +360,7 @@ class ActivityLoggerService {
   /**
    * Get activity logs by entity
    */
-  getByEntity(entityType: string, entityId: number, limit: number = 50): any[] {
+  getByEntity(entityType: string, entityId: number, limit: number = 50): ActivityLogDbEntry[] {
     try {
       return db.prepare(`
         SELECT al.*, u.username

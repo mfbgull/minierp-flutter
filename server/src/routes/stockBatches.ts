@@ -6,9 +6,32 @@ import { validateZodBody, zodBodySchemas } from '../middleware/validation';
 import logger from '../utils/logger';
 import { parsePageParams, envelope } from '../utils/paginate';
 import { isFeatureEnabled } from '../utils/featureFlags';
-import { getEffectiveBatchStatus } from '../utils/batchStatus';
+import { getEffectiveBatchStatus, type BatchStatus } from '../utils/batchStatus';
+import { SqlParam, SqlRow } from '../utils/sqlTypes';
 
 const router = Router();
+type BatchLocationRow = {
+  location_id: number;
+  location_code: string;
+  location_name: string;
+  quantity_physical: number;
+  quantity_reserved: number;
+  quantity_available: number;
+  status_override: string | null;
+  effective_status?: BatchStatus;
+};
+
+type BatchListRow = SqlRow & {
+  id: number;
+  item_id: number;
+  item_code: string | null;
+  item_name: string | null;
+  warehouse_code: string | null;
+  warehouse_name: string | null;
+  effective_status?: BatchStatus;
+  locations?: BatchLocationRow[];
+};
+
 router.use(authenticateToken);
 
 // Will be injected via initStockBatchesRoutes
@@ -47,10 +70,10 @@ router.get('/stock-batches', requirePermission('inventory', 'read'), (req, res) 
     `;
 
     const featureOn = isFeatureEnabled(db, 'feature_batch_locations');
-    const params: any[] = [];
-    const countParams: any[] = [];
+    const params: SqlParam[] = [];
+    const countParams: SqlParam[] = [];
 
-    const applyFilters = (target: string, into: any[]): string => {
+    const applyFilters = (target: string, into: SqlParam[]): string => {
       let out = target;
       if (item_id) {
         out += ' AND sb.item_id = ?';
@@ -76,7 +99,7 @@ router.get('/stock-batches', requirePermission('inventory', 'read'), (req, res) 
       const p = parsePageParams(req);
       sql += ' LIMIT ? OFFSET ?';
       params.push(p.limit, p.offset);
-      const batches = db.prepare(sql).all(...params) as any[];
+      const batches = db.prepare(sql).all(...params) as BatchListRow[];
       if (featureOn) {
         for (const b of batches) {
           const locs = db.prepare(`
@@ -86,17 +109,17 @@ router.get('/stock-batches', requirePermission('inventory', 'read'), (req, res) 
             FROM batch_stock_by_location bsl
             JOIN locations l ON bsl.location_id = l.id
             WHERE bsl.batch_id = ?
-          `).all(b.id) as any[];
+          `).all(b.id) as BatchLocationRow[];
           for (const loc of locs) {
-            (loc as any).effective_status = getEffectiveBatchStatus(db, b.id, loc.location_id);
+            loc.effective_status = getEffectiveBatchStatus(db, b.id, loc.location_id);
           }
-          (b as any).locations = locs;
-          (b as any).effective_status = getEffectiveBatchStatus(db, b.id);
+          b.locations = locs;
+          b.effective_status = getEffectiveBatchStatus(db, b.id);
         }
       }
       res.json({ success: true, data: batches, pagination: envelope(total, p) });
     } else {
-      const batches = db.prepare(sql).all(...params) as any[];
+      const batches = db.prepare(sql).all(...params) as BatchListRow[];
       if (featureOn) {
         for (const b of batches) {
           const locs = db.prepare(`
@@ -106,12 +129,12 @@ router.get('/stock-batches', requirePermission('inventory', 'read'), (req, res) 
             FROM batch_stock_by_location bsl
             JOIN locations l ON bsl.location_id = l.id
             WHERE bsl.batch_id = ?
-          `).all(b.id) as any[];
+          `).all(b.id) as BatchLocationRow[];
           for (const loc of locs) {
-            (loc as any).effective_status = getEffectiveBatchStatus(db, b.id, loc.location_id);
+            loc.effective_status = getEffectiveBatchStatus(db, b.id, loc.location_id);
           }
-          (b as any).locations = locs;
-          (b as any).effective_status = getEffectiveBatchStatus(db, b.id);
+          b.locations = locs;
+          b.effective_status = getEffectiveBatchStatus(db, b.id);
         }
       }
       res.json(batches);

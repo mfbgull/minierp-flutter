@@ -5,6 +5,7 @@ import { sanitizeSortParams, STOCK_BALANCE_SORT_COLUMNS, STOCK_MOVEMENT_SORT_COL
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { SellableStockUnavailableError } from '../types';
 import { roundQty, qtyEpsilon, qtyLessThan, qtyPositive } from '../utils/quantity';
+import { SqlParam } from '../utils/sqlTypes';
 
 interface StockMovement {
   id: number;
@@ -264,7 +265,7 @@ class StockMovementModel {
       WHERE 1=1
     `;
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (filters.item_id) {
       conditions.push('sm.item_id = ?');
@@ -354,7 +355,7 @@ class StockMovementModel {
       JOIN warehouses w ON sm.warehouse_id = w.id
       WHERE sm.item_id = ?
     `;
-    const params: any[] = [itemId];
+    const params: SqlParam[] = [itemId];
 
     if (warehouseId) {
       query += ' AND sm.warehouse_id = ?';
@@ -539,7 +540,7 @@ class StockMovementModel {
       WHERE 1=1
     `;
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (filters.search) {
       conditions.push(

@@ -6,6 +6,7 @@
 import db from '../config/database';
 import logger from '../utils/logger';
 import { errorMessage } from '../utils/errorMessage';
+import { SqlParam } from '../utils/sqlTypes';
 
 // Activity log query filters
 export interface ActivityLogFilters {
@@ -111,7 +112,7 @@ class ActivityLogModel {
   find(filters: ActivityLogFilters): { data: ActivityLogWithUser[]; total: number } {
     try {
       let whereClause = '1=1';
-      const params: any[] = [];
+      const params: SqlParam[] = [];
 
       if (filters.userId) {
         whereClause += ' AND al.user_id = ?';
@@ -249,7 +250,7 @@ class ActivityLogModel {
   } {
     try {
       let dateFilter = '';
-      const params: any[] = [];
+      const params: SqlParam[] = [];
 
       if (startDate && endDate) {
         dateFilter = ' WHERE created_at >= ? AND created_at < ?';

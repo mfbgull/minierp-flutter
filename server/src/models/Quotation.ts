@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, QUOTATION_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { SalesOrderWithWarehouse, InvoiceWithUsername } from '../types';
+import { SqlParam } from '../utils/sqlTypes';
 
 export interface Quotation {
   id: number;
@@ -284,7 +285,7 @@ class QuotationModel {
       WHERE 1=1
     `;
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (filters.status) {
       conditions.push('q.status = ?');
@@ -417,7 +418,7 @@ class QuotationModel {
 
       // Update header
       const updateFields: string[] = [];
-      const updateParams: any[] = [];
+      const updateParams: SqlParam[] = [];
 
       if (customer_id !== undefined) {
         updateFields.push('customer_id = ?');

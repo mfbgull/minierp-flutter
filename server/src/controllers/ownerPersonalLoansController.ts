@@ -9,6 +9,7 @@ import { logCRUD, ActionType } from '../services/activityLogger';
 import db from '../config/database';
 import logger from '../utils/logger';
 import { generateDocNo } from '../utils/sequence';
+import { SqlParam } from '../utils/sqlTypes';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -286,7 +287,7 @@ function updateLoan(req: AuthRequest, res: Response): void {
 
     db.transaction(() => {
       const updates: string[] = [];
-      const values: any[] = [];
+      const values: SqlParam[] = [];
 
       if (borrower_name !== undefined) { updates.push('borrower_name = ?'); values.push(borrower_name.trim()); }
       if (amount !== undefined) { updates.push('amount = ?'); values.push(Number(amount)); }
@@ -638,7 +639,7 @@ function updateBorrower(req: AuthRequest, res: Response): void {
     }
 
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: SqlParam[] = [];
     if (name !== undefined) { updates.push('name = ?'); values.push(name.trim()); }
     if (phone !== undefined) { updates.push('phone = ?'); values.push(phone || null); }
     if (linked_type !== undefined) { updates.push('linked_type = ?'); values.push(linked_type || null); }
