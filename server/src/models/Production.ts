@@ -5,6 +5,7 @@ import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, PRODUCTION_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
 import AccountingService from '../services/accountingService';
+import { SqlParam } from '../utils/sqlTypes';
 
 interface Production {
   id: number;
@@ -411,7 +412,7 @@ class ProductionModel {
     `;
 
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (filters.start_date) {
       conditions.push('p.production_date >= ?');

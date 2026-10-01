@@ -86,6 +86,14 @@ export interface AccountBalance {
   text_code: string | null;
 }
 
+export type AccountingPeriod = {
+  id: number;
+  period_name: string;
+  start_date: string;
+  end_date: string;
+  status: 'open' | 'closed';
+};
+
 export class AccountingService {
 
   // ------------------------------------------------------------------
@@ -1493,18 +1501,12 @@ export class AccountingService {
   }
 
 
-  static listPeriods(db: Database.Database): Array<{
-    id: number;
-    period_name: string;
-    start_date: string;
-    end_date: string;
-    status: 'open' | 'closed';
-  }> {
+  static listPeriods(db: Database.Database): AccountingPeriod[] {
     return db.prepare(`
       SELECT id, period_name, start_date, end_date, status
       FROM accounting_periods
       ORDER BY start_date DESC
-    `).all() as any[];
+    `).all() as AccountingPeriod[];
   }
 
   static closePeriod(db: Database.Database, periodId: number, closedBy?: number): void {

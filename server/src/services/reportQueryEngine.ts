@@ -12,6 +12,7 @@ import type { EntityDefinition } from './entityRegistry';
 import logger from '../utils/logger';
 import { validateConfigExpressions, ExpressionValidationError } from './expressionValidator';
 import { errorMessage } from '../utils/errorMessage';
+import { SqlParam } from '../utils/sqlTypes';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -135,7 +136,7 @@ interface BuildContext {
   primaryTableAlias: string;
   usedJoins: Map<string, string>;  // entityKey -> alias
   joinClauses: string[];
-  paramValues: any[];
+  paramValues: SqlParam[];
 }
 
 /**

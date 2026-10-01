@@ -4,6 +4,7 @@ import { sanitizeSortParams, SALES_ORDER_SORT_COLUMNS } from '../utils/sqlSaniti
 import { QuotationWithWarehouse, InvoiceWithUsername } from '../types';
 import InvoiceModel from './Invoice';
 import { InvoiceCreationService } from '../services/InvoiceCreationService';
+import { SqlParam } from '../utils/sqlTypes';
 
 export interface SalesOrder {
   id: number;
@@ -287,7 +288,7 @@ class SalesOrderModel {
       WHERE 1=1
     `;
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (filters.status) {
       conditions.push('so.status = ?');
@@ -428,7 +429,7 @@ class SalesOrderModel {
 
       // Update header
       const updateFields: string[] = [];
-      const updateParams: any[] = [];
+      const updateParams: SqlParam[] = [];
 
       if (customer_id !== undefined) {
         updateFields.push('customer_id = ?');

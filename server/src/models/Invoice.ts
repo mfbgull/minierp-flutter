@@ -9,6 +9,7 @@ import AccountingService from '../services/accountingService';
 import InvoiceReturnModel from './InvoiceReturn';
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { roundQty } from '../utils/quantity';
+import { SqlParam } from '../utils/sqlTypes';
 
 /**
  * Reversal-rules guard rejection (rule 4/5: paid + returned documents
@@ -16,6 +17,29 @@ import { roundQty } from '../utils/quantity';
  * correct (payments/returns present) — the controller maps it to HTTP
  * 409 rather than a 500 server fault.
  */
+export type InvoiceReturnRow = {
+  id: number;
+  movement_no: string;
+  item_id: number;
+  warehouse_id: number;
+  quantity: number;
+  unit_cost: number;
+  reference_doctype: string;
+  invoice_no: string;
+  remarks: string | null;
+  return_date: string;
+  created_at: string;
+  created_by: number | null;
+  item_code: string;
+  item_name: string;
+  unit_of_measure: string | null;
+  warehouse_code: string;
+  warehouse_name: string;
+  created_by_username: string | null;
+  customer_name: string | null;
+  customer_id: number | null;
+};
+
 export class InvoiceCancellationGuardError extends Error {
   constructor(message: string) {
     super(message);
@@ -307,7 +331,7 @@ class InvoiceModel {
       WHERE 1=1 AND i.deleted_at IS NULL
     `;
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (filters.statuses && filters.statuses.length > 0) {
       conditions.push(`i.status IN (${filters.statuses.map(() => '?').join(',')})`);
@@ -1297,7 +1321,7 @@ class InvoiceModel {
       limit?: number;
     } = {},
     db: Database.Database
-  ): { rows: any[]; total: number; pageNum: number; limitNum: number } {
+  ): { rows: InvoiceReturnRow[]; total: number; pageNum: number; limitNum: number } {
     const pageNum = filters.page || 1;
     const limitNum = filters.limit || 10;
 
@@ -1332,7 +1356,7 @@ class InvoiceModel {
         AND sm.quantity > 0
     `;
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (filters.start_date) {
       conditions.push('sm.movement_date >= ?');
@@ -1378,7 +1402,7 @@ class InvoiceModel {
     const offset = (pageNum - 1) * limitNum;
     const rows = db
       .prepare(`${select}${where} ORDER BY ${sortColumn} ${order}, sm.id DESC LIMIT ? OFFSET ?`)
-      .all(...params, limitNum, offset) as any[];
+      .all(...params, limitNum, offset) as InvoiceReturnRow[];
 
     const countRow = db
       .prepare(`SELECT COUNT(*) as total FROM stock_movements sm

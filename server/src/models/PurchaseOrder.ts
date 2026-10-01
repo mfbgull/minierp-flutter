@@ -241,7 +241,7 @@ class PurchaseOrderModel {
       WHERE 1=1
     `;
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     if (filters.supplier_id) {
       conditions.push('po.supplier_id = ?');
@@ -1164,5 +1164,6 @@ class PurchaseOrderModel {
 
 // Import SupplierLedgerModel at the bottom to avoid circular dependency
 import SupplierLedgerModel from './SupplierLedger';
+import { SqlParam } from '../utils/sqlTypes';
 
 export default PurchaseOrderModel;

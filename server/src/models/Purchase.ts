@@ -6,6 +6,7 @@ import SupplierLedgerModel from './SupplierLedger';
 import AccountingService from '../services/accountingService';
 import ledgerUtils from '../utils/ledgerUtils';
 import { roundQty } from '../utils/quantity';
+import { SqlParam } from '../utils/sqlTypes';
 
 interface Purchase {
   id: number;
@@ -401,7 +402,7 @@ class PurchaseModel {
       WHERE 1=1
     `;
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: SqlParam[] = [];
 
     // Voided purchases stay off the grid unless explicitly requested
     // (the client's "Show Voided" toggle sends include_voided=1). The

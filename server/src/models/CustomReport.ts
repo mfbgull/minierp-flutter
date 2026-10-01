@@ -4,6 +4,7 @@
  */
 
 import db from '../config/database';
+import { SqlParam } from '../utils/sqlTypes';
 
 /** System user ID used for shared report templates */
 const SYSTEM_USER_ID = 0;
@@ -67,7 +68,7 @@ function create(data: CreateReportDTO): CustomReportRow {
 
 function update(id: number, userId: number, data: UpdateReportDTO): boolean {
   const sets: string[] = [];
-  const params: any[] = [];
+  const params: SqlParam[] = [];
 
   if (data.name !== undefined) {
     sets.push('name = ?');

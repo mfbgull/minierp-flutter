@@ -67,6 +67,13 @@ export interface LoanSummary {
   overdue_loans: number;
 }
 
+export type GlobalActiveLoan = {
+  id: number; employee_id: number; employee_code: string;
+  employee_name: string; amount: number; balance: number;
+  purpose: string | null; status: string; due_date: string | null;
+  disbursement_date: string; days_until_due: number;
+};
+
 export class EmployeeLoanModel {
 
   // ── Create ──────────────────────────────────────────────────
@@ -268,12 +275,7 @@ export class EmployeeLoanModel {
 
   // ── Dashboard: global active loans ───────────────────────────
 
-  static getGlobalActiveLoans(db: Database.Database): Array<{
-    id: number; employee_id: number; employee_code: string;
-    employee_name: string; amount: number; balance: number;
-    purpose: string | null; status: string; due_date: string | null;
-    disbursement_date: string; days_until_due: number;
-  }> {
+  static getGlobalActiveLoans(db: Database.Database): GlobalActiveLoan[] {
     // Auto-update overdue first
     EmployeeLoanModel.updateOverdueStatuses(db);
 
@@ -288,7 +290,7 @@ export class EmployeeLoanModel {
       JOIN employees e ON e.id = el.employee_id
       WHERE el.status IN ('active', 'overdue') AND el.voided_at IS NULL
       ORDER BY el.due_date ASC
-    `).all() as any[];
+    `).all() as GlobalActiveLoan[];
   }
 
   static getGlobalLoanSummary(db: Database.Database): {

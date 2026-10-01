@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
 import { CASH_ACCOUNTS, getCashAccountTotals, collectFlows, normalizeCashMethod } from '../services/cashService';
 import { netRevenueSum, NET_REVENUE_STATUS, AR_OUTSTANDING, ACTIVE_EXPENSE_STATUS, cogsForPeriod } from '../utils/reportSql';
+import { SqlParam } from '../utils/sqlTypes';
 
 function getARAgingReport(asOfDate: string, db: Database.Database) {
   const agingData = db.prepare(`
@@ -96,7 +97,7 @@ function getCustomerStatements(db: Database.Database, customerId: number, startD
 // Moved from reportsController
 function getTopDebtors(db: Database.Database, limit: number = 10, asOfDate?: string) {
   const dateFilter = asOfDate ? ` AND i.invoice_date <= ?` : ``;
-  const params: any[] = [limit];
+  const params: SqlParam[] = [limit];
   if (asOfDate) params.unshift(asOfDate);
   const rows = db.prepare(`
     SELECT c.customer_name, c.customer_code, SUM(i.balance_amount) as total_outstanding,
