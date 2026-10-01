@@ -1233,7 +1233,7 @@ function runStockInvariantChecksRebuild(): void {
           );
         `);
         // Column-aware copy
-        const cols = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all().map((c: any) => c.name);
+        const cols = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all().map((c: { name: string }) => c.name);
         const base = ['id','batch_no','item_id','warehouse_id','source_type','source_id','quantity_original','quantity_remaining','unit_cost','received_date'];
         const optional = ['created_at','expiry_date','halted','halted_reason'].filter(c => cols.includes(c));
         const allCols = [...base, ...optional];

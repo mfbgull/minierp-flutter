@@ -500,7 +500,7 @@ export interface TaxCalculation {
 export interface TaxJarResponse {
   error?: string;
   tax?: TaxCalculation;
-  validation?: any;
+  validation?: Record<string, unknown>;
   categories?: Array<{ name: string }>;
 }
 

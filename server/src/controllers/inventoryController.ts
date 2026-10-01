@@ -1176,7 +1176,7 @@ export default {
 
 export function getBatchReconciliation(req: AuthRequest, res: Response): Response | void {
   try {
-        const { item_id, warehouse_id } = req.query as any;
+        const { item_id, warehouse_id } = req.query as { item_id?: string; warehouse_id?: string };
 
     let where = 'WHERE 1=1';
     const params: SqlParam[] = [];
@@ -1217,7 +1217,9 @@ export function getBatchReconciliation(req: AuthRequest, res: Response): Respons
 
 export function correctBatchReconciliation(req: AuthRequest, res: Response): Response | void {
   try {
-        const { batch_id, location_id, new_quantity_physical } = req.body as any;
+        const { batch_id, location_id, new_quantity_physical } = req.body as {
+      batch_id?: number; location_id?: number; new_quantity_physical?: number;
+    };
     const userId = req.user!.id;
 
     if (!batch_id || location_id === undefined || new_quantity_physical === undefined) {
@@ -1259,7 +1261,7 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
       `).run(totalPhysical.total, batch_id);
 
       // Record correction movement
-      const diff = newQty - (db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id = ? AND location_id = ?`).get(batch_id, location_id) as any).quantity_physical;
+      const diff = newQty - (db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id = ? AND location_id = ?`).get(batch_id, location_id) as { quantity_physical: number }).quantity_physical;
       // Actually we already updated it, so let's get the old value from a subquery or just use the diff
       const oldRow = db.prepare(`
         SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id = ? AND location_id = ?
@@ -1299,7 +1301,7 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
         ) VALUES (?, ?, ?, 'ADJUSTMENT', ?, 0, 'BATCH_RECONCILIATION', ?, ?, ?, ?)
       `).run(
         movementNo,
-        (db.prepare(`SELECT item_id FROM stock_batches WHERE id = ?`).get(batch_id) as any).item_id,
+        (db.prepare(`SELECT item_id FROM stock_batches WHERE id = ?`).get(batch_id) as { item_id: number }).item_id,
         locRow.warehouse_id,
         diff,
         `RECON-${batch_id}`,
@@ -1348,7 +1350,8 @@ export function updateBatchStatus(req: AuthRequest, res: Response): Response | v
 
 export function createReservation(req: AuthRequest, res: Response): Response | void {
   try {
-        const { item_id, warehouse_id, location_id, batch_id, quantity_reserved, reference_doctype, reference_docno, reference_line_id } = req.body as any;
+        const { item_id, warehouse_id, location_id, batch_id, quantity_reserved, reference_doctype, reference_docno, reference_line_id } =
+      req.body as Parameters<typeof StockReservationModel.create>[0];
     const userId = req.user!.id;
 
     const reservation = StockReservationModel.create(
@@ -1409,7 +1412,7 @@ export function releaseReservation(req: AuthRequest, res: Response): Response | 
 
 export function getReservations(req: AuthRequest, res: Response): Response | void {
   try {
-        const { doctype, docno } = req.query as any;
+        const { doctype, docno } = req.query as { doctype?: string; docno?: string };
 
     let reservations: StockReservation[];
     if (doctype && docno) {

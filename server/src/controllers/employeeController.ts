@@ -532,7 +532,7 @@ function addEmployeeDocument(req: Request, res: Response): void {
     }
 
     // Handle file upload
-    const uploadedFile = (req as any).file;
+    const uploadedFile = (req as AuthRequest & { file?: Express.Multer.File }).file;
     const filePath = uploadedFile ? uploadedFile.filename : file_path || null;
 
     const docId = EmployeeModel.addDocument({

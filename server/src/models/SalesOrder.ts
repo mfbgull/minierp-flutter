@@ -676,9 +676,9 @@ class SalesOrderModel {
    * Get sales cycle chain (quotation -> SO -> invoice)
    */
   static getSalesCycleChain(salesOrderId: number, db: Database.Database): {
-    quotation: any | undefined;
+    quotation: QuotationWithWarehouse | undefined;
     salesOrder: SalesOrder | undefined;
-    invoice: any | undefined;
+    invoice: InvoiceWithUsername | undefined;
   } {
     const salesOrder = this.getById(salesOrderId, db);
 

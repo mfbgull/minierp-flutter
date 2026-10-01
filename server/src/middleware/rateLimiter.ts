@@ -69,12 +69,22 @@ export const apiLimiter = rateLimit({
   }
 });
 
-/** Shut down rate limiter stores to release timers (used in test teardown) */
+/**
+ * Shut down rate limiter stores to release timers (used in test teardown).
+ *
+ * rateLimit() returns a RateLimitRequestHandler, which does not expose the
+ * backing store even though the RateLimit instance has one. Only MemoryStore
+ * implements shutdown(), so that is the only method required here.
+ */
+type LimiterWithStore = {
+  store?: { shutdown?: () => void };
+};
+
 export function shutdownRateLimiters() {
   // MemoryStore exposes a shutdown() method that clears the interval
   const stores = [apiLimiter, authLimiter, passwordChangeLimiter, sensitiveOperationLimiter];
   for (const limiter of stores) {
-    const store = (limiter as any).store;
+    const store = (limiter as LimiterWithStore).store;
     if (store && typeof store.shutdown === 'function') {
       store.shutdown();
     }

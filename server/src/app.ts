@@ -47,6 +47,7 @@ import stockBatchesRoutes, { initStockBatchesRoutes } from './routes/stockBatche
 import path from 'path';
 import fs from 'fs';
 import { errorMessage } from './utils/errorMessage';
+import type { ServerResponse } from 'http';
 
 // Create Express app
 const app: Express = express();
@@ -290,7 +291,7 @@ if (process.env.NODE_ENV === 'production') {
   // Serve static assets (js, css, images, etc.)
   app.use(express.static(clientDistPath, {
     maxAge: '1y',
-    setHeaders: (res: any, filePath: string) => {
+    setHeaders: (res: ServerResponse, filePath: string) => {
       if (!filePath.endsWith('.html')) {
         res.setHeader('Cache-Control', 'public, max-age=31536000');
       }

@@ -78,6 +78,35 @@ export type UnifiedPaymentRow = {
   direction: 'in' | 'out' | 'unknown';
 };
 
+export type PaymentAllocation = {
+  id: number;
+  payment_id: number;
+  invoice_id: number;
+  invoice_no: string;
+  amount: number;
+};
+
+export type PaymentDetailRow = {
+  id: number;
+  payment_no: string;
+  customer_id: number;
+  customer_name: string;
+  supplier_id: number | null;
+  voided_at: string | null;
+  invoice_id: number | null;
+  invoice_no: string | null;
+  payment_date: string;
+  amount: number;
+  payment_method: string;
+  reference_no: string;
+  notes: string;
+  created_at: string;
+  allocated_invoices: string | null;
+  allocation_amounts: string | null;
+  allocation_ids: string | null;
+  allocations?: PaymentAllocation[];
+};
+
 export class PaymentModel {
   /**
    * Generate payment number using sequence utility.
@@ -106,7 +135,7 @@ export class PaymentModel {
   /**
    * Get payment by ID
    */
-  static getById(db: Database.Database, id: number): any {
+  static getById(db: Database.Database, id: number): PaymentDetailRow | undefined {
     const payment = db.prepare(`
       SELECT p.id, p.payment_no, p.customer_id, c.customer_name, p.supplier_id, p.invoice_id, i.invoice_no,
              p.payment_date, p.amount, p.payment_method, p.reference_no, p.notes, p.created_at,
@@ -118,20 +147,14 @@ export class PaymentModel {
       LEFT JOIN invoices i ON p.invoice_id = i.id
       LEFT JOIN payment_allocations pa ON p.id = pa.payment_id
       WHERE p.id = ? GROUP BY p.id
-    `).get(id) as {
-      id: number; payment_no: string; customer_id: number; customer_name: string; supplier_id: number | null; voided_at: string | null;
-      invoice_id: number | null;
-      invoice_no: string | null; payment_date: string; amount: number; payment_method: string;
-      reference_no: string; notes: string; created_at: string; allocated_invoices: string | null;
-      allocation_amounts: string | null; allocation_ids: string | null; allocations?: Array<{ id: number; payment_id: number; invoice_id: number; invoice_no: string; amount: number }>;
-    } | undefined;
+    `).get(id) as PaymentDetailRow | undefined;
 
     if (payment && payment.allocated_invoices) {
       payment.allocations = db.prepare(`
         SELECT pa.id, pa.payment_id, pa.invoice_id, i.invoice_no, pa.amount
         FROM payment_allocations pa LEFT JOIN invoices i ON pa.invoice_id = i.id
         WHERE pa.payment_id = ? AND pa.voided_at IS NULL ORDER BY pa.id
-      `).all(id) as Array<{ id: number; payment_id: number; invoice_id: number; invoice_no: string; amount: number }>;
+      `).all(id) as PaymentAllocation[];
     } else if (payment) {
       payment.allocations = [];
     }
