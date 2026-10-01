@@ -69,7 +69,17 @@ function createFixture(): Database.Database {
 }
 
 let counter = 0;
-function seedPurchase(db: Database.Database, overrides: Record<string, any> = {}): number {
+type PurchaseSeedOverrides = {
+  item_id?: number;
+  warehouse_id?: number;
+  quantity?: number;
+  unit_cost?: number;
+  supplier_id?: number;
+  purchase_no?: string;
+  purchase_date?: string;
+};
+
+function seedPurchase(db: Database.Database, overrides: PurchaseSeedOverrides = {}): number {
   counter += 1;
   const itemId = overrides.item_id ?? counter;
   const warehouseId = overrides.warehouse_id ?? 1;

@@ -71,7 +71,7 @@ export interface ReportConfig {
 
 export interface QueryResult {
   columns: string[];          // Column names (aliases or field names)
-  rows: Record<string, any>[]; // Result rows
+  rows: Record<string, unknown>[]; // Result rows
   totalCount: number;
   elapsedMs: number;
 }
@@ -244,7 +244,7 @@ export function executeReport(config: ReportConfig): QueryResult {
     const totalCount = countResult?.total ?? 0;
 
     // Execute main query
-    const rows = db.prepare(sql).all(...params) as Record<string, any>[];
+    const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
 
     // Build column names from SELECT items (aliases)
     const colNames: string[] = [];

@@ -84,7 +84,29 @@ function createFixture(): Database.Database {
  * Returns the purchase id.
  */
 let seedCounter = 0;
-function seedPurchase(db: Database.Database, overrides: Record<string, any> = {}): number {
+type PurchaseSeedOverrides = {
+  item_id?: number;
+  warehouse_id?: number;
+  quantity?: number;
+  unit_cost?: number;
+  supplier_id?: number;
+  supplier_name?: string;
+  purchase_no?: string;
+  purchase_date?: string;
+};
+
+type POSeedOverrides = {
+  item_id?: number;
+  warehouse_id?: number;
+  quantity?: number;
+  unit_price?: number;
+  received_quantity?: number;
+  supplier_id?: number;
+  po_no?: string;
+  po_date?: string;
+};
+
+function seedPurchase(db: Database.Database, overrides: PurchaseSeedOverrides = {}): number {
   const qty = overrides.quantity ?? 10;
   seedCounter += 1;
   const itemId = overrides.item_id ?? seedCounter;
@@ -140,7 +162,7 @@ function seedPurchase(db: Database.Database, overrides: Record<string, any> = {}
   return purchaseId;
 }
 
-function seedPO(db: Database.Database, overrides: Record<string, any> = {}): { poId: number; poItemId: number } {
+function seedPO(db: Database.Database, overrides: POSeedOverrides = {}): { poId: number; poItemId: number } {
   const qty = overrides.quantity ?? 10;
   const received = overrides.received_quantity ?? 10;
   seedCounter += 1;

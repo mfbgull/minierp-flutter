@@ -75,7 +75,7 @@ class ActivityLogModel {
     logLevel: string = 'INFO',
     ipAddress?: string,
     userAgent?: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     durationMs?: number
   ): number {
     try {
