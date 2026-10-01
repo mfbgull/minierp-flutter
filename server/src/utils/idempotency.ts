@@ -23,6 +23,11 @@ export const POS_SALE_SCOPE = 'pos_sale';
  * A scope is per operation, never per category — sharing one across two
  * operations risks a false-positive replay, and a key is only unique within
  * its scope, so a shared scope would also collide across them.
+ *
+ * Deliberate exception: PURCHASE_RECORD covers both the multi-item and the
+ * single-item branch of `recordPurchase`. They are one endpoint and one
+ * business operation, and the request hash already separates the two payload
+ * shapes, so a single scope is correct rather than merely convenient.
  */
 export const IDEMPOTENCY_SCOPES = {
   PAYMENT_CUSTOMER: 'payments.customer',

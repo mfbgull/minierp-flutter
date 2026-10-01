@@ -38,6 +38,23 @@ function count(sql: string, ...params: unknown[]): number {
   return Number((db.prepare(sql).get(...(params as [])) as { n: number }).n);
 }
 
+/**
+ * Cash debited by supplier refunds so far. The account is picked from
+ * `payment_method` (1000 Cash, 1010 Bank, 1020-1040 wallets), so this sums
+ * the family instead of assuming one code.
+ */
+function refundCashDebit(): number {
+  return Number((db.prepare(`
+    SELECT COALESCE(SUM(jl.debit), 0) AS total
+    FROM journal_lines jl
+    JOIN journal_entries je ON je.id = jl.journal_entry_id
+    JOIN chart_of_accounts coa ON coa.id = jl.account_id
+    WHERE coa.code IN ('1000','1010','1020','1030','1040')
+      AND je.reference_type = 'SUPPLIER_REFUND'
+      AND je.voided = 0 AND jl.voided = 0
+  `).get() as { total: number }).total);
+}
+
 function keyFor(scope: string): string {
   return `${scope}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 }
@@ -418,6 +435,57 @@ describe('idempotency — Round 2 money handlers', () => {
 
   // ── supplier-refunds.create ──────────────────────────────────────────
   describe('supplier-refunds.create', () => {
+    /**
+     * A supplier refund needs a real POSTED supplier credit note, which only
+     * a purchase return with `credit_on_account` disposition produces. The
+     * chain is purchase -> purchase return (credit on account) -> credit note
+     * -> refund, because a refund pays real cash out against that note.
+     */
+    async function postableCreditNote(): Promise<number> {
+      const supplier = await request(app).post('/api/suppliers')
+        .set('Cookie', authCookie)
+        .send({
+          supplier_name: `Idem Refund Supplier ${Date.now()}`,
+          supplier_code: `R2-REF-${Date.now()}`,
+        });
+      expect(supplier.status).toBe(201);
+      const supplierId = supplier.body.data?.id ?? supplier.body.id;
+
+      const purchase = await request(app).post('/api/purchases')
+        .set('Cookie', authCookie)
+        .send({
+          item_id: itemId,
+          warehouse_id: warehouseId,
+          quantity: 20,
+          unit_cost: 10,
+          purchase_date: '2026-09-03',
+          supplier_id: supplierId,
+        });
+      expect(purchase.status).toBe(201);
+      const purchaseId = Array.isArray(purchase.body) ? purchase.body[0].id : purchase.body.id;
+
+      const returned = await request(app).post('/api/purchase-returns')
+        .set('Cookie', authCookie)
+        .send({
+          return_date: '2026-09-16',
+          source_type: 'PURCHASE',
+          source_id: purchaseId,
+          warehouse_id: warehouseId,
+          disposition: 'credit_on_account',
+          reason: 'idempotency refund probe',
+          items: [{ source_item_id: purchaseId, quantity: 2, unit_cost: 10 }],
+        });
+      expect(returned.status).toBe(201);
+      const returnId = returned.body.data?.id ?? returned.body.data?.return_id;
+
+      const note = db.prepare(
+        "SELECT id FROM credit_notes WHERE source_type = 'PURCHASE_RETURN' AND source_id = ? AND status = 'POSTED'",
+      ).get(returnId) as { id: number } | undefined;
+      expect(note).toBeDefined();
+      expect(Number(note!.id)).toBeGreaterThan(0);
+      return note!.id;
+    }
+
     it('rejects a malformed key with 400', async () => {
       const res = await post('/api/supplier-refunds', 'short', {
         refund_date: '2026-09-16', credit_note_id: 1, amount: 10, payment_method: 'Cash',
@@ -426,14 +494,56 @@ describe('idempotency — Round 2 money handlers', () => {
       expect(res.body.error).toMatch(/Idempotency-Key must be 8\.\.200/);
     });
 
-    /**
-     * The replay and 409 paths need a real POSTED supplier credit note, which
-     * only a purchase-return with `credit_on_account` disposition produces.
-     * That fixture is left to a follow-up rather than faked here — what this
-     * asserts is that the key is parsed and scoped before the credit-note
-     * validation runs, so a replay can never reach the refund itself.
-     */
-    it('parses the key before the credit-note check, so no refund is attempted', async () => {
+    it('replays a lost refund instead of paying the supplier twice', async () => {
+      await fundCash();
+      const creditNoteId = await postableCreditNote();
+      const payload = {
+        refund_date: '2026-09-17',
+        credit_note_id: creditNoteId,
+        amount: 20,
+        payment_method: 'Cash',
+      };
+      const key = keyFor(IDEMPOTENCY_SCOPES.SUPPLIER_REFUND_CREATE);
+
+      // A supplier refund writes supplier_refunds + a GL entry; it does NOT
+      // create a payments row, so that is not one of the things to count.
+      const before = {
+        refunds: count('SELECT COUNT(*) AS n FROM supplier_refunds'),
+        gl: count("SELECT COUNT(*) AS n FROM journal_entries WHERE reference_type = 'SUPPLIER_REFUND'"),
+        cashDr: refundCashDebit(),
+      };
+
+      const first = await post('/api/supplier-refunds', key, payload);
+      expect(first.status).toBe(201);
+      const second = await post('/api/supplier-refunds', key, payload);
+      expect(second.status).toBe(201);
+
+      expect(second.headers['x-idempotent-replay']).toBe('true');
+      // The defect this prevents: cash out to the supplier a second time.
+      expect(count('SELECT COUNT(*) AS n FROM supplier_refunds')).toBe(before.refunds + 1);
+      expect(count("SELECT COUNT(*) AS n FROM journal_entries WHERE reference_type = 'SUPPLIER_REFUND'"))
+        .toBe(before.gl + 1);
+      expect(refundCashDebit() - before.cashDr).toBeCloseTo(20, 2);
+    });
+
+    it('rejects the same key with a changed amount', async () => {
+      await fundCash();
+      const first = await postableCreditNote();
+      const second = await postableCreditNote();
+      const key = keyFor(IDEMPOTENCY_SCOPES.SUPPLIER_REFUND_CREATE);
+
+      const created = await post('/api/supplier-refunds', key, {
+        refund_date: '2026-09-17', credit_note_id: first, amount: 20, payment_method: 'Cash',
+      });
+      expect(created.status).toBe(201);
+
+      const changed = await post('/api/supplier-refunds', key, {
+        refund_date: '2026-09-17', credit_note_id: second, amount: 30, payment_method: 'Cash',
+      });
+      expect(changed.status).toBe(409);
+    });
+
+    it('claims nothing when the credit note is invalid, so the key stays reusable', async () => {
       const key = keyFor(IDEMPOTENCY_SCOPES.SUPPLIER_REFUND_CREATE);
       const before = count('SELECT COUNT(*) AS n FROM supplier_refunds');
       const res = await post('/api/supplier-refunds', key, {
@@ -441,7 +551,6 @@ describe('idempotency — Round 2 money handlers', () => {
       });
       expect(res.status).toBe(400);
       expect(count('SELECT COUNT(*) AS n FROM supplier_refunds')).toBe(before);
-      // A failed attempt claims nothing, so the key stays reusable.
       expect(count(
         'SELECT COUNT(*) AS n FROM idempotency_keys WHERE scope = ? AND key = ?',
         IDEMPOTENCY_SCOPES.SUPPLIER_REFUND_CREATE, key,
