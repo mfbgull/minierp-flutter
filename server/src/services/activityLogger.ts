@@ -128,7 +128,7 @@ export interface ActivityLogEntry {
   logLevel?: LogLevel;
   ipAddress?: string;
   userAgent?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   durationMs?: number;
   /** Prior row snapshot (task 4.2) — JSON, capped at 8KB */
   oldValue?: unknown;
@@ -212,7 +212,7 @@ class ActivityLoggerService {
     action: ActionType.LOGIN | ActionType.LOGOUT | ActionType.LOGIN_FAILED | ActionType.PASSWORD_CHANGE,
     userId: number | undefined,
     description: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     ipAddress?: string
   ): void {
     this.log({
@@ -234,7 +234,7 @@ class ActivityLoggerService {
     entityId: number | undefined,
     description: string,
     userId?: number,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
     audit?: {
       oldValue?: unknown;
       newValue?: unknown;

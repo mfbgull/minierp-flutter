@@ -7,7 +7,7 @@ import SettingsModel from '../models/Settings';
 function getSettings(req: Request, res: Response): void {
   try {
     const settings = SettingsModel.getAll(db);
-    const settingsObj: Record<string, any> = settings.reduce((acc, setting) => {
+    const settingsObj: Record<string, unknown> = settings.reduce((acc, setting) => {
       acc[setting.key] = { value: setting.value, description: setting.description, updated_at: setting.updated_at };
       return acc;
     }, {} as Record<string, unknown>);
@@ -46,13 +46,13 @@ function updateSetting(req: Request, res: Response): void {
 
 function updateSettings(req: Request, res: Response): void {
   try {
-    const settings = req.body as Record<string, any>;
+    const settings = req.body as Parameters<typeof SettingsModel.updateBulk>[1];
     if (!settings || typeof settings !== 'object') { res.status(400).json({ error: 'Invalid settings data' }); return; }
 
     SettingsModel.updateBulk(db, settings);
 
     const allSettings = SettingsModel.getAll(db);
-    const settingsObj: Record<string, any> = allSettings.reduce((acc, setting) => {
+    const settingsObj: Record<string, unknown> = allSettings.reduce((acc, setting) => {
       acc[setting.key] = { value: setting.value, description: setting.description, updated_at: setting.updated_at };
       return acc;
     }, {} as Record<string, unknown>);
