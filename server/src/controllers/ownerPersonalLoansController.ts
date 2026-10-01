@@ -11,6 +11,56 @@ import logger from '../utils/logger';
 import { generateDocNo } from '../utils/sequence';
 import { SqlParam } from '../utils/sqlTypes';
 
+// Row shapes for the three tables in add-owner-personal-loans.sql.
+type BorrowerRow = {
+  id: number;
+  name: string;
+  phone: string | null;
+  linked_type: 'customer' | 'supplier' | null;
+  linked_id: number | null;
+  is_active: number;
+  created_at: string;
+};
+
+type LoanRow = {
+  id: number;
+  loan_no: string;
+  borrower_name: string;
+  borrower_id: number | null;
+  borrower_type: 'customer' | 'supplier' | null;
+  amount: number;
+  balance: number;
+  currency: string;
+  loan_date: string;
+  due_date: string | null;
+  purpose: string | null;
+  status: 'pending' | 'partial' | 'settled' | 'written_off';
+  notes: string | null;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type RepaymentRow = {
+  id: number;
+  loan_id: number;
+  amount: number;
+  payment_date: string;
+  notes: string | null;
+  created_by: number | null;
+  created_at: string;
+};
+
+type LoanSummaryRow = {
+  total_lent: number;
+  total_repaid: number;
+  total_pending: number;
+  active_count: number;
+  settled_count: number;
+  written_off_count: number;
+};
+
+
 // ── Helpers ──────────────────────────────────────────────────
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -256,7 +306,7 @@ function updateLoan(req: AuthRequest, res: Response): void {
     const userId = req.user!.id;
     const { borrower_name, amount, due_date, purpose, notes, status, balance } = req.body;
 
-    const existing = db.prepare('SELECT * FROM owner_personal_loans WHERE id = ?').get(id) as any;
+    const existing = db.prepare('SELECT * FROM owner_personal_loans WHERE id = ?').get(id) as LoanRow | undefined;
     if (!existing) {
       res.status(404).json({ success: false, error: 'Personal loan not found' });
       return;
@@ -319,7 +369,7 @@ function deleteLoan(req: AuthRequest, res: Response): void {
     const id = parseInt(getRouteParam(req.params.id), 10);
     const userId = req.user!.id;
 
-    const existing = db.prepare('SELECT * FROM owner_personal_loans WHERE id = ?').get(id) as any;
+    const existing = db.prepare('SELECT * FROM owner_personal_loans WHERE id = ?').get(id) as LoanRow | undefined;
     if (!existing) {
       res.status(404).json({ success: false, error: 'Personal loan not found' });
       return;
@@ -351,7 +401,7 @@ function addRepayment(req: AuthRequest, res: Response): void {
     const userId = req.user!.id;
     const { amount, payment_date, notes } = req.body;
 
-    const loan = db.prepare('SELECT * FROM owner_personal_loans WHERE id = ?').get(loanId) as any;
+    const loan = db.prepare('SELECT * FROM owner_personal_loans WHERE id = ?').get(loanId) as LoanRow | undefined;
     if (!loan) {
       res.status(404).json({ success: false, error: 'Personal loan not found' });
       return;
@@ -428,13 +478,13 @@ function deleteRepayment(req: AuthRequest, res: Response): void {
     const repId = parseInt(getRouteParam(req.params.repId), 10);
     const userId = req.user!.id;
 
-    const repayment = db.prepare('SELECT * FROM owner_personal_loan_repayments WHERE id = ? AND loan_id = ?').get(repId, loanId) as any;
+    const repayment = db.prepare('SELECT * FROM owner_personal_loan_repayments WHERE id = ? AND loan_id = ?').get(repId, loanId) as RepaymentRow | undefined;
     if (!repayment) {
       res.status(404).json({ success: false, error: 'Repayment not found' });
       return;
     }
 
-    const loan = db.prepare('SELECT * FROM owner_personal_loans WHERE id = ?').get(loanId) as any;
+    const loan = db.prepare('SELECT * FROM owner_personal_loans WHERE id = ?').get(loanId) as LoanRow | undefined;
     if (!loan) {
       res.status(404).json({ success: false, error: 'Personal loan not found' });
       return;
@@ -494,7 +544,7 @@ function summary(_req: Request, res: Response): void {
         SUM(CASE WHEN status = 'settled' THEN 1 ELSE 0 END) as settled_count,
         SUM(CASE WHEN status = 'written_off' THEN 1 ELSE 0 END) as written_off_count
       FROM owner_personal_loans
-    `).get() as any;
+    `).get() as LoanSummaryRow;
 
     const currencyBreakdown = db.prepare(`
       SELECT
@@ -615,7 +665,7 @@ function updateBorrower(req: AuthRequest, res: Response): void {
     const userId = req.user!.id;
     const { name, phone, linked_type, linked_id } = req.body;
 
-    const existing = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as any;
+    const existing = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as BorrowerRow | undefined;
     if (!existing) {
       res.status(404).json({ success: false, error: 'Borrower not found' });
       return;
@@ -665,7 +715,7 @@ function deactivateBorrower(req: AuthRequest, res: Response): void {
     const id = parseInt(getRouteParam(req.params.id), 10);
     const userId = req.user!.id;
 
-    const existing = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as any;
+    const existing = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as BorrowerRow | undefined;
     if (!existing) {
       res.status(404).json({ success: false, error: 'Borrower not found' });
       return;
@@ -698,7 +748,7 @@ function reactivateBorrower(req: AuthRequest, res: Response): void {
     const id = parseInt(getRouteParam(req.params.id), 10);
     const userId = req.user!.id;
 
-    const existing = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as any;
+    const existing = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as BorrowerRow | undefined;
     if (!existing) {
       res.status(404).json({ success: false, error: 'Borrower not found' });
       return;
@@ -721,7 +771,7 @@ function unlinkBorrower(req: AuthRequest, res: Response): void {
     const id = parseInt(getRouteParam(req.params.id), 10);
     const userId = req.user!.id;
 
-    const existing = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as any;
+    const existing = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as BorrowerRow | undefined;
     if (!existing) {
       res.status(404).json({ success: false, error: 'Borrower not found' });
       return;
@@ -754,13 +804,13 @@ function mergeBorrowers(req: AuthRequest, res: Response): void {
       return;
     }
 
-    const source = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(sourceId) as any;
+    const source = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(sourceId) as BorrowerRow | undefined;
     if (!source) {
       res.status(404).json({ success: false, error: 'Source borrower not found' });
       return;
     }
 
-    const target = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(target_borrower_id) as any;
+    const target = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(target_borrower_id) as BorrowerRow | undefined;
     if (!target) {
       res.status(404).json({ success: false, error: 'Target borrower not found' });
       return;

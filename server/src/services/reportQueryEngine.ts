@@ -33,7 +33,7 @@ export interface ComputedColumnDef {
 export interface FilterDef {
   field?: string;
   operator: FilterOperator;
-  value?: any;
+  value?: SqlParam | SqlParam[];
   children?: FilterDef[];   // for AND/OR groups
   logicalOperator?: 'AND' | 'OR';
 }
@@ -110,10 +110,28 @@ function resolveRelativeDate(value: string): string | null {
 }
 
 /**
+ * Narrow a filter value for the single-value operators.
+ *
+ * The scalar operators (equals, greater_than, ...) bind exactly one
+ * placeholder, so neither an array nor a missing value has meaning here.
+ * better-sqlite3 rejects both at bind time; catching them here turns an
+ * opaque driver TypeError into a message that names the actual problem.
+ */
+function scalarParam(value: SqlParam | SqlParam[] | undefined): SqlParam {
+  if (Array.isArray(value)) {
+    throw new Error('Operator requires a single value, received an array');
+  }
+  if (value === undefined) {
+    throw new Error('Operator requires a value, received none');
+  }
+  return value;
+}
+
+/**
  * Check if a value is a relative date expression that should be inlined as SQL.
  * Returns { sqlExpr } if it should be inlined, or null to treat as a parameter value.
  */
-function checkRelativeDate(value: any): { sqlExpr: string } | null {
+function checkRelativeDate(value: unknown): { sqlExpr: string } | null {
   if (typeof value === 'string') {
     const sqlExpr = resolveRelativeDate(value);
     if (sqlExpr !== null) {
@@ -442,38 +460,38 @@ function buildFilterExpression(
       if (value === null || value === undefined) return `${col} IS NULL`;
       const rd = checkRelativeDate(value);
       if (rd) return `${col} = ${rd.sqlExpr}`;
-      ctx.paramValues.push(value);
+      ctx.paramValues.push(scalarParam(value));
       return `${col} = ?`;
     }
     case 'not_equals': {
       if (value === null || value === undefined) return `${col} IS NOT NULL`;
       const rd = checkRelativeDate(value);
       if (rd) return `${col} != ${rd.sqlExpr}`;
-      ctx.paramValues.push(value);
+      ctx.paramValues.push(scalarParam(value));
       return `${col} != ?`;
     }
     case 'greater_than': {
       const rd = checkRelativeDate(value);
       if (rd) return `${col} > ${rd.sqlExpr}`;
-      ctx.paramValues.push(value);
+      ctx.paramValues.push(scalarParam(value));
       return `${col} > ?`;
     }
     case 'less_than': {
       const rd = checkRelativeDate(value);
       if (rd) return `${col} < ${rd.sqlExpr}`;
-      ctx.paramValues.push(value);
+      ctx.paramValues.push(scalarParam(value));
       return `${col} < ?`;
     }
     case 'greater_or_equal': {
       const rd = checkRelativeDate(value);
       if (rd) return `${col} >= ${rd.sqlExpr}`;
-      ctx.paramValues.push(value);
+      ctx.paramValues.push(scalarParam(value));
       return `${col} >= ?`;
     }
     case 'less_or_equal': {
       const rd = checkRelativeDate(value);
       if (rd) return `${col} <= ${rd.sqlExpr}`;
-      ctx.paramValues.push(value);
+      ctx.paramValues.push(scalarParam(value));
       return `${col} <= ?`;
     }
     case 'contains': {
@@ -493,11 +511,11 @@ function buildFilterExpression(
       const rd = checkRelativeDate(value[0]);
       if (rd) {
         // For date lists with relative dates, inline each
-        const items = value.map((v: any) => {
+        const items = value.map((v) => {
           const r = checkRelativeDate(v);
           return r ? r.sqlExpr : '?';
         });
-        const nonParam = value.filter((v: any, i: number) => !checkRelativeDate(v));
+        const nonParam = value.filter((v) => !checkRelativeDate(v));
         ctx.paramValues.push(...nonParam);
         return `${col} IN (${items.join(', ')})`;
       }

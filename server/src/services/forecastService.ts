@@ -1178,8 +1178,9 @@ export function setModelConfig(config: Partial<ForecastModelConfig> & { item_id:
 
     db.prepare(`UPDATE forecast_model_config SET ${sets.join(', ')} WHERE item_id = ?`).run(...params);
   } else {
-    const keys = Object.keys(config).filter(k => k !== 'id');
-    const values = keys.map(k => (config as any)[k]);
+    const entries = Object.entries(config).filter(([key]) => key !== 'id');
+    const keys = entries.map(([key]) => key);
+    const values: SqlParam[] = entries.map(([, value]) => value as SqlParam);
     const placeholders = keys.map(() => '?').join(', ');
 
     db.prepare(`INSERT INTO forecast_model_config (${keys.join(', ')}) VALUES (${placeholders})`).run(...values);
@@ -1210,17 +1211,25 @@ export function deleteSeasonalEvent(id: number): void {
 // 18. SAFETY STOCK QUERY
 // ============================================================
 
+type SafetyStockItemRow = {
+  id: number;
+  item_code: string;
+  item_name: string;
+  current_stock: number;
+  category: string | null;
+};
+
 export function getSafetyStock(itemId?: number): SafetyStockResult[] {
   const items = itemId
-    ? db.prepare('SELECT id, item_code, item_name, current_stock FROM items WHERE id = ?').all(itemId) as { id: number; item_code: string; item_name: string; current_stock: number }[]
-    : db.prepare('SELECT id, item_code, item_name, current_stock FROM items WHERE is_active = 1').all() as { id: number; item_code: string; item_name: string; current_stock: number }[];
+    ? db.prepare('SELECT id, item_code, item_name, current_stock, category FROM items WHERE id = ?').all(itemId) as SafetyStockItemRow[]
+    : db.prepare('SELECT id, item_code, item_name, current_stock, category FROM items WHERE is_active = 1').all() as SafetyStockItemRow[];
 
   const ids = items.map(i => i.id);
   const salesMap = getAllHistoricalSales(ids);
 
   return items.map(item => {
     const sales = salesMap.get(item.id) || [];
-    const config = loadModelConfig({ id: item.id, category: (item as any).category ?? null });
+    const config = loadModelConfig({ id: item.id, category: item.category });
 
     const { safetyStock, reorderPoint, dailyDemand, demandStdDev, zScore } = calculateSafetyStock(
       sales,

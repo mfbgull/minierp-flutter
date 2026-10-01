@@ -179,7 +179,10 @@ function createPayment(req: AuthRequest, res: Response): void {
         }
       }
 
-      const totalAllocated = invoice_allocations.reduce((sum: number, alloc: any) => sum + parseCurrency(alloc.amount), 0);
+      const totalAllocated = invoice_allocations.reduce(
+        (sum: number, alloc: { amount: number | string }) => sum + parseCurrency(alloc.amount),
+        0
+      );
       if (Math.abs(totalAllocated - parsedAmount) > 0.01) {
         res.status(400).json({ success: false, error: `Payment amount (${parsedAmount.toFixed(2)}) does not match total allocated amount (${totalAllocated.toFixed(2)})` });
         return;

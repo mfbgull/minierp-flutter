@@ -74,6 +74,12 @@ export type GlobalActiveLoan = {
   disbursement_date: string; days_until_due: number;
 };
 
+type LoanPortfolioSummary = {
+  total_outstanding: number;
+  total_loans: number;
+  overdue_count: number;
+};
+
 export class EmployeeLoanModel {
 
   // ── Create ──────────────────────────────────────────────────
@@ -303,7 +309,7 @@ export class EmployeeLoanModel {
         SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END) as overdue_count
       FROM employee_loans
       WHERE status IN ('active', 'overdue') AND voided_at IS NULL
-    `).get() as any;
+    `).get() as LoanPortfolioSummary;
   }
 }
 

@@ -121,6 +121,31 @@ type SalaryHistoryDbRow = {
   last_payment_date: string;
 };
 
+export type SalaryPaymentRow = {
+  id: number;
+  employee_id: number;
+  amount: number;
+  payment_date: string;
+  payment_method: string;
+  reference_no: string | null;
+  notes: string | null;
+  journal_entry_id: number | null;
+  status: 'paid' | 'cancelled';
+  paid_by: number | null;
+  voided_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SalaryMonthDetail = {
+  pay_period: string;
+  employee_salary: number;
+  total_paid: number;
+  remaining: number;
+  advance_carryover: number;
+  payments: SalaryPaymentRow[];
+};
+
 export type SalaryHistoryRow = {
   pay_period: string;
   employee_salary: number;
@@ -396,15 +421,15 @@ class EmployeeModel {
   /**
    * Individual payments for a specific pay_period (month).
    */
-  static getSalaryMonthDetail(employeeId: number, payPeriod: string, db: Database.Database): any {
+  static getSalaryMonthDetail(employeeId: number, payPeriod: string, db: Database.Database): SalaryMonthDetail {
     const employee = db.prepare('SELECT salary FROM employees WHERE id = ?').get(employeeId) as { salary: number } | undefined;
     const salary = employee?.salary ?? 0;
 
     const payments = db.prepare(
       `SELECT * FROM salary_payments WHERE employee_id = ? AND pay_period = ? AND voided_at IS NULL ORDER BY payment_date ASC`
-    ).all(employeeId, payPeriod);
+    ).all(employeeId, payPeriod) as SalaryPaymentRow[];
 
-    const totalPaid = (payments as Array<{ amount: number }>).reduce((sum, p) => sum + p.amount, 0);
+    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
     const advanceCarryover = EmployeeModel.getAdvanceCarryover(employeeId, payPeriod, db);
 
     return {
@@ -465,10 +490,10 @@ class EmployeeModel {
     return carryover;
   }
 
-  static getSalaryPayment(paymentId: number, db: Database.Database): any | undefined {
+  static getSalaryPayment(paymentId: number, db: Database.Database): SalaryPaymentRow | undefined {
     return db.prepare(
       `SELECT * FROM salary_payments WHERE id = ?`
-    ).get(paymentId);
+    ).get(paymentId) as SalaryPaymentRow | undefined;
   }
 
   static deleteSalaryPayment(paymentId: number, db: Database.Database, voidedBy: number | null, voidReason: string): void {

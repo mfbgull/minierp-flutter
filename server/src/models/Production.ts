@@ -198,7 +198,7 @@ class ProductionModel {
         const stockBalance = db.prepare(`
           SELECT quantity FROM stock_balances
           WHERE item_id = ? AND warehouse_id = ?
-        `).get(input.item_id, materialsWarehouseId) as { quantity: any } | undefined;
+        `).get(input.item_id, materialsWarehouseId) as { quantity: number } | undefined;
 
         const availableStock = roundQty(stockBalance ? parseFloat(String(stockBalance.quantity)) : 0);
         const requiredQty = roundQty(input.quantity);

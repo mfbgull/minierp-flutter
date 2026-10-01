@@ -8,7 +8,7 @@ import { AuthRequest } from '../types';
 import CustomReport from '../models/CustomReport';
 import { getAllEntities, getEntity } from '../services/entityRegistry';
 import { executeReport } from '../services/reportQueryEngine';
-import type { ReportConfig } from '../services/reportQueryEngine';
+import type { ReportConfig, ColumnDef, ComputedColumnDef, SortDef } from '../services/reportQueryEngine';
 import { validateConfigExpressions, ExpressionValidationError } from '../services/expressionValidator';
 import logger from '../utils/logger';
 import { errorMessage } from '../utils/errorMessage';
@@ -24,7 +24,21 @@ interface ValidationError {
  * Validate a report config structure before saving.
  * Ensures the entity exists, columns are specified, and field references are valid.
  */
-function validateReportConfig(config: any): ValidationError[] {
+/**
+ * A report config as it arrives from a client: untrusted, so every member is
+ * optional until the checks inside validateReportConfig have promoted it.
+ * `direction` stays a plain string because the validator lowercases it before
+ * comparing, so a client sending "ASC" must survive the type.
+ */
+type ReportConfigUnderValidation = Partial<{
+  entity: string;
+  columns: Array<Partial<ColumnDef>>;
+  computedColumns: ComputedColumnDef[];
+  sort: Array<Partial<SortDef> & { direction?: string }>;
+  filters: Array<{ field?: string }>;
+}>;
+
+function validateReportConfig(config: ReportConfigUnderValidation): ValidationError[] {
   const errors: ValidationError[] = [];
 
   if (!config.entity || typeof config.entity !== 'string') {
@@ -39,7 +53,7 @@ function validateReportConfig(config: any): ValidationError[] {
   }
 
   // Build a set of valid field names (including computed column names)
-  const validFields = new Set(entity.fields.map((f: any) => f.name));
+  const validFields = new Set(entity.fields.map((f) => f.name));
 
   // Validate columns
   if (!Array.isArray(config.columns) || config.columns.length === 0) {
@@ -52,7 +66,7 @@ function validateReportConfig(config: any): ValidationError[] {
       } else if (!validFields.has(col.field)) {
         // Check if it's a computed column reference
         const isComputed = Array.isArray(config.computedColumns) &&
-          config.computedColumns.some((cc: any) => cc.name === col.field);
+          config.computedColumns.some((cc) => cc.name === col.field);
         if (!isComputed) {
           errors.push({ field: `columns[${i}].field`, message: `Field "${col.field}" not found on entity "${config.entity}"` });
         }
@@ -68,7 +82,7 @@ function validateReportConfig(config: any): ValidationError[] {
         errors.push({ field: `sort[${i}].field`, message: 'Sort field name is required' });
       } else if (!validFields.has(s.field)) {
         const isComputed = Array.isArray(config.computedColumns) &&
-          config.computedColumns.some((cc: any) => cc.name === s.field);
+          config.computedColumns.some((cc) => cc.name === s.field);
         if (!isComputed) {
           errors.push({ field: `sort[${i}].field`, message: `Sort field "${s.field}" not found on entity "${config.entity}"` });
         }

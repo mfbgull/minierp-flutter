@@ -675,8 +675,8 @@ class QuotationModel {
    */
   static getSalesCycleChain(quotationId: number, db: Database.Database): {
     quotation: Quotation | undefined;
-    salesOrder: any | undefined;
-    invoice: any | undefined;
+    salesOrder: SalesOrderWithWarehouse | undefined;
+    invoice: InvoiceWithUsername | undefined;
   } {
     const quotation = this.getById(quotationId, db);
 
