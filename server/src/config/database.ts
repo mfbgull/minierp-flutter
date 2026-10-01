@@ -1823,6 +1823,10 @@ runLedgered('add-invoice-return-void-attribution.sql');
 // P11: idempotency_keys table — retries of a timed-out create request must
 // replay the original result, not create a second document.
 runLedgered('add-idempotency-keys.sql');
+// audit-3 task 08 (8.3): keys are unique per (scope, key), not globally.
+// The old global UNIQUE meant an upsert on a colliding key overwrote
+// another operation's resource_id — a wrong dedupe on a money write.
+runLedgered('scope-idempotency-keys.sql');
 // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
 // return time — a legacy COA predating GL foundation must fail the boot
 // with a clear error, never mis-post.

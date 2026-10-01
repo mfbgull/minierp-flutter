@@ -39,6 +39,12 @@ export type CustomerPaymentInput = {
   readonly userId?: number | null;
   /** Supplied by callers that already generated a document number. */
   readonly paymentNo?: string;
+  /**
+   * audit-3 task 08. When present, the key is checked and claimed inside
+   * this write's transaction: a retry after a lost response replays
+   * `replayedPaymentId` instead of recording the money twice.
+   */
+  readonly idempotency?: IdempotentClaim;
 };
 
 export type SupplierPaymentAllocation = {
@@ -57,12 +63,23 @@ export type SupplierPaymentInput = {
   readonly notes?: string | null;
   readonly userId?: number | null;
   readonly paymentNo?: string;
+  /** audit-3 task 08 — claimed inside the supplier payment transaction. */
+  readonly idempotency?: IdempotentClaim;
 };
 
 export type ExistingPaymentAllocationInput = {
   readonly paymentId: number;
   readonly customerId: number;
   readonly allocations: readonly PaymentAllocation[];
+  /** audit-3 task 08 — claimed inside the allocation transaction. */
+  readonly idempotency?: IdempotentClaim;
+};
+
+/** audit-3 task 08: an idempotency key plus the hash of the request it claims. */
+export type IdempotentClaim = {
+  readonly scope: string;
+  readonly key: string;
+  readonly hash: string;
 };
 
 export type PaymentRecordingResult = {

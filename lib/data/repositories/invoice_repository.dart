@@ -82,11 +82,19 @@ class InvoiceRepository {
 
   /// Create a payment against an invoice (`POST /payments` with an
   /// `invoice_allocations` entry — see `prepareInvoiceData`). Enveloped.
+  /// [idempotencyKey] makes a retry after a lost response replay the
+  /// original payment instead of taking the money twice (audit-3 task 08).
+  /// Derive it from [body] with `IdempotencyKeyCache` so an unchanged retry
+  /// reuses it and an edited payload rotates it.
   Future<ApiResult<InvoicePaymentRecord>> createInvoicePayment(
-    Map<String, dynamic> body,
-  ) => _api.post(
+    Map<String, dynamic> body, {
+    String? idempotencyKey,
+  }) => _api.post(
     ApiEndpoints.payments,
     body: body,
+    headers: idempotencyKey == null
+        ? null
+        : <String, dynamic>{'Idempotency-Key': idempotencyKey},
     parse: (Object? json) =>
         InvoicePaymentRecord.fromJson(json as Map<String, dynamic>),
   );

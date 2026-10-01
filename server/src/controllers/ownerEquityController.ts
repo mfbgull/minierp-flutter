@@ -20,6 +20,12 @@ import OwnerWithdrawalModel, {
 } from '../models/OwnerWithdrawal';
 import ExpenseModel from '../models/Expense';
 import { isValidPaymentMethod } from '../services/cashService';
+import {
+  IDEMPOTENCY_SCOPES,
+  claimIdempotencyKey,
+  hashRequestPayload,
+  startIdempotentRequest,
+} from '../utils/idempotency';
 
 /**
  * Business-rule violations (funds guard, stock guard, closed periods,
@@ -92,6 +98,20 @@ function createCapital(req: AuthRequest, res: Response): void {
       return;
     }
 
+    // audit-3 task 08: owner capital is money IN, so a retry after a lost
+    // response must replay rather than capitalise the bank twice.
+    const hash = hashRequestPayload(req.body);
+    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.OWNER_CAPITAL, hash);
+    if (start.kind === 'error') {
+      res.status(start.status).json({ error: start.message });
+      return;
+    }
+    if (start.kind === 'replay') {
+      res.set('X-Idempotent-Replay', 'true');
+      res.status(201).json({ success: true, idempotentReplay: true, data: { id: start.resourceId } });
+      return;
+    }
+
     let capitalId: number;
     let capitalNo: string;
     db.transaction(() => {
@@ -105,6 +125,9 @@ function createCapital(req: AuthRequest, res: Response): void {
         created_by: userId,
       };
       capitalId = OwnerCapitalModel.create(db, dto);
+      if (start.key) {
+        claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.OWNER_CAPITAL, start.key, hash, capitalId);
+      }
     })();
 
     logCRUD(ActionType.SETTING_UPDATE, 'OwnerCapital', capitalId!, `Created owner capital ${capitalNo!} (${parsedAmount})`, userId, {
@@ -297,6 +320,20 @@ function createWithdrawal(req: AuthRequest, res: Response): void {
       lines = check.lines;
     }
 
+    // audit-3 task 08: a goods withdrawal reverses stock batches, so a retry
+    // must replay rather than reverse the same stock twice.
+    const hash = hashRequestPayload(req.body);
+    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.OWNER_WITHDRAWAL, hash);
+    if (start.kind === 'error') {
+      res.status(start.status).json({ error: start.message });
+      return;
+    }
+    if (start.kind === 'replay') {
+      res.set('X-Idempotent-Replay', 'true');
+      res.status(201).json({ success: true, idempotentReplay: true, data: { id: start.resourceId } });
+      return;
+    }
+
     let withdrawalId: number;
     let withdrawalNo: string;
     let recordedAmount: number;
@@ -314,6 +351,9 @@ function createWithdrawal(req: AuthRequest, res: Response): void {
       });
       withdrawalId = result.id;
       recordedAmount = result.amount;
+      if (start.key) {
+        claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.OWNER_WITHDRAWAL, start.key, hash, withdrawalId);
+      }
     })();
 
     logCRUD(ActionType.STOCK_MOVEMENT, 'OwnerWithdrawal', withdrawalId!, `Created owner withdrawal ${withdrawalNo!} (${kind}, ${recordedAmount!.toFixed(2)})`, userId, {

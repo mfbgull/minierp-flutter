@@ -10,6 +10,12 @@ import { AccountingService } from '../services/accountingService';
 import { isValidPaymentMethod } from '../services/cashService';
 import fs from 'fs';
 import path from 'path';
+import {
+  IDEMPOTENCY_SCOPES,
+  claimIdempotencyKey,
+  hashRequestPayload,
+  startIdempotentRequest,
+} from '../utils/idempotency';
 
 function getEmployees(req: Request, res: Response): void {
   try {
@@ -237,6 +243,24 @@ function paySalary(req: Request, res: Response): void {
       return;
     }
 
+    // audit-3 task 08: salary is cash OUT plus a GL entry and possibly a
+    // next-month advance, so a retry after a lost response must replay
+    // rather than pay the employee twice.
+    const hash = hashRequestPayload(req.body);
+    const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.EMPLOYEE_SALARY_PAY, hash);
+    if (start.kind === 'error') {
+      res.status(start.status).json({ success: false, error: start.message });
+      return;
+    }
+    if (start.kind === 'replay') {
+      // Same status as the original success, so a client cannot tell a
+      // replay from a first response by status alone (matches the
+      // invoice-create replay, which also answers 201).
+      res.set('X-Idempotent-Replay', 'true');
+      res.status(201).json({ success: true, idempotentReplay: true, data: { paymentId: start.resourceId } });
+      return;
+    }
+
     // Duplicate guard: reject a 'full' payment if one already exists for the month.
     // Advance and partial payments are always allowed.
     if (safeType === 'full') {
@@ -265,6 +289,10 @@ function paySalary(req: Request, res: Response): void {
         paid_by: authReq.user?.id,
         payment_type: safeType,
       }, db);
+
+      if (start.key) {
+        claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.EMPLOYEE_SALARY_PAY, start.key, hash, paymentId);
+      }
 
       let journalEntryId: number | null = null;
       try {

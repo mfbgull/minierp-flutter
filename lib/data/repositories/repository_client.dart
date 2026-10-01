@@ -86,10 +86,20 @@ class RepositoryClient {
   Future<ApiResult<T>> post<T>(
     String path, {
     Object? body,
+    Map<String, dynamic>? headers,
     required T Function(Object?) parse,
   }) async {
     unawaited(_invalidateFor(path));
-    return _parse(_guard(() => _dio.post(path, data: body)), parse);
+    return _parse(
+      _guard(
+        () => _dio.post(
+          path,
+          data: body,
+          options: headers == null ? null : Options(headers: headers),
+        ),
+      ),
+      parse,
+    );
   }
 
   /// Enveloped multipart POST — `{success: true, data}` with a

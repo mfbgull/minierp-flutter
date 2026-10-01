@@ -14,6 +14,30 @@ import CustomerModel from '../models/Customer';
 import InvoiceModel from '../models/Invoice';
 import SupplierModel from '../models/Supplier';
 import { handleBusinessError } from '../utils/businessRuleError';
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  IDEMPOTENCY_SCOPES,
+  IdempotencyConflictError,
+  beginIdempotentWrite,
+  claimIdempotencyKey,
+  hashRequestPayload,
+  normalizeIdempotencyKey,
+} from '../utils/idempotency';
+
+/**
+ * audit-3 task 08: read the retry key, or 400 on a malformed one.
+ * Returns null when the client sent no key, which leaves the write unguarded
+ * exactly as before.
+ */
+function readIdempotencyKey(req: AuthRequest, res: Response): string | null | undefined {
+  try {
+    return normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
+  } catch (err) {
+    res.status(400).json({ success: false, error: (err as Error).message });
+    return undefined;
+  }
+}
+
 import { formatCurrency, getCurrencySymbol } from '../utils/displayCurrency';
 
 function getPayments(req: Request, res: Response): void {
@@ -106,6 +130,9 @@ function createPayment(req: AuthRequest, res: Response): void {
 
     const parsedAmount = parseCurrency(amount);
 
+    const idemKey = readIdempotencyKey(req, res);
+    if (idemKey === undefined) return;
+
     const currency = getCurrencySymbol(db);
 
     if (customer_id) {
@@ -158,10 +185,24 @@ function createPayment(req: AuthRequest, res: Response): void {
         return;
       }
 
-      const paymentId = PaymentModel.create(db, {
-        customer_id: parsedCustomerId, payment_date, amount: parsedAmount, payment_method, reference_no, notes, invoice_allocations,
-        userId: req.user!.id,
-      });
+      const hash = hashRequestPayload(req.body);
+      const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.PAYMENT_CUSTOMER, idemKey, hash);
+      if (replayId !== null) {
+        if (idemKey) res.set('X-Idempotent-Replay', 'true');
+        res.status(201).json({ success: true, data: PaymentModel.getById(db, replayId) });
+        return;
+      }
+
+      const paymentId = db.transaction(() => {
+        const id = PaymentModel.create(db, {
+          customer_id: parsedCustomerId, payment_date, amount: parsedAmount, payment_method, reference_no, notes, invoice_allocations,
+          userId: req.user!.id,
+        });
+        if (idemKey) {
+          claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PAYMENT_CUSTOMER, idemKey, hash, id);
+        }
+        return id;
+      })();
 
       const customer = CustomerModel.getById(parsedCustomerId, db);
       logCRUD(ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created payment - ${formatCurrency(parsedAmount, currency)} from ${customer?.customer_name || 'Unknown'}`, req.user!.id, { customer_id: parsedCustomerId, amount: parsedAmount, payment_method, invoice_allocations: invoice_allocations.length });
@@ -185,17 +226,31 @@ function createPayment(req: AuthRequest, res: Response): void {
         return;
       }
 
-      const paymentId = PaymentModel.createSupplierPayment(db, {
-        supplier_id: parsedSupplierId,
-        payment_date,
-        amount: parsedAmount,
-        payment_method,
-        reference_no,
-        notes,
-        po_allocations: hasPoAllocs ? po_allocations : [],
-        purchase_allocations: hasPurchaseAllocs ? purchase_allocations : [],
-        userId: req.user!.id,
-      });
+      const hash = hashRequestPayload(req.body);
+      const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.PAYMENT_SUPPLIER, idemKey, hash);
+      if (replayId !== null) {
+        if (idemKey) res.set('X-Idempotent-Replay', 'true');
+        res.status(201).json({ success: true, data: PaymentModel.getById(db, replayId) });
+        return;
+      }
+
+      const paymentId = db.transaction(() => {
+        const id = PaymentModel.createSupplierPayment(db, {
+          supplier_id: parsedSupplierId,
+          payment_date,
+          amount: parsedAmount,
+          payment_method,
+          reference_no,
+          notes,
+          po_allocations: hasPoAllocs ? po_allocations : [],
+          purchase_allocations: hasPurchaseAllocs ? purchase_allocations : [],
+          userId: req.user!.id,
+        });
+        if (idemKey) {
+          claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PAYMENT_SUPPLIER, idemKey, hash, id);
+        }
+        return id;
+      })();
 
       const supplier = SupplierModel.getById(parsedSupplierId, db);
       logCRUD(ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created supplier payment - ${formatCurrency(parsedAmount, currency)} to ${supplier?.supplier_name || 'Unknown'}`, req.user!.id, { supplier_id: parsedSupplierId, amount: parsedAmount, payment_method, allocation_count: (po_allocations || []).length + (purchase_allocations || []).length });
@@ -205,6 +260,10 @@ function createPayment(req: AuthRequest, res: Response): void {
       return;
     }
   } catch (error) {
+    if (error instanceof IdempotencyConflictError) {
+      res.status(409).json({ success: false, error: error.message });
+      return;
+    }
     handleBusinessError(res, error, 'Create payment', 'Failed to create payment', { success: true });
   }
 }
@@ -447,6 +506,25 @@ function allocatePaymentToInvoice(req: AuthRequest, res: Response): void {
       ).get(id) as { total: number }).total,
     );
 
+    const idemKey = readIdempotencyKey(req, res);
+    if (idemKey === undefined) return;
+    const claim = idemKey
+      ? { scope: IDEMPOTENCY_SCOPES.PAYMENT_ALLOCATE, key: idemKey, hash: hashRequestPayload({ id, allocations }) }
+      : undefined;
+
+    if (claim) {
+      const { replayId } = beginIdempotentWrite(db, claim.scope, claim.key, claim.hash);
+      if (replayId !== null) {
+        res.set('X-Idempotent-Replay', 'true');
+        res.json({
+          success: true,
+          message: 'Allocation recorded',
+          data: PaymentModel.getById(db, replayId),
+        });
+        return;
+      }
+    }
+
     new PaymentRecordingService(db).allocateExistingPayment({
       paymentId: id,
       customerId: Number(payment.customer_id),
@@ -454,6 +532,7 @@ function allocatePaymentToInvoice(req: AuthRequest, res: Response): void {
         invoiceId: parseInt(alloc.invoice_id as string, 10),
         amount: parseCurrency(alloc.amount),
       })),
+      idempotency: claim,
     });
 
     const newTotal = parseCurrency(payment.amount) - allocatedTotal;
@@ -463,6 +542,10 @@ function allocatePaymentToInvoice(req: AuthRequest, res: Response): void {
 
     res.json({ success: true, message: 'Allocation recorded', data: PaymentModel.getById(db, id) });
   } catch (error) {
+    if (error instanceof IdempotencyConflictError) {
+      res.status(409).json({ success: false, error: error.message });
+      return;
+    }
     handleBusinessError(res, error, 'Allocate payment', 'Failed to allocate payment', { success: true });
   }
 }

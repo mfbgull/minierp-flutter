@@ -130,8 +130,9 @@ class _FakeInvoiceRepository extends InvoiceRepository {
 
   @override
   Future<ApiResult<InvoicePaymentRecord>> createInvoicePayment(
-    Map<String, dynamic> body,
-  ) async {
+    Map<String, dynamic> body, {
+    String? idempotencyKey,
+  }) async {
     postedPayments.add(body);
     return ApiSuccess(
       InvoicePaymentRecord(

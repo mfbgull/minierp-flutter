@@ -30,6 +30,7 @@ import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'customer_providers.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:minierp_app/widgets/movable_dialog.dart';
+import '../../../core/utils/idempotency_key.dart';
 
 /// Opens the web-style Record Payment modal with [customer] pre-bound.
 Future<void> showCustomerPaymentModal(
@@ -80,6 +81,7 @@ class _Allocation {
 
 class _CustomerPaymentModalState extends ConsumerState<CustomerPaymentModal> {
   final _formKey = GlobalKey<FormState>();
+  final _idemKeys = IdempotencyKeyCache(prefix: 'pay');
   late DateTime _paymentDate;
   late final TextEditingController _dateController;
   final _amountController = TextEditingController();
@@ -230,32 +232,34 @@ class _CustomerPaymentModalState extends ConsumerState<CustomerPaymentModal> {
     final invoiceNos = [
       for (final a in _allocations) a.invoice.invoiceNo,
     ];
+    final body = {
+      'customer_id': widget.customer.id,
+      'payment_date': isoDate(_paymentDate),
+      'amount': _totalAmount,
+      'payment_method': _paymentMethod,
+      if (_referenceController.text.trim().isNotEmpty)
+        'reference_no': _referenceController.text.trim(),
+      if (_notesController.text.trim().isNotEmpty)
+        'notes': _notesController.text.trim(),
+      'description': invoiceNos.isEmpty
+          ? 'Payment'
+          : 'Payment for ${invoiceNos.join(', ')}',
+      'invoice_allocations': [
+        for (final a in _allocations)
+          {
+            'invoice_id': a.invoice.id,
+            'amount': double.tryParse(a.controller.text.trim()) ?? 0,
+          },
+      ],
+    };
     final result = await ref
         .read(invoiceRepositoryProvider)
-        .createInvoicePayment({
-          'customer_id': widget.customer.id,
-          'payment_date': isoDate(_paymentDate),
-          'amount': _totalAmount,
-          'payment_method': _paymentMethod,
-          if (_referenceController.text.trim().isNotEmpty)
-            'reference_no': _referenceController.text.trim(),
-          if (_notesController.text.trim().isNotEmpty)
-            'notes': _notesController.text.trim(),
-          'description': invoiceNos.isEmpty
-              ? 'Payment'
-              : 'Payment for ${invoiceNos.join(', ')}',
-          'invoice_allocations': [
-            for (final a in _allocations)
-              {
-                'invoice_id': a.invoice.id,
-                'amount': double.tryParse(a.controller.text.trim()) ?? 0,
-              },
-          ],
-        });
+        .createInvoicePayment(body, idempotencyKey: _idemKeys.keyFor(body));
     if (!mounted) return;
 
     switch (result) {
       case ApiSuccess(:final data):
+        _idemKeys.reset();
         setState(() {
           _submitting = false;
           _lastPaymentId = data.id;

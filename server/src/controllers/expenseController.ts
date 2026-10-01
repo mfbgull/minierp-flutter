@@ -10,6 +10,15 @@ import ExpenseModel from '../models/Expense';
 import { isValidPaymentMethod } from '../services/cashService';
 import { handleBusinessError } from '../utils/businessRuleError';
 import { formatCurrency, getCurrencySymbol } from '../utils/displayCurrency';
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  IDEMPOTENCY_SCOPES,
+  IdempotencyConflictError,
+  beginIdempotentWrite,
+  claimIdempotencyKey,
+  hashRequestPayload,
+  normalizeIdempotencyKey,
+} from '../utils/idempotency';
 
 function createExpense(req: AuthRequest, res: Response): void {
   try {
@@ -47,6 +56,24 @@ function createExpense(req: AuthRequest, res: Response): void {
       return;
     }
 
+    // audit-3 task 08: a retry after a lost response must not expense the
+    // cash twice. The check and the claim both sit inside the write
+    // transaction, so a rolled-back attempt leaves no claim behind.
+    let idemKey: string | null;
+    try {
+      idemKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
+    } catch (keyError) {
+      res.status(400).json({ success: false, error: (keyError as Error).message });
+      return;
+    }
+    const hash = hashRequestPayload(req.body);
+    const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.EXPENSE_CREATE, idemKey, hash);
+    if (replayId !== null) {
+      if (idemKey) res.set('X-Idempotent-Replay', 'true');
+      res.status(201).json({ success: true, message: 'Expense created successfully', data: ExpenseModel.getById(db, replayId) });
+      return;
+    }
+
     // EXP-05 (task 5.4): numbering comes from the shared settings counter
     // inside the same transaction as the INSERT — the old MAX(expense_no)
     // scan was non-atomic outside any transaction.
@@ -59,6 +86,9 @@ function createExpense(req: AuthRequest, res: Response): void {
         amount: parsedAmount, expense_date, payment_method, reference_no, vendor_name,
         project, status: 'Draft', created_by: userId,
       });
+      if (idemKey) {
+        claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.EXPENSE_CREATE, idemKey, hash, expenseId);
+      }
     })();
 
     logCRUD(ActionType.EXPENSE_CREATE, 'Expense', expenseId!, `Created expense: ${expenseNo!} - ${expense_category} (${formatCurrency(parsedAmount, getCurrencySymbol(db))})`, userId, { expense_no: expenseNo!, expense_category, amount: parsedAmount, vendor_name });
@@ -70,6 +100,10 @@ function createExpense(req: AuthRequest, res: Response): void {
     });
   } catch (error) {
     logger.error('Error creating expense:', error);
+    if (error instanceof IdempotencyConflictError) {
+      res.status(409).json({ success: false, error: error.message });
+      return;
+    }
     handleBusinessError(res, error, 'Create expense', 'Failed to create expense', { success: true });
   }
 }
