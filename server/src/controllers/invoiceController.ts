@@ -62,17 +62,6 @@ class InvalidPaymentMethodError extends Error {
 }
 
 /**
- * Credit offset exceeds the customer's available credit balance — a
- * client error (400), not a server fault.
- */
-class InsufficientCreditError extends Error {
-  constructor(offset: number, available: number) {
-    super(`Credit offset (${offset.toFixed(2)}) exceeds available credit balance (${available.toFixed(2)})`);
-    this.name = 'InsufficientCreditError';
-  }
-}
-
-/**
  * An edit tried to change an invoice's applied store credit. Changing it
  * means reversing part of an existing GL offset entry, which this path
  * does not do; the client re-sending the unchanged value is a no-op and
@@ -536,6 +525,7 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // Insert new invoice items and create new stock movements
         let updatedCogsTotal = 0;
         for (const item of items) {
+            // Intentionally bypasses InvoiceCreationService (post-create amendment, not invoice creation).
             InvoiceModel.createInvoiceItem(db, invoiceId, {
                 item_id: item.item_id,
                 quantity: item.quantity,
