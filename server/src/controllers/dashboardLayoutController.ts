@@ -12,7 +12,7 @@ import { AuthRequest } from '../types';
 import logger from '../utils/logger';
 import DashboardLayoutModel from '../models/DashboardLayout';
 
-import { errorMessage, errorCode } from '../utils/errorMessage';
+import { errorCode } from '../utils/errorMessage';
 
 // ═══════════════════════════════════════════════════════════════
 //  LAYOUT CRUD
