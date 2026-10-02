@@ -305,9 +305,6 @@ class Invoice {
     this.customerEmail,
     this.customerPhone,
     this.customerAddress,
-    this.customerCurrentBalance,
-    this.customerCreditLimit,
-    this.customerCreditUtilization,
     this.dueDate,
     this.returnedAmount = 0,
     this.returnFee,
@@ -349,9 +346,6 @@ class Invoice {
     customerEmail: asString(json['customer_email']),
     customerPhone: asString(json['customer_phone']),
     customerAddress: asString(json['customer_address']),
-    customerCurrentBalance: asNum(json['customer_current_balance']),
-    customerCreditLimit: asNum(json['customer_credit_limit']),
-    customerCreditUtilization: asNum(json['customer_credit_utilization']),
     invoiceDate: asString(json['invoice_date']) ?? '',
     dueDate: asString(json['due_date']),
     totalAmount: asNum(json['total_amount']) ?? 0,
@@ -405,9 +399,6 @@ class Invoice {
   final String? customerEmail;
   final String? customerPhone;
   final String? customerAddress;
-  final num? customerCurrentBalance;
-  final num? customerCreditLimit;
-  final num? customerCreditUtilization;
   final String invoiceDate;
   final String? dueDate;
   final num totalAmount;
@@ -453,12 +444,6 @@ class Invoice {
     if (customerEmail != null) 'customer_email': customerEmail,
     if (customerPhone != null) 'customer_phone': customerPhone,
     if (customerAddress != null) 'customer_address': customerAddress,
-    if (customerCurrentBalance != null)
-      'customer_current_balance': customerCurrentBalance,
-    if (customerCreditLimit != null)
-      'customer_credit_limit': customerCreditLimit,
-    if (customerCreditUtilization != null)
-      'customer_credit_utilization': customerCreditUtilization,
     'invoice_date': invoiceDate,
     if (dueDate != null) 'due_date': dueDate,
     'total_amount': totalAmount,
