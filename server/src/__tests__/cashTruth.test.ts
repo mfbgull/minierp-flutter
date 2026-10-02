@@ -2,7 +2,6 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { collectFlows, getCashAccountTransactions, getCashAccountTotals, normalizeCashMethod, isValidPaymentMethod, syncOpeningBalancesToGl } from '../services/cashService';
-import AccountingService from '../services/accountingService';
 import ExpenseModel from '../models/Expense';
 
 /** Task 1.6: cash truth + method normalization (CASH-01/02). */

@@ -3,7 +3,6 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import PhysicalCountModel from '../models/PhysicalCount';
-import StockMovementModel from '../models/StockMovement';
 
 function createFixture(): Database.Database {
   const db = new Database(':memory:');

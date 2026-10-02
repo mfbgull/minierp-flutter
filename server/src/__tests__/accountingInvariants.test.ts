@@ -28,7 +28,7 @@ import request from 'supertest';
 import bcrypt from 'bcrypt';
 import app from '../app';
 import db from '../config/database';
-import { expectAllInvariantsHold, arImbalances, apImbalances, inventoryImbalances, cashImbalances, type Violation } from './helpers/accountingInvariants';
+import { expectAllInvariantsHold, arImbalances, apImbalances, cashImbalances, type Violation } from './helpers/accountingInvariants';
 import AccountingService from '../services/accountingService';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;

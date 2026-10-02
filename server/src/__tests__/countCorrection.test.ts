@@ -17,7 +17,6 @@ import bcrypt from 'bcrypt';
 import app from '../app';
 import db from '../config/database';
 import PhysicalCountModel from '../models/PhysicalCount';
-import AccountingService from '../services/accountingService';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {

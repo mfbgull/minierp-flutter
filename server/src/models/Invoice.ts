@@ -1,4 +1,4 @@
-import { multiplyCurrency, addCurrency, subtractCurrency, parseCurrency, decomposeLineAmount } from '../utils/currency';
+import { addCurrency, subtractCurrency, parseCurrency, decomposeLineAmount } from '../utils/currency';
 import ledgerUtils from '../utils/ledgerUtils';
 import { getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, INVOICE_SORT_COLUMNS, INVOICE_RETURN_SORT_COLUMNS } from '../utils/sqlSanitizer';

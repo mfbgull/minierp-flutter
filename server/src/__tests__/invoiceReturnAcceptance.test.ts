@@ -9,7 +9,6 @@
  * and DB shape. They will fail until the new tables/endpoints exist —
  * that is intentional (spec-first development).
  */
-import request from 'supertest';
 import db from '../config/database';
 import {
   getAuthCookie, createItem, purchaseStock, createCustomer, createInvoice,

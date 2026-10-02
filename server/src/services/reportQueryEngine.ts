@@ -10,7 +10,7 @@ import db from '../config/database';
 import { getEntity } from './entityRegistry';
 import type { EntityDefinition } from './entityRegistry';
 import logger from '../utils/logger';
-import { validateConfigExpressions, ExpressionValidationError } from './expressionValidator';
+import { validateConfigExpressions } from './expressionValidator';
 import { errorMessage } from '../utils/errorMessage';
 import { SqlParam } from '../utils/sqlTypes';
 
