@@ -43,7 +43,7 @@ import adminBackupRoutes from './routes/adminBackup';
 import customReportsRoutes from './routes/customReports';
 import preferencesRoutes from './routes/preferences';
 import searchRoutes from './routes/search';
-import stockBatchesRoutes, { initStockBatchesRoutes } from './routes/stockBatches';
+import { initStockBatchesRoutes } from './routes/stockBatches';
 import path from 'path';
 import fs from 'fs';
 import { errorMessage } from './utils/errorMessage';

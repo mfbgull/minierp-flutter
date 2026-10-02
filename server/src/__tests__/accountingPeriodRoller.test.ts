@@ -5,7 +5,6 @@
  * with no pre-created accounting period. postEntry auto-creates the
  * calendar-month period inside the caller's transaction.
  */
-import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
 
 // Test DB comes from __tests__/setup.ts via DATABASE_PATH; migrations run

@@ -20,7 +20,6 @@ import {
 } from '../utils/currency';
 import { isValidPaymentMethod } from '../services/cashService';
 import { handleBusinessError } from '../utils/businessRuleError';
-import { generateDocNo } from '../utils/sequence';
 import {
   InvoiceCreationCreditError,
   InvoiceCreationIdempotencyError,

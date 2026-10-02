@@ -31,7 +31,6 @@ function fingerprint(db: import('better-sqlite3').Database): Record<string, stri
 describe('boot idempotency (task 3.9)', () => {
   it('second boot leaves every business table byte-identical', () => {
     jest.resetModules();
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     let db = require('../config/database').default as import('better-sqlite3').Database;
     const before = fingerprint(db);

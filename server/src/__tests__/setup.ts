@@ -60,7 +60,7 @@ afterAll(async () => {
   try {
     shutdownRateLimiters();
     logger.close();
-  } catch (err) {
+  } catch {
     // Ignore cleanup errors
   }
 });
