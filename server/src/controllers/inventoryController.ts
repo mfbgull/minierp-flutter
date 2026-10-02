@@ -1241,35 +1241,6 @@ export function correctBatchReconciliation(req: AuthRequest, res: Response): Res
       return res.status(400).json({ error: 'new_quantity_physical must be a non-negative number' });
     }
 
-    const run = db.transaction(() => {
-      // Update batch_stock_by_location
-      db.prepare(`
-        UPDATE batch_stock_by_location
-        SET quantity_physical = ?, quantity_available = MAX(0, ? - quantity_reserved), updated_at = CURRENT_TIMESTAMP
-        WHERE batch_id = ? AND location_id = ?
-      `).run(newQty, newQty, batch_id, location_id);
-
-      // Adjust master batch quantity_remaining to match total across locations
-      const totalPhysical = db.prepare(`
-        SELECT COALESCE(SUM(quantity_physical), 0) as total
-        FROM batch_stock_by_location
-        WHERE batch_id = ?
-      `).get(batch_id) as { total: number };
-
-      db.prepare(`
-        UPDATE stock_batches SET quantity_remaining = ? WHERE id = ?
-      `).run(totalPhysical.total, batch_id);
-
-      // Record correction movement
-      const diff = newQty - (db.prepare(`SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id = ? AND location_id = ?`).get(batch_id, location_id) as { quantity_physical: number }).quantity_physical;
-      // Actually we already updated it, so let's get the old value from a subquery or just use the diff
-      const oldRow = db.prepare(`
-        SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id = ? AND location_id = ?
-      `).get(batch_id, location_id) as { quantity_physical: number };
-
-      // Recalculate diff properly: we need old value. Let's do it before update.
-    });
-
     // Re-implement with proper old value capture
     const oldRow = db.prepare(`
       SELECT quantity_physical FROM batch_stock_by_location WHERE batch_id = ? AND location_id = ?
