@@ -35,7 +35,7 @@ router.get('/health/stock-discrepancies', requirePermission('admin', 'read'), (_
       count: discrepancies.length,
       error: null,
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({
       success: false,
       data: null,

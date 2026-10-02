@@ -6,7 +6,6 @@
  * SCAFFOLDING NOTE: describe post-implementation behaviour; intentional
  * red until the new tables/endpoints exist.
  */
-import request from 'supertest';
 import db from '../config/database';
 import app from '../app';
 import {

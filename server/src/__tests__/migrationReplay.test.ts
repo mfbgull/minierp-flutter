@@ -24,7 +24,6 @@ describe('migration replay (task 2.6)', () => {
     process.env.JWT_SECRET = 'replay-test-secret';
     process.env.DEFAULT_ADMIN_PASSWORD = 'replay-admin-pass';
 
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const dbModuleNS = require('../config/database');
     const dbModule = dbModuleNS.default as import('better-sqlite3').Database;
@@ -42,7 +41,6 @@ describe('migration replay (task 2.6)', () => {
     // Second boot of the same process = every runLedgered call skips (recorded).
     // Force a "second boot" by clearing require cache and re-importing.
     jest.resetModules();
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const db2NS = require('../config/database');
     const db2 = db2NS.default as import('better-sqlite3').Database;
