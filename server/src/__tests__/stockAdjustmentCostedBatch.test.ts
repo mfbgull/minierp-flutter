@@ -17,7 +17,6 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import StockMovementModel from '../models/StockMovement';
-import ItemModel from '../models/Item';
 
 function createFixture(): Database.Database {
   const db = new Database(':memory:');

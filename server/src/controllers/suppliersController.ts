@@ -4,7 +4,6 @@ import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
 import db from '../config/database';
 import SupplierModel from '../models/Supplier';
-import { getRouteParam } from '../utils/queryUtils';
 import { sanitizeSortParams, SUPPLIER_SORT_COLUMNS, LEDGER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import logger from '../utils/logger';
 import { parsePageParams, envelope } from '../utils/paginate';

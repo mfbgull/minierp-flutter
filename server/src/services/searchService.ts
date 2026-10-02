@@ -1,7 +1,6 @@
 import db from '../config/database';
 import { formatCurrency, getCurrencySymbol } from '../utils/displayCurrency';
 import { SearchResult, SearchAction, SearchResponse, ActionDef, PageAction } from '../types/search';
-import { AuthRequest } from '../types';
 
 // ============================================================
 // Entity-action registry (spec §4.9)

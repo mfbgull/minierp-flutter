@@ -1,7 +1,7 @@
 import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
-import { getAuthCookie, createItem, purchaseStock, FUTURE_DUE_DATE } from './helpers/invoiceReturnSpec';
+import { getAuthCookie, purchaseStock, FUTURE_DUE_DATE } from './helpers/invoiceReturnSpec';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {

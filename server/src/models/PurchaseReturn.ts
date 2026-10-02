@@ -3,7 +3,6 @@ import StockMovementModel from './StockMovement';
 import SupplierLedgerModel from './SupplierLedger';
 import SupplierRefundModel from './SupplierRefund';
 import AccountingService from '../services/accountingService';
-import logger from '../utils/logger';
 import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, PURCHASE_RETURN_HEADER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { isFeatureEnabled } from '../utils/featureFlags';
