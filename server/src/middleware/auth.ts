@@ -3,7 +3,7 @@ import { Response, NextFunction } from 'express';
 import { AuthUser, AuthRequest } from '../types';
 import logger from '../utils/logger';
 
-import { errorMessage, errorName } from '../utils/errorMessage';
+import { errorName } from '../utils/errorMessage';
 
 if (!process.env.JWT_SECRET) {
   throw new Error('FATAL: JWT_SECRET environment variable must be set. Generate one with: openssl rand -base64 64');

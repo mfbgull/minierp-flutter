@@ -10,7 +10,7 @@ import logger from '../utils/logger';
 import { parsePageParams, envelope } from '../utils/paginate';
 import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/sequence';
 
-import { errorMessage, errorCode } from '../utils/errorMessage';
+import { errorCode } from '../utils/errorMessage';
 
 function getSuppliers(req: Request, res: Response): void {
   try {
