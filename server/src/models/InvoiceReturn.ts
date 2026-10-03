@@ -124,7 +124,9 @@ export class InvoiceReturnModel {
       invoice_id: number;
       customer_id: number;
       return_date: string;
-      reason?: string;
+      // invoice_returns.reason is a nullable column, so an explicit null
+      // ("no reason given") is a legitimate value, not just an omission.
+      reason?: string | null;
       fee_type?: 'none' | 'fixed' | 'percentage';
       fee_value?: number;
       fee_amount?: number;

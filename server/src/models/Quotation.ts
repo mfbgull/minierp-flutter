@@ -692,7 +692,7 @@ class QuotationModel {
       WHERE so.source_id = ?
     `).get(quotationId) as SalesOrderWithWarehouse | undefined;
 
-    let invoice = undefined;
+    let invoice: InvoiceWithUsername | undefined = undefined;
     if (salesOrder) {
       invoice = db.prepare(`
         SELECT

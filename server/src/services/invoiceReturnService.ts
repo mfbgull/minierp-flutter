@@ -1157,10 +1157,10 @@ export class InvoiceReturnService {
     dbArg: Database.Database,
     args: {
       returnHeader: InvoiceReturnHeader; invoiceNo: string; customerId: number;
-      netAmount: number; userId: number; targetInvoiceIds: number[] | null;
+      netAmount: number; userId: number; targetInvoiceIds?: number[] | null;
     },
   ): PostedSettlement[] {
-    let targets = args.targetInvoiceIds ?? null;
+    let targets: number[] | null = args.targetInvoiceIds ?? null;
     if (!targets || targets.length === 0) {
       targets = (dbArg.prepare(`
         SELECT id FROM invoices
@@ -1429,7 +1429,7 @@ function reverseRestock(
       warehouse_id: movement.warehouse_id,
       movement_type: 'ADJUSTMENT',
       quantity: -restockQty,
-      unit_cost: movement.unit_cost,
+      unit_cost: movement.unit_cost ?? undefined,
       reference_doctype: 'RETURN',
       reference_docno: args.invoiceNo,
       remarks: args.remarks,

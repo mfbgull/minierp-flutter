@@ -25,42 +25,10 @@ jobs:
       - name: Reversal-rules verification (81-case gate)
         run: npm run verify:reversal-rules
 
-  # Advisory only — reports the strictNullChecks error count but never blocks.
-  # Tracked in server/STRICT_NULL_CHECKS.md; the flag flips once the count is 0.
-  strict-nullchecks-advisory:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    defaults:
-      run:
-        working-directory: server
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: server/package-lock.json
-      - run: npm ci
-      - name: Count strictNullChecks errors
-        id: count
-        run: |
-          npx tsc --noEmit --strictNullChecks > strict-null.log 2>&1 || true
-          COUNT=$(grep -c 'error TS' strict-null.log || true)
-          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
-          {
-            echo "### strictNullChecks advisory: $COUNT error(s)"
-            echo ""
-            echo "<details><summary>first 40</summary>"
-            echo ""
-            echo '```'
-            grep 'error TS' strict-null.log | head -40 || echo "(none)"
-            echo '```'
-            echo ""
-            echo "</details>"
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: Report
-        run: |
-          echo "strictNullChecks errors: ${{ steps.count.outputs.count }}"
+  # strictNullChecks is enabled in server/tsconfig.json, so the gating
+  # `npm run typecheck` step above is the regression gate. The former
+  # advisory-counting job was removed at the flip (see
+  # server/STRICT_NULL_CHECKS.md).
 
   flutter:
     runs-on: ubuntu-latest

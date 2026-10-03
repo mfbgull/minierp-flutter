@@ -223,7 +223,9 @@ function findC1Collisions(db: Database.Database): HistoricalIntegrityFinding[] {
         check: 'return_reference_collision',
         severity: 'high',
         document: row.reference_type,
-        reference: row.return_no,
+        // Same fallback as the orphan branch: a resolvable return_id whose
+        // return_no is somehow NULL still gets a printable reference.
+        reference: row.return_no ?? String(row.reference_id),
         affectedQuantity: null,
         affectedAmount: amountFromGroup(row.debit, row.credit),
         expected: `Return ${row.return_no} belongs to Invoice ${row.invoice_no}; only its owning invoice may void its GL.`,

@@ -5,9 +5,12 @@
     "lib": ["ES2020", "ES2022"],
     "outDir": "./dist",
     "rootDir": ".",
-    "strict": false,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
+    // Full strict mode. Enabled after the strictNullChecks rollout reached 0
+    // errors; the remaining flags (noImplicitAny, strictPropertyInitialization,
+    // useUnknownInCatchVariables, ...) surfaced only 2 further errors, both
+    // callback-parameter widenings in config/database.ts. See
+    // STRICT_NULL_CHECKS.md.
+    "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

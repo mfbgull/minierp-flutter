@@ -433,8 +433,10 @@ class InvoiceModel {
   } {
     const invoice = this.getById(invoiceId, db);
 
-    let salesOrder = undefined;
-    let quotation = undefined;
+    // Annotated explicitly: `let x = undefined` has no inferred type for
+    // TS to evolve here, so the assignments below collapse to `never`.
+    let salesOrder: Record<string, unknown> | undefined = undefined;
+    let quotation: Record<string, unknown> | undefined = undefined;
 
     if (invoice?.so_id) {
       salesOrder = db.prepare(`

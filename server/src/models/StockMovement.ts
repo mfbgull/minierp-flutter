@@ -402,7 +402,9 @@ class StockMovementModel {
     item_id: number;
     quantity: number;
     movement_date: string;
-    created_by: number;
+    // recordMovement accepts a null userId (system-originated movements),
+    // and journal_entries.created_by is nullable, so this must be too.
+    created_by: number | null;
     batch_id?: number | null;
   }, db: Database.Database): void {
     const { id, item_id, quantity, movement_date, created_by, batch_id } = params;

@@ -162,7 +162,10 @@ describe('Report expression security (REP-18)', () => {
       const entity = db.prepare; // placeholder to satisfy lint on unused import shape
       void entity;
       const { getEntity } = await import('../services/entityRegistry');
-      const def = getEntity(parsed.entity);
+      // A config with computed columns but no entity key is still validated
+      // against an empty field set, same as a lookup miss — '' is not a
+      // registry key, so getEntity returns undefined as before.
+      const def = getEntity(parsed.entity ?? '');
       const fields = new Set<string>(def ? def.fields.map((f: { name: string }) => f.name) : []);
       expect(() => validateConfigExpressions(parsed as { computedColumns?: { name: string; expression: string }[] }, fields))
         .not.toThrow(`stored report ${row.id} (${row.name}) uses a now-invalid expression`);
