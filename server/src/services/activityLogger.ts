@@ -308,13 +308,13 @@ class ActivityLoggerService {
           entry.correlationId || null
         );
       }
+
+      return true;
     } catch (error: unknown) {
       // Task 4.7: re-queue so nothing is silently lost; caller can detect failure.
       this.logQueue.unshift(...batch);
       logger.error('[ActivityLogger] Failed to flush logs:', { error: errorMessage(error) });
       return false;
-      // Re-add failed entries to queue
-      this.logQueue.unshift(...batch);
     } finally {
       this.isProcessing = false;
     }
