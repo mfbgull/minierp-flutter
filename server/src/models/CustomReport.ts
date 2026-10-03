@@ -116,7 +116,10 @@ function duplicate(id: number, userId: number): CustomReportRow | null {
   return create({
     user_id: userId,
     name: copyName,
-    description: original.description,
+    // create() normalizes `undefined` to NULL via `data.description || null`,
+    // so map the row's NULL onto the DTO's optional rather than widening the
+    // DTO to accept both spellings of "no description".
+    description: original.description ?? undefined,
     config: JSON.parse(original.config),
   });
 }

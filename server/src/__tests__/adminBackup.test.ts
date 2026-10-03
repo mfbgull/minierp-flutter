@@ -16,11 +16,13 @@ jest.setTimeout(30000);
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) throw new Error('TEST_ADMIN_PASSWORD must be set');
+// Bind the narrowed value so the default parameter below is a plain string.
+const ADMIN_PASSWORD: string = TEST_PASSWORD;
 
 // DATABASE_PATH is the database directory; backupService nests backups/ in it.
 const BACKUP_DIR = path.join(process.env.DATABASE_PATH as string, 'backups');
 
-async function getAuthCookie(username = 'admin', password: string = TEST_PASSWORD): Promise<string> {
+async function getAuthCookie(username = 'admin', password: string = ADMIN_PASSWORD): Promise<string> {
   const res = await request(app)
     .post('/api/auth/login')
     .send({ username, password });

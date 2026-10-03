@@ -31,7 +31,9 @@ if (!fs.existsSync(dbDir)) {
 
 // Create database connection
 const db = new Database(dbPath, {
-  verbose: process.env.NODE_ENV === 'development' ? (msg: string) => logger.debug(msg) : undefined
+  // better-sqlite3 types `verbose` as (message?: unknown, ...args) => void,
+  // so the param must accept unknown rather than assume string.
+  verbose: process.env.NODE_ENV === 'development' ? (msg: unknown) => logger.debug(String(msg)) : undefined
 });
 
 // Enable foreign keys
@@ -1233,7 +1235,7 @@ function runStockInvariantChecksRebuild(): void {
           );
         `);
         // Column-aware copy
-        const cols = db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all().map((c: { name: string }) => c.name);
+        const cols = (db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all() as Array<{ name: string }>).map((c) => c.name);
         const base = ['id','batch_no','item_id','warehouse_id','source_type','source_id','quantity_original','quantity_remaining','unit_cost','received_date'];
         const optional = ['created_at','expiry_date','halted','halted_reason'].filter(c => cols.includes(c));
         const allCols = [...base, ...optional];

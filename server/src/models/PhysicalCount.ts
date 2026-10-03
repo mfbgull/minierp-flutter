@@ -309,7 +309,13 @@ class PhysicalCountModel {
     const transaction = db.transaction(() => {
       // Post adjustments for all items with variances
       const items = this.getItems(countId, db);
-      const adjustmentItems = items.filter(i => i.counted_quantity !== null && i.variance !== 0);
+      // counted_quantity and variance are only ever written together (see
+      // recordCount and correctCount), so a counted row always has a variance.
+      // Stating that lets the arithmetic below treat it as non-null.
+      const adjustmentItems = items.filter(
+        (i): i is typeof i & { variance: number } =>
+          i.counted_quantity !== null && i.variance !== null && i.variance !== 0
+      );
 
       for (const item of adjustmentItems) {
         // INV-01: count completion reconciles ALL THREE tables — movements,

@@ -682,7 +682,7 @@ class SalesOrderModel {
   } {
     const salesOrder = this.getById(salesOrderId, db);
 
-    let quotation = undefined;
+    let quotation: QuotationWithWarehouse | undefined = undefined;
     if (salesOrder?.source_type === 'QUOTATION' && salesOrder.source_id) {
       quotation = db.prepare(`
         SELECT

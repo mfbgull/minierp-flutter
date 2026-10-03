@@ -62,8 +62,13 @@ export interface PostEntryInput {
   entry_date: string;            // YYYY-MM-DD
   description: string;
   reference_type?: string;
-  reference_id?: number;
-  created_by?: number;
+  // journal_lines.reference_id is nullable; a GL-only or system entry
+  // legitimately carries no source document.
+  reference_id?: number | null;
+  // journal_entries.created_by / journal_lines.created_by are nullable and
+  // written as `|| null`, so system-originated entries (migrations, repairs)
+  // legitimately post with no acting user.
+  created_by?: number | null;
   lines: JournalLineInput[];
 }
 
@@ -440,7 +445,9 @@ export class AccountingService {
       debitTextCode: string;
       creditTextCode: string;
       amount: number;
-      createdBy?: number;
+      // journal_entries.created_by is nullable and written as `|| null`, so
+      // a system-originated entry with no acting user is a real case.
+      createdBy?: number | null;
     }
   ): number {
     if (!args.amount || args.amount <= 0) {
@@ -1396,7 +1403,11 @@ export class AccountingService {
     db: Database.Database,
     referenceType: string,
     referenceId: number,
-    attribution?: { voidedBy?: number; voidReason?: string }
+    // `| null` matches the sibling void APIs (Employee, EmployeeLoan,
+    // OwnerCapital) and the nullable journal_lines.voided_by column: an
+    // explicit "voided by nobody" is distinct from an omitted attribution,
+    // and both mean the same thing once written to the column.
+    attribution?: { voidedBy?: number | null; voidReason?: string | null }
   ): number {
     const result = db.prepare(`
       UPDATE journal_lines
@@ -1475,7 +1486,11 @@ export class AccountingService {
   static voidOwnInvoiceReturnLines(
     db: Database.Database,
     invoiceId: number,
-    attribution?: { voidedBy?: number; voidReason?: string }
+    // `| null` matches the sibling void APIs (Employee, EmployeeLoan,
+    // OwnerCapital) and the nullable journal_lines.voided_by column: an
+    // explicit "voided by nobody" is distinct from an omitted attribution,
+    // and both mean the same thing once written to the column.
+    attribution?: { voidedBy?: number | null; voidReason?: string | null }
   ): number {
     const result = db.prepare(`
       UPDATE journal_lines

@@ -73,7 +73,9 @@ function updateBulk(db: Database.Database, settings: Record<string, { value: str
   const transaction = db.transaction(() => {
     for (const [key, data] of Object.entries(settings)) {
       const value = typeof data === 'object' ? data.value : data;
-      const description = typeof data === 'object' ? data.description : null;
+      // data.description is optional, so an omitted key and an explicit
+      // null must both reach upsert as the column's null.
+      const description = typeof data === 'object' ? data.description ?? null : null;
       upsert(db, key, value, description);
     }
   });
