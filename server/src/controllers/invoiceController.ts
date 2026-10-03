@@ -34,7 +34,6 @@ import {
   INVOICE_CREATE_SCOPE,
   normalizeIdempotencyKey,
   hashRequestPayload,
-  findIdempotencyRecord,
   claimIdempotencyKey,
   startIdempotentRequest,
 } from '../utils/idempotency';
@@ -79,8 +78,6 @@ class CreditOffsetChangeNotSupportedError extends Error {
 }
 
 const {
-  createLedgerEntry,
-  recalcCustomerBalanceFromLedger,
   calculateInvoiceBalance,
   updateInvoiceStatus,
 } = ledgerUtils;

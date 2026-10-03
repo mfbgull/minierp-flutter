@@ -69,10 +69,6 @@ interface CreateCountDTO {
   notes?: string;
 }
 
-interface CorrectCountDTO {
-  corrections: Array<{ item_id: number; counted_quantity: number; notes?: string | null }>;
-}
-
 interface CountFilters {
   search?: string;
   sortBy?: string;

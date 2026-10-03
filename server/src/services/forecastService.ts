@@ -1,7 +1,7 @@
 import db from '../config/database';
 import {
   ForecastResult, ForecastDashboardData, ForecastAlert, TrendData, MonthlySaleData,
-  ForecastModelType, ForecastModelConfig, SeasonalEvent, ForecastAccuracy,
+  ForecastModelType, ForecastModelConfig, SeasonalEvent,
   SafetyStockResult, ItemAccuracy, AccuracyDataPoint, ForecastOverrideRequest
 } from '../types';
 import { errorMessage } from '../utils/errorMessage';
@@ -17,8 +17,6 @@ const DEFAULT_LEAD_TIME = 7;
 const DEFAULT_SERVICE_LEVEL = 0.95;
 /** Number of trailing months to use for bias calculation */
 const BIAS_WINDOW_MONTHS = 3;
-/** Minimum data points needed for forecast */
-const MIN_DATA_POINTS = 2;
 
 /**
  * Load model config for a given item. Falls back: item-specific → category → default.
@@ -676,7 +674,6 @@ function readCachedForecasts(): ForecastResult[] | null {
   const itemMap = new Map<number, ForecastResult>();
   for (const row of cachedRows) {
     if (!itemMap.has(row.item_id)) {
-      const defaultLeadTime = DEFAULT_LEAD_TIME;
       itemMap.set(row.item_id, {
         itemId: row.item_id,
         itemCode: row.item_code,
