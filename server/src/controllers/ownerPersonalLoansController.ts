@@ -824,19 +824,21 @@ function mergeBorrowers(req: AuthRequest, res: Response): void {
       return;
     }
 
-    let mergedLoans: number;
-
-    db.transaction(() => {
+    // better-sqlite3 transactions run synchronously, so returning the
+    // row count out of the callback gives a definite value instead of a
+    // "used before assigned" hole that `mergedLoans!` had to paper over.
+    const mergedLoans = db.transaction((): number => {
       // Reassign loans
       const result = db.prepare(`
         UPDATE owner_personal_loans
         SET borrower_id = ?, borrower_name = ?, borrower_type = ?, updated_at = CURRENT_TIMESTAMP
         WHERE borrower_id = ?
       `).run(target.id, target.name, target.linked_type, sourceId);
-      mergedLoans = result.changes;
 
       // Deactivate source
       db.prepare('UPDATE owner_personal_loan_borrowers SET is_active = 0 WHERE id = ?').run(sourceId);
+
+      return result.changes;
     })();
 
     logCRUD(ActionType.SETTING_UPDATE, 'PersonalLoanBorrower', sourceId, `Merged borrower ${source.name} into ${target.name} (${mergedLoans} loans)`, userId);
@@ -845,7 +847,7 @@ function mergeBorrowers(req: AuthRequest, res: Response): void {
     res.json({
       success: true,
       data: {
-        merged_loans: mergedLoans!,
+        merged_loans: mergedLoans,
         source_deactivated: true,
       },
     });

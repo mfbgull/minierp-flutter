@@ -83,8 +83,11 @@ function getDSOMetric(req: Request, res: Response): void {
 function getReceivablesSummary(req: Request, res: Response): void {
   try {
     const asOfDate = (req.query.asOfDate as string) || todayLocal();
+    // getReceivablesSummary already echoes asOfDate in its result, so
+    // spreading it after an explicit `asOfDate` key silently overwrote
+    // one with the other. Return the summary as-is.
     const summary = ReportsModel.getReceivablesSummary(db, asOfDate);
-    res.json({ success: true, data: { asOfDate, ...summary } });
+    res.json({ success: true, data: summary });
   } catch (error) {
     logger.error('Error fetching receivables summary:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch receivables summary' });
