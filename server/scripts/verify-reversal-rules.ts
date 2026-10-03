@@ -44,6 +44,10 @@ let failed = 0;
  * and an accidental early return or a conditional assert that stops firing
  * fails the gate instead of quietly shrinking it.
  *
+ * If you recount with grep and land on 80, that is not a drift: the extra
+ * line is assertClose's own delegation to assert inside its function body,
+ * not a call site. 80 grep-visible lines - 1 delegation = 79 assertions.
+ *
  * Keep in sync with the assert/assertClose call sites below.
  */
 const EXPECTED_ASSERTIONS = 79;
