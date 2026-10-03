@@ -210,14 +210,9 @@ describe('XSS Prevention', () => {
 
 describe('SQL Injection Regression', () => {
   let authCookie: string;
-  let csrfCookie: string;
-  let csrfToken: string;
 
   beforeAll(async () => {
     authCookie = await getAuthCookie();
-    const csrf = await getCsrfToken(authCookie);
-    csrfCookie = csrf.cookie;
-    csrfToken = csrf.token;
   });
 
   const sqliPayloads = [
@@ -271,7 +266,7 @@ describe('SQL Injection Regression', () => {
 
   it('database tables remain intact after all SQLi attempts', async () => {
     const tables = ['customers', 'payments', 'invoices', 'users'];
-    for (const table of tables) {
+    for (const _table of tables) {
       const res = await request(app)
         .get('/api/customers')
         .set('Cookie', authCookie);

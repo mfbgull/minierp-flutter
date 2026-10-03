@@ -59,7 +59,6 @@ function createFixture(): void {
   // Seed roles and permissions for action filtering
   db.exec(`INSERT OR IGNORE INTO roles (id, role_name, description, is_system_role, is_active) VALUES (1, 'Admin', 'Admin', 1, 1), (2, 'User', 'User', 1, 1)`);
   db.exec(`UPDATE users SET role_id = 1, role = 'admin' WHERE username = 'admin'`);
-  const permModules = ['invoices','payments','purchases','inventory','sales_orders','production','employees','customers','suppliers','reports'];
   const permActions: Record<string, string[]> = {
     invoices: ['read','create','update','delete'],
     payments: ['read','create','update','delete'],

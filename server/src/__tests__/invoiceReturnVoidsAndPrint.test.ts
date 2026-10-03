@@ -57,7 +57,6 @@ describe('Invoice Return spec — scenarios 15–21 (voids, deferral, periods, G
     expect(ret.status).toBe(200);
     const returnId = ret.returnId!;
     const ledgerAfterReturn = customerLedgerNet(customerId);
-    const balanceBeforeAnyReturn = ledgerAfterReturn; // set here; re-read after void below
 
     const status = await voidReturn(returnId, authCookie);
     expect(status).toBe(200);

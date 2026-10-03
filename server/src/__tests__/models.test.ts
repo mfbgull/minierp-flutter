@@ -423,7 +423,7 @@ describe('StockMovementModel', () => {
     });
 
     it('consumes from oldest batch first (FIFO)', () => {
-      const batch1Result = StockMovementModel.recordMovement({
+      StockMovementModel.recordMovement({
         item_id: testItemId,
         warehouse_id: testWhId,
         movement_type: 'PURCHASE',

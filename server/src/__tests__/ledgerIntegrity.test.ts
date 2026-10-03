@@ -172,7 +172,7 @@ describe('ledger integrity and reconciliation', () => {
     expect([200, 201]).toContain(pay.status);
 
     // Backdated invoice between them (150 on 2026-06-15).
-    const invB = await createInvoice(customerId2, 150, '2026-06-15');
+    await createInvoice(customerId2, 150, '2026-06-15');
 
     const rows = ledgerRows(
       'customer_ledger',

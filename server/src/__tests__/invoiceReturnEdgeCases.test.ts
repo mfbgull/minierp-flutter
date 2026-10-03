@@ -7,7 +7,6 @@
  * red until the new tables/endpoints exist.
  */
 import db from '../config/database';
-import app from '../app';
 import {
   getAuthCookie, createItem, purchaseStock, createCustomer, createInvoice,
   processReturn, expectPositionOf, expectNoNegativeBalance, returnRow,
