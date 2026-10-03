@@ -25,13 +25,6 @@ async function getAuthCookie(): Promise<string> {
   return tokenCookie ? tokenCookie.split(';')[0] : '';
 }
 
-function activeLines(refType: string, refId: number) {
-  return db.prepare(
-    `SELECT account_id, debit, credit, voided FROM journal_lines
-     WHERE reference_type = ? AND reference_id = ? AND voided = 0`
-  ).all(refType, refId) as Array<{ account_id: number; debit: number; credit: number; voided: number }>;
-}
-
 function voidedAttribution(refType: string, refId: number) {
   return db.prepare(
     `SELECT voided_at, voided_by, void_reason FROM journal_lines

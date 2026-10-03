@@ -65,16 +65,6 @@ function batchQtyRemaining(itemId: number): number {
   );
 }
 
-function glNetByAccount(code: string): number {
-  const row = db.prepare(`
-    SELECT COALESCE(SUM(jl.debit), 0) - COALESCE(SUM(jl.credit), 0) AS net
-    FROM journal_lines jl
-    JOIN chart_of_accounts coa ON coa.id = jl.account_id
-    WHERE coa.code = ? AND jl.voided = 0
-  `).get(code) as { net: number };
-  return Number(row.net);
-}
-
 function glNetForReturn(code: string, returnId: number): number {
   const row = db.prepare(`
     SELECT COALESCE(SUM(jl.debit), 0) - COALESCE(SUM(jl.credit), 0) AS net
@@ -84,18 +74,6 @@ function glNetForReturn(code: string, returnId: number): number {
       AND jl.reference_type = 'INVOICE_RETURN'
       AND jl.reference_id = ?
   `).get(code, returnId) as { net: number };
-  return Number(row.net);
-}
-
-function glNetForCogsReversal(returnId: number): number {
-  const row = db.prepare(`
-    SELECT COALESCE(SUM(jl.debit), 0) - COALESCE(SUM(jl.credit), 0) AS net
-    FROM journal_lines jl
-    JOIN chart_of_accounts coa ON coa.id = jl.account_id
-    WHERE coa.code = '1200' AND jl.voided = 0
-      AND jl.reference_type = 'INVOICE_RETURN'
-      AND jl.reference_id = ?
-  `).get(returnId) as { net: number };
   return Number(row.net);
 }
 
@@ -202,7 +180,7 @@ describe('C2 scenario 1: 2 + 2 (two equal partial returns)', () => {
     await purchaseStock(item, sellQty, cost);
     const beforeStock = stockOf(item);
 
-    const { invoiceId, invoiceItemIds, returnIds } = await sellAndReturn(item, sellQty, sellPrice, [2, 2]);
+    const { invoiceItemIds, returnIds } = await sellAndReturn(item, sellQty, sellPrice, [2, 2]);
     const [retId1, retId2] = returnIds;
 
     // Stock: sold 10, returned 2+2 = 4 → stock = beforeStock - 10 + 4
@@ -242,7 +220,7 @@ describe('C2 scenario 2: 1 + 3 (unequal partial returns)', () => {
     await purchaseStock(item, sellQty, cost);
     const beforeStock = stockOf(item);
 
-    const { invoiceId, invoiceItemIds, returnIds } = await sellAndReturn(item, sellQty, sellPrice, [1, 3]);
+    const { invoiceItemIds, returnIds } = await sellAndReturn(item, sellQty, sellPrice, [1, 3]);
     const [retId1, retId2] = returnIds;
 
     // Stock: -10 + 1 + 3 = -6 from original
@@ -271,7 +249,7 @@ describe('C2 scenario 3: 5 + 5 (two full-size partial returns)', () => {
     await purchaseStock(item, sellQty, cost);
     const beforeStock = stockOf(item);
 
-    const { invoiceId, invoiceItemIds, returnIds } = await sellAndReturn(item, sellQty, sellPrice, [5, 5]);
+    const { invoiceItemIds, returnIds } = await sellAndReturn(item, sellQty, sellPrice, [5, 5]);
     const [retId1, retId2] = returnIds;
 
     // Stock fully restored: original level

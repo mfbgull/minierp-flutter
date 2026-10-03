@@ -140,7 +140,7 @@ describe('H11: PO cancel only unreceived remainder', () => {
     it('reverses full PO value — net supplier effect 0, stock 0', async () => {
       const { poId } = await createPO(10, 100);
 
-      const balBefore = getSupplierBalance();
+      getSupplierBalance();
       const stockBefore = getStockQty();
 
       const cancel = await request(app)

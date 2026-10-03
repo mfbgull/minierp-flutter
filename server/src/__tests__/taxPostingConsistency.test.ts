@@ -17,7 +17,7 @@ import app from '../app';
 import db from '../config/database';
 import {
   getAuthCookie, createItem, purchaseStock, createCustomer, createInvoice,
-  processReturn, glTotalsFor, assertGlBalanced,
+  processReturn, assertGlBalanced,
 } from './helpers/invoiceReturnSpec';
 import { glImbalances } from './helpers/accountingInvariants';
 import { decomposeLineAmount, parseCurrency } from '../utils/currency';

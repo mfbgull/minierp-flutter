@@ -605,7 +605,6 @@ describe('PurchaseReturnModel', () => {
     it('PRET-02: a full return after most stock was sold fails loudly (no silent short-consume)', () => {
       const db = createFixture();
       const purchaseId = seedPurchase(db, { quantity: 10 });
-      const itemRow = db.prepare('SELECT item_id FROM purchases WHERE id = ?').get(purchaseId) as { item_id: number };
 
       // Simulate 8 of the 10 units already sold out of the batch.
       db.prepare('UPDATE stock_batches SET quantity_remaining = 2 WHERE source_type = ? AND source_id = ?')

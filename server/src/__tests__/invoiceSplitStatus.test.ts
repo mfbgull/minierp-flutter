@@ -62,7 +62,7 @@ describe('P23: Invoice split payment_status / return_status', () => {
 
   beforeAll(async () => {
     const authCookie = token;
-    const iw = await purchaseStock(0, 1, 100, 10, authCookie).catch(() => null);
+    await purchaseStock(0, 1, 100, 10, authCookie).catch(() => null);
     const itemRes = await request(app).post('/api/inventory/items')
       .set('Cookie', authCookie)
       .send({ item_code: `SPLIT-ITEM-${Date.now()}`, item_name: 'Split Status Item' });

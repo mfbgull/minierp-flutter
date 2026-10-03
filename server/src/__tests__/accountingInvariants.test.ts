@@ -634,7 +634,7 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
 
   // 1. Direct purchase (cash PO receipt with supplier)
   it('1. direct purchase — invariants hold', async () => {
-    const apBefore = apSnapshot();
+    apSnapshot();
     checkF_I('baseline');
     const supplierId = await makeSupplier();
     const warehouseId = await whId();
@@ -854,7 +854,7 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
 
   // 10. Customer credit (credit_offset on invoice)
   it('10. customer credit — invariants hold', async () => {
-    const apBefore = apSnapshot();
+    apSnapshot();
     const customerId = await makeCustomer();
     const warehouseId = await whId();
     const itemId = await makeItem();
@@ -900,7 +900,7 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
 
   // 11. Supplier payment (PO allocation)
   it('11. supplier payment — invariants hold', async () => {
-    const apBefore = apSnapshot();
+    apSnapshot();
     const supplierId = await makeSupplier();
     const warehouseId = await whId();
     const itemId = await makeItem();

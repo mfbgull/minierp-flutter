@@ -14,7 +14,7 @@ import {
   getAuthCookie, createItem, purchaseStock, createCustomer, createInvoice,
   processReturn, settleReturn, fetchPosition, expectPositionOf,
   expectNoNegativeBalance, assertOriginalLinesUntouched, assertPaymentsUnchanged,
-  assertGlBalanced, assertFeeEntrySeparate, customerLedgerNet, returnRow,
+  assertGlBalanced, assertFeeEntrySeparate, returnRow,
   settlementsFor, getInvoiceRow, type Position,
 } from './helpers/invoiceReturnSpec';
 
