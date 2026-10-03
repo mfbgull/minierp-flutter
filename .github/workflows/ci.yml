@@ -22,7 +22,9 @@ jobs:
       - name: ESLint (zero errors gate)
         run: npx eslint . --quiet
       - run: npm test
-      - name: Reversal-rules verification (81-case gate)
+      # Case count is asserted by the script itself (EXPECTED_ASSERTIONS),
+      # so it is deliberately not repeated in this label.
+      - name: Reversal-rules verification gate
         run: npm run verify:reversal-rules
 
   # strictNullChecks is enabled in server/tsconfig.json, so the gating

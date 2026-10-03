@@ -35,6 +35,19 @@ import { InvoiceCancellationGuardError } from '../src/models/Invoice';
 
 let passed = 0;
 let failed = 0;
+
+/**
+ * Number of assertions this script is expected to make. The CI step name
+ * used to hardcode "81-case gate" while the script actually ran 79, so a
+ * case silently disappearing went unnoticed. Asserting the count here makes
+ * that drift loud: add a case and this must be bumped in the same commit,
+ * and an accidental early return or a conditional assert that stops firing
+ * fails the gate instead of quietly shrinking it.
+ *
+ * Keep in sync with the assert/assertClose call sites below.
+ */
+const EXPECTED_ASSERTIONS = 79;
+
 function assert(cond: boolean, label: string): void {
   if (cond) { passed++; console.log(`  PASS  ${label}`); }
   else { failed++; console.log(`  FAIL  ${label}`); }
@@ -595,6 +608,16 @@ function createPostedInvoice(invoiceNo: string, qty: number, unitPrice: number):
   assertClose(stockOf(itemId), systemQty - 1, 'stock unchanged after rejected double correction');
 
   console.log(`\nResult: ${passed} passed, ${failed} failed`);
+
+  if (passed + failed !== EXPECTED_ASSERTIONS) {
+    console.error(
+      `Assertion count drift: expected ${EXPECTED_ASSERTIONS}, ran ${passed + failed}. ` +
+      'Update EXPECTED_ASSERTIONS in the same commit that adds or removes a case.'
+    );
+    fs.rmSync(testDbDir, { recursive: true, force: true });
+    process.exit(1);
+  }
+
   fs.rmSync(testDbDir, { recursive: true, force: true });
   process.exit(failed > 0 ? 1 : 0);
 }
