@@ -53,8 +53,6 @@ export const CASH_GL_CODES: Record<string, string> = {
  * 'Credit' — an AR adjustment between invoices). Everything money-like
  * that isn't a named wallet falls through to 'bank'.
  */
-const CASH_METHOD_KEYS = ['cash', 'easypaisa', 'jazzcash', 'upaisa', 'bank', 'unclassified'] as const;
-
 /**
  * CASH-02 (financial-audit-p0-remediation 1.2): explicit whitelist.
  * Named wallets map to themselves; bank-like instruments → 'bank';
