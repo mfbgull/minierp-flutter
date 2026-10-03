@@ -73,6 +73,11 @@ graphify-out/
 .pi/
 .spynel/
 
+# Agent session scratch (machine-local, regenerable). .omo/plans/ holds
+# hand-authored design docs and stays tracked, so it is carved back out.
+.omo/*
+!.omo/plans/
+
 # Stray root-level SQLite databases. The nested patterns below only covered
 # server/database and database/, which is how sqlite_mcp_server.db slipped in.
 /*.db
