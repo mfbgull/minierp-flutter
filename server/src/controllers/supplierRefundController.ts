@@ -79,11 +79,22 @@ function createSupplierRefund(req: AuthRequest, res: Response): Response | void 
     if (!body.credit_note_id || body.credit_note_id <= 0) {
       return res.status(400).json({ error: 'A valid credit_note_id is required' });
     }
+    // Validate amount here rather than letting Number(undefined) become NaN
+    // and surface as a 500 from the model layer.
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'A positive amount is required' });
+    }
     if (body.payment_method !== undefined && !isValidPaymentMethod(body.payment_method)) {
       return res.status(400).json({
         error: `Invalid payment_method "${body.payment_method}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`,
       });
     }
+
+    // Bind the validated values: the guards above narrow `body.*`, but that
+    // narrowing does not carry into the transaction callback below.
+    const refundDate = body.refund_date;
+    const creditNoteId = body.credit_note_id;
 
     // audit-3 task 08: a supplier refund is cash OUT and reduces AP, so a
     // retry after a lost response must replay rather than refund twice.
@@ -100,9 +111,9 @@ function createSupplierRefund(req: AuthRequest, res: Response): Response | void 
     const created = db.transaction(() => {
       const row = SupplierRefundModel.create(
         {
-          refund_date: body.refund_date,
-          credit_note_id: body.credit_note_id,
-          amount: Number(body.amount),
+          refund_date: refundDate,
+          credit_note_id: creditNoteId,
+          amount,
           payment_method: body.payment_method,
           reference_no: body.reference_no,
         },
