@@ -199,8 +199,6 @@ class InvoiceFormState {
     required this.company,
     required this.payment,
     required this.paymentMethods,
-    this.customerCurrentBalance,
-    this.customerCreditUtilization,
     this.createdBy,
     this.id,
     this.totalAmount,
@@ -217,8 +215,6 @@ class InvoiceFormState {
   final String customerEmail;
   final String customerPhone;
   final String customerAddress;
-  final num? customerCurrentBalance;
-  final num? customerCreditUtilization;
   final DiscountScope discountScope;
   final Discount discount;
   final List<InvoiceFormItem> items;
