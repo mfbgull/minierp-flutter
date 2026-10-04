@@ -150,7 +150,15 @@ const R2 = (v: number): number => Math.round(v * 100) / 100;
  * 1110 (Customer Credit) is a contra of AR: store credit granted on a return
  * is credited to 1110, so a settled credit offset leaves GL AR at zero while
  * customer_ledger is also zero. Comparing 1100 alone drifts by exactly the
- * 1110 balance on credit return/offset flows — measured, not assumed. */
+ * 1110 balance on credit return/offset flows — measured, not assumed.
+ *
+ * The Math.abs() on both sides is retained deliberately. Measured 2026-10-04
+ * across all 17 call sites: GL and Σ current_balance are exactly equal and
+ * positive every time, so the abs is inert today. It would mask a future
+ * equal-magnitude sign inversion (GL +x against subledger −x). Removing it
+ * asserts that a negative AR position must fail the invariant, which is an
+ * accounting-policy decision and not a test-mechanics one — so it is left in
+ * place until that convention is decided. Do not "simplify" this away. */
 export function arImbalances(): Violation[] {
   const glBalance = R2(Math.abs(GL_BALANCE('1100') + GL_BALANCE('1110')));
   const row = db.prepare(

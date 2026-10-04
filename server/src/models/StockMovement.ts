@@ -425,6 +425,16 @@ class StockMovementModel {
 
     const value = Math.abs(quantity) * unitCost;
 
+    // KNOWN QUESTION (not a confirmed defect, 2026-10-04): on the dev
+    // databases the persisted financial_value does not always equal
+    // |quantity| * unit_cost — e.g. movement 150 has quantity -2,
+    // unit_cost 300, financial_value 1000. The likeliest explanation is
+    // that unit_cost was revised after the posting (revaluation), leaving
+    // financial_value at its original. That is benign if true, but it is
+    // unconfirmed, and nothing currently checks the relationship. Resolve
+    // before treating financial_value as authoritative. See
+    // docs/stock-authority-map.md.
+
     if (value === 0) return;
 
     const isRemoval = quantity < 0;
