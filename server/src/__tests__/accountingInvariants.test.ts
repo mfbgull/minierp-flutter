@@ -28,7 +28,7 @@ import request from 'supertest';
 import bcrypt from 'bcrypt';
 import app from '../app';
 import db from '../config/database';
-import { expectAllInvariantsHold, arImbalances, apImbalances, cashImbalances, type Violation } from './helpers/accountingInvariants';
+import { expectAllInvariantsHold, arImbalances, apImbalances, cashImbalances, inventoryImbalances, type Violation } from './helpers/accountingInvariants';
 import AccountingService from '../services/accountingService';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
@@ -602,17 +602,19 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
 
   function apSnapshot(): Violation[] { return apImbalances(); }
 
-  // TASK 35: GL 1200 (Inventory) vs batch value. Most of the historical
-  // "systemic gap" was this file's own fixtures injecting stock into
-  // stock_batches/stock_balances with no journal behind them; posting the
-  // matching opening entry (postOpeningInventoryGL) cut the drift from a
-  // growing -1985..-2925 to a constant +25.
+  // GL 1200 (Inventory) vs batch value is now asserted here, via
+  // inventoryImbalances() in checkF_I. It previously was not asserted anywhere
+  // in the suite: expectAllInvariantsHold covers A-E only, and
+  // inventoryImbalances had zero call sites, so the one invariant carrying the
+  // -1533.20 class of divergence was never checked on any database. That is
+  // what let the purchase-return double-credit below reach a green suite.
   //
-  // The residual +25 is ONE physical-count event: a stock_adjustment debit of
-  // 25 to 1200 whose batch value moved by a different amount. It is constant
-  // across every scenario below, so it is a single localised defect in the
-  // count-correction path, NOT a systemic valuation-model problem — which is
-  // why these scenarios use checkF_I, which does not assert inventory.
+  // The "+25 residual" this comment used to describe no longer reproduces. It
+  // was a physical-count shortage whose GL leg was valued at the snapshot
+  // unit_cost while the batch moved at the consumed layer cost;
+  // PhysicalCount.ts:411-422 now values shortages at the ACTUAL consumed FIFO
+  // layer costs. Verified on a clean database at 17/17 checkpoints in this
+  // file, including 'after count completion' and 'after stock adjustment'.
   // See server/docs/stock-authority-map.md.
 
   function checkF_I_core(label: string) {
@@ -625,6 +627,7 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     expect(arImbalances()).toEqual([]);
     expect(apImbalances()).toEqual([]);
     expect(cashImbalances()).toEqual([]);
+    expect(inventoryImbalances()).toEqual([]);
     void label;
   }
 
@@ -941,6 +944,83 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     expect(cancelRes.status).toBe(200);
     checkF_I_core('after expense cancel');
     expect(apSnapshot()).toEqual(apBefore);
+  });
+
+  // 13. Purchase return: create → void. This is the guard for the second
+  // instance of the item-1 pattern. The purchase-return path records an
+  // ADJUSTMENT movement (whose financial leg credits 1200) AND calls
+  // postPurchaseReturnEntry (which credits 1200 again) in the same
+  // transaction, so 1200 is credited twice for one return. The adjustment leg
+  // is the redundant one — see docs/known-issues.md item 4.
+  //
+  // standard_cost is set away from the layer cost on purpose. With
+  // standard_cost = 0 the adjustment leg is dormant and this assertion would
+  // pass without the suppression. The void leg is checked too because
+  // voidReturn reverses postPurchaseReturnEntry and records its own movement:
+  // suppressing only the create side would leave the void double-posting.
+  it('13. purchase return — create and void leave GL inventory equal to batch value', async () => {
+    const supplierId = await makeSupplier();
+    const warehouseId = await whId();
+    const itemId = await makeItem();
+
+    // Acquire through the real purchase path so the inventory GL exists;
+    // a direct batch insert would make the invariant unmeasurable.
+    const buyRes = await request(app).post('/api/purchases').set('Cookie', token)
+      .send({
+        item_id: itemId, warehouse_id: warehouseId, quantity: 10, unit_cost: 50,
+        purchase_date: '2026-09-15', supplier_id: supplierId,
+      });
+    expect([200, 201]).toContain(buyRes.status);
+    checkF_I('after direct purchase for return');
+
+    db.prepare('UPDATE items SET standard_cost = ? WHERE id = ?').run(400, itemId);
+    const purchaseId = (db.prepare(
+      'SELECT id FROM purchases WHERE item_id = ? ORDER BY id DESC LIMIT 1'
+    ).get(itemId) as { id: number }).id;
+
+    const PurchaseReturnModel = (await import('../models/PurchaseReturn')).default;
+    const created = PurchaseReturnModel.create(
+      {
+        return_date: '2026-09-15', source_type: 'PURCHASE', source_id: purchaseId,
+        warehouse_id: warehouseId, reason: 'Damaged',
+        items: [{ source_item_id: purchaseId, quantity: 3 }],
+      }, 1, db,
+    );
+    expect(created.status).toBe('POSTED');
+    checkF_I('after purchase return');
+
+    // Exactly one inventory credit for THIS return. Scoped to the return's own
+    // movement rather than by date or by an unscoped aggregate: scenarios 1-12
+    // share this database and post their own entries, so an unscoped query
+    // passes in isolation and fails in file context.
+    const credits = db.prepare(`
+      SELECT je.id, je.reference_type, SUM(jl.credit) AS cr
+      FROM stock_movements sm
+      JOIN journal_entries je ON je.id = sm.journal_entry_id
+      JOIN journal_lines jl ON jl.journal_entry_id = je.id
+      JOIN chart_of_accounts a ON a.id = jl.account_id
+      WHERE sm.purchase_return_id = ? AND je.voided = 0 AND jl.voided = 0 AND a.code = '1200'
+      GROUP BY je.id
+      HAVING cr > 0
+    `).all(created.id) as Array<{ id: number; reference_type: string; cr: number }>;
+    expect(credits).toEqual([]);
+
+    // The authoritative posting is keyed to the return document, at layer cost.
+    const authoritative = db.prepare(`
+      SELECT je.id, SUM(jl.credit) AS cr
+      FROM journal_entries je
+      JOIN journal_lines jl ON jl.journal_entry_id = je.id
+      JOIN chart_of_accounts a ON a.id = jl.account_id
+      WHERE je.voided = 0 AND jl.voided = 0 AND a.code = '1200'
+        AND je.reference_type = 'PURCHASE_RETURN' AND je.reference_id = ?
+      GROUP BY je.id
+    `).all(created.id) as Array<{ id: number; cr: number }>;
+    expect(authoritative).toHaveLength(1);
+    expect(Number(authoritative[0].cr)).toBeCloseTo(150, 2);
+
+    const voided = PurchaseReturnModel.voidReturn(created.id, 1, 'Guard test void', db);
+    expect(voided.status).toBe('VOIDED');
+    checkF_I('after purchase return void');
   });
 });
 
