@@ -614,10 +614,6 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
   // count-correction path, NOT a systemic valuation-model problem — which is
   // why these scenarios use checkF_I, which does not assert inventory.
   // See server/docs/stock-authority-map.md.
-  // Pre-existing gap (scenarios 11-12): GL 1100 (AR) ≠ customer
-  // balances after credit-return flows (scenario 10).  The credit
-  // return reduces GL AR but the customer_ledger balance does not
-  // track the same amount.
 
   function checkF_I_core(label: string) {
     expect(apImbalances()).toEqual([]);
@@ -878,7 +874,7 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
     const retRes = await request(app).post(`/api/invoices/${inv1.id}/return`).set('Cookie', token)
       .send({ disposition: 'credit', items: [{ invoice_item_id: invItem.id, return_quantity: 3 }] });
     expect([200, 201]).toContain(retRes.status);
-    // checkF_I omitted: credit return GL AR reduction doesn't match customer ledger balance (pre-existing business behavior)
+    checkF_I('credit return');
 
     const custRow = db.prepare(
       'SELECT current_balance, COALESCE(credit_balance, 0) as credit_balance FROM customers WHERE id = ?'
@@ -895,7 +891,7 @@ describe('Reconciliation invariants F-I over transaction lifecycle', () => {
         credit_offset: availableCredit,
       });
     expect([200, 201]).toContain(inv2Res.status);
-    // checkF_I omitted: credit offset invoice uses same credit_return balance which doesn't match GL AR (pre-existing)
+    checkF_I('credit offset applied to invoice');
   });
 
   // 11. Supplier payment (PO allocation)

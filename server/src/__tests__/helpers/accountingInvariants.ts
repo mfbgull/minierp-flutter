@@ -145,9 +145,14 @@ const GL_BALANCE = (code: string): number => {
 
 const R2 = (v: number): number => Math.round(v * 100) / 100;
 
-/** Invariant F: GL AR (1100) == Σ customer balances. */
+/** Invariant F: GL AR (1100) + Customer Credit (1110) == Σ customer balances.
+ *
+ * 1110 (Customer Credit) is a contra of AR: store credit granted on a return
+ * is credited to 1110, so a settled credit offset leaves GL AR at zero while
+ * customer_ledger is also zero. Comparing 1100 alone drifts by exactly the
+ * 1110 balance on credit return/offset flows — measured, not assumed. */
 export function arImbalances(): Violation[] {
-  const glBalance = R2(Math.abs(GL_BALANCE('1100')));
+  const glBalance = R2(Math.abs(GL_BALANCE('1100') + GL_BALANCE('1110')));
   const row = db.prepare(
     'SELECT COALESCE(SUM(current_balance), 0) AS total FROM customers'
   ).get() as { total: number };
@@ -224,4 +229,3 @@ export function expectAllInvariantsHold(context: string): void {
   expect(stockImbalances()).toEqual([]);
   void context;
 }
-
