@@ -29,6 +29,22 @@ posts the COGS reversal, and `postFinancialEntryForAdjustment` posts a third
 entry. Suppressing the wrong one makes things worse. Until that is answered,
 neither suppression nor cost-forwarding is correct here.
 
+### The second `avgUnitCost` site — checked, and NOT a second posting path
+
+`Invoice.ts:737` is the only `recordMovement` call that passes `avgUnitCost`.
+`Invoice.ts:752` is the same call's cost echoed into the `posted[]` result
+array, not a separate GL posting. So there is one reversal call site to exclude,
+not two, and the exclusion comment at `Invoice.ts:730` is complete as to call
+sites.
+
+**Open question that remains:** `posted[]` is consumed by callers
+(`invoiceController.ts:545` and `:823` both consume from batches). Whether any
+caller posts GL inventory from `posted[].unit_cost` — making it a fourth
+potential inventory poster alongside the return service and the adjustment leg
+— has **not** been verified. Check this before concluding item 1 accounts for
+every posting on the return path, and keep `posted[].unit_cost` consistent with
+whatever the authoritative poster turns out to be.
+
 Related: in a fresh fixture with `standard_cost = 0` the adjustment leg is
 dormant (`financial_posted=0`) because `postFinancialEntryForAdjustment`
 early-returns on `value === 0`. Forwarding a caller cost would **wake it** and
