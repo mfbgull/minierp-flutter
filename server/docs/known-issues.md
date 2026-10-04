@@ -76,7 +76,38 @@ purchase → sale → return sequence, and only via direct-insert fixtures like
 `batchLocationIntegration.test.ts` 7.6. That is why this class of defect never
 showed up in ordinary flows or on the scratch databases.
 
-## 4. Cost-basis forwarding for three callers — authorized, not started
+## 4. Cost-basis forwarding for three callers — LANDED
+
+`postFinancialEntryForAdjustment` re-derived cost from `items.standard_cost`
+and ignored the cost the caller recorded and relieved the layer at. For
+`PurchaseReturn.ts:443`, `PurchaseReturn.ts:638` and `Production.ts:627` the
+adjustment leg *is* the GL posting, so forwarding is correct.
+
+**Landed.** `RecordMovementDTO` gained `skipFinancialCostForwarding`;
+`Invoice.ts:738` is the only setter, so the invoice-return exclusion is
+explicit rather than an omission.
+
+Measured effect on LIVE: GL 1200 rises by **700.00**, moving the GL-vs-batch
+gap from **−1533.20** to **−833.20**.
+
+```
+id   doctype          qty  mv_cost  std  fin_val  1200 leg   delta
+150  PO_RETURN        -2   300      500  1000     CREDIT   +400.00
+152  PO_RETURN        -1   300      500  500      CREDIT   +200.00
+153  PURCHASE_RETURN  -1   500      500  500      CREDIT     +0.00
+155  PURCHASE_RETURN  -1   400      500  500      CREDIT   +100.00
+```
+
+Guarded by `purchaseReturn.test.ts` — seeds a purchase whose batch cost (10)
+diverges from `items.standard_cost` (40) and asserts the adjustment leg
+credits 40, not 160.
+
+**Do not read −833.20 as the remaining bug.** Item 1's corrections push GL
+*downward* — the overvalued adjustment legs and the duplicate COGS reversal
+both overstate 1200 — so the two changes move the same number in opposite
+directions. Re-measure the gap after item 1 lands.
+
+Historical note:
 
 `postFinancialEntryForAdjustment` re-derives cost from `items.standard_cost`
 and ignores the cost the caller recorded and relieved the layer at. For
@@ -94,8 +125,6 @@ id   doctype          qty  mv_cost  std  fin_val  1200 leg   delta
 155  PURCHASE_RETURN  -1   400      500  500      CREDIT   +100.00
 ```
 
-The invoice-return caller (`Invoice.ts:722`) is **excluded by design** pending
-item 1 — this asymmetry is intentional, not an oversight.
-
-Note the residual **−833.20** is unexplained, and item 1's corrections push GL
-*downward*, so the two interact. Re-measure the gap after any of these lands.
+The invoice-return caller (`Invoice.ts:737`) is **excluded by design** pending
+item 1 — this asymmetry is intentional, not an oversight, and is enforced by
+`skipFinancialCostForwarding` rather than left to chance.
