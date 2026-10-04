@@ -279,11 +279,15 @@ describe('PurchaseReturnModel', () => {
       expect(journal.length).toBe(2);
     });
 
-    it('posts the adjustment leg at the source batch cost, not items.standard_cost', () => {
-      // known-issues.md item 4. The adjustment leg is the GL posting for a
-      // purchase return, so it must value the layer it relieved. Diverging
-      // items.standard_cost from the batch cost is what makes the two
-      // distinguishable; without that split the assertion is vacuous.
+    it('credits inventory once per return, at the source batch cost', () => {
+      // known-issues.md item 4. postPurchaseReturnEntry is the authoritative
+      // inventory posting for this path (see the file header). The ADJUSTMENT
+      // movement records the stock change, so its own financial leg would be
+      // a second credit for the same units — the adjustment leg is suppressed.
+      //
+      // Diverging items.standard_cost from the batch cost is what makes the
+      // assertion non-vacuous: at standard_cost 40 the layer would have been
+      // credited 160 instead of 40.
       const db = createFixture();
       const purchaseId = seedPurchase(db, { unit_cost: 10 });
       // seedPurchase allocates item ids from a module-level counter, so the id
@@ -308,20 +312,29 @@ describe('PurchaseReturnModel', () => {
         1,
         db,
       );
+      expect(result.status).toBe('POSTED');
 
-      const leg = db.prepare(`
+      // No adjustment leg survived on this return's own movement.
+      const adjustmentLegs = db.prepare(`
+        SELECT je.id
+        FROM stock_movements sm
+        JOIN journal_entries je ON je.id = sm.journal_entry_id
+        WHERE sm.purchase_return_id = ? AND je.voided = 0
+      `).all(result.id);
+      expect(adjustmentLegs).toEqual([]);
+
+      // The one authoritative credit: 4 units at the batch cost of 10 = 40,
+      // on the credit side (a removal), keyed to the return document.
+      const authoritative = db.prepare(`
         SELECT jl.debit AS debit, jl.credit AS credit
         FROM journal_lines jl
         JOIN chart_of_accounts a ON a.id = jl.account_id
-        WHERE jl.reference_type = 'stock_adjustment' AND jl.voided = 0 AND a.code = '1200'
-        ORDER BY jl.id DESC LIMIT 1
-      `).get() as { debit: number; credit: number };
-
-      // 4 units at the batch cost of 10 = 40, credit side (a removal).
-      // At items.standard_cost (40) this would post 160 instead.
-      expect(Number(leg.credit)).toBeCloseTo(40, 2);
-      expect(Number(leg.debit)).toBeCloseTo(0, 2);
-      expect(result.status).toBe('POSTED');
+        WHERE jl.reference_type = 'PURCHASE_RETURN' AND jl.voided = 0 AND a.code = '1200'
+          AND jl.reference_id = ?
+      `).all(result.id) as Array<{ debit: number; credit: number }>;
+      expect(authoritative).toHaveLength(1);
+      expect(Number(authoritative[0].credit)).toBeCloseTo(40, 2);
+      expect(Number(authoritative[0].debit)).toBeCloseTo(0, 2);
     });
 
     it('rejects a line quantity above the remaining returnable quantity', () => {
