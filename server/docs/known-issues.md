@@ -4,52 +4,65 @@ Open findings that are **not** guarded by any test. Each was established by
 measurement; none has a fix. Do not rediscover these — they cost six
 exchanges to characterise and the numbers are easy to mis-frame.
 
-## 1. Invoice-return triple-posting (HIGH, undiagnosed)
+## 1. Invoice-return redundant adjustment leg (CORRECTED 2026-10-04)
 
-One sales return posts inventory to GL 1200 **three times** on live data.
-Measured on `server/database/erp.db`, invoice `INV-0926-00003`:
+**Correction.** This was first pinned as "triple-posting" with a *duplicate
+COGS reversal*. That was wrong, and the error was mine: I inferred a code
+defect from two journal entries that turned out to be legacy data.
 
-| entry | reference_type | 1200 leg |
-|---|---|---|
-| `je=182` | INVOICE | Cr 200 (COGS) |
-| `je=186` | INVOICE_RETURN | Dr 100 (COGS reversal) |
-| `je=192` | INVOICE_RETURN | Dr 100 (COGS reversal) — **identical to 186** |
-| `je=184` | stock_adjustment | Dr 500 ("Stock addition: 1 units @ 500") |
+### The duplicate COGS reversal is NOT a code defect
 
-Two independent defects underneath:
+`postCOGSReversalEntry` (`accountingService.ts:1133`) has exactly **one**
+caller — `invoiceReturnService.ts:403`, guarded by `if (cogsAmount > 0)`. The
+current path cannot double-post.
 
-- **Duplicate COGS reversal** — `je=186` and `je=192` carry byte-identical
-  descriptions. Survives any cost-basis work. Separate bug.
-- **Overvalued adjustment leg** — `je=184` posts `items.standard_cost` (500)
-  where the cost actually reversed is 100.
+Measured on the dev database: the only two rows in `invoice_returns` each have
+**exactly one** COGS reversal, correctly keyed to the return id
+(`return 1 → je=218`, `return 2 → je=223`).
 
-Blocking question before any fix: **which poster is authoritative on the
-return path?** `Invoice.ts` ~:661-700 restores the layer, the return service
-posts the COGS reversal, and `postFinancialEntryForAdjustment` posts a third
-entry. Suppressing the wrong one makes things worse. Until that is answered,
-neither suppression nor cost-forwarding is correct here.
+The `je=186`/`je=192` pair is keyed to `reference_id = 45`, and **no
+`invoice_returns` row with id 45 exists** — 45 is an `invoices.id`. Those rows
+were written before the rework that re-keyed return GL to the return document
+(`reference_id = invoice_returns.id`). They are historical rows, not live
+emissions. **No code change is warranted, and "dedupe" was the wrong
+treatment.** Same for the `je=200`/`je=206` pair at `reference_id = 49`.
 
-### The second `avgUnitCost` site — checked, and NOT a second posting path
+The reason this was easy to get wrong: return ids and invoice ids are separate
+AUTONCINCREMENT sequences, and several void paths key by one while posting keys
+by the other. See the warnings at `Invoice.ts:1028-1044` and
+`accountingService:1470-1486`.
 
-`Invoice.ts:737` is the only `recordMovement` call that passes `avgUnitCost`.
-`Invoice.ts:752` is the same call's cost echoed into the `posted[]` result
-array, not a separate GL posting. So there is one reversal call site to exclude,
-not two, and the exclusion comment at `Invoice.ts:730` is complete as to call
-sites.
+### The real live defect: a redundant, misvalued adjustment leg
 
-**Open question that remains:** `posted[]` is consumed by callers
-(`invoiceController.ts:545` and `:823` both consume from batches). Whether any
-caller posts GL inventory from `posted[].unit_cost` — making it a fourth
-potential inventory poster alongside the return service and the adjustment leg
-— has **not** been verified. Check this before concluding item 1 accounts for
-every posting on the return path, and keep `posted[].unit_cost` consistent with
-whatever the authoritative poster turns out to be.
+The invoice-side stock reversal posts inventory to GL **twice** on fresh data:
 
-Related: in a fresh fixture with `standard_cost = 0` the adjustment leg is
-dormant (`financial_posted=0`) because `postFinancialEntryForAdjustment`
-early-returns on `value === 0`. Forwarding a caller cost would **wake it** and
-add a fourth posting. That is why the invoice-return caller must be excluded
-from any cost-forwarding change.
+1. `postCOGSReversalEntry` — Dr 1200 at the true FIFO cost. **Correct.**
+2. `postFinancialEntryForAdjustment`, fired from `recordMovement` — a
+   `stock_adjustment` entry at `items.standard_cost`, because the return path
+   passes `skipBatchCreation` so `batch_id` is null and the poster falls back to
+   standard cost.
+
+17 such entries exist on the dev database, and **3 are misvalued**:
+
+| entry | movement | qty | movement cost | standard_cost | posted at |
+|---|---|---|---|---|---|
+| `je=156` | RETURN | 1 | 400 | 500 | 500 |
+| `je=163` | RETURN | 1 | 400 | 500 | 500 |
+| `je=184` | RETURN | 1 | 100 | 500 | 500 |
+
+`je=184`'s COGS reversal was 100 while the adjustment leg posted 500 — the
+overvaluation measured earlier.
+
+`skipFinancialCostForwarding` (landed in `3c1af576`) does **not** fix this: it
+only controls which cost the leg derives, so the leg still fires whenever
+`standard_cost != 0`. What is needed is suppression of the leg entirely on the
+invoice-return path, because `postCOGSReversalEntry` already posts the inventory
+effect. `Invoice.ts:738` is the only setter of the flag, so repurposing it to
+suppress rather than re-cost is safe.
+
+**Still open before that change:** whether `posted[]` — the result array from
+`reverseStockForItems`, consumed at `invoiceController.ts:545` and `:823` — is a
+fourth posting path. Not traced.
 
 ## 2. Which stock table is authoritative — undocumented
 
