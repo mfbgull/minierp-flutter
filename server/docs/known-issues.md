@@ -128,3 +128,40 @@ id   doctype          qty  mv_cost  std  fin_val  1200 leg   delta
 The invoice-return caller (`Invoice.ts:737`) is **excluded by design** pending
 item 1 — this asymmetry is intentional, not an oversight, and is enforced by
 `skipFinancialCostForwarding` rather than left to chance.
+
+---
+
+# Validating a guard before trusting it
+
+Two failure modes caught in the session that produced this file. Both are
+checks that *felt* sufficient and were not.
+
+## 1. Run guards in file context, not just targeted
+
+The item-4 guard passed when run with `-t` and failed in the full file. It
+hardcoded `item_id = 1`, but `seedPurchase` allocates item ids from a
+module-level counter, so the id is only 1 when that test runs first. Every
+other assertion still held; only the fixture's premise was wrong.
+
+**Run the guard (a) targeted, (b) with the whole file, and (c) against the
+unfixed source.** A targeted green is the weakest of the three. A guard that
+only passes in isolation is worse than no guard, because it reads as coverage.
+
+## 2. Ask what the number measures before asking whether the conclusion is nice
+
+`−1700` was `ABS(quantity) × (unit_cost − standard_cost)` — the signed change
+in a posted GL amount. It was reported as a divergence contribution, and on its
+own would have justified a commit. The actual GL-vs-batch gap on that database
+was **−1533.20**, a different quantity with a different sign.
+
+Before a number supports a conclusion, confirm the query computes the thing the
+conclusion is about. This is read-only and takes one query.
+
+## 3. Prove the guard can fail
+
+Every landed fix here was checked by reverting the source and confirming the
+guard goes red with the *right* number (`Expected 10, Received 6`;
+`Expected 40, Received 160`). A guard never observed red has not been shown to
+guard anything — the pre-audit `cashImbalances` helper and the stale
+scenario-10 skip were both accepted in the earlier report on the strength of
+passing tests.
