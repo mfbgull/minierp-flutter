@@ -225,15 +225,3 @@ export function expectAllInvariantsHold(context: string): void {
   void context;
 }
 
-/**
- * Assert all nine invariants A–I. Use only in scenarios that seed
- * inventory through proper GL-posting flows (PO receipts), not raw
- * batch inserts.
- */
-export function expectAllReconciliationInvariantsHold(context: string): void {
-  expectAllInvariantsHold(context);
-  expect(arImbalances()).toEqual([]);
-  expect(apImbalances()).toEqual([]);
-  expect(inventoryImbalances()).toEqual([]);
-  expect(cashImbalances()).toEqual([]);
-}
