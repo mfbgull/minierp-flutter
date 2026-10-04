@@ -104,7 +104,8 @@ router.get(
   '/backup/:name/download',
   requirePermission('admin', 'read'),
   (req: Request, res: Response): void => {
-    const target = resolveBackupFilePath(paramName(req.params.name));
+    const name = paramName(req.params.name);
+    const target = resolveBackupFilePath(name);
     if (!target) {
       res.status(404).json({
         success: false,
@@ -115,6 +116,9 @@ router.get(
     }
     // res.download sets Content-Disposition: attachment itself.
     res.download(target, (err) => {
+      if (err) {
+        logger.error('[AdminBackup] download failed:', { name, error: err.message });
+      }
       if (err && !res.headersSent) {
         res.status(500).json({
           success: false,
