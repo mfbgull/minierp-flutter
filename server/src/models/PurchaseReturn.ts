@@ -433,14 +433,18 @@ class PurchaseReturnModel {
             .run(line.quantity, line.source_item_id);
         }
 
-        // Negative stock movement — recordMovement handles stock_balances,
-        // items.current_stock and the ADJUSTMENT financial entry.
+        // Negative stock movement — recordMovement handles stock_balances and
+        // items.current_stock. It posts NO GL leg: postPurchaseReturnEntry
+        // below already credits 1200 for this return, in this same
+        // transaction, so an adjustment leg here would credit inventory twice.
+        // See docs/known-issues.md item 4.
         const movement = StockMovementModel.recordMovement({
           item_id: line.item_id,
           warehouse_id: data.warehouse_id,
           movement_type: 'ADJUSTMENT',
           quantity: -line.quantity,
           unit_cost: line.unit_cost,
+          skipAdjustmentFinancialPosting: true,
           reference_doctype: data.source_type === 'PURCHASE' ? 'PURCHASE_RETURN' : 'PO_RETURN',
           reference_docno: returnNo,
           remarks: `Return ${returnNo}${data.reason ? ': ' + data.reason : ''}`,
@@ -631,13 +635,18 @@ class PurchaseReturnModel {
         }
 
         // Positive reversal movement — puts stock back (balances +
-        // current_stock + adjustment entry handled by recordMovement).
+        // current_stock handled by recordMovement). It posts NO GL leg, for
+        // the same reason as the create side: voidJournalLinesByReference
+        // below already reverses the PURCHASE_RETURN entry that credited
+        // 1200. Suppressing both sides keeps the pair symmetric — suppressing
+        // only create would leave the void debiting inventory twice.
         const reversal = StockMovementModel.recordMovement({
           item_id: line.item_id,
           warehouse_id: header.warehouse_id,
           movement_type: 'ADJUSTMENT',
           quantity: line.quantity,
           unit_cost: line.unit_cost,
+          skipAdjustmentFinancialPosting: true,
           reference_doctype: header.return_type,
           reference_docno: header.return_no,
           skipBatchCreation: true,
