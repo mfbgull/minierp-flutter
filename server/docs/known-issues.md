@@ -71,15 +71,24 @@ where 0 were expected — and green after.
 oversight — do not write a repair script for it without revisiting that
 decision.**
 
-Frozen baseline on `server/database/erp.db`, measured 2026-10-04:
+Frozen baseline on `server/database/erp.db`, measured 2026-10-04. Note that the
+database is **live** — a running server's backup scheduler rewrites it and
+users record transactions against it — so treat the two stable rows as the
+finding and the rest as a snapshot:
 
-| | |
-|---|---|
-| GL 1200 net | 2433.60 |
-| batch value | 3966.80 |
-| **signed gap** | **−1533.20** |
-| `stock_adjustment` legs | 26 |
-| ADJUSTMENT movements with no remaining layer | 17 |
+| | measured | stable? |
+|---|---|---|
+| **signed gap (GL 1200 − batch value)** | **−1533.20** | yes — re-measured after a later transaction, unchanged |
+| `stock_adjustment` legs | 26 | yes |
+| ADJUSTMENT movements with no remaining layer | 17 | yes |
+| GL 1200 net | 2433.60 | no — drifted to 2146.80 |
+| batch value | 3966.80 | no — drifted to 3680.00 |
+
+The two drifting rows moved by the *same* −286.80 when a further purchase was
+recorded against the live database, so the gap did not move. Incidental but
+worth recording: the current code posts GL and batch together on a new
+transaction. The historical rows are the residue; they are not reproduced by
+new activity.
 
 Rationale: both databases are untracked scratch (`.gitignore:51-61`) whose rows
 are placeholder data, and no code path produces this shape any more — a clean
