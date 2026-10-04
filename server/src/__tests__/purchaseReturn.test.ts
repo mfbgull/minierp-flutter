@@ -279,6 +279,51 @@ describe('PurchaseReturnModel', () => {
       expect(journal.length).toBe(2);
     });
 
+    it('posts the adjustment leg at the source batch cost, not items.standard_cost', () => {
+      // known-issues.md item 4. The adjustment leg is the GL posting for a
+      // purchase return, so it must value the layer it relieved. Diverging
+      // items.standard_cost from the batch cost is what makes the two
+      // distinguishable; without that split the assertion is vacuous.
+      const db = createFixture();
+      const purchaseId = seedPurchase(db, { unit_cost: 10 });
+      // seedPurchase allocates item ids from a module-level counter, so the id
+      // is only 1 when this test runs first. Read it back instead of assuming.
+      const itemId = (db.prepare('SELECT item_id FROM purchases WHERE id = ?').get(purchaseId) as { item_id: number }).item_id;
+      db.prepare('UPDATE items SET standard_cost = 40 WHERE id = ?').run(itemId);
+
+      const batch = db.prepare(
+        'SELECT unit_cost FROM stock_batches WHERE item_id = ? ORDER BY id LIMIT 1',
+      ).get(itemId) as { unit_cost: number };
+      expect(Number(batch.unit_cost)).toBe(10);
+
+      const result = PurchaseReturnModel.create(
+        {
+          return_date: '2026-08-01',
+          source_type: 'PURCHASE',
+          source_id: purchaseId,
+          warehouse_id: 1,
+          reason: 'Damaged',
+          items: [{ source_item_id: purchaseId, quantity: 4 }],
+        },
+        1,
+        db,
+      );
+
+      const leg = db.prepare(`
+        SELECT jl.debit AS debit, jl.credit AS credit
+        FROM journal_lines jl
+        JOIN chart_of_accounts a ON a.id = jl.account_id
+        WHERE jl.reference_type = 'stock_adjustment' AND jl.voided = 0 AND a.code = '1200'
+        ORDER BY jl.id DESC LIMIT 1
+      `).get() as { debit: number; credit: number };
+
+      // 4 units at the batch cost of 10 = 40, credit side (a removal).
+      // At items.standard_cost (40) this would post 160 instead.
+      expect(Number(leg.credit)).toBeCloseTo(40, 2);
+      expect(Number(leg.debit)).toBeCloseTo(0, 2);
+      expect(result.status).toBe('POSTED');
+    });
+
     it('rejects a line quantity above the remaining returnable quantity', () => {
       const db = createFixture();
       const purchaseId = seedPurchase(db, { quantity: 5 });

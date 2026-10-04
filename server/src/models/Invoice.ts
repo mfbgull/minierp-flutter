@@ -735,6 +735,7 @@ class InvoiceModel {
           // standard_cost can be 0, adding a fourth posting. Fix once the
           // authoritative poster on the return path is identified.
           unit_cost: avgUnitCost,
+          skipFinancialCostForwarding: true,
           reference_doctype: referenceDoctype,
           reference_docno: invoiceNo,
           skipBatchCreation: true,

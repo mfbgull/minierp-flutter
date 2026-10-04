@@ -101,6 +101,11 @@ interface RecordMovementDTO {
   batch_id?: number;
   /** When true, skip H10 batch creation — the caller manages batches directly. */
   skipBatchCreation?: boolean;
+  /** When true, the ADJUSTMENT GL leg derives its own cost instead of using
+   *  `unit_cost`. Set by paths that already post inventory to GL themselves,
+   *  where forwarding would add a duplicate posting. See
+   *  docs/known-issues.md item 1. */
+  skipFinancialCostForwarding?: boolean;
 }
 
 class StockMovementModel {
@@ -212,7 +217,8 @@ class StockMovementModel {
           quantity: data.quantity,
           movement_date: data.movement_date || new Date().toISOString().split('T')[0],
           created_by: userId,
-          batch_id: resolvedBatchId
+          batch_id: resolvedBatchId,
+          caller_unit_cost: data.skipFinancialCostForwarding ? undefined : data.unit_cost
         }, db);
       }
 
@@ -406,11 +412,14 @@ class StockMovementModel {
     // and journal_entries.created_by is nullable, so this must be too.
     created_by: number | null;
     batch_id?: number | null;
+    /** Cost the caller recorded on the movement — the cost at which the layer
+     *  was relieved. Wins over anything re-derived below. */
+    caller_unit_cost?: number;
   }, db: Database.Database): void {
     const { id, item_id, quantity, movement_date, created_by, batch_id } = params;
 
-    let unitCost = 0;
-    if (batch_id) {
+    let unitCost = params.caller_unit_cost || 0;
+    if (!unitCost && batch_id) {
       const batch = db.prepare(`
         SELECT unit_cost FROM stock_batches WHERE id = ?
       `).get(batch_id) as { unit_cost: number } | undefined;
