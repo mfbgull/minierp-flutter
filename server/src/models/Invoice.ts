@@ -727,6 +727,13 @@ class InvoiceModel {
           warehouse_id: warehouseId,
           movement_type: 'ADJUSTMENT',
           quantity: movementQty,
+          // avgUnitCost is deliberately NOT forwarded to
+          // postFinancialEntryForAdjustment. This path already posts inventory
+          // to GL, and the adjustment leg is a third posting on top of it —
+          // see server/docs/known-issues.md item 1. Forwarding a cost here
+          // would wake a leg that is currently dormant only because
+          // standard_cost can be 0, adding a fourth posting. Fix once the
+          // authoritative poster on the return path is identified.
           unit_cost: avgUnitCost,
           reference_doctype: referenceDoctype,
           reference_docno: invoiceNo,
