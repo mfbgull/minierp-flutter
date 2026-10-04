@@ -1,8 +1,19 @@
 # Known issues — inventory / GL integrity
 
-Open findings that are **not** guarded by any test. Each was established by
-measurement; none has a fix. Do not rediscover these — they cost six
-exchanges to characterise and the numbers are easy to mis-frame.
+Findings on inventory valuation and GL integrity, each established by
+measurement. Do not rediscover these — they cost a chain of exchanges to
+characterise and the numbers are easy to mis-frame.
+
+Status per item: **OPEN** (no fix, no guard) or **FIXED** (landed, with the
+guard named and the mutation that proved the guard fires). Items 1 and 4 are
+fixed forward-only; neither repairs historical rows, and section
+*"What is NOT fixed, by decision"* explains why that is deliberate.
+
+A note on the scratch databases: `server/database/erp.db` and
+`database/erp.db` are untracked and **the test suite never opens them** —
+`src/__tests__/setup.ts` hands every run its own `mkdtemp` database. Their
+divergence is therefore historical data, never a contamination risk, and it
+cannot evidence current behaviour in either direction.
 
 ## 1. Invoice-return redundant adjustment leg — FIXED (forward only)
 
@@ -54,14 +65,35 @@ context, which is trap 1 below.
 Verified red by reverting the source — the leg query returned **6** entries
 where 0 were expected — and green after.
 
-### What is NOT fixed
+### What is NOT fixed, by decision
 
-**Historical rows are unrepaired.** The dev database still holds 21 redundant
-`stock_adjustment` legs from invoice-side movements, and its GL-vs-batch gap is
-**−1533.20** — unchanged by either fix. Any earlier figure describing what
-these commits "do to the gap" is a **projection of a replay, not a
-measurement**. There is no repair script and none is planned; both databases are
-untracked scratch (`.gitignore:51-61`).
+**The historical rows stay broken. This is a deliberate decision, not an
+oversight — do not write a repair script for it without revisiting that
+decision.**
+
+Frozen baseline on `server/database/erp.db`, measured 2026-10-04:
+
+| | |
+|---|---|
+| GL 1200 net | 2433.60 |
+| batch value | 3966.80 |
+| **signed gap** | **−1533.20** |
+| `stock_adjustment` legs | 26 |
+| ADJUSTMENT movements with no remaining layer | 17 |
+
+Rationale: both databases are untracked scratch (`.gitignore:51-61`) whose rows
+are placeholder data, and no code path produces this shape any more — a clean
+database driven through the fixed paths returns a zero gap. Repairing
+placeholder data would add a migration and a script to fix rows nothing reads.
+
+Consequences to keep in mind:
+
+- Any figure describing what a code-only commit "does to the gap" is a
+  **projection of a replay, not a measurement**. Treat the −1533.20 baseline as
+  the only real number for this database.
+- These rows are *not* evidence about current behaviour, in either direction.
+  They cannot be used to argue a fix works, and they cannot be used to argue one
+  is still needed.
 
 ## 2. Which stock table is authoritative — undocumented
 
@@ -88,65 +120,130 @@ purchase → sale → return sequence, and only via direct-insert fixtures like
 `batchLocationIntegration.test.ts` 7.6. That is why this class of defect never
 showed up in ordinary flows or on the scratch databases.
 
-## 4. Cost-basis forwarding for three callers — LANDED
+**Confirmed on clean data, 2026-10-04.** With `feature_batch_locations` ON, on
+a freshly migrated database: purchase 20 @ 100 then sell 5. The SALE movement
+carries `batch_id: null` and `unit_cost: null`, and `batch_stock_by_location`
+holds **0 rows** — the purchase wrote no location coverage, so the fallback is
+taken on every flag-on sale. This is structural, not a property of the scratch
+rows.
 
-`postFinancialEntryForAdjustment` re-derived cost from `items.standard_cost`
-and ignored the cost the caller recorded and relieved the layer at. For
-`PurchaseReturn.ts:443`, `PurchaseReturn.ts:638` and `Production.ts:627` the
-adjustment leg *is* the GL posting, so forwarding is correct.
+Note the interaction with item 2: because no location rows are ever written,
+`stock_batches.quantity_remaining` is the only populated authority and the two
+sources cannot disagree *on clean data*. That is not evidence the migration is
+complete — it is evidence the new table is unused.
 
-**Landed.** `RecordMovementDTO` gained `skipFinancialCostForwarding`;
-`Invoice.ts:738` is the only setter, so the invoice-return exclusion is
-explicit rather than an omission.
+## 4. Cost-basis forwarding for three callers — LANDED, premise corrected
 
-Measured effect on LIVE: GL 1200 rises by **700.00**, moving the GL-vs-batch
-gap from **−1533.20** to **−833.20**.
+`postFinancialEntryForAdjustment` re-derived cost from `items.standard_cost` and
+ignored the cost the caller recorded and relieved the layer at. `3c1af576` fixed
+that by forwarding `caller_unit_cost` from `RecordMovementDTO`.
 
-```
-id   doctype          qty  mv_cost  std  fin_val  1200 leg   delta
-150  PO_RETURN        -2   300      500  1000     CREDIT   +400.00
-152  PO_RETURN        -1   300      500  500      CREDIT   +200.00
-153  PURCHASE_RETURN  -1   500      500  500      CREDIT     +0.00
-155  PURCHASE_RETURN  -1   400      500  500      CREDIT   +100.00
-```
+### Premise correction (2026-10-04)
 
-Guarded by `purchaseReturn.test.ts` — seeds a purchase whose batch cost (10)
-diverges from `items.standard_cost` (40) and asserts the adjustment leg
-credits 40, not 160.
+> **Reading `git log 3c1af576` alone will mislead you.** That commit message
+> states "the adjustment leg IS the GL posting" for `PurchaseReturn.ts:443`,
+> `PurchaseReturn.ts:638` and `Production.ts:627`, and reports a +700.00 effect
+> on the GL-vs-batch gap. **That claim is superseded for the two
+> `PurchaseReturn` callers** — see below. Only the `Production.ts` claim
+> survives. The commit is left unamended on purpose: it is immutable history and
+> rewriting it would destroy the record of the wrong turn. This section is the
+> correction that `git log` cannot show you.
 
-**Do not read −833.20 as the remaining bug.** Item 1's corrections push GL
-*downward* — the overvalued adjustment legs and the duplicate COGS reversal
-both overstate 1200 — so the two changes move the same number in opposite
-directions. Re-measure the gap after item 1 lands.
+`3c1af576` asserted that for `PurchaseReturn.ts:443`, `PurchaseReturn.ts:638`
+and `Production.ts:627` "the adjustment leg *is* the GL posting". **That holds
+for `Production.ts` only.** On the two `PurchaseReturn` callers it was false,
+and the file's own header said so: `PurchaseReturn.ts:28` documents that GL
+posting "reuses `AccountingService.postPurchaseReturnEntry` (Dr AP / Cr
+Inventory)", called at `:559` in the same transaction as `recordMovement` at
+`:438`. The adjustment leg was therefore always a **duplicate** credit, not the
+posting.
 
-Historical note:
+Measured on a clean database — purchase 10 @ layer cost 50 with
+`items.standard_cost = 400`, return 3 units:
 
-`postFinancialEntryForAdjustment` re-derives cost from `items.standard_cost`
-and ignores the cost the caller recorded and relieved the layer at. For
-`PurchaseReturn.ts:443`, `PurchaseReturn.ts:638` and `Production.ts:627` the
-adjustment leg *is* the GL posting, so forwarding is correct.
+| state | 1200 leg from the movement | GL 1200 vs batch gap |
+|---|---|---|
+| `3c1af576` reverted | credit **1200** (3 × standard_cost) | **−1200** |
+| `3c1af576` as landed | credit **150** (3 × layer cost) | **−150** |
 
-Measured effect on LIVE: GL 1200 rises by **700.00**, moving the GL-vs-batch
-gap from **−1533.20** to **−833.20**.
+Two credits for one return: `je=8` `stock_adjustment` and `je=9`
+`PURCHASE_RETURN`, 150 each, against 150 of inventory that actually left
+(batch 10 → 7).
 
-```
-id   doctype          qty  mv_cost  std  fin_val  1200 leg   delta
-150  PO_RETURN        -2   300      500  1000     CREDIT   +400.00
-152  PO_RETURN        -1   300      500  500      CREDIT   +200.00
-153  PURCHASE_RETURN  -1   500      500  500      CREDIT     +0.00
-155  PURCHASE_RETURN  -1   400      500  500      CREDIT   +100.00
-```
+So `3c1af576` **narrowed** the double-post on these two callers without
+eliminating it. It remains correct for `Production.ts:594`/`:620`, which has
+no second poster.
 
-The invoice-return caller (`Invoice.ts:737`) is **excluded by design** pending
-item 1 — this asymmetry is intentional, not an oversight, and is enforced by
-`skipFinancialCostForwarding` rather than left to chance.
+### The fix
+
+`skipAdjustmentFinancialPosting` — the mechanism item 1 introduced — is now set
+at `PurchaseReturn.ts:438` (create) and `:635` (void). Both sides are required:
+`voidReturn` reverses the `PURCHASE_RETURN` entry via
+`voidJournalLinesByReference`, so suppressing only create would leave the void
+debiting inventory twice.
+
+Option considered and rejected: drop the 1200 line from
+`postPurchaseReturnEntry`. It owns the AP leg and the void-reversal symmetry
+that makes the void path work.
+
+### Guards
+
+- `accountingInvariants.test.ts` scenario 13 — drives a real purchase then a
+  purchase return on the app database, with `standard_cost = 400` against layer
+  cost 50 so the leg is not dormant, then voids it. Asserts the invariant after
+  each of the three steps, zero adjustment legs on the return's movement, and
+  exactly one `PURCHASE_RETURN` credit at 150. Verified red on the unfixed tree
+  (`diff: -150`), red again with only the create suppression removed
+  (`diff: -150`), and red with only the void suppression removed
+  (`diff: 150`).
+- `purchaseReturn.test.ts` — "credits inventory once per return, at the source
+  batch cost". This replaces the `3c1af576` guard, which asserted the leg
+  credited 40 and therefore failed once the leg was suppressed. The replacement
+  asserts the stronger property: no adjustment leg, and one authoritative
+  `PURCHASE_RETURN` credit at the layer cost (40, not the 160 that
+  `standard_cost` would have produced). Verified red with the suppression
+  reverted.
+
+### Do not reuse the old figures
+
+The earlier "GL 1200 rises 700.00, gap −1533.20 → −833.20" was a **projection of
+a replay**, not a measurement: it was computed against the unrepaired scratch
+rows that item 1 leaves alone, on a database the test suite never opens. It is
+retained nowhere as a result.
+
+## 5. `expectAllInvariantsHold` still asserts only four of the nine
+
+Follow-up task, **not a bug**. Recorded so it is not rediscovered as a new
+finding.
+
+`expectAllInvariantsHold` is documented as asserting nine invariants and calls
+four: `glImbalances` (A), `customerArImbalances` (B + C),
+`supplierApImbalances` (D) and `stockImbalances` (E). It calls none of F–I.
+
+After the invariant-H wiring (pattern 4 below) coverage is:
+
+| invariant | asserted by |
+|---|---|
+| A–E | `expectAllInvariantsHold` |
+| F (AR), G (AP), I (cash) | `checkF_I` in `accountingInvariants.test.ts` |
+| H (inventory) | `checkF_I` — first assertion of H anywhere |
+
+The remaining asymmetry: H is now asserted by `checkF_I` but is still absent
+from `expectAllInvariantsHold`, so the first describe block in that file — which
+uses `expectAllInvariantsHold` throughout — does not check inventory either.
+
+Open question for whoever picks this up: should `expectAllInvariantsHold` call
+F–I directly, or should its name and docstring be narrowed to A–E with callers
+composed explicitly? Widening it changes every call site and may surface
+pre-existing drift. That is the point, but it should be a deliberate step with
+its own before/after gap measurement, not a drive-by.
 
 ---
 
 # Validating a guard before trusting it
 
-Two failure modes caught in the session that produced this file. Both are
-checks that *felt* sufficient and were not.
+Five failure modes caught while producing this file. All are checks that
+*felt* sufficient and were not.
 
 ## 1. Run guards in file context, not just targeted
 
@@ -177,3 +274,52 @@ guard goes red with the *right* number (`Expected 10, Received 6`;
 guard anything — the pre-audit `cashImbalances` helper and the stale
 scenario-10 skip were both accepted in the earlier report on the strength of
 passing tests.
+
+## 4. A green suite that never asks the question
+
+The strongest of these, because no amount of re-running finds it.
+
+`expectAllInvariantsHold` is documented as asserting nine invariants and
+asserts **four** (A–E). `inventoryImbalances` — GL 1200 vs batch value — had
+**zero call sites in the entire suite**. So the one invariant carrying the
+−1533.20 class of divergence was never checked, on any database, by any test.
+
+113/113 suites and 978/978 tests passed *while the purchase-return path
+double-posted inventory on clean data* (item 4). Nothing was wrong with any
+guard; the question simply was not on the sheet. `checkF_I` even carried a
+comment explaining why it skipped inventory — the skip looked deliberate and
+justified, which is what made it durable.
+
+Generalisation: **a passing suite bounds the questions it asks.** When a number
+matters, confirm some assertion actually computes it — grep for the checker's
+call sites, and treat "exported but never called" as "not implemented". Adding
+the missing assertion is worth more than any single fix: it is the difference
+between closing one bug and closing the class.
+
+Corollary for reviewing green output: "suite green" answers "did anything
+already asserted break?" It cannot answer "is the thing I care about correct?"
+Only a check on that specific quantity can.
+
+## 5. Whoever writes the next artifact has to read the code first
+
+This one is not specific to agents, and recording it as such would be
+self-flattery. **Read the code before asserting a fact about it — and that
+applies to the author of the prompt, not only the author of the fix.**
+
+The chain that produced this file contained seven falsified premises. Six were
+caught by the implementer after it had already stated a conclusion. The seventh
+was in the **verification brief itself**: it asserted that "all verification to
+date ran against scratch DBs with pre-existing divergence", which was false.
+`src/__tests__/setup.ts` has always created a `mkdtemp` database per run, so
+every green suite result had *already* been a clean-database result. The brief
+also inherited the stale `+25` claim as a live open question. Both errors were
+found in the first ten minutes of executing against it — by reading
+`setup.ts`, which the brief had not required.
+
+The pattern is not "agents assert too confidently". It is that a plausible
+premise, inherited from a summary, survives unexamined until something forces
+a check. Author and artifact type make no difference — prompt, fix, guard, doc,
+or commit message all fail the same way. The mitigation is the same in every
+case: before a claim about code is written down, open the file and confirm it.
+Cheap, and it is the only thing that has ever worked here.
+

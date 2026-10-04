@@ -434,15 +434,28 @@ class StockMovementModel {
 
     const value = Math.abs(quantity) * unitCost;
 
-    // KNOWN QUESTION (not a confirmed defect, 2026-10-04): on the dev
-    // databases the persisted financial_value does not always equal
-    // |quantity| * unit_cost — e.g. movement 150 has quantity -2,
-    // unit_cost 300, financial_value 1000. The likeliest explanation is
-    // that unit_cost was revised after the posting (revaluation), leaving
-    // financial_value at its original. That is benign if true, but it is
-    // unconfirmed, and nothing currently checks the relationship. Resolve
-    // before treating financial_value as authoritative. See
-    // docs/stock-authority-map.md.
+    // RESOLVED (2026-10-04): the earlier "KNOWN QUESTION" here cited movement
+    // 150 (quantity -2, unit_cost 300, financial_value 1000) as a possible
+    // revaluation artifact. That reading was wrong, and the count that
+    // suggested it was measured against the wrong baseline.
+    //
+    // Measured: `financial_value` and `journal_entry_id` are written ONLY by
+    // this function, at this line. Every other movement type leaves both at
+    // 0/NULL because its GL posting is emitted by the owning service
+    // (purchase, sale) rather than through the adjustment leg. So the
+    // population contract is: financial_value is populated for ADJUSTMENT
+    // movements only.
+    //
+    // On `server/database/erp.db` (85 movements) 58 rows are 0-with-no-entry,
+    // and 65 mismatch |qty| * unit_cost — dominated by PURCHASE and SALE rows
+    // where the column was simply never written. The same shape appears on a
+    // freshly migrated database, so it is structural, not a revaluation
+    // artifact. (An earlier note said 59 anomalies; that figure compared
+    // against items.standard_cost instead of unit_cost and should not be used.)
+    //
+    // Consequence: financial_value is NOT a movement's financial value. It is
+    // an adjustment-leg audit field. Resolve its consumers before treating it
+    // as authoritative. See docs/stock-authority-map.md.
 
     if (value === 0) return;
 
