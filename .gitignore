@@ -73,6 +73,9 @@ graphify-out/
 .pi/
 .spynel/
 
+# Throwaway supertest debug scripts (contain hardcoded credentials).
+server/dbg-*.ts
+
 # Agent session scratch (machine-local, regenerable). .omo/plans/ holds
 # hand-authored design docs and stays tracked, so it is carved back out.
 .omo/*
