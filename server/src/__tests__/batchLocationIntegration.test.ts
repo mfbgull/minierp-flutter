@@ -173,6 +173,14 @@ describe('7.6 invoice return restores per-location quantities', () => {
     expect(irb.location_id).toBe(locId);
     expect(irb.quantity).toBe(4);
     expect(irb.reference_doctype).toBe('RETURN');
+
+    // The master batch row must be credited too. Dashboard.ts:103 and :460
+    // value inventory from stock_batches.quantity_remaining with no feature
+    // flag gate, so a location-only restore leaves returned stock invisible to
+    // valuation while still sellable. Asserted as an exact value so a
+    // double-credit (14) fails as loudly as a missing one (6).
+    const masterAfter = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id=?`).get(batchId) as { quantity_remaining: number };
+    expect(masterAfter.quantity_remaining).toBe(10);
   });
 });
 

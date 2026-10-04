@@ -689,13 +689,20 @@ class InvoiceModel {
                 `).run(invRow.id, movement.batch_id, locRow.id, restoreQty, invoiceNo);
               }
             }
-          } else {
-            db.prepare(`
-              UPDATE stock_batches
-              SET quantity_remaining = quantity_remaining + ?
-              WHERE id = ?
-            `).run(restoreQty, movement.batch_id);
           }
+
+          // Credit the master batch row on every flag state. Consumption
+          // decrements it at StockMovement.ts:953-956 ("for backward
+          // compatibility"), but the flag-on restore path only credited the
+          // location rows — so returned stock stayed invisible to
+          // stock_batches.quantity_remaining, which is what Dashboard.ts:103
+          // and :460 value inventory from, ungated by the flag. Keep this
+          // write outside the isFeatureEnabled branch.
+          db.prepare(`
+            UPDATE stock_batches
+            SET quantity_remaining = quantity_remaining + ?
+            WHERE id = ?
+          `).run(restoreQty, movement.batch_id);
         }
       }
 
