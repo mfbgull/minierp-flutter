@@ -4,65 +4,64 @@ Open findings that are **not** guarded by any test. Each was established by
 measurement; none has a fix. Do not rediscover these — they cost six
 exchanges to characterise and the numbers are easy to mis-frame.
 
-## 1. Invoice-return redundant adjustment leg (CORRECTED 2026-10-04)
+## 1. Invoice-return redundant adjustment leg — FIXED (forward only)
 
-**Correction.** This was first pinned as "triple-posting" with a *duplicate
-COGS reversal*. That was wrong, and the error was mine: I inferred a code
-defect from two journal entries that turned out to be legacy data.
+Resolved in two steps. Both are **code-only**: neither repairs historical
+journal entries, and the dev-database gap is therefore unchanged.
 
-### The duplicate COGS reversal is NOT a code defect
+### The duplicate COGS reversal was never a code defect
 
 `postCOGSReversalEntry` (`accountingService.ts:1133`) has exactly **one**
 caller — `invoiceReturnService.ts:403`, guarded by `if (cogsAmount > 0)`. The
-current path cannot double-post.
+current path cannot double-post. Measured: the only two `invoice_returns` rows
+each have exactly one reversal, keyed to the return id.
 
-Measured on the dev database: the only two rows in `invoice_returns` each have
-**exactly one** COGS reversal, correctly keyed to the return id
-(`return 1 → je=218`, `return 2 → je=223`).
+The `je=186`/`je=192` pair is keyed to `reference_id = 45`, and **no return with
+id 45 exists** — 45 is an `invoices.id`. Pre-rework rows. Same for
+`je=200`/`je=206` at 49. **No code emits them; "dedupe" was the wrong
+treatment.** The trap: return ids and invoice ids are independent sequences,
+and void paths key by one while the posting path keys by the other — warned
+about at `Invoice.ts:1028-1044` and `accountingService:1470-1486`.
 
-The `je=186`/`je=192` pair is keyed to `reference_id = 45`, and **no
-`invoice_returns` row with id 45 exists** — 45 is an `invoices.id`. Those rows
-were written before the rework that re-keyed return GL to the return document
-(`reference_id = invoice_returns.id`). They are historical rows, not live
-emissions. **No code change is warranted, and "dedupe" was the wrong
-treatment.** Same for the `je=200`/`je=206` pair at `reference_id = 49`.
+### The real defect, and the fix
 
-The reason this was easy to get wrong: return ids and invoice ids are separate
-AUTONCINCREMENT sequences, and several void paths key by one while posting keys
-by the other. See the warnings at `Invoice.ts:1028-1044` and
-`accountingService:1470-1486`.
+The invoice-side reversal posted inventory to GL **twice on fresh data**:
+`postCOGSReversalEntry` (correct, at true FIFO cost) and then
+`postFinancialEntryForAdjustment` (redundant, at `items.standard_cost` because
+the return path sets `skipBatchCreation` so `batch_id` is null). 17 such legs
+existed on the dev database, 3 misvalued (`je=156`, `je=163`, `je=184` posted
+500 against reversals of 400/400/100).
 
-### The real live defect: a redundant, misvalued adjustment leg
+`RecordMovementDTO.skipFinancialCostForwarding` (`3c1af576`) only picked the
+leg's cost, so it still fired whenever `standard_cost != 0`. Replaced with
+**`skipAdjustmentFinancialPosting`**, which suppresses the leg entirely.
+`Invoice.ts:738` is the only setter. `unit_cost` stays on the movement for the
+audit trail and `posted[]` consumers.
 
-The invoice-side stock reversal posts inventory to GL **twice** on fresh data:
+`posted[]` was checked and is **not** a fourth posting path: the return value
+is discarded at all four call sites, and `invoiceReturnService.ts:365` uses it
+only for `m.item_id` FK bookkeeping.
 
-1. `postCOGSReversalEntry` — Dr 1200 at the true FIFO cost. **Correct.**
-2. `postFinancialEntryForAdjustment`, fired from `recordMovement` — a
-   `stock_adjustment` entry at `items.standard_cost`, because the return path
-   passes `skipBatchCreation` so `batch_id` is null and the poster falls back to
-   standard cost.
+### Guard
 
-17 such entries exist on the dev database, and **3 are misvalued**:
+`invoiceReturnAcceptance.test.ts` scenario 9 — a dedicated item with
+`standard_cost = 999` (with `standard_cost = 0` the leg is dormant and the
+assertion would pass without the fix). Asserts exactly one `INVOICE_RETURN`
+1200 posting for that return, at the FIFO cost, and zero adjustment legs.
+Scoped to its own return id: unscoped, it passes in isolation and fails in file
+context, which is trap 1 below.
 
-| entry | movement | qty | movement cost | standard_cost | posted at |
-|---|---|---|---|---|---|
-| `je=156` | RETURN | 1 | 400 | 500 | 500 |
-| `je=163` | RETURN | 1 | 400 | 500 | 500 |
-| `je=184` | RETURN | 1 | 100 | 500 | 500 |
+Verified red by reverting the source — the leg query returned **6** entries
+where 0 were expected — and green after.
 
-`je=184`'s COGS reversal was 100 while the adjustment leg posted 500 — the
-overvaluation measured earlier.
+### What is NOT fixed
 
-`skipFinancialCostForwarding` (landed in `3c1af576`) does **not** fix this: it
-only controls which cost the leg derives, so the leg still fires whenever
-`standard_cost != 0`. What is needed is suppression of the leg entirely on the
-invoice-return path, because `postCOGSReversalEntry` already posts the inventory
-effect. `Invoice.ts:738` is the only setter of the flag, so repurposing it to
-suppress rather than re-cost is safe.
-
-**Still open before that change:** whether `posted[]` — the result array from
-`reverseStockForItems`, consumed at `invoiceController.ts:545` and `:823` — is a
-fourth posting path. Not traced.
+**Historical rows are unrepaired.** The dev database still holds 21 redundant
+`stock_adjustment` legs from invoice-side movements, and its GL-vs-batch gap is
+**−1533.20** — unchanged by either fix. Any earlier figure describing what
+these commits "do to the gap" is a **projection of a replay, not a
+measurement**. There is no repair script and none is planned; both databases are
+untracked scratch (`.gitignore:51-61`).
 
 ## 2. Which stock table is authoritative — undocumented
 

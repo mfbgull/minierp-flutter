@@ -101,11 +101,11 @@ interface RecordMovementDTO {
   batch_id?: number;
   /** When true, skip H10 batch creation — the caller manages batches directly. */
   skipBatchCreation?: boolean;
-  /** When true, the ADJUSTMENT GL leg derives its own cost instead of using
-   *  `unit_cost`. Set by paths that already post inventory to GL themselves,
-   *  where forwarding would add a duplicate posting. See
-   *  docs/known-issues.md item 1. */
-  skipFinancialCostForwarding?: boolean;
+  /** When true, an ADJUSTMENT movement records no GL leg at all. Set by paths
+   *  that already post the inventory effect themselves, where a leg here is a
+   *  duplicate — and a duplicate valued at items.standard_cost rather than the
+   *  cost of the layer restored. See docs/known-issues.md item 1. */
+  skipAdjustmentFinancialPosting?: boolean;
 }
 
 class StockMovementModel {
@@ -210,7 +210,7 @@ class StockMovementModel {
 
       // Post financial entry for ADJUSTMENT movements
       const movementId = result.lastInsertRowid as number;
-      if (data.movement_type === 'ADJUSTMENT') {
+      if (data.movement_type === 'ADJUSTMENT' && !data.skipAdjustmentFinancialPosting) {
         this.postFinancialEntryForAdjustment({
           id: movementId,
           item_id: data.item_id,
@@ -218,7 +218,7 @@ class StockMovementModel {
           movement_date: data.movement_date || new Date().toISOString().split('T')[0],
           created_by: userId,
           batch_id: resolvedBatchId,
-          caller_unit_cost: data.skipFinancialCostForwarding ? undefined : data.unit_cost
+          caller_unit_cost: data.unit_cost
         }, db);
       }
 

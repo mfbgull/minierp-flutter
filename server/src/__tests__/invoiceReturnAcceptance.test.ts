@@ -374,4 +374,64 @@ describe('Invoice Return spec — scenarios 1–8 (position math + settlements)'
     const pos = await fetchPosition(inv.invoiceId, authCookie);
     expect(pos.settledAmount).toBeCloseTo(0, 2);
   });
+  // known-issues.md item 1. The invoice-side reversal posts inventory to GL
+  // here (postCOGSReversalEntry, at true FIFO cost) and must not post it again
+  // from the stock movement's adjustment leg. standard_cost is set away from
+  // the layer cost on purpose: with standard_cost = 0 the leg is dormant and
+  // this assertion would pass without the fix.
+  it('9. a return posts inventory to GL exactly once, with no adjustment leg', async () => {
+    const localItem = await createItem('Widget A (single-posting)', authCookie);
+    db.prepare('UPDATE items SET standard_cost = ? WHERE id = ?').run(999, localItem);
+    await purchaseStock(localItem, warehouseId, 10, 300, authCookie);
+    const localCustomer = await createCustomer('Single Posting Customer', authCookie);
+
+    const inv = await createInvoice(
+      {
+        customerId: localCustomer,
+        itemId: localItem,
+        lines: [{ quantity: 2, unitPrice: 600 }],
+        payment: 'full',
+        invoiceDate: '2026-09-15',
+      },
+      authCookie,
+    );
+
+    const res = await processReturn(
+      inv.invoiceId,
+      { invoiceItemIds: inv.invoiceItemIds, quantities: [1], warehouseId },
+      authCookie,
+    );
+    expect(res.status).toBe(200);
+
+    // Scope both queries to THIS return. Scenarios 1-8 run against the same
+    // database and each posts its own COGS reversal, so an unscoped aggregate
+    // passes in isolation and fails in file context.
+    const returnId = (db.prepare(
+      'SELECT id FROM invoice_returns WHERE invoice_id = ? ORDER BY id DESC LIMIT 1',
+    ).get(inv.invoiceId) as { id: number }).id;
+
+    // The authoritative posting: the COGS reversal, keyed to the return doc.
+    const reversals = db.prepare(`
+      SELECT je.id, SUM(jl.debit) AS dr, SUM(jl.credit) AS cr
+      FROM journal_entries je
+      JOIN journal_lines jl ON jl.journal_entry_id = je.id
+      JOIN chart_of_accounts a ON a.id = jl.account_id
+      WHERE je.voided = 0 AND jl.voided = 0 AND a.code = '1200'
+        AND je.reference_type = 'INVOICE_RETURN' AND je.reference_id = ?
+      GROUP BY je.id
+    `).all(returnId) as Array<{ id: number; dr: number; cr: number }>;
+    expect(reversals.length).toBe(1);
+    expect(Number(reversals[0].dr) - Number(reversals[0].cr)).toBeCloseTo(300, 2);
+
+    // The redundant leg. stock_movements.journal_entry_id is only populated by
+    // postFinancialEntryForAdjustment, so a non-null value here means the leg
+    // fired and duplicated the inventory posting above.
+    const legs = db.prepare(`
+      SELECT sm.id, sm.journal_entry_id
+      FROM stock_movements sm
+      WHERE sm.movement_type = 'ADJUSTMENT' AND sm.reference_docno = ?
+        AND sm.journal_entry_id IS NOT NULL
+    `).all(inv.invoiceNo) as Array<{ id: number; journal_entry_id: number }>;
+    expect(legs).toEqual([]);
+  });
 });

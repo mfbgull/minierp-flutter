@@ -727,15 +727,15 @@ class InvoiceModel {
           warehouse_id: warehouseId,
           movement_type: 'ADJUSTMENT',
           quantity: movementQty,
-          // avgUnitCost is deliberately NOT forwarded to
-          // postFinancialEntryForAdjustment. This path already posts inventory
-          // to GL, and the adjustment leg is a third posting on top of it —
-          // see server/docs/known-issues.md item 1. Forwarding a cost here
-          // would wake a leg that is currently dormant only because
-          // standard_cost can be 0, adding a fourth posting. Fix once the
-          // authoritative poster on the return path is identified.
+          // unit_cost stays on the movement for the audit trail and for
+          // posted[].unit_cost consumers, but posts NO GL leg: postInvoice-
+          // ReturnEntry and postCOGSReversalEntry already post the inventory
+          // effect at true FIFO cost. A leg here is a third posting valued at
+          // items.standard_cost — 17 existed on the dev database, 3 of them
+          // misvalued (je=156, je=163, je=184 posted 500 against reversals of
+          // 400/400/100). See server/docs/known-issues.md item 1.
           unit_cost: avgUnitCost,
-          skipFinancialCostForwarding: true,
+          skipAdjustmentFinancialPosting: true,
           reference_doctype: referenceDoctype,
           reference_docno: invoiceNo,
           skipBatchCreation: true,
