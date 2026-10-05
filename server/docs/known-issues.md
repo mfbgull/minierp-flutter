@@ -220,32 +220,124 @@ a replay**, not a measurement: it was computed against the unrepaired scratch
 rows that item 1 leaves alone, on a database the test suite never opens. It is
 retained nowhere as a result.
 
-## 5. `expectAllInvariantsHold` still asserts only four of the nine
+## 5. `expectAllInvariantsHold` covers A–E and H; F, G, I deferred
 
-Follow-up task, **not a bug**. Recorded so it is not rediscovered as a new
-finding.
+**Partly resolved.** The master used to assert four invariants (A–E) while being
+documented as asserting nine. It now asserts six — **A–E and H** — and the
+header carries a letter→collector map stating exactly that. F, G and I are
+reached only by `checkF_I` inside `accountingInvariants.test.ts`.
 
-`expectAllInvariantsHold` is documented as asserting nine invariants and calls
-four: `glImbalances` (A), `customerArImbalances` (B + C),
-`supplierApImbalances` (D) and `stockImbalances` (E). It calls none of F–I.
-
-After the invariant-H wiring (pattern 4 below) coverage is:
+Current coverage:
 
 | invariant | asserted by |
 |---|---|
-| A–E | `expectAllInvariantsHold` |
-| F (AR), G (AP), I (cash) | `checkF_I` in `accountingInvariants.test.ts` |
-| H (inventory) | `checkF_I` — first assertion of H anywhere |
+| A–E, H | `expectAllInvariantsHold` (26 call sites) |
+| F (AR), G (AP), I (cash) | `checkF_I` in `accountingInvariants.test.ts` only |
 
-The remaining asymmetry: H is now asserted by `checkF_I` but is still absent
-from `expectAllInvariantsHold`, so the first describe block in that file — which
-uses `expectAllInvariantsHold` throughout — does not check inventory either.
+**Why F, G and I are not in the master yet.** They were implemented and
+measured. Adding `inventoryImbalances` alone leaves the suite green; adding
+`arImbalances` **exposes a real pre-existing violation of invariant F on clean
+data** — see item 6. A gate that fails is not a gate, so the master stops at H
+and the helper's header says so explicitly rather than claiming all nine.
 
-Open question for whoever picks this up: should `expectAllInvariantsHold` call
-F–I directly, or should its name and docstring be narrowed to A–E with callers
-composed explicitly? Widening it changes every call site and may surface
-pre-existing drift. That is the point, but it should be a deliberate step with
-its own before/after gap measurement, not a drive-by.
+**Do not "fix" this by deleting the H assertion, by weakening F, or by renaming
+the function to match its scope.** Those are pattern 4 below with extra steps.
+The remaining work is sequenced, not optional:
+
+1. Fix item 6 (the credit settlement's missing GL leg).
+2. Add `arImbalances`, `apImbalances` and `cashImbalances` to the master.
+3. Land a planted-drift test for each. None exists today — the file's single
+   planted-drift test targets `cashImbalances` and calls the **collector
+   directly**, so the master's F, G and I calls would ship unproven. That is the
+   same class of assumption this item exists to remove.
+
+Step 3 is easy to skip and must not be. Add them with their own anti-vacuity
+proofs, the way H got one.
+
+## 6. Invariant F violated on clean data — GL AR and the customer subledger disagree
+
+**Status: OPEN, no fix. Found 2026-10-04 by wiring invariant F into
+`expectAllInvariantsHold`; the wiring is what made it visible.**
+
+`arImbalances()` returns, on the freshly-migrated database used by
+`invoiceCancelReturnCollision.test.ts`:
+
+```
+GL AR vs customer balances  {account: "1100", actual: 80, expected: 0, diff: 80}
+```
+
+GL 1100 carries a **net credit of 80** while every customer's
+`current_balance` is 0 and every `customer_ledger` net is 0. Account 1110
+(Customer Credit) is also 0, so the 80 is not held as store credit either.
+
+Non-voided 1100 lines at the first checkpoint, as measured:
+
+| entry | effect on 1100 | state |
+|---|---|---|
+| `je=5` INVOICE ref=1 | Dr 200 | **voided** by the cancellation of invoice A |
+| `je=7` INVOICE ref=2 | Dr 200 | active |
+| `je=9` PAYMENT ref=1 | Cr 200 | active |
+| `je=10` INVOICE_RETURN ref=1 | Cr 100 | active |
+| `je=11` RETURN_FEE ref=1 | Dr 20 | active |
+
+Net −80.
+
+### Diagnosis: the credit settlement's GL side never posted
+
+Measured `customer_ledger` at the same checkpoint — the subledger is fully
+consistent and nets to zero, so the fault is **entirely on the GL side**:
+
+| id | customer | type | reference | Dr | Cr |
+|---|---|---|---|---|---|
+| 1 | 1 | INVOICE | INV-1026-00001 | 200 | |
+| 2 | 2 | INVOICE | INV-1026-00002 | 200 | |
+| 3 | 2 | PAYMENT | PAY-1026-00001 | | 200 |
+| 4 | 2 | RETURN | RET-1026-00001 | | **80** |
+| 5 | 2 | **CREDIT** | **CR-1026-00001** | **80** | |
+| 6 | 1 | CANCELLATION | INV-1026-00001 | | 200 |
+
+Customer 1: 200 − 200 = 0. Customer 2: 200 − 200 − 80 + 80 = 0.
+
+The return (`invoice_returns.id=1`, `invoice_id=2`, status **Settled**,
+`returned_amount` 100, `fee_amount` 20, `net_amount` 80, `settled_amount` 80)
+produced **two** ledger rows: a RETURN credit of 80 and a consuming CREDIT debit
+of 80. Row 5 is the settlement extinguishing that credit in the subledger.
+
+**Row 5 has no journal entry.** `postCreditOffsetEntry` posts `Dr 1110 /
+Cr 1100` per the H9 model in `models/AGENTS.md`; it did not run. Proof by
+exhaustion: the entry list filtered to accounts 1100 and 1110 contains exactly
+`je=5, 7, 9, 10, 11` — no credit-offset entry — and 1110's balance is 0.
+
+So the subledger moved 80 from RETURN to CREDIT, and the GL left the 80 sitting
+as a credit on 1100. That is the whole of the 80.
+
+Three candidate explanations were considered and **all three are now excluded**:
+
+1. ~~Return posts AR to 1100 where H9 says store credit belongs on 1110~~ —
+   excluded: the subledger *did* record the return and its settlement. The
+   accounts chosen on the subledger side are consistent.
+2. ~~Return emits GL with no matching ledger row~~ — excluded: rows 4 and 5 are
+   exactly that matching pair.
+3. ~~Cancellation should have been refused~~ — excluded: invoice 1 has
+   `paid_amount = 0`, so `Invoice.ts:1093` correctly did not fire. The payment
+   belongs to invoice 2 (`payment: 'full'`).
+
+**Remaining question, and it is narrow:** why did `postCreditOffsetEntry` not
+post for this settlement? The subledger write happened, so the credit-offset
+consumer recorded its ledger effect and skipped — or was never called for —
+the GL half. Note the test asserts the current 1100 behaviour as intended
+(`accountTotals('INVOICE_RETURN', returnId, '1100').credit ≈ 100`), so the
+return's own posting is deliberate; it is the **settlement's** missing GL leg
+that is unaccounted for.
+
+This is the same family as the orphaned-GL tooling that already exists
+(`repair-orphaned-ledger.ts`, `void-orphaned-salary-gl.ts`) — a ledger row
+without its journal entry. It was invisible for the reason in pattern 4: no
+assertion computed invariant F on this path.
+
+Evidence that it predates the invariant wiring: calling `arImbalances()`
+directly in that file, with the master not involved, returns the identical
+violation.
 
 ---
 
