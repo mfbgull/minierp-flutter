@@ -1,22 +1,43 @@
 /**
  * Reversal-rules Phase 5 — shared accounting-invariant checkers.
  *
- * Nine invariants over the whole database:
+ * Nine invariants over the whole database, each with the collector that checks
+ * it. The collectors are exported individually for targeted assertions.
+ *
+ * `expectAllInvariantsHold(context)` is the master gate but does NOT yet cover
+ * all nine. It asserts **A–E and H**. F, G and I are reached only by `checkF_I`
+ * inside accountingInvariants.test.ts, so a caller of the master still does not
+ * see them. They are deferred because `arImbalances` currently fails on clean
+ * data — see docs/known-issues.md item 6 — and a gate that fails is not a gate.
+ * Land them once item 6 is fixed; that is the next step, not an oversight.
+ *
+ * When adding an invariant: add a row below AND a call in the master, or record
+ * the reason it is deferred. This list is the checklist.
+ *
  *   A. GL balance: every journal_lines reference group sums debit == credit.
+ *      → glImbalances
  *   B. Customer subledger: customers.current_balance == customer_ledger sum
  *      (voided and reversed rows excluded, matching the authoritative
  *      writer in ledgerUtils).
+ *      → customerArImbalances
  *   C. Invoice allocations: invoices.paid_amount == non-voided allocation sum.
+ *      → customerArImbalances
  *   D. Supplier subledger: suppliers.current_balance == supplier_ledger sum.
+ *      → supplierApImbalances
  *   E. Stock vs batches: stock_balances.quantity == Σ stock_batches
  *      .quantity_remaining per item/warehouse.
- *   F. GL AR (1100) == sum of customer balances.
+ *      → stockImbalances
+ *   F. GL AR (1100 + 1110) == sum of customer balances.
+ *      → arImbalances          [deferred — item 6]
  *   G. GL AP (2000) == sum of supplier balances.
+ *      → apImbalances          [deferred — item 6]
  *   H. GL Inventory (1200) == inventory batch values.
+ *      → inventoryImbalances
  *   I. GL Cash == cash account operational balances.
+ *      → cashImbalances        [deferred — item 6]
  *
- * `expectAllInvariantsHold(context)` asserts all nine; the individual
- * collectors are exported for targeted assertions.
+ * A returns a two-field object rather than `Violation[]`, so the master
+ * asserts its `groups`/`totalDiff` pair separately.
  */
 import db from '../../config/database';
 import { collectFlows, CASH_ACCOUNTS, CASH_GL_CODES } from '../../services/cashService';
@@ -227,7 +248,12 @@ export function cashImbalances(): Violation[] {
   return violations;
 }
 
-/** Assert invariants A–E; `context` aids debugging on failure. */
+/** Assert invariants A–E and H; `context` labels the call site for the reader.
+ *
+ *  Deliberately NOT "all nine". F, G and I are deferred: `arImbalances`
+ *  currently fails on clean data (docs/known-issues.md item 6), and a master
+ *  gate that fails is not a gate. Adding them is the next step once item 6 is
+ *  fixed. See the file header for the full letter→collector map. */
 export function expectAllInvariantsHold(context: string): void {
   const gl = glImbalances();
   expect(gl.groups).toEqual([]);
@@ -235,5 +261,6 @@ export function expectAllInvariantsHold(context: string): void {
   expect(customerArImbalances()).toEqual([]);
   expect(supplierApImbalances()).toEqual([]);
   expect(stockImbalances()).toEqual([]);
+  expect(inventoryImbalances()).toEqual([]);
   void context;
 }
