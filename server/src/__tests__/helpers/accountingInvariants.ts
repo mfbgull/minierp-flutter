@@ -5,11 +5,11 @@
  * it. The collectors are exported individually for targeted assertions.
  *
  * `expectAllInvariantsHold(context)` is the master gate but does NOT yet cover
- * all nine. It asserts **A–E and H**. F, G and I are reached only by `checkF_I`
- * inside accountingInvariants.test.ts, so a caller of the master still does not
- * see them. They are deferred because `arImbalances` currently fails on clean
- * data — see docs/known-issues.md item 6 — and a gate that fails is not a gate.
- * Land them once item 6 is fixed; that is the next step, not an oversight.
+ * all nine. It asserts **A–E, F and H**. G and I are reached only by `checkF_I`
+ * inside accountingInvariants.test.ts. They are deferred because neither has a
+ * planted-drift proof that the MASTER reaches it — the file's one existing
+ * planted-drift test calls `cashImbalances` directly. Land them with guards of
+ * their own; that is the next step, not an oversight.
  *
  * When adding an invariant: add a row below AND a call in the master, or record
  * the reason it is deferred. This list is the checklist.
@@ -27,14 +27,14 @@
  *   E. Stock vs batches: stock_balances.quantity == Σ stock_batches
  *      .quantity_remaining per item/warehouse.
  *      → stockImbalances
- *   F. GL AR (1100 + 1110) == sum of customer balances.
- *      → arImbalances          [deferred — item 6]
+ *   F. GL AR (1100 + 1110) == Σ (current_balance - credit_balance).
+ *      → arImbalances
  *   G. GL AP (2000) == sum of supplier balances.
- *      → apImbalances          [deferred — item 6]
+ *      → apImbalances          [deferred — no master-level guard yet]
  *   H. GL Inventory (1200) == inventory batch values.
  *      → inventoryImbalances
  *   I. GL Cash == cash account operational balances.
- *      → cashImbalances        [deferred — item 6]
+ *      → cashImbalances        [deferred — no master-level guard yet]
  *
  * A returns a two-field object rather than `Violation[]`, so the master
  * asserts its `groups`/`totalDiff` pair separately.
@@ -173,6 +173,27 @@ const R2 = (v: number): number => Math.round(v * 100) / 100;
  * customer_ledger is also zero. Comparing 1100 alone drifts by exactly the
  * 1110 balance on credit return/offset flows — measured, not assumed.
  *
+ * The subledger side is `SUM(current_balance) - SUM(credit_balance)`, and the
+ * minus sign is not cosmetic. H9 (models/AGENTS.md, CREDIT OFFSET BEHAVIOR)
+ * defines customer credit as TWO non-overlapping representations:
+ *
+ *   - `current_balance` — signed. Positive means the customer owes us.
+ *   - `credit_balance` — unsigned pool. Positive means WE owe the customer,
+ *     granted by a return settled as store credit.
+ *
+ * `applyCredit` zeroes the RETURN credit out of `current_balance` with a
+ * consuming CREDIT debit precisely so the same money is not counted twice, so
+ * granted store credit exists ONLY in `credit_balance`. Reading `current_balance`
+ * alone therefore drops the entire granted-but-unconsumed pool from the
+ * operational side and reports a violation equal to it.
+ *
+ * Derived by measurement, not assumed. Across the six states of the H9 store
+ * credit lifecycle (grant, partial consumption, full consumption, over-
+ * application rejection) `current_balance` alone mismatches on three of them;
+ * `current_balance + credit_balance` mismatches on three; only the subtraction
+ * reconciles on all six. Signs agree on the GL and subledger sides at every
+ * state, so the Math.abs() below is inert here and does not mask an inversion.
+ *
  * The Math.abs() on both sides is retained deliberately. Measured 2026-10-04
  * across all 17 call sites: GL and Σ current_balance are exactly equal and
  * positive every time, so the abs is inert today. It would mask a future
@@ -183,9 +204,9 @@ const R2 = (v: number): number => Math.round(v * 100) / 100;
 export function arImbalances(): Violation[] {
   const glBalance = R2(Math.abs(GL_BALANCE('1100') + GL_BALANCE('1110')));
   const row = db.prepare(
-    'SELECT COALESCE(SUM(current_balance), 0) AS total FROM customers'
-  ).get() as { total: number };
-  const custBalance = R2(Math.abs(row.total));
+    'SELECT COALESCE(SUM(current_balance), 0) AS receivable, COALESCE(SUM(credit_balance), 0) AS storeCredit FROM customers'
+  ).get() as { receivable: number; storeCredit: number };
+  const custBalance = R2(Math.abs(R2(row.receivable) - R2(row.storeCredit)));
   if (Math.abs(glBalance - custBalance) > 0.005) {
     return [{ label: 'GL AR vs customer balances', diff: R2(glBalance - custBalance), account: '1100', expected: custBalance, actual: glBalance }];
   }
@@ -248,12 +269,12 @@ export function cashImbalances(): Violation[] {
   return violations;
 }
 
-/** Assert invariants A–E and H; `context` labels the call site for the reader.
+/** Assert invariants A–E, F and H; `context` labels the call site for the reader.
  *
- *  Deliberately NOT "all nine". F, G and I are deferred: `arImbalances`
- *  currently fails on clean data (docs/known-issues.md item 6), and a master
- *  gate that fails is not a gate. Adding them is the next step once item 6 is
- *  fixed. See the file header for the full letter→collector map. */
+ *  Still NOT "all nine". G and I are deferred pending their own planted-drift
+ *  proofs. F was deferred while its collector modelled only `current_balance`;
+ *  that collector is corrected (see `arImbalances`) and F now carries a
+ *  planted-drift guard of its own. See the file header for the map. */
 export function expectAllInvariantsHold(context: string): void {
   const gl = glImbalances();
   expect(gl.groups).toEqual([]);
@@ -261,6 +282,7 @@ export function expectAllInvariantsHold(context: string): void {
   expect(customerArImbalances()).toEqual([]);
   expect(supplierApImbalances()).toEqual([]);
   expect(stockImbalances()).toEqual([]);
+  expect(arImbalances()).toEqual([]);
   expect(inventoryImbalances()).toEqual([]);
   void context;
 }

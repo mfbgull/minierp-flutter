@@ -13,6 +13,9 @@ import {
   getAuthCookie, createItem, purchaseStock, createCustomer, createInvoice,
   processReturn, customerLedgerNet, glTotalsFor, assertGlBalanced,
 } from './helpers/invoiceReturnSpec';
+import { arImbalances } from './helpers/accountingInvariants';
+
+const R2 = (v: number): number => Math.round(v * 100) / 100;
 
 interface CustomerRow {
   current_balance: number;
@@ -193,5 +196,41 @@ describe('H9: store credit lifecycle', () => {
     expect(res.status).toBe(400);
     expect(String(res.body.error)).toMatch(/exceeds invoice total/i);
     expect(customerRow(customerId).credit_balance).toBeCloseTo(100, 2);
+  });
+
+  // This file's header claims "AR/ledger/GL stay consistent" but nothing
+  // asserted it, which is how a granted store credit could leave GL AR and the
+  // customer subledger permanently 200 apart with the suite green. These
+  // assertions close that hole.
+  it('reconciles GL AR against current_balance MINUS credit_balance at every pool state', () => {
+    const gl = (code: string) => Number((db.prepare(
+      `SELECT COALESCE(SUM(jl.debit) - SUM(jl.credit), 0) AS b
+       FROM journal_lines jl JOIN chart_of_accounts a ON a.id = jl.account_id
+       WHERE a.code = ? AND jl.voided = 0`
+    ).get(code) as { b: number }).b);
+    const totals = db.prepare(
+      'SELECT COALESCE(SUM(current_balance), 0) AS receivable, COALESCE(SUM(credit_balance), 0) AS storeCredit FROM customers'
+    ).get() as { receivable: number; storeCredit: number };
+
+    const glSide = Math.abs(gl('1100') + gl('1110'));
+    const subledgerSide = Math.abs(R2(totals.receivable) - R2(totals.storeCredit));
+
+    // The reconciliation, stated explicitly.
+    expect(glSide).toBeCloseTo(subledgerSide, 2);
+    expect(arImbalances()).toEqual([]);
+
+    // Non-vacuity: the granted pool must be material here, and reading
+    // current_balance alone must NOT reconcile. If this stopped holding, the
+    // assertion above would be passing for the wrong reason.
+    expect(totals.storeCredit).toBeGreaterThan(0);
+    expect(Math.abs(glSide - Math.abs(R2(totals.receivable)))).toBeGreaterThan(0.005);
+
+    // The consuming debit exists, and the ledger net equals current_balance.
+    const creditRows = db.prepare(
+      `SELECT COUNT(*) AS n FROM customer_ledger
+       WHERE transaction_type = 'CREDIT' AND voided = 0 AND reversed_by IS NULL AND debit > 0`
+    ).get() as { n: number };
+    expect(creditRows.n).toBeGreaterThan(0);
+    expect(customerLedgerNet(customerId)).toBeCloseTo(customerRow(customerId).current_balance, 2);
   });
 });

@@ -220,124 +220,139 @@ a replay**, not a measurement: it was computed against the unrepaired scratch
 rows that item 1 leaves alone, on a database the test suite never opens. It is
 retained nowhere as a result.
 
-## 5. `expectAllInvariantsHold` covers A–E and H; F, G, I deferred
+## 5. `expectAllInvariantsHold` covers A–E, F and H; G, I deferred
 
 **Partly resolved.** The master used to assert four invariants (A–E) while being
-documented as asserting nine. It now asserts six — **A–E and H** — and the
-header carries a letter→collector map stating exactly that. F, G and I are
-reached only by `checkF_I` inside `accountingInvariants.test.ts`.
+documented as asserting nine. It now asserts six — **A–E, F and H** — and the
+header carries a letter→collector map stating exactly that.
 
 Current coverage:
 
 | invariant | asserted by |
 |---|---|
-| A–E, H | `expectAllInvariantsHold` (26 call sites) |
-| F (AR), G (AP), I (cash) | `checkF_I` in `accountingInvariants.test.ts` only |
+| A–E, F, H | `expectAllInvariantsHold` (26 call sites) |
+| G (AP), I (cash) | `checkF_I` in `accountingInvariants.test.ts` only |
 
-**Why F, G and I are not in the master yet.** They were implemented and
-measured. Adding `inventoryImbalances` alone leaves the suite green; adding
-`arImbalances` **exposes a real pre-existing violation of invariant F on clean
-data** — see item 6. A gate that fails is not a gate, so the master stops at H
-and the helper's header says so explicitly rather than claiming all nine.
+**Why G and I are not in the master yet.** Neither has a planted-drift proof
+that the *master* reaches it. The file's single existing planted-drift test
+calls `cashImbalances` **directly**, so it cannot fail if the master's I call
+were deleted.
 
-**Do not "fix" this by deleting the H assertion, by weakening F, or by renaming
-the function to match its scope.** Those are pattern 4 below with extra steps.
-The remaining work is sequenced, not optional:
+F was deferred for a different reason — its collector modelled only
+`current_balance` and reported a false violation. That is fixed (item 6) and F
+is back in the master with its own planted-drift guard.
 
-1. Fix item 6 (the credit settlement's missing GL leg).
-2. Add `arImbalances`, `apImbalances` and `cashImbalances` to the master.
-3. Land a planted-drift test for each. None exists today — the file's single
-   planted-drift test targets `cashImbalances` and calls the **collector
-   directly**, so the master's F, G and I calls would ship unproven. That is the
-   same class of assumption this item exists to remove.
+**Do not "fix" this by weakening F or H, or by renaming the function to match
+its scope.** Those are pattern 4 below with extra steps. The remaining work is
+sequenced, not optional:
 
-Step 3 is easy to skip and must not be. Add them with their own anti-vacuity
-proofs, the way H got one.
+1. Add a planted-drift test for **G** (`apImbalances`) that goes through the
+   master.
+2. Add one for **I** (`cashImbalances`) that goes through the master — the
+   existing cash test does not, so it must be added rather than reused.
+3. Then add `apImbalances` and `cashImbalances` to the master.
+
+Step 2 is easy to skip and must not be: reusing the existing direct-collector
+cash test would leave the master's I call unproven, which is the precise defect
+this item exists to remove. F and H both demonstrate the shape — a guard that
+fails when the master line is deleted.
 
 ## 6. Invariant F violated on clean data — GL AR and the customer subledger disagree
 
-**Status: OPEN, no fix. Found 2026-10-04 by wiring invariant F into
-`expectAllInvariantsHold`; the wiring is what made it visible.**
+**Status: FIXED 2026-10-04. The root cause was the invariant, not the ledger.**
 
-`arImbalances()` returns, on the freshly-migrated database used by
-`invoiceCancelReturnCollision.test.ts`:
+`arImbalances()` reported `{account: "1100", actual: 80, expected: 0, diff: 80}`
+on the freshly-migrated database used by `invoiceCancelReturnCollision.test.ts`,
+while every customer subledger netted to zero.
+
+### What the symptom actually was
+
+The return was settled as store credit. `applyCredit` writes a CREDIT ledger
+row and increments `customers.credit_balance`, and posts no GL entry — so GL 1100
+carried a −80 credit balance while `current_balance` was 0.
+
+That reads as an orphaned GL leg. It is not one. **No GL entry is correct here.**
+
+### Root cause: the invariant modelled half the subledger
+
+H9 defines customer credit as **two non-overlapping representations**:
+
+- `current_balance` — signed. Positive: the customer owes us.
+- `credit_balance` — unsigned pool. Positive: **we** owe the customer.
+
+`applyCredit` deliberately zeroes the RETURN credit out of `current_balance` with
+a consuming CREDIT debit so the same money is not counted twice. Granted store
+credit therefore exists **only** in `credit_balance`. The invariant compared
+`SUM(current_balance)` alone, silently dropping the entire granted-but-unconsumed
+pool, and reported a violation equal to it.
+
+The reconciliation equation:
 
 ```
-GL AR vs customer balances  {account: "1100", actual: 80, expected: 0, diff: 80}
+before:  |GL(1100) + GL(1110)|  ==  |Σ current_balance|
+after:   |GL(1100) + GL(1110)|  ==  |Σ (current_balance - credit_balance)|
 ```
 
-GL 1100 carries a **net credit of 80** while every customer's
-`current_balance` is 0 and every `customer_ledger` net is 0. Account 1110
-(Customer Credit) is also 0, so the 80 is not held as store credit either.
+The minus sign is the whole fix. `credit_balance` is a liability we owe, the
+opposite direction to a receivable.
 
-Non-voided 1100 lines at the first checkpoint, as measured:
+### Derivation, not assumption
 
-| entry | effect on 1100 | state |
-|---|---|---|
-| `je=5` INVOICE ref=1 | Dr 200 | **voided** by the cancellation of invoice A |
-| `je=7` INVOICE ref=2 | Dr 200 | active |
-| `je=9` PAYMENT ref=1 | Cr 200 | active |
-| `je=10` INVOICE_RETURN ref=1 | Cr 100 | active |
-| `je=11` RETURN_FEE ref=1 | Dr 20 | active |
+Measured across the six states of the H9 store-credit lifecycle (grant,
+partial consumption, full consumption, over-application rejection):
 
-Net −80.
+| equation | result |
+|---|---|
+| `current_balance` alone | mismatches on 3 of 6 states |
+| `current_balance + credit_balance` | mismatches on 3 of 6 states |
+| **`current_balance - credit_balance`** | **matches on 6 of 6** |
 
-### Diagnosis: the credit settlement's GL side never posted
+The GL side was already correct at every state. Signs agree between GL and
+subledger throughout, so the existing `Math.abs()` remains inert and still does
+not mask an inversion.
 
-Measured `customer_ledger` at the same checkpoint — the subledger is fully
-consistent and nets to zero, so the fault is **entirely on the GL side**:
+### Why no GL entry was added
 
-| id | customer | type | reference | Dr | Cr |
-|---|---|---|---|---|---|
-| 1 | 1 | INVOICE | INV-1026-00001 | 200 | |
-| 2 | 2 | INVOICE | INV-1026-00002 | 200 | |
-| 3 | 2 | PAYMENT | PAY-1026-00001 | | 200 |
-| 4 | 2 | RETURN | RET-1026-00001 | | **80** |
-| 5 | 2 | **CREDIT** | **CR-1026-00001** | **80** | |
-| 6 | 1 | CANCELLATION | INV-1026-00001 | | 200 |
+Adding `Dr 1100 / Cr 1110` at settlement was tested and **does not work** —
+measured, not reasoned. `arImbalances` sums 1100 and 1110 together, so any
+balanced entry with its counterpart inside that pair nets exactly zero on the
+sum and cannot move the verdict:
 
-Customer 1: 200 − 200 = 0. Customer 2: 200 − 200 − 80 + 80 = 0.
+| settlement entry | `arImbalances()` |
+|---|---|
+| no GL (chosen) | `[]` |
+| `Dr 1100 / Cr 1110` | `diff: 80` — unchanged |
+| `Dr 1100 / Cr <outside the AR family>` | `[]` |
 
-The return (`invoice_returns.id=1`, `invoice_id=2`, status **Settled**,
-`returned_amount` 100, `fee_amount` 20, `net_amount` 80, `settled_amount` 80)
-produced **two** ledger rows: a RETURN credit of 80 and a consuming CREDIT debit
-of 80. Row 5 is the settlement extinguishing that credit in the subledger.
+The third row works but requires a new account outside the AR family,
+contradicting the H9 policy that 1110 serves returns and overpayments. So the
+model was wrong, not the missing entry.
 
-**Row 5 has no journal entry.** `postCreditOffsetEntry` posts `Dr 1110 /
-Cr 1100` per the H9 model in `models/AGENTS.md`; it did not run. Proof by
-exhaustion: the entry list filtered to accounts 1100 and 1110 contains exactly
-`je=5, 7, 9, 10, 11` — no credit-offset entry — and 1110's balance is 0.
+### The near-miss worth recording
 
-So the subledger moved 80 from RETURN to CREDIT, and the GL left the 80 sitting
-as a credit on 1100. That is the whole of the 80.
+`Dr 1100 / Cr 1110` made the collision suite **pass** — because F was deferred
+from the master at the time, so `expectAllInvariantsHold` no longer computed
+`arImbalances`. Calling `arImbalances()` directly still returned `diff: 80`.
+Had "tests green" been accepted, a non-fix would have been landed. That is
+pattern 4 below, occurring inside the fix attempt itself, and it is the single
+strongest argument for calling a collector directly when a suite passes.
 
-Three candidate explanations were considered and **all three are now excluded**:
+### Guards
 
-1. ~~Return posts AR to 1100 where H9 says store credit belongs on 1110~~ —
-   excluded: the subledger *did* record the return and its settlement. The
-   accounts chosen on the subledger side are consistent.
-2. ~~Return emits GL with no matching ledger row~~ — excluded: rows 4 and 5 are
-   exactly that matching pair.
-3. ~~Cancellation should have been refused~~ — excluded: invoice 1 has
-   `paid_amount = 0`, so `Invoice.ts:1093` correctly did not fire. The payment
-   belongs to invoice 2 (`payment: 'full'`).
+- `customerStoreCredit.test.ts` — "reconciles GL AR against current_balance
+  MINUS credit_balance at every pool state". States the equation explicitly, and
+  asserts **non-vacuity**: the granted pool must be material *and* reading
+  `current_balance` alone must fail to reconcile. This file's header had claimed
+  "AR/ledger/GL stay consistent" while asserting nothing — that was the hole.
+- `accountingInvariants.test.ts` — "expectAllInvariantsHold reaches invariant F".
+  Plants `Dr 3200 / Cr 1100`: balanced, so invariant A still passes, and it moves
+  GL AR with no ledger row. Verified red by removing the `arImbalances()` call
+  from the master (`Expected pattern: /1100/ … Received function did not throw`).
+- The collector change is mutation-tested: reverting it to `current_balance`
+  alone fails 4 assertions across both suites (`diff` of −100, 80, 80, 200).
 
-**Remaining question, and it is narrow:** why did `postCreditOffsetEntry` not
-post for this settlement? The subledger write happened, so the credit-offset
-consumer recorded its ledger effect and skipped — or was never called for —
-the GL half. Note the test asserts the current 1100 behaviour as intended
-(`accountTotals('INVOICE_RETURN', returnId, '1100').credit ≈ 100`), so the
-return's own posting is deliberate; it is the **settlement's** missing GL leg
-that is unaccounted for.
-
-This is the same family as the orphaned-GL tooling that already exists
-(`repair-orphaned-ledger.ts`, `void-orphaned-salary-gl.ts`) — a ledger row
-without its journal entry. It was invisible for the reason in pattern 4: no
-assertion computed invariant F on this path.
-
-Evidence that it predates the invariant wiring: calling `arImbalances()`
-directly in that file, with the master not involved, returns the identical
-violation.
+F is back in `expectAllInvariantsHold` as of this commit. G and I remain
+deferred — see item 5.
 
 ---
 
