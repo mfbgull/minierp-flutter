@@ -28,7 +28,7 @@ import request from 'supertest';
 import bcrypt from 'bcrypt';
 import app from '../app';
 import db from '../config/database';
-import { expectAllInvariantsHold, arImbalances, apImbalances, cashImbalances, inventoryImbalances, type Violation } from './helpers/accountingInvariants';
+import { expectAllInvariantsHold, arImbalances, apImbalances, cashImbalances, inventoryImbalances, glImbalances, stockImbalances, type Violation } from './helpers/accountingInvariants';
 import AccountingService from '../services/accountingService';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
@@ -1056,5 +1056,79 @@ describe('cashImbalances detects planted GL-only drift', () => {
     }
 
     expect(cashImbalances()).toEqual([]);
+  });
+});
+
+// A master assertion that cannot fail is not a gate. This proves
+// expectAllInvariantsHold actually reaches invariant H, by planting drift that
+// ONLY H can see: the entry is internally balanced and creates no stock
+// movement, so A, E and the subledger invariants are untouched.
+//
+// The plant is Dr capital / Cr 1200 — GL inventory moves with no batch moving,
+// which is exactly the class of divergence the purchase-return double-post
+// produced. See docs/known-issues.md item 4.
+describe('expectAllInvariantsHold reaches invariant H', () => {
+  const REFERENCE = 'TEST_INVENTORY_DRIFT';
+
+  function plant(): void {
+    const capital = AccountingService.getAccountByCode(db, '3200');
+    const inventory = AccountingService.getAccountByCode(db, '1200');
+    if (!capital || !inventory) throw new Error('Chart of accounts is missing 3200 or 1200');
+    AccountingService.postEntry(db, {
+      entry_date: '2026-09-01',
+      description: 'Planted GL-only inventory drift (test)',
+      reference_type: REFERENCE,
+      reference_id: null,
+      lines: [
+        { account_id: capital.id, debit: 7.77, description: 'planted inventory drift' },
+        { account_id: inventory.id, credit: 7.77, description: 'planted inventory drift' },
+      ],
+    });
+  }
+
+  function clearPlant(): void {
+    db.prepare('DELETE FROM journal_lines WHERE reference_type = ?').run(REFERENCE);
+    db.prepare('DELETE FROM journal_entries WHERE reference_type = ?').run(REFERENCE);
+  }
+
+  it('fails on a planted inventory violation while the other invariants still pass', () => {
+    // Clean state passes the complete master assertion.
+    expectAllInvariantsHold('before plant');
+
+    plant();
+    try {
+      // The collector and the master agree on what is wrong.
+      const violations = inventoryImbalances();
+      expect(violations).toHaveLength(1);
+      expect(violations[0].account).toBe('1200');
+      // The plant credits GL 1200 by 7.77 and moves no batch, so operational
+      // value is unchanged and GL sits exactly 7.77 below it. Asserted as a
+      // relation rather than a literal because GL 1200 carries whatever the
+      // earlier lifecycle scenarios accumulated — the sign of `diff` depends
+      // on that balance, the size of the gap does not. The precondition is
+      // asserted, not assumed: if GL were below 7.77 the abs() in
+      // inventoryImbalances would fold the sign and this would not hold.
+      expect(violations[0].expected ?? 0).toBeGreaterThanOrEqual(7.77);
+      expect(violations[0].actual).toBeCloseTo((violations[0].expected ?? 0) - 7.77, 2);
+      expect(violations[0].diff).toBeCloseTo(-7.77, 2);
+
+      // The master reaches it.
+      expect(() => expectAllInvariantsHold('planted inventory drift')).toThrow(/1200/);
+
+      // And it fails for H's reason only: the entry is balanced and no stock
+      // moved, so every other invariant is unaffected. If A were the cause,
+      // this assertion would not hold.
+      const gl = glImbalances();
+      expect(gl.groups).toEqual([]);
+      expect(gl.totalDiff).toBeCloseTo(0, 2);
+      expect(arImbalances()).toEqual([]);
+      expect(apImbalances()).toEqual([]);
+      expect(stockImbalances()).toEqual([]);
+      expect(cashImbalances()).toEqual([]);
+    } finally {
+      clearPlant();
+    }
+
+    expectAllInvariantsHold('after cleanup');
   });
 });
