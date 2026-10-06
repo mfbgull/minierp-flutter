@@ -1133,6 +1133,87 @@ describe('expectAllInvariantsHold reaches invariant H', () => {
   });
 });
 
+describe("invariant H's legacyVal term is load-bearing", () => {
+  const REFERENCE = 'TEST_LEGACY_VAL';
+  const QTY = 10;
+  const UNIT_COST = 250;
+  const LEGACY_VALUE = QTY * UNIT_COST;
+
+  function gl1200(): number {
+    const r = db.prepare(`
+      SELECT COALESCE(SUM(jl.debit) - SUM(jl.credit), 0) AS b
+      FROM journal_lines jl
+      JOIN chart_of_accounts a ON a.id = jl.account_id
+      WHERE a.code = '1200' AND jl.voided = 0
+    `).get() as { b: number };
+    return Number(r.b);
+  }
+
+  function batchValue(): number {
+    const r = db.prepare(
+      'SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) AS v FROM stock_batches WHERE quantity_remaining > 0'
+    ).get() as { v: number };
+    return Number(r.v);
+  }
+
+  it('reconciles unbatched stock only because legacyVal supplies its value', async () => {
+    const itemId = await createItemWithStock(0);
+
+    const inventory = AccountingService.getAccountByCode(db, '1200');
+    const capital = AccountingService.getAccountByCode(db, '3200');
+    if (!inventory || !capital) throw new Error('Chart of accounts is missing 1200 or 3200');
+
+    const glBefore = gl1200();
+    const batchBefore = batchValue();
+    expectAllInvariantsHold('before legacyVal plant');
+
+    AccountingService.postEntry(db, {
+      entry_date: '2026-09-01',
+      description: 'Unbatched legacy stock (test)',
+      reference_type: REFERENCE,
+      reference_id: null,
+      lines: [
+        { account_id: inventory.id, debit: LEGACY_VALUE, description: 'legacy stock on hand' },
+        { account_id: capital.id, credit: LEGACY_VALUE, description: 'legacy stock funded' },
+      ],
+    });
+    // current_stock with NO batch and NO stock_balances row: the shape
+    // legacyVal exists for. E reads stock_balances, so it cannot see this.
+    db.prepare('UPDATE items SET current_stock = ?, standard_cost = ? WHERE id = ?').run(QTY, UNIT_COST, itemId);
+
+    try {
+      // Non-vacuity: GL carries the 2500 and no batch does, so legacyVal is the
+      // only term that can reconcile it. Were a cost layer ever added,
+      // batchValue would move and this assertion would fail rather than the
+      // test quietly stop testing anything.
+      expect(gl1200() - glBefore).toBeCloseTo(LEGACY_VALUE, 2);
+      expect(batchValue()).toBeCloseTo(batchBefore, 2);
+
+      // H holds, and the master holds, only via that term.
+      expect(inventoryImbalances()).toEqual([]);
+      expect(() => expectAllInvariantsHold('legacyVal plant')).not.toThrow();
+
+      // Nothing else moved: the entry is balanced and touches no ledger,
+      // receivable, payable, cash or batch.
+      const gl = glImbalances();
+      expect(gl.groups).toEqual([]);
+      expect(gl.totalDiff).toBeCloseTo(0, 2);
+      expect(customerArImbalances()).toEqual([]);
+      expect(supplierApImbalances()).toEqual([]);
+      expect(stockImbalances()).toEqual([]);
+      expect(arImbalances()).toEqual([]);
+      expect(apImbalances()).toEqual([]);
+      expect(cashImbalances()).toEqual([]);
+    } finally {
+      db.prepare('UPDATE items SET current_stock = 0, standard_cost = 0 WHERE id = ?').run(itemId);
+      db.prepare('DELETE FROM journal_lines WHERE reference_type = ?').run(REFERENCE);
+      db.prepare('DELETE FROM journal_entries WHERE reference_type = ?').run(REFERENCE);
+    }
+
+    expectAllInvariantsHold('after legacyVal cleanup');
+  });
+});
+
 // Same contract for F. Without this, `arImbalances` could sit in the master
 // unexercised and a future edit could drop it silently — which is exactly how
 // invariant H went unasserted for so long.
