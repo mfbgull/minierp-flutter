@@ -28,7 +28,7 @@ import request from 'supertest';
 import bcrypt from 'bcrypt';
 import app from '../app';
 import db from '../config/database';
-import { expectAllInvariantsHold, arImbalances, apImbalances, cashImbalances, inventoryImbalances, glImbalances, stockImbalances, customerArImbalances, type Violation } from './helpers/accountingInvariants';
+import { expectAllInvariantsHold, arImbalances, apImbalances, cashImbalances, inventoryImbalances, glImbalances, stockImbalances, customerArImbalances, supplierApImbalances, type Violation } from './helpers/accountingInvariants';
 import AccountingService from '../services/accountingService';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
@@ -1136,6 +1136,58 @@ describe('expectAllInvariantsHold reaches invariant H', () => {
 // Same contract for F. Without this, `arImbalances` could sit in the master
 // unexercised and a future edit could drop it silently — which is exactly how
 // invariant H went unasserted for so long.
+describe('expectAllInvariantsHold reaches invariant G', () => {
+  const REFERENCE = 'TEST_AP_DRIFT';
+
+  it('fails on a planted AP drift while the other invariants still pass', () => {
+    expectAllInvariantsHold('before plant');
+
+    // Debits 2000 with no matching supplier_ledger row, so GL AP moves and the
+    // supplier position does not. The entry is internally balanced, so
+    // invariant A still passes and no cash, receivable or stock is touched.
+    const capital = AccountingService.getAccountByCode(db, '3200');
+    const ap = AccountingService.getAccountByCode(db, '2000');
+    if (!capital || !ap) throw new Error('Chart of accounts is missing 3200 or 2000');
+    AccountingService.postEntry(db, {
+      entry_date: '2026-09-01',
+      description: 'Planted GL-only AP drift (test)',
+      reference_type: REFERENCE,
+      reference_id: null,
+      lines: [
+        { account_id: ap.id, debit: 7.77, description: 'planted AP drift' },
+        { account_id: capital.id, credit: 7.77, description: 'planted AP drift' },
+      ],
+    });
+
+    try {
+      const violations = apImbalances();
+      expect(violations).toHaveLength(1);
+      expect(violations[0].account).toBe('2000');
+      expect(violations[0].diff).not.toBe(0);
+
+      // The master reaches it.
+      expect(() => expectAllInvariantsHold('planted AP drift')).toThrow(/2000/);
+
+      // And it fails for G's reason only: the entry is balanced and touches
+      // neither cash, receivables nor stock.
+      const gl = glImbalances();
+      expect(gl.groups).toEqual([]);
+      expect(gl.totalDiff).toBeCloseTo(0, 2);
+      expect(arImbalances()).toEqual([]);
+      expect(customerArImbalances()).toEqual([]);
+      expect(supplierApImbalances()).toEqual([]);
+      expect(stockImbalances()).toEqual([]);
+      expect(inventoryImbalances()).toEqual([]);
+      expect(cashImbalances()).toEqual([]);
+    } finally {
+      db.prepare('DELETE FROM journal_lines WHERE reference_type = ?').run(REFERENCE);
+      db.prepare('DELETE FROM journal_entries WHERE reference_type = ?').run(REFERENCE);
+    }
+
+    expectAllInvariantsHold('after AP cleanup');
+  });
+});
+
 describe('expectAllInvariantsHold reaches invariant F', () => {
   const REFERENCE = 'TEST_AR_DRIFT';
 
