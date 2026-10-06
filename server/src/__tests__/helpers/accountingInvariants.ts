@@ -143,17 +143,23 @@ export function supplierApImbalances(): Violation[] {
   }));
 }
 
-/** Invariant E: balances == remaining batch quantities. */
+/** Invariant E: balances == remaining batch quantities.
+ *
+ * FULL OUTER JOIN, not INNER: a key present on only one side IS the divergence,
+ * so this must stay the union of both tables. An INNER JOIN dropped both
+ * directions and let real orphans report clean — do not "simplify" it back.
+ * Needs SQLite 3.39+; better-sqlite3 bundles its own SQLite (3.51.2) instead of
+ * the system one, so the floor comes from the dependency, not the host. */
 export function stockImbalances(): Violation[] {
   return db.prepare(`
-    SELECT b.item_id || '/' || b.warehouse_id AS label,
-           sb.quantity - COALESCE(b.total, 0) AS diff
+    SELECT COALESCE(b.item_id, sb.item_id) || '/' || COALESCE(b.warehouse_id, sb.warehouse_id) AS label,
+           COALESCE(sb.quantity, 0) - COALESCE(b.total, 0) AS diff
     FROM stock_balances sb
-    JOIN (
+    FULL OUTER JOIN (
       SELECT item_id, warehouse_id, SUM(quantity_remaining) AS total
       FROM stock_batches GROUP BY item_id, warehouse_id
     ) b ON b.item_id = sb.item_id AND b.warehouse_id = sb.warehouse_id
-    WHERE ABS(sb.quantity - COALESCE(b.total, 0)) > 0.005
+    WHERE ABS(COALESCE(sb.quantity, 0) - COALESCE(b.total, 0)) > 0.005
   `).all() as unknown as Violation[];
 }
 

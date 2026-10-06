@@ -1293,3 +1293,181 @@ describe('expectAllInvariantsHold reaches invariant F', () => {
     expectAllInvariantsHold('after AR cleanup');
   });
 });
+
+// ---------------------------------------------------------------------
+// Invariant E — symmetric key-space reconciliation
+// ---------------------------------------------------------------------
+
+/**
+ * E compares stock_balances.quantity against SUM(stock_batches
+ * .quantity_remaining) per (item_id, warehouse_id). The reconciliation must
+ * span the UNION of both key spaces: an INNER JOIN silently drops a
+ * (item, warehouse) that exists on only one side.
+ *
+ * These four cases pin all three outcomes the equation must distinguish —
+ * matched, one-sided-both-ways, and a plain matched-key mismatch — plus the
+ * anti-vacuity guard below proving the master actually reaches E.
+ *
+ * Items are created with current_stock 0 and the rows are planted directly,
+ * so the ONLY thing the other eight invariants can object to is a planted
+ * stock row. That keeps these tests proving E's own detection rather than
+ * accidentally leaning on H's legacyVal term.
+ */
+
+function plantBalance(itemId: number, warehouseId: number, qty: number): void {
+  db.prepare('INSERT INTO stock_balances (item_id, warehouse_id, quantity) VALUES (?, ?, ?)').run(itemId, warehouseId, qty);
+}
+
+function plantBatch(itemId: number, warehouseId: number, qty: number, unitCost: number): void {
+  seq += 1;
+  db.prepare(`
+    INSERT INTO stock_batches (
+      batch_no, item_id, warehouse_id, source_type, source_id,
+      quantity_original, quantity_remaining, unit_cost, received_date
+    ) VALUES ('INV-E-SEED-' || ?, ?, ?, 'OPENING', 0, ?, ?, ?, '2026-09-01')
+  `).run(seq, itemId, warehouseId, qty, qty, unitCost);
+}
+
+function purgePlantedStock(itemId: number): void {
+  db.prepare('DELETE FROM stock_batches WHERE item_id = ?').run(itemId);
+  db.prepare('DELETE FROM stock_balances WHERE item_id = ?').run(itemId);
+}
+
+describe('Invariant E reconciles the union of both key spaces', () => {
+  let warehouseId: number;
+
+  beforeAll(async () => {
+    warehouseId = await getFirstWarehouseId();
+  });
+
+  it('A. matched balance and batches report no violation', async () => {
+    const itemId = await createItemWithStock(0);
+    try {
+      plantBalance(itemId, warehouseId, 10);
+      plantBatch(itemId, warehouseId, 10, 2);
+      expect(stockImbalances()).toEqual([]);
+    } finally {
+      purgePlantedStock(itemId);
+    }
+  });
+
+  it('B. a balance with no batch row is reported', async () => {
+    // The historical unbatched-stock shape, as found in the dev database:
+    // on-hand quantity with no covering cost layer.
+    const itemId = await createItemWithStock(0);
+    try {
+      plantBalance(itemId, warehouseId, 47);
+
+      const violations = stockImbalances();
+      expect(violations).toHaveLength(1);
+      expect(violations[0].label).toBe(`${itemId}/${warehouseId}`);
+      expect(violations[0].diff).toBeCloseTo(47, 3);
+    } finally {
+      purgePlantedStock(itemId);
+    }
+  });
+
+  it('C. a batch with no balance row is reported', async () => {
+    // The opposite direction: cost layers claim stock the balance row denies.
+    const itemId = await createItemWithStock(0);
+    try {
+      plantBatch(itemId, warehouseId, 5, 2);
+
+      const violations = stockImbalances();
+      expect(violations).toHaveLength(1);
+      expect(violations[0].label).toBe(`${itemId}/${warehouseId}`);
+      expect(violations[0].diff).toBeCloseTo(-5, 3);
+    } finally {
+      purgePlantedStock(itemId);
+    }
+  });
+
+  it('reports a plain quantity mismatch between matched rows', async () => {
+    const itemId = await createItemWithStock(0);
+    try {
+      plantBalance(itemId, warehouseId, 10);
+      plantBatch(itemId, warehouseId, 7, 2);
+
+      const violations = stockImbalances();
+      expect(violations).toHaveLength(1);
+      expect(violations[0].label).toBe(`${itemId}/${warehouseId}`);
+      expect(violations[0].diff).toBeCloseTo(3, 3);
+    } finally {
+      purgePlantedStock(itemId);
+    }
+  });
+
+  it('sums several batches before comparing, per item and warehouse', async () => {
+    // Preserves the pre-existing aggregation semantics: E compares the SUM of
+    // quantity_remaining, not individual batch rows.
+    const itemId = await createItemWithStock(0);
+    try {
+      plantBatch(itemId, warehouseId, 4, 2);
+      plantBatch(itemId, warehouseId, 6, 2);
+      plantBalance(itemId, warehouseId, 10);
+      expect(stockImbalances()).toEqual([]);
+    } finally {
+      purgePlantedStock(itemId);
+    }
+  });
+
+  it('keeps the existing 0.005 tolerance', async () => {
+    const withinTolerance = await createItemWithStock(0);
+    const beyondTolerance = await createItemWithStock(0);
+    try {
+      plantBalance(withinTolerance, warehouseId, 10);
+      plantBatch(withinTolerance, warehouseId, 9.999, 2);
+      expect(stockImbalances()).toEqual([]);
+
+      plantBalance(beyondTolerance, warehouseId, 9.99);
+      plantBatch(beyondTolerance, warehouseId, 10, 2);
+      expect(stockImbalances()).toHaveLength(1);
+    } finally {
+      purgePlantedStock(withinTolerance);
+      purgePlantedStock(beyondTolerance);
+    }
+  });
+});
+
+describe('expectAllInvariantsHold reaches invariant E', () => {
+  it('fails on a planted unbatched balance while the other invariants still pass', async () => {
+    const warehouseId = await getFirstWarehouseId();
+    const itemId = await createItemWithStock(0);
+
+    expectAllInvariantsHold('before plant');
+
+    try {
+      // On-hand stock with no covering batch. The item's current_stock stays
+      // 0, so H's legacyVal term cannot see this either — which is the point:
+      // E alone has to catch it, and the master has to reach E for it.
+      plantBalance(itemId, warehouseId, 47);
+
+      // 1. The collector detects it.
+      const violations = stockImbalances();
+      expect(violations).toHaveLength(1);
+      expect(violations[0].label).toBe(`${itemId}/${warehouseId}`);
+      expect(violations[0].diff).toBeCloseTo(47, 3);
+
+      // 2. The master reaches it. Deleting only E's line from
+      //    expectAllInvariantsHold would leave the master green and fail
+      //    this assertion — that is the anti-vacuity property.
+      expect(() => expectAllInvariantsHold('planted unbatched balance')).toThrow();
+
+      // 3. And it fails for E's reason only: no journal, ledger, cash or
+      //    inventory-value term is touched.
+      const gl = glImbalances();
+      expect(gl.groups).toEqual([]);
+      expect(gl.totalDiff).toBeCloseTo(0, 2);
+      expect(customerArImbalances()).toEqual([]);
+      expect(supplierApImbalances()).toEqual([]);
+      expect(arImbalances()).toEqual([]);
+      expect(apImbalances()).toEqual([]);
+      expect(inventoryImbalances()).toEqual([]);
+      expect(cashImbalances()).toEqual([]);
+    } finally {
+      purgePlantedStock(itemId);
+    }
+
+    expectAllInvariantsHold('after unbatched-balance cleanup');
+  });
+});
