@@ -115,7 +115,14 @@ router.get(
       return;
     }
     // res.download sets Content-Disposition: attachment itself.
-    res.download(target, (err) => {
+    //
+    // dotfiles:'allow' is required, not a relaxation: send() defaults to
+    // 'ignore' and 404s any path with a dot-prefixed segment, so a deployment
+    // whose DATABASE_PATH sits under one (~/.local/share/minierp, ~/.config/…)
+    // failed every download, surfacing as a 500. Traversal safety is unchanged —
+    // resolveBackupFilePath already restricts the name to erp-<timestamp>.db and
+    // confines it to the backup directory.
+    res.download(target, path.basename(target), { dotfiles: 'allow' }, (err) => {
       if (err) {
         logger.error('[AdminBackup] download failed:', { name, error: err.message });
       }
