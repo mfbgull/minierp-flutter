@@ -1136,6 +1136,61 @@ describe('expectAllInvariantsHold reaches invariant H', () => {
 // Same contract for F. Without this, `arImbalances` could sit in the master
 // unexercised and a future edit could drop it silently — which is exactly how
 // invariant H went unasserted for so long.
+// The pre-existing "cashImbalances detects planted GL-only drift" test calls
+// the COLLECTOR directly, so it still passes if the master's cashImbalances()
+// call is deleted. This one asserts through the master, which is the only
+// thing that proves the master reaches I.
+describe('expectAllInvariantsHold reaches invariant I', () => {
+  const REFERENCE = 'TEST_CASH_DRIFT_VIA_MASTER';
+
+  it('fails on a planted cash drift while the other invariants still pass', () => {
+    expectAllInvariantsHold('before plant');
+
+    // Moves the cash account with no matching business row, so the GL side of
+    // I moves and the operational side does not. Balanced against equity, so
+    // invariant A still passes and no receivable, payable or stock is touched.
+    const cash = AccountingService.getAccountByCode(db, '1000');
+    const capital = AccountingService.getAccountByCode(db, '3200');
+    if (!cash || !capital) throw new Error('Chart of accounts is missing 1000 or 3200');
+    AccountingService.postEntry(db, {
+      entry_date: '2026-09-01',
+      description: 'Planted GL-only cash drift via master (test)',
+      reference_type: REFERENCE,
+      reference_id: null,
+      lines: [
+        { account_id: cash.id, debit: 7.77, description: 'planted cash drift' },
+        { account_id: capital.id, credit: 7.77, description: 'planted cash drift' },
+      ],
+    });
+
+    try {
+      // 1. the collector detects it directly
+      const violations = cashImbalances();
+      expect(violations.length).toBeGreaterThan(0);
+      expect(violations.some(v => v.account === '1000')).toBe(true);
+
+      // 2. and the master fails because of I
+      expect(() => expectAllInvariantsHold('planted cash drift')).toThrow(/1000|GL Cash/);
+
+      // 3. failing for I's reason only
+      const gl = glImbalances();
+      expect(gl.groups).toEqual([]);
+      expect(gl.totalDiff).toBeCloseTo(0, 2);
+      expect(customerArImbalances()).toEqual([]);
+      expect(supplierApImbalances()).toEqual([]);
+      expect(arImbalances()).toEqual([]);
+      expect(apImbalances()).toEqual([]);
+      expect(stockImbalances()).toEqual([]);
+      expect(inventoryImbalances()).toEqual([]);
+    } finally {
+      db.prepare('DELETE FROM journal_lines WHERE reference_type = ?').run(REFERENCE);
+      db.prepare('DELETE FROM journal_entries WHERE reference_type = ?').run(REFERENCE);
+    }
+
+    expectAllInvariantsHold('after cash cleanup');
+  });
+});
+
 describe('expectAllInvariantsHold reaches invariant G', () => {
   const REFERENCE = 'TEST_AP_DRIFT';
 
