@@ -4,13 +4,9 @@
  * Nine invariants over the whole database, each with the collector that checks
  * it. The collectors are exported individually for targeted assertions.
  *
- * `expectAllInvariantsHold(context)` is the master gate but does NOT yet cover
- * all nine. It asserts **A–E, F, G and H**. I is reached only by `checkF_I`
- * inside accountingInvariants.test.ts. It is deferred because it has no
- * planted-drift proof that the MASTER reaches it — the file's existing cash
- * drift test calls `cashImbalances` directly, so it cannot fail if the master's
- * I call were deleted. Land it with a guard of its own; that is the next step,
- * not an oversight.
+ * `expectAllInvariantsHold(context)` is the master gate and now asserts ALL
+ * NINE. Every letter below is called by it, and every one has a planted-drift
+ * guard that goes red when its master line is deleted.
  *
  * When adding an invariant: add a row below AND a call in the master, or record
  * the reason it is deferred. This list is the checklist.
@@ -34,8 +30,8 @@
  *      → apImbalances
  *   H. GL Inventory (1200) == inventory batch values.
  *      → inventoryImbalances
- *   I. GL Cash == cash account operational balances.
- *      → cashImbalances        [deferred — no master-level guard yet]
+ *   I. GL cash accounts == operational cash flows, per account.
+ *      → cashImbalances
  *
  * G needs no second subledger term the way F did: `suppliers` has no
  * `credit_balance` column and supplier prepayments are DESIGN-ONLY
@@ -43,6 +39,11 @@
  * supplier position. Note the GL/subledger signs are OPPOSITE for AP — 2000 is
  * credit-normal while the ledger runs debit-positive — so the `Math.abs()` in
  * `apImbalances` is load-bearing here, unlike F's where it is inert.
+ *
+ * I is the only one of the nine that compares SIGNED values with no
+ * `Math.abs()` — correctly so, because both sides mean "net cash held": GL cash
+ * is debit-normal and `collectFlows` returns `inflow - outflow`. Measured across
+ * twelve cash states the two sides were equal including sign, every time.
  *
  * A returns a two-field object rather than `Violation[]`, so the master
  * asserts its `groups`/`totalDiff` pair separately.
@@ -277,11 +278,7 @@ export function cashImbalances(): Violation[] {
   return violations;
 }
 
-/** Assert invariants A–E, F, G and H; `context` labels the call site for the reader.
- *
- *  Still NOT "all nine". I is deferred pending its own planted-drift proof:
- *  the existing cash drift test calls `cashImbalances` DIRECTLY, so it cannot
- *  fail if the master's I call were deleted. See the file header for the map. */
+/** Assert invariants A–E and F–I, i.e. all nine; `context` labels the call site. */
 export function expectAllInvariantsHold(context: string): void {
   const gl = glImbalances();
   expect(gl.groups).toEqual([]);
@@ -292,5 +289,6 @@ export function expectAllInvariantsHold(context: string): void {
   expect(arImbalances()).toEqual([]);
   expect(apImbalances()).toEqual([]);
   expect(inventoryImbalances()).toEqual([]);
+  expect(cashImbalances()).toEqual([]);
   void context;
 }
