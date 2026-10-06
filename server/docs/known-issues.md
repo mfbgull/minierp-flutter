@@ -286,6 +286,24 @@ capital (cash and bank), owner withdrawal, salary, customer refund, supplier
 refund, voided payment, and multiple transactions. `cashImbalances` returned
 `[]` at every one, with the two sides equal including sign.
 
+### I's scope: representation only, not business intent
+
+**I verifies representation consistency. It does not prove that a requested
+business operation succeeded, or that a request was accepted at all.**
+
+A reconciliation can only compare what both sides recorded. An operation that
+fails and moves no money on either side leaves the two sides in agreement, so
+the invariant is silent — correctly, but silently. Observed concretely while
+building this coverage: an owner withdrawal sent with the wrong field name and
+a refund sent with the wrong payload shape both returned HTTP 400, moved no cash
+on either side, and produced no violation. Nothing in I can distinguish those
+from the intended case.
+
+So a green I means *"the GL and the operational record of cash agree"*, not
+*"cash moved when it should have"*. Proving the latter needs the operation's own
+assertions — status codes, row counts, ledger rows written — which is what the
+functional suites already do. Do not read I as operational coverage.
+
 ## 6. Invariant F violated on clean data — GL AR and the customer subledger disagree
 
 **Status: FIXED 2026-10-04. The root cause was the invariant, not the ledger.**
@@ -380,8 +398,10 @@ strongest argument for calling a collector directly when a suite passes.
 - The collector change is mutation-tested: reverting it to `current_balance`
   alone fails 4 assertions across both suites (`diff` of −100, 80, 80, 200).
 
-F is back in `expectAllInvariantsHold` as of this commit. G and I remain
-deferred — see item 5.
+F was re-enabled in the master by `0cc2e314`; G by `9a390542`, H by
+`0385b81a` and I by `4bcdd38c`. **All nine are now asserted by
+`expectAllInvariantsHold`** — see item 5, which is authoritative for the
+current gate scope.
 
 ---
 
@@ -468,3 +488,27 @@ or commit message all fail the same way. The mitigation is the same in every
 case: before a claim about code is written down, open the file and confirm it.
 Cheap, and it is the only thing that has ever worked here.
 
+
+## Test-environment debt — Jest leaks ~113 temporary databases per full run
+
+**Not an accounting problem. Do not read a disk-induced failure as an invariant
+failure.**
+
+Observed 2026-10-04. A full `npx jest` run leaves roughly **113 directories**
+under `/tmp` matching `minierp-test-*`, about **150 MB** per run.
+
+Cause: `src/__tests__/setup.ts` creates a fresh database per test file with
+`fs.mkdtempSync(path.join(os.tmpdir(), 'minierp-test-'))` and removes it from a
+`process.on('exit')` handler. Jest force-exits some workers before that handler
+runs, so those directories are never reclaimed.
+
+Consequence to recognise: once `/` fills, a full-suite run reports a mass
+failure that has nothing to do with the code. The signature is a **test count
+well below the baseline** — 661 against an expected 982 was observed, with 44
+suites "failing". Treat an unexpectedly low count, or a large failure burst
+with no coherent theme, as an environment symptom first: check `df -h /`, then
+`rm -rf /tmp/minierp-test-*` and re-run before investigating anything else.
+
+Fixing it properly means closing and unlinking the per-file database in a hook
+that Jest actually runs, rather than relying on process exit — deliberately not
+done here. Until then, clear the directories between full runs.
