@@ -220,42 +220,60 @@ a replay**, not a measurement: it was computed against the unrepaired scratch
 rows that item 1 leaves alone, on a database the test suite never opens. It is
 retained nowhere as a result.
 
-## 5. `expectAllInvariantsHold` covers A–E, F and H; G, I deferred
+## 5. `expectAllInvariantsHold` covers A–E, F, G and H; I deferred
 
 **Partly resolved.** The master used to assert four invariants (A–E) while being
-documented as asserting nine. It now asserts six — **A–E, F and H** — and the
-header carries a letter→collector map stating exactly that.
+documented as asserting nine. It now asserts seven — **A–E, F, G and H** — and
+the header carries a letter→collector map stating exactly that.
 
 Current coverage:
 
 | invariant | asserted by |
 |---|---|
-| A–E, F, H | `expectAllInvariantsHold` (26 call sites) |
-| G (AP), I (cash) | `checkF_I` in `accountingInvariants.test.ts` only |
+| A–E, F, G, H | `expectAllInvariantsHold` (26 call sites) |
+| I (cash) | `checkF_I` in `accountingInvariants.test.ts` only |
 
-**Why G and I are not in the master yet.** Neither has a planted-drift proof
-that the *master* reaches it. The file's single existing planted-drift test
-calls `cashImbalances` **directly**, so it cannot fail if the master's I call
-were deleted.
+**Why I is the last one.** It is the only invariant with no planted-drift proof
+that the *master* reaches it. `accountingInvariants.test.ts`'s existing cash
+drift test ("flags a balanced journal pair moving cash outside business flows")
+calls `cashImbalances()` **directly**, so it still passes if the master's I call
+were deleted. Reusing it would mark I covered while leaving it unproven.
 
-F was deferred for a different reason — its collector modelled only
-`current_balance` and reported a false violation. That is fixed (item 6) and F
-is back in the master with its own planted-drift guard.
-
-**Do not "fix" this by weakening F or H, or by renaming the function to match
+**Do not "fix" this by weakening an invariant or renaming the function to match
 its scope.** Those are pattern 4 below with extra steps. The remaining work is
-sequenced, not optional:
+one step, and it is not optional:
 
-1. Add a planted-drift test for **G** (`apImbalances`) that goes through the
-   master.
-2. Add one for **I** (`cashImbalances`) that goes through the master — the
-   existing cash test does not, so it must be added rather than reused.
-3. Then add `apImbalances` and `cashImbalances` to the master.
+1. Add a planted-drift test for **I** that asserts through
+   `expectAllInvariantsHold`, not through the collector.
+2. Then add `cashImbalances` to the master.
 
-Step 2 is easy to skip and must not be: reusing the existing direct-collector
-cash test would leave the master's I call unproven, which is the precise defect
-this item exists to remove. F and H both demonstrate the shape — a guard that
-fails when the master line is deleted.
+F, G and H each demonstrate the required shape — a guard that goes red when the
+master's line is deleted. I has none.
+
+### A sign-convention note that matters for I
+
+`apImbalances` and `arImbalances` both wrap their two sides in `Math.abs()`, but
+for **opposite reasons**, and this was measured rather than assumed:
+
+- **F (AR)** — GL and subledger signs *agree* at every state, so the `abs()` is
+  inert and does not mask an inversion.
+- **G (AP)** — the signs are *systematically opposite*: 2000 is credit-normal
+  while `supplier_ledger` runs debit-positive, so `GL(2000) = −Σ current_balance`
+  at every state measured. The `abs()` is therefore **load-bearing** for AP.
+
+Verified across unpaid purchase, partial payment, full payment, purchase return
+and supplier refund: `apImbalances` returned `[]` at all five.
+
+The consequence to carry forward: because G compares absolute values, it cannot
+detect a GL-side sign flip on 2000. That is a pre-existing limitation of the
+abs, not a defect introduced here, and it is the same policy question the
+`arImbalances` abs note already defers. Do not "fix" it casually — the AP sign
+convention is systematic and any change is a balance-sheet policy decision.
+
+G needed **no** second subledger term the way F did: `suppliers` has no
+`credit_balance` column and supplier prepayments are DESIGN-ONLY
+(`docs/supplier-prepayments-design.md`), so `current_balance` is the whole
+supplier position.
 
 ## 6. Invariant F violated on clean data — GL AR and the customer subledger disagree
 
