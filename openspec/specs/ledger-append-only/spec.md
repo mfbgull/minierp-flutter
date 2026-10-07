@@ -1,6 +1,12 @@
-# Spec: ledger-append-only (Delta)
+# Ledger Append-Only
 
-## ADDED Requirements
+## Purpose
+
+Customer and supplier ledgers are permanent books of record. Corrections are
+made by appending a reversing entry, never by deleting or rewriting history, and
+every balance derivation reads the ledger through one consistent exclusion rule.
+
+## Requirements
 
 ### Requirement: Ledger rows are never deleted
 `customer_ledger` and `supplier_ledger` rows SHALL NOT be deleted by any application code path. Corrections SHALL be made by inserting an equal-and-opposite reversing row that references the original (`reversed_by`) and marking the original `voided = 1`. All ledger reads used for balances and statements SHALL exclude voided rows.

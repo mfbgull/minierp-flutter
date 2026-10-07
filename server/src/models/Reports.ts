@@ -420,14 +420,18 @@ function getProfitLossReport(startDate: string, endDate: string, db: Database.Da
   // statement and the balance sheet cannot disagree by construction.
   // 4100 Sales Returns is debit-normal contra revenue, so net revenue is
   // credits minus debits across 4000 + 4100.
+  const plAccounts = db.prepare(
+    `SELECT code, type FROM chart_of_accounts WHERE type IN ('revenue', 'expense')`
+  ).all() as Array<{ code: string; type: string }>;
   const revenueMovement = AccountingService.getPeriodMovement(db, {
-    accountCodes: ['4000', '4100'], startDate, endDate,
+    accountCodes: plAccounts.filter(a => a.type === 'revenue').map(a => a.code), startDate, endDate,
   });
   const cogsMovement = AccountingService.getPeriodMovement(db, {
     accountCodes: ['5000'], startDate, endDate,
   });
+  // Every expense account except COGS (6000, 6100, 7000-7200, custom...).
   const opexMovement = AccountingService.getPeriodMovement(db, {
-    accountCodes: ['6000'], startDate, endDate,
+    accountCodes: plAccounts.filter(a => a.type === 'expense' && a.code !== '5000').map(a => a.code), startDate, endDate,
   });
 
   const revenue = { total: round2(revenueMovement.total_credit - revenueMovement.total_debit) };
@@ -466,8 +470,16 @@ function getBalanceSheet(asOfDate: string, db: Database.Database) {
   const bal = (code: string): number => byCode.get(code)?.balance ?? 0;
   const CASH_CODES = ['1000', '1010', '1020', '1030', '1040'];
 
+  // `balance` is signed on the account's OWN normal side. Re-sign to the
+  // type's natural side so contra accounts (e.g. 1110 Customer Credit, a
+  // credit-normal asset) reduce or add correctly instead of flipping sign.
+  const NATURAL_SIDE: Record<string, 'debit' | 'credit'> = {
+    asset: 'debit', expense: 'debit', liability: 'credit', equity: 'credit', revenue: 'credit',
+  };
+  const onTypeSide = (b: { type: string; normal_balance: string; balance: number }): number =>
+    NATURAL_SIDE[b.type] === b.normal_balance ? b.balance : -b.balance;
   const sumType = (type: string): number =>
-    round2(balances.filter(b => b.type === type).reduce((s, b) => s + b.balance, 0));
+    round2(balances.filter(b => b.type === type).reduce((s, b) => s + onTypeSide(b), 0));
 
   // --- ASSETS ---
   const inventoryValue = bal('1200');
@@ -477,7 +489,7 @@ function getBalanceSheet(asOfDate: string, db: Database.Database) {
   const knownAssetCodes = new Set([...CASH_CODES, '1100', '1200']);
   const otherAssets = round2(
     balances.filter(b => b.type === 'asset' && !knownAssetCodes.has(b.account_code))
-      .reduce((s, b) => s + b.balance, 0)
+      .reduce((s, b) => s + onTypeSide(b), 0)
   );
   const totalAssets = sumType('asset');
 

@@ -377,7 +377,8 @@ function createGoodsReceipt(req: AuthRequest, res: Response): void {
         return;
       }
 
-      if (item.received_quantity <= 0) {
+      const receivedQty = Number(item.received_quantity);
+      if (typeof item.received_quantity === 'boolean' || !Number.isFinite(receivedQty) || receivedQty <= 0) {
         res.status(400).json({
           error: 'Received quantity must be positive'
         });

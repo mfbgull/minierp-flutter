@@ -1,6 +1,12 @@
-# Spec: report-expression-security (Delta)
+# Report Expression Security
 
-## ADDED Requirements
+## Purpose
+
+Report configuration is user-supplied and reaches the SQL layer. Every
+user-controlled expression — stored or transient — is validated against a safe
+grammar before it is used to construct a query.
+
+## Requirements
 
 ### Requirement: Computed column expressions are safely validated
 Custom report `computedColumns[].expression` values SHALL be validated against a safe grammar (column references, arithmetic operators, numeric literals, parentheses, and whitelisted SQL functions) before being used in query construction. Any expression containing identifiers not in the report's field list, string literals, semicolons, comments, or non-whitelisted keywords MUST be rejected with a 400 validation error.

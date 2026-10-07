@@ -10,28 +10,28 @@ posted, creates the supplier credit note + GL reversal.
 ## Requirements
 
 ### Requirement: purchase-return-entry
-Users can start a purchase return from the purchase return screen via a dedicated new-return action.
+The purchase return screen SHALL expose a dedicated new-return action that opens the purchase return entry flow.
 
 #### Scenario: new return from purchase return screen
 - **WHEN** a user is on the purchase return screen
 - **THEN** a new-return action is available and opens the purchase return entry flow
 
 ### Requirement: purchase-order-return-menu
-Users can initiate a return from a purchase order using a 3-dot menu action.
+A purchase order's 3-dot menu SHALL offer a Return option that routes to purchase return creation for that order.
 
 #### Scenario: return from purchase order
 - **WHEN** a user opens the 3-dot menu on a purchase order
 - **THEN** a Return option is available and routes to purchase return creation for that order
 
 ### Requirement: purchase-return-menu
-Users can initiate a return from a purchase using a 3-dot menu action.
+A purchase's 3-dot menu SHALL offer a Return option that routes to purchase return creation for that purchase.
 
 #### Scenario: return from purchase
 - **WHEN** a user opens the 3-dot menu on a purchase
 - **THEN** a Return option is available and routes to purchase return creation for that purchase
 
 ### Requirement: purchase-return-source-warehouse
-A purchase return reduces stock from the source document's warehouse — the warehouse is not user-selectable.
+A purchase return SHALL reduce stock from the source document's warehouse; the warehouse SHALL NOT be user-selectable.
 
 #### Scenario: warehouse is fixed to the source
 - **WHEN** a user submits a return for a purchase or purchase order

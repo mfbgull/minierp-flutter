@@ -310,6 +310,10 @@ export class AccountingService {
       );
     }
 
+    // A closed period is immutable: refuse before any auto-create logic can
+    // open an overlapping period over it (ACCT-004).
+    AccountingService.assertPeriodNotClosed(db, input.entry_date, input.description || 'Journal entry');
+
     // Period check — auto-create the calendar-month period when the
     // entry date falls outside every existing period (ACC-11 rollover).
     // INSERT ... ON CONFLICT DO NOTHING keeps concurrent postings

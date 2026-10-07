@@ -656,7 +656,7 @@ class InvoiceModel {
       // otherwise subsequent partial returns under-restock physical stock
       // while the GL already posted the full return value.
       const effectiveQty = referenceDoctype === 'RETURN' ? totalToReturn : remainingToReturn;
-      const ratio = Math.abs(totalSold) < 0.001 ? 1 : Math.min(roundQty(effectiveQty / totalSold), 1);
+      const ratio = Math.abs(totalSold) < 0.001 ? 1 : Math.min(effectiveQty / totalSold, 1);
 
       // Restore quantity on each consumed batch (new path: batch_stock_by_location)
       for (const movement of saleMovements) {

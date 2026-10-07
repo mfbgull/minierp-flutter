@@ -7,6 +7,7 @@ import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, PURCHASE_RETURN_HEADER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { roundQty } from '../utils/quantity';
+import { roundCurrency } from '../utils/currency';
 import { SqlParam } from '../utils/sqlTypes';
 
 /**
@@ -310,7 +311,7 @@ class PurchaseReturnModel {
             );
           }
 
-          const amount = agg.quantity * purchase.unit_cost;
+          const amount = roundCurrency(agg.quantity * purchase.unit_cost);
           lines.push({
             source_item_id: purchase.id,
             item_id: purchase.item_id,
@@ -346,7 +347,7 @@ class PurchaseReturnModel {
             );
           }
 
-          const amount = agg.quantity * poItem.unit_price;
+          const amount = roundCurrency(agg.quantity * poItem.unit_price);
           lines.push({
             source_item_id: poItem.id,
             item_id: poItem.item_id,
@@ -359,6 +360,8 @@ class PurchaseReturnModel {
           totalAmount += amount;
         }
       }
+
+      totalAmount = roundCurrency(totalAmount);
 
       // PRET-06 (task 4.5): returning goods worth more than is still owed
       // drives the supplier balance negative (a hidden receivable). Require
@@ -409,7 +412,10 @@ class PurchaseReturnModel {
       `);
 
       // Stock: verify availability, then record negative movements per line.
+      const batchLocationsEnabled = isFeatureEnabled(db, 'feature_batch_locations');
+
       for (const line of lines) {
+        const batchDraws: { batchId: number; quantity: number; locationId: number | null }[] = [];
         // Stock must exist in the restock warehouse before we remove it.
         const balance = db.prepare(`
           SELECT quantity FROM stock_balances
@@ -459,65 +465,110 @@ class PurchaseReturnModel {
         // FIFO-oldest layers — returning goods must deplete the batch they
         // came from at their own cost. Short coverage is an error: never
         // silently under-consume while recording a full return.
-        const sourceBatch = db.prepare(`
-          SELECT id, quantity_remaining FROM stock_batches
-          WHERE source_type = ? AND source_id = ?
-            AND item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
-          ORDER BY id LIMIT 1
-        `).get(
-          data.source_type === 'PURCHASE' ? 'PURCHASE' : 'GOODS_RECEIPT',
-          line.source_item_id,
-          line.item_id,
-          data.warehouse_id
-        ) as { id: number; quantity_remaining: number } | undefined;
+        const sourceBatchIds: number[] =
+          data.source_type === 'PURCHASE'
+            ? (
+                db.prepare(`
+                  SELECT id FROM stock_batches
+                  WHERE source_type = 'PURCHASE' AND source_id = ?
+                    AND item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+                  ORDER BY id
+                `).all(line.source_item_id, line.item_id, data.warehouse_id) as { id: number }[]
+              ).map((r) => r.id)
+            : (
+                db.prepare(`
+                  SELECT sb.id FROM stock_batches sb
+                  JOIN goods_receipt_items gri ON gri.id = sb.source_id
+                  WHERE sb.source_type = 'GOODS_RECEIPT'
+                    AND gri.po_item_id = ?
+                    AND sb.item_id = ?
+                    AND sb.warehouse_id = ?
+                    AND sb.quantity_remaining > 0
+                  ORDER BY sb.id
+                `).all(line.source_item_id, line.item_id, data.warehouse_id) as { id: number }[]
+              ).map((r) => r.id);
 
-        if (!sourceBatch || roundQty(sourceBatch.quantity_remaining) < roundQty(line.quantity)) {
+        const coverage = sourceBatchIds.reduce((sum, id) => {
+          const row = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id = ?`).get(id) as
+            | { quantity_remaining: number }
+            | undefined;
+          return roundQty(sum + (row ? Number(row.quantity_remaining) : 0));
+        }, 0);
+
+        if (sourceBatchIds.length === 0 || coverage < roundQty(line.quantity)) {
           throw new Error(
             `Insufficient stock in the source batch for ${line.item_name}: ` +
-            `available ${roundQty(sourceBatch?.quantity_remaining ?? 0)}, required ${roundQty(line.quantity)}. ` +
+            `available ${coverage}, required ${roundQty(line.quantity)}. ` +
             `Goods already sold cannot be returned to the supplier.`
           );
         }
 
-        // New path: consume from batch_stock_by_location for the source batch
-        if (isFeatureEnabled(db, 'feature_batch_locations')) {
-          const locRows = db.prepare(`
-            SELECT bsl.id, bsl.quantity_available, bsl.location_id
-            FROM batch_stock_by_location bsl
-            JOIN locations l ON bsl.location_id = l.id
-            WHERE bsl.batch_id = ? AND l.warehouse_id = ?
-              AND bsl.quantity_available > 0
-            ORDER BY l.created_at ASC, bsl.id ASC
-          `).all(sourceBatch.id, data.warehouse_id) as Array<{ id: number; quantity_available: number; location_id: number }>;
+        // Draw the return down across the line's own batches, oldest first, so a
+        // line received in several partial receipts is fully recoverable.
+        let remainingToDraw = roundQty(line.quantity);
 
-          let remaining = roundQty(line.quantity);
-          for (const loc of locRows) {
-            if (remaining <= 0) break;
-            const locAvail = roundQty(loc.quantity_available);
-            const take = roundQty(Math.min(remaining, locAvail));
-            db.prepare(`
-              UPDATE batch_stock_by_location
-              SET quantity_physical = quantity_physical - ?
-              WHERE id = ?
-            `).run(take, loc.id);
-            remaining -= take;
+        for (const batchId of sourceBatchIds) {
+          if (remainingToDraw <= 0) break;
+
+          const batch = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id = ?`).get(batchId) as
+            | { quantity_remaining: number }
+            | undefined;
+          if (!batch) continue;
+
+          const take = roundQty(Math.min(remainingToDraw, roundQty(Number(batch.quantity_remaining))));
+          if (take <= 0) continue;
+
+          if (batchLocationsEnabled) {
+            const locRows = db.prepare(`
+              SELECT bsl.id, bsl.quantity_available, bsl.location_id
+              FROM batch_stock_by_location bsl
+              JOIN locations l ON bsl.location_id = l.id
+              WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+                AND bsl.quantity_available > 0
+              ORDER BY l.created_at ASC, bsl.id ASC
+            `).all(batchId, data.warehouse_id) as Array<{ id: number; quantity_available: number; location_id: number }>;
+
+            let locRemaining = take;
+            for (const loc of locRows) {
+              if (locRemaining <= 0) break;
+              const locTake = roundQty(Math.min(locRemaining, roundQty(loc.quantity_available)));
+              db.prepare(`
+                UPDATE batch_stock_by_location
+                SET quantity_physical = quantity_physical - ?
+                WHERE id = ?
+              `).run(locTake, loc.id);
+              locRemaining -= locTake;
+            }
+            if (locRemaining > 0) {
+              throw new Error(
+                `Insufficient batch_stock_by_location for ${line.item_name}: ` +
+                `required ${take}, only ${roundQty(take - locRemaining).toFixed(3)} available in source batch locations`
+              );
+            }
           }
-          if (remaining > 0) {
-            throw new Error(
-              `Insufficient batch_stock_by_location for ${line.item_name}: ` +
-              `required ${roundQty(line.quantity)}, only ${roundQty(roundQty(line.quantity) - remaining).toFixed(3)} available in source batch locations`
-            );
-          }
-          // Keep the master batch in sync with the location rows
-          // (same contract as consumeFromOldestBatches).
-          db.prepare(`
-            UPDATE stock_batches
-            SET quantity_remaining = quantity_remaining - ?
-            WHERE id = ?
-          `).run(line.quantity, sourceBatch.id);
-        } else {
+
           db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')
-            .run(line.quantity, sourceBatch.id);
+            .run(take, batchId);
+
+          remainingToDraw -= take;
+          batchDraws.push({ batchId, quantity: take, locationId: null });
+
+          if (batchLocationsEnabled) {
+            const consumedLoc = db.prepare(`
+              SELECT bsl.location_id FROM batch_stock_by_location bsl
+              JOIN locations l ON bsl.location_id = l.id
+              WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+              ORDER BY l.created_at ASC LIMIT 1
+            `).get(batchId, data.warehouse_id) as { location_id: number } | undefined;
+            batchDraws[batchDraws.length - 1].locationId = consumedLoc?.location_id ?? null;
+          }
+        }
+
+        if (roundQty(remainingToDraw) > 0) {
+          throw new Error(
+            `Insufficient stock in the source batch for ${line.item_name}: ` +
+            `short by ${roundQty(remainingToDraw)}. Goods already sold cannot be returned to the supplier.`
+          );
         }
 
         insertLine.run(
@@ -534,26 +585,22 @@ class PurchaseReturnModel {
         // these batches (PRET-05, task 4.4).
         // New path: also record location_id (flag on only — legacy
         // databases don't have the column yet).
-        if (isFeatureEnabled(db, 'feature_batch_locations')) {
-          const consumedLoc = db.prepare(`
-              SELECT bsl.location_id FROM batch_stock_by_location bsl
-              JOIN locations l ON bsl.location_id = l.id
-              WHERE bsl.batch_id = ? AND l.warehouse_id = ?
-              ORDER BY l.created_at ASC LIMIT 1
-            `).get(sourceBatch.id, data.warehouse_id) as { location_id: number } | undefined;
-          db.prepare(`
-            INSERT INTO purchase_return_batches (return_line_id, batch_id, quantity, location_id)
-            SELECT id, ?, ?, ? FROM purchase_return_items
-            WHERE purchase_return_id = ? AND source_item_id = ?
-            ORDER BY id DESC LIMIT 1
-          `).run(sourceBatch.id, line.quantity, consumedLoc?.location_id ?? null, returnId, line.source_item_id);
-        } else {
-          db.prepare(`
-            INSERT INTO purchase_return_batches (return_line_id, batch_id, quantity)
-            SELECT id, ?, ? FROM purchase_return_items
-            WHERE purchase_return_id = ? AND source_item_id = ?
-            ORDER BY id DESC LIMIT 1
-          `).run(sourceBatch.id, line.quantity, returnId, line.source_item_id);
+        for (const draw of batchDraws) {
+          if (batchLocationsEnabled) {
+            db.prepare(`
+              INSERT INTO purchase_return_batches (return_line_id, batch_id, quantity, location_id)
+              SELECT id, ?, ?, ? FROM purchase_return_items
+              WHERE purchase_return_id = ? AND source_item_id = ?
+              ORDER BY id DESC LIMIT 1
+            `).run(draw.batchId, draw.quantity, draw.locationId, returnId, line.source_item_id);
+          } else {
+            db.prepare(`
+              INSERT INTO purchase_return_batches (return_line_id, batch_id, quantity)
+              SELECT id, ?, ? FROM purchase_return_items
+              WHERE purchase_return_id = ? AND source_item_id = ?
+              ORDER BY id DESC LIMIT 1
+            `).run(draw.batchId, draw.quantity, returnId, line.source_item_id);
+          }
         }
       }
 
