@@ -1,11 +1,11 @@
 /**
  * Reversal-rules Phase 5 — shared accounting-invariant checkers.
  *
- * Nine invariants over the whole database, each with the collector that checks
+ * Ten invariants over the whole database, each with the collector that checks
  * it. The collectors are exported individually for targeted assertions.
  *
  * `expectAllInvariantsHold(context)` is the master gate and now asserts ALL
- * NINE. Every letter below is called by it, and every one has a planted-drift
+ * TEN. Every letter below is called by it, and every one has a planted-drift
  * guard that goes red when its master line is deleted.
  *
  * When adding an invariant: add a row below AND a call in the master, or record
@@ -32,6 +32,10 @@
  *      → inventoryImbalances
  *   I. GL cash accounts == operational cash flows, per account.
  *      → cashImbalances
+ *   J. Every source-typed stock_batches row resolves to a row in its own
+ *      namespace (PURCHASE→purchases, GOODS_RECEIPT→goods_receipt_items,
+ *      PRODUCTION→production_orders).
+ *      → orphanSourceBatches
  *
  * G needs no second subledger term the way F did: `suppliers` has no
  * `credit_balance` column and supplier prepayments are DESIGN-ONLY
@@ -284,7 +288,46 @@ export function cashImbalances(): Violation[] {
   return violations;
 }
 
-/** Assert invariants A–E and F–I, i.e. all nine; `context` labels the call site. */
+/** Invariant J: every source-typed batch resolves to a row in its own namespace.
+ *
+ * `stock_batches.source_id` is meaningless without `source_type`: the same
+ * integer column addresses a different table per type. A reader that guesses
+ * the wrong table gets a plausible-looking wrong answer rather than an error,
+ * which is how C-06 shipped — a PO-return lookup keyed on
+ * `purchase_order_items.id` matched nothing once the two autoincrement
+ * sequences diverged, and the PO-return feature died while CI stayed green.
+ *
+ * Cost layer and return paths are excluded: an ADJUSTMENT batch from a
+ * positive stock movement has no source document by design, and RETURN /
+ * OPENING / TRANSFER / RECON rows legitimately reference a return header or a
+ * sibling batch rather than a purchase or receipt.
+ */
+export function orphanSourceBatches(): Violation[] {
+  const orphans = db.prepare(`
+    SELECT sb.id, sb.source_type, sb.source_id
+    FROM stock_batches sb
+    WHERE sb.source_type = 'PURCHASE'
+      AND NOT EXISTS (SELECT 1 FROM purchases p WHERE p.id = sb.source_id)
+    UNION ALL
+    SELECT sb.id, sb.source_type, sb.source_id
+    FROM stock_batches sb
+    WHERE sb.source_type = 'GOODS_RECEIPT'
+      AND NOT EXISTS (SELECT 1 FROM goods_receipt_items gri WHERE gri.id = sb.source_id)
+    UNION ALL
+    SELECT sb.id, sb.source_type, sb.source_id
+    FROM stock_batches sb
+    WHERE sb.source_type = 'PRODUCTION'
+      AND EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'productions')
+      AND NOT EXISTS (SELECT 1 FROM productions pr WHERE pr.id = sb.source_id)
+  `).all() as Array<{ id: number; source_type: string; source_id: number }>;
+
+  return orphans.map((r) => ({
+    label: `stock_batches #${r.id} (${r.source_type}) points at missing source ${r.source_id}`,
+    diff: 1,
+  }));
+}
+
+/** Assert invariants A–E, F–I and J; `context` labels the call site. */
 export function expectAllInvariantsHold(context: string): void {
   const gl = glImbalances();
   expect(gl.groups).toEqual([]);
@@ -296,5 +339,6 @@ export function expectAllInvariantsHold(context: string): void {
   expect(apImbalances()).toEqual([]);
   expect(inventoryImbalances()).toEqual([]);
   expect(cashImbalances()).toEqual([]);
+  expect(orphanSourceBatches()).toEqual([]);
   void context;
 }

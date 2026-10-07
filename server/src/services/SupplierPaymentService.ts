@@ -11,7 +11,7 @@ import type Database from 'better-sqlite3';
 import AccountingService from './accountingService';
 import InvoiceModel from '../models/Invoice';
 import SupplierLedgerModel from '../models/SupplierLedger';
-import { parseCurrency, subtractCurrency } from '../utils/currency';
+import { parseCurrency } from '../utils/currency';
 import { validateSupplierPayment } from './paymentValidation';
 import { assertPaymentMethod, assertPeriodOpen, insertPaymentRow } from './paymentWriterCore';
 import type { PaymentRecordingResult, SupplierPaymentInput } from './paymentRecordingTypes';
@@ -60,7 +60,6 @@ export class SupplierPaymentService {
     input: SupplierPaymentInput,
     amount: number,
   ): void {
-    const openingBalance = SupplierLedgerModel.getBalance(input.supplierId, this.db);
     SupplierLedgerModel.createEntry({
       supplier_id: input.supplierId,
       transaction_date: input.paymentDate,
@@ -69,8 +68,9 @@ export class SupplierPaymentService {
       credit: amount,
       description: `Payment against ${this.documentReferences(input).join(', ')}`,
     }, this.db);
-    this.db.prepare('UPDATE suppliers SET current_balance = ? WHERE id = ?')
-      .run(subtractCurrency(openingBalance, amount), input.supplierId);
+    // Rebuild in insertion order: getBalance() follows transaction_date, which
+    // is stale whenever an earlier-dated entry was posted after a later one.
+    SupplierLedgerModel.rebuildBalances(input.supplierId, this.db);
 
     // ACC-03: Dr 2000 AP / Cr cash-per-method, and the drawer/account must
     // actually hold the money leaving the business.

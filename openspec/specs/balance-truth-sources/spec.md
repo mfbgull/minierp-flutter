@@ -1,6 +1,13 @@
-# Spec: balance-truth-sources (Delta)
+# Balance Truth Sources
 
-## ADDED Requirements
+## Purpose
+
+Every reported financial figure has exactly one authoritative derivation. The
+server computes monetary totals; reports read the GL and the operational
+sub-ledgers through a single documented rule each, so two screens cannot
+disagree about the same balance.
+
+## Requirements
 
 ### Requirement: Server computes invoice money authoritatively
 The server SHALL compute each invoice line amount as quantity × unit_price minus discount, plus tax, rounded at the line boundary; the header total SHALL be the sum of server-computed lines. A client-supplied `total_amount` differing from the computed total by more than 0.01 SHALL be rejected with 400 and no document shall be created or updated. POS sales and mobile invoices SHALL enforce the same rule.

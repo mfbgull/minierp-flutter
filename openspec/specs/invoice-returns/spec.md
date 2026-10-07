@@ -10,21 +10,21 @@ effects and applies the disposition (refund, credit or adjust).
 ## Requirements
 
 ### Requirement: invoice-return-menu
-Users can initiate a return from an invoice using a 3-dot menu action.
+An invoice's 3-dot menu SHALL offer a Return option that routes to invoice return creation for that invoice.
 
 #### Scenario: return from invoice list
 - **WHEN** a user opens the 3-dot menu on an invoice
 - **THEN** a Return option is available and routes to invoice return creation for that invoice
 
 ### Requirement: invoice-detail-return
-Users can initiate a return from the invoice detail view.
+The invoice detail view SHALL offer a return action that routes to invoice return creation for that invoice.
 
 #### Scenario: return from invoice detail
 - **WHEN** a user is viewing invoice detail
 - **THEN** a return action is available and routes to invoice return creation for that invoice
 
 ### Requirement: invoice-return-restock-warehouse
-A customer return asks which warehouse to restock into.
+A customer return SHALL require the user to select a restock warehouse, and the server SHALL restock the returned items into that warehouse.
 
 #### Scenario: restock warehouse is required
 - **WHEN** a user processes a return on an invoice

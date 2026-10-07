@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import PurchaseReturnModel from '../models/PurchaseReturn';
+import PurchaseOrderModel from '../models/PurchaseOrder';
 import { backfillPurchaseReturns } from '../utils/purchaseReturnBackfill';
 
 /**
@@ -32,6 +33,10 @@ function createFixture(): Database.Database {
     'add-gl-void-attribution.sql',
     'add-salary-payments.sql',
     'add-payment-salary-void-columns.sql',
+    'add-production-tables.sql',
+    'add-payments-purchase-order-id.sql',
+    'add-invoice-soft-delete.sql',
+    'add-audit-trail-fields.sql',
   ];
 
   for (const file of migrations) {
@@ -56,6 +61,10 @@ function createFixture(): Database.Database {
   if (!has('financial_posted')) db.exec('ALTER TABLE stock_movements ADD COLUMN financial_posted BOOLEAN DEFAULT FALSE');
   if (!has('journal_entry_id')) db.exec('ALTER TABLE stock_movements ADD COLUMN journal_entry_id INTEGER REFERENCES journal_entries(id)');
 
+  for (const file of ['add-item-expiry-tracking.sql', 'add-expired-stock.sql']) {
+    db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', file), 'utf8'));
+  }
+
   // Seed the minimal master data the flows need.
   db.prepare(`
     INSERT INTO users (username, email, password_hash, full_name, role, is_active)
@@ -73,6 +82,8 @@ function createFixture(): Database.Database {
     INSERT INTO suppliers (supplier_code, supplier_name, is_active)
     VALUES ('SUP-1', 'Acme Supplies', 1)
   `).run();
+
+  desyncReceiptItemSequence(db);
 
   return db;
 }
@@ -162,6 +173,38 @@ function seedPurchase(db: Database.Database, overrides: PurchaseSeedOverrides = 
   return purchaseId;
 }
 
+/**
+ * Desynchronise `goods_receipt_items.id` from `purchase_order_items.id`.
+ *
+ * On a pristine database the two autoincrement sequences advance in lockstep,
+ * so keying a batch lookup on the PO line id accidentally matches. That is why
+ * C-06 stayed green here even after the fixture was routed through
+ * `addReceipt`. Seeding extra receipt items makes the collision impossible.
+ */
+function desyncReceiptItemSequence(db: Database.Database, offset = 3): void {
+  const poId = db.prepare(`
+    INSERT INTO purchase_orders (po_no, supplier_id, po_date, status, total_amount, warehouse_id, created_by)
+    VALUES (?, 1, '2026-06-01', 'Submitted', 0, 1, 1)
+  `).run(`PO-DESEED-${Date.now()}-${seedCounter}`).lastInsertRowid as number;
+
+  const poItemId = db.prepare(`
+    INSERT INTO purchase_order_items (po_id, item_id, quantity, received_quantity, unit_price, amount)
+    VALUES (?, 1, 0, 0, 10, 0)
+  `).run(poId).lastInsertRowid as number;
+
+  const receiptId = db.prepare(`
+    INSERT INTO goods_receipts (receipt_no, po_id, receipt_date, warehouse_id, created_by)
+    VALUES (?, ?, '2026-06-01', 1, 1)
+  `).run(`GR-DESEED-${Date.now()}`, poId).lastInsertRowid as number;
+
+  for (let i = 0; i < offset; i++) {
+    db.prepare(`
+      INSERT INTO goods_receipt_items (receipt_id, po_item_id, item_id, received_quantity)
+      VALUES (?, ?, 1, 0)
+    `).run(receiptId, poItemId);
+  }
+}
+
 function seedPO(db: Database.Database, overrides: POSeedOverrides = {}): { poId: number; poItemId: number } {
   const qty = overrides.quantity ?? 10;
   const received = overrides.received_quantity ?? 10;
@@ -190,32 +233,25 @@ function seedPO(db: Database.Database, overrides: POSeedOverrides = {}): { poId:
 
   const itemResult = db.prepare(`
     INSERT INTO purchase_order_items (po_id, item_id, quantity, received_quantity, unit_price, amount)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(poId, itemId, qty, received, overrides.unit_price ?? 10, received * (overrides.unit_price ?? 10));
+    VALUES (?, ?, ?, 0, ?, ?)
+  `).run(poId, itemId, qty, overrides.unit_price ?? 10, qty * (overrides.unit_price ?? 10));
   const poItemId = itemResult.lastInsertRowid as number;
 
-  db.prepare(`
-    INSERT INTO stock_batches (
-      batch_no, item_id, warehouse_id, source_type, source_id,
-      quantity_original, quantity_remaining, unit_cost, received_date
-    ) VALUES (?, ?, ?, 'GOODS_RECEIPT', ?, ?, ?, ?, ?)
-  `).run(
-    `BATCH-PO-${poItemId}`,
-    itemId,
-    warehouseId,
-    poItemId,
-    received,
-    received,
-    overrides.unit_price ?? 10,
-    overrides.po_date ?? '2026-07-01',
-  );
-
-  db.prepare(`
-    INSERT INTO stock_balances (item_id, warehouse_id, quantity)
-    VALUES (?, ?, ?)
-  `).run(itemId, warehouseId, received);
-  db.prepare(`UPDATE items SET current_stock = ? WHERE id = ?`)
-    .run(received, itemId);
+  // Receive through the production path so the stock_batches row has the
+  // shape addReceipt actually writes — source_id = goods_receipt_items.id.
+  // Hand-writing the batch here is what kept C-06 invisible to CI.
+  if (received > 0) {
+    PurchaseOrderModel.addReceipt(
+      {
+        po_id: poId,
+        receipt_date: overrides.po_date ?? '2026-07-05',
+        warehouse_id: warehouseId,
+        items: [{ po_item_id: poItemId, received_quantity: received }],
+      },
+      1,
+      db,
+    );
+  }
 
   return { poId, poItemId };
 }
