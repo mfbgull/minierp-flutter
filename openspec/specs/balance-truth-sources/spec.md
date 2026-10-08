@@ -6,9 +6,7 @@ Every reported financial figure has exactly one authoritative derivation. The
 server computes monetary totals; reports read the GL and the operational
 sub-ledgers through a single documented rule each, so two screens cannot
 disagree about the same balance.
-
 ## Requirements
-
 ### Requirement: Server computes invoice money authoritatively
 The server SHALL compute each invoice line amount as quantity × unit_price minus discount, plus tax, rounded at the line boundary; the header total SHALL be the sum of server-computed lines. A client-supplied `total_amount` differing from the computed total by more than 0.01 SHALL be rejected with 400 and no document shall be created or updated. POS sales and mobile invoices SHALL enforce the same rule.
 
@@ -54,3 +52,24 @@ Cash on the balance sheet SHALL be the sum of the five per-method GL cash accoun
 #### Scenario: Cash matches the dashboard
 - **WHEN** the dashboard shows expected cash for a method family
 - **THEN** the balance sheet's combined cash line reflects the same five-account total rather than a second, conflicting figure
+
+### Requirement: A reconciliation aggregates the ledger; it never reads an undefined column
+A reconciliation SHALL compute an account's operational side by aggregating the
+source rows over a documented filter. It SHALL NOT read a stored running-balance
+column whose maintenance rules differ from the rows it summarises.
+
+Reading the highest-id row's `balance` is specifically prohibited: after a void
+the highest-id non-voided row is the reversal, whose stored balance was computed
+against a pre-void read and which `rebuildBalances` excludes and therefore never
+refreshes. The column is undefined after any void.
+
+#### Scenario: AP reconciliation agrees with the ledger after voids
+- **WHEN** any supplier has had a purchase voided
+- **THEN** the AP row's operational balance equals Σ(debit) − Σ(credit) over the
+      filtered rows, and its delta against GL 2000 reflects real drift only
+
+#### Scenario: Backdated entries do not make reconciliation accidentally correct
+- **WHEN** two errors would cancel
+- **THEN** the report must still be correct, because it no longer depends on a
+      column that happened to be right
+

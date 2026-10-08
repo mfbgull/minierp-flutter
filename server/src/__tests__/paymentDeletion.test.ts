@@ -11,6 +11,7 @@ const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
   throw new Error('TEST_ADMIN_PASSWORD environment variable must be set.');
 }
+import { resolveSupplierByName } from './helpers/invoiceReturnSpec';
 
 async function getAuthCookie(): Promise<string> {
   const res = await request(app)
@@ -46,6 +47,8 @@ describe('Payment deletion safety on invoice update (PAY-01)', () => {
     itemId = item.body.id;
 
     // Stock for two invoices' worth of sales.
+    // ACCT-005: purchases must name an identified supplier.
+    const supplierId = await resolveSupplierByName('PAY-01 Supplier', authCookie);
     await request(app)
       .post('/api/purchases')
       .set('Cookie', authCookie)
@@ -55,7 +58,7 @@ describe('Payment deletion safety on invoice update (PAY-01)', () => {
         quantity: 10,
         unit_cost: 20,
         purchase_date: '2026-08-01',
-        supplier_name: 'PAY-01 Supplier',
+        supplier_id: supplierId,
       });
 
     const customer = await request(app)

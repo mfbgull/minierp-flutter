@@ -5,6 +5,7 @@ import StockMovementModel from './StockMovement';
 import SupplierLedgerModel from './SupplierLedger';
 import AccountingService from '../services/accountingService';
 import ledgerUtils from '../utils/ledgerUtils';
+import { requireSupplierForPurchase } from '../utils/purchaseValidation';
 import { roundQty } from '../utils/quantity';
 import { SqlParam } from '../utils/sqlTypes';
 
@@ -128,12 +129,17 @@ class PurchaseModel {
     return generateDocNo(db, 'STK');
   }
 
-  private static validateCreateDTO(data: CreatePurchaseDTO): void {
+  private static validateCreateDTO(data: CreatePurchaseDTO, db: Database.Database): void {
     if (!data.item_id || data.item_id <= 0) throw new Error('Invalid item_id');
     if (!data.warehouse_id || data.warehouse_id <= 0) throw new Error('Invalid warehouse_id');
     if (!data.quantity || data.quantity <= 0) throw new Error('Quantity must be positive');
     if (data.unit_cost === undefined || data.unit_cost < 0) throw new Error('unit_cost must be non-negative');
     if (!data.purchase_date) throw new Error('purchase_date is required');
+    // ACCT-005: no purchase may exist without an identified,
+    // active supplier — regardless of amount, payment method or
+    // user role. Checked before any row is written so a rejected
+    // purchase creates no record, line, journal entry or side effect.
+    requireSupplierForPurchase(data.supplier_id, db);
   }
 
   /**
@@ -327,7 +333,7 @@ class PurchaseModel {
   }
 
   static recordPurchase(data: CreatePurchaseDTO, userId: number, db: Database.Database): Purchase {
-    this.validateCreateDTO(data);
+    this.validateCreateDTO(data, db);
     const { id, name } = this.resolveSupplier(data.supplier_id, data.supplier_name, db);
     const transaction = db.transaction(() => this.writePurchaseRow(data, id, name, userId, db));
     return transaction();
@@ -348,7 +354,8 @@ class PurchaseModel {
         ...line,
         warehouse_id: data.warehouse_id,
         purchase_date: data.purchase_date,
-      });
+        supplier_id: data.supplier_id,
+      }, db);
     }
 
     const { id, name } = this.resolveSupplier(data.supplier_id, undefined, db);
@@ -374,6 +381,27 @@ class PurchaseModel {
     );
 
     return transaction();
+  }
+
+  /**
+   * ACCT-005 — an update may not strip the supplier off a
+   * purchase: a purchase row must always name an identified,
+   * active supplier. `supplier_id` null/undefined in the patch
+   * means "leave unchanged" (the header keeps its supplier);
+   * an explicit null/0/non-numeric or an unknown/inactive
+   * supplier is rejected before anything is written.
+   */
+  static assertSupplierSurvivesUpdate(
+    patch: { supplier_id?: number | null },
+    currentSupplierId: number | null,
+    db: Database.Database
+  ): number {
+    const next = patch.supplier_id === undefined
+      ? currentSupplierId
+      : patch.supplier_id;
+    // next === null here means the caller explicitly tried to
+    // null the supplier — reject via the same rule.
+    return requireSupplierForPurchase(next ?? null, db);
   }
 
   static getAll(filters: PurchaseFilters = {}, db: Database.Database): PaginatedPurchases {
@@ -657,7 +685,11 @@ class PurchaseModel {
       });
 
       if (batch && batch.quantity_remaining > 0) {
-        // ADJUSTMENT movement to remove only the genuinely remaining stock
+        // ADJUSTMENT movement to remove only the genuinely remaining stock.
+        // No financial leg: the Dr 1200 / Cr 2000 group above is already
+        // voided, and a second posting here credits inventory twice and books
+        // a shrinkage expense for goods that were returned, not lost. Same
+        // contract as the create-side twins in Invoice.ts and PurchaseReturn.ts.
         StockMovementModel.recordMovement(
           {
             item_id: purchase.item_id,
@@ -665,10 +697,11 @@ class PurchaseModel {
             movement_type: 'ADJUSTMENT',
             quantity: -batch.quantity_remaining,
             unit_cost: batch.unit_cost,
+            skipAdjustmentFinancialPosting: true,
             reference_doctype: 'PURCHASE_VOID',
             reference_docno: purchase.purchase_no,
             remarks: `Stock reversed - Purchase ${purchase.purchase_no} voided (batch ${batch.batch_no}): ${reason.trim()}`,
-            movement_date: new Date().toISOString().split('T')[0],
+            movement_date: purchase.purchase_date,
           },
           userId,
           db

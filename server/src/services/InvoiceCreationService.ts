@@ -58,9 +58,38 @@ type ExistingInvoiceRow = {
   balance_amount: number;
 };
 
-function defaultDueDate(invoiceDate: string): string {
+/**
+ * Resolve a due date from the customer's payment terms.
+ *
+ * `customers.payment_terms_days` is the canonical numeric term (default 14,
+ * set by `add-customer-ar-fields.sql`). If it is absent, fall back to the
+ * `payment_terms` row flagged `is_default`, then to 0 days — "due on receipt"
+ * is the safer default than inventing a term.
+ *
+ * This used to add a hardcoded 15 days, which contradicted the seeded default
+ * of 14: every invoice without an explicit due date aged one day faster than
+ * the customer's terms said.
+ */
+export function resolveDueDate(
+  db: Database.Database,
+  customerId: number,
+  invoiceDate: string,
+): string {
+  const customer = db.prepare(
+    'SELECT payment_terms_days FROM customers WHERE id = ?',
+  ).get(customerId) as { payment_terms_days: number | null } | undefined;
+
+  let days = customer?.payment_terms_days ?? null;
+
+  if (days === null || days === undefined) {
+    const fallback = db.prepare(
+      'SELECT days FROM payment_terms WHERE is_default = 1 AND is_active = 1 ORDER BY id LIMIT 1',
+    ).get() as { days: number } | undefined;
+    days = fallback?.days ?? 0;
+  }
+
   const date = new Date(`${invoiceDate}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + 15);
+  date.setUTCDate(date.getUTCDate() + Number(days));
   return date.toISOString().slice(0, 10);
 }
 
@@ -118,7 +147,9 @@ export class InvoiceCreationService {
     const paidAmount = addCurrency(legsTotal, creditOffset);
     const balanceAmount = subtractCurrency(totalAmount, paidAmount);
     const status = input.status ?? (paidAmount >= totalAmount ? 'Paid' : paidAmount > 0 ? 'Partially Paid' : 'Unpaid');
-    const dueDate = input.dueDate === undefined ? defaultDueDate(input.invoiceDate) : input.dueDate;
+    const dueDate = input.dueDate == null
+      ? resolveDueDate(this.db, input.customerId, input.invoiceDate)
+      : input.dueDate;
 
     const transaction = this.db.transaction((): InvoiceCreationResult => {
       if (input.idempotency) {

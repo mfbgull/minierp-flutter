@@ -11,6 +11,7 @@ import {
   hashRequestPayload,
   startIdempotentRequest,
 } from '../utils/idempotency';
+import { requireSupplierForPurchase } from '../utils/purchaseValidation';
 import { errorMessage } from '../utils/errorMessage';
 
 function createPurchaseOrder(req: AuthRequest, res: Response): void {
@@ -25,6 +26,20 @@ function createPurchaseOrder(req: AuthRequest, res: Response): void {
     if (!supplier_id || !po_date) {
       res.status(400).json({
         error: 'Supplier and PO date are required'
+      });
+      return;
+    }
+
+    // ACCT-005 — a purchase order may not be created
+    // without an identified, active supplier (policy: no
+    // exemptions by amount, payment method or role).
+    try {
+      requireSupplierForPurchase(supplier_id, db);
+    } catch (supplierError) {
+      logger.warn('Create PO rejected (ACCT-005): %s — body: %j', (supplierError as Error).message, req.body);
+      res.status(400).json({
+        error: 'A supplier is required for all purchases.',
+        code: 'SUPPLIER_REQUIRED_FOR_PURCHASE',
       });
       return;
     }

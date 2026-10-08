@@ -245,11 +245,13 @@ describe('purchases grid: voided filter + multi-item recording', () => {
     seedItem(db, itemA, 'Multi A');
     seedItem(db, itemB, 'Multi B');
 
+    // ACCT-005: purchases must name an identified supplier.
     const created = PurchaseModel.recordPurchaseMulti({
       warehouse_id: 1,
       purchase_date: '2026-08-20',
       invoice_no: 'INV-MULTI-1',
       remarks: 'one delivery',
+      supplier_id: 1,
       items: [
         { item_id: itemA, quantity: 4, unit_cost: 12 },
         { item_id: itemB, quantity: 2, unit_cost: 30 },
@@ -314,6 +316,7 @@ describe('purchases grid: voided filter + multi-item recording', () => {
     expect(() => PurchaseModel.recordPurchaseMulti({
       warehouse_id: 1,
       purchase_date: '2026-08-20',
+      supplier_id: 1,
       items: [
         { item_id: goodItem, quantity: 1, unit_cost: 5 },
         { item_id: 999999, quantity: 1, unit_cost: 5 }, // FK violation mid-batch
@@ -336,6 +339,7 @@ describe('purchases grid: voided filter + multi-item recording', () => {
       warehouse_id: 1,
       quantity: 3,
       unit_cost: 9,
+      supplier_id: 1,
       purchase_date: '2026-08-21',
     }, 1, db);
 

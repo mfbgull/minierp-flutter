@@ -6,6 +6,7 @@ import { sanitizeSortParams, PURCHASE_ORDER_SORT_COLUMNS } from '../utils/sqlSan
 import { StockBalance } from '../types';
 import logger from '../utils/logger';
 import { addCurrency, multiplyCurrency, roundCurrency } from '../utils/currency';
+import { requireSupplierForPurchase } from '../utils/purchaseValidation';
 import { roundQty, qtyEpsilon } from '../utils/quantity';
 
 interface PurchaseOrder {
@@ -128,6 +129,10 @@ class PurchaseOrderModel {
     if (!items || items.length === 0) {
       throw new Error('At least one item is required');
     }
+
+    // ACCT-005: a purchase order is a purchase document —
+    // it may not exist without an identified, active supplier.
+    requireSupplierForPurchase(supplier_id, db);
 
     const transaction = db.transaction(() => {
       // Generate PO number
@@ -366,6 +371,13 @@ class PurchaseOrderModel {
     }
 
     const { supplier_id, po_date, expected_delivery_date, notes, warehouse_id } = data;
+
+    // ACCT-005 — an update may not remove the supplier from a
+    // purchase order. COALESCE keeps an omitted supplier_id, so
+    // only an explicit null/invalid value is a rejection.
+    if (supplier_id !== undefined) {
+      requireSupplierForPurchase(supplier_id, db);
+    }
 
     const transaction = db.transaction(() => {
       // Recalculate total from existing items (rounded once at the boundary)

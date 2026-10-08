@@ -31,6 +31,7 @@ async function getAuthCookie(): Promise<string> {
     .find((c: string) => c.startsWith('token='));
   return tokenCookie ? tokenCookie.split(';')[0] : '';
 }
+import { resolveSupplierByName } from './helpers/invoiceReturnSpec';
 
 type InvoiceState = {
   total_amount: number;
@@ -56,7 +57,8 @@ describe('invoice update with applied store credit', () => {
       .send({ item_code: `UPDCR-${Date.now()}`, item_name: 'Update Credit Item' });
     expect(item.status).toBe(201);
     itemId = item.body.id;
-
+    // ACCT-005: purchases must name an identified supplier.
+    const supplierId = await resolveSupplierByName('Update Credit Supplier', authCookie);
     await request(app).post('/api/purchases')
       .set('Cookie', authCookie)
       .send({
@@ -65,7 +67,7 @@ describe('invoice update with applied store credit', () => {
         quantity: 40,
         unit_cost: 10,
         purchase_date: '2026-08-01',
-        supplier_name: 'Update Credit Supplier',
+        supplier_id: supplierId,
       });
 
     const customer = await request(app).post('/api/customers')

@@ -45,8 +45,8 @@ const CLASSIFY_PATTERNS: [RegExp, number][] = [
   [/is\s+already\s+cancelled/i, 409],
   [/Invoice\s+is\s+already\s+cancelled/i, 409],
 
-  // --- 400 Bad Request: validation / precondition failures ---
   [/refusing\s+to\s+delete/i, 400],
+  [/SUPPLIER_REQUIRED_FOR_PURCHASE/i, 400],
   [/insufficient\s+funds/i, 400],
   [/not\s+found/i, 404],
   [/does\s+not\s+exist/i, 404],

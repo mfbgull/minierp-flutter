@@ -11,6 +11,7 @@
 import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
+import { resolveSupplierByName } from './helpers/invoiceReturnSpec';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
@@ -49,6 +50,8 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
     itemId = item.body.id;
 
     // Stock: several invoices' worth of sales.
+    // ACCT-005: purchases must name an identified supplier.
+    const supplierId = await resolveSupplierByName('C1/C4 Stock Supplier', authCookie);
     await request(app)
       .post('/api/purchases')
       .set('Cookie', authCookie)
@@ -58,7 +61,7 @@ describe('Invoice/SO cancellation reversal (C1 + C4)', () => {
         quantity: 50,
         unit_cost: 10,
         purchase_date: '2026-08-01',
-        supplier_name: 'C1/C4 Stock Supplier',
+        supplier_id: supplierId,
       });
 
     const customer = await request(app)

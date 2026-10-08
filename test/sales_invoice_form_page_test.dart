@@ -71,6 +71,10 @@ class _FakeInvoiceRepository extends InvoiceRepository {
   /// response the client gave up on.
   bool timeOutFirstCreate = false;
 
+  /// When set, `createInvoicePayment` fails with this message (simulates the
+  /// server rejecting a payment — e.g. one that exceeds the invoice total).
+  String? failPaymentWith;
+
   /// Last body passed to [update] (edit-mode in-flight-commit assertions).
   Map<String, dynamic>? lastUpdateBody;
 
@@ -134,6 +138,9 @@ class _FakeInvoiceRepository extends InvoiceRepository {
     String? idempotencyKey,
   }) async {
     postedPayments.add(body);
+    if (failPaymentWith != null) {
+      return ApiFailure(ApiError(message: failPaymentWith!));
+    }
     return ApiSuccess(
       InvoicePaymentRecord(
         id: postedPayments.length,
@@ -2068,6 +2075,101 @@ void main() {
       // Pool is shown, but nothing can be applied against a 0 total.
       expect(amount(250), findsNWidgets(2)); // available == remaining
       expect(amount(75), findsNothing);
+    });
+  });
+
+  group('overpayment at creation', () {
+    /// Fill a one-line invoice of exactly [qty] x [rate] and return the
+    /// payment amount field, so tests know the total they are paying against.
+    Future<Finder> fillInvoiceAndFindAmount(
+      WidgetTester tester, {
+      required double payAmount,
+      int qty = 2,
+      int rate = 100,
+    }) async {
+      await tester.tap(find.text('Acme Corp').last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, 'Wid');
+      await tester.pump();
+      await tester.tap(find.text('Widget').last);
+      await tester.pumpAndSettle();
+
+      // After the item is picked the grid editor sits on the quantity cell.
+      await tester.enterText(gridEditor(), '$qty');
+      await tester.pumpAndSettle();
+
+      await tester.tap(rateCell());
+      await tester.pumpAndSettle();
+      await tester.enterText(gridEditor(), '$rate');
+      await tester.pumpAndSettle();
+
+      final amountField = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == 'Amount',
+      );
+      expect(amountField, findsOneWidget);
+      await tester.enterText(amountField, '$payAmount');
+      await tester.pumpAndSettle();
+      return amountField;
+    }
+
+    Future<void> save(WidgetTester tester) async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a payment larger than the total is refused before saving', (
+      tester,
+    ) async {
+      final repo = _FakeInvoiceRepository();
+      await _pumpPage(tester, repo: repo);
+
+      // Deliberately far above the 200 total this one line produces.
+      await fillInvoiceAndFindAmount(tester, payAmount: 999999);
+      await save(tester);
+
+      expect(
+        repo.lastCreateBody,
+        isNull,
+        reason: 'nothing may be persisted when the payment cannot be applied',
+      );
+      expect(
+        find.textContaining('exceeds the remaining balance'),
+        findsOneWidget,
+        reason: 'the user must be told, not silently saved as unpaid',
+      );
+    });
+
+    testWidgets('a rejected payment is never reported as a saved invoice', (
+      tester,
+    ) async {
+      final repo = _FakeInvoiceRepository()
+        ..failPaymentWith =
+            'Allocation amount (150.00) for invoice 1 exceeds the remaining '
+            'balance (100.00)';
+      await _pumpPage(tester, repo: repo);
+
+      // A payment the client-side guard accepts (50 < the 200 total), but the
+      // server rejects for its own reason. This isolates the second defect:
+      // a rejected leg must not be reported as a saved invoice.
+      await fillInvoiceAndFindAmount(tester, payAmount: 50);
+      await save(tester);
+
+      expect(repo.lastCreateBody, isNotNull, reason: 'the invoice itself saved');
+      expect(repo.postedPayments, isNotEmpty, reason: 'a payment was attempted');
+
+      // The server's reason must survive to the user...
+      expect(find.textContaining('exceeds the remaining balance'), findsOneWidget);
+      // ...and the bare success toast must NOT be the last word. showAppToast
+      // calls hideCurrentSnackBar() first, so a later success toast would
+      // silently replace the error — which is the reported bug.
+      expect(
+        find.text('Invoice saved successfully!'),
+        findsNothing,
+        reason: 'a rejected payment must not report plain success',
+      );
     });
   });
 }

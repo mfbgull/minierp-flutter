@@ -166,6 +166,10 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   bool _printing = false;
   String? _error;
 
+  /// Set by [_save] when the invoice saved but at least one payment leg was
+  /// rejected by the server. [_submit] must not report plain success then.
+  String? _paymentFailure;
+
   /// The current [_error] came from a request whose outcome is unknown, so
   /// the banner stays until the user retries or dismisses it (task 42).
   bool _errorRetryable = false;
@@ -755,9 +759,13 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   /// payment"), the loop stops at the first failure; when false
   /// (create-mode payment posting), it keeps going so every method gets
   /// attempted. Returns whether every post succeeded.
+  ///
+  /// [surfaceErrors] is false when the caller shows its own durable banner for
+  /// the failure — otherwise the same message would appear twice.
   Future<bool> _postPaymentBodies(
     List<Map<String, dynamic>> bodies, {
     required bool stopOnFirstFailure,
+    bool surfaceErrors = true,
   }) async {
     final repo = ref.read(invoiceRepositoryProvider);
     var ok = true;
@@ -771,7 +779,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       );
       if (result case ApiFailure(:final error)) {
         ok = false;
-        if (mounted) showAppToast(context, error.message);
+        _paymentFailure ??= error.message;
+        if (surfaceErrors && mounted) showAppToast(context, error.message);
         if (stopOnFirstFailure) break;
       }
     }
@@ -1057,6 +1066,25 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       _showError(_invalidQuantityMessage);
       return null;
     }
+    // Create mode posts its payment legs AFTER the invoice is saved, and the
+    // server rejects any leg above the invoice total. Catching it here stops
+    // the form from persisting an invoice that can never be paid. Previously
+    // the rejection surfaced only from the second call, and the "Invoice
+    // saved" toast then replaced it — leaving a silently Unpaid invoice.
+    //
+    // Compared against the total BEFORE this payment is applied. `_remainingBalance`
+    // is the balance AFTER, so it is not the right operand here.
+    if (!_isEdit && _recordPayment && _paymentSum > 0) {
+      final collectible = calculateTotal(filled, _scope, _invoiceDiscount);
+      if (_paymentSum + _creditOffset > collectible) {
+        _showError(
+          l10n.paymentsErrorAmountExceedsBalance(
+            Formatters.currency(collectible),
+          ),
+        );
+        return null;
+      }
+    }
     if (!await _confirmExpiry()) return null;
     _errorTimer?.cancel();
     setState(() {
@@ -1090,7 +1118,11 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                 if (m.amount > 0)
                   _paymentBody(m, invoiceId: data.id, invoiceNo: data.invoiceNo),
             ];
-            await _postPaymentBodies(bodies, stopOnFirstFailure: false);
+            await _postPaymentBodies(
+              bodies,
+              stopOnFirstFailure: false,
+              surfaceErrors: false,
+            );
           }
           break;
         case ApiFailure(:final error):
@@ -1118,9 +1150,17 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
 
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context)!;
+    _paymentFailure = null;
     final saved = await _save();
     if (!mounted || saved == null) return;
     ref.invalidate(invoicesProvider);
+    // The invoice exists but a payment leg was rejected. Popping here would
+    // raise "Invoice saved" over the server's reason — showAppToast hides the
+    // current snackbar first — so stay on the form and say what went wrong.
+    if (_paymentFailure != null) {
+      _showError(_paymentFailure!);
+      return;
+    }
     Navigator.of(context).pop();
     showAppToast(context, l10n.salesInvoicesaved);
   }
@@ -1129,8 +1169,13 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   /// then close the form (spec §7).
   Future<void> _saveAndPrint() async {
     final l10n = AppLocalizations.of(context)!;
+    _paymentFailure = null;
     final saved = await _save();
     if (!mounted || saved == null) return;
+    if (_paymentFailure != null) {
+      _showError(_paymentFailure!);
+      return;
+    }
     await _showPrintFormatPicker(saved.id);
     if (!mounted) return;
     ref.invalidate(invoicesProvider);

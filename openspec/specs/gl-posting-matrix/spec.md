@@ -5,10 +5,7 @@
 Every financial document type posts a complete, balanced journal entry at the
 economically correct moment, and every mutation path voids or re-posts what it
 invalidates.
-
 ## Requirements
-
-
 ### Requirement: Every financial document posts a balanced GL entry
 Each of the following SHALL produce a complete, balanced `journal_lines` entry through `AccountingService.postEntry` inside the document's own transaction: direct purchases, supplier payments, expenses, POS sales, mobile invoices, and sales-order-to-invoice conversion. Each entry SHALL use the seeded chart accounts (1200 Inventory Asset, 2000 Accounts Payable, 6000 Operating Expenses, 4000 Sales Revenue, 5000 COGS, 1100 AR, cash-per-method 1000/1010/1020/1030/1040).
 
@@ -72,7 +69,6 @@ A receipt's "previous balance" SHALL be derived from the payment's own ledger ro
 - **WHEN** a valid allocation set covering the unallocated remainder is posted
 - **THEN** payment_allocations rows appear, affected invoices' balances update, and over-cap requests fail 400
 
-
 #### Scenario: Invoice edit re-posts the GL
 - **WHEN** an invoice's total is changed from 1,000 to 2,000 via update
 - **THEN** the old INVOICE journal lines have voided = 1 and new active lines total 2,000
@@ -125,3 +121,40 @@ A one-time, idempotent, ledgered migration SHALL post balanced journal entries f
 #### Scenario: One cash number everywhere
 - **WHEN** any user compares the dashboard cash card, cash-flow report, cash reconciliation and balance sheet in one session
 - **THEN** all show the same per-method and total cash figures
+
+### Requirement: Inventory movement and inventory accounting post exactly once per event
+Each business event SHALL produce exactly one inventory financial effect. Goods
+received post `Dr 1200`. A reversal of that receipt removes the posting; it does
+not add one.
+
+```
+  create            Dr 1200 / Cr 2000        (Purchase.ts)
+  void              void the group           (Purchase.ts)
+                    movement: no leg         ← was posting a second Dr/Cr pair
+  goods receipt     Dr 1200 / Cr 2000        (PurchaseOrder.ts)
+  void              void the group, raw INSERT for stock (PurchaseOrder.ts — correct)
+```
+
+#### Scenario: A receipt and its void are net zero
+- **WHEN** a purchase order receipt is created and then voided before any of its
+  stock is consumed
+- **THEN** GL 1200 and GL 2000 both return to their pre-receipt values
+
+#### Scenario: The correct pattern already exists and is the reference
+- **WHEN** `voidGoodsReceipt` reverses a receipt
+- **THEN** it writes its stock movement with a raw INSERT and no financial leg,
+  which is the shape `Purchase.void` now follows
+
+### Requirement: Shrinkage is reserved for genuine loss
+GL 7200 Inventory Shrinkage SHALL be posted only when inventory actually
+disappears — damage, expiry, theft, a count correction downward. Voiding a
+purchase or a return SHALL NOT post to it.
+
+#### Scenario: Returning goods to a supplier is not a loss
+- **WHEN** purchased goods are returned to the supplier
+- **THEN** no shrinkage expense is recognised
+
+#### Scenario: A count correction downward is still a loss
+- **WHEN** a physical count finds less stock than recorded
+- **THEN** the shortfall posts `Dr 7200 / Cr 1200` at the consumed layer's cost
+

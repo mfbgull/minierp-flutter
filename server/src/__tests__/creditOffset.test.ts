@@ -26,6 +26,7 @@ async function getAuthCookie(): Promise<string> {
   return tokenCookie ? tokenCookie.split(';')[0] : '';
 }
 
+import { resolveSupplierByName } from './helpers/invoiceReturnSpec';
 describe('invoice create with credit_offset', () => {
   let authCookie: string;
   let itemId: number;
@@ -44,7 +45,8 @@ describe('invoice create with credit_offset', () => {
       .send({ item_code: `CRO-${Date.now()}`, item_name: 'Credit Offset Item' });
     expect(item.status).toBe(201);
     itemId = item.body.id;
-
+    // ACCT-005: purchases must name an identified supplier.
+    const supplierId = await resolveSupplierByName('Credit Offset Supplier', authCookie);
     await request(app).post('/api/purchases')
       .set('Cookie', authCookie)
       .send({
@@ -53,7 +55,7 @@ describe('invoice create with credit_offset', () => {
         quantity: 20,
         unit_cost: 10,
         purchase_date: '2026-08-01',
-        supplier_name: 'Credit Offset Supplier',
+        supplier_id: supplierId,
       });
 
     const customer = await request(app).post('/api/customers')
