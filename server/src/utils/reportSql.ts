@@ -67,7 +67,13 @@ export const ACTIVE_EXPENSE_STATUS = (alias = ''): string => {
  */
 export const AR_OUTSTANDING = (alias = ''): string => {
   const p = alias ? `${alias}.` : '';
-  return `${p}balance_amount > 0 AND ${p}status NOT IN ('Cancelled', 'Draft')`;
+  // `deleted_at IS NULL` is part of this predicate, not an extra condition each
+  // caller has to remember. `deleteInvoice` is an AUD-06 soft delete: the row
+  // survives with `status = 'Deleted'` and its `balance_amount` intact, so a
+  // query that filters only on status counted a deleted invoice as live AR and
+  // diverged from GL 1100 by exactly the deleted total (audit SALES-007).
+  return `${p}balance_amount > 0 AND ${p}status NOT IN ('Cancelled', 'Draft')`
+    + ` AND ${p}deleted_at IS NULL`;
 };
 
 /**

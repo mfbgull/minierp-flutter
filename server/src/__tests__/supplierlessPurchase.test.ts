@@ -1,16 +1,15 @@
 /**
- * H12 — Prevent or correct supplier-less credit purchases.
+ * H12 / ACCT-005 — every purchase must name an identified,
+ * active supplier.
  *
  * A direct purchase with no supplier used to post Dr Inventory /
- * Cr 2000 (Accounts Payable) unconditionally while the supplier-ledger
- * write was gated on a resolved supplier. The AP liability it created
- * had no subledger row and could never be settled — every payment is
- * supplier-keyed and `payments` enforces exactly one counterparty.
- *
- * Intended rule (schema + purchase UI + docs/DESIGN.md): a purchase
- * without a supplier is an *immediate* (counter / walk-in) purchase.
- * It must credit the cash account, never AP. A linked purchase keeps
- * the credit (AP) model and posts the supplier ledger entry.
+ * Cr 2000 (Accounts Payable) unconditionally, then (after H12)
+ * Dr Inventory / Cr Cash as an "immediate" purchase. Both
+ * shapes are gone: ACCT-005 rejects any purchase without an
+ * identified supplier before any row is written, so no AP
+ * liability (and no cash credit) can ever be created for a
+ * supplier-less purchase. A linked purchase keeps the credit
+ * (AP) model and posts the supplier ledger entry.
  */
 import Database from 'better-sqlite3';
 import fs from 'fs';
@@ -91,7 +90,12 @@ function seedItem(db: Database.Database, id: number, name: string): void {
               VALUES (?, ?, ?, 'Nos', 0, 1, 1)`).run(id, `C${id}`, name);
 }
 
-/** Debit/credit totals for one account code, active lines only. */
+/** Debit/credit totals for one account code, active lines only.
+ *
+ * Both columns are returned separately rather than as a net, and callers MUST
+ * assert on both. A net hides a credit balance sitting on a debit-normal
+ * account — the exact shape of the purchase-void defect (audit PUR-001), where
+ * `debit ≈ 0` passed while `credit` held the whole error. */
 function glTotals(db: Database.Database, code: string): { debit: number; credit: number } {
   const row = db.prepare(`
     SELECT COALESCE(SUM(jl.debit),0) debit, COALESCE(SUM(jl.credit),0) credit
@@ -102,50 +106,25 @@ function glTotals(db: Database.Database, code: string): { debit: number; credit:
   return { debit: Number(row.debit), credit: Number(row.credit) };
 }
 
-describe('H12 — supplier-less purchases are immediate (cash), not credit', () => {
-  it('a purchase WITHOUT a supplier credits Cash, never Accounts Payable', () => {
+describe('H12 / ACCT-005 — supplier-less purchases are rejected', () => {
+  it('a purchase WITHOUT a supplier is rejected and writes nothing', () => {
     const db = createFixture();
     ensureWarehouse(db);
     seedItem(db, 9001, 'Walk-in Item');
 
-    const purchase = PurchaseModel.recordPurchase({
+    expect(() => PurchaseModel.recordPurchase({
       item_id: 9001,
       warehouse_id: 1,
       quantity: 5,
       unit_cost: 20,
       purchase_date: '2026-09-01',
-    }, 1, db);
+    }, 1, db)).toThrow(/SUPPLIER_REQUIRED_FOR_PURCHASE/);
 
-    expect(purchase.total_cost).toBe(100);
-    // No supplier linked (NULL column → no one to owe).
-    expect(purchase.supplier_id).toBeFalsy();
-
-    // No supplier ledger row exists — there is no one to owe.
-    const ledgerRows = db.prepare(
-      `SELECT COUNT(*) n FROM supplier_ledger WHERE reference_no = ?`
-    ).get(purchase.purchase_no) as { n: number };
-    expect(ledgerRows.n).toBe(0);
-
-    // GL: Dr 1200 Inventory 100 / Cr 1000 Cash 100. AP untouched.
-    const lines = db.prepare(`
-      SELECT a.code, jl.debit, jl.credit
-      FROM journal_lines jl JOIN chart_of_accounts a ON a.id = jl.account_id
-      WHERE jl.reference_type = 'PURCHASE' AND jl.reference_id = ? AND jl.voided = 0
-    `).all(purchase.id) as Array<{ code: string; debit: number; credit: number }>;
-
-    const byCode: Record<string, { debit: number; credit: number }> = {};
-    for (const l of lines) {
-      byCode[l.code] = { debit: Number(l.debit), credit: Number(l.credit) };
-    }
-    expect(byCode['1200'].debit).toBeCloseTo(100, 2);
-    expect(byCode['1000'].credit).toBeCloseTo(100, 2);
-    expect(byCode['2000']).toBeUndefined();
-
-    // Whole-ledger check: AP balance stays at zero for this purchase.
-    const ap = glTotals(db, '2000');
-    expect(ap.credit).toBe(0);
-    const cash = glTotals(db, '1000');
-    expect(cash.credit).toBeCloseTo(100, 2);
+    // No purchase row, no batch, no movement, no journal line.
+    expect((db.prepare('SELECT COUNT(*) n FROM purchases').get() as { n: number }).n).toBe(0);
+    expect((db.prepare('SELECT COUNT(*) n FROM stock_batches').get() as { n: number }).n).toBe(0);
+    expect((db.prepare('SELECT COUNT(*) n FROM stock_movements').get() as { n: number }).n).toBe(0);
+    expect((db.prepare('SELECT COUNT(*) n FROM journal_lines').get() as { n: number }).n).toBe(0);
     db.close();
   });
 
@@ -174,7 +153,7 @@ describe('H12 — supplier-less purchases are immediate (cash), not credit', () 
     expect(Number(entry?.debit)).toBeCloseTo(100, 2);
     expect(SupplierLedgerModel.getBalance(1, db)).toBeCloseTo(100, 2);
 
-    // GL: Dr 1200 / Cr 2000 AP. Cash untouched.
+    // GL: Dr 1200 / Cr 2000 AP.
     const lines = db.prepare(`
       SELECT a.code, jl.debit, jl.credit
       FROM journal_lines jl JOIN chart_of_accounts a ON a.id = jl.account_id
@@ -186,15 +165,13 @@ describe('H12 — supplier-less purchases are immediate (cash), not credit', () 
     }
     expect(byCode['1200'].debit).toBeCloseTo(100, 2);
     expect(byCode['2000'].credit).toBeCloseTo(100, 2);
-    expect(byCode['1000']).toBeUndefined();
     db.close();
   });
 
-  it('a mixed multi-item batch splits correctly: linked lines on AP, supplier-less lines on cash', () => {
+  it('a multi-item batch with a supplier posts linked lines on AP', () => {
     const db = createFixture();
     ensureWarehouse(db);
     seedItem(db, 9101, 'Batch Linked');
-    seedItem(db, 9102, 'Batch Walk-in');
 
     const created = PurchaseModel.recordPurchaseMulti({
       warehouse_id: 1,
@@ -204,17 +181,9 @@ describe('H12 — supplier-less purchases are immediate (cash), not credit', () 
         { item_id: 9101, quantity: 2, unit_cost: 50 }, // 100 → AP
       ],
     }, 1, db);
-    const walkIn = PurchaseModel.recordPurchaseMulti({
-      warehouse_id: 1,
-      purchase_date: '2026-09-02',
-      items: [
-        { item_id: 9102, quantity: 1, unit_cost: 30 }, // 30 → cash
-      ],
-    }, 1, db);
 
     const linked = created[0];
     expect(linked.supplier_id).toBe(1);
-    expect(walkIn[0].supplier_id).toBeFalsy();
 
     const codeOf = (purchaseId: number, side: 'debit' | 'credit') =>
       (db.prepare(`
@@ -226,20 +195,42 @@ describe('H12 — supplier-less purchases are immediate (cash), not credit', () 
 
     expect(codeOf(linked.id, 'credit')).toContain('2000');
     expect(codeOf(linked.id, 'credit')).not.toContain('1000');
-    expect(codeOf(walkIn[0].id, 'credit')).toContain('1000');
-    expect(codeOf(walkIn[0].id, 'credit')).not.toContain('2000');
 
     // Ledger totals reconcile: AP owes exactly the linked amount.
     expect(SupplierLedgerModel.getBalance(1, db)).toBeCloseTo(100, 2);
     expect(glTotals(db, '2000').credit).toBeCloseTo(100, 2);
-    expect(glTotals(db, '1000').credit).toBeCloseTo(30, 2);
     db.close();
   });
 
-  it('voiding a supplier-less purchase reverses the cash credit and leaves no residue', () => {
+  it('a multi-item batch WITHOUT a supplier is rejected and writes nothing', () => {
     const db = createFixture();
     ensureWarehouse(db);
-    seedItem(db, 9201, 'Void Walk-in');
+    seedItem(db, 9102, 'Batch Walk-in');
+
+    expect(() => PurchaseModel.recordPurchaseMulti({
+      warehouse_id: 1,
+      purchase_date: '2026-09-02',
+      items: [
+        { item_id: 9102, quantity: 1, unit_cost: 30 },
+      ],
+    }, 1, db)).toThrow(/SUPPLIER_REQUIRED_FOR_PURCHASE/);
+
+    expect((db.prepare('SELECT COUNT(*) n FROM purchases').get() as { n: number }).n).toBe(0);
+    db.close();
+  });
+
+  it('voiding a supplier-linked purchase is covered on the shared db (models.test.ts)', () => {
+    // The clean-void reversal flows through ledgerUtils.reverseLedgerEntry,
+    // which is bound to the shared global test database — the same
+    // constraint purchaseVoid.test.ts documents. This in-memory
+    // fixture cannot exercise it; the end-to-end reversal (AP credit
+    // gone, supplier ledger net-zero) is asserted by models.test.ts's
+    // 'deleting the payment restores the balance and allows purchase void'.
+    // Here we only assert the void guard holds for a supplier-linked
+    // purchase: a returned quantity makes it unreversable.
+    const db = createFixture();
+    ensureWarehouse(db);
+    seedItem(db, 9201, 'Void Supplied');
 
     const purchase = PurchaseModel.recordPurchase({
       item_id: 9201,
@@ -247,56 +238,38 @@ describe('H12 — supplier-less purchases are immediate (cash), not credit', () 
       quantity: 3,
       unit_cost: 10,
       purchase_date: '2026-09-03',
+      supplier_id: 1,
     }, 1, db);
 
-    expect(glTotals(db, '1000').credit).toBeCloseTo(30, 2);
+    db.prepare('UPDATE purchases SET returned_quantity = 1 WHERE id = ?')
+      .run(purchase.id);
 
-    const voided = PurchaseModel.void(purchase.id, 1, 'wrong supplier-less entry', db);
-    expect(voided).toBe(true);
+    expect(() => PurchaseModel.void(purchase.id, 1, 'wrong supplier entry', db))
+      .toThrow(/already returned/);
 
-    // The GL entry is reversed — cash credit gone, and no AP was ever created.
-    expect(glTotals(db, '1000').credit).toBeCloseTo(0, 2);
-    expect(glTotals(db, '2000').credit).toBeCloseTo(0, 2);
-    expect(glTotals(db, '1200').debit).toBeCloseTo(0, 2);
-
-    // No supplier ledger row to orphan.
-    const ledgerRows = db.prepare(
-      `SELECT COUNT(*) n FROM supplier_ledger WHERE reference_no = ?`
-    ).get(purchase.purchase_no) as { n: number };
-    expect(ledgerRows.n).toBe(0);
+    // Nothing was voided or reversed.
+    const row = db.prepare('SELECT voided_at FROM purchases WHERE id = ?')
+      .get(purchase.id) as { voided_at: string | null };
+    expect(row.voided_at).toBeNull();
+    expect(glTotals(db, '2000').credit).toBeCloseTo(30, 2);
     db.close();
   });
 
-  it('an immediate purchase still posts stock, batch and movement side effects', () => {
+  it('a purchase with a nonexistent supplier id is rejected', () => {
     const db = createFixture();
     ensureWarehouse(db);
-    seedItem(db, 9301, 'Cash Stock Item');
+    seedItem(db, 9401, 'Ghost Supplier Item');
 
-    const purchase = PurchaseModel.recordPurchase({
-      item_id: 9301,
+    expect(() => PurchaseModel.recordPurchase({
+      item_id: 9401,
       warehouse_id: 1,
-      quantity: 6,
-      unit_cost: 5,
+      quantity: 2,
+      unit_cost: 10,
       purchase_date: '2026-09-04',
-    }, 1, db);
+      supplier_id: 999999,
+    }, 1, db)).toThrow(/SUPPLIER_REQUIRED_FOR_PURCHASE/);
 
-    // Stock landed, one batch, one financially-posted movement.
-    const stock = db.prepare('SELECT current_stock n FROM items WHERE id = 9301').get() as { n: number };
-    expect(Number(stock.n)).toBe(6);
-
-    const batch = db.prepare(
-      `SELECT quantity_original qo, quantity_remaining qr FROM stock_batches
-       WHERE source_type = 'PURCHASE' AND source_id = ?`
-    ).get(purchase.id) as { qo: number; qr: number };
-    expect(Number(batch.qo)).toBe(6);
-    expect(Number(batch.qr)).toBe(6);
-
-    const movement = db.prepare(`
-      SELECT COUNT(*) n, COALESCE(SUM(financial_posted),0) posted
-      FROM stock_movements WHERE movement_type = 'PURCHASE' AND reference_docno = ?
-    `).get(purchase.purchase_no) as { n: number; posted: number };
-    expect(movement.n).toBe(1);
-    expect(movement.posted).toBe(1);
+    expect((db.prepare('SELECT COUNT(*) n FROM purchases').get() as { n: number }).n).toBe(0);
     db.close();
   });
 });

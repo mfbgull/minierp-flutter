@@ -13,6 +13,7 @@
 import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
+import { resolveSupplierByName } from './helpers/invoiceReturnSpec';
 import ledgerUtils from '../utils/ledgerUtils';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
@@ -55,6 +56,8 @@ describe('ledger integrity and reconciliation', () => {
     expect(item.status).toBe(201);
     itemId = item.body.id;
 
+    // ACCT-005: purchases must name an identified supplier.
+    const supplierId = await resolveSupplierByName('Ledger Integrity Supplier', authCookie);
     const supplierRes = await request(app).post('/api/purchases')
       .set('Cookie', authCookie)
       .send({
@@ -63,7 +66,7 @@ describe('ledger integrity and reconciliation', () => {
         quantity: 500,
         unit_cost: 10,
         purchase_date: '2026-05-01',
-        supplier_name: 'Ledger Integrity Supplier',
+        supplier_id: supplierId,
       });
     expect(supplierRes.status).toBe(201);
 

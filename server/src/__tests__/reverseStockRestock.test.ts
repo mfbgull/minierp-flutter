@@ -26,6 +26,7 @@
 import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
+import { resolveSupplierByName } from './helpers/invoiceReturnSpec';
 
 // ── helpers ──────────────────────────────────────────────────────────
 
@@ -108,9 +109,12 @@ async function createItem(name: string): Promise<number> {
 }
 
 async function purchaseStock(itemId: number, qty: number, cost: number): Promise<void> {
+  // ACCT-005: purchases must name an identified supplier.
+  const supplierId = await resolveSupplierByName('Restock Supplier', authCookie);
   const res = await api('post', '/api/purchases', {
     warehouse_id: warehouseId,
     purchase_date: '2026-09-10',
+    supplier_id: supplierId,
     items: [{ item_id: itemId, quantity: qty, unit_cost: cost }],
   });
   if (res.status !== 201) throw new Error(`purchaseStock failed: ${res.status} ${JSON.stringify(res.body)}`);

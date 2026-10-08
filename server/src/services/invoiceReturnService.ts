@@ -971,6 +971,22 @@ export class InvoiceReturnService {
   ): PostedSettlement {
     const today = todayLocal();
     const { userId } = args;
+
+    // REVERSAL-RULES §1.12 / audit H-03: a refund may never exceed the cash
+    // the customer actually collected. `applyLegacyRefund` already applied
+    // this cap, but the spec-driven settlement path did not — so an invoice
+    // settled ENTIRELY by store credit (collected cash = 0, paid_amount > 0)
+    // could be converted to cash on return: `Dr Cash / Cr AR` for money the
+    // business never received. Cap here, at the single chokepoint every refund
+    // leg passes through, so neither caller can bypass it.
+    const refundable = PaymentModel.refundableOnInvoice(dbArg, args.returnHeader.invoice_id);
+    if (args.amount > refundable + 0.01) {
+      throw new ReturnError(
+        400,
+        `Refund of ${args.amount.toFixed(2)} exceeds the ${refundable.toFixed(2)} collected on Invoice ` +
+        `${args.invoiceNo}. Refund only the cash that was actually paid in.`,
+      );
+    }
     // TASK 33: negative payment, negative allocation, the REFUND ledger row,
     // the cash-only funds guard and the Dr AR / Cr cash journal entry are all
     // decided by the single payment writer.
@@ -1084,11 +1100,19 @@ export class InvoiceReturnService {
       Math.min(args.amount, Math.max(0, Number(target.balance_amount))),
     );
 
+    let adjustmentPaymentId: number | null = null;
+
     if (applied > 0) {
       // TASK 33: the credit application is recorded by the single payment
       // writer, which also posts the Dr 1110 / Cr 1100 CREDIT_OFFSET entry
       // this path was previously missing.
-      new PaymentRecordingService(dbArg).recordCustomerPayment({
+      //
+      // The payment id MUST be captured. `revertSettlement`'s adjust branch is
+      // gated on it: with it null, voiding the settlement left the allocation
+      // live and the CREDIT_OFFSET group un-voided while still freeing the
+      // settlement cap, so the same return could be settled a second time and
+      // the cash paid out twice for one entitlement (audit C-01).
+      const recorded = new PaymentRecordingService(dbArg).recordCustomerPayment({
         mode: 'CREDIT_APPLICATION',
         customerId: args.customerId,
         paymentDate: today,
@@ -1098,6 +1122,7 @@ export class InvoiceReturnService {
         userId,
         allocations: [{ invoiceId: target.id, amount: applied }],
       });
+      adjustmentPaymentId = recorded.paymentId;
     }
 
     const record = InvoiceReturnModel.createSettlement(dbArg, {
@@ -1108,7 +1133,7 @@ export class InvoiceReturnService {
       method: null,
       reference: target.invoice_no,
       target_invoice_id: target.id,
-      payment_id: null,
+      payment_id: adjustmentPaymentId,
       settled_date: today,
       created_by: userId,
     });
@@ -1272,6 +1297,13 @@ export class InvoiceReturnService {
       ).run(nowIso, settlement.payment_id);
     }
     if (settlement.target_invoice_id) {
+      // A CREDIT_APPLICATION moves no cash, so it posts no PAYMENT group.
+      // Its GL lives under CREDIT_OFFSET keyed by the TARGET invoice —
+      // voiding ('PAYMENT', payment_id) matches zero rows and silently leaves
+      // Dr 1110 standing for an entitlement already given back (audit C-01).
+      AccountingService.voidJournalLinesByReference(
+        dbArg, 'CREDIT_OFFSET', settlement.target_invoice_id, { voidedBy: userId, voidReason: reason },
+      );
       calculateInvoiceBalance(settlement.target_invoice_id);
       updateInvoiceStatus(settlement.target_invoice_id);
     }
@@ -1421,8 +1453,11 @@ function reverseRestock(
   });
 
   // 2. Equal-and-opposite ADJUSTMENT movement in the same warehouse at the
-  //    same cost. recordMovement posts its own balanced financial entry,
-  //    which restores the inventory GL.
+  //    same cost. It posts NO GL leg: `voidReturn` already voided the
+  //    INVOICE_RETURN group, which carries the Dr 1200 / Cr 5000 COGS
+  //    reversal. A leg here is a third posting — it credits inventory twice
+  //    and books a shrinkage expense for goods that were never lost. Same
+  //    contract as the create-side restock and as `Purchase.void`.
   StockMovementModel.recordMovement(
     {
       item_id: args.itemId,
@@ -1430,6 +1465,7 @@ function reverseRestock(
       movement_type: 'ADJUSTMENT',
       quantity: -restockQty,
       unit_cost: movement.unit_cost ?? undefined,
+      skipAdjustmentFinancialPosting: true,
       reference_doctype: 'RETURN',
       reference_docno: args.invoiceNo,
       remarks: args.remarks,

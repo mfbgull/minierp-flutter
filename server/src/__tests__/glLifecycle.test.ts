@@ -8,6 +8,7 @@
 import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
+import { resolveSupplierByName } from './helpers/invoiceReturnSpec';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
@@ -59,6 +60,8 @@ describe('GL lifecycle: update/delete voiding', () => {
     expect(item.status).toBe(201);
     itemId = item.body.id;
 
+    // ACCT-005: purchases must name an identified supplier.
+    const supplierId = await resolveSupplierByName('GL Lifecycle Supplier', authCookie);
     await request(app).post('/api/purchases')
       .set('Cookie', authCookie)
       .send({
@@ -67,7 +70,7 @@ describe('GL lifecycle: update/delete voiding', () => {
         quantity: 20,
         unit_cost: 10,
         purchase_date: '2026-08-01',
-        supplier_name: 'GL Lifecycle Supplier',
+        supplier_id: supplierId,
       });
 
     const customer = await request(app).post('/api/customers')

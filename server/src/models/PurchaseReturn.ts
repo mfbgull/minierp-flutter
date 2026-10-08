@@ -380,6 +380,23 @@ class PurchaseReturnModel {
         throw new Error(`Invalid disposition '${data.disposition}' — use 'credit_on_account' or 'refund_expected'`);
       }
 
+      // `refund_expected` promises money back to the supplier, so it may only
+      // promise what was actually collected. Without this, returning goods from
+      // a fully UNPAID purchase posted `Dr Cash / Cr AP` and manufactured a cash
+      // asset and an AP credit out of nothing (audit C-02, H-03).
+      let refundableAmount = totalAmount;
+      if (data.disposition === 'refund_expected') {
+        const collected = this.sourceCollected(data.source_type, data.source_id, db);
+        if (collected <= 0.01) {
+          throw new Error(
+            `Cannot refund ${totalAmount.toFixed(2)} — nothing has been collected against this ` +
+            `${data.source_type === 'PURCHASE' ? 'purchase' : 'purchase order'}. ` +
+            `Use 'credit_on_account' instead.`
+          );
+        }
+        refundableAmount = roundQty(Math.min(totalAmount, collected));
+      }
+
       // Header
       const returnNo = this.generateReturnNo(db);
       const headerResult = db.prepare(`
@@ -623,14 +640,16 @@ class PurchaseReturnModel {
 
       db.prepare('UPDATE purchase_returns SET credit_note_id = ? WHERE id = ?').run(creditNoteId, returnId);
 
-      // refund_expected: settle immediately — collect the full credit note
-      // back in cash inside the same transaction (no orphan credit-note window).
+      // refund_expected: settle immediately — collect the credit note back in
+      // cash inside the same transaction (no orphan credit-note window). The
+      // amount is capped at what was collected, computed above; this branch
+      // only runs when that cap is greater than zero.
       if (data.disposition === 'refund_expected') {
         SupplierRefundModel.create(
           {
             refund_date: data.return_date,
             credit_note_id: creditNoteId,
-            amount: totalAmount,
+            amount: refundableAmount,
             payment_method: 'cash',
             reference_no: returnNo,
           },
@@ -910,6 +929,27 @@ class PurchaseReturnModel {
    * total minus what supplier payments have already settled, derived from
    * the authoritative allocation tables.
    */
+  private static sourceCollected(
+    sourceType: string,
+    sourceId: number,
+    db: Database.Database
+  ): number {
+    if (sourceType === 'PURCHASE') {
+      const row = db.prepare(`
+        SELECT COALESCE((SELECT SUM(amount) FROM purchase_allocations
+          WHERE purchase_id = ? AND voided_at IS NULL), 0) AS paid
+      `).get(sourceId) as { paid: number } | undefined;
+      if (!row) throw new Error('Purchase not found');
+      return Number(row.paid);
+    }
+    const row = db.prepare(`
+      SELECT COALESCE((SELECT SUM(amount) FROM po_allocations
+        WHERE po_id = ? AND voided_at IS NULL), 0) AS paid
+    `).get(sourceId) as { paid: number } | undefined;
+    if (!row) throw new Error('Purchase Order not found');
+    return Number(row.paid);
+  }
+
   private static sourceUnpaidBalance(
     sourceType: string,
     sourceId: number,

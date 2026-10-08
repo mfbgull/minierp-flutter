@@ -300,7 +300,26 @@ export const zodBodySchemas = {
 
   seasonalEvent: z.object({}).passthrough().optional(),
 
-  modelConfig: z.object({}).passthrough().optional(),
+  // SEC-001: was `z.object({}).passthrough()`, which validated nothing and let
+  // a caller put arbitrary SQL in a *key* (see forecastService.setModelConfig).
+  // `.strict()` so an unrecognised field is a 400 rather than a silent write.
+  modelConfig: z.object({
+    category: z.string().max(120).nullish(),
+    model_type: z.enum([
+      'weighted_moving_average', 'simple_exponential_smoothing',
+      'holt', 'holt_winters', 'linear_trend', 'seasonal_naive',
+    ]).nullish(),
+    ses_alpha: z.coerce.number().min(0).max(1).nullish(),
+    holt_alpha: z.coerce.number().min(0).max(1).nullish(),
+    holt_beta: z.coerce.number().min(0).max(1).nullish(),
+    hw_alpha: z.coerce.number().min(0).max(1).nullish(),
+    hw_beta: z.coerce.number().min(0).max(1).nullish(),
+    hw_gamma: z.coerce.number().min(0).max(1).nullish(),
+    seasonal_periods: z.coerce.number().int().min(2).max(60).nullish(),
+    service_level: z.coerce.number().min(0.5).max(0.9999).nullish(),
+    lead_time_days: z.coerce.number().int().min(0).max(365).nullish(),
+    bias_correction: z.coerce.number().int().min(0).max(1).nullish(),
+  }).strict().optional(),
 
   // Activity log cleanup
   cleanupLogs: z.object({

@@ -2,8 +2,8 @@
  * Audit regression tests, round 2 — findings from the purchases / returns /
  * purchase-order / supplier-ledger pass. Each test encodes CORRECT behaviour
  * and is expected to FAIL on commit 87f1265b until the finding is fixed.
- *
- *   ACCT-005  cash purchases (no supplier) must respect the cash-funds guard
+ *   ACCT-005  every purchase must name an identified supplier — any
+ *             supplier-less purchase is rejected, at any amount
  *   ACCT-012  supplier balance must stay correct after a backdated purchase + payment
  *   PO-001    goods receipt must reject a non-numeric quantity and leave the PO line intact
  *   PRET-001  purchase-return amounts must be rounded to currency precision everywhere
@@ -13,6 +13,7 @@ import app from '../app';
 import db from '../config/database';
 import AccountingService from '../services/accountingService';
 import { getAuthCookie, createItem, purchaseStock, createCustomer, createInvoice } from './helpers/invoiceReturnSpec';
+import PurchaseModel from '../models/Purchase';
 
 let cookie: string;
 let warehouseId: number;
@@ -40,14 +41,74 @@ beforeAll(async () => {
   warehouseId = (db.prepare('SELECT id FROM warehouses ORDER BY id LIMIT 1').get() as { id: number }).id;
 });
 
-describe('ACCT-005: cash purchase must not overdraw the cash account', () => {
-  it('rejects a supplier-less (cash) purchase larger than cash on hand', async () => {
+describe('ACCT-005: every purchase requires an identified supplier', () => {
+  it('rejects a supplier-less purchase at any amount and creates no record', async () => {
     const itemId = await createItem('ACCT-005 item', cookie);
+    const before = (db.prepare('SELECT COUNT(*) n FROM purchases').get() as { n: number }).n;
+    const res = await post('/api/purchases', {
+      item_id: itemId, warehouse_id: warehouseId, quantity: 1, unit_cost: 1, purchase_date: '2026-09-02',
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('SUPPLIER_REQUIRED_FOR_PURCHASE');
+    expect(res.body.error).toBe('A supplier is required for all purchases.');
+    const after = (db.prepare('SELECT COUNT(*) n FROM purchases').get() as { n: number }).n;
+    expect(after).toBe(before);
+  });
+
+  it('rejects an oversized supplier-less purchase too (no amount exemption)', async () => {
+    const itemId = await createItem('ACCT-005 big item', cookie);
     const res = await post('/api/purchases', {
       item_id: itemId, warehouse_id: warehouseId, quantity: 1, unit_cost: 50000, purchase_date: '2026-09-02',
     });
-    expect(res.status).toBeGreaterThanOrEqual(400);
-    expect(glBalance('1000', 'debit')).toBeGreaterThanOrEqual(0);
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('SUPPLIER_REQUIRED_FOR_PURCHASE');
+  });
+
+  it('rejects a purchase with a nonexistent supplier id', async () => {
+    const itemId = await createItem('ACCT-005 ghost item', cookie);
+    const res = await post('/api/purchases', {
+      item_id: itemId, warehouse_id: warehouseId, quantity: 1, unit_cost: 10,
+      purchase_date: '2026-09-02', supplier_id: 999999,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('SUPPLIER_REQUIRED_FOR_PURCHASE');
+  });
+
+  it('creates a purchase when a valid active supplier is supplied', async () => {
+    const sup = await post('/api/suppliers', { supplier_code: 'ACCT-005-SUP', supplier_name: 'ACCT-005 Supplier' });
+    const supplierId = idOf(sup);
+    const itemId = await createItem('ACCT-005 valid item', cookie);
+    const res = await post('/api/purchases', {
+      item_id: itemId, warehouse_id: warehouseId, quantity: 1, unit_cost: 10,
+      purchase_date: '2026-09-02', supplier_id: supplierId,
+    });
+    expect(res.status).toBe(201);
+    expect((res.body as { supplier_id: number }).supplier_id).toBe(supplierId);
+  });
+
+  it('rejects an update that would null the supplier of a purchase', async () => {
+    const sup = await post('/api/suppliers', { supplier_code: 'ACCT-005-SUP2', supplier_name: 'ACCT-005 Supplier 2' });
+    const supplierId = idOf(sup);
+    const itemId = await createItem('ACCT-005 upd item', cookie);
+    const created = await post('/api/purchases', {
+      item_id: itemId, warehouse_id: warehouseId, quantity: 1, unit_cost: 10,
+      purchase_date: '2026-09-02', supplier_id: supplierId,
+    });
+    expect(created.status).toBe(201);
+    const purchaseId = idOf(created);
+
+    // No purchase-update endpoint exists today; assert the domain
+    // guard directly so the "may not null the supplier" rule is
+    // pinned regardless of which surface later exposes updates.
+    expect(() =>
+      PurchaseModel.assertSupplierSurvivesUpdate(
+        { supplier_id: null },
+        supplierId,
+        db
+      )
+    ).toThrow(/SUPPLIER_REQUIRED_FOR_PURCHASE/);
+    const still = db.prepare('SELECT supplier_id FROM purchases WHERE id = ?').get(purchaseId) as { supplier_id: number | null };
+    expect(still.supplier_id).toBe(supplierId);
   });
 });
 
@@ -56,6 +117,10 @@ describe('ACCT-012: supplier balance after a backdated purchase and a payment', 
     const sup = await post('/api/suppliers', { supplier_code: 'REG-SUP', supplier_name: 'Regression Supplier' });
     const supplierId = idOf(sup);
     const itemId = await createItem('ACCT-012 item', cookie);
+    // GL 2000 is global — other suites' purchases land on it too.
+    // Baseline before ours so the delta isolates this supplier's
+    // activity (ACCT-005 now creates supplier-linked purchases).
+    const apBefore = glBalance('2000', 'credit');
     const buy = async (date: string, cost: number): Promise<number> =>
       idOf(await post('/api/purchases', {
         item_id: itemId, warehouse_id: warehouseId, quantity: 1, unit_cost: cost, purchase_date: date, supplier_id: supplierId,
@@ -73,7 +138,7 @@ describe('ACCT-012: supplier balance after a backdated purchase and a payment', 
     const ledger = r2((db.prepare('SELECT COALESCE(SUM(debit - credit), 0) AS b FROM supplier_ledger WHERE supplier_id = ? AND voided = 0').get(supplierId) as { b: number }).b);
     expect(ledger).toBe(1300);
     expect(header).toBe(ledger);
-    expect(glBalance('2000', 'credit')).toBe(ledger);
+    expect(r2(glBalance('2000', 'credit') - apBefore)).toBe(ledger);
   });
 
   it('control: the customer side stays consistent for the same backdating pattern', async () => {

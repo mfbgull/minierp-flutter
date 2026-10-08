@@ -14,6 +14,7 @@ import Purchase from '../models/Purchase';
 import AccountingService from '../services/accountingService';
 import db from '../config/database';
 import logger from '../utils/logger';
+import { requireSupplierForPurchase } from '../utils/purchaseValidation';
 import { handleBusinessError } from '../utils/businessRuleError';
 import { errorMessage } from '../utils/errorMessage';
 
@@ -37,7 +38,24 @@ function recordPurchase(req: AuthRequest, res: Response): void {
       res.status(201).json(Purchase.getById(replayId, db));
       return;
     }
-
+    // ACCT-005: a purchase may not be created without an
+    // identified, active supplier — no amount, payment method
+    // or role is exempt. Rejected before any write so nothing
+    // (row, line, journal entry, idempotency claim) survives.
+    try {
+      requireSupplierForPurchase(req.body?.supplier_id, db);
+    } catch (supplierError) {
+      logger.warn(
+        'Record purchase rejected (ACCT-005): %s — body: %j',
+        (supplierError as Error).message,
+        req.body
+      );
+      res.status(400).json({
+        error: 'A supplier is required for all purchases.',
+        code: 'SUPPLIER_REQUIRED_FOR_PURCHASE',
+      });
+      return;
+    }
     // Multi-item payload (Record Purchase form's line items): one
     // transaction creates one purchases row per item. The flat
     // single-item body remains the legacy path.

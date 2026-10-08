@@ -904,11 +904,15 @@ class InvoiceModel {
    * balance chains in (transaction_date, id) order over non-voided rows.
    */
   static createLedgerEntry(db: Database.Database, customerId: number, type: string, referenceNo: string, transactionDate: string, debit: number, credit: number, description: string): void {
-    // Calculate running balance from last entry for this customer
+    // Seed from the last row the rest of the ledger agrees on: `id` order,
+    // excluding voided and reversal rows — the same filter and ordering
+    // `ledgerUtils` and `rebuildLedgerBalances` use. Reading a reversal row's
+    // stored balance seeds a chain from a value nothing maintains (audit
+    // SALES-021).
     const lastBalanceResult = db.prepare(`
       SELECT balance FROM customer_ledger
-      WHERE customer_id = ? AND voided = 0
-      ORDER BY transaction_date DESC, id DESC
+      WHERE customer_id = ? AND voided = 0 AND reversed_by IS NULL
+      ORDER BY id DESC
       LIMIT 1
     `).get(customerId) as { balance: number } | undefined;
 

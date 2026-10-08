@@ -76,6 +76,20 @@ describe('Invoice Return spec — scenarios 15–21 (voids, deferral, periods, G
     expect(glTotalsFor('INVOICE_RETURN', returnId)).toEqual({ debit: 0, credit: 0 });
     expect(glTotalsFor('RETURN_FEE', returnId)).toEqual({ debit: 0, credit: 0 });
 
+    // Scoping the checks above to two reference types hides a second posting
+    // under `stock_adjustment`. Voiding a return used to record the restock
+    // reversal as an ADJUSTMENT movement with a financial leg, which posted
+    // Dr 7200 / Cr 1200 — inventory credited twice and a shrinkage expense
+    // for goods that were never lost (audit C-05). Assert the accounts
+    // globally, not per reference type.
+    const glByCode = (code: string) => db.prepare(`
+      SELECT COALESCE(SUM(jl.debit),0) debit, COALESCE(SUM(jl.credit),0) credit
+      FROM journal_lines jl JOIN chart_of_accounts a ON a.id = jl.account_id
+      WHERE a.code = ? AND jl.voided = 0
+    `).get(code) as { debit: number; credit: number };
+
+    expect(glByCode('7200')).toEqual({ debit: 0, credit: 0 });
+
     // Ledger rows voided via the reversal mechanism — customer balance
     // back to what it was before the return+settlement. The invoice was
     // fully paid (balance 0) and the only ledger activity since the

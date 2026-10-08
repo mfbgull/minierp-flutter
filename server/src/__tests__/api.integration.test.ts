@@ -2,6 +2,7 @@ import request from 'supertest';
 import bcrypt from 'bcrypt';
 import app from '../app';
 import db from '../config/database';
+import { resolveSupplierByName } from './helpers/invoiceReturnSpec';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
@@ -807,6 +808,8 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
     customerId = customer.body.data.id;
 
     // Stock the sale warehouse so the invoice can dispatch from it.
+    // ACCT-005: purchases must name an identified supplier.
+    const supplierId = await resolveSupplierByName('Invoice Return Supplier', authCookie);
     const purchase = await request(app)
       .post('/api/purchases')
       .set('Cookie', authCookie)
@@ -816,7 +819,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
         quantity: 10,
         unit_cost: 20,
         purchase_date: '2026-08-01',
-        supplier_name: 'Invoice Return Supplier',
+        supplier_id: supplierId,
       });
     expect(purchase.status).toBe(201);
   });
@@ -948,6 +951,8 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
     expect(item.status).toBe(201);
     const itmId = item.body.id as number;
 
+    // ACCT-005: purchases must name an identified supplier.
+    const ledgerSupplierId = await resolveSupplierByName('Ledger Test Supplier', authCookie);
     const purchase = await request(app)
       .post('/api/purchases')
       .set('Cookie', authCookie)
@@ -957,7 +962,7 @@ describe('Invoice Returns Endpoints (restock warehouse)', () => {
         quantity: 20,
         unit_cost: 10,
         purchase_date: '2026-08-01',
-        supplier_name: 'Ledger Test Supplier',
+        supplier_id: ledgerSupplierId,
       });
     expect(purchase.status).toBe(201);
 

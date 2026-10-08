@@ -354,6 +354,28 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
           discount_value,
         });
         const totalAmountNum = computedTotal;
+
+        // SALES-005: void-then-repost below has no floor. `postInvoiceEntry`
+        // returns null when the total is non-positive, so editing a paid
+        // invoice's lines down to zero voided the original Dr 1100 / Cr 4000,
+        // posted nothing back, and left a bare Cr 1100 for a sale that no
+        // longer existed — a credit balance on a debit-normal asset, with the
+        // trial balance still balanced so nothing alerted.
+        //
+        // The floor is NON-POSITIVE, not "below what was paid". Reducing a paid
+        // invoice's total while leaving the payment intact is legitimate and
+        // is covered by moneyPaths 9.3: the balance floors at 0 and the invoice
+        // stays 'Paid'. The failure is specifically the case where nothing is
+        // posted back at all.
+        //
+        // The existing over-payment guard below only covers a payment supplied
+        // in THIS request; it does not cover editing the lines of an invoice
+        // that already carries payments.
+        const alreadyPaid = parseCurrency(PaymentModel.getTotalPaidByInvoiceId(db, invoiceId));
+        if (alreadyPaid > 0 && totalAmountNum <= 0) {
+            throw new InvoiceCreationOffsetError(alreadyPaid, totalAmountNum);
+        }
+
         if (total_amount !== undefined && total_amount !== null) {
             const clientTotal = parseCurrency(total_amount);
             if (Math.abs(clientTotal - computedTotal) > 0.01) {

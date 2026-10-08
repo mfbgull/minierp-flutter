@@ -14,6 +14,7 @@ const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
   throw new Error('TEST_ADMIN_PASSWORD environment variable must be set.');
 }
+import { resolveSupplierByName } from './helpers/invoiceReturnSpec';
 
 async function getAuthCookie(): Promise<string> {
   const res = await request(app)
@@ -53,6 +54,8 @@ describe('Production deletion GL void (C2)', () => {
     outputItemId = output.body.id;
 
     // Stock the raw material so a production can consume it.
+    // ACCT-005: purchases must name an identified supplier.
+    const supplierId = await resolveSupplierByName('C2 Stock Supplier', authCookie);
     await request(app)
       .post('/api/purchases')
       .set('Cookie', authCookie)
@@ -62,7 +65,7 @@ describe('Production deletion GL void (C2)', () => {
         quantity: 20,
         unit_cost: 5,
         purchase_date: '2026-08-01',
-        supplier_name: 'C2 Stock Supplier',
+        supplier_id: supplierId,
       });
   });
 

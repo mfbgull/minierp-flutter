@@ -1155,32 +1155,65 @@ export function getModelConfig(itemId: number): ForecastModelConfig | null {
 }
 
 /**
+ * Writable columns of `forecast_model_config`, in a hardcoded map.
+ *
+ * The column list cannot be derived from the request. A previous version built
+ * the SET clause from `Object.entries(config)`, so a caller could put arbitrary
+ * SQL in a *key*: `{"model_type = (SELECT password_hash FROM users LIMIT 1) =
+ * 'guess'": 1}` produced a working blind boolean oracle over any table, because
+ * the result was readable through `getModelConfig`. Keys are now matched against
+ * this map and anything unrecognised is dropped.
+ */
+const MODEL_CONFIG_COLUMNS = [
+  'category',
+  'model_type',
+  'ses_alpha',
+  'holt_alpha',
+  'holt_beta',
+  'hw_alpha',
+  'hw_beta',
+  'hw_gamma',
+  'seasonal_periods',
+  'service_level',
+  'lead_time_days',
+  'bias_correction',
+] as const;
+
+type ModelConfigColumn = (typeof MODEL_CONFIG_COLUMNS)[number];
+
+/**
  * Set model config for an item.
  */
 export function setModelConfig(config: Partial<ForecastModelConfig> & { item_id: number }): void {
   const existing = db.prepare('SELECT id FROM forecast_model_config WHERE item_id = ?').get(config.item_id) as { id: number } | undefined;
 
-  if (existing) {
-    const sets: string[] = [];
-    const params: SqlParam[] = [];
+  const writable = MODEL_CONFIG_COLUMNS.filter(
+    (col) => config[col as ModelConfigColumn] !== undefined
+  ) as ModelConfigColumn[];
 
-    for (const [key, value] of Object.entries(config)) {
-      if (key !== 'item_id' && key !== 'id') {
-        sets.push(`${key} = ?`);
-        params.push(value);
-      }
+  if (existing) {
+    if (writable.length === 0) {
+      db.prepare(`UPDATE forecast_model_config SET updated_at = CURRENT_TIMESTAMP WHERE item_id = ?`)
+        .run(config.item_id);
+      return;
     }
-    sets.push("updated_at = CURRENT_TIMESTAMP");
+
+    const sets = writable.map((col) => `${col} = ?`);
+    const params: SqlParam[] = writable.map((col) => config[col as ModelConfigColumn] as SqlParam);
+
+    sets.push('updated_at = CURRENT_TIMESTAMP');
     params.push(config.item_id);
 
     db.prepare(`UPDATE forecast_model_config SET ${sets.join(', ')} WHERE item_id = ?`).run(...params);
   } else {
-    const entries = Object.entries(config).filter(([key]) => key !== 'id');
-    const keys = entries.map(([key]) => key);
-    const values: SqlParam[] = entries.map(([, value]) => value as SqlParam);
-    const placeholders = keys.map(() => '?').join(', ');
+    const columns = ['item_id', ...writable];
+    const params: SqlParam[] = [
+      config.item_id,
+      ...writable.map((col) => config[col as ModelConfigColumn] as SqlParam),
+    ];
+    const placeholders = columns.map(() => '?').join(', ');
 
-    db.prepare(`INSERT INTO forecast_model_config (${keys.join(', ')}) VALUES (${placeholders})`).run(...values);
+    db.prepare(`INSERT INTO forecast_model_config (${columns.join(', ')}) VALUES (${placeholders})`).run(...params);
   }
 }
 

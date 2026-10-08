@@ -111,6 +111,52 @@ export async function purchaseStock(
   }
 }
 
+/**
+ * ACCT-005: every purchase must name an identified supplier.
+ * Tests that previously sent only a free-text `supplier_name`
+ * now resolve (or create) a real supplier row and send its
+ * id. The supplier row is cached per name so repeated
+ * fixtures reuse one row.
+ */
+const namedSupplierIds = new Map<string, number>();
+
+export async function resolveSupplierByName(
+  supplierName: string,
+  authCookie: string,
+): Promise<number> {
+  const cached = namedSupplierIds.get(supplierName);
+  if (cached !== undefined) return cached;
+  const existing = db.prepare(
+    'SELECT id FROM suppliers WHERE supplier_name = ? LIMIT 1'
+  ).get(supplierName) as { id: number } | undefined;
+  const id = existing?.id ?? (
+    await request(app).post('/api/suppliers')
+      .set('Cookie', authCookie)
+      .send({
+        supplier_code: `SUP-${supplierName.toUpperCase().replace(/[^A-Z0-9]+/g, '-').slice(0, 40)}`,
+        supplier_name: supplierName,
+      })
+  ).body?.data?.id;
+  namedSupplierIds.set(supplierName, id);
+  return id;
+}
+
+/**
+ * ACCT-005: POST a purchase that names its supplier by id.
+ * Convenience for tests that previously sent only a free-text
+ * supplier_name — resolves/creates the supplier row first.
+ */
+export async function purchaseWithNamedSupplier(
+  supplierName: string,
+  payload: Record<string, unknown>,
+  authCookie: string,
+): Promise<request.Response> {
+  const supplierId = await resolveSupplierByName(supplierName, authCookie);
+  return request(app).post('/api/purchases')
+    .set('Cookie', authCookie)
+    .send({ ...payload, supplier_id: supplierId });
+}
+
 export async function createCustomer(name: string, authCookie: string): Promise<number> {
   const res = await request(app).post('/api/customers')
     .set('Cookie', authCookie)

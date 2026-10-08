@@ -17,9 +17,13 @@ function getARAgingReport(asOfDate: string, db: Database.Database) {
     GROUP BY i.customer_id, c.customer_name, c.customer_code ORDER BY total_outstanding DESC
   `).all(asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate);
 
+  // A NULL due_date yields NULL from julianday(), so every comparison is NULL
+  // and the row falls through to ELSE 0 — the balance appeared in
+  // totalReceivables and in no bucket, so the aging did not foot. Such a row is
+  // "not yet due" and belongs in current_amount (audit ACCT-004).
   const summary = db.prepare(`
     SELECT SUM(balance_amount) as totalReceivables,
-      SUM(CASE WHEN julianday(?) - julianday(due_date) <= 0 THEN balance_amount ELSE 0 END) as current_amount,
+      SUM(CASE WHEN due_date IS NULL OR julianday(?) - julianday(due_date) <= 0 THEN balance_amount ELSE 0 END) as current_amount,
       SUM(CASE WHEN julianday(?) - julianday(due_date) > 0 AND julianday(?) - julianday(due_date) <= 30 THEN balance_amount ELSE 0 END) as total_1_30,
       SUM(CASE WHEN julianday(?) - julianday(due_date) > 30 AND julianday(?) - julianday(due_date) <= 60 THEN balance_amount ELSE 0 END) as total_31_60,
       SUM(CASE WHEN julianday(?) - julianday(due_date) > 60 AND julianday(?) - julianday(due_date) <= 90 THEN balance_amount ELSE 0 END) as total_61_90,
@@ -160,8 +164,12 @@ function getReceivablesSummary(db: Database.Database, asOfDate: string = new Dat
 
       -- Buckets: days past due = asOfDate - due_date. Negative or zero
       -- (not yet due) goes into "current". > 90 goes into "over_90".
+      -- A NULL due_date is "not yet due" — it has no known maturity, so it
+      -- cannot be aged. It belongs in current_amount so the buckets foot to
+      -- total_outstanding; assigning it to nothing made the aging fail to
+      -- foot by exactly that balance (audit ACCT-004).
       COALESCE(SUM(CASE
-        WHEN due_date IS NULL THEN 0
+        WHEN due_date IS NULL THEN balance_amount
         WHEN julianday(?) - julianday(due_date) <= 0 THEN balance_amount
         ELSE 0
       END), 0) as current_amount,
@@ -331,15 +339,25 @@ interface APAgingBucket {
 }
 
 function computeAPAging(asOfDate: string, db: Database.Database): APAgingBucket[] {
+  // One exclusion rule on both sides of the net, matching invariant D and
+  // SupplierLedger.rebuildBalances: a reversal row carries `reversed_by`
+  // pointing at the original, and the original is marked voided. Counting the
+  // reversal while the original's debit is already excluded charges the void
+  // twice — a voided purchase made AP negative (audit PUR-002).
+  //
+  // The as-of filter applies to both sides too. Without it on the credit side a
+  // credit dated after the as-of date silently reduces an earlier figure
+  // (audit PUR-006).
   const debitRows = db.prepare(`
     SELECT sl.supplier_id, sl.transaction_date, sl.debit,
       COALESCE(s.supplier_name, '') AS supplier_name,
       s.supplier_code
     FROM supplier_ledger sl
     JOIN suppliers s ON s.id = sl.supplier_id
-    WHERE sl.voided = 0 AND sl.debit > 0
+    WHERE sl.voided = 0 AND sl.reversed_by IS NULL AND sl.debit > 0
+      AND sl.transaction_date <= ?
     ORDER BY sl.supplier_id, sl.transaction_date ASC, sl.id ASC
-  `).all() as Array<{
+  `).all(asOfDate) as Array<{
     supplier_id: number; transaction_date: string;
     debit: number; supplier_name: string; supplier_code: string | null;
   }>;
@@ -347,8 +365,10 @@ function computeAPAging(asOfDate: string, db: Database.Database): APAgingBucket[
   const creditTotals = new Map<number, number>();
   const creditRows = db.prepare(`
     SELECT supplier_id, SUM(credit) AS credit FROM supplier_ledger
-    WHERE voided = 0 AND credit > 0 GROUP BY supplier_id
-  `).all() as Array<{ supplier_id: number; credit: number }>;
+    WHERE voided = 0 AND reversed_by IS NULL AND credit > 0
+      AND transaction_date <= ?
+    GROUP BY supplier_id
+  `).all(asOfDate) as Array<{ supplier_id: number; credit: number }>;
   for (const r of creditRows) creditTotals.set(r.supplier_id, Number(r.credit));
 
   const buckets = new Map<number, APAgingBucket>();
@@ -1307,17 +1327,16 @@ function getGLReconciliation(asOfDate: string, db: Database.Database) {
     delta: round(glBalance('1100') - arOp),
   });
 
-  // --- AP: GL 2000 vs latest supplier_ledger positions ----------------------
+  // --- AP: GL 2000 vs the supplier ledger ------------------------------------
+  // Summed over the filtered set rather than read from the highest-id row.
+  // A reversal row carries the highest id but its stored `balance` was computed
+  // against a pre-void read and `rebuildBalances` never refreshes it (that
+  // rebuild excludes `reversed_by`), so the row is stale — and the column was
+  // undefined after any void (audit PUR-004).
   const apOpRow = db.prepare(`
-    SELECT COALESCE(SUM(balance), 0) as total FROM (
-      SELECT sl1.supplier_id, sl1.balance
-      FROM supplier_ledger sl1
-      WHERE sl1.voided = 0
-        AND sl1.id = (
-          SELECT MAX(sl2.id) FROM supplier_ledger sl2
-          WHERE sl2.supplier_id = sl1.supplier_id AND sl2.voided = 0
-        )
-    )
+    SELECT COALESCE(SUM(debit) - SUM(credit), 0) AS total
+    FROM supplier_ledger
+    WHERE voided = 0 AND reversed_by IS NULL
   `).get() as { total: number };
   const apOp = round(apOpRow.total);
   rows.push({

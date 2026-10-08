@@ -61,12 +61,16 @@ class SupplierLedgerModel {
   }
 
   static getBalance(supplier_id: number, db: Database.Database): number {
-    // ACC-12: chain order is (transaction_date, id); ACC-14: voided rows
-    // are excluded so reversals immediately restore the prior position.
+    // Chain order is `id`, matching rebuildBalances. Ordering by
+    // `transaction_date` disagreed with it on any backdated entry: a purchase
+    // entered after a later payment sorted ahead of it, so the two readers
+    // returned different positions for the same supplier (audit PUR-004).
+    // Voided and reversal rows are excluded so a void restores the prior
+    // position immediately.
     const result = db.prepare(`
       SELECT balance FROM supplier_ledger
       WHERE supplier_id = ? AND voided = 0 AND reversed_by IS NULL
-      ORDER BY transaction_date DESC, id DESC
+      ORDER BY id DESC
       LIMIT 1
     `).get(supplier_id) as { balance: number } | undefined;
 

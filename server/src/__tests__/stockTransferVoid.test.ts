@@ -13,6 +13,7 @@
 import request from 'supertest';
 import app from '../app';
 import db from '../config/database';
+import { resolveSupplierByName } from './helpers/invoiceReturnSpec';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
@@ -59,6 +60,8 @@ describe('Stock transfer void (Phase 4)', () => {
     expect(item.status).toBe(201);
     itemId = item.body.id;
 
+    // ACCT-005: purchases must name an identified supplier.
+    const supplierId = await resolveSupplierByName('Transfer Void Supplier', authCookie);
     await request(app)
       .post('/api/purchases')
       .set('Cookie', authCookie)
@@ -68,7 +71,7 @@ describe('Stock transfer void (Phase 4)', () => {
         quantity: 20,
         unit_cost: 5,
         purchase_date: '2026-08-01',
-        supplier_name: 'Transfer Void Supplier',
+        supplier_id: supplierId,
       });
   });
 

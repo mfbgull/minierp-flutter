@@ -126,9 +126,10 @@ describe('GL posting matrix', () => {
     expect(invLine?.debit).toBeCloseTo(150, 2); // 5 × 30
     expect(apLine?.credit).toBeCloseTo(150, 2);
 
-    // A supplier-name-only purchase is an immediate purchase: same Dr
-    // Inventory, but the credit lands on Cash, never on AP (H12 — an AP
-    // liability with no supplier is an orphan no payment can settle).
+    // ACCT-005: a supplier-less purchase is rejected outright —
+    // there is no "immediate purchase on Cash" path any more, so
+    // no orphan AP liability can ever be created (H12 holds by
+    // construction: no supplier → no purchase).
     const cashRes = await request(app).post('/api/purchases')
       .set('Cookie', authCookie)
       .send({
@@ -139,16 +140,11 @@ describe('GL posting matrix', () => {
         purchase_date: '2026-08-05',
         supplier_name: 'Matrix Supplier Two',
       });
-    expect(cashRes.status).toBe(201);
-    const cashLines = linesFor('PURCHASE', cashRes.body.id as number);
-    expectBalanced(cashLines);
-    const cashId = accountId('1000');
-    const cashInvLine = cashLines.find(l => l.account_id === inventoryId);
-    const cashLine = cashLines.find(l => l.account_id === cashId);
-    const orphanAp = cashLines.find(l => l.account_id === apId);
-    expect(cashInvLine?.debit).toBeCloseTo(60, 2); // 2 × 30
-    expect(cashLine?.credit).toBeCloseTo(60, 2);
-    expect(orphanAp).toBeUndefined();
+    expect(cashRes.status).toBe(400);
+    expect(cashRes.body.code).toBe('SUPPLIER_REQUIRED_FOR_PURCHASE');
+    // Nothing was written — no inventory, no cash, no AP lines.
+    const afterLines = linesFor('PURCHASE', Number.MAX_SAFE_INTEGER);
+    expect(afterLines).toEqual([]);
 
     // Movement flagged financially posted
     const mv = db.prepare(
