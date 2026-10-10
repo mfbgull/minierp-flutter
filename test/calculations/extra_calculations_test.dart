@@ -309,6 +309,18 @@ void main() {
       expect(doesPaymentExceedBalance(90, 100), false);
     });
 
+    // Regression: the second operand is the balance BEFORE this payment is
+    // applied. A full payment against a 100 balance must be allowed —
+    // `doesPaymentExceedBalance(100, 100)` is false. Passing the
+    // after-payment remainder (100 − 100 = 0) instead wrongly blocks it
+    // (`doesPaymentExceedBalance(100, 0)` is true); that was the edit-mode
+    // record-payment bug, fixed at the call site in
+    // sales_invoice_form_page.dart via `_balanceBeforePayment`.
+    test('full payment against the balance is allowed', () {
+      expect(doesPaymentExceedBalance(100, 100), false);
+      expect(doesPaymentExceedBalance(100, 0), true);
+    });
+
     test('submission validation messages', () {
       expect(validateInvoiceSubmission(null, 1), 'Please select a customer');
       expect(validateInvoiceSubmission('', 1), 'Please select a customer');

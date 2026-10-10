@@ -12,6 +12,13 @@ bool isValidPaymentAmount(num totalPaymentAmount) {
 }
 
 /// Check if payment exceeds the invoice balance.
+///
+/// [remainingBalance] is the balance **before** this payment is applied —
+/// the invoice total in create mode, the invoice's current unpaid balance
+/// in edit mode. It must NOT already have `_paymentSum` subtracted from it:
+/// a full payment against a 100 balance is `doesPaymentExceedBalance(100,
+/// 100) == false`, not `doesPaymentExceedBalance(100, 0)`. Callers holding
+/// an after-payment remainder must add the in-progress payment back first.
 bool doesPaymentExceedBalance(num totalPaymentAmount, num remainingBalance) {
   return totalPaymentAmount > remainingBalance;
 }
