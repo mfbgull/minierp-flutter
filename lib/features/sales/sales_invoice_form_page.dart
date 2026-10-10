@@ -186,6 +186,11 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   final Set<int> _deletedPayments = {};
   int _methodSeq = 1;
 
+  /// Server-side `balance_amount` of the invoice being edited, re-read on
+  /// demand by [_refreshEditBalance]. Null until the first refresh — the
+  /// invoice captured at page load is used until then.
+  num? _freshEditBalance;
+
   bool _recordingPayment = false;
 
   // Price-history hint (rate cell).
@@ -625,9 +630,32 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
 
   num get _paymentSum => _paymentMethods.fold<num>(0, (s, m) => s + m.amount);
 
+  /// Unpaid balance of the invoice being edited, preferring the value last
+  /// read by [_refreshEditBalance] over the one captured at page load.
+  num get _editBalance => _freshEditBalance ?? widget.invoice!.balanceAmount;
+
+  /// After-payment remainder (create: the total still owed once this
+  /// payment lands; edit: the invoice's unpaid balance once it lands).
+  ///
+  /// The credit offset is NOT subtracted in edit mode: the server folds
+  /// `credit_offset` into `paid_amount`, so `balance_amount` is already net
+  /// of it (`paid_amount = cash + credit_offset`). Subtracting it again
+  /// would both understate the panel's Balance row and cap collectible cash
+  /// at less than the invoice actually owes. Create mode computes its total
+  /// from the lines, which knows nothing about credit, so it must subtract.
   num get _remainingBalance => _isEdit
-      ? (widget.invoice!.balanceAmount - _paymentSum - _creditOffset)
+      ? (_editBalance - _paymentSum)
       : (calculateTotal(_filledLines, _scope, _invoiceDiscount) - _paymentSum - _creditOffset);
+
+  /// Balance the in-progress payment is validated against — the balance
+  /// **before** this payment is applied. `_remainingBalance` already has
+  /// `_paymentSum` subtracted (it is the after-payment remainder used for
+  /// display), so it is the wrong operand here: a full payment against a
+  /// 100 balance would otherwise be checked as `doesPaymentExceedBalance(
+  /// 100, 0)` and blocked. Adding the payment back restores the
+  /// before-payment balance that `doesPaymentExceedBalance`'s contract
+  /// (test/extra_calculations_test.dart:308) expects.
+  num get _balanceBeforePayment => _remainingBalance + _paymentSum;
 
   // H9: available credit is the explicit store-credit pool plus any
   // legacy ledger credit (negative AR). The server enforces the same sum.
@@ -692,22 +720,52 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     if (picked != null && mounted) setState(() => _paymentDate = picked);
   }
 
+  /// Edit mode: re-read the invoice so payment validation runs against the
+  /// server's current `balance_amount`, not the value captured when the
+  /// page opened (another session may have recorded payments since — and
+  /// this form can sit open for a long time).
+  ///
+  /// Any failure keeps the in-memory balance: a stale read can only cost
+  /// the user the server's own rejection message, while aborting here would
+  /// make "Record Payment" fail silently on a flaky connection. A response
+  /// that does not carry this invoice's id carries no usable balance and is
+  /// ignored the same way.
+  Future<void> _refreshEditBalance() async {
+    if (!_isEdit) return;
+    final id = widget.invoice!.id;
+    final result = await ref.read(invoiceRepositoryProvider).invoice(id);
+    if (!mounted) return;
+    if (result case ApiSuccess(:final data) when data.id == id) {
+      setState(() => _freshEditBalance = data.balanceAmount);
+    }
+  }
+
   bool _validatePayment() {
     final l10n = AppLocalizations.of(context)!;
     if (!isValidPaymentAmount(_paymentSum)) {
       showAppToast(context, l10n.paymentsErrorAmountGreaterThanZero);
       return false;
     }
-    if (doesPaymentExceedBalance(_paymentSum, _remainingBalance)) {
+    if (doesPaymentExceedBalance(_paymentSum, _balanceBeforePayment)) {
       showAppToast(
         context,
         l10n.paymentsErrorAmountExceedsBalance(
-          Formatters.currency(_remainingBalance < 0 ? 0 : _remainingBalance),
+          Formatters.currency(_balanceBeforePayment < 0 ? 0 : _balanceBeforePayment),
         ),
       );
       return false;
     }
-    if (_creditOffset > _availableCustomerCredit) {
+    // Credit already applied to this invoice was consumed from the pool
+    // when the offset was posted, so re-checking it would block every later
+    // payment on any invoice that used store credit. Only credit applied by
+    // THIS save is bounded by what the pool still holds.
+    // (`widget.invoice` is null in create mode, hence the guarded read.)
+    num creditToApply = _creditOffset;
+    if (_isEdit) {
+      final creditDelta = _creditOffset - widget.invoice!.creditOffset;
+      creditToApply = creditDelta > 0 ? creditDelta : 0;
+    }
+    if (creditToApply > _availableCustomerCredit) {
       showAppToast(
         context,
         l10n.paymentsErrorAmountExceedsBalance(
@@ -790,7 +848,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   /// Edit mode only: post each positive method sequentially, stopping at
   /// the first failure.
   Future<void> _recordPayments() async {
-    if (!_validatePayment()) return;
+    await _refreshEditBalance();
+    if (!mounted || !_validatePayment()) return;
     setState(() => _recordingPayment = true);
     final l10n = AppLocalizations.of(context)!;
     final ok = await _postPaymentBodies(
@@ -805,6 +864,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     });
     if (ok) {
       showAppToast(context, l10n.salesPaymentrecorded);
+      await _refreshEditBalance(); // keep the panel's Balance honest
+      if (!mounted) return;
       await _loadExistingPayments(widget.invoice!.id);
       _markGridDirty();
     }
@@ -816,28 +877,22 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
 
   Future<void> _onEditPayment(InvoicePaymentRecord p) async {
     final l10n = AppLocalizations.of(context)!;
-    final amountController = TextEditingController(text: _numText(p.amount));
-    final refController = TextEditingController(text: p.referenceNo ?? '');
+    // The controllers live inside [_PaymentEditFields] (owned by the dialog
+    // route) so they are released only once its exit animation finishes.
+    // Disposing them here, right after showDialog resolves, races that
+    // animation and throws "A TextEditingController was used after being
+    // disposed" while the dialog is still tearing down.
+    final fieldsKey = GlobalKey<_PaymentEditFieldsState>();
     final updated = await showDialog<(num, String)>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.salesEditpayment),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: amountController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: InputDecoration(labelText: l10n.fieldsAmount),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: refController,
-              decoration: InputDecoration(labelText: l10n.salesReference),
-            ),
-          ],
+        content: _PaymentEditFields(
+          key: fieldsKey,
+          amountText: _numText(p.amount),
+          reference: p.referenceNo ?? '',
+          amountLabel: l10n.fieldsAmount,
+          referenceLabel: l10n.salesReference,
         ),
         actions: [
           TextButton(
@@ -845,18 +900,41 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
             child: Text(l10n.commonCancel),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop((
-              num.tryParse(amountController.text) ?? 0,
-              refController.text.trim(),
-            )),
+            onPressed: () =>
+                Navigator.of(context).pop(fieldsKey.currentState!.value),
             child: Text(l10n.commonSave),
           ),
         ],
       ),
     );
-    amountController.dispose();
-    refController.dispose();
     if (updated == null || !mounted) return;
+
+    final newAmount = updated.$1;
+    if (!isValidPaymentAmount(newAmount)) {
+      showAppToast(context, l10n.paymentsErrorAmountGreaterThanZero);
+      return;
+    }
+    // The edit is bounded by the invoice's CURRENT unpaid balance — the
+    // value captured at page load may already have been paid down.
+    await _refreshEditBalance();
+    if (!mounted) return;
+    // `balance_amount` already contains this payment (`paid_amount` = cash +
+    // credit_offset), so raising it by X lowers the balance by X. Payments
+    // queued in [_deletedPayments] return to the collectible pool when the
+    // pending PUT lands, so their amounts buy headroom back.
+    final pendingDeleteSum = _existingPayments
+        .where((e) => _deletedPayments.contains(e.id))
+        .fold<num>(0, (s, e) => s + e.amount);
+    final headroom = _editBalance + p.amount + pendingDeleteSum;
+    if (newAmount > headroom) {
+      showAppToast(
+        context,
+        l10n.paymentsErrorAmountExceedsBalance(
+          Formatters.currency(headroom < 0 ? 0 : headroom),
+        ),
+      );
+      return;
+    }
 
     setState(() => _recordingPayment = true);
     final result = await ref.read(invoiceRepositoryProvider).updatePayment(
@@ -871,6 +949,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     switch (result) {
       case ApiSuccess():
         showAppToast(context, l10n.salesPaymentupdated);
+        await _refreshEditBalance(); // the balance just moved
+        if (!mounted) return;
         await _loadExistingPayments(widget.invoice!.id);
       case ApiFailure(:final error):
         showAppToast(context, error.message);
@@ -1072,18 +1152,16 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     // the rejection surfaced only from the second call, and the "Invoice
     // saved" toast then replaced it — leaving a silently Unpaid invoice.
     //
-    // Compared against the total BEFORE this payment is applied. `_remainingBalance`
-    // is the balance AFTER, so it is not the right operand here.
-    if (!_isEdit && _recordPayment && _paymentSum > 0) {
-      final collectible = calculateTotal(filled, _scope, _invoiceDiscount);
-      if (_paymentSum + _creditOffset > collectible) {
-        _showError(
-          l10n.paymentsErrorAmountExceedsBalance(
-            Formatters.currency(collectible),
-          ),
-        );
-        return null;
-      }
+    // Reuses [_validatePayment] rather than a separate inline guard: with
+    // [_balanceBeforePayment] it checks the same thing (`_paymentSum +
+    // _creditOffset > collectible`, since `_balanceBeforePayment` =
+    // `calculateTotal - _creditOffset`), and additionally enforces the
+    // credit-offset-vs-customer-credit check the inline guard skipped.
+    // Edit mode is excluded — its payments are recorded separately via
+    // [_recordPayments], and a zero payment sum must not block the PUT.
+    if (!_isEdit && _recordPayment && _paymentSum > 0 &&
+        !_validatePayment()) {
+      return null;
     }
     if (!await _confirmExpiry()) return null;
     _errorTimer?.cancel();
@@ -2169,3 +2247,68 @@ String _statusLabel(AppLocalizations l10n, String status) =>
 /// Quantity must be positive — shown in the error banner when a filled
 /// line has a zero/empty qty. No l10n key exists for this phrasing.
 const String _invalidQuantityMessage = 'Quantity must be greater than zero';
+
+/// Fields of the "Edit payment" dialog.
+///
+/// The two controllers live here rather than in `_onEditPayment` so the
+/// dialog route owns their lifetime. Disposing them as soon as `showDialog`
+/// resolves races the route's exit animation — the still-mounted fields
+/// then call `addListener` on a disposed controller and the dialog teardown
+/// fails with "A TextEditingController was used after being disposed".
+class _PaymentEditFields extends StatefulWidget {
+  const _PaymentEditFields({
+    super.key,
+    required this.amountText,
+    required this.reference,
+    required this.amountLabel,
+    required this.referenceLabel,
+  });
+
+  /// Amount, pre-formatted by the caller (see `_numText`).
+  final String amountText;
+  final String reference;
+  final String amountLabel;
+  final String referenceLabel;
+
+  @override
+  State<_PaymentEditFields> createState() => _PaymentEditFieldsState();
+}
+
+class _PaymentEditFieldsState extends State<_PaymentEditFields> {
+  late final TextEditingController _amount = TextEditingController(
+    text: widget.amountText,
+  );
+  late final TextEditingController _reference = TextEditingController(
+    text: widget.reference,
+  );
+
+  /// What the dialog's Save action pops.
+  (num, String) get value => (
+    num.tryParse(_amount.text) ?? 0,
+    _reference.text.trim(),
+  );
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    _reference.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      TextField(
+        controller: _amount,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(labelText: widget.amountLabel),
+      ),
+      const SizedBox(height: 8),
+      TextField(
+        controller: _reference,
+        decoration: InputDecoration(labelText: widget.referenceLabel),
+      ),
+    ],
+  );
+}
