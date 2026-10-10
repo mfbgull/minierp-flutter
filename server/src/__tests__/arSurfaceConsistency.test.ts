@@ -171,6 +171,32 @@ describe('ACCT-004 — AR aging buckets foot to the total outstanding', () => {
     ).toBeCloseTo(s.totalReceivables, 2);
     db.close();
   });
+
+  it('the per-customer agingBuckets rows foot, not just the summary', () => {
+    const db = createFixture();
+    invoice(db, { balance: 100, due: '2026-03-05' });   // ~88 days -> 61-90
+    invoice(db, { balance: 175, due: null });            // unknown maturity
+
+    const r = ReportsModel.getARAgingReport('2026-06-01', db) as unknown as {
+      agingBuckets: Array<{
+        total_outstanding: number; current_amount: number;
+        days_1_30: number; days_31_60: number; days_61_90: number; days_over_90: number;
+      }>;
+    };
+    expect(r.agingBuckets).toHaveLength(1); // one customer
+
+    // The residual defect this pins: the per-customer query counted an
+    // undated invoice in `total_outstanding` but in no bucket, so a
+    // customer's own row failed to foot even though the summary did.
+    const row = r.agingBuckets[0];
+    expect(Number(row.total_outstanding)).toBe(275);
+    expect(Number(row.current_amount)).toBeGreaterThanOrEqual(175);
+    const foot =
+      Number(row.current_amount) + Number(row.days_1_30) + Number(row.days_31_60) +
+      Number(row.days_61_90) + Number(row.days_over_90);
+    expect(foot).toBeCloseTo(Number(row.total_outstanding), 2);
+    db.close();
+  });
 });
 describe('SALES-017 — a due date is derived from the customer payment terms', () => {
   function fixture(): Database.Database {

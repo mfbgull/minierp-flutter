@@ -7,7 +7,7 @@ import { SqlParam } from '../utils/sqlTypes';
 function getARAgingReport(asOfDate: string, db: Database.Database) {
   const agingData = db.prepare(`
     SELECT c.customer_name, c.customer_code, SUM(i.balance_amount) as total_outstanding,
-      SUM(CASE WHEN julianday(?) - julianday(i.due_date) <= 0 THEN i.balance_amount ELSE 0 END) as current_amount,
+      SUM(CASE WHEN i.due_date IS NULL OR julianday(?) - julianday(i.due_date) <= 0 THEN i.balance_amount ELSE 0 END) as current_amount,
       SUM(CASE WHEN julianday(?) - julianday(i.due_date) > 0 AND julianday(?) - julianday(i.due_date) <= 30 THEN i.balance_amount ELSE 0 END) as days_1_30,
       SUM(CASE WHEN julianday(?) - julianday(i.due_date) > 30 AND julianday(?) - julianday(i.due_date) <= 60 THEN i.balance_amount ELSE 0 END) as days_31_60,
       SUM(CASE WHEN julianday(?) - julianday(i.due_date) > 60 AND julianday(?) - julianday(i.due_date) <= 90 THEN i.balance_amount ELSE 0 END) as days_61_90,
@@ -18,9 +18,11 @@ function getARAgingReport(asOfDate: string, db: Database.Database) {
   `).all(asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate);
 
   // A NULL due_date yields NULL from julianday(), so every comparison is NULL
-  // and the row falls through to ELSE 0 — the balance appeared in
-  // totalReceivables and in no bucket, so the aging did not foot. Such a row is
-  // "not yet due" and belongs in current_amount (audit ACCT-004).
+  // and the row falls through to ELSE 0 — the balance appeared in the total and
+  // in no bucket, so the aging did not foot. Such a row is "not yet due" and
+  // belongs in current_amount. The rule is applied in BOTH queries above (the
+  // per-customer buckets and the grand summary) because both foot against a
+  // total that counts the undated row (audit ACCT-004).
   const summary = db.prepare(`
     SELECT SUM(balance_amount) as totalReceivables,
       SUM(CASE WHEN due_date IS NULL OR julianday(?) - julianday(due_date) <= 0 THEN balance_amount ELSE 0 END) as current_amount,
