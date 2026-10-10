@@ -1,7 +1,8 @@
 # Audit Coverage Ledger
 
 One row per canonical finding from Part 0 of `audit/prompts.md` (65 rows), plus
-three IDs that appear in Part 3 without their own Part 0 row.
+five IDs that appear in Part 3 or the CONSOLIDATED remediation table without
+their own Part 0 row: DB-004, DB-005/006/007/008, SALES-020, PRET-001, RET-008.
 
 **This file is the answer to "did we leave anything?"** It is generated from the
 audit, not from memory. `status` is one of `planned`, `in-progress`, `landed`,
@@ -10,7 +11,7 @@ every `won't-fix` row carries a reason. Nothing may be silently absent.
 
 ## Invariants this file must satisfy
 
-1. Every canonical ID from Part 0 appears exactly once. (65 rows)
+1. Every canonical ID from Part 0 appears exactly once. (65 Part-0 rows; 67 total)
 2. Every row resolves to a change or an explicit `won't-fix`.
 3. Every `deferred` row has a reason **and** a review date.
 4. No row is blank in both `change` and `status`.
@@ -26,12 +27,12 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 
 ## Summary
 
-- `landed`: **18**
-- `planned`: **43**
+- `landed`: **21**
+- `planned`: **42**
 - `deferred`: **1**
 - `won't-fix`: **3**
-- Total rows: **65** (Part 0 = 65, plus DB-004, DB-005/006/007/008, SALES-020)
-- Changes: **17**
+- Total rows: **67** (Part 0 = 65, plus DB-004, DB-005/006/007/008, SALES-020, PRET-001, RET-008)
+- Changes: **18**
 
 ## Changes and what each closes
 
@@ -41,7 +42,7 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 | `accrual-and-tax-model` | PUR-008 · SALES-016 |
 | `c-06-layer-key-mismatch` | C-06 |
 | `cross-document-reference-guards` | PUR-007 |
-| `db-integrity-constraints` | PUR-012 · PUR-013 · PUR-014 · PUR-015 · DB-001 · DB-002 · DB-003 |
+| `db-integrity-constraints` | PUR-012 · PUR-013 · PUR-014 · PUR-015 · DB-001 · DB-002 · DB-003 · RET-008 |
 | `discount-and-tax-base` | CODE-006 · SALES-001 · SALES-006 |
 | `error-taxonomy-uniformity` | SALES-010 · SALES-014 · CODE-002 · SEC-004 · GL-005 · SALES-022 |
 | `idempotency-atomicity` | PUR-010 · SEC-003 · GL-007 · SALES-004 |
@@ -51,6 +52,7 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 | `live-data-repair` | PUR-016 |
 | `money-rounding-boundary` | PUR-009 · GL-003 · GL-006 |
 | `period-protection-primitive` | PUR-003 · PUR-005 · SALES-011 · CODE-001 · ACCT-007 · GL-004 · SALES-013 |
+| `purchase-return-refund-void` | PRET-001 |
 | `reversal-symmetry` | PUR-001 · C-05 |
 | `settlement-cash-integrity` | SALES-005 · C-01 · C-02 · H-03 |
 | `validation-schema-unification` | SALES-002 · SALES-012 · SALES-018 · CODE-005 · SEC-001 · SEC-002 · SALES-003 · SALES-009 · SALES-019 |
@@ -74,12 +76,14 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 | **PUR-014** | LOW | `db-integrity-constraints` | purchase-returns | purchases.balance_amount never goes below 0 | `planned` | — |
 | **PUR-015** | LOW | `db-integrity-constraints` | gl-posting-matrix | backfillGlPreposting skips voided purchases and writes the supplier-ledger leg on receipts | `planned` | — |
 | **PUR-016** | INFO | (none) | n/a | no repair: the two live rows belong to different suppliers (id 38 supplier 1 = 3,000; id 54 supplier 2 = 1,000) and are therefore not duplicates | `won't-fix` | Ruled by the owner 2026-10-08: different suppliers means not a duplicate. No data repair. |
+| **PRET-001** | CRITICAL | `purchase-return-refund-void` | purchase-returns | voiding a `refund_expected` purchase return voids the auto-issued supplier refund in the same transaction: no POSTED refund survives against a VOIDED credit note, the GL cash/AP legs are reversed, and the supplier balance returns to its pre-return position (`supplierRefund.test.ts` "PRET-001") | `landed` | — |
+| **RET-008** | MEDIUM | `db-integrity-constraints` | invoice-returns | a settlement whose `settled_amount` exceeds the return's `returned_amount` is rejected by a DB CHECK (`add-invoice-returns.sql` currently floors at 0 with no ceiling) | `planned` | — |
 | **SALES-005** | HIGH | `settlement-cash-integrity` | invoice-returns | editing a paid invoice to zero total is refused 400 | `landed` | — |
 | **SALES-007** | HIGH | `2026-10-08-ledger-single-derivation` (archived) | report-query-integrity | AR_OUTSTANDING carries deleted_at IS NULL; aging + top debtors exclude a soft-deleted invoice | `landed` | — |
 | **SALES-002** | HIGH | `validation-schema-unification` | authz-hardening | tax_rate < 0 rejected 400; postInvoiceEntry uses !== 0 so negative tax cannot take the no-tax branch | `planned` | — |
 | **SALES-016** | HIGH | `accrual-and-tax-model` | sales-tax-chain (new) | quotation -> SO -> invoice preserves tax_rate and discount; Cr 2100 posted | `planned` | — |
 | **SALES-011** | MEDIUM | `period-protection-primitive` | closed-period-immutability (new) | a future-dated invoice is rejected 400 and creates no period | `planned` | — |
-| **SALES-010** | MEDIUM | `error-taxonomy-uniformity` | report-query-integrity | backdating into a closed period returns 409, not 500 | `planned` | — |
+| **SALES-010** | MEDIUM | `error-taxonomy-uniformity` | report-query-integrity | POST /api/invoices dated inside a closed period returns 409 and writes nothing (`paymentRecordingMatrix.test.ts` asserts 409 on the create path); the create path now throws assertPeriodNotClosed's 'inside closed accounting period' message, which CLASSIFY_PATTERNS maps to 409 | `landed` | — |
 | **SALES-012** | MEDIUM | `validation-schema-unification` | authz-hardening | duplicate invoice_no on PUT returns 409; per-item validation runs on update | `planned` | — |
 | **SALES-014** | LOW | `error-taxonomy-uniformity` | invoice-returns | a cancelled invoice can be reinstated | `deferred` | Product decision: reinstate is a workflow question, not a defect. No user requirement yet. |
 | **SALES-018** | LOW | `validation-schema-unification` | authz-hardening | non-numeric money returns 400 with a field-level message | `planned` | — |
@@ -108,7 +112,7 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 | **DB-003** | HIGH | `db-integrity-constraints` | migration-ledger | migration checksum verification covers all applied migrations | `planned` | — |
 | **GL-002** | HIGH | `invariant-gate-coverage` | financial-test-invariants | deleting the master GL assertion fails the suite | `planned` | — |
 | **GL-003** | MEDIUM | `money-rounding-boundary` | gl-integrity | no float artefact in journal_lines; journal_entry_id 46 corrected symmetrically on both legs | `planned` | — |
-| **GL-004** | MEDIUM | `period-protection-primitive` | closed-period-immutability (new) | a non-calendar period name is closed by a real close action, not by naming convention | `planned` | — |
+| **GL-004** | MEDIUM | `period-protection-primitive` (create-side guard landed in 8badf489) | closed-period-immutability (new) | postEntry refuses ANY date inside a closed period by date overlap before the YYYY-MM auto-create; `auditRegression.test.ts` ACCT-004 rejects an invoice and a purchase dated inside a non-calendar closed period ('FY-REGRESSION-JULY') with zero GL lines written and zero overlapping open periods created | `landed` | — |
 | **GL-005** | MEDIUM | `error-taxonomy-uniformity` | gl-integrity | stock-authority-map.md matches the code | `planned` | — |
 | **GL-006** | MEDIUM | `money-rounding-boundary` | gl-integrity | every write to journal_lines passes through a currency rounding boundary | `planned` | — |
 | **GL-007** | MEDIUM | `idempotency-atomicity` | report-query-integrity | the 5 money-moving endpoints accept and enforce an idempotency key | `planned` | — |
@@ -135,6 +139,8 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 - MEDIUM-HIGH: 3
 - LOW-MEDIUM: 1
 
+Plus the two non-Part-0 rows added 2026-10-10: CRITICAL 1 (PRET-001), MEDIUM 1 (RET-008).
+
 ## Known blockers
 
 - **C-04 / inventory-layer-truth** — blocked on `inventory-batch-lot-spec`, a BREAKING
@@ -155,3 +161,12 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 
 *Generated 2026-10-07 from `audit/prompts.md`. Verification: every Part 0 canonical ID
 appears exactly once above; every `deferred` row has a reason and a review date.*
+
+*Updated 2026-10-10 — PRET-001 fixed and marked `landed`: `PurchaseReturn.voidReturn`
+now voids every live `supplier_refunds` row against the return's credit note before
+voiding the note itself (was untracked; surfaced by the CONSOLIDATED-AUDIT P0 table and
+`reg-test.md` defect 5). RET-008 added as `planned`. GL-004 and SALES-010 re-verified
+against HEAD and flipped to `landed` — both had been fixed in code (postEntry's
+date-overlap closed-period guard, 8badf489) without the ledger row being updated.
+ACCT-004's residual per-customer `agingBuckets` NULL-`due_date` gap closed in
+`Reports.getARAgingReport` and pinned by a new `arSurfaceConsistency` test.*
