@@ -75,6 +75,18 @@ class _FakeInvoiceRepository extends InvoiceRepository {
   /// server rejecting a payment — e.g. one that exceeds the invoice total).
   String? failPaymentWith;
 
+  /// Invoice detail returned by [invoice]. Edit mode re-reads the invoice
+  /// before validating a payment, so this is the balance validation runs
+  /// against. Null keeps the empty envelope (which carries no id and is
+  /// therefore ignored by the refresh).
+  Invoice? invoiceDetail;
+
+  /// Payments returned by [invoicePayments] — the edit-mode history panel.
+  List<InvoicePaymentRecord> existingPayments = const <InvoicePaymentRecord>[];
+
+  /// Bodies passed to [updatePayment] (the existing-payment edit path).
+  final List<(int, Map<String, dynamic>)> updatedPayments = [];
+
   /// Last body passed to [update] (edit-mode in-flight-commit assertions).
   Map<String, dynamic>? lastUpdateBody;
 
@@ -108,11 +120,26 @@ class _FakeInvoiceRepository extends InvoiceRepository {
 
   @override
   Future<ApiResult<List<InvoicePaymentRecord>>> invoicePayments(int id) async =>
-      const ApiSuccess(<InvoicePaymentRecord>[]);
+      ApiSuccess(existingPayments);
 
   @override
   Future<ApiResult<Invoice>> invoice(int id) async =>
-      ApiSuccess(Invoice.fromJson(const <String, dynamic>{}));
+      ApiSuccess(invoiceDetail ?? Invoice.fromJson(const <String, dynamic>{}));
+
+  @override
+  Future<ApiResult<InvoicePaymentRecord>> updatePayment(
+    int id,
+    Map<String, dynamic> body,
+  ) async {
+    updatedPayments.add((id, body));
+    return ApiSuccess(
+      InvoicePaymentRecord(
+        id: id,
+        amount: (body['amount'] as num?) ?? 0,
+        method: 'Cash',
+      ),
+    );
+  }
 
   @override
   Future<ApiResult<void>> delete(int id) async => const ApiSuccess(null);
@@ -2170,6 +2197,236 @@ void main() {
         findsNothing,
         reason: 'a rejected payment must not report plain success',
       );
+    });
+  });
+
+  group('edit-mode payment validation', () {
+    /// Same shape as [_editInvoice] with an arbitrary paid/balance/credit
+    /// split, so a test can model an invoice whose balance moved after the
+    /// page opened, or one partly settled with store credit.
+    Invoice editInvoice({
+      num paid = 0,
+      num balance = 1000,
+      num credit = 0,
+    }) => Invoice(
+      id: 42,
+      invoiceNo: 'INV-EDIT-1',
+      customerId: 1,
+      invoiceDate: '2026-08-11',
+      totalAmount: 1000,
+      paidAmount: paid,
+      balanceAmount: balance,
+      creditOffset: credit,
+      status: paid > 0 ? 'Partially Paid' : 'Unpaid',
+      discountScope: 'invoice',
+      items: const [
+        InvoiceItem(
+          id: 1,
+          invoiceId: 42,
+          itemId: 1,
+          quantity: 10,
+          unitPrice: 100,
+          amount: 1000,
+          taxRate: 0,
+          discountType: 'none',
+          discountValue: 0,
+          returnedQty: 0,
+        ),
+      ],
+    );
+
+    Finder amountField() => find.byWidgetPredicate(
+      (w) => w is TextField && w.decoration?.labelText == 'Amount',
+    );
+
+    Future<void> enterAmount(WidgetTester tester, String value) async {
+      expect(amountField(), findsOneWidget);
+      await tester.enterText(amountField(), value);
+      await tester.pumpAndSettle();
+    }
+
+    /// The button sits at the bottom of the panel's internal scroll view, so
+    /// it must be brought into the viewport before it can be hit-tested.
+    Future<void> recordPayment(WidgetTester tester) async {
+      final button = find.text('Record Payment');
+      await tester.ensureVisible(button);
+      await tester.pumpAndSettle();
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a payment equal to the full balance is recorded', (
+      tester,
+    ) async {
+      final repo = _FakeInvoiceRepository()..invoiceDetail = editInvoice();
+      await _pumpPage(tester, repo: repo, invoice: editInvoice());
+
+      await enterAmount(tester, '1000');
+      await recordPayment(tester);
+
+      expect(
+        repo.postedPayments,
+        hasLength(1),
+        reason:
+            'the reported bug: a full payment was checked as '
+            'doesPaymentExceedBalance(1000, 0) and blocked',
+      );
+      expect(repo.postedPayments.single['amount'], 1000);
+      expect(find.text('Payment recorded'), findsOneWidget);
+    });
+
+    testWidgets('a payment above the unpaid balance is refused', (tester) async {
+      final repo = _FakeInvoiceRepository()..invoiceDetail = editInvoice();
+      await _pumpPage(tester, repo: repo, invoice: editInvoice());
+
+      await enterAmount(tester, '1001');
+      await recordPayment(tester);
+
+      expect(repo.postedPayments, isEmpty, reason: 'nothing may be posted');
+      expect(
+        find.text(
+          'Payment exceeds the remaining balance of ${Formatters.currency(1000)}',
+        ),
+        findsOneWidget,
+        reason: 'the cap shown is the balance BEFORE this payment',
+      );
+    });
+
+    testWidgets(
+      'validation trusts the balance the server reports now, not the one '
+      'captured at page load',
+      (tester) async {
+        final repo = _FakeInvoiceRepository()
+          // The server has already collected the balance down to 600,
+          // while the invoice handed to the page still says 1,000.
+          ..invoiceDetail = editInvoice(paid: 400, balance: 600);
+        await _pumpPage(tester, repo: repo, invoice: editInvoice());
+
+        await enterAmount(tester, '700');
+        await recordPayment(tester);
+
+        expect(
+          repo.postedPayments,
+          isEmpty,
+          reason: 'the stale in-memory balance must not be trusted',
+        );
+        expect(
+          find.text(
+            'Payment exceeds the remaining balance of ${Formatters.currency(600)}',
+          ),
+          findsOneWidget,
+        );
+
+        // The refresh is not a one-way ratchet — the same session can still
+        // record what the server says is collectible.
+        await enterAmount(tester, '600');
+        await recordPayment(tester);
+        expect(repo.postedPayments, hasLength(1));
+      },
+    );
+
+    testWidgets(
+      'a settled store-credit offset neither blocks recording nor shrinks '
+      'the collectible balance',
+      (tester) async {
+        // 1,000 total, 400 settled from the credit pool (the server folds
+        // credit_offset into paid_amount), 600 still collectible in cash.
+        // The pool itself is empty now — the offset already consumed it.
+        final invoice = editInvoice(paid: 400, balance: 600, credit: 400);
+        final repo = _FakeInvoiceRepository()..invoiceDetail = invoice;
+        await _pumpPage(tester, repo: repo, invoice: invoice);
+
+        await enterAmount(tester, '600');
+        await recordPayment(tester);
+
+        expect(
+          repo.postedPayments,
+          hasLength(1),
+          reason: 'the whole unpaid balance is still collectible',
+        );
+        expect(find.text('Payment recorded'), findsOneWidget);
+      },
+    );
+
+    testWidgets('editing an existing payment is capped at the unpaid balance', (
+      tester,
+    ) async {
+      final repo = _FakeInvoiceRepository()
+        ..invoiceDetail = editInvoice()
+        ..existingPayments = const [
+          InvoicePaymentRecord(id: 7, amount: 100, method: 'Cash'),
+        ];
+      await _pumpPage(tester, repo: repo, invoice: editInvoice());
+
+      final editIcon = find.byIcon(Icons.edit_outlined);
+      expect(editIcon, findsOneWidget);
+      await tester.ensureVisible(editIcon);
+      await tester.pumpAndSettle();
+      await tester.tap(editIcon);
+      await tester.pumpAndSettle();
+
+      Finder dialogField(String label) => find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byWidgetPredicate(
+          (w) => w is TextField && w.decoration?.labelText == label,
+        ),
+      );
+      Finder dialogButton(String label) => find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text(label),
+      );
+
+      expect(dialogField('Amount'), findsOneWidget);
+      await tester.enterText(dialogField('Amount'), '5000');
+      await tester.pumpAndSettle();
+      await tester.tap(dialogButton('Save'));
+      await tester.pumpAndSettle();
+
+      expect(
+        repo.updatedPayments,
+        isEmpty,
+        reason: '5,000 cannot fit in a 1,000 balance plus the 100 already '
+            'recorded — headroom is 1,100',
+      );
+      expect(
+        find.text(
+          'Payment exceeds the remaining balance of ${Formatters.currency(1100)}',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('editing an existing payment to zero is refused', (
+      tester,
+    ) async {
+      final repo = _FakeInvoiceRepository()
+        ..invoiceDetail = editInvoice()
+        ..existingPayments = const [
+          InvoicePaymentRecord(id: 7, amount: 100, method: 'Cash'),
+        ];
+      await _pumpPage(tester, repo: repo, invoice: editInvoice());
+
+      final editIcon = find.byIcon(Icons.edit_outlined);
+      await tester.ensureVisible(editIcon);
+      await tester.pumpAndSettle();
+      await tester.tap(editIcon);
+      await tester.pumpAndSettle();
+
+      final amount = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byWidgetPredicate(
+          (w) => w is TextField && w.decoration?.labelText == 'Amount',
+        ),
+      );
+      await tester.enterText(amount, '0');
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(of: find.byType(AlertDialog), matching: find.text('Save')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repo.updatedPayments, isEmpty);
+      expect(find.text('Payment amount must be greater than zero'), findsOneWidget);
     });
   });
 }
