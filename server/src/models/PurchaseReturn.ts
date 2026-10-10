@@ -677,7 +677,7 @@ class PurchaseReturnModel {
   }
 
   // ------------------------------------------------------------------
-  // Void — full reversal (stock + GL + credit note + ledger + audit)
+  // Void — full reversal (stock + GL + credit note + auto-refund + ledger + audit)
   // ------------------------------------------------------------------
 
   static voidReturn(id: number, userId: number, reason: string, db: Database.Database): PurchaseReturnHeaderRow {
@@ -789,6 +789,28 @@ class PurchaseReturnModel {
 
       // Reverse the supplier credit note + ledger entry.
       if (header.credit_note_id) {
+        // PRET-001: a `refund_expected` return auto-issues a supplier refund
+        // against this credit note in the same transaction as the create
+        // (`create` → `SupplierRefundModel.create`). Voiding the note without
+        // reversing that refund left `Dr Cash / Cr AP` posted for goods the
+        // business no longer returned, and the now-VOIDED note made the
+        // orphan unrecoverable — `creditNoteRefundable` returns 0 for a
+        // non-POSTED note, so the money became invisible on every surface.
+        // Reverse every live refund against the note so the pair unwinds
+        // together.
+        const liveRefunds = db.prepare(`
+          SELECT id FROM supplier_refunds
+          WHERE credit_note_id = ? AND status = 'POSTED'
+        `).all(header.credit_note_id) as Array<{ id: number }>;
+        for (const refund of liveRefunds) {
+          SupplierRefundModel.void(
+            refund.id,
+            userId,
+            `Purchase return ${header.return_no} voided`,
+            db
+          );
+        }
+
         const note = db.prepare(`SELECT * FROM credit_notes WHERE id = ?`)
           .get(header.credit_note_id) as { credit_no: string; amount: number; supplier_id: number | null } | undefined;
 

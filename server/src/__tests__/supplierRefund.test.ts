@@ -277,6 +277,50 @@ describe('SupplierRefundModel', () => {
     expect(total).toBeGreaterThan(0);
   });
 
+  test('PRET-001: voiding a refund_expected return also voids the auto-issued refund', () => {
+    const db = setupDb();
+    const { returnId, creditNoteId } = seedReturn(db, { cash: 1000 });
+
+    // The refund_expected return auto-issued its cash collection.
+    const refund = db.prepare(
+      `SELECT id FROM supplier_refunds WHERE credit_note_id = ? AND status = 'POSTED'`
+    ).get(creditNoteId) as { id: number };
+    expect(refund).toBeDefined();
+
+    PurchaseReturnModel.voidReturn(returnId, 1, 'PRET-001 regression', db);
+
+    // The refund is voided WITH the return — a POSTED refund against a
+    // VOIDED credit note made the paid-out cash invisible
+    // (creditNoteRefundable returns 0 for a non-POSTED note).
+    const after = db.prepare(`SELECT status FROM supplier_refunds WHERE id = ?`)
+      .get(refund.id) as { status: string };
+    expect(after.status).toBe('VOIDED');
+
+    // GL: both reversal groups fully voided — no fabricated cash/AP survives.
+    const live = db.prepare(`
+      SELECT COUNT(*) AS n FROM journal_lines
+      WHERE voided = 0
+        AND ((reference_type = 'SUPPLIER_REFUND' AND reference_id = ?)
+          OR (reference_type = 'PURCHASE_RETURN' AND reference_id = ?))
+    `).get(refund.id, returnId) as { n: number };
+    expect(live.n).toBe(0);
+
+    // Cash account holds only the seeded opening balance: the refund's
+    // Dr 1000 leg is reversed, not left behind.
+    const cash = db.prepare(`
+      SELECT COALESCE(SUM(jl.debit - jl.credit), 0) AS net
+      FROM journal_lines jl JOIN chart_of_accounts a ON a.id = jl.account_id
+      WHERE a.code = '1000' AND jl.voided = 0
+    `).get() as { net: number };
+    expect(cash.net).toBeCloseTo(1000, 2);
+
+    // Subledger: the supplier position returns to its pre-return value (~0).
+    const balance = db.prepare(
+      `SELECT balance FROM supplier_ledger WHERE supplier_id = 1 ORDER BY id DESC LIMIT 1`
+    ).get() as { balance: number };
+    expect(Math.abs(balance.balance)).toBeLessThan(0.01);
+  });
+
   test('void reverses ledger + GL and restores the refundable balance', () => {
     const db = setupDb();
     const { creditNoteId, total } = seedReturn(db, { cash: 1000, disposition: 'credit_on_account' });
