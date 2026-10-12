@@ -6,42 +6,15 @@
 // off/on behavioral contract.
 
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
 import StockMovementModel from '../models/StockMovement';
 import { StockReservationModel } from '../models/StockReservation';
 import { runBackfillBatchLocations } from '../migrations/backfillBatchLocations';
 import { getEffectiveBatchStatus, setBatchStatusOverride } from '../utils/batchStatus';
 import { isFeatureEnabled, setFeatureEnabled } from '../utils/featureFlags';
+import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
 
 function createFixture(): Database.Database {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
-  const migrations = [
-    'init.sql', 'add-purchases-table.sql', 'add-purchase-return-fields.sql',
-    'add-batch-costing.sql', 'add-stock-adjustment-financial.sql',
-    'create-supplier-ledger.sql', 'add-gl-foundation.sql',
-    'add-physical-counts.sql', 'add-production-tables.sql', 'add-item-expiry-tracking.sql',
-    'add-purchase-return-batches.sql', 'add-batch-location-model.sql',
-  ];
-  for (const file of migrations) {
-    const p = path.join(__dirname, '..', 'migrations', file);
-    if (fs.existsSync(p)) db.exec(fs.readFileSync(p, 'utf8'));
-    else console.warn('MISSING migration fixture:', file);
-  }
-  const cols = db
-    .prepare(`SELECT name FROM pragma_table_info('stock_movements')`)
-    .all() as { name: string }[];
-  const has = (n: string) => cols.some((c) => c.name === n);
-  if (!has('batch_id'))
-    db.exec('ALTER TABLE stock_movements ADD COLUMN batch_id INTEGER REFERENCES stock_batches(id)');
-  if (!has('financial_value'))
-    db.exec('ALTER TABLE stock_movements ADD COLUMN financial_value DECIMAL(15,4) DEFAULT 0');
-  if (!has('financial_posted'))
-    db.exec('ALTER TABLE stock_movements ADD COLUMN financial_posted BOOLEAN DEFAULT FALSE');
-  if (!has('journal_entry_id'))
-    db.exec('ALTER TABLE stock_movements ADD COLUMN journal_entry_id INTEGER REFERENCES journal_entries(id)');
-
+  const db = createFixtureDb();
   db.prepare(
     `INSERT INTO users (username,email,password_hash,full_name,role,is_active) VALUES ('admin','a@b.c','x','A','admin',1)`
   ).run();
@@ -59,6 +32,10 @@ function createFixture(): Database.Database {
   ).run();
   return db;
 }
+
+afterAll(() => {
+  cleanupFixtureDbs();
+});
 
 /** Seed one batch + one location row + stock_balances coverage. */
 function seedBatch(

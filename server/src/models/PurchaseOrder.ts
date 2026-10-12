@@ -8,6 +8,7 @@ import logger from '../utils/logger';
 import { addCurrency, multiplyCurrency, roundCurrency } from '../utils/currency';
 import { requireSupplierForPurchase } from '../utils/purchaseValidation';
 import { roundQty, qtyEpsilon } from '../utils/quantity';
+import { BusinessRuleError } from '../utils/businessRuleError';
 
 interface PurchaseOrder {
   id: number;
@@ -883,9 +884,38 @@ class PurchaseOrderModel {
       throw new Error('Cannot receive items for Draft or Cancelled Purchase Orders');
     }
 
+    // PUR-013: the batch, the stock movement and the balance all use the
+    // RECEIPT's warehouse, so accepting a receipt into a different warehouse
+    // silently moves stock somewhere the PO never authorised. Measured: PO
+    // warehouse 8, receipt warehouse 9, accepted with no error.
+    //
+    // Only a PO that NAMED a warehouse can mismatch. A NULL po.warehouse_id
+    // authorises no particular warehouse, so the receipt's is the only
+    // available choice — treating that as a mismatch would block every
+    // receipt against a warehouse-less PO.
+    if (po.warehouse_id != null && warehouse_id !== po.warehouse_id) {
+      throw new BusinessRuleError(
+        400,
+        `Receipt warehouse (${warehouse_id}) does not match Purchase Order warehouse (${po.warehouse_id})`,
+      );
+    }
+
     const transaction = db.transaction(() => {
       // Validate quantities
       for (const receiptItem of items) {
+        // PUR-012: the upper bound alone let zero and negative through. Zero
+        // created four zero-valued rows and no GL entry, silently; negative was
+        // caught only by a table CHECK, surfacing as a 500 carrying the raw
+        // SQLite message. The HTTP surface was protected by the controller, so
+        // this only bit non-HTTP callers — which is exactly why the guard
+        // belongs at the model, not only at the edge.
+        if (!(receiptItem.received_quantity > 0)) {
+          throw new BusinessRuleError(
+            400,
+            `Received quantity must be greater than 0 (got ${receiptItem.received_quantity})`,
+          );
+        }
+
         const poItem = db.prepare(`
           SELECT * FROM purchase_order_items WHERE id = ?
         `).get(receiptItem.po_item_id) as { po_id: number; quantity: number; received_quantity: number; item_id: number };

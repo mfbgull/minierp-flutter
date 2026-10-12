@@ -3,39 +3,18 @@
  * expense lifecycle (EXP-03/04/05) regressions.
  */
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
 import ReportsModel from '../models/Reports';
 import ExpenseModel from '../models/Expense';
-
-const MIGRATIONS = [
-  'init.sql',
-  'add-purchases-table.sql',
-  'create-supplier-ledger.sql',
-  'create-payment-allocations.sql',
-  'add-expenses-table.sql',
-  'add-supplier-payment-support.sql',
-  'add-purchase-supplier-payment.sql',
-  'add-gl-foundation.sql',
-  'create-customer-ledger.sql',
-  'add-gl-void-attribution.sql',
-  'add-salary-payments.sql',
-  'add-cash-accounts.sql',
-  'add-opening-balances.sql',
-  'add-purchase-returns-tables.sql',
-];
+import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
 
 function createFixture(): Database.Database {
-  const db = new Database(':memory:');
-  for (const f of MIGRATIONS) {
-    db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
-  }
-  // suppliers.current_balance is added programmatically at boot.
-  db.exec('ALTER TABLE suppliers ADD COLUMN current_balance DECIMAL(15,2) DEFAULT 0');
+  const db = createFixtureDb();
   db.prepare(`INSERT INTO users (username,email,password_hash,full_name,role,is_active)
               VALUES ('u','e@x.c','h','U','admin',1)`).run();
   return db;
 }
+
+afterAll(() => cleanupFixtureDbs());
 
 describe('PAY-07: AP reports execute on the live schema', () => {
   it('both reports run without SQL errors and return zero on empty books', () => {

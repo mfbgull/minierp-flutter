@@ -178,7 +178,129 @@ finding sits on the layer that rewrite replaces. No code has been touched.
 
 ---
 
-## BUG-005 · `sales_order_items` has no tax or discount columns
+## BUG-005 · `journal_lines` has no database-level *prevention* of unbalanced entries (DB-002)
+
+**Status:** `OPEN` (detection half shipped) — prevention needs an architectural decision · **Severity:** HIGH
+**Audit row:** DB-002, still `planned` in the ledger — correctly, since prevention is undone
+
+### The finding
+
+`add-gl-foundation.sql` gives `journal_lines` only PER-LINE checks
+(`debit = 0 OR credit = 0`). There is no cross-row constraint and no trigger, so
+"debits == credits" is enforced only in application code at
+`accountingService.ts:300-311`. The FK-OFF non-transactional rebuild path and
+the `--rollback` CLI execute raw SQL with no such guard.
+
+### Why it is not simply a missing trigger
+
+A row-level trigger asserting the group sums to zero cannot work here, and
+adding one would break the system rather than protect it:
+
+- **`postEntry` inserts one statement per line** (`accountingService.ts:393-410`).
+  The trigger would fire on line 1 of a balanced two-line entry and abort every
+  legitimate posting.
+- **`voidJournalLinesByReference` voids every line of a reference in a SINGLE
+  `UPDATE ... SET voided = 1`.** A per-row trigger would observe a half-voided
+  group and abort every void in the system.
+
+SQLite has no `DEFERRABLE` constraint, so there is no way to defer the check to
+statement or transaction end.
+
+### The only sound option, and its cost
+
+A **seal**: a guaranteed parent row whose final UPDATE asserts the group
+balances. That requires
+
+1. creating a `journal_entries` table for the `journal_lines` grouping — the one
+   that exists today is OPTIONAL (only `add-stock-adjustment-financial.sql`
+   creates it) and has a different two-leg shape (`debit_account`,
+   `credit_account`, `amount`), so it cannot be reused as-is;
+2. backfilling a parent row for every existing `journal_entry_id` group;
+3. routing all **5** `INSERT INTO journal_lines` sites through a seal step;
+4. routing every void path through a matching unseal.
+
+That is a redesign of every GL write, against a suite where 123 of 124 suites
+encode GL invariants. It is put to the user rather than taken unilaterally.
+
+### What IS now enforced — the detection half
+
+`assertJournalEntriesBalance` runs at boot, after the migration sequence and
+before any HTTP listen. It compares each `journal_entry_id` group's live lines in
+**integer minor units** (matching the application invariant, so float artefacts
+cannot fail it) and aborts with `process.exit(1)` naming the entry ids and the
+drift. Fully voided groups are ignored.
+
+So an unbalanced entry written by raw SQL — the FK-OFF rebuild path, the
+`--rollback` CLI — now fails the boot loudly instead of leaving books that every
+report then reads. Covered by 5 behavioural tests, proved non-vacuous by M12.
+
+### Two prevention attempts, both reverted — do not repeat them
+
+Both were implemented, measured against the full suite, and removed.
+
+**Attempt 1 — a trigger on `DELETE`.** Fires whenever the surviving lines of an
+entry do not balance, which includes routine teardown. Result: **19 tests across
+34 suites failed**, 18 of them with `cannot delete a journal line that would
+leave its entry unbalanced`. Suites legitimately delete journal lines while
+cleaning up fixtures and drifted entries, and repairing damage is itself a
+delete — so guarding it protects less than it costs.
+
+**Attempt 2 — a trigger on `UPDATE OF debit, credit` for live lines.** Scoped
+precisely to the one operation no production path performs, so it broke no
+posting, void or repair (`backfillInvoiceTaxGl` repairs by void-and-repost via
+`postEntry`, never by editing amounts). Result: **4 tests failed** in
+`taxGlRepairMigration.test.ts`, whose `corruptToGrossTax` fixture deliberately
+edits live credits to CREATE drift for the repair migration to fix.
+
+That second failure is the decisive one. A guard that forbids manufacturing
+drift also forbids the test that proves drift is repairable, and would in time
+forbid any future repair that corrects an existing entry by editing its amounts.
+Enforcement strong enough to stop that is enforcement strong enough to block the
+fix. Ship the detection, not the prohibition.
+
+### A third attempt — the seal — hit a blocker bigger than DB-002
+
+A **seal** design sidesteps all four operations above: an entry is built freely,
+then sealed in one separate statement that the database checks atomically. Sealing
+asserts the live lines balance, and a `BEFORE INSERT` trigger on `journal_lines`
+refuses to add lines to a sealed entry, so a balanced entry cannot later be
+broken. Void/un-void never add a line, so neither trips it.
+
+It was implemented — migration, triggers, and the seal call in
+`AccountingService.postEntry` — and reverted, for a reason unrelated to the GL:
+
+> `SqliteError: no such table: journal_entry_seal` — 38 occurrences, 51 tests,
+> 11 suites.
+
+**24 test files maintain their own hand-written list of migrations to apply**, and
+**15 of them call `AccountingService`**. None had the new migration, so the seal
+insert failed. The production boot path was fine; the fixtures were not.
+
+This is a structural limitation of the test harness, and it is worth more than
+DB-002: **the project currently cannot add ANY migration that runtime code
+depends on.** A migration that only adds indexes or triggers is invisible to
+those fixtures and lands safely (as DB-001 and RET-008 did). A migration that
+application code then reads from breaks them.
+
+Two ways forward, neither chosen unilaterally:
+
+1. Add the migration to each of the 24 lists — works, but every future migration
+   that runtime code depends on must be added 24 times, and any list missed
+   breaks as a confusing `no such table` at a distance from its cause.
+2. Make the fixtures apply the whole `src/migrations` directory instead of a
+   hand-picked subset. Removes the duplication permanently. It is a real
+   refactor: some fixtures deliberately apply a SUBSET (e.g. an invoice-return
+   suite that omits later migrations), and applying all of them may change what
+   those tests exercise.
+
+Option 2 is the fix. It is also a separate piece of work from DB-002.
+
+### What stays unenforced until the redesign lands
+
+Raw SQL can still *write* an unbalanced entry; the boot gate only notices on the
+next start. Nothing prevents it at write time.
+
+## BUG-006 · `sales_order_items` has no tax or discount columns
 
 **Status:** `OPEN` — **Severity:** medium-high
 

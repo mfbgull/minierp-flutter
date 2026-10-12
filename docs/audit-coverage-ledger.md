@@ -27,8 +27,8 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 
 ## Summary
 
-- `landed`: **21**
-- `planned`: **42**
+- `landed`: **28**
+- `planned`: **35**
 - `deferred`: **1**
 - `won't-fix`: **3**
 - Total rows: **67** (Part 0 = 65, plus DB-004, DB-005/006/007/008, SALES-020, PRET-001, RET-008)
@@ -71,13 +71,13 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 | **PUR-008** | MEDIUM | `accrual-and-tax-model` | purchase-accruals (new) | GRNI account exists; a receipt credits GRNI not 2000; price variance posts to a variance account | `planned` | — |
 | **PUR-009** | MEDIUM | `money-rounding-boundary` | gl-integrity | purchases.total_cost is 2dp; GL Cr 2000 equals it exactly | `planned` | — |
 | **PUR-010** | MEDIUM | `idempotency-atomicity` | report-query-integrity | a duplicated partial receipt request is rejected by idempotency key | `planned` | — |
-| **PUR-012** | LOW | `db-integrity-constraints` | gl-integrity | a receipt with quantity 0 or negative is rejected 400 at the model layer | `planned` | — |
-| **PUR-013** | LOW | `db-integrity-constraints` | batch-source-typing | a receipt into a warehouse other than the PO warehouse is rejected | `planned` | — |
-| **PUR-014** | LOW | `db-integrity-constraints` | purchase-returns | purchases.balance_amount never goes below 0 | `planned` | — |
-| **PUR-015** | LOW | `db-integrity-constraints` | gl-posting-matrix | backfillGlPreposting skips voided purchases and writes the supplier-ledger leg on receipts | `planned` | — |
+| **PUR-012** | LOW | `db-integrity-constraints` | gl-integrity | a receipt with quantity 0 or negative is rejected 400 at the model layer | `landed` | — |
+| **PUR-013** | LOW | `db-integrity-constraints` | batch-source-typing | a receipt into a warehouse other than the PO warehouse is rejected | `landed` | — |
+| **PUR-014** | LOW | `db-integrity-constraints` | purchase-returns | purchases.balance_amount never goes below 0 | `landed` | — |
+| **PUR-015** | LOW | `db-integrity-constraints` | gl-posting-matrix | backfillGlPreposting skips voided purchases and writes the supplier-ledger leg on receipts | `landed` | — |
 | **PUR-016** | INFO | (none) | n/a | no repair: the two live rows belong to different suppliers (id 38 supplier 1 = 3,000; id 54 supplier 2 = 1,000) and are therefore not duplicates | `won't-fix` | Ruled by the owner 2026-10-08: different suppliers means not a duplicate. No data repair. |
 | **PRET-001** | CRITICAL | `purchase-return-refund-void` | purchase-returns | voiding a `refund_expected` purchase return voids the auto-issued supplier refund in the same transaction: no POSTED refund survives against a VOIDED credit note, the GL cash/AP legs are reversed, and the supplier balance returns to its pre-return position (`supplierRefund.test.ts` "PRET-001") | `landed` | — |
-| **RET-008** | MEDIUM | `db-integrity-constraints` | invoice-returns | a settlement whose `settled_amount` exceeds the return's `returned_amount` is rejected by a DB CHECK (`add-invoice-returns.sql` currently floors at 0 with no ceiling) | `planned` | — |
+| **RET-008** | MEDIUM | `db-integrity-constraints` | invoice-returns | a settlement whose `settled_amount` exceeds the return's `returned_amount` is rejected by a DB CHECK (`add-invoice-returns.sql` currently floors at 0 with no ceiling) | `landed` | — |
 | **SALES-005** | HIGH | `settlement-cash-integrity` | invoice-returns | editing a paid invoice to zero total is refused 400 | `landed` | — |
 | **SALES-007** | HIGH | `2026-10-08-ledger-single-derivation` (archived) | report-query-integrity | AR_OUTSTANDING carries deleted_at IS NULL; aging + top debtors exclude a soft-deleted invoice | `landed` | — |
 | **SALES-002** | HIGH | `validation-schema-unification` | authz-hardening | tax_rate < 0 rejected 400; postInvoiceEntry uses !== 0 so negative tax cannot take the no-tax branch | `planned` | — |
@@ -107,9 +107,9 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 | **SEC-002** | CRITICAL | `2026-10-08-validation-schema-unification` (partial — inventory + structural guard) | authz-hardening | the 7 remaining passthrough schemas are pinned in KNOWN_PASSTHROUGH; adding an 8th fails a test | `landed` | — |
 | **SEC-003** | HIGH | `idempotency-atomicity` | report-query-integrity | no HTTP response is written inside a DB transaction | `planned` | — |
 | **SEC-004** | HIGH | `error-taxonomy-uniformity` | report-query-integrity | SQLite error text never reaches the client | `planned` | — |
-| **DB-001** | HIGH | `db-integrity-constraints` | query-performance | goods_receipt_items has indexes on purchase_order_id and item_id | `planned` | — |
+| **DB-001** | HIGH | `db-integrity-constraints` | query-performance | goods_receipt_items has indexes on purchase_order_id and item_id | `landed` | — |
 | **DB-002** | HIGH | `db-integrity-constraints` | gl-integrity | a DB-level constraint or trigger rejects an unbalanced journal entry | `planned` | — |
-| **DB-003** | HIGH | `db-integrity-constraints` | migration-ledger | migration checksum verification covers all applied migrations | `planned` | — |
+| **DB-003** | HIGH | `db-integrity-constraints` | migration-ledger | migration checksum verification covers all applied migrations | `landed` | — |
 | **GL-002** | HIGH | `invariant-gate-coverage` | financial-test-invariants | deleting the master GL assertion fails the suite | `planned` | — |
 | **GL-003** | MEDIUM | `money-rounding-boundary` | gl-integrity | no float artefact in journal_lines; journal_entry_id 46 corrected symmetrically on both legs | `planned` | — |
 | **GL-004** | MEDIUM | `period-protection-primitive` (create-side guard landed in 8badf489) | closed-period-immutability (new) | postEntry refuses ANY date inside a closed period by date overlap before the YYYY-MM auto-create; `auditRegression.test.ts` ACCT-004 rejects an invoice and a purchase dated inside a non-calendar closed period ('FY-REGRESSION-JULY') with zero GL lines written and zero overlapping open periods created | `landed` | — |

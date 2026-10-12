@@ -6,9 +6,7 @@ Keeps the measured hot paths fast: covering indexes on the hot queries, pruned
 redundant indexes, incremental ledger balance updates, bounded batched
 dashboards, hoisted search permission checks, and paginated/date-bounded
 reports and ledgers.
-
 ## Requirements
-
 ### Requirement: Hot-path indexes exist
 The schema SHALL include covering indexes for the measured hot paths: `invoice_items(invoice_id)` and `invoice_items(item_id)`, `customers(customer_name)`, `suppliers(supplier_name)`, `settings(key)`, `invoices(due_date)`, `invoices(status, invoice_date)`, `customer_ledger(customer_id, transaction_date, id)`, `customer_ledger(customer_id, id)`, `stock_movements(item_id, warehouse_id, movement_date)`; invoice-detail and sales-by-item lookups SHALL be index searches, not full scans.
 
@@ -56,3 +54,22 @@ All /reports/* endpoints, customer/supplier ledger and statement endpoints, /sto
 #### Scenario: Save is independent of history depth
 - **WHEN** an invoice is created for a customer with 100k ledger rows
 - **THEN** the write performs a bounded number of statements unrelated to the customer's row count, and all running balances remain correct
+
+### Requirement: Foreign key columns used for joins and cascades are indexed
+Every foreign key column on a hot transactional table SHALL carry an index, so
+that a parent delete, update, or join resolves by lookup rather than by full
+table scan.
+
+`goods_receipt_items` carried three foreign keys and no indexes at all, so the
+`goods_receipts` ON DELETE CASCADE and every parent update scanned the whole
+receipt table.
+
+#### Scenario: A goods receipt delete does not scan the item table
+- **WHEN** a goods receipt is deleted
+- **THEN** its items are found by index on `receipt_id`
+
+#### Scenario: Each FK column is individually covered
+- **WHEN** the schema is inspected
+- **THEN** `goods_receipt_items` has an index covering `receipt_id`,
+      `po_item_id` and `item_id`
+

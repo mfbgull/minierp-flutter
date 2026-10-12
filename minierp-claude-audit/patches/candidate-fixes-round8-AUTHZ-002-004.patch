@@ -1,0 +1,187 @@
+diff --git a/server/src/controllers/rolesController.ts b/server/src/controllers/rolesController.ts
+index 934b4cc8..072c6c72 100644
+--- a/server/src/controllers/rolesController.ts
++++ b/server/src/controllers/rolesController.ts
+@@ -1,6 +1,7 @@
+ import { Response } from 'express';
+ import db from '../config/database';
+ import { AuthRequest } from '../types';
++import { permissionKeysForIds, permissionsBeyondActor } from '../middleware/requirePermission';
+ import logger from '../utils/logger';
+ import RoleModel from '../models/Role';
+ 
+@@ -45,6 +46,17 @@ function createRole(req: AuthRequest, res: Response): void {
+       return;
+     }
+ 
++    // AUTHZ-004: a non-admin cannot hand out permissions they do not hold
++    // (otherwise a role manager can grant their own role everything).
++    const beyond = permissionsBeyondActor(req.user, permissionKeysForIds(permissions || []));
++    if (beyond.length > 0) {
++      res.status(403).json({
++        error: 'You cannot grant permissions you do not hold yourself',
++        missing_permissions: beyond.slice(0, 10),
++      });
++      return;
++    }
++
+     const userId = req.user?.id ?? 0;
+     const newRole = RoleModel.create(db, { role_name, description, permissions }, userId);
+ 
+@@ -86,6 +98,17 @@ function updateRolePermissions(req: AuthRequest, res: Response): void {
+     const roleId = parseInt(String(id), 10);
+     const { permissions }: { permissions: number[] } = req.body;
+ 
++    // AUTHZ-004: a non-admin cannot hand out permissions they do not hold
++    // (otherwise a role manager can grant their own role everything).
++    const beyond = permissionsBeyondActor(req.user, permissionKeysForIds(permissions || []));
++    if (beyond.length > 0) {
++      res.status(403).json({
++        error: 'You cannot grant permissions you do not hold yourself',
++        missing_permissions: beyond.slice(0, 10),
++      });
++      return;
++    }
++
+     RoleModel.updatePermissions(db, roleId, permissions);
+     res.json({ success: true, message: 'Permissions updated successfully' });
+   } catch (error: unknown) {
+diff --git a/server/src/controllers/userController.ts b/server/src/controllers/userController.ts
+index 0916ec3b..ef05c3e4 100644
+--- a/server/src/controllers/userController.ts
++++ b/server/src/controllers/userController.ts
+@@ -5,6 +5,37 @@ import bcrypt from 'bcrypt';
+ import { log, logAuth, ActionType } from '../services/activityLogger';
+ import logger from '../utils/logger';
+ import UserModel from '../models/User';
++import { rolePermissionKeys, permissionsBeyondActor } from '../middleware/requirePermission';
++
++/**
++ * AUTHZ-002: administrator accounts are only manageable by administrators.
++ * Without this, anyone holding users:update could reset the admin's password
++ * (or change its e-mail) and take the account over.
++ */
++function denyIfTargetIsAdmin(req: AuthRequest, res: Response, target: { role?: string }): boolean {
++  if (target.role === 'admin' && req.user?.role !== 'admin') {
++    res.status(403).json({ error: 'Only administrators can modify administrator accounts' });
++    return true;
++  }
++  return false;
++}
++
++/**
++ * AUTHZ-003: a non-admin may only assign roles whose permissions they hold
++ * themselves, so users:create / users:update cannot be used to mint access
++ * (e.g. the system Admin role) beyond the assigner's own.
++ */
++function denyIfRoleExceedsActor(req: AuthRequest, res: Response, roleId: number): boolean {
++  const beyond = permissionsBeyondActor(req.user, rolePermissionKeys(Number(roleId)));
++  if (beyond.length > 0) {
++    res.status(403).json({
++      error: 'You cannot assign a role that grants permissions you do not hold yourself',
++      missing_permissions: beyond.slice(0, 10),
++    });
++    return true;
++  }
++  return false;
++}
+ 
+ function getUsers(req: AuthRequest, res: Response): void {
+   try {
+@@ -42,6 +73,7 @@ async function createUser(req: AuthRequest, res: Response): Promise<void> {
+       res.status(400).json({ error: 'Invalid role' });
+       return;
+     }
++    if (denyIfRoleExceedsActor(req, res, role_id)) return;
+ 
+     if (UserModel.usernameExists(db, username)) {
+       res.status(409).json({ error: 'Username already exists' });
+@@ -80,6 +112,7 @@ function updateUser(req: AuthRequest, res: Response): void {
+ 
+     const existingUser = UserModel.getPublicById(userId, db);
+     if (!existingUser) { res.status(404).json({ error: 'User not found' }); return; }
++    if (denyIfTargetIsAdmin(req, res, existingUser)) return;
+ 
+     // SEC-04: own role is immutable through self-edit, full stop.
+     // Reject any self-edit containing role_id regardless of target role —
+@@ -93,6 +126,7 @@ function updateUser(req: AuthRequest, res: Response): void {
+       res.status(400).json({ error: 'Invalid role' });
+       return;
+     }
++    if (role_id && denyIfRoleExceedsActor(req, res, role_id)) return;
+ 
+     if (username && username !== existingUser.username && UserModel.usernameExists(db, username, userId)) {
+       res.status(409).json({ error: 'Username already exists' });
+@@ -129,6 +163,7 @@ function deleteUser(req: AuthRequest, res: Response): void {
+     const userId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+     const existingUser = UserModel.getPublicById(userId, db);
+     if (!existingUser) { res.status(404).json({ error: 'User not found' }); return; }
++    if (denyIfTargetIsAdmin(req, res, existingUser)) return;
+     if (req.user!.id === userId) { res.status(400).json({ error: 'Cannot delete your own account' }); return; }
+     if (existingUser.role === 'admin' && UserModel.getAdminCount(db) <= 1) {
+       res.status(400).json({ error: 'Cannot delete the last active admin user' });
+@@ -157,6 +192,7 @@ async function resetPassword(req: AuthRequest, res: Response): Promise<void> {
+ 
+     const existingUser = UserModel.getPublicById(userId, db);
+     if (!existingUser) { res.status(404).json({ error: 'User not found' }); return; }
++    if (denyIfTargetIsAdmin(req, res, existingUser)) return;
+ 
+     // Async bcrypt (spec 2.1) — hashSync blocked the event loop ~300ms.
+     const passwordHash = await bcrypt.hash(newPassword, 12);
+@@ -181,6 +217,7 @@ function toggleUserStatus(req: AuthRequest, res: Response): void {
+ 
+     const existingUser = UserModel.getPublicById(userId, db);
+     if (!existingUser) { res.status(404).json({ error: 'User not found' }); return; }
++    if (denyIfTargetIsAdmin(req, res, existingUser)) return;
+     if (req.user!.id === userId) { res.status(400).json({ error: 'Cannot deactivate your own account' }); return; }
+     if (existingUser.role === 'admin' && !is_active && UserModel.getAdminCount(db) <= 1) {
+       res.status(400).json({ error: 'Cannot deactivate the last active admin user' });
+diff --git a/server/src/middleware/requirePermission.ts b/server/src/middleware/requirePermission.ts
+index 76863fb4..cdef84a2 100644
+--- a/server/src/middleware/requirePermission.ts
++++ b/server/src/middleware/requirePermission.ts
+@@ -40,6 +40,44 @@ export function userHasPermission(
+   return !!granted;
+ }
+ 
++/** 'module:action' keys granted to a role. */
++export function rolePermissionKeys(roleId: number): Set<string> {
++  const rows = db.prepare(`
++    SELECT p.module AS module, p.action AS action
++    FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
++    WHERE rp.role_id = ?
++  `).all(roleId) as Array<{ module: string; action: string }>;
++  return new Set(rows.map(r => `${r.module}:${r.action}`));
++}
++
++/** 'module:action' keys for a list of permission ids. */
++export function permissionKeysForIds(ids: number[]): Set<string> {
++  const keys = new Set<string>();
++  const stmt = db.prepare('SELECT module, action FROM permissions WHERE id = ?');
++  for (const id of ids) {
++    const row = stmt.get(Number(id)) as { module: string; action: string } | undefined;
++    if (row) keys.add(`${row.module}:${row.action}`);
++  }
++  return keys;
++}
++
++/**
++ * Permissions in `wanted` that the acting user does not hold themselves.
++ * Administrators are unrestricted (empty result). Used to stop a delegated
++ * user/role manager from minting access beyond their own (AUTHZ-003/004).
++ */
++export function permissionsBeyondActor(
++  user: { id: number; role?: string } | undefined,
++  wanted: Set<string>
++): string[] {
++  if (user?.role === 'admin') return [];
++  const actorRow = user
++    ? db.prepare('SELECT role_id FROM users WHERE id = ?').get(user.id) as { role_id: number | null } | undefined
++    : undefined;
++  const held = actorRow?.role_id ? rolePermissionKeys(actorRow.role_id) : new Set<string>();
++  return [...wanted].filter(k => !held.has(k));
++}
++
+ export function requirePermission(module: string, action: string) {
+   return (req: AuthRequest, res: Response, next: NextFunction): void => {
+     if (!req.user) {
