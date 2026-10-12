@@ -5,68 +5,18 @@
 // batch_stock_by_location path is exercised end to end.
 
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
 import PurchaseReturnModel from '../models/PurchaseReturn';
 import InvoiceModel from '../models/Invoice';
 import PhysicalCountModel from '../models/PhysicalCount';
 import StockMovementModel from '../models/StockMovement';
 import { setFeatureEnabled } from '../utils/featureFlags';
+import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
 
 /**
- * Fixture: replay the real migration chain (incl. the batch-location
- * model) on an in-memory DB, then seed master data.
+ * Fixture: the real production schema, then master data.
  */
 function createFixture(): Database.Database {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
-
-  const migrations = [
-    'init.sql',
-    'add-purchases-table.sql',
-    'add-purchase-return-fields.sql',
-    'add-batch-costing.sql',
-    'add-stock-adjustment-financial.sql',
-    'create-supplier-ledger.sql',
-    'add-gl-foundation.sql',
-    'create-payment-allocations.sql',
-    'add-supplier-payment-support.sql',
-    'add-purchase-supplier-payment.sql',
-    'add-purchase-returns-tables.sql',
-    'add-purchase-return-batches.sql',
-    'add-disposition-and-supplier-refunds.sql',
-    'create-customer-ledger.sql',
-    'add-gl-void-attribution.sql',
-    'add-salary-payments.sql',
-    'add-payment-salary-void-columns.sql',
-    'add-physical-counts.sql',
-    'add-count-correction-columns.sql',
-    'add-production-tables.sql',
-    'add-item-expiry-tracking.sql',
-    'add-batch-location-model.sql',
-  ];
-  for (const file of migrations) {
-    db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', file), 'utf8'));
-  }
-
-  // purchase_return_batches.location_id — added programmatically at boot
-  const prbCols = db.prepare(`SELECT name FROM pragma_table_info('purchase_return_batches')`).all() as { name: string }[];
-  if (!prbCols.some((c) => c.name === 'location_id')) {
-    db.exec('ALTER TABLE purchase_return_batches ADD COLUMN location_id INTEGER REFERENCES locations(id)');
-  }
-
-  const supCols = db.prepare(`SELECT name FROM pragma_table_info('suppliers')`).all() as { name: string }[];
-  if (!supCols.some((c) => c.name === 'current_balance')) {
-    db.exec('ALTER TABLE suppliers ADD COLUMN current_balance DECIMAL(15,2) DEFAULT 0');
-  }
-
-  const cols = db.prepare(`SELECT name FROM pragma_table_info('stock_movements')`).all() as { name: string }[];
-  const has = (n: string) => cols.some((c) => c.name === n);
-  if (!has('batch_id')) db.exec('ALTER TABLE stock_movements ADD COLUMN batch_id INTEGER REFERENCES stock_batches(id)');
-  if (!has('financial_value')) db.exec('ALTER TABLE stock_movements ADD COLUMN financial_value DECIMAL(15,4) DEFAULT 0');
-  if (!has('financial_posted')) db.exec('ALTER TABLE stock_movements ADD COLUMN financial_posted BOOLEAN DEFAULT FALSE');
-  if (!has('journal_entry_id')) db.exec('ALTER TABLE stock_movements ADD COLUMN journal_entry_id INTEGER REFERENCES journal_entries(id)');
-  if (!has('purchase_return_id')) db.exec('ALTER TABLE stock_movements ADD COLUMN purchase_return_id INTEGER REFERENCES purchase_returns(id)');
+  const db = createFixtureDb();
 
   db.prepare(`INSERT INTO users (username,email,password_hash,full_name,role,is_active) VALUES ('admin','a@b.c','x','A','admin',1)`).run();
   db.prepare(`INSERT INTO items (id,item_code,item_name,unit_of_measure,standard_cost,is_purchased,is_active) VALUES (1,'IT-1','Widget','Nos',10,1,1)`).run();
@@ -80,6 +30,10 @@ function createFixture(): Database.Database {
   setFeatureEnabled(db, 'feature_batch_locations', true);
   return db;
 }
+
+afterAll(() => {
+  cleanupFixtureDbs();
+});
 
 /** Full stock seed: purchase → batch → location row → balance row. */
 function seedStock(db: Database.Database, qty: number, cost = 10): number {

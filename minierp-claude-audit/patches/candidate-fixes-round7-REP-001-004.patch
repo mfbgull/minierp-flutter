@@ -1,0 +1,277 @@
+diff --git a/server/src/controllers/customReportsController.ts b/server/src/controllers/customReportsController.ts
+index 28a0941a..d92856bb 100644
+--- a/server/src/controllers/customReportsController.ts
++++ b/server/src/controllers/customReportsController.ts
+@@ -6,7 +6,8 @@
+ import { Request, Response } from 'express';
+ import { AuthRequest } from '../types';
+ import CustomReport from '../models/CustomReport';
+-import { getAllEntities, getEntity } from '../services/entityRegistry';
++import { getAllEntities, getEntity, getEntityPermissionModule } from '../services/entityRegistry';
++import { userHasPermission } from '../middleware/requirePermission';
+ import { executeReport } from '../services/reportQueryEngine';
+ import type { ReportConfig, ColumnDef, ComputedColumnDef, SortDef } from '../services/reportQueryEngine';
+ import { validateConfigExpressions, ExpressionValidationError } from '../services/expressionValidator';
+@@ -336,6 +337,17 @@ function runReport(req: AuthRequest, res: Response): void {
+       return;
+     }
+ 
++    // REP-001: the report reads the entity's table directly, so the caller
++    // needs read access to the module that owns that data. Saved reports are
++    // re-checked on every run (permissions can change after saving).
++    const requiredModule = getEntityPermissionModule(String(config?.entity));
++    if (!userHasPermission(req.user, requiredModule, 'read')) {
++      res.status(403).json({
++        error: `Access denied: running this report requires "read" permission for "${requiredModule}"`,
++      });
++      return;
++    }
++
+     const result = executeReport(config);
+     res.json({
+       success: true,
+@@ -360,9 +372,10 @@ function runReport(req: AuthRequest, res: Response): void {
+  * GET /api/reports/custom/entities
+  * List all available entities with their fields and join info.
+  */
+-function listEntities(_req: Request, res: Response): void {
++function listEntities(req: AuthRequest, res: Response): void {
+   try {
+-    const entities = getAllEntities();
++    // Only advertise the entities this user could actually run (REP-001).
++    const entities = getAllEntities().filter((e) => userHasPermission(req.user, getEntityPermissionModule(e.key), 'read'));
+     res.json({ success: true, data: entities });
+   } catch (error: unknown) {
+     logger.error('List entities error:', errorMessage(error));
+@@ -374,9 +387,13 @@ function listEntities(_req: Request, res: Response): void {
+  * GET /api/reports/custom/entities/:key
+  * Get a single entity definition by key.
+  */
+-function getEntityDetail(req: Request, res: Response): void {
++function getEntityDetail(req: AuthRequest, res: Response): void {
+   try {
+     const entityKey = String(req.params.key);
++    if (!userHasPermission(req.user, getEntityPermissionModule(entityKey), 'read')) {
++      res.status(403).json({ error: 'Access denied' });
++      return;
++    }
+     const entity = getEntity(entityKey);
+     if (!entity) {
+       res.status(404).json({ error: 'Entity not found' });
+diff --git a/server/src/middleware/requirePermission.ts b/server/src/middleware/requirePermission.ts
+index b6f7a48a..76863fb4 100644
+--- a/server/src/middleware/requirePermission.ts
++++ b/server/src/middleware/requirePermission.ts
+@@ -17,6 +17,29 @@ import { AuthRequest } from '../types';
+ import db from '../config/database';
+ import logger from '../utils/logger';
+ 
++/**
++ * Programmatic permission check (same rules as requirePermission): admins pass,
++ * everyone else needs the role permission. Used where the module being
++ * authorised depends on request content (e.g. the custom-report entity).
++ */
++export function userHasPermission(
++  user: { id: number; role?: string } | undefined,
++  module: string,
++  action: string
++): boolean {
++  if (!user) return false;
++  if (user.role === 'admin') return true;
++  const row = db.prepare('SELECT role_id FROM users WHERE id = ?').get(user.id) as { role_id: number | null } | undefined;
++  if (!row || !row.role_id) return false;
++  const granted = db.prepare(`
++    SELECT 1
++    FROM role_permissions rp
++    JOIN permissions p ON p.id = rp.permission_id
++    WHERE rp.role_id = ? AND p.module = ? AND p.action = ?
++  `).get(row.role_id, module, action);
++  return !!granted;
++}
++
+ export function requirePermission(module: string, action: string) {
+   return (req: AuthRequest, res: Response, next: NextFunction): void => {
+     if (!req.user) {
+diff --git a/server/src/services/entityRegistry.ts b/server/src/services/entityRegistry.ts
+index 2a08f326..44fe54f7 100644
+--- a/server/src/services/entityRegistry.ts
++++ b/server/src/services/entityRegistry.ts
+@@ -211,7 +211,6 @@ const ENTITY_REGISTRY: Record<string, EntityDefinition> = {
+     table: 'stock_balances',
+     label: 'Stock Balances',
+     fields: [
+-      { name: 'id', column: 'id', type: 'number' },
+       { name: 'quantity', column: 'quantity', type: 'number', aggregateFns: ['SUM', 'AVG'] },
+     ],
+     joins: [
+@@ -379,7 +378,6 @@ const ENTITY_REGISTRY: Record<string, EntityDefinition> = {
+       { name: 'bom_name', column: 'bom_name', type: 'string' },
+       { name: 'quantity', column: 'quantity', type: 'number', aggregateFns: ['SUM', 'AVG'] },
+       { name: 'is_active', column: 'is_active', type: 'boolean' },
+-      { name: 'notes', column: 'notes', type: 'string' },
+       { name: 'created_at', column: 'created_at', type: 'date' },
+     ],
+     joins: [
+@@ -426,6 +424,36 @@ const ENTITY_REGISTRY: Record<string, EntityDefinition> = {
+   },
+ };
+ 
++// ── Authorisation ────────────────────────────────────────────
++// A report reads the entity's table directly, so running one must require the
++// same read permission as the module that owns that data (REP-001).
++const ENTITY_PERMISSION_MODULE: Record<string, string> = {
++  invoices: 'invoices',
++  invoice_items: 'invoices',
++  sales_orders: 'sales_orders',
++  sales_order_items: 'sales_orders',
++  purchase_orders: 'purchase_orders',
++  purchase_order_items: 'purchase_orders',
++  items: 'inventory',
++  stock_movements: 'inventory',
++  stock_balances: 'inventory',
++  warehouses: 'inventory',
++  customers: 'customers',
++  suppliers: 'suppliers',
++  payments: 'payments',
++  expenses: 'expenses',
++  employees: 'employees',
++  productions: 'production',
++  boms: 'bom',
++  quotations: 'quotations',
++  activity_log: 'activity_log',
++};
++
++/** Permission module required to read an entity; unknown entities are admin-only. */
++export function getEntityPermissionModule(entityKey: string): string {
++  return ENTITY_PERMISSION_MODULE[entityKey] ?? 'admin';
++}
++
+ // ── Public API ───────────────────────────────────────────────
+ 
+ export function getEntity(entityKey: string): EntityDefinition | undefined {
+diff --git a/server/src/services/reportQueryEngine.ts b/server/src/services/reportQueryEngine.ts
+index 914f91c7..850c34fd 100644
+--- a/server/src/services/reportQueryEngine.ts
++++ b/server/src/services/reportQueryEngine.ts
+@@ -147,6 +147,47 @@ function quoteIdentifier(name: string): string {
+   return `"${name.replace(/"/g, '""')}"`;
+ }
+ 
++// ── Whitelist hardening (REP-002) ────────────────────────────
++
++/** Real column names of a table (registry-controlled name, never user input). */
++function realColumns(table: string): Set<string> {
++  const rows = db.prepare(`PRAGMA table_info("${table.replace(/"/g, '""')}")`).all() as Array<{ name: string }>;
++  return new Set(rows.map(r => r.name));
++}
++
++/**
++ * A computed column's name becomes a "valid field" for filters, sorting and
++ * grouping. If it could shadow a real column that is NOT in the registry
++ * (bank_iban, cnic_no, password_hash...), the field whitelist would be
++ * bypassed and the column could be probed through filters. So computed names
++ * must be plain identifiers that collide with no column of the entity's
++ * table or of any table it can join to, and with no registry field.
++ */
++function assertComputedNamesAreSafe(config: ReportConfig, entityDef: EntityDefinition): void {
++  if (!Array.isArray(config.computedColumns) || config.computedColumns.length === 0) return;
++  const taken = new Set<string>(entityDef.fields.map(f => f.name));
++  for (const c of realColumns(entityDef.table)) taken.add(c);
++  for (const join of entityDef.joins) {
++    const joined = getEntity(join.entity);
++    if (!joined) continue;
++    for (const c of realColumns(joined.table)) taken.add(c);
++    for (const f of joined.fields) taken.add(f.name);
++  }
++  const seen = new Set<string>();
++  for (const cc of config.computedColumns) {
++    if (typeof cc.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(cc.name)) {
++      throw new Error(`Computed column name "${String(cc.name)}" must be a plain identifier`);
++    }
++    if (taken.has(cc.name)) {
++      throw new Error(`Computed column name "${cc.name}" collides with an existing column; choose another name`);
++    }
++    if (seen.has(cc.name)) {
++      throw new Error(`Computed column name "${cc.name}" is defined twice`);
++    }
++    seen.add(cc.name);
++  }
++}
++
+ // ── SQL Builder ──────────────────────────────────────────────
+ 
+ interface BuildContext {
+@@ -174,6 +215,7 @@ export function executeReport(config: ReportConfig): QueryResult {
+   // nothing unvalidated ever reaches query construction.
+   const entityFieldNames = new Set(entityDef.fields.map(f => f.name));
+   validateConfigExpressions(config, entityFieldNames);
++  assertComputedNamesAreSafe(config, entityDef);
+ 
+   const ctx: BuildContext = {
+     validFieldNames: new Set(entityDef.fields.map(f => f.name)),
+@@ -232,17 +274,30 @@ export function executeReport(config: ReportConfig): QueryResult {
+     sql += `\nHAVING ${havingClause}`;
+   }
+ 
++  // The grouped count is taken from this point: same SELECT aliases, WHERE,
++  // GROUP BY and HAVING as the main query, but no ORDER BY / LIMIT.
++  const sqlBeforeOrder = sql;
++
+   if (orderByClause) {
+     sql += `\nORDER BY ${orderByClause}`;
+   }
+ 
+-  // 10. Build count query (never includes LIMIT — always counts total matching rows)
+-  let countSql = `SELECT COUNT(*) as total FROM ${entityDef.table} ${ctx.primaryTableAlias}`;
++  // 10. Build count query (never includes LIMIT — always counts total matching rows).
++  // A grouped report returns one row per GROUP, so its count must be the number
++  // of groups surviving HAVING; the HAVING parameters then belong to this query
++  // too (REP-004).
++  let countInner = `FROM ${entityDef.table} ${ctx.primaryTableAlias}`;
+   if (ctx.joinClauses.length > 0) {
+-    countSql += '\n' + ctx.joinClauses.join('\n');
++    countInner += '\n' + ctx.joinClauses.join('\n');
+   }
+   if (whereClause) {
+-    countSql += `\nWHERE ${whereClause}`;
++    countInner += `\nWHERE ${whereClause}`;
++  }
++  let countSql: string;
++  if (groupByClause) {
++    countSql = `SELECT COUNT(*) as total FROM (${sqlBeforeOrder})`;
++  } else {
++    countSql = `SELECT COUNT(*) as total ${countInner}`;
+   }
+ 
+   // Now append LIMIT to the main query (after count SQL is built)
+@@ -566,11 +621,27 @@ function buildGroupByClause(config: ReportConfig, ctx: BuildContext): string {
+ // ── HAVING Builder ──────────────────────────────────────────
+ 
+ function buildHavingClause(config: ReportConfig, ctx: BuildContext): string {
+-  if (!config.groupBy?.having || config.groupBy.having.length === 0) return '';
++  if (!config.groupBy?.enabled || !config.groupBy.fields.length) return '';
++  if (!config.groupBy.having || config.groupBy.having.length === 0) return '';
+ 
+-  // HAVING filters use aggregate aliases (computed column names), not table columns.
+-  // So we use havingMode=true which skips table prefix and validFieldNames check.
++  // HAVING filters use aggregate aliases (computed column names), not table columns,
++  // so they are rendered without the table prefix. They are still validated against
++  // the same whitelist (REP-002): an unvalidated quoted identifier here could name
++  // any column of the table, including ones the registry deliberately hides.
+   const havingMode = true;
++  const havingFields = new Set<string>(ctx.validFieldNames);
++  for (const a of config.groupBy.aggregates ?? []) {
++    if (a.alias) havingFields.add(a.alias);
++  }
++  const checkHavingFields = (filters: FilterDef[]): void => {
++    for (const f of filters) {
++      if (f.field && !havingFields.has(f.field)) {
++        throw new Error(`Having field "${f.field}" not found`);
++      }
++      if (f.children && f.children.length > 0) checkHavingFields(f.children);
++    }
++  };
++  checkHavingFields(config.groupBy.having);
+   const clauses = config.groupBy.having.map(f => buildFilterExpression(f, ctx, havingMode));
+   const nonEmpty = clauses.filter(c => c !== '');
+   if (nonEmpty.length === 0) return '';

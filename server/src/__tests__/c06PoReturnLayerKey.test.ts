@@ -1,8 +1,7 @@
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
 import PurchaseOrderModel from '../models/PurchaseOrder';
 import PurchaseReturnModel from '../models/PurchaseReturn';
+import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
 
 /**
  * C-06 — PO-source purchase returns.
@@ -18,52 +17,7 @@ import PurchaseReturnModel from '../models/PurchaseReturn';
  */
 
 function createFixture(): Database.Database {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
-
-  const migrations = [
-    'init.sql',
-    'add-purchases-table.sql',
-    'add-purchase-return-fields.sql',
-    'add-batch-costing.sql',
-    'add-stock-adjustment-financial.sql',
-    'create-supplier-ledger.sql',
-    'add-gl-foundation.sql',
-    'create-payment-allocations.sql',
-    'add-supplier-payment-support.sql',
-    'add-purchase-supplier-payment.sql',
-    'add-purchase-returns-tables.sql',
-    'add-purchase-return-batches.sql',
-    'add-disposition-and-supplier-refunds.sql',
-    'create-customer-ledger.sql',
-    'add-gl-void-attribution.sql',
-    'add-production-tables.sql',
-    'add-payments-purchase-order-id.sql',
-    'add-invoice-soft-delete.sql',
-    'add-audit-trail-fields.sql',
-    'add-salary-payments.sql',
-    'add-payment-salary-void-columns.sql',
-  ];
-
-  for (const file of migrations) {
-    db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', file), 'utf8'));
-  }
-
-  const supCols = db.prepare(`SELECT name FROM pragma_table_info('suppliers')`).all() as { name: string }[];
-  if (!supCols.some((c) => c.name === 'current_balance')) {
-    db.exec('ALTER TABLE suppliers ADD COLUMN current_balance DECIMAL(15,2) DEFAULT 0');
-  }
-
-  const mvCols = db.prepare(`SELECT name FROM pragma_table_info('stock_movements')`).all() as { name: string }[];
-  const has = (n: string) => mvCols.some((c) => c.name === n);
-  if (!has('batch_id')) db.exec('ALTER TABLE stock_movements ADD COLUMN batch_id INTEGER REFERENCES stock_batches(id)');
-  if (!has('financial_value')) db.exec('ALTER TABLE stock_movements ADD COLUMN financial_value DECIMAL(15,4) DEFAULT 0');
-  if (!has('financial_posted')) db.exec('ALTER TABLE stock_movements ADD COLUMN financial_posted BOOLEAN DEFAULT FALSE');
-  if (!has('journal_entry_id')) db.exec('ALTER TABLE stock_movements ADD COLUMN journal_entry_id INTEGER REFERENCES journal_entries(id)');
-
-  for (const file of ['add-item-expiry-tracking.sql', 'add-expired-stock.sql']) {
-    db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', file), 'utf8'));
-  }
+  const db = createFixtureDb();
 
   db.prepare(`
     INSERT INTO users (username, email, password_hash, full_name, role, is_active)
@@ -84,6 +38,10 @@ function createFixture(): Database.Database {
 
   return db;
 }
+
+afterAll(() => {
+  cleanupFixtureDbs();
+});
 
 /**
  * Desynchronise `goods_receipt_items.id` from `purchase_order_items.id`.

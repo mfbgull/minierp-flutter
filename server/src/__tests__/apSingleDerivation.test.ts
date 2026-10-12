@@ -1,38 +1,9 @@
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
 import ReportsModel from '../models/Reports';
-
-const MIGRATIONS = [
-  'init.sql',
-  'add-purchases-table.sql',
-  'add-purchase-return-fields.sql',
-  'add-batch-costing.sql',
-  'add-stock-adjustment-financial.sql',
-  'create-supplier-ledger.sql',
-  'add-gl-foundation.sql',
-  'create-customer-ledger.sql',
-  'add-gl-void-attribution.sql',
-  'add-purchase-returns-tables.sql',
-  'create-payment-allocations.sql',
-  'add-supplier-payment-support.sql',
-  'add-purchase-supplier-payment.sql',
-  'add-salary-payments.sql',
-  'add-cash-accounts.sql',
-  'add-payment-salary-void-columns.sql',
-];
+import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
 
 function createFixture(): Database.Database {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
-  for (const f of MIGRATIONS) {
-    db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
-  }
-
-  const supCols = db.prepare(`SELECT name FROM pragma_table_info('suppliers')`).all() as { name: string }[];
-  if (!supCols.some((c) => c.name === 'current_balance')) {
-    db.exec('ALTER TABLE suppliers ADD COLUMN current_balance DECIMAL(15,2) DEFAULT 0');
-  }
+  const db = createFixtureDb();
 
   db.prepare(`INSERT INTO users (username,email,password_hash,full_name,role,is_active)
               VALUES ('u','e@x.c','h','U','admin',1)`).run();
@@ -40,6 +11,8 @@ function createFixture(): Database.Database {
               VALUES ('S1','Acme',1,0)`).run();
   return db;
 }
+
+afterAll(() => cleanupFixtureDbs());
 
 type LedgerRow = {
   supplier_id: number; transaction_date: string; transaction_type: string;

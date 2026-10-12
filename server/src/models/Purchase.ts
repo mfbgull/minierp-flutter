@@ -418,7 +418,7 @@ class PurchaseModel {
         w.warehouse_name,
         u.username as created_by_username,
         COALESCE(pa.paid_amount, 0) as paid_amount,
-        p.total_cost - COALESCE(pa.paid_amount, 0) as balance_amount
+        MAX(0, p.total_cost - COALESCE(pa.paid_amount, 0)) as balance_amount
       FROM purchases p
       JOIN items i ON p.item_id = i.id
       JOIN warehouses w ON p.warehouse_id = w.id
@@ -516,7 +516,7 @@ class PurchaseModel {
         w.warehouse_name,
         u.username as created_by_username,
         COALESCE(pa.paid_amount, 0) as paid_amount,
-        p.total_cost - COALESCE(pa.paid_amount, 0) as balance_amount
+        MAX(0, p.total_cost - COALESCE(pa.paid_amount, 0)) as balance_amount
       FROM purchases p
       JOIN items i ON p.item_id = i.id
       JOIN warehouses w ON p.warehouse_id = w.id

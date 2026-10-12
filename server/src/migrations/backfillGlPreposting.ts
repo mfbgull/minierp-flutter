@@ -130,9 +130,18 @@ export function runBackfillGlPreposting(db: Database.Database): void {
 
   const run = (): void => {
     // ── 1. Direct purchases ──────────────────────────────────────────
+    // PUR-015: voided_at IS NULL, mirroring the receipts leg below. Without it,
+    // voiding a purchase and then running this backfill re-posts
+    // `Dr 1200 / Cr 2000` for goods that were never received — measured GL 1200
+    // drifting to 130 against an apImbalances() expectation of 0. The column
+    // is filtered only when present, because a legacy database running this
+    // backfill may predate it.
+    const purchCols = db.prepare(`SELECT name FROM pragma_table_info('purchases')`).all() as Array<{ name: string }>;
+    const purchHasVoidedAt = purchCols.some((c) => c.name === 'voided_at');
     const purchases = db.prepare(`
       SELECT id, purchase_no, total_cost, purchase_date FROM purchases
       WHERE total_cost > 0
+      ${purchHasVoidedAt ? 'AND voided_at IS NULL' : ''}
     `).all() as PurchaseRow[];
     for (const p of purchases) {
       if (hasActiveLines.get('PURCHASE', p.id)) continue;
@@ -271,6 +280,36 @@ export function runBackfillGlPreposting(db: Database.Database): void {
         { code: '1200', debit: amt, label: `Inventory received via ${r.receipt_no} (backfill)` },
         { code: '2000', credit: amt, label: `AP created for ${r.receipt_no} (backfill)` },
       ])) postedCount += 1;
+
+      // PUR-015: the GL leg alone leaves GL 2000 permanently above the AP
+      // subledger — measured apImbalances() {expected: 200, actual: 330}. The
+      // live purchase path writes this entry in the same transaction as the GL
+      // post, so the backfill must too.
+      const supplierId = db.prepare(`
+        SELECT po.supplier_id FROM purchase_orders po WHERE po.id = ?
+      `).get(r.po_id) as { supplier_id: number | null } | undefined;
+      // The supplier ledger is DEBIT-normal (debit = we owe more), so the
+      // receipt DEBITS it while the GL AP credit posts in parallel — the same
+      // direction the live path uses at PurchaseOrder.ts:1085.
+      const alreadyLedgered = db.prepare(`
+        SELECT 1 FROM supplier_ledger
+        WHERE transaction_type = 'GOODS_RECEIPT' AND reference_no = ?
+        LIMIT 1
+      `).get(r.receipt_no);
+      if (supplierId?.supplier_id != null && !alreadyLedgered) {
+        db.prepare(`
+          INSERT INTO supplier_ledger
+            (supplier_id, transaction_date, transaction_type, reference_no,
+             debit, credit, balance, description)
+          VALUES (?, ?, 'GOODS_RECEIPT', ?, ?, 0, 0, ?)
+        `).run(
+          supplierId.supplier_id,
+          r.receipt_date,
+          r.receipt_no,
+          amt,
+          `Goods receipt ${r.receipt_no} against PO ${r.po_no} (backfill)`,
+        );
+      }
     }
 
     // ── Sanity: the whole table must still foot ───────────────────────

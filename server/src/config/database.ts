@@ -92,14 +92,47 @@ function checksumOfFile(absolutePath: string): string {
 }
 
 /**
+ * Hash an inline migration body — a `fn.*` ledger key names a FUNCTION, not a
+ * file, so `checksumOfFile` can only ever return 'inline' for it. DB-003: 73
+ * of 99 ledger rows carried 'inline' and verification skipped every one, so
+ * editing an already-applied inline migration was invisible.
+ *
+ * Hashing the function's own source closes that gap: the same edit that a
+ * file migration would abort on now aborts for inline migrations too. The
+ * 'fn.' prefix is stripped so the digest is over the body only, and a function
+ * that cannot be read (minified, renamed, or removed) still falls back to
+ * 'inline' and is skipped, rather than failing every boot.
+ */
+function checksumOfFunction(key: string, fn?: () => void): string {
+  if (!fn) return 'inline';
+  try {
+    const source = fn.toString();
+    if (!source || source === '() => {}') return 'inline';
+    return crypto
+      .createHash('sha256')
+      .update(key.replace(/^fn\./, '') + '\n' + source)
+      .digest('hex')
+      .slice(0, 16);
+  } catch {
+    return 'inline';
+  }
+}
+
+/**
  * Ledger runner: skip if recorded; otherwise execute body inside a
  * transaction, record with checksum on success. Any failure aborts the
  * process non-zero BEFORE HTTP listen.
  */
+/** `fn.*` ledger key → its body, so verifyMigrationChecksums can re-hash it. */
+const inlineMigrations = new Map<string, () => void>();
+
 function runLedgered(key: string, fn?: () => void, opts?: { noTxn?: boolean }): void {
   ensureMigrationsTable();
   if (db.prepare('SELECT 1 FROM schema_migrations WHERE filename = ?').get(key)) return;
-  const checksum = checksumOfFile(path.join(MIGRATIONS_DIR, key));
+  if (fn) inlineMigrations.set(key, fn);
+  const checksum = fn
+    ? checksumOfFunction(key, fn)
+    : checksumOfFile(path.join(MIGRATIONS_DIR, key));
   try {
     if (fn) {
       if (opts?.noTxn) {
@@ -152,8 +185,8 @@ function runLedgered(key: string, fn?: () => void, opts?: { noTxn?: boolean }): 
  * migration was edited after it ran — the schema can then no longer be
  * reproduced from source, so the boot must stop.
  *
- * Never auto-repairs and never touches the database: on mismatch it throws,
- * and the boot sequence converts that into the same logger.error +
+ * Never auto-repairs the schema: on mismatch it throws, and the boot sequence
+ * converts that into the same logger.error +
  * process.exit(1) a failing migration produces, i.e. at import time and
  * therefore before HTTP listen. Cheap — one SELECT per boot, and only files
  * that exist on disk are hashed.
@@ -166,6 +199,62 @@ function runLedgered(key: string, fn?: () => void, opts?: { noTxn?: boolean }): 
  *    internally consistent, so this only warns; a content *edit* aborts.
  *  - no schema_migrations table / no rows → brand-new database, no-op.
  */
+/**
+ * DB-002 (detection half): every journal_entry_id group of LIVE lines must
+ * sum to zero.
+ *
+ * `journal_lines` cannot carry this as a constraint. SQLite has no DEFERRABLE
+ * CHECK, and a row trigger is not viable here either: `postEntry` inserts one
+ * statement per line, `voidJournalLinesByReference` and its un-void sibling
+ * flip every line of a reference in one UPDATE, the orphan reconciler voids
+ * rows one at a time, and the GL-unification backfill reassigns
+ * `journal_entry_id`. A trigger would fire mid-operation, see a half-built or
+ * half-voided group, and abort legitimate postings and voids. Prevention needs a
+ * seal (a guaranteed parent row whose final UPDATE asserts the balance), which
+ * is a redesign of every GL write — tracked as BUG-005, not taken unilaterally.
+ *
+ * So the invariant is asserted at the BOOT instead. That does not stop raw SQL
+ * from writing an unbalanced entry; it stops it being SILENT. The FK-OFF
+ * rebuild path and the --rollback CLI are the vectors of concern, and both run
+ * under this gate.
+ *
+ * Compared in integer minor units, matching the application-level invariant in
+ * accountingService, so a float-summation artefact cannot fail the boot.
+ */
+export function assertJournalEntriesBalance(database: Database.Database): void {
+  const unbalanced = database
+    .prepare(
+      `SELECT journal_entry_id,
+              SUM(CAST(ROUND(debit   * 100) AS INTEGER)) AS d,
+              SUM(CAST(ROUND(credit * 100) AS INTEGER)) AS c
+       FROM journal_lines
+       WHERE voided = 0
+       GROUP BY journal_entry_id
+       HAVING d <> c
+       ORDER BY journal_entry_id
+       LIMIT 10`,
+    )
+    .all() as Array<{ journal_entry_id: number; d: number; c: number }>;
+
+  if (unbalanced.length === 0) return;
+
+  const detail = unbalanced
+    .map(
+      (u) =>
+        `#${u.journal_entry_id} (Dr ${(u.d / 100).toFixed(2)} / Cr ${(u.c / 100).toFixed(2)}, ` +
+        `off by ${(Math.abs(u.d - u.c) / 100).toFixed(2)})`,
+    )
+    .join(', ');
+  throw new Error(
+    `FATAL: ${unbalanced.length}+ unbalanced journal entr${unbalanced.length === 1 ? 'y' : 'ies'} ` +
+    `(live lines only): ${detail}.\n` +
+    `Every journal_entry_id must have equal debits and credits. This usually means a ` +
+    `maintenance path wrote journal lines directly, bypassing accountingService.postEntry.\n` +
+    `Remedy: inspect the listed entries and correct them, or restore from a backup. ` +
+    `Do NOT reset the database — the rest of the schema is still valid.`
+  );
+}
+
 export function verifyMigrationChecksums(database: Database.Database, migrationsDir: string): void {
   const ledgerExists = database
     .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'")
@@ -175,13 +264,33 @@ export function verifyMigrationChecksums(database: Database.Database, migrations
   const rows = database
     .prepare('SELECT filename, checksum FROM schema_migrations ORDER BY filename')
     .all() as { filename: string; checksum: string }[];
+
+  // DB-003 baseline upgrade: rows stamped before inline bodies were hashed
+  // carry the literal 'inline'. Those databases verified nothing at all, so
+  // there is no recorded hash to compare against — and aborting on the first
+  // boot after this change would take every existing install offline. Adopt
+  // the CURRENT body as the baseline once, then enforce from here on. An
+  // inline migration edited before this change is therefore not detected; that
+  // is unavoidable, since no earlier record of it exists.
+  let adopted = 0;
+
   for (const { filename, checksum } of rows) {
-    if (checksum === 'inline') continue; // inline migration: no file to compare
-    const current = checksumOfFile(path.join(migrationsDir, filename));
+    // DB-003: a `fn.*` row is stamped from the function body, not from a file.
+    const inline = inlineMigrations.get(filename);
+    const current = inline
+      ? checksumOfFunction(filename, inline)
+      : checksumOfFile(path.join(migrationsDir, filename));
     if (current === 'inline') {
       logger.warn(
         `migration '${filename}' was applied from a file that no longer exists in ${migrationsDir}; the ledger row is kept as-is (no content change detected).`
       );
+      continue;
+    }
+    if (checksum === 'inline') {
+      database
+        .prepare('UPDATE schema_migrations SET checksum = ? WHERE filename = ?')
+        .run(current, filename);
+      adopted += 1;
       continue;
     }
     if (current !== checksum) {
@@ -193,6 +302,13 @@ export function verifyMigrationChecksums(database: Database.Database, migrations
         `Remedy: restore the original file, or create a NEW migration that expresses the change. Do NOT reset, drop or recreate the database — the applied schema is still valid.`
       );
     }
+  }
+
+  if (adopted > 0) {
+    logger.warn(
+      `adopted ${adopted} inline migration checksum(s) as the verification baseline ` +
+      `(audit DB-003). They were previously unverifiable; edits from now on abort the boot.`
+    );
   }
 }
 
@@ -1597,6 +1713,7 @@ try {
   process.exit(1);
 }
 
+
 runLedgered('fn.initializeDatabase', initializeDatabase);
 runLedgered('fn.runExpensesMigration', runExpensesMigration);
 runLedgered('fn.runPurchasesMigration', runPurchasesMigration);
@@ -1830,6 +1947,14 @@ runLedgered('add-idempotency-keys.sql');
 // The old global UNIQUE meant an upsert on a colliding key overwrote
 // another operation's resource_id — a wrong dedupe on a money write.
 runLedgered('scope-idempotency-keys.sql');
+// audit DB-001: goods_receipt_items carried three FK columns and no indexes
+// at all, so the goods_receipts ON DELETE CASCADE and every parent update
+// full-scanned the receipt hot path.
+runLedgered('add-goods-receipt-item-indexes.sql');
+// audit RET-008: settled_amount shipped with a floor at 0 and no ceiling, so a
+// return could settle for more than the net owed back. A trigger, not a CHECK,
+// so existing installs get the guard without a table rebuild.
+runLedgered('add-invoice-return-settled-ceiling.sql');
 // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
 // return time — a legacy COA predating GL foundation must fail the boot
 // with a clear error, never mis-post.
@@ -1844,6 +1969,17 @@ runLedgered('scope-idempotency-keys.sql');
       "the account manually before booting."
     );
   }
+}
+
+// DB-002 (detection half): assert every journal entry balances. Placed AFTER the
+// migration sequence so a first boot has its tables, and before any HTTP
+// listen, so a maintenance path that wrote raw journal lines fails loudly
+// rather than leaving unbalanced books that every report then reads.
+try {
+  assertJournalEntriesBalance(db);
+} catch (err: unknown) {
+  logger.error(err instanceof Error ? err.message : String(err));
+  process.exit(1);
 }
 
 // Ensure dbSeedReady resolves on every boot — createDefaultUser() is

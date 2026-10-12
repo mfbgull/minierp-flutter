@@ -21,8 +21,6 @@
  */
 import request from 'supertest';
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
 import app from '../app';
 import db from '../config/database';
 import {
@@ -30,6 +28,7 @@ import {
   glTotalsFor, customerLedgerNet,
 } from './helpers/invoiceReturnSpec';
 import { runBackfillMobileInvoiceStockReference } from '../migrations/backfillMobileInvoiceStockReference';
+import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
 
 // ── shared fixtures ────────────────────────────────────────────────────
 describe('TASK 17: mobile invoice cancellation restores stock', () => {
@@ -208,23 +207,8 @@ describe('TASK 17: mobile invoice cancellation restores stock', () => {
 
 // ── one-time repair of databases populated before the fix ─────────────
 describe('TASK 17 backfill: re-keys legacy mobile movements and restores cancelled stock', () => {
-  const MIGRATIONS = [
-    'init.sql',
-    'add-batch-costing.sql',
-    'add-stock-adjustment-financial.sql',
-    'add-gl-foundation.sql',
-  ];
-
   function makeDb(): Database.Database {
-    const fixture = new Database(':memory:');
-    fixture.pragma('foreign_keys = ON');
-    for (const f of MIGRATIONS) {
-      fixture.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
-    }
-    // Columns the boot migration adds programmatically (guarded by
-    // pragma_table_info in config/database.ts), so the fixture has to add
-    // them itself — reverseStockForItems writes batch_id on the restore.
-    fixture.exec('ALTER TABLE stock_movements ADD COLUMN batch_id INTEGER REFERENCES stock_batches(id)');
+    const fixture = createFixtureDb();
     fixture.prepare(`INSERT INTO users (username,email,password_hash,full_name,role,is_active)
                      VALUES ('u','e@x.c','h','U','admin',1)`).run();
     fixture.prepare(`INSERT INTO customers (customer_code,customer_name,is_active)
@@ -372,3 +356,5 @@ describe('TASK 17 backfill: re-keys legacy mobile movements and restores cancell
     expect(cancelCount).toBe(0);
   });
 });
+
+afterAll(() => cleanupFixtureDbs());

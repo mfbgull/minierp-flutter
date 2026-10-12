@@ -5,59 +5,12 @@
  * PAY-11: receipt previous balance derives from the payment's own ledger row.
  */
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
 import PaymentModel from '../models/Payment';
 import { isValidPaymentMethod } from '../services/cashService';
-
-const MIGRATIONS = [
-  'init.sql',
-  'add-purchases-table.sql',
-  'create-payment-allocations.sql',
-  'add-expenses-table.sql',
-  'add-supplier-payment-support.sql',
-  'add-purchase-supplier-payment.sql',
-  'add-gl-foundation.sql',
-  'add-salary-payments.sql',
-  'add-cash-accounts.sql',
-  'add-opening-balances.sql',
-];
+import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
 
 function createFixture(): Database.Database {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = OFF');
-  for (const f of MIGRATIONS) {
-    db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
-  }
-  // Replicate the programmatic customer_id-nullable + CHECK rebuild end state
-  // (the counterparty-check migration ships the same shape).
-  db.exec(`
-    CREATE TABLE payments_new (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      payment_no VARCHAR(50) UNIQUE NOT NULL,
-      customer_id INTEGER REFERENCES customers(id),
-      supplier_id INTEGER REFERENCES suppliers(id),
-      invoice_id INTEGER,
-      payment_date DATE NOT NULL,
-      amount DECIMAL(15,2) NOT NULL,
-      payment_method VARCHAR(50) NOT NULL DEFAULT 'Cash',
-      reference_no VARCHAR(100),
-      notes TEXT,
-      purchase_order_id INTEGER REFERENCES purchase_orders(id),
-      created_by INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      voided_at TEXT,
-      voided_by INTEGER,
-      void_reason TEXT,
-      CHECK ((customer_id IS NULL) <> (supplier_id IS NULL)),
-      FOREIGN KEY (customer_id) REFERENCES customers(id),
-      FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
-      FOREIGN KEY (invoice_id) REFERENCES invoices(id)
-    );
-    DROP TABLE payments;
-    ALTER TABLE payments_new RENAME TO payments;
-  `);
-  db.pragma('foreign_keys = ON');
+  const db = createFixtureDb();
 
   db.prepare(`INSERT INTO users (username,email,password_hash,full_name,role,is_active)
               VALUES ('u','e@x.c','h','U','admin',1)`).run();
@@ -66,6 +19,8 @@ function createFixture(): Database.Database {
   db.prepare(`INSERT INTO suppliers (supplier_code,supplier_name) VALUES ('S1','Acme')`).run();
   return db;
 }
+
+afterAll(() => cleanupFixtureDbs());
 
 describe('PAY-04: amount edits are forbidden', () => {
   it('rejects an amount change on a customer payment and touches nothing', () => {

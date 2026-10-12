@@ -12,6 +12,7 @@ import {
   startIdempotentRequest,
 } from '../utils/idempotency';
 import { requireSupplierForPurchase } from '../utils/purchaseValidation';
+import { BusinessRuleError } from '../utils/businessRuleError';
 import { errorMessage } from '../utils/errorMessage';
 
 function createPurchaseOrder(req: AuthRequest, res: Response): void {
@@ -436,6 +437,13 @@ function createGoodsReceipt(req: AuthRequest, res: Response): void {
 
     res.status(201).json(receipt);
   } catch (error: unknown) {
+    // PUR-012: addReceipt's guards raise BusinessRuleError(400). Collapsing
+    // them into 500 turned a client mistake into a server fault and leaked the
+    // raw SQLite message when a table CHECK fired instead.
+    if (error instanceof BusinessRuleError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
     logger.error('Create goods receipt error:', error);
     res.status(500).json({ error: errorMessage(error) || 'Failed to create goods receipt' });
   }
