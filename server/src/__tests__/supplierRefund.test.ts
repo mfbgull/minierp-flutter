@@ -2,93 +2,59 @@
  * SupplierRefundModel — cash receipt against a supplier credit note.
  * Covers: create (ledger + GL), refundable cap, void reversal.
  */
-import fs from 'fs';
-import path from 'path';
 import Database from 'better-sqlite3';
 import SupplierRefundModel, { creditNoteRefundable } from '../models/SupplierRefund';
 import PurchaseReturnModel from '../models/PurchaseReturn';
 import AccountingService from '../services/accountingService';
+import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
 
-const MIGRATIONS = [
-  'init.sql',
-  'add-purchases-table.sql',
-  'add-supplier-payment-support.sql',
-  'add-purchase-supplier-payment.sql',
-  'add-purchase-return-fields.sql',
-  'add-batch-costing.sql',
-  'add-stock-adjustment-financial.sql',
-  'create-supplier-ledger.sql',
-  'add-gl-foundation.sql',
-  'create-payment-allocations.sql',
-  'add-payments-purchase-order-id.sql',
-  'add-purchase-returns-tables.sql',
-  'add-purchase-return-batches.sql',
-  'add-disposition-and-supplier-refunds.sql',
-  'create-customer-ledger.sql',
-  'add-gl-void-attribution.sql',
-  'add-salary-payments.sql',
-  'add-payment-salary-void-columns.sql',
-];
+afterAll(() => cleanupFixtureDbs());
+
+/** createFixtureDb() clones schema only, so the rows add-gl-foundation.sql and
+ * add-opening-balances.sql seed as DATA are absent. The refund posts Dr cash /
+ * Cr AP and the void reversal undoes it, resolving accounts by code. */
+function seedProductionReferenceData(db: Database.Database): void {
+  db.exec(`
+    INSERT OR IGNORE INTO opening_balances (account_key, amount) VALUES
+      ('cash', 0), ('bank', 0), ('easypaisa', 0), ('jazzcash', 0), ('upaisa', 0);
+  `);
+  db.exec(`
+    INSERT OR IGNORE INTO chart_of_accounts (code, name, type, normal_balance, text_code, description) VALUES
+      ('1000', 'Cash', 'asset', 'debit', 'cash', 'On-hand cash'),
+      ('1010', 'Bank', 'asset', 'debit', 'bank', 'Bank balances'),
+      ('1020', 'Easypaisa / Mobile Wallet', 'asset', 'debit', 'easypaisa', 'Easypaisa / mobile wallet balances'),
+      ('1030', 'JazzCash', 'asset', 'debit', 'jazzcash', 'JazzCash wallet balances'),
+      ('1040', 'UPaisa', 'asset', 'debit', 'upaisa', 'UPaisa wallet balances'),
+      ('1100', 'Accounts Receivable', 'asset', 'debit', 'accounts_receivable', 'Customer balances'),
+      ('1110', 'Customer Credit', 'asset', 'credit', 'customer_credit', 'Customer credit balances'),
+      ('1200', 'Inventory Asset', 'asset', 'debit', 'inventory_asset', 'On-hand inventory at cost'),
+      ('1300', 'Employee Loan Receivable', 'asset', 'debit', 'employee_loan_receivable', 'Loans advanced to employees'),
+      ('2000', 'Accounts Payable', 'liability', 'credit', 'accounts_payable', 'Supplier balances'),
+      ('2100', 'Tax Payable', 'liability', 'credit', 'tax_payable', 'Sales tax collected'),
+      ('3000', 'Owner''s Equity', 'equity', 'credit', 'owners_equity', 'Capital contributions'),
+      ('3100', 'Retained Earnings', 'equity', 'credit', 'opening_retained_earnings', 'Cumulative profit/loss carried forward'),
+      ('3200', 'Owner Capital', 'equity', 'credit', 'owner_capital', 'Cash contributed by the owner'),
+      ('3300', 'Owner Drawings', 'equity', 'debit', 'owner_drawings', 'Cash/goods taken by the owner (contra-equity)'),
+      ('4000', 'Sales Revenue', 'revenue', 'credit', 'sales_revenue', 'Revenue from invoices and POS'),
+      ('4100', 'Sales Returns', 'revenue', 'debit', 'sales_returns', 'Contra-revenue: returned/credited sales'),
+      ('4150', 'Restocking Fee Income', 'revenue', 'credit', 'restocking_fee_income', 'Fees charged on returned items'),
+      ('5000', 'Cost of Goods Sold', 'expense', 'debit', 'cogs', 'Cost of items sold'),
+      ('6000', 'Operating Expenses', 'expense', 'debit', 'operating_expenses', 'General operating costs'),
+      ('6100', 'Wages & Salaries', 'expense', 'debit', 'wages_salaries', 'Payroll'),
+      ('6300', 'Loan Write-off', 'expense', 'debit', 'loan_write_off', 'Employee loans written off / forgiven'),
+      ('7000', 'Production Clearing', 'expense', 'debit', 'production_clearing', 'Clearing account for production cost flow'),
+      ('7100', 'Inventory Correction', 'expense', 'debit', 'inventory_correction', 'Adjustments adding to inventory'),
+      ('7200', 'Inventory Shrinkage', 'expense', 'debit', 'inventory_shrinkage', 'Losses / removals from inventory'),
+      ('7201', 'Expired Goods Loss', 'expense', 'debit', 'expired_goods_loss', 'Written-off expired stock (write-off endpoint)'),
+      ('7202', 'Damaged Goods Loss', 'expense', 'debit', 'damaged_goods_loss', 'Written-off damaged stock'),
+      ('7203', 'Stock Shortage Loss', 'expense', 'debit', 'stock_shortage_loss', 'Physical count shortages written off'),
+      ('7204', 'Obsolete Stock Loss', 'expense', 'debit', 'obsolete_stock_loss', 'Written-off obsolete stock')
+  `);
+}
 
 function setupDb(): Database.Database {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
-
-  for (const file of MIGRATIONS) {
-    const sql = fs.readFileSync(path.join(__dirname, '..', 'migrations', file), 'utf8');
-    db.exec(sql);
-  }
-
-  // Boot-time rebuild: make payments.customer_id nullable.
-  const notNull = db.prepare(`
-    SELECT COUNT(*) as count FROM pragma_table_info('payments')
-    WHERE name='customer_id' AND "notnull"=1
-  `).get() as { count: number };
-  if (notNull.count > 0) {
-    db.pragma('foreign_keys = OFF');
-    try {
-      db.exec(`
-        CREATE TABLE payments_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            payment_no VARCHAR(50) UNIQUE NOT NULL,
-            customer_id INTEGER,
-            supplier_id INTEGER REFERENCES suppliers(id),
-            invoice_id INTEGER,
-            payment_date DATE NOT NULL,
-            amount DECIMAL(15,2) NOT NULL,
-            payment_method VARCHAR(50),
-            reference_no VARCHAR(100),
-            notes TEXT,
-            purchase_order_id INTEGER REFERENCES purchase_orders(id),
-            created_by INTEGER,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (customer_id) REFERENCES customers(id),
-            FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
-            FOREIGN KEY (invoice_id) REFERENCES invoices(id),
-            FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
-            FOREIGN KEY (created_by) REFERENCES users(id)
-        );
-        INSERT INTO payments_new (id, payment_no, customer_id, supplier_id, invoice_id, payment_date, amount, payment_method, reference_no, notes, purchase_order_id, created_by, created_at)
-          SELECT id, payment_no, customer_id, supplier_id, invoice_id, payment_date, amount, payment_method, reference_no, notes, purchase_order_id, created_by, created_at FROM payments;
-        DROP TABLE payments;
-        ALTER TABLE payments_new RENAME TO payments;
-      `);
-    } finally {
-      db.pragma('foreign_keys = ON');
-    }
-  }
-
-  const supCols = db.prepare(`SELECT name FROM pragma_table_info('suppliers')`).all() as { name: string }[];
-  if (!supCols.some((c) => c.name === 'current_balance')) {
-    db.exec('ALTER TABLE suppliers ADD COLUMN current_balance DECIMAL(15,2) DEFAULT 0');
-  }
-
-  const cols = db.prepare(`SELECT name FROM pragma_table_info('stock_movements')`).all() as { name: string }[];
-  const has = (n: string) => cols.some((c) => c.name === n);
-  if (!has('batch_id')) db.exec('ALTER TABLE stock_movements ADD COLUMN batch_id INTEGER REFERENCES stock_batches(id)');
-  if (!has('financial_value')) db.exec('ALTER TABLE stock_movements ADD COLUMN financial_value DECIMAL(15,4) DEFAULT 0');
-  if (!has('financial_posted')) db.exec('ALTER TABLE stock_movements ADD COLUMN financial_posted BOOLEAN DEFAULT FALSE');
-  if (!has('journal_entry_id')) db.exec('ALTER TABLE stock_movements ADD COLUMN journal_entry_id INTEGER REFERENCES journal_entries(id)');
+  const db = createFixtureDb();
+  seedProductionReferenceData(db);
 
   db.prepare(`
     INSERT INTO users (username, email, password_hash, full_name, role, is_active)
