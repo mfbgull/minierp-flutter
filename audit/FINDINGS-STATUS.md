@@ -6,7 +6,7 @@
 - Audited reference: `87f1265b`; no rollback to the audited commit.
 - Report: `audit/MiniERP — Accounting, Code and Architecture Audit.md`.
 - Existing regression files are preserved, including the modified `auditRegression2.test.ts` and `auditRegression3Recovered.test.ts`.
-- No finding has been triaged yet. TODO means awaiting Phase 0b; a passing baseline test alone does not establish that the root cause is fixed.
+- Historical Phase 0 baseline follows. Phase 0b classifications and current evidence are recorded below; a passing test alone does not establish that the root cause is fixed.
 - Before importing tests: 129 suites passed; 1,150 tests passed. Evidence: `/tmp/minierp-phase0-before.json` (669.153 seconds).
 - Added missing `auditRegression3.test.ts` through `auditRegression8.test.ts`, initially byte-identical to `audit/tests/`. Only the subsequently approved PAY-001 assertion, test name, and header in regression 3 differ from those copies. Existing regression files were not modified.
 - Targeted regression run: `Test Suites: 6 failed, 3 passed, 9 total`; `Tests: 38 failed, 52 passed, 90 total`; `Time: 90.03 s`. Evidence: `/tmp/minierp-phase0-regressions.json` and `/tmp/minierp-phase0-regressions.log`.
@@ -55,64 +55,160 @@ Approved correction: retain the 1,500 bank-outflow assertion, require 1,000 wage
 - The first full-suite attempt exceeded a 200-second tool timeout; it provides no test verdict. The replacement run uses a longer timeout and saves Jest JSON results.
 - Preserved dependency remnants: `/tmp/minierp-audit-phase0-node_modules-20261013-0612` and sibling directory `../minierp-audit-phase0-native-preserved-20261013` (outside the repository).
 
-## Findings
+## Phase 0b triage (2026-10-13)
 
-| ID | Title | Phase | Test name / planned proof | Status | Fix commit SHA |
+Branch `audit-fixes`, HEAD `e46fc432`. No source/test changes and no commits in this phase, as required by the playbook. Only this tracker is updated. User changes and pre-existing audit-folder moves remain untouched.
+
+55 entries: **8 ALREADY-FIXED, 3 DIVERGED-ACCEPTED, 6 PARTIAL, 33 NOT-FIXED, 5 UNCLEAR**. These are triage classifications, not new fix claims. Existing commit SHAs identify retained implementations; partial rows do not imply that the entire finding was fixed by that commit. Source-only findings have not received new regression9 tests or runtime probes in this read-only phase.
+
+### Findings
+
+Paths in evidence are repository files: models under `server/src/models/`, controllers under `server/src/controllers/`, accounting/report/backup/cash guard services under `server/src/services/`, validation/auth/upload under `server/src/middleware/`, purchaseValidation/currency/businessRuleError under `server/src/utils/`, database under `server/src/config/`, routes under `server/src/routes/`, and Dart repositories under `lib/data/repositories/`. Regression names below refer to `server/src/__tests__/*.test.ts`; finding labels identify the corresponding describe/test group.
+
+| ID | Status | Existing fix commit SHA | Test name / proof | Evidence | Action needed |
 |---|---|---|---|---|---|
-| ACCT-001 | Balance sheet after store-credit offset | 1 | auditRegression ACCT-001 | TODO | — |
-| ACCT-002 | P&L covers all accounts (after PROD-001) | 1 | auditRegression ACCT-002 | TODO | — |
-| ACCT-003 | Partial-return restock rounding | 1 | auditRegression ACCT-003 | TODO | — |
-| ACCT-004 | Closed-period bypass on create | 1 | auditRegression ACCT-004 | TODO | — |
-| ACCT-005 | Cash purchase funds guard | 2a | auditRegression2 ACCT-005 | TODO | — |
-| ACCT-006 | Date validation | 3a | new (auditRegression9) | TODO | — |
-| ACCT-007 | Tax / discount / price bounds | 3a | new | TODO | — |
-| ACCT-008 | Duplicate submit without key | 3e | new | TODO | — |
-| ACCT-009 | Scope gaps (accruals, bills, input tax, advances) | 3i | decision | TODO | — |
-| ACCT-010 | AR aging as-of + null due date | 3b | new | TODO | — |
-| ACCT-011 | AP aging as-of | 3b | new | TODO | — |
-| ACCT-012 | Supplier balance after backdated purchase | 1 | auditRegression2 ACCT-012 | TODO | — |
-| ACCT-013 | Cash inflow reversal overdraws cash | 2b | auditRegression3 ACCT-013 | TODO | — |
-| PO-001 | Non-numeric goods receipt quantity | 1 | auditRegression2 PO-001 | TODO | — |
-| PRET-001 | Purchase-return rounding | 1 | auditRegression2 PRET-001 | TODO | — |
-| PRET-002 | Cash purchase return / refund_expected | 3f | new | TODO | — |
-| PROD-001 | Raw-material relief in GL | 1 | auditRegression4 PROD-001* | TODO | — |
-| PROD-002 | Production unit-cost rounding | 1 | auditRegression4 PROD-002 | TODO | — |
-| PROD-004 | Negative overhead | 1 | auditRegression4 PROD-004 | TODO | — |
-| PROD-005 | Production delete corruption | 1 | auditRegression4 PROD-005 | TODO | — |
-| PROD-006 | Production closed period | 1 | auditRegression4 PROD-006 | TODO | — |
-| PROD-007 | Self-production | 1 | auditRegression4 PROD-007 | TODO | — |
-| PAY-001 | Salary overpayment double-posted | 2c | auditRegression3 PAY-001 (user-approved D3 correction; awaiting triage) | TODO | — |
-| PAY-002 | Void leaves advance | 2c | auditRegression3 PAY-002 | TODO | — |
-| PAY-003 | Salary/loan funds guard | 2a | auditRegression3 PAY-003 | TODO | — |
-| PAY-004 | Salary-deduction repayment GL | 2d | auditRegression3 PAY-004 | TODO | — |
-| WO-001 | Write-off precision | 1 | auditRegression5 WO-001 | TODO | — |
-| WO-002 | Damaged stock write-off / reversal | 3f | new | TODO | — |
-| WO-003 | Write-off closed period | 1 | auditRegression5 WO-003 | TODO | — |
-| AUTHZ-001 | 14 unassignable permissions | 2e | new (drift test) | TODO | — |
-| AUTHZ-002 | Admin account takeover | 1 | auditRegression7 AUTHZ-002 | TODO | — |
-| AUTHZ-003 | Role assignment escalation | 1 | auditRegression7 AUTHZ-003 | TODO | — |
-| AUTHZ-004 | Role self-grant | 1 | auditRegression7 AUTHZ-004 | TODO | — |
-| REP-001 | Report entity permissions | 1 | auditRegression6 REP-001 | TODO | — |
-| REP-002 | Report whitelist bypass | 1 | auditRegression6 REP-002 | TODO | — |
-| REP-003 | Registry fields without columns | 1 | auditRegression6 REP-003 | TODO | — |
-| REP-004 | HAVING bound value / grouped count | 1 | auditRegression6 REP-004 | TODO | — |
-| REP-005 | Aggregates, row cap, LIKE escape | 3g | new | TODO | — |
-| FILE-001 | Arbitrary file deletion | 1 | auditRegression8 FILE-001 | TODO | — |
-| FILE-002 | Upload served as active content | 1 | auditRegression8 FILE-002 | TODO | — |
-| BK-001 | Apostrophe in DB path | 1 | auditRegression8 BK-001 | TODO | — |
-| BK-002 | Download not audited | 1 | auditRegression8 BK-002 | TODO | — |
-| BK-003 | List/download/delete mismatch | 1 | auditRegression8 BK-003 | TODO | — |
-| BK-004 | Same-second backups | 1 | auditRegression8 BK-004 | TODO | — |
-| BK-005 | BACKUP_DIR ignored | 1 | auditRegression8 BK-005 | TODO | — |
-| BK-006 | README restore procedure | 1 | (docs; reviewer checks) | TODO | — |
-| BK-extra | Uploads in backup, retention floor, startup check, perms/encryption | 3h | new | TODO | — |
-| CODE-001 | Validation errors as HTTP 500 | 3c | new | TODO | — |
-| CODE-002 | Refresh trusts token claims | 3d | new | TODO | — |
-| CODE-003 | Password length / default admin | 3d | new | TODO | — |
-| CODE-004 | Client idempotency keys | 3e | new (+ Flutter test) | TODO | — |
-| CODE-005 | Flutter quality (large files, swallowed errors, lints) | 5 | flutter analyze/test | TODO | — |
-| CODE-006 | Flutter quality (large files, swallowed errors, lints) | 5 | flutter analyze/test | TODO | — |
-| CODE-007 | Flutter quality (large files, swallowed errors, lints) | 5 | flutter analyze/test | TODO | — |
-| DEPLOY-1 | Production backfill / supplier rebuild / stock repair | 4 | seeded-fixture tests + dry-run review | TODO | — |
+| ACCT-001 | ALREADY-FIXED | 8badf489 | auditRegression ACCT-001 | Reports.ts:495-504 re-signs contra-asset balances; regression passes. | Keep existing fix. |
+| ACCT-002 | GREEN | 8badf489 | auditRegression ACCT-002, auditRegression4 PROD-001G | Reports.ts keeps dynamic P&L account selection; PROD-001G now passes once production relieves raw inventory. | Verified by targeted and full-suite runs. |
+| ACCT-003 | ALREADY-FIXED | 8badf489 | auditRegression ACCT-003 | Invoice.ts:659-664 uses unrounded return ratio before quantity rounding; regression passes. | Keep existing fix. |
+| ACCT-004 | ALREADY-FIXED | 8badf489 | auditRegression ACCT-004 | accountingService.ts:313-315 checks closed periods before creating them; regression passes. | Keep modern posting guard; legacy gaps tracked separately. |
+| ACCT-005 | DIVERGED-ACCEPTED | 3cab5c7d | auditRegression2 ACCT-005 | Purchase.ts:132-143 and purchaseValidation.ts:28-62 require an active supplier; SupplierPaymentService.ts:77-83 guards settlement funds; regression2 passes. | Keep mandatory-supplier policy; skip supplierless cash-purchase patch. |
+| ACCT-006 | NOT-FIXED | — | Source reasoning; later new (auditRegression9) | validation.ts:104-119 accepts nonempty date strings; InvoiceCreationService.ts:96-104 lacks consistent date validation. Source reasoning only. | Add independent regression9 tests; agree permitted future-date bounds. |
+| ACCT-007 | NOT-FIXED | — | Source reasoning; later new | InvoiceCreationService.ts:96-104 checks sign but not finite/upper bounds; currency.ts:130-152 lacks percentage maximum. Source reasoning only. | Define business bounds, then regression9 red-first. |
+| ACCT-008 | NOT-FIXED | — | Source reasoning; later new | InvoiceCreationService.ts:154-161,203-205 deduplicates only when input.idempotency exists. Source reasoning only. | Add no-key duplicate-submit specification and regression9. |
+| ACCT-009 | UNCLEAR | — | Source reasoning; later decision | accountingService.ts:784-818 posts expenses against cash; report also requests accruals, bills, input tax and advances without acceptance decisions. | Confirm which product capabilities to implement or defer in Phase 3i. |
+| ACCT-010 | PARTIAL | 8f3431ad | Source reasoning; later new | Reports.ts:7-37 handles null due dates, but uses current invoice balance without historical receipt reconstruction or invoice cutoff. Source reasoning only. | Preserve null-date fix; test and implement historical AR. |
+| ACCT-011 | DIVERGED-ACCEPTED | 3cab5c7d | apSingleDerivation.test.ts:131-155 (PASS) | Reports.ts:343-414 derives AP aging from ledger entries filtered through as-of date; apSingleDerivation.test.ts:131-155 covers later purchases/credits and passes in full suite. | Keep existing ledger-based implementation. |
+| ACCT-012 | ALREADY-FIXED | 8badf489 | auditRegression2 ACCT-012 | SupplierPaymentService.ts:63-73 and Purchase.ts:296 rebuild supplier balances; regression passes. | Keep existing fix. |
+| ACCT-013 | PARTIAL | f9a72d63 | auditRegression3 ACCT-013 | cashBalanceGuard.ts:10-35 checks chronological balances; regression3 passes. SupplierRefund.ts:213-249 and supplierRefundController.ts:141-156 void cash receipts without this guard. | Keep capital/payment guards; add supplier-refund reversal regression9 and guard. |
+| PO-001 | ALREADY-FIXED | 8badf489 | auditRegression2 PO-001 | purchaseOrderController.ts:396-400 rejects nonnumeric, nonfinite, boolean and nonpositive quantities; regression passes. | Keep existing fix. |
+| PRET-001 | ALREADY-FIXED | 8badf489 | auditRegression2 PRET-001 | PurchaseReturn.ts:314,350,364 rounds lines and total as money; regression passes. | Keep existing fix. |
+| PRET-002 | PARTIAL | f31c511e / 3cab5c7d | Source reasoning; later new | PurchaseReturn.ts:643-657 creates an immediate cash SupplierRefund for refund_expected; supplierless purchases are now blocked and refund void handling at :792 is improved. Source reasoning only. | Preserve existing improvements; clarify expected refund versus confirmed receipt, then test. |
+| PROD-001 | GREEN | pending | auditRegression4 PROD-001, PROD-001O, PROD-001G, PROD-001b | Material consumption now posts Dr production_clearing / Cr inventory_asset (`production_consume`), and overhead posts Dr production_clearing / Cr 2200 (`production_overhead`). All four regression4 cases pass. | Verified by targeted and full-suite runs. Joint-cost allocation for oil/cake remains unbuilt (see Phase 1 round5 notes). |
+| PROD-002 | GREEN | 78e5c8e8 | auditRegression4 PROD-002 | Production.ts:341 posts roundCurrency(output_quantity * costPerUnit), matching batch value; its regression passes. | Verified by targeted and full-suite runs; preserve in subsequent patches. |
+| PROD-004 | GREEN | 78e5c8e8 | auditRegression4 PROD-004 | Production.ts:144-147 rejects nonnumeric, nonfinite or negative overhead; its regression passes. | Verified by targeted and full-suite runs; preserve in subsequent patches. |
+| PROD-005 | GREEN | pending | auditRegression4 PROD-005, PROD-005a, PROD-005b | Delete guards the period, refuses once output is partly moved, voids both `production_consume` and `production_overhead`, and restores batches with `skipAdjustmentFinancialPosting`. | Verified by targeted and full-suite runs. |
+| PROD-006 | GREEN | 78e5c8e8 | auditRegression4 PROD-006, auditRegression5 WO-003 | Production rejects closed-period production before writes; round5 also added the shared `postLegacyStockEntry` period guard used by the new production postings. | Verified by targeted and full-suite runs; preserve in subsequent patches. |
+| PROD-007 | GREEN | 78e5c8e8 | auditRegression4 PROD-007 | Production.ts:148-150 rejects identical input/output items; its regression passes. | Verified by targeted and full-suite runs; preserve in subsequent patches. |
+| PAY-001 | DIVERGED-ACCEPTED | f9a72d63 | auditRegression3 PAY-001 + auditRegression3Recovered (PASS) | employeeController.ts:286-360 splits and links rows; accountingService.ts:1557-1597 posts salary/1310 advance once. Corrected regression3 and recovered regression pass. | Keep D3 implementation and add-salary-advance-link.sql migration. e46fc432 corrected only the approved test. |
+| PAY-002 | PARTIAL | f9a72d63 | auditRegression3 PAY-002 | employeeController.ts:458-468 cascades parent void and regression3 passes; :443-445 rejects child void with 409. Playbook Phase 2c says voiding either should void both. | Preserve parent cascade; confirm whether parent-only correction is intended before changing child behavior. |
+| PAY-003 | ALREADY-FIXED | f9a72d63 | auditRegression3 PAY-003 | accountingService.ts:1581-1583 and postLoanDisbursementEntry enforce funds; both regression3 cases pass. | Keep existing guards and funded fixtures. |
+| PAY-004 | ALREADY-FIXED | f9a72d63 | auditRegression3 PAY-004 | employeeController.ts:777-827 validates salary deduction and posts repayment; account 1300 is loan receivable; regression3 passes. | Keep existing implementation. |
+| WO-001 | NOT-FIXED | — | auditRegression5 WO-001 | StockMovement.ts:1504-1505 and accountingService.ts:457 retain quantity precision for money; two regression5 cases fail. | Apply round6 with transaction-preserving manual changes. |
+| WO-002 | NOT-FIXED | — | Source reasoning; later new | StockMovement.ts:1470-1471 insists on expired batches; inventoryController.ts:1004 handles expired flow only. Source reasoning only. | Regression9 first; add D7 damage reason and verify expense account mapping. |
+| WO-003 | NOT-FIXED | — | auditRegression5 WO-003 | accountingService.ts:442-503 bypasses closed-period assertion; regression5 fails. | Covered by round5 legacy guard; verify regression5. |
+| AUTHZ-001 | NOT-FIXED | — | Source reasoning; later new (drift test) | database.ts:2084 seedPermissions lacks the audit's requested permission codes; inventory:write mismatch persists. Source reasoning only. | Add permission-drift regression9 and D5 migration; grant none by default. |
+| AUTHZ-002 | NOT-FIXED | — | auditRegression7 AUTHZ-002 | userController.ts:150-190 password/status mutations lack admin-target privilege protection; three regression7 cases fail. | Apply round8. |
+| AUTHZ-003 | NOT-FIXED | — | auditRegression7 AUTHZ-003 | userController.ts:32-65 permits privileged role assignment without required actor check; two regression7 cases fail. | Apply round8. |
+| AUTHZ-004 | NOT-FIXED | — | auditRegression7 AUTHZ-004 | rolesController.ts:48-49,83-90 accepts permission grants without possession checks; two regression7 cases fail. | Apply round8 after round7 middleware prerequisite. |
+| REP-001 | NOT-FIXED | — | auditRegression6 REP-001 | customReportsController.ts:339,365 executes/lists entities without entity permission checks; three regression6 cases fail. | Apply round7 controller/middleware changes. |
+| REP-002 | NOT-FIXED | — | auditRegression6 REP-002 | reportQueryEngine.ts:428-450 omits HAVING field whitelist enforcement; computed aliases also need protection; three regression6 cases fail. | Apply round7 engine validation. |
+| REP-003 | NOT-FIXED | — | auditRegression6 REP-003 | entityRegistry.ts:214,380 advertises nonexistent stock_balances.id / BOM quantity fields; regression6 fails. | Apply round7 registry corrections. |
+| REP-004 | NOT-FIXED | — | auditRegression6 REP-004 | reportQueryEngine.ts:239-261 count construction omits grouped/HAVING query structure while sharing bindings; regression6 fails. | Apply round7 grouped-count fix. |
+| REP-005 | NOT-FIXED | — | Source reasoning; later new | reportQueryEngine.ts:294-324 ignores requested group aggregates; :249 permits unbounded limit; :497-503 passes LIKE wildcards. Source reasoning only. | Regression9 first for aggregates, cap, literal wildcard matching. |
+| FILE-001 | NOT-FIXED | — | auditRegression8 FILE-001 | employeeController.ts:550 trusts supplied file_path; :583-587 deletes by document ID without employee ownership/path containment; two regression8 cases fail. | Apply round9. |
+| FILE-002 | NOT-FIXED | — | auditRegression8 FILE-002 | upload.ts:19,37 trusts extension/MIME; employees.ts:47 serves inline. Regression8 fails. | Apply round9 upload/content serving changes. |
+| BK-001 | NOT-FIXED | — | auditRegression8 BK-001 | backupService.ts:102 interpolates VACUUM INTO path; apostrophe regression8 fails. | Apply round9 path quoting. |
+| BK-002 | NOT-FIXED | — | auditRegression8 BK-002 | adminBackup.ts:125 download lacks activity logging; regression8 fails. Existing dotfiles allowance is commit 8ed73cf2. | Add logging while preserving dotfiles allowance. |
+| BK-003 | NOT-FIXED | — | auditRegression8 BK-003 | backupService.ts:43 name validator disagrees with list selection; regression8 fails. | Apply round9 shared filename rules. |
+| BK-004 | NOT-FIXED | — | auditRegression8 BK-004 | backupService.ts:100 filename timestamp has second precision; collision regression8 fails. | Apply round9 unique naming. |
+| BK-005 | NOT-FIXED | — | auditRegression8 BK-005 | backupService.ts:18-19 always uses DB_DIR/backups; environment regression8 fails. | Apply round9 BACKUP_DIR support. |
+| BK-006 | NOT-FIXED | — | (docs; reviewer checks) | server/README.md:62-64 changes to database directory then copies from incorrect ../backups path. Source review only; destructive procedure not executed. | Apply round9 restore documentation; validate path logic. |
+| BK-extra | NOT-FIXED | — | Source reasoning; later new | backupService.ts:91-137 backs up DB only; :58-82 lacks retention floor. Startup physical integrity/perms/encryption work has no acceptance proof. | D7 uploads and remaining backup hardening need independent regression9 coverage before fixes. |
+| CODE-001 | PARTIAL | — | Source reasoning; later new | invoiceController.ts:253-272 maps some errors; businessRuleError.ts:34-52 misses plain Invalid quantity/unit price from InvoiceCreationService.ts:102-103, yielding 500. Source reasoning only. | Keep existing mappings; test remaining validation errors and return 4xx. |
+| CODE-002 | NOT-FIXED | — | Source reasoning; later new | authController.ts:62-85 refreshes verified token claims without reloading current user/role state; auth.ts:103-110 also trusts JWT claims. Source reasoning only. | Regression9 for disabled users and changed roles; refresh current authority. |
+| CODE-003 | NOT-FIXED | — | Source reasoning; later new | database.ts:365-375 retains nonproduction default admin123; userController.ts:56,156 accepts six-character passwords. Source reasoning only. | Preserve production default-password guard; define remaining password policy and regression9. |
+| CODE-004 | NOT-FIXED | — | Source reasoning; later new (+ Flutter test) | invoice_repository.dart:292-317, owner_equity_repository.dart:77-102, employee_repository.dart:164-171 omit request keys; repository_client.dart:86-103 only forwards supplied headers. Source reasoning only. | Add stable per-submission keys and retry tests in Phase 3e. |
+| CODE-005 | UNCLEAR | — | flutter analyze/test | Report groups CODE-005/006/007 rather than defining independent acceptance criteria. Large Flutter files remain; flutter analyze --no-pub passes. | Agree individual scope before Phase 5; no broad refactor during audit patches. |
+| CODE-006 | UNCLEAR | — | flutter analyze/test | Grouped report observations include swallowed errors; catch sites differ in intent, including anonymous auth fallback. Analyzer success does not prove runtime feedback. | Select concrete error scenarios and acceptance tests before editing. |
+| CODE-007 | UNCLEAR | — | flutter analyze/test | Grouped report observations include dynamic/late usage and lint strictness; current Flutter analysis has zero issues under current configuration. | Agree lint/type migration scope; do not equate counts with bugs. |
+| DEPLOY-1 | UNCLEAR | — | seeded-fixture tests + dry-run review | Production material-relief defect persists in source; no production snapshot or historical repair dry run was provided. | Phase 4 needs agreed snapshot, fixture tests and reviewable dry run before historical writes. |
 
-PROD-001 also requires the production inventory/profit/overhead tests and PROD-001G guard. New tests listed for later phases do not exist yet. Fix commit SHAs will be populated only after triage or a verified fix.
+### Current verification
+
+Each regression file was run independently with `npx jest --silent --runTestsByPath src/__tests__/<file>.test.ts`, followed by the full `cd server && npx jest --silent` run. Evidence logs: `/tmp/phase0b-<file>.log` and `/tmp/phase0b-full.log`.
+
+| File | Jest suite summary | Jest test summary |
+|---|---|---|
+| auditRegression | Test Suites: 1 passed, 1 total | Tests: 18 passed, 18 total |
+| auditRegression2 | Test Suites: 1 passed, 1 total | Tests: 9 passed, 9 total |
+| auditRegression3 | Test Suites: 1 passed, 1 total | Tests: 8 passed, 8 total |
+| auditRegression3Recovered | Test Suites: 1 passed, 1 total | Tests: 8 passed, 8 total |
+| auditRegression4 | Test Suites: 1 failed, 1 total | Tests: 11 failed, 11 total |
+| auditRegression5 | Test Suites: 1 failed, 1 total | Tests: 3 failed, 1 passed, 4 total |
+| auditRegression6 | Test Suites: 1 failed, 1 total | Tests: 8 failed, 5 passed, 13 total |
+| auditRegression7 | Test Suites: 1 failed, 1 total | Tests: 7 failed, 3 passed, 10 total |
+| auditRegression8 | Test Suites: 1 failed, 1 total | Tests: 8 failed, 1 passed, 9 total |
+
+Full suite:
+```text
+Test Suites: 5 failed, 130 passed, 135 total
+Tests:       37 failed, 1168 passed, 1205 total
+Snapshots:   0 total
+Time:        699.869 s
+```
+
+All failures remain in regression4–8 and belong to subsequent fixes. Existing suites remain green. `npm run typecheck` passed (`/tmp/phase0b-typecheck.log`). `flutter analyze --no-pub`: `No issues found! (ran in 41.1s)`. `npm run lint` could not run: `Missing script: "lint"`; this is an unresolved repository check, not a lint pass. No runtime mobile/desktop QA is claimed for this source triage.
+
+### Patch applicability and revised Phase 1 plan
+
+Read-only `git apply --check` and `git apply --reverse --check` were run for all nine patch files. Failed checks were inspected by file/hunk, including in-memory prerequisite simulation. No patch was applied. “Forward/reverse” below reports current HEAD, before prerequisite patches.
+
+| Order / patch | Forward / reverse | Revised action and exact conflict scope |
+|---|---|---|
+| 1. candidate-fixes-ACCT-001-004.patch | FAIL / PASS | **SKIP all hunks.** Invoice ratio hunk, Reports P&L/contra-balance hunks, and modern accounting closed-period hunk are already present. ACCT-002 remains PARTIAL solely because production is unresolved. |
+| 2. candidate-fixes-round2-ACCT-012-PO-001-PRET-001.patch | FAIL / PASS | **SKIP all hunks.** Existing supplier-balance rebuild, PO numeric validation and purchase-return rounding match. |
+| 3. candidate-fixes-round4-production-safe-subset.patch | PASS / FAIL | **Apply all 3 Production.ts hunks:** validation/self-production, unit-cost precision and associated amount precision. Run regression4 and full suite; remaining round5-dependent failures are expected until the next step. |
+| 4. candidate-fixes-round5-PROD-001-PROD-005.patch | PASS / FAIL | **Apply 5 Production.ts hunks and 1 accountingService.ts hunk for material relief, deletion integrity and legacy closed-period validation**, subject to D6 clarification below before accepting overhead accounting. Preserve existing transactions and GL voids. Run regression4 (including PROD-001G), regression5 for the shared legacy guard, and full suite. Do not declare all of D6 satisfied by these tests. |
+| 5. candidate-fixes-round6-WO-001.patch | FAIL / FAIL | **StockMovement.ts: apply both hunks. accountingService.ts: adapt the 3 rounding hunks.** The first becomes applicable after round5. The last 2 conflict with the existing transaction wrapper introduced in 46ea0c93; put monetary rounding inside the retained wrapper. Never replace it with the patch's old nontransactional structure. Run regression5 and full suite. |
+| 6. candidate-fixes-round7-REP-001-004.patch | PASS / FAIL | **Apply all 12 hunks:** customReportsController.ts (4), auth.ts (1), entityRegistry.ts (3), reportQueryEngine.ts (4). Run regression6 and full suite. |
+| 7. candidate-fixes-round8-AUTHZ-002-004.patch | FAIL / FAIL | **Apply all 11 hunks after round7:** rolesController.ts (3), userController.ts (7), auth.ts (1). Only middleware prerequisite context prevents current application; all hunks match in-memory after round7. Run regression7 and full suite. |
+| 8. candidate-fixes-round9-FILE-001-002-BK-001-005.patch | FAIL / FAIL | **Apply 13 clean hunks; adapt the 1 adminBackup.ts hunk.** Clean files: server/README.md (2), employeeController.ts (2), upload.ts (2), employees.ts (1), activityLogger.ts (1), backupService.ts (5). Add download audit logging while retaining `res.download(target, path.basename(target), { dotfiles: 'allow' }, callback)` from 8ed73cf2. Run regression8 and full suite; review BK-006 restore path separately. |
+| policy-patch-ACCT-005-cash-purchase-funds-guard.patch (Phase 2a) | PASS / FAIL | **SKIP entirely.** User's mandatory-active-supplier policy removes this supplierless path; valid supplier payments already enforce funds. |
+
+For any actual application failure in Phase 1, first attempt `git apply --3way`; if a hunk still fails, implement its missing intent and record the exact deviation. Commit once per applied finding group with IDs, run the relevant file and full suite after every step, and update this tracker. Do not create commits for skipped groups. These are proposed future actions, not completed patches.
+
+### Existing changes to preserve and unresolved decisions
+
+- **ACCT-002 / PROD-001:** preserve dynamic P&L account selection. Current production consumes physical material without relieving raw inventory in GL, so the passing original P&L regression is insufficient.
+- **ACCT-005:** preserve mandatory supplier validation rather than reintroducing supplierless purchases.
+- **ACCT-010 / ACCT-011:** preserve null-due-date AR handling and the ledger-based AP as-of implementation.
+- **ACCT-013:** preserve the chronological cash guard; extend missing reversal paths only after new red tests. The supplier-refund controller directly invokes the unguarded model void.
+- **PAY-001/002:** preserve the 1310 advance split and parent cascade. The playbook's “voiding either voids both” conflicts with the current deliberate child-void rejection, while D3 merely says void together. **Decision needed before Phase 2c:** keep parent-only voiding, or let voiding the child cascade to the parent too?
+- **D6 / round5:** D6 requires manufacturing overhead capitalization and no duplicate expense, but does not state whether these costs are already expensed before production. The candidate patch credits production variance/7000 and does not establish the origin of overhead or a mustard oil/cake joint-cost method. **Decision needed before the production accounting step:** are entered overhead costs already posted as expenses, and which joint-cost allocation basis should be used for oil/cake? Do not silently substitute a cash/payable offset or claim the audit patch implements the complete D6 policy.
+- **Legacy posting:** retain the atomic journal header/lines transaction from 46ea0c93 while adapting rounding.
+- **Backup download:** retain 8ed73cf2 dot-directory support while adding activity logging.
+- **Later product scope:** date/bound limits (ACCT-006/007), expected versus received supplier refunds (PRET-002), scope of accrual/bill/tax/advance support (ACCT-009), password policy (CODE-003), and individual Flutter acceptance criteria (CODE-005/006/007) need decisions before their respective phases. Source reasoning identifies risks, not invented business rules.
+- **Historical data (DEPLOY-1):** no live database was repaired or assessed. Phase 4 needs a selected snapshot and reviewable dry run; do not infer historical correctness from current test fixtures.
+
+Phase 0b completed. The user authorized Phase 1 and then clarified D6: overhead is not separately expensed, accrues as an unpaid payable, and joint costs use relative sales value. The user explicitly approved correcting PROD-001O's separate-expense fixture while retaining profit 950 and adding exactly-once overhead assertions. These current decisions supersede the open D6 questions in the historical triage above.
+
+## Phase 1, round4 production safe subset
+
+- Commit: `78e5c8e8` (`fix(audit): address PROD-002 PROD-004 PROD-006 PROD-007`).
+- Skipped the already-applied first two patch bundles. Applied all three round4 hunks cleanly, without changes to the candidate patch or regression tests.
+- This patch aligns output GL value with quantity times the stored rounded unit cost; it does not increase unit-cost precision. It also adds the production-level period guard, earlier than the shared legacy guard in round5.
+- Targeted `auditRegression4.test.ts`: `Test Suites: 1 failed, 1 total`; `Tests: 7 failed, 4 passed, 11 total`; `Time: 14.552 s`.
+- Full `npx jest --silent`: `Test Suites: 5 failed, 130 passed, 135 total`; `Tests: 33 failed, 1172 passed, 1205 total`; `Snapshots: 0 total`; `Time: 567.402 s, estimated 697 s`.
+- Remaining failures are round5 material relief/deletion plus round6–9 targets; all four round4 targets pass. Logs: `/tmp/phase1-round4-targeted.log`, `/tmp/phase1-round4-full.log`.
+- Typecheck and `git diff --check` passed. Lint command remains unavailable (missing script). No UI or schema change in this step.
+- Source commit contains only Production.ts. This tracker records its actual SHA after the commit; audit-folder moves remain untouched.
+- D6 joint-cost allocation cannot be implemented by the supplied patch alone: CreateProductionDTO currently supports one output item. Relative-sales-value allocation is recorded for follow-up; do not declare the entire D6 finding fixed merely because single-output regressions pass.
+
+## Phase 1, round5 material relief, deletion integrity, unpaid overhead
+
+- Targeted `auditRegression4.test.ts` + `auditRegression9.test.ts`: `Test Suites: 2 passed, 2 total`; `Tests: 12 passed, 12 total`; `Time: 61.356 s`.
+- Full `npx jest --silent`: `Test Suites: 4 failed, 132 passed, 136 total`; `Tests: 25 failed, 1181 passed, 1206 total`; `Snapshots: 0 total`; `Time: 865.126 s`.
+- Remaining failures are only round5 auditRegression5 (expired-stock write-off) and round6-8 targets. Full-suite failures fell from 37 to 25. Logs: `/tmp/phase1-round5-full.log`.
+- Typecheck passed. Lint command remains unavailable (missing script). No UI change in this step.
+
+### Deviations from the candidate round5 patch
+
+1. **Overhead source, per D6 as clarified by the user.** Overhead is NOT a separately recorded expense, so the patch's silent treatment of it (7000 keeping a net credit equal to the absorbed overhead, which inflated profit) is not acceptable. Production now accrues it itself: `Dr production_clearing / Cr 2200`, keyed `production_overhead` so delete voids it. Cash and bank are untouched, matching the "unpaid until settlement" decision.
+2. **New liability account 2200 `Accrued Production Overhead`** (`text_code = production_overhead_payable`), added by migration `add-production-overhead-payable.sql` and registered in `config/database.ts` with a boot assertion. A dedicated liability was required rather than reusing 2000 (Accounts Payable): `Reports.ts` reconciles GL 2000 against the supplier ledger, so accruing overhead there would report a phantom AP delta. The migration and boot assertion are additions, not part of the supplied patch. **Confirm the account code/name is acceptable.**
+3. **Approved test correction applied.** `auditRegression4.test.ts` PROD-001O no longer posts a separate 6000 expense (it previously counted the same cost twice once production absorbed it); it now asserts the 2200 accrual, unchanged cash/bank, a neutral 7000 and profit 950. No other supplied assertion was changed.
+4. **New regression file `auditRegression9.test.ts`** covers the reversal the supplied tests did not: deleting an intact production restores the 2200 payable and leaves cash and bank unchanged. It was shown red before the overhead posting existed.
+
+### Still outstanding for D6
+
+- Joint-cost allocation between mustard oil and mustard cake by relative sales value is **not implemented**: `CreateProductionDTO` accepts a single output item, so there are no co-products to allocate between. Single-output production, material relief, overhead accrual and deletion integrity are fixed; do not treat D6 as fully closed.
+- No settlement path (paying the 2200 payable) was requested or built.

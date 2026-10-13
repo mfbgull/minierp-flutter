@@ -274,10 +274,47 @@ class ProductionModel {
         StockMovementModel.refreshItemStockMirror(input.item_id, db);
       }
 
+      // PROD-001: consuming raw materials must relieve inventory. The output
+      // posting below is Dr Inventory / Cr Production Clearing for the whole
+      // batch cost, so the clearing account has to be debited, and inventory
+      // credited, with the material cost actually consumed (FIFO). Net effect:
+      // inventory moves by (output value - materials) and 7000 keeps only the
+      // absorbed overhead. Keyed by the production id so delete can void it.
+      const consumedValue = roundCurrency(totalMaterialCost);
+      if (consumedValue > 0) {
+        AccountingService.postLegacyStockEntry(db, {
+          referenceType: 'production_consume',
+          referenceId: Number(productionId),
+          entryDate: production_date,
+          description: `Production ${productionNo}: raw materials consumed (${consumedValue.toFixed(2)})`,
+          debitTextCode: 'production_clearing',
+          creditTextCode: 'inventory_asset',
+          amount: consumedValue,
+          createdBy: userId,
+        });
+      }
+
       // Calculate total batch cost from actual FIFO consumption
       const totalOverhead = overhead_cost ?? 0;
       const totalBatchCost = totalMaterialCost + totalOverhead;
       const costPerUnit = output_quantity > 0 ? roundQty(totalBatchCost / output_quantity) : 0;
+
+      // D6: overhead is not a separately recorded expense, so production itself
+      // must accrue it. Without this the clearing account keeps a net credit for
+      // the absorbed overhead and profit is inflated by that amount.
+      const overheadValue = roundCurrency(totalOverhead);
+      if (overheadValue > 0) {
+        AccountingService.postLegacyStockEntry(db, {
+          referenceType: 'production_overhead',
+          referenceId: Number(productionId),
+          entryDate: production_date,
+          description: `Production ${productionNo}: overhead accrued unpaid (${overheadValue.toFixed(2)})`,
+          debitTextCode: 'production_clearing',
+          creditTextCode: 'production_overhead_payable',
+          amount: overheadValue,
+          createdBy: userId,
+        });
+      }
 
       // Create a stock_batch record for the finished good
       db.prepare(`
@@ -546,6 +583,25 @@ class ProductionModel {
     }
 
     const transaction = db.transaction(() => {
+      // Reversal rules: a posting dated in a closed period cannot be undone.
+      AccountingService.assertPeriodNotClosed(db, production.production_date, `Production ${production.production_no}`);
+
+      // PROD-005: the output must be intact. Once any of it was sold,
+      // transferred or consumed, deleting would conjure stock (raw materials
+      // restored in full while part of the output is already gone).
+      const producedBatch = db.prepare(`
+        SELECT quantity_original, quantity_remaining
+        FROM stock_batches
+        WHERE source_type = 'PRODUCTION' AND source_id = ?
+      `).get(id) as { quantity_original: number; quantity_remaining: number } | undefined;
+      if (producedBatch && roundQty(producedBatch.quantity_remaining) < roundQty(producedBatch.quantity_original)) {
+        throw new Error(
+          `Cannot delete production ${production.production_no}: ` +
+          `${roundQty(producedBatch.quantity_original - producedBatch.quantity_remaining)} of its ` +
+          `${roundQty(producedBatch.quantity_original)} output units have already been sold or moved`
+        );
+      }
+
       const outputMovement = db.prepare(`
         SELECT id, journal_entry_id, unit_cost, quantity,
           (SELECT COUNT(*) FROM journal_lines
@@ -573,6 +629,28 @@ class ProductionModel {
         throw new Error(
           `Refusing to delete production ${production.production_no}: its GL journal entry is missing — GL state unexpected`
         );
+      }
+
+      // PROD-001: void the raw-material consumption posting too (productions
+      // recorded before it existed simply have none).
+      const activeConsume = db.prepare(`
+        SELECT COUNT(*) AS n FROM journal_lines
+        WHERE reference_type = 'production_consume' AND reference_id = ? AND voided = 0
+      `).get(id) as { n: number };
+      if (activeConsume.n > 0) {
+        AccountingService.voidJournalLinesByReference(db, 'production_consume', id);
+        db.prepare(`UPDATE journal_entries SET voided = TRUE WHERE reference_type = 'production_consume' AND reference_id = ?`).run(id);
+      }
+
+      // The overhead accrual is reversed with the production, so the payable
+      // returns to what it was before this record existed.
+      const activeOverhead = db.prepare(`
+        SELECT COUNT(*) AS n FROM journal_lines
+        WHERE reference_type = 'production_overhead' AND reference_id = ? AND voided = 0
+      `).get(id) as { n: number };
+      if (activeOverhead.n > 0) {
+        AccountingService.voidJournalLinesByReference(db, 'production_overhead', id);
+        db.prepare(`UPDATE journal_entries SET voided = TRUE WHERE reference_type = 'production_overhead' AND reference_id = ?`).run(id);
       }
 
       // 1. Restore raw material batch quantities from PRODUCTION movements
@@ -613,6 +691,11 @@ class ProductionModel {
             reference_docno: production.production_no,
             remarks: `Stock reversed - Production ${production.production_no} deleted (raw material)`,
             movement_date: new Date().toISOString().split('T')[0],
+            // PROD-005: the consumed batch was restored above, and the GL is
+            // undone by voiding the consumption posting - so no second batch
+            // and no inventory-adjustment posting here.
+            batch_id: movement.batch_id ?? undefined,
+            skipAdjustmentFinancialPosting: true,
           },
           userId,
           db
@@ -639,6 +722,8 @@ class ProductionModel {
             reference_docno: production.production_no,
             remarks: `Stock reversed - Production ${production.production_no} deleted (output)`,
             movement_date: new Date().toISOString().split('T')[0],
+            batch_id: outputBatch.id,
+            skipAdjustmentFinancialPosting: true,
           },
           userId,
           db
