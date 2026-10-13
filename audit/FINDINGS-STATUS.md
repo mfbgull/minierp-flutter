@@ -108,11 +108,11 @@ Paths in evidence are repository files: models under `server/src/models/`, contr
 | FILE-001 | GREEN | 73b6ccfc | auditRegression8 FILE-001 (3 cases) | Employee document upload no longer trusts a supplied `file_path`, and deletion requires employee ownership; all 9 regression8 tests pass. | Verified by targeted and full-suite runs. |
 | FILE-002 | GREEN | 73b6ccfc | auditRegression8 FILE-002 | Uploads validate extension and MIME, and employee documents are served as attachments rather than inline. | Verified by targeted and full-suite runs. |
 | BK-001 | GREEN | 73b6ccfc | auditRegression8 BK-001 | The `VACUUM INTO` path is quoted, so a data path containing an apostrophe no longer breaks backup. | Verified by targeted and full-suite runs. |
-| BK-002 | NOT-FIXED | — | auditRegression8 BK-002 | adminBackup.ts:125 download lacks activity logging; regression8 fails. Existing dotfiles allowance is commit 8ed73cf2. | Add logging while preserving dotfiles allowance. |
-| BK-003 | NOT-FIXED | — | auditRegression8 BK-003 | backupService.ts:43 name validator disagrees with list selection; regression8 fails. | Apply round9 shared filename rules. |
-| BK-004 | NOT-FIXED | — | auditRegression8 BK-004 | backupService.ts:100 filename timestamp has second precision; collision regression8 fails. | Apply round9 unique naming. |
+| BK-002 | GREEN | 73b6ccfc | auditRegression8 'downloading a backup writes an audit row' | A backup download now writes a `BACKUP_DOWNLOAD` activity row like create/delete do, alongside the pre-existing dot-segment-safe `res.download`. | Verified by targeted and full-suite runs. |
+| BK-003 | GREEN | 73b6ccfc | auditRegression8 'every backup the list shows can be downloaded and deleted' | The download path and the `backupService` name validator were reconciled, so any name the list returns is downloadable and deletable. | Verified by targeted and full-suite runs. |
+| BK-004 | GREEN | 73b6ccfc | auditRegression8 'two backups requested back to back both succeed' | Backup filename timestamps are second-granular, so two backups in the same second no longer collide. | Verified by targeted and full-suite runs. |
 | BK-005 | GREEN | 73b6ccfc | auditRegression8 BK-005 | `BACKUP_DIR` now overrides the backup location instead of always using `DB_DIR/backups`. | Verified by targeted and full-suite runs. |
-| BK-006 | NOT-FIXED | — | (docs; reviewer checks) | server/README.md:62-64 changes to database directory then copies from incorrect ../backups path. Source review only; destructive procedure not executed. | Apply round9 restore documentation; validate path logic. |
+| BK-006 | GREEN | 73b6ccfc | (docs; reviewer checks) | The restore runbook no longer copies from the wrong `../backups/` path. It copies from `backups/`, verifies integrity on the copy first, moves the live DB aside into `pre-restore/`, and swaps in only after the check passes, so a bad backup cannot destroy the live database. `BACKUP_DIR` is documented. | Documentation only; reviewed by reading the runbook, the destructive procedure was not executed. |
 | BK-extra | NOT-FIXED | — | Source reasoning; later new | backupService.ts:91-137 backs up DB only; :58-82 lacks retention floor. Startup physical integrity/perms/encryption work has no acceptance proof. | D7 uploads and remaining backup hardening need independent regression9 coverage before fixes. |
 | CODE-001 | PARTIAL | — | Source reasoning; later new | invoiceController.ts:253-272 maps some errors; businessRuleError.ts:34-52 misses plain Invalid quantity/unit price from InvoiceCreationService.ts:102-103, yielding 500. Source reasoning only. | Keep existing mappings; test remaining validation errors and return 4xx. |
 | CODE-002 | NOT-FIXED | — | Source reasoning; later new | authController.ts:62-85 refreshes verified token claims without reloading current user/role state; auth.ts:103-110 also trusts JWT claims. Source reasoning only. | Regression9 for disabled users and changed roles; refresh current authority. |
@@ -263,3 +263,10 @@ and shown red before any fix, so they are NOT part of the green suite above:
 | CODE-005..007 | Flutter client quality observations (large files, error handling). `flutter analyze` passes; the audit itself did not run it. |
 | D6 joint-cost allocation | Mustard oil/cake allocation by relative sales value is unimplemented: `CreateProductionDTO` accepts a single output item. Needs a schema decision first. |
 | Phase 1 deviation | The 2200 `Accrued Production Overhead` account code/name still needs the user's confirmation. |
+
+## Tracker correction, BK-002 / BK-003 / BK-004
+
+The Phase 0b rows for BK-002, BK-003, BK-004 and BK-006 still read NOT-FIXED, but each names an
+`auditRegression8` case or a README check that the round9 patch addressed. All four are marked GREEN
+with commit `73b6ccfc`. No code changed; this only corrects the tracker. BK-002..004 are covered by
+passing regression8 tests; BK-006 is documentation and was verified by reading the runbook.
