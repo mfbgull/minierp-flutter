@@ -47,7 +47,9 @@ router.get('/:id/documents/file/:filename', requirePermission('employees', 'read
     return;
   }
   const filePath = path.join(employeeDocsDir, safeName);
-  res.sendFile(filePath, (err) => {
+  // Always an attachment + nosniff: an uploaded file must never render as a page
+  // in the API's origin (FILE-002).
+  res.sendFile(filePath, { headers: { 'Content-Disposition': 'attachment', 'X-Content-Type-Options': 'nosniff' } }, (err) => {
     if (err) {
       res.status(404).json({ success: false, error: 'File not found' });
     }

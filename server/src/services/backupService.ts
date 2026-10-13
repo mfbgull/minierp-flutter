@@ -16,7 +16,9 @@ import { pruneIdempotencyKeys } from '../utils/idempotency';
 // DATABASE_PATH is the database *directory* (see config/database.ts);
 // backups live alongside erp.db inside <db-dir>/backups.
 const DB_DIR = process.env.DATABASE_PATH || path.join(__dirname, '../../database');
-const BACKUP_DIR = path.join(DB_DIR, 'backups');
+// BACKUP_DIR (same variable the CLI script honours) lets backups go to another
+// drive; defaults to <db-dir>/backups. (BK-005)
+const BACKUP_DIR = process.env.BACKUP_DIR || path.join(DB_DIR, 'backups');
 const DAILY_KEEP = 7;
 const WEEKLY_KEEP = 4;
 const INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -40,7 +42,10 @@ export interface BackupFileInfo {
 
 // Only filenames the service itself generates are addressable over HTTP —
 // anything else (../, arbitrary paths) is rejected before touching the fs.
-const BACKUP_NAME_RE = /^erp-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.db$/;
+// Accepts both the in-app form (erp-<ts>.db) and the CLI form (erp-backup-<ts>.db),
+// plus a numeric suffix for backups taken within the same second, so everything
+// the list shows can also be downloaded, deleted and pruned consistently (BK-003/004).
+const BACKUP_NAME_RE = /^erp-(?:backup-)?\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(?:-\d+)?\.db$/;
 
 /**
  * Absolute path of an existing backup file, or null when the name is not
@@ -57,7 +62,7 @@ export function resolveBackupFilePath(name: string): string | null {
 
 function pruneRetention(): void {
   const files = fs.readdirSync(BACKUP_DIR)
-    .filter(f => f.startsWith('erp-') && f.endsWith('.db'))
+    .filter(f => BACKUP_NAME_RE.test(f))
     .map(f => ({ f, m: fs.statSync(path.join(BACKUP_DIR, f)).mtimeMs }))
     .sort((a, b) => b.m - a.m);
   const now = Date.now();
@@ -98,13 +103,32 @@ export function runBackup(opts?: RunBackupOptions): string | null {
     db.pragma('wal_checkpoint(TRUNCATE)');
 
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const target = path.join(BACKUP_DIR, `erp-${stamp}.db`);
-    db.exec(`VACUUM INTO '${target}'`);
+    // Second-resolution names collide when two backups are taken together; pick
+    // a free name instead of letting VACUUM INTO fail (BK-004).
+    let target = path.join(BACKUP_DIR, `erp-${stamp}.db`);
+    for (let n = 1; fs.existsSync(target); n++) {
+      target = path.join(BACKUP_DIR, `erp-${stamp}-${n}.db`);
+    }
+    // A single quote in the path (e.g. C:\Users\O'Brien\...) would end the SQL
+    // string literal early and make every backup fail (BK-001).
+    try {
+      db.exec(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
+    } catch (err) {
+      // never leave a partial file that looks like a backup (and counts toward retention)
+      fs.rmSync(target, { force: true });
+      throw err;
+    }
 
     // Integrity check on the copy
-    const copy = new Database(target, { readonly: true });
-    const res = copy.pragma('integrity_check', { simple: true }) as unknown;
-    copy.close();
+    let res: unknown;
+    try {
+      const copy = new Database(target, { readonly: true });
+      res = copy.pragma('integrity_check', { simple: true });
+      copy.close();
+    } catch (err) {
+      fs.rmSync(target, { force: true });
+      throw err;
+    }
     if (res !== 'ok') {
       logger.error(`[Backup] integrity_check FAILED on ${target}: ${res}`);
       fs.rmSync(target);
@@ -140,7 +164,7 @@ export function runBackup(opts?: RunBackupOptions): string | null {
 export function listBackups(): BackupFileInfo[] {
   if (!fs.existsSync(BACKUP_DIR)) return [];
   return fs.readdirSync(BACKUP_DIR)
-    .filter(f => f.startsWith('erp-') && f.endsWith('.db'))
+    .filter(f => BACKUP_NAME_RE.test(f))
     .map(f => {
       const st = fs.statSync(path.join(BACKUP_DIR, f));
       return { name: f, sizeBytes: st.size, createdAt: new Date(st.mtimeMs).toISOString() };

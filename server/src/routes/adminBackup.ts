@@ -114,6 +114,17 @@ router.get(
       });
       return;
     }
+    // A backup is a full copy of the database (password hashes, salaries, bank
+    // details...). Downloading one must leave a trail like create/delete do (BK-002).
+    logWithRequest(
+      {
+        userId: req.user?.id,
+        action: ActionType.BACKUP_DOWNLOAD,
+        entityType: 'Database',
+        description: `Downloaded backup ${name}`,
+      },
+      req
+    );
     // res.download sets Content-Disposition: attachment itself.
     //
     // dotfiles:'allow' is required, not a relaxation: send() defaults to
