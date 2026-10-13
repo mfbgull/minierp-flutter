@@ -457,6 +457,9 @@ export class AccountingService {
     if (!args.amount || args.amount <= 0) {
       throw new Error('postLegacyStockEntry requires a positive amount');
     }
+    // These postings bypass postEntry (raw INSERT), so they need their own
+    // closed-period guard (PROD-006 / stock adjustments).
+    AccountingService.assertPeriodNotClosed(db, args.entryDate, args.description);
     const debitAcct = AccountingService.getAccountByTextCode(db, args.debitTextCode);
     const creditAcct = AccountingService.getAccountByTextCode(db, args.creditTextCode);
     if (!debitAcct || !creditAcct) {

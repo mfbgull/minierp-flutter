@@ -6,8 +6,8 @@
  *
  *   PROD-001  consuming raw materials must relieve inventory in the GL
  *   PROD-001G GUARD: P&L profit must stay correct if account 7000 is included in the P&L
- *   PROD-001O overhead design: overhead_cost is absorbed into inventory and its underlying expense is
- *             recorded separately (Dr 6000), so the absorption credit in 7000 offsets that expense
+ *   PROD-001O overhead design: overhead_cost is capitalized once against unpaid overhead payable,
+ *             with no separate expense or cash posting (user-approved D6 correction)
  *   PROD-002  output batch value must equal the cost posted to the GL (no 3dp unit-cost drift)
  *   PROD-004  a negative overhead must be rejected (no negative unit cost)
  *   PROD-005  deleting a production must restore stock exactly once, and not after output was sold
@@ -91,13 +91,9 @@ describe('PROD-001: raw-material consumption is relieved from inventory', () => 
     expect(r2(after.bs - before.bs)).toBe(1000);
   });
 
-  it('PROD-001O: overhead absorbed into inventory is neutral once its expense is recorded separately (profit 950)', async () => {
-    // Design assumption: overhead_cost (labour, power...) is ALSO recorded as an expense
-    // when incurred. Absorbing it into inventory credits 7000, which offsets that expense
-    // until the goods are sold and the overhead flows through COGS.
+  it('PROD-001O: overhead accrues once as unpaid overhead payable (profit 950)', async () => {
     const bank = AccountingService.getAccountByCode(db, '1010')!;
     const equity = AccountingService.getAccountByCode(db, '3000')!;
-    const wages = AccountingService.getAccountByCode(db, '6000')!;
     db.transaction(() => AccountingService.postEntry(db, {
       entry_date: '2026-09-01', description: 'PROD-001O funding', reference_type: 'OWNER_CAPITAL', reference_id: 0,
       lines: [{ account_id: bank.id, debit: 100 }, { account_id: equity.id, credit: 100 }],
@@ -107,17 +103,26 @@ describe('PROD-001: raw-material consumption is relieved from inventory', () => 
     const finished = await createItem('PROD-001o finished', cookie);
     const customerId = await createCustomer('PROD-001o customer', cookie);
     const before = await reports();
-    db.transaction(() => AccountingService.postEntry(db, {
-      entry_date: '2026-09-10', description: 'PROD-001O overhead incurred', reference_type: 'MANUAL_JOURNAL', reference_id: 0,
-      lines: [{ account_id: wages.id, debit: 50 }, { account_id: bank.id, credit: 50 }],
-    }))();
+    const payableBefore = glNet('2200');
+    const cashBefore = glNet('1000');
+    const bankBefore = glNet('1010');
+    const expensesBefore = glNet('6000');
+    const clearingBefore = glNet('7000');
     const res = await produce({
       output_item_id: finished, output_quantity: 10, input_items: [{ item_id: raw, quantity: 100 }], overhead_cost: 50,
     });
     expect(res.status).toBe(201);
+    expect(r2(glNet('2200') - payableBefore)).toBe(-50);
+    expect(glNet('1000')).toBe(cashBefore);
+    expect(glNet('1010')).toBe(bankBefore);
+    expect(glNet('6000')).toBe(expensesBefore);
+    expect(glNet('7000')).toBe(clearingBefore);
+    expect(r2((await reports()).pl - before.pl)).toBe(0);
     await createInvoice({ customerId, itemId: finished, lines: [{ quantity: 10, unitPrice: 200 }], invoiceDate: '2026-09-15', payment: 'full' }, cookie);
     const after = await reports();
     expect(r2(after.bs - before.bs)).toBe(950);
+    expect(r2(after.pl - before.pl)).toBe(950);
+    expect(r2(glNet('2200') - payableBefore)).toBe(-50);
   });
 
   it('GUARD: P&L profit still rises by 1,000 for the same scenario (must hold after ACCT-002 is applied)', async () => {

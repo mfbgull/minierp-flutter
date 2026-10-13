@@ -1932,6 +1932,35 @@ runLedgered('add-salary-advance-link.sql');
 // stock_batches/stock_movements (init + rebuilds) — all applied above.
 runLedgered('add-expired-stock.sql');
 
+// D6: production overhead accrues as an unpaid payable (2200) instead of a
+// separately recorded expense. Dedicated liability, because GL 2000 is
+// reconciled against the supplier ledger.
+runLedgered('add-production-overhead-payable.sql');
+// Post-apply assertion - production resolves this by text_code and aborts the
+// post when it is absent, so a wrong occupant must fail the boot, never
+// silently mis-post.
+runLedgered('fn.verifyProductionOverheadPayableAccount', () => {
+  const rows = db.prepare(
+    `SELECT code, name, type, normal_balance FROM chart_of_accounts WHERE text_code = ?`
+  ).all('production_overhead_payable') as Array<{
+    code: string;
+    name: string;
+    type: string;
+    normal_balance: string;
+  }>;
+  if (
+    rows.length !== 1 ||
+    rows[0].code !== '2200' ||
+    rows[0].type !== 'liability' ||
+    rows[0].normal_balance !== 'credit'
+  ) {
+    throw new Error(
+      `Production overhead payable account check failed: expected exactly one credit ` +
+      `liability account 2200, found ${JSON.stringify(rows)}`
+    );
+  }
+});
+
 // Invoice Returns (invoice-return-spec.md Milestone 1): first-class return
 // documents — invoice_returns / invoice_return_items / return_settlements.
 // FK-free on purpose (SQLite FKs to invoices/customers/users already exist),
