@@ -5,6 +5,7 @@ import { sanitizeSortParams, STOCK_BALANCE_SORT_COLUMNS, STOCK_MOVEMENT_SORT_COL
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { SellableStockUnavailableError } from '../types';
 import { roundQty, qtyEpsilon, qtyLessThan, qtyPositive } from '../utils/quantity';
+import { roundCurrency } from '../utils/currency';
 import { SqlParam } from '../utils/sqlTypes';
 
 interface StockMovement {
@@ -1501,8 +1502,11 @@ class StockMovementModel {
       if (!Number.isFinite(qty) || qty <= 0) {
         throw new Error(`Batch ${batch.batch_no} has no remaining quantity to write off`);
       }
-      const unitCost = roundQty(Number(target.unit_cost ?? 0));
-      const value = roundQty(qty * unitCost);
+      // WO-001: money, not quantity, precision. Use the batch's exact unit cost
+      // and round the VALUE to currency precision (2dp) - rounding the unit cost
+      // to 3dp first overstated e.g. 1,000 x 1.23456 as 1,235.00 instead of 1,234.56.
+      const unitCost = Number(target.unit_cost ?? 0);
+      const value = roundCurrency(qty * unitCost);
 
       // 2. WRITE_OFF movement (negative qty at the EXPIRED warehouse).
       const remarks = `[WRITE_OFF] reason=${args.reason} gl=${args.lossAccountCode} batch=${batch.batch_no}`;
