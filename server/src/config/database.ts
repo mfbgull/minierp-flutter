@@ -1956,6 +1956,7 @@ runLedgered('add-goods-receipt-item-indexes.sql');
 // return could settle for more than the net owed back. A trigger, not a CHECK,
 // so existing installs get the guard without a table rebuild.
 runLedgered('add-invoice-return-settled-ceiling.sql');
+runLedgered('add-journal-balance-commit-guard.sql');
 // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
 // return time — a legacy COA predating GL foundation must fail the boot
 // with a clear error, never mis-post.

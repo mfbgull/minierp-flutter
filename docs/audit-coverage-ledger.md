@@ -28,8 +28,8 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 
 ## Summary
 
-- `landed`: **33**
-- `planned`: **35**
+- `landed`: **34**
+- `planned`: **34**
 - `deferred`: **1**
 - `won't-fix`: **3**
 - Total rows: **72** (including five recovered owner-equity/payroll findings)
@@ -115,7 +115,7 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 | **SEC-003** | HIGH | `idempotency-atomicity` | report-query-integrity | no HTTP response is written inside a DB transaction | `planned` | — |
 | **SEC-004** | HIGH | `error-taxonomy-uniformity` | report-query-integrity | SQLite error text never reaches the client | `planned` | — |
 | **DB-001** | HIGH | `db-integrity-constraints` | query-performance | goods_receipt_items has indexes on purchase_order_id and item_id | `landed` | — |
-| **DB-002** | HIGH | `db-integrity-constraints` | gl-integrity | a DB-level constraint or trigger rejects an unbalanced journal entry | `planned` | — |
+| **DB-002** | HIGH | `db-integrity-constraints` | gl-integrity | a deferred foreign key rejects any nonzero journal balance at commit; full posting, void, restore, deletion, and balanced correction remain atomic | `landed` | `journalBalanceCommit.test.ts`; `database-journal-seal.md` |
 | **DB-003** | HIGH | `db-integrity-constraints` | migration-ledger | migration checksum verification covers all applied migrations | `landed` | — |
 | **GL-002** | HIGH | `invariant-gate-coverage` | financial-test-invariants | deleting the master GL assertion fails the suite | `planned` | — |
 | **GL-003** | MEDIUM | `money-rounding-boundary` | gl-integrity | no float artefact in journal_lines; journal_entry_id 46 corrected symmetrically on both legs | `planned` | — |

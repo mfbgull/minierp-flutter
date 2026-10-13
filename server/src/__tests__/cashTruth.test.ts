@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { afterAll, describe, expect, it } from '@jest/globals';
 import { collectFlows, getCashAccountTransactions, getCashAccountTotals, normalizeCashMethod, isValidPaymentMethod, syncOpeningBalancesToGl } from '../services/cashService';
 import ExpenseModel from '../models/Expense';
 import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
@@ -209,10 +210,12 @@ describe('opening balances sync to the GL (dashboard seed)', () => {
     // A stale legacy BACKFILL_OPENING line must get voided by the sync.
     const cashAcct = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1000'`).get() as { id: number };
     const equityAcct = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '3000'`).get() as { id: number };
-    db.prepare(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, line_date, reference_type, reference_id)
-                VALUES (999, ?, 500, 0, '2026-01-01', 'BACKFILL_OPENING', 0)`).run(cashAcct.id);
-    db.prepare(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, line_date, reference_type, reference_id)
-                VALUES (999, ?, 0, 500, '2026-01-01', 'BACKFILL_OPENING', 0)`).run(equityAcct.id);
+    db.transaction(() => {
+      db.prepare(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, line_date, reference_type, reference_id)
+                  VALUES (999, ?, 500, 0, '2026-01-01', 'BACKFILL_OPENING', 0)`).run(cashAcct.id);
+      db.prepare(`INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, line_date, reference_type, reference_id)
+                  VALUES (999, ?, 0, 500, '2026-01-01', 'BACKFILL_OPENING', 0)`).run(equityAcct.id);
+    })();
 
     db.prepare(`UPDATE opening_balances SET amount = 1000 WHERE account_key = 'cash'`).run();
     db.prepare(`INSERT INTO expenses (expense_no, expense_category, description, amount, expense_date, payment_method, status)

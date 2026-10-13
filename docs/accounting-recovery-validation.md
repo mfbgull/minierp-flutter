@@ -39,6 +39,18 @@ The implementation follows the finalized D1 through D4 decisions in `audit/DECIS
 
 The new migration adds the salary parent link and account 1310 (Employee Salary Advances). It does not infer links or rewrite old payroll transactions. Existing historical unlinked advances and old deductions require separately reviewed data reconciliation. The live database was never opened for writing.
 
-## DB-002 next step
+## Completed continuation
 
-An isolated SQLite experiment verifies that a deferred foreign-key balance constraint can act as the transaction seal: balanced posting, full void/restore, balanced amount correction, and full deletion succeed; unbalanced posting, partial void, and partial deletion fail at commit. Production integration and validation remain pending.
+Accounting recovery was committed separately as `f9a72d63` (`fix(server): restore cash and payroll audit coverage`).
+
+DB-002 now enforces each journal's balance at transaction commit through a
+trigger-maintained integer balance and a deferred foreign key to zero. The
+legacy stock writer owns its transaction, and ordinary fixtures create complete
+postings atomically. Boot-detection tests retain their deliberate corruption
+scenarios with enforcement restored before each assertion. See
+[DB-002 design and validation](database-journal-seal.md).
+
+Final combined validation passed **129 suites and 1,150 tests**, TypeScript,
+strict lint on changed files, and the whitespace check. The existing Jest
+worker-exit warning remains. No live database migration or manual Flutter UI
+retest was performed. Unrelated audit-directory changes were left untouched.

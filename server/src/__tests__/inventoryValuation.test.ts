@@ -12,6 +12,7 @@
  *   5. The invariant note is present
  */
 import request from 'supertest';
+import { beforeAll, describe, expect, it } from '@jest/globals';
 import app from '../app';
 import db from '../config/database';
 
@@ -149,31 +150,33 @@ describe('GET /api/reports/inventory-valuation', () => {
     });
 
     // Simulate a completed write-off the way the model does it.
-    const value = 30;
-    const mv = db.prepare(`
-      INSERT INTO stock_movements (movement_no, item_id, warehouse_id, movement_type,
-        quantity, unit_cost, reference_doctype, reference_docno, remarks, movement_date, created_by, batch_id,
-        financial_value, financial_posted)
-      VALUES ('MV-WO-VAL-' || (SELECT COUNT(*) FROM stock_movements), ?, ?, 'WRITE_OFF',
-        -3, 10, 'WRITE_OFF', 'VAL-WO', '[WRITE_OFF] reason=test gl=7201 batch=VAL-WO', date('now'),
-        (SELECT id FROM users ORDER BY id LIMIT 1), ?, ?, 1)
-    `).run(itemId, expiredWh, batchId, value);
-    const movementId = mv.lastInsertRowid as number;
-    db.prepare(`UPDATE stock_batches SET quantity_remaining = 0 WHERE id = ?`).run(batchId);
-    const je = db.prepare(`
-      INSERT INTO journal_entries (reference_type, reference_id, entry_date, description,
-        debit_account, credit_account, amount, created_by, voided)
-      VALUES ('WRITE_OFF', ?, date('now'), 'test write-off', '7201', 'inventory_asset', 30,
-        (SELECT id FROM users ORDER BY id LIMIT 1), 0)
-    `).run(movementId);
-    const jeId = je.lastInsertRowid as number;
-    for (const [code, debit, credit] of [['7201', 30, 0], ['1200', 0, 30]] as const) {
-      db.prepare(`
-        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, line_date,
-          reference_type, reference_id)
-        VALUES (?, (SELECT id FROM chart_of_accounts WHERE code = ?), ?, ?, date('now'), 'WRITE_OFF', ?)
-      `).run(jeId, code, debit, credit, movementId);
-    }
+    db.transaction(() => {
+      const value = 30;
+      const mv = db.prepare(`
+        INSERT INTO stock_movements (movement_no, item_id, warehouse_id, movement_type,
+          quantity, unit_cost, reference_doctype, reference_docno, remarks, movement_date, created_by, batch_id,
+          financial_value, financial_posted)
+        VALUES ('MV-WO-VAL-' || (SELECT COUNT(*) FROM stock_movements), ?, ?, 'WRITE_OFF',
+          -3, 10, 'WRITE_OFF', 'VAL-WO', '[WRITE_OFF] reason=test gl=7201 batch=VAL-WO', date('now'),
+          (SELECT id FROM users ORDER BY id LIMIT 1), ?, ?, 1)
+      `).run(itemId, expiredWh, batchId, value);
+      const movementId = mv.lastInsertRowid as number;
+      db.prepare(`UPDATE stock_batches SET quantity_remaining = 0 WHERE id = ?`).run(batchId);
+      const je = db.prepare(`
+        INSERT INTO journal_entries (reference_type, reference_id, entry_date, description,
+          debit_account, credit_account, amount, created_by, voided)
+        VALUES ('WRITE_OFF', ?, date('now'), 'test write-off', '7201', 'inventory_asset', 30,
+          (SELECT id FROM users ORDER BY id LIMIT 1), 0)
+      `).run(movementId);
+      const jeId = je.lastInsertRowid as number;
+      for (const [code, debit, credit] of [['7201', 30, 0], ['1200', 0, 30]] as const) {
+        db.prepare(`
+          INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, line_date,
+            reference_type, reference_id)
+          VALUES (?, (SELECT id FROM chart_of_accounts WHERE code = ?), ?, ?, date('now'), 'WRITE_OFF', ?)
+        `).run(jeId, code, debit, credit, movementId);
+      }
+    })();
 
     const after = await fetchReport(authCookie);
     expect(after.writtenOff.count - before.writtenOff.count).toBe(1);
