@@ -457,6 +457,11 @@ export class AccountingService {
     if (!args.amount || args.amount <= 0) {
       throw new Error('postLegacyStockEntry requires a positive amount');
     }
+    // Journal amounts are money: store them at currency precision (WO-001).
+    const amount = roundCurrency(args.amount);
+    if (amount <= 0) {
+      throw new Error('postLegacyStockEntry amount rounds to zero');
+    }
     // These postings bypass postEntry (raw INSERT), so they need their own
     // closed-period guard (PROD-006 / stock adjustments).
     AccountingService.assertPeriodNotClosed(db, args.entryDate, args.description);
@@ -482,7 +487,7 @@ export class AccountingService {
         args.description,
         args.debitTextCode,
         args.creditTextCode,
-        args.amount,
+        amount,
         args.createdBy || null
       );
       const journalEntryId = Number(header.lastInsertRowid);
@@ -494,11 +499,11 @@ export class AccountingService {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       insertLine.run(
-        journalEntryId, debitAcct.id, args.amount, 0,
+        journalEntryId, debitAcct.id, amount, 0,
         args.description, args.entryDate, args.referenceType, args.referenceId, args.createdBy || null
       );
       insertLine.run(
-        journalEntryId, creditAcct.id, 0, args.amount,
+        journalEntryId, creditAcct.id, 0, amount,
         args.description, args.entryDate, args.referenceType, args.referenceId, args.createdBy || null
       );
       return journalEntryId;

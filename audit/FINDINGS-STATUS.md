@@ -93,9 +93,9 @@ Paths in evidence are repository files: models under `server/src/models/`, contr
 | PAY-002 | PARTIAL | f9a72d63 | auditRegression3 PAY-002 | employeeController.ts:458-468 cascades parent void and regression3 passes; :443-445 rejects child void with 409. Playbook Phase 2c says voiding either should void both. | Preserve parent cascade; confirm whether parent-only correction is intended before changing child behavior. |
 | PAY-003 | ALREADY-FIXED | f9a72d63 | auditRegression3 PAY-003 | accountingService.ts:1581-1583 and postLoanDisbursementEntry enforce funds; both regression3 cases pass. | Keep existing guards and funded fixtures. |
 | PAY-004 | ALREADY-FIXED | f9a72d63 | auditRegression3 PAY-004 | employeeController.ts:777-827 validates salary deduction and posts repayment; account 1300 is loan receivable; regression3 passes. | Keep existing implementation. |
-| WO-001 | NOT-FIXED | — | auditRegression5 WO-001 | StockMovement.ts:1504-1505 and accountingService.ts:457 retain quantity precision for money; two regression5 cases fail. | Apply round6 with transaction-preserving manual changes. |
+| WO-001 | GREEN | pending | auditRegression5 WO-001 (2 cases) | StockMovement.ts uses the batch's exact unit cost and rounds the write-off VALUE to currency precision; `postLegacyStockEntry` normalises every amount with `roundCurrency` and rejects a value that rounds to zero. All 4 regression5 tests pass. | Verified by targeted and full-suite runs. |
 | WO-002 | NOT-FIXED | — | Source reasoning; later new | StockMovement.ts:1470-1471 insists on expired batches; inventoryController.ts:1004 handles expired flow only. Source reasoning only. | Regression9 first; add D7 damage reason and verify expense account mapping. |
-| WO-003 | NOT-FIXED | — | auditRegression5 WO-003 | accountingService.ts:442-503 bypasses closed-period assertion; regression5 fails. | Covered by round5 legacy guard; verify regression5. |
+| WO-003 | GREEN | 6eba103c | auditRegression5 WO-003 | Round5 added the shared `postLegacyStockEntry` closed-period guard, which covers write-offs and the new production postings; regression5 passes. | Verified by targeted and full-suite runs. |
 | AUTHZ-001 | NOT-FIXED | — | Source reasoning; later new (drift test) | database.ts:2084 seedPermissions lacks the audit's requested permission codes; inventory:write mismatch persists. Source reasoning only. | Add permission-drift regression9 and D5 migration; grant none by default. |
 | AUTHZ-002 | NOT-FIXED | — | auditRegression7 AUTHZ-002 | userController.ts:150-190 password/status mutations lack admin-target privilege protection; three regression7 cases fail. | Apply round8. |
 | AUTHZ-003 | NOT-FIXED | — | auditRegression7 AUTHZ-003 | userController.ts:32-65 permits privileged role assignment without required actor check; two regression7 cases fail. | Apply round8. |
@@ -212,3 +212,18 @@ Phase 0b completed. The user authorized Phase 1 and then clarified D6: overhead 
 
 - Joint-cost allocation between mustard oil and mustard cake by relative sales value is **not implemented**: `CreateProductionDTO` accepts a single output item, so there are no co-products to allocate between. Single-output production, material relief, overhead accrual and deletion integrity are fixed; do not treat D6 as fully closed.
 - No settlement path (paying the 2200 payable) was requested or built.
+
+## Phase 2, round6 expired-stock write-off precision
+
+- Targeted `auditRegression5.test.ts`: `Test Suites: 1 passed, 1 total`; `Tests: 4 passed, 4 total`; `Time: 26.987 s`.
+- Full `npx jest --silent`: `Test Suites: 3 failed, 133 passed, 136 total`; `Tests: 23 failed, 1183 passed, 1206 total`; `Snapshots: 0 total`; `Time: 751.608 s`. Failures fell from 25 to 23; only regressions 6-8 remain. Log: `/tmp/phase2-round6-full.log`.
+- Typecheck passed. Lint command remains unavailable (missing script).
+
+### Deviation from the candidate round6 patch
+
+`git apply --3way` reported the `StockMovement.ts` hunk as clean but then aborted the whole patch because `accountingService.ts:481` no longer matched, so nothing was written. Both hunks were therefore applied by hand to identical content:
+
+1. `StockMovement.ts` imports `roundCurrency` and computes `value = roundCurrency(qty * unitCost)` from the batch's unrounded `unit_cost`.
+2. `accountingService.postLegacyStockEntry` rounds the amount once via `roundCurrency` and throws when it rounds to zero, then uses that value for the header and both lines.
+
+The hunk context had shifted because round5 inserted the closed-period guard into `postLegacyStockEntry`; the patch's own content was otherwise unchanged.
