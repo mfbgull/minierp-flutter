@@ -547,6 +547,12 @@ function addEmployeeDocument(req: Request, res: Response): void {
 
     // Handle file upload
     const uploadedFile = (req as AuthRequest & { file?: Express.Multer.File }).file;
+    // FILE-001: a stored file name is later used to delete the file, so a name
+    // supplied in the body must be a bare file name - never a path.
+    if (!uploadedFile && file_path && (path.basename(String(file_path)) !== String(file_path) || String(file_path).includes('..'))) {
+      res.status(400).json({ success: false, error: 'Invalid file_path' });
+      return;
+    }
     const filePath = uploadedFile ? uploadedFile.filename : file_path || null;
 
     const docId = EmployeeModel.addDocument({
@@ -579,11 +585,18 @@ function removeEmployeeDocument(req: Request, res: Response): void {
       return;
     }
 
-    // Delete file if it exists
-    const doc = db.prepare('SELECT file_path FROM employee_documents WHERE id = ?').get(documentId) as { file_path?: string } | undefined;
-    if (doc?.file_path) {
-      const filePath = path.join(__dirname, '../../uploads/employees', doc.file_path);
-      if (fs.existsSync(filePath)) {
+    // The document must belong to the employee in the URL (FILE-001).
+    const doc = db.prepare('SELECT file_path FROM employee_documents WHERE id = ? AND employee_id = ?')
+      .get(documentId, employeeId) as { file_path?: string } | undefined;
+    if (!doc) {
+      res.status(404).json({ success: false, error: 'Document not found' });
+      return;
+    }
+    // Delete the file only if it really lives inside the upload folder.
+    if (doc.file_path) {
+      const docsRoot = path.resolve(__dirname, '../../uploads/employees');
+      const filePath = path.resolve(docsRoot, doc.file_path);
+      if (filePath.startsWith(docsRoot + path.sep) && fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
     }

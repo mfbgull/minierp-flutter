@@ -11,6 +11,11 @@ The server runs an in-process backup scheduler:
 
 Manual backup: `cd server && npm run db:backup`
 
+Set `BACKUP_DIR` (for example to an external drive or a synced folder) to store backups somewhere other than
+`server/database/backups/`; both the scheduler and `npm run db:backup` honour it. Backups made by the
+CLI (`erp-backup-<timestamp>.db`) and by the scheduler (`erp-<timestamp>.db`) are listed, downloadable and
+subject to the same retention rules.
+
 ## Historical data-integrity scan (audit-remediation task 30)
 
 Run the report-only C1/C2/C3/H10 scanner against the configured database:
@@ -57,18 +62,21 @@ and backfill paths needed by existing databases.
    ls -lt server/database/backups/
    ```
 
-3. **Replace the database**
+3. **Replace the database** (the old files are kept until the restore is verified)
    ```bash
    cd server/database
-   rm -f erp.db erp.db-wal erp.db-shm     # remove live DB and any WAL remnants
-   cp ../backups/erp-<timestamp>.db erp.db
+   # backups live in server/database/backups/ - NOT ../backups/
+   cp backups/erp-<timestamp>.db erp.restore.tmp
    ```
 
-4. **Verify integrity before restart**
+4. **Verify the copy before swapping it in**
    ```bash
-   sqlite3 erp.db "PRAGMA integrity_check;"
-   # must output: ok
+   sqlite3 erp.restore.tmp "PRAGMA integrity_check;"   # must output: ok
+   mkdir -p pre-restore
+   mv erp.db erp.db-wal erp.db-shm pre-restore/ 2>/dev/null   # keep the old DB aside
+   mv erp.restore.tmp erp.db
    ```
+   Only delete `pre-restore/` once the restored system has been checked.
 
 5. **Restart the server**
    ```bash

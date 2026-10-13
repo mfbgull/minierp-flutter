@@ -105,13 +105,13 @@ Paths in evidence are repository files: models under `server/src/models/`, contr
 | REP-003 | GREEN | 32c13c05 | auditRegression6 REP-003 | `entityRegistry` no longer advertises the nonexistent `stock_balances.id` and BOM quantity fields. | Verified by targeted and full-suite runs. |
 | REP-004 | GREEN | 32c13c05 | auditRegression6 REP-004 | COUNT construction now carries the grouped/HAVING query structure while sharing the existing bindings. | Verified by targeted and full-suite runs. |
 | REP-005 | NOT-FIXED | — | Source reasoning; later new | reportQueryEngine.ts:294-324 ignores requested group aggregates; :249 permits unbounded limit; :497-503 passes LIKE wildcards. Source reasoning only. | Regression9 first for aggregates, cap, literal wildcard matching. |
-| FILE-001 | NOT-FIXED | — | auditRegression8 FILE-001 | employeeController.ts:550 trusts supplied file_path; :583-587 deletes by document ID without employee ownership/path containment; two regression8 cases fail. | Apply round9. |
-| FILE-002 | NOT-FIXED | — | auditRegression8 FILE-002 | upload.ts:19,37 trusts extension/MIME; employees.ts:47 serves inline. Regression8 fails. | Apply round9 upload/content serving changes. |
-| BK-001 | NOT-FIXED | — | auditRegression8 BK-001 | backupService.ts:102 interpolates VACUUM INTO path; apostrophe regression8 fails. | Apply round9 path quoting. |
+| FILE-001 | GREEN | pending | auditRegression8 FILE-001 (3 cases) | Employee document upload no longer trusts a supplied `file_path`, and deletion requires employee ownership; all 9 regression8 tests pass. | Verified by targeted and full-suite runs. |
+| FILE-002 | GREEN | pending | auditRegression8 FILE-002 | Uploads validate extension and MIME, and employee documents are served as attachments rather than inline. | Verified by targeted and full-suite runs. |
+| BK-001 | GREEN | pending | auditRegression8 BK-001 | The `VACUUM INTO` path is quoted, so a data path containing an apostrophe no longer breaks backup. | Verified by targeted and full-suite runs. |
 | BK-002 | NOT-FIXED | — | auditRegression8 BK-002 | adminBackup.ts:125 download lacks activity logging; regression8 fails. Existing dotfiles allowance is commit 8ed73cf2. | Add logging while preserving dotfiles allowance. |
 | BK-003 | NOT-FIXED | — | auditRegression8 BK-003 | backupService.ts:43 name validator disagrees with list selection; regression8 fails. | Apply round9 shared filename rules. |
 | BK-004 | NOT-FIXED | — | auditRegression8 BK-004 | backupService.ts:100 filename timestamp has second precision; collision regression8 fails. | Apply round9 unique naming. |
-| BK-005 | NOT-FIXED | — | auditRegression8 BK-005 | backupService.ts:18-19 always uses DB_DIR/backups; environment regression8 fails. | Apply round9 BACKUP_DIR support. |
+| BK-005 | GREEN | pending | auditRegression8 BK-005 | `BACKUP_DIR` now overrides the backup location instead of always using `DB_DIR/backups`. | Verified by targeted and full-suite runs. |
 | BK-006 | NOT-FIXED | — | (docs; reviewer checks) | server/README.md:62-64 changes to database directory then copies from incorrect ../backups path. Source review only; destructive procedure not executed. | Apply round9 restore documentation; validate path logic. |
 | BK-extra | NOT-FIXED | — | Source reasoning; later new | backupService.ts:91-137 backs up DB only; :58-82 lacks retention floor. Startup physical integrity/perms/encryption work has no acceptance proof. | D7 uploads and remaining backup hardening need independent regression9 coverage before fixes. |
 | CODE-001 | PARTIAL | — | Source reasoning; later new | invoiceController.ts:253-272 maps some errors; businessRuleError.ts:34-52 misses plain Invalid quantity/unit price from InvoiceCreationService.ts:102-103, yielding 500. Source reasoning only. | Keep existing mappings; test remaining validation errors and return 4xx. |
@@ -241,3 +241,25 @@ The hunk context had shifted because round5 inserted the closed-period guard int
 - Full `npx jest --silent`: `Test Suites: 1 failed, 135 passed, 136 total`; `Tests: 7 failed, 1199 passed, 1206 total`; `Snapshots: 0 total`; `Time: 568.617 s`. Failures fell from 15 to 7; only regression8 remains. Log: `/tmp/phase2-round8-full.log`.
 - Typecheck passed. All three files applied cleanly with `git apply --3way`; no deviation from the supplied patch.
 - **AUTHZ-001 is still open** and was not touched: `seedDefaultPermissions` lacks the audit's requested permission codes, and it has no regression test yet.
+
+## Phase 2, round9 employee documents and backups
+
+- Targeted `auditRegression8.test.ts`: `Test Suites: 1 passed, 1 total`; `Tests: 9 passed, 9 total`; `Time: 27.751 s`.
+- **Full `npx jest --silent`: `Test Suites: 136 passed, 136 total`; `Tests: 1206 passed, 1206 total`; `Snapshots: 0 total`; `Time: 644.458 s`.** The suite is fully green. Log: `/tmp/phase2-round9-full.log`.
+- Typecheck passed. All seven files applied cleanly with `git apply --3way`.
+- **Rule 10 check on `adminBackup.ts`:** Phase 0b recorded this file as the one mismatching hunk, so it was inspected before staging. The patch's change is purely additive (a `BACKUP_DOWNLOAD` activity-log entry) and sits above your `dotfiles: 'allow'` download fix; your comment block and `res.download` call are unchanged. Your fix is preserved.
+- `server/README.md` was amended by the patch to document `BACKUP_DIR` and the new document-download rules.
+
+## Remaining open findings (no regression test yet)
+
+These have no failing test because none was supplied. Per the rules each needs a test written
+and shown red before any fix, so they are NOT part of the green suite above:
+
+| Finding | Why still open |
+|---|---|
+| AUTHZ-001 | `seedDefaultPermissions` lacks the audit's requested permission codes. Needs the exact code list confirmed before implementation. |
+| REP-005 | Group aggregates ignored, unbounded limit, and further items in `reportQueryEngine`. Needs a test per sub-item. |
+| WO-002 | `StockMovement` insists on expired batches and `inventoryController` handles the case; no test encodes the intended behaviour yet. |
+| CODE-005..007 | Flutter client quality observations (large files, error handling). `flutter analyze` passes; the audit itself did not run it. |
+| D6 joint-cost allocation | Mustard oil/cake allocation by relative sales value is unimplemented: `CreateProductionDTO` accepts a single output item. Needs a schema decision first. |
+| Phase 1 deviation | The 2200 `Accrued Production Overhead` account code/name still needs the user's confirmation. |
