@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import db from '../config/database';
 import { AuthRequest } from '../types';
+import { permissionKeysForIds, permissionsBeyondActor } from '../middleware/requirePermission';
 import logger from '../utils/logger';
 import RoleModel from '../models/Role';
 
@@ -45,6 +46,17 @@ function createRole(req: AuthRequest, res: Response): void {
       return;
     }
 
+    // AUTHZ-004: a non-admin cannot hand out permissions they do not hold
+    // (otherwise a role manager can grant their own role everything).
+    const beyond = permissionsBeyondActor(req.user, permissionKeysForIds(permissions || []));
+    if (beyond.length > 0) {
+      res.status(403).json({
+        error: 'You cannot grant permissions you do not hold yourself',
+        missing_permissions: beyond.slice(0, 10),
+      });
+      return;
+    }
+
     const userId = req.user?.id ?? 0;
     const newRole = RoleModel.create(db, { role_name, description, permissions }, userId);
 
@@ -85,6 +97,17 @@ function updateRolePermissions(req: AuthRequest, res: Response): void {
     const { id } = req.params;
     const roleId = parseInt(String(id), 10);
     const { permissions }: { permissions: number[] } = req.body;
+
+    // AUTHZ-004: a non-admin cannot hand out permissions they do not hold
+    // (otherwise a role manager can grant their own role everything).
+    const beyond = permissionsBeyondActor(req.user, permissionKeysForIds(permissions || []));
+    if (beyond.length > 0) {
+      res.status(403).json({
+        error: 'You cannot grant permissions you do not hold yourself',
+        missing_permissions: beyond.slice(0, 10),
+      });
+      return;
+    }
 
     RoleModel.updatePermissions(db, roleId, permissions);
     res.json({ success: true, message: 'Permissions updated successfully' });

@@ -97,9 +97,9 @@ Paths in evidence are repository files: models under `server/src/models/`, contr
 | WO-002 | NOT-FIXED | — | Source reasoning; later new | StockMovement.ts:1470-1471 insists on expired batches; inventoryController.ts:1004 handles expired flow only. Source reasoning only. | Regression9 first; add D7 damage reason and verify expense account mapping. |
 | WO-003 | GREEN | 6eba103c | auditRegression5 WO-003 | Round5 added the shared `postLegacyStockEntry` closed-period guard, which covers write-offs and the new production postings; regression5 passes. | Verified by targeted and full-suite runs. |
 | AUTHZ-001 | NOT-FIXED | — | Source reasoning; later new (drift test) | database.ts:2084 seedPermissions lacks the audit's requested permission codes; inventory:write mismatch persists. Source reasoning only. | Add permission-drift regression9 and D5 migration; grant none by default. |
-| AUTHZ-002 | NOT-FIXED | — | auditRegression7 AUTHZ-002 | userController.ts:150-190 password/status mutations lack admin-target privilege protection; three regression7 cases fail. | Apply round8. |
-| AUTHZ-003 | NOT-FIXED | — | auditRegression7 AUTHZ-003 | userController.ts:32-65 permits privileged role assignment without required actor check; two regression7 cases fail. | Apply round8. |
-| AUTHZ-004 | NOT-FIXED | — | auditRegression7 AUTHZ-004 | rolesController.ts:48-49,83-90 accepts permission grants without possession checks; two regression7 cases fail. | Apply round8 after round7 middleware prerequisite. |
+| AUTHZ-002 | GREEN | pending | auditRegression7 AUTHZ-002 | Password and status mutations now protect admin targets; all 10 regression7 tests pass. | Verified by targeted and full-suite runs. |
+| AUTHZ-003 | GREEN | pending | auditRegression7 AUTHZ-003 | Privileged role assignment requires the actor check that was previously missing. | Verified by targeted and full-suite runs. |
+| AUTHZ-004 | GREEN | pending | auditRegression7 AUTHZ-004 | Permission grants now require the actor to possess the permission being granted. | Verified by targeted and full-suite runs. |
 | REP-001 | GREEN | 32c13c05 | auditRegression6 REP-001 (3 cases) | Custom reports now require the entity's read permission to execute or list it; all regression6 cases pass. | Verified by targeted and full-suite runs. |
 | REP-002 | GREEN | 32c13c05 | auditRegression6 REP-002 | HAVING fields are whitelist-enforced and computed aliases are protected in `reportQueryEngine`. | Verified by targeted and full-suite runs. |
 | REP-003 | GREEN | 32c13c05 | auditRegression6 REP-003 | `entityRegistry` no longer advertises the nonexistent `stock_balances.id` and BOM quantity fields. | Verified by targeted and full-suite runs. |
@@ -234,3 +234,10 @@ The hunk context had shifted because round5 inserted the closed-period guard int
 - Full `npx jest --silent`: `Test Suites: 2 failed, 134 passed, 136 total`; `Tests: 15 failed, 1191 passed, 1206 total`; `Snapshots: 0 total`; `Time: 662.787 s`. Failures fell from 23 to 15; only regressions 7-8 remain. Log: `/tmp/phase2-round7-full.log`.
 - Typecheck passed. All four files applied cleanly with `git apply --3way`; no deviation from the supplied patch.
 - **REP-005 is still open** and was deliberately not touched: the supplied patch does not address group aggregates, the unbounded limit, or the remaining items recorded against it. It has no regression test yet, so it needs one written before any fix (see below).
+
+## Phase 2, round8 privilege escalation
+
+- Targeted `auditRegression7.test.ts`: `Test Suites: 1 passed, 1 total`; `Tests: 10 passed, 10 total`; `Time: 26.956 s`.
+- Full `npx jest --silent`: `Test Suites: 1 failed, 135 passed, 136 total`; `Tests: 7 failed, 1199 passed, 1206 total`; `Snapshots: 0 total`; `Time: 568.617 s`. Failures fell from 15 to 7; only regression8 remains. Log: `/tmp/phase2-round8-full.log`.
+- Typecheck passed. All three files applied cleanly with `git apply --3way`; no deviation from the supplied patch.
+- **AUTHZ-001 is still open** and was not touched: `seedDefaultPermissions` lacks the audit's requested permission codes, and it has no regression test yet.
