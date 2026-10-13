@@ -147,6 +147,47 @@ function quoteIdentifier(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
+// ── Whitelist hardening (REP-002) ────────────────────────────
+
+/** Real column names of a table (registry-controlled name, never user input). */
+function realColumns(table: string): Set<string> {
+  const rows = db.prepare(`PRAGMA table_info("${table.replace(/"/g, '""')}")`).all() as Array<{ name: string }>;
+  return new Set(rows.map(r => r.name));
+}
+
+/**
+ * A computed column's name becomes a "valid field" for filters, sorting and
+ * grouping. If it could shadow a real column that is NOT in the registry
+ * (bank_iban, cnic_no, password_hash...), the field whitelist would be
+ * bypassed and the column could be probed through filters. So computed names
+ * must be plain identifiers that collide with no column of the entity's
+ * table or of any table it can join to, and with no registry field.
+ */
+function assertComputedNamesAreSafe(config: ReportConfig, entityDef: EntityDefinition): void {
+  if (!Array.isArray(config.computedColumns) || config.computedColumns.length === 0) return;
+  const taken = new Set<string>(entityDef.fields.map(f => f.name));
+  for (const c of realColumns(entityDef.table)) taken.add(c);
+  for (const join of entityDef.joins) {
+    const joined = getEntity(join.entity);
+    if (!joined) continue;
+    for (const c of realColumns(joined.table)) taken.add(c);
+    for (const f of joined.fields) taken.add(f.name);
+  }
+  const seen = new Set<string>();
+  for (const cc of config.computedColumns) {
+    if (typeof cc.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(cc.name)) {
+      throw new Error(`Computed column name "${String(cc.name)}" must be a plain identifier`);
+    }
+    if (taken.has(cc.name)) {
+      throw new Error(`Computed column name "${cc.name}" collides with an existing column; choose another name`);
+    }
+    if (seen.has(cc.name)) {
+      throw new Error(`Computed column name "${cc.name}" is defined twice`);
+    }
+    seen.add(cc.name);
+  }
+}
+
 // ── SQL Builder ──────────────────────────────────────────────
 
 interface BuildContext {
@@ -174,6 +215,7 @@ export function executeReport(config: ReportConfig): QueryResult {
   // nothing unvalidated ever reaches query construction.
   const entityFieldNames = new Set(entityDef.fields.map(f => f.name));
   validateConfigExpressions(config, entityFieldNames);
+  assertComputedNamesAreSafe(config, entityDef);
 
   const ctx: BuildContext = {
     validFieldNames: new Set(entityDef.fields.map(f => f.name)),
@@ -232,17 +274,30 @@ export function executeReport(config: ReportConfig): QueryResult {
     sql += `\nHAVING ${havingClause}`;
   }
 
+  // The grouped count is taken from this point: same SELECT aliases, WHERE,
+  // GROUP BY and HAVING as the main query, but no ORDER BY / LIMIT.
+  const sqlBeforeOrder = sql;
+
   if (orderByClause) {
     sql += `\nORDER BY ${orderByClause}`;
   }
 
-  // 10. Build count query (never includes LIMIT — always counts total matching rows)
-  let countSql = `SELECT COUNT(*) as total FROM ${entityDef.table} ${ctx.primaryTableAlias}`;
+  // 10. Build count query (never includes LIMIT — always counts total matching rows).
+  // A grouped report returns one row per GROUP, so its count must be the number
+  // of groups surviving HAVING; the HAVING parameters then belong to this query
+  // too (REP-004).
+  let countInner = `FROM ${entityDef.table} ${ctx.primaryTableAlias}`;
   if (ctx.joinClauses.length > 0) {
-    countSql += '\n' + ctx.joinClauses.join('\n');
+    countInner += '\n' + ctx.joinClauses.join('\n');
   }
   if (whereClause) {
-    countSql += `\nWHERE ${whereClause}`;
+    countInner += `\nWHERE ${whereClause}`;
+  }
+  let countSql: string;
+  if (groupByClause) {
+    countSql = `SELECT COUNT(*) as total FROM (${sqlBeforeOrder})`;
+  } else {
+    countSql = `SELECT COUNT(*) as total ${countInner}`;
   }
 
   // Now append LIMIT to the main query (after count SQL is built)
@@ -566,11 +621,27 @@ function buildGroupByClause(config: ReportConfig, ctx: BuildContext): string {
 // ── HAVING Builder ──────────────────────────────────────────
 
 function buildHavingClause(config: ReportConfig, ctx: BuildContext): string {
-  if (!config.groupBy?.having || config.groupBy.having.length === 0) return '';
+  if (!config.groupBy?.enabled || !config.groupBy.fields.length) return '';
+  if (!config.groupBy.having || config.groupBy.having.length === 0) return '';
 
-  // HAVING filters use aggregate aliases (computed column names), not table columns.
-  // So we use havingMode=true which skips table prefix and validFieldNames check.
+  // HAVING filters use aggregate aliases (computed column names), not table columns,
+  // so they are rendered without the table prefix. They are still validated against
+  // the same whitelist (REP-002): an unvalidated quoted identifier here could name
+  // any column of the table, including ones the registry deliberately hides.
   const havingMode = true;
+  const havingFields = new Set<string>(ctx.validFieldNames);
+  for (const a of config.groupBy.aggregates ?? []) {
+    if (a.alias) havingFields.add(a.alias);
+  }
+  const checkHavingFields = (filters: FilterDef[]): void => {
+    for (const f of filters) {
+      if (f.field && !havingFields.has(f.field)) {
+        throw new Error(`Having field "${f.field}" not found`);
+      }
+      if (f.children && f.children.length > 0) checkHavingFields(f.children);
+    }
+  };
+  checkHavingFields(config.groupBy.having);
   const clauses = config.groupBy.having.map(f => buildFilterExpression(f, ctx, havingMode));
   const nonEmpty = clauses.filter(c => c !== '');
   if (nonEmpty.length === 0) return '';
