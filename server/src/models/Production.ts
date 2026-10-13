@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { parseCurrency } from '../utils/currency';
+import { parseCurrency, roundCurrency } from '../utils/currency';
 import { roundQty } from '../utils/quantity';
 import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, PRODUCTION_SORT_COLUMNS } from '../utils/sqlSanitizer';
@@ -138,6 +138,17 @@ class ProductionModel {
     } = data;
 
     const materialsWarehouseId = raw_materials_warehouse_id || warehouse_id;
+
+    // PROD-004 / PROD-007 / PROD-006: reject inputs that would create a
+    // negative-cost batch, a circular recipe, or a posting in a closed period.
+    const overheadValue = overhead_cost ?? 0;
+    if (typeof overheadValue !== 'number' || !Number.isFinite(overheadValue) || overheadValue < 0) {
+      throw new Error('Overhead cost must be a non-negative number');
+    }
+    if (input_items.some((line) => Number(line.item_id) === Number(output_item_id))) {
+      throw new Error('An item cannot be produced from itself');
+    }
+    AccountingService.assertPeriodNotClosed(db, production_date, 'Production');
 
     // Validate bom_id matches output_item_id
     if (bom_id) {
@@ -327,7 +338,7 @@ class ProductionModel {
         id: outputMovementId,
         item_id: output_item_id,
         quantity: output_quantity,
-        total_batch_cost: totalBatchCost,
+        total_batch_cost: roundCurrency(output_quantity * costPerUnit),
         movement_date: production_date,
         created_by: userId
       }, db);
