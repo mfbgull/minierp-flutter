@@ -2112,7 +2112,7 @@ function runRolesPermissionsMigration(): void {
   }
 }
 
-function seedDefaultPermissions(): void {
+export function seedDefaultPermissions(): void {
   try {
     logger.info('Seeding default permissions...');
 
@@ -2307,16 +2307,9 @@ function seedDefaultPermissions(): void {
       logger.info(`Seeded ${readPermissions.length} read permission(s) to User role (was empty)`);
     }
 
-    // Grant reports:create to Admin and Manager even on pre-seeded roles.
-    const rcPerm = db.prepare(`SELECT id FROM permissions WHERE permission_name = 'reports:create'`).get() as { id: number } | undefined;
-    if (rcPerm) {
-      for (const roleName of ['Admin', 'Manager']) {
-        const role = db.prepare('SELECT id FROM roles WHERE role_name = ?').get(roleName) as { id: number } | undefined;
-        if (role) {
-          db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, ?)`).run(role.id, rcPerm.id);
-        }
-      }
-    }
+    // D8: the Manager half of the old reports:create grant is removed. Admin still
+    // receives reports:create from the all-permissions branch above. No other role
+    // is handed a newly seeded code - D5/D8 grant none by default.
     logger.info('✅ Default permissions seeded successfully!');
   } catch (error: unknown) {
     throw new Error('Seed default permissions error:: ' + errorMessage(error), { cause: error });

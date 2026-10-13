@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import request from 'supertest';
 import app from '../app';
-import db from '../config/database';
+import db, { seedDefaultPermissions } from '../config/database';
 import { createItem, getAuthCookie, purchaseStock } from './helpers/invoiceReturnSpec';
 
 const balance = (code: string): number => {
@@ -90,6 +90,27 @@ describe('AUTHZ-001: every guarded permission code is grantable', () => {
     expect(db.prepare<[string], { n: number }>(
       'SELECT COUNT(*) AS n FROM permissions WHERE permission_name = ?',
     ).get('inventory:update')?.n).toBe(1);
+  });
+
+  it('leaves reports:create ungranted even when a Manager role exists (D8)', () => {
+    // The dormant seed block used to hand reports:create to Manager. It only ever
+    // ran on installs that already had a Manager role, so a test that never
+    // creates one cannot catch its return. Creating the role here does.
+    const roleId = db.prepare<[string], { id: number }>(`
+      INSERT INTO roles (role_name, description, is_system_role, is_active)
+      VALUES (?, 'd8 regression', 0, 1)
+      RETURNING id
+    `).get('Manager')?.id as number;
+
+    seedDefaultPermissions();
+
+    const managerHolds = db.prepare<[number], { n: number }>(`
+      SELECT COUNT(*) AS n
+      FROM role_permissions rp
+      JOIN permissions p ON p.id = rp.permission_id
+      WHERE rp.role_id = ? AND p.permission_name = 'reports:create'
+    `).get(roleId);
+    expect(managerHolds?.n).toBe(0);
   });
 
   it('grants the newly seeded codes to no non-Admin role (D5)', () => {
