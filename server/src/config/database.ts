@@ -1935,6 +1935,8 @@ runLedgered('add-expired-stock.sql');
 // D6: production overhead accrues as an unpaid payable (2200) instead of a
 // separately recorded expense. Dedicated liability, because GL 2000 is
 // reconciled against the supplier ledger.
+runLedgered('add-missing-guarded-permissions.sql');
+
 runLedgered('add-production-overhead-payable.sql');
 // Post-apply assertion - production resolves this by text_code and aborts the
 // post when it is absent, so a wrong occupant must fail the boot, never

@@ -149,7 +149,7 @@ router.get('/stock-batches', requirePermission('inventory', 'read'), (req, res) 
  * PATCH /api/inventory/stock-batches/:id
  * Update batch expiry_date
  */
-router.patch('/stock-batches/:id', requirePermission('inventory', 'write'), validateZodBody(zodBodySchemas.batchExpiry), (req, res) => {
+router.patch('/stock-batches/:id', requirePermission('inventory', 'update'), validateZodBody(zodBodySchemas.batchExpiry), (req, res) => {
   try {
     const batchId = Number(req.params.id);
     const { expiry_date } = req.body;
@@ -189,7 +189,7 @@ router.patch('/stock-batches/:id', requirePermission('inventory', 'write'), vali
  * PATCH /api/inventory/stock-batches/:id/halt
  * Halt a batch (exclude from FEFO consumption)
  */
-router.patch('/stock-batches/:id/halt', requirePermission('inventory', 'write'), validateZodBody(zodBodySchemas.batchHalt), (req, res) => {
+router.patch('/stock-batches/:id/halt', requirePermission('inventory', 'update'), validateZodBody(zodBodySchemas.batchHalt), (req, res) => {
   try {
     const batchId = Number(req.params.id);
     const { reason } = req.body;
@@ -223,7 +223,7 @@ router.patch('/stock-batches/:id/halt', requirePermission('inventory', 'write'),
  * PATCH /api/inventory/stock-batches/:id/unhalt
  * Unhalt a batch (re-enable in FEFO consumption)
  */
-router.patch('/stock-batches/:id/unhalt', requirePermission('inventory', 'write'), validateZodBody(zodBodySchemas.object), (req, res) => {
+router.patch('/stock-batches/:id/unhalt', requirePermission('inventory', 'update'), validateZodBody(zodBodySchemas.object), (req, res) => {
   try {
     const batchId = Number(req.params.id);
 

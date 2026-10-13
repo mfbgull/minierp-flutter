@@ -96,7 +96,7 @@ Paths in evidence are repository files: models under `server/src/models/`, contr
 | WO-001 | GREEN | a8266f37 | auditRegression5 WO-001 (2 cases) | StockMovement.ts uses the batch's exact unit cost and rounds the write-off VALUE to currency precision; `postLegacyStockEntry` normalises every amount with `roundCurrency` and rejects a value that rounds to zero. All 4 regression5 tests pass. | Verified by targeted and full-suite runs. |
 | WO-002 | NOT-FIXED | — | Source reasoning; later new | StockMovement.ts:1470-1471 insists on expired batches; inventoryController.ts:1004 handles expired flow only. Source reasoning only. | Regression9 first; add D7 damage reason and verify expense account mapping. |
 | WO-003 | GREEN | 6eba103c | auditRegression5 WO-003 | Round5 added the shared `postLegacyStockEntry` closed-period guard, which covers write-offs and the new production postings; regression5 passes. | Verified by targeted and full-suite runs. |
-| AUTHZ-001 | NOT-FIXED | — | Source reasoning; later new (drift test) | database.ts:2084 seedPermissions lacks the audit's requested permission codes; inventory:write mismatch persists. Source reasoning only. | Add permission-drift regression9 and D5 migration; grant none by default. |
+| AUTHZ-001 | GREEN | pending | auditRegression9 AUTHZ-001 (3 cases) | A drift test walks `routes/`, `controllers/` and `middleware/` for every `requirePermission('m','a')` call and asserts each code exists in `permissions`. Migration `add-missing-guarded-permissions.sql` seeds the 17 genuinely absent codes; `stockBatches.ts` uses `inventory:update` per D5. | Verified by targeted and full-suite runs. |
 | AUTHZ-002 | GREEN | 235b01ab | auditRegression7 AUTHZ-002 | Password and status mutations now protect admin targets; all 10 regression7 tests pass. | Verified by targeted and full-suite runs. |
 | AUTHZ-003 | GREEN | 235b01ab | auditRegression7 AUTHZ-003 | Privileged role assignment requires the actor check that was previously missing. | Verified by targeted and full-suite runs. |
 | AUTHZ-004 | GREEN | 235b01ab | auditRegression7 AUTHZ-004 | Permission grants now require the actor to possess the permission being granted. | Verified by targeted and full-suite runs. |
@@ -270,3 +270,45 @@ The Phase 0b rows for BK-002, BK-003, BK-004 and BK-006 still read NOT-FIXED, bu
 `auditRegression8` case or a README check that the round9 patch addressed. All four are marked GREEN
 with commit `73b6ccfc`. No code changed; this only corrects the tracker. BK-002..004 are covered by
 passing regression8 tests; BK-006 is documentation and was verified by reading the runbook.
+
+## Phase 3, AUTHZ-001 guarded permissions that could not be granted
+
+- Red first: the new drift test reported 19 codes guarded by a route but absent from `permissions`,
+  and `stockBatches.ts` still used `inventory:write`. Then green after the fix.
+- Targeted `auditRegression9.test.ts`: `Test Suites: 1 passed, 1 total`; `Tests: 4 passed, 4 total`.
+- Full `npx jest --silent`: `Test Suites: 136 passed, 136 total`; `Tests: 1209 passed, 1209 total`;
+  `Snapshots: 0 total`; `Time: 714.323 s`. Log: `/tmp/phase3-authz001-full.log`.
+- Typecheck passed.
+
+### The audit's list was stale; the drift test found the real set
+
+The audit reported 14 unassignable codes. Measuring the current tree gives **17 codes that were
+genuinely absent**, because the audit predates later work:
+
+| Code | Why the audit's list did not match |
+|---|---|
+| `admin:read/create/delete` | Audit wrote `admin:*` generically; only 3 codes exist |
+| `owner_equity:read/create/edit/delete` | Audit wrote `owner_equity:*`; 4 codes exist, and `edit` is an action the audit never named |
+| `dashboard:create/update/delete` | **Not in the audit's list at all** - these guards were added later |
+| `accounting:update`, `expenses:delete`, `forecasts:delete`, `invoices:void`, `reports:create/update/delete` | Present in the audit's list |
+| `inventory:write` | Audit listed it; D5 retires it, so it is renamed away rather than seeded |
+| `activity_log:purge` | Audit did not list it; a migration already seeds it, so it was correctly excluded |
+
+Seeding `reports:create` also activates a previously dormant block in
+`seedDefaultPermissions` that grants `reports:create` to the **Manager** role. It is a no-op in
+tests because no migration creates a Manager role, but on any real installation that has one it
+would hand out a permission D5 says to grant to nobody. **Left unchanged - needs a user decision.**
+
+### Decisions still needed from the user
+
+1. **`reports:create` to Manager.** Keep the dormant grant (the role needs to author reports) or
+   remove it to honour D5's "grant none by default"?
+2. **D5's "seed admin:* and owner_equity:* as sensitive permissions" is unimplemented.** The
+   `permissions` table has no sensitivity column and `requirePermission` has no notion of sensitive
+   modules, so "sensitive" has no defined enforcement. Options: add an `is_sensitive` column and
+   enforce it, treat it as description text only, or drop the bullet. **Not guessed.**
+3. **AUTHZ-001 grant exception.** The migration grants the new codes to the **Admin** role only.
+   `seedDefaultPermissions` grants Admin every permission but only when the role has none, so an
+   existing installation would otherwise lose access to `owner_equity:*`, `admin:*`, `dashboard:*`
+   and `invoices:void`. D5's "grant none by default" is read as protecting non-Admin roles; the
+   test asserts exactly that. Confirm this reading.
