@@ -36,9 +36,7 @@ let cachedSql: string[] | null = null;
 /** Captured once per test file; the boot runs the full migration sequence. */
 function productionSchemaSql(): string[] {
   if (cachedSql !== null) return cachedSql;
-  // Lazy require so importing this module does not itself trigger a boot.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const migrated = require('../../config/database').default as Database.Database;
+  const migrated = migratedDb();
   const rows = migrated
     .prepare(
       `SELECT sql FROM sqlite_master
@@ -53,12 +51,59 @@ function productionSchemaSql(): string[] {
   return cachedSql;
 }
 
+/**
+ * Tables whose rows are static reference data seeded by the migrations, not
+ * business records a test creates.
+ *
+ * Only these are ever copied. Transactional and mutable data - invoices,
+ * payments, journal lines, stock movements, ledger entries - is deliberately
+ * excluded: copying it would give a "fresh" fixture pre-existing history and
+ * quietly invalidate any test that counts rows or sums balances.
+ */
+const REFERENCE_TABLES = ['chart_of_accounts'] as const;
+
+function migratedDb(): Database.Database {
+  // Lazy require so importing this module does not itself trigger a boot.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('../../config/database').default as Database.Database;
+}
+
+function copyReferenceRows(from: Database.Database, to: Database.Database): void {
+  for (const table of REFERENCE_TABLES) {
+    const columns = (from.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(
+      (c) => c.name,
+    );
+    if (columns.length === 0) continue;
+    const rows = from.prepare(`SELECT ${columns.join(', ')} FROM ${table}`).all() as Array<
+      Record<string, unknown>
+    >;
+    if (rows.length === 0) continue;
+    const placeholders = columns.map(() => '?').join(', ');
+    const insert = to.prepare(
+      `INSERT OR IGNORE INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`,
+    );
+    for (const row of rows) insert.run(...columns.map((c) => row[c]));
+  }
+}
+
+export interface FixtureOptions {
+  /**
+   * Copy the migrations' seeded reference rows (currently chart_of_accounts)
+   * into the fixture. Off by default, so the base behaviour stays schema-only.
+   *
+   * Needed by anything that posts to the ledger: accounting code resolves
+   * accounts by code and aborts when a required one is absent.
+   */
+  reference?: boolean;
+}
+
 /** An isolated, empty database with the production schema. Cheap; DDL replay. */
-export function createFixtureDb(): Database.Database {
+export function createFixtureDb(options: FixtureOptions = {}): Database.Database {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'erp-fixture-'));
   const db = new Database(path.join(dir, 'erp.db'));
   db.pragma('foreign_keys = ON');
   for (const sql of productionSchemaSql()) db.exec(sql);
+  if (options.reference === true) copyReferenceRows(migratedDb(), db);
   open.push(db);
   return db;
 }
