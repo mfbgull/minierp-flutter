@@ -1,8 +1,9 @@
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
 import { collectFlows, getCashAccountTransactions, getCashAccountTotals, normalizeCashMethod, isValidPaymentMethod, syncOpeningBalancesToGl } from '../services/cashService';
 import ExpenseModel from '../models/Expense';
+import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
+
+afterAll(() => cleanupFixtureDbs());
 
 /** Task 1.6: cash truth + method normalization (CASH-01/02). */
 describe('cash method normalization', () => {
@@ -24,75 +25,55 @@ describe('cash method normalization', () => {
   });
 });
 
-// Migration list for the in-memory fixture — the same set the previous
-// fixtures loaded, kept in one place so adding a migration is one edit.
-const MIGRATIONS = [
-  'init.sql', 'add-purchases-table.sql', 'create-payment-allocations.sql',
-  'add-expenses-table.sql', 'add-supplier-payment-support.sql',
-  'add-gl-foundation.sql', 'add-salary-payments.sql', 'add-cash-accounts.sql',
-  'add-opening-balances.sql', 'add-owner-equity.sql', 'add-employees-table.sql',
-  'add-employee-loans.sql', 'add-purchase-returns-tables.sql',
-  'add-disposition-and-supplier-refunds.sql', 'add-purchase-supplier-payment.sql',
-  'add-payment-salary-void-columns.sql', 'add-employee-loan-void-columns.sql',
-];
+/** createFixtureDb() clones schema only, so the rows add-gl-foundation.sql and
+ * add-opening-balances.sql seed as DATA are absent. The opening-balance sync
+ * and the expense GL lifecycle both post against account codes, and read the
+ * opening 'cash' row the tests UPDATE. */
+function seedProductionReferenceData(db: Database.Database): void {
+  db.exec(`
+    INSERT OR IGNORE INTO opening_balances (account_key, amount) VALUES
+      ('cash', 0), ('bank', 0), ('easypaisa', 0), ('jazzcash', 0), ('upaisa', 0);
+  `);
+  db.exec(`
+    INSERT OR IGNORE INTO chart_of_accounts (code, name, type, normal_balance, text_code, description) VALUES
+      ('1000', 'Cash', 'asset', 'debit', 'cash', 'On-hand cash'),
+      ('1010', 'Bank', 'asset', 'debit', 'bank', 'Bank balances'),
+      ('1020', 'Easypaisa / Mobile Wallet', 'asset', 'debit', 'easypaisa', 'Easypaisa / mobile wallet balances'),
+      ('1030', 'JazzCash', 'asset', 'debit', 'jazzcash', 'JazzCash wallet balances'),
+      ('1040', 'UPaisa', 'asset', 'debit', 'upaisa', 'UPaisa wallet balances'),
+      ('1100', 'Accounts Receivable', 'asset', 'debit', 'accounts_receivable', 'Customer balances'),
+      ('1110', 'Customer Credit', 'asset', 'credit', 'customer_credit', 'Customer credit balances'),
+      ('1200', 'Inventory Asset', 'asset', 'debit', 'inventory_asset', 'On-hand inventory at cost'),
+      ('1300', 'Employee Loan Receivable', 'asset', 'debit', 'employee_loan_receivable', 'Loans advanced to employees'),
+      ('2000', 'Accounts Payable', 'liability', 'credit', 'accounts_payable', 'Supplier balances'),
+      ('2100', 'Tax Payable', 'liability', 'credit', 'tax_payable', 'Sales tax collected'),
+      ('3000', 'Owner''s Equity', 'equity', 'credit', 'owners_equity', 'Capital contributions'),
+      ('3100', 'Retained Earnings', 'equity', 'credit', 'opening_retained_earnings', 'Cumulative profit/loss carried forward'),
+      ('3200', 'Owner Capital', 'equity', 'credit', 'owner_capital', 'Cash contributed by the owner'),
+      ('3300', 'Owner Drawings', 'equity', 'debit', 'owner_drawings', 'Cash/goods taken by the owner (contra-equity)'),
+      ('4000', 'Sales Revenue', 'revenue', 'credit', 'sales_revenue', 'Revenue from invoices and POS'),
+      ('4100', 'Sales Returns', 'revenue', 'debit', 'sales_returns', 'Contra-revenue: returned/credited sales'),
+      ('4150', 'Restocking Fee Income', 'revenue', 'credit', 'restocking_fee_income', 'Fees charged on returned items'),
+      ('5000', 'Cost of Goods Sold', 'expense', 'debit', 'cogs', 'Cost of items sold'),
+      ('6000', 'Operating Expenses', 'expense', 'debit', 'operating_expenses', 'General operating costs'),
+      ('6100', 'Wages & Salaries', 'expense', 'debit', 'wages_salaries', 'Payroll'),
+      ('6300', 'Loan Write-off', 'expense', 'debit', 'loan_write_off', 'Employee loans written off / forgiven'),
+      ('7000', 'Production Clearing', 'expense', 'debit', 'production_clearing', 'Clearing account for production cost flow'),
+      ('7100', 'Inventory Correction', 'expense', 'debit', 'inventory_correction', 'Adjustments adding to inventory'),
+      ('7200', 'Inventory Shrinkage', 'expense', 'debit', 'inventory_shrinkage', 'Losses / removals from inventory'),
+      ('7201', 'Expired Goods Loss', 'expense', 'debit', 'expired_goods_loss', 'Written-off expired stock (write-off endpoint)'),
+      ('7202', 'Damaged Goods Loss', 'expense', 'debit', 'damaged_goods_loss', 'Written-off damaged stock'),
+      ('7203', 'Stock Shortage Loss', 'expense', 'debit', 'stock_shortage_loss', 'Physical count shortages written off'),
+      ('7204', 'Obsolete Stock Loss', 'expense', 'debit', 'obsolete_stock_loss', 'Written-off obsolete stock')
+  `);
+}
 
 function fixtureDb(): Database.Database {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
-  for (const f of MIGRATIONS) {
-    db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
-  }
+  const db = createFixtureDb();
+  seedProductionReferenceData(db);
   db.prepare(`INSERT INTO users (username, email, password_hash, full_name, role, is_active)
               VALUES ('u','e@x.c','h','U','admin',1)`).run();
   return db;
-}
-
-// The customer_id-nullable rebuild is a programmatic boot migration, so
-// replicate its end state before inserting payments in the raw fixture.
-function rebuildPaymentsTable(db: Database.Database): void {
-  db.exec(`
-    CREATE TABLE payments_new (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      payment_no VARCHAR(50) UNIQUE NOT NULL,
-      customer_id INTEGER REFERENCES customers(id),
-      supplier_id INTEGER REFERENCES suppliers(id),
-      invoice_id INTEGER,
-      payment_date DATE NOT NULL,
-      amount DECIMAL(15,2) NOT NULL,
-      payment_method VARCHAR(50) NOT NULL DEFAULT 'Cash',
-      reference_no VARCHAR(100),
-      notes TEXT,
-      purchase_order_id INTEGER REFERENCES purchase_orders(id),
-      created_by INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      voided_at TEXT,
-      voided_by INTEGER,
-      void_reason TEXT
-    );
-    DROP TABLE payments;
-    ALTER TABLE payments_new RENAME TO payments;
-  `);
-}
-
-// journal_entries header table (postEntry writes a header first; the legacy
-// table is retained as the header/audit copy) — created only when a fixture
-// exercises AccountingService paths.
-function ensureJournalEntriesHeader(db: Database.Database): void {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS journal_entries (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      reference_type TEXT NOT NULL,
-      reference_id INTEGER NOT NULL,
-      entry_date DATE NOT NULL,
-      description TEXT,
-      debit_account TEXT NOT NULL,
-      credit_account TEXT NOT NULL,
-      amount DECIMAL(15,4) NOT NULL,
-      created_by INTEGER REFERENCES users(id),
-      voided BOOLEAN DEFAULT FALSE,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
 }
 
 describe('unpaid purchase moves no cash (CASH-01)', () => {
@@ -103,7 +84,6 @@ describe('unpaid purchase moves no cash (CASH-01)', () => {
     // counted as money coming IN, overstating the till by 2x the payment
     // and desynchronising the GL cash reconciliation.
     const db = fixtureDb();
-    rebuildPaymentsTable(db);
     db.prepare(`INSERT INTO suppliers (supplier_code, supplier_name) VALUES ('S1','Acme')`).run();
 
     const recent = collectFlows(db, '2026-08-31');
@@ -120,7 +100,6 @@ describe('unpaid purchase moves no cash (CASH-01)', () => {
 
   it('an unpaid purchase contributes nothing to the till; its supplier payment is the only outflow', () => {
     const db = fixtureDb();
-    rebuildPaymentsTable(db);
     db.prepare(`INSERT INTO suppliers (supplier_code, supplier_name) VALUES ('S1','Acme')`).run();
     db.prepare(`INSERT INTO items (item_code, item_name) VALUES ('I1','Item')`).run();
     db.prepare(`INSERT INTO warehouses (warehouse_code, warehouse_name) VALUES ('W1','Main')`).run();
@@ -160,7 +139,6 @@ describe('unpaid purchase moves no cash (CASH-01)', () => {
 describe('supplier payment is the only purchase-side outflow (CASH-01)', () => {
   it('a paid purchase appears once via its supplier payment', () => {
     const db = fixtureDb();
-    rebuildPaymentsTable(db);
     db.prepare(`INSERT INTO suppliers (supplier_code, supplier_name) VALUES ('S1','Acme')`).run();
     db.prepare(`INSERT INTO items (item_code, item_name) VALUES ('I1','Item')`).run();
     db.prepare(`INSERT INTO warehouses (warehouse_code, warehouse_name) VALUES ('W1','Main')`).run();
@@ -185,7 +163,6 @@ describe('supplier payment is the only purchase-side outflow (CASH-01)', () => {
 describe('unclassified methods surface in reconciliation (CASH-02/03)', () => {
   it('a payment stored with an unknown method produces a flagged unclassified row and never maps to bank', () => {
     const db = fixtureDb();
-    rebuildPaymentsTable(db);
     db.prepare(`INSERT INTO customers (customer_code, customer_name) VALUES ('C1','Cust')`).run();
 
     // unit sanity (kept from the source-scan version)
@@ -262,10 +239,6 @@ describe('employee loans and supplier refunds appear in the till walk', () => {
 describe('opening balances sync to the GL (dashboard seed)', () => {
   it('sync voids stale openings and posts dated at the earliest transaction', () => {
     const db = fixtureDb();
-    for (const f of ['create-customer-ledger.sql', 'create-supplier-ledger.sql', 'add-gl-void-attribution.sql']) {
-      db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
-    }
-    ensureJournalEntriesHeader(db);
 
     // A stale legacy BACKFILL_OPENING line must get voided by the sync.
     const cashAcct = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1000'`).get() as { id: number };
@@ -296,10 +269,6 @@ describe('opening balances sync to the GL (dashboard seed)', () => {
 describe('expense GL lifecycle (draft → record → cancel)', () => {
   it('draft carries no GL; record posts; cancel voids; edit while live re-posts', () => {
     const db = fixtureDb();
-    for (const f of ['create-customer-ledger.sql', 'create-supplier-ledger.sql', 'add-gl-void-attribution.sql']) {
-      db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
-    }
-    ensureJournalEntriesHeader(db);
     const id = ExpenseModel.create(db, {
       expense_no: 'EXP-2609-0001', expense_category: 'Utilities', description: 'test',
       amount: 250, expense_date: '2026-09-01', payment_method: 'Cash', status: 'Draft', created_by: 1,

@@ -4,44 +4,16 @@
  * direct purchases through `PurchaseModel.getAll` with `supplier_id`.
  */
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
 import request from 'supertest';
 import app from '../app';
 import sharedDb from '../config/database';
 import PurchaseModel from '../models/Purchase';
+import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
 
-const MIGRATIONS = [
-  'init.sql',
-  'add-purchases-table.sql',
-  'add-purchase-return-fields.sql',
-  'add-batch-costing.sql',
-  'add-stock-adjustment-financial.sql',
-  'create-supplier-ledger.sql',
-  'add-gl-foundation.sql',
-  'create-customer-ledger.sql',
-  'add-gl-void-attribution.sql',
-  'add-purchase-returns-tables.sql',
-  'create-payment-allocations.sql',
-  'add-supplier-payment-support.sql',
-  'add-purchase-supplier-payment.sql',
-  'add-expenses-table.sql',
-  'add-salary-payments.sql',
-  'add-cash-accounts.sql',
-  'add-opening-balances.sql',
-  'add-purchase-void-columns.sql',
-  'add-purchase-return-batches.sql',
-  // C6 (reversal-rules): voided_at columns on payments + allocations —
-  // PurchaseModel.getAll's paid_amount subquery filters voided_at IS NULL.
-  'add-payment-salary-void-columns.sql',
-];
+afterAll(() => cleanupFixtureDbs());
 
 function createFixture(): Database.Database {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
-  for (const f of MIGRATIONS) {
-    db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', f), 'utf8'));
-  }
+  const db = createFixtureDb();
 
   db.prepare(`INSERT INTO users (username,email,password_hash,full_name,role,is_active)
               VALUES ('u','e@x.c','h','U','admin',1)`).run();

@@ -1,69 +1,63 @@
 import Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
 import PurchaseReturnModel from '../models/PurchaseReturn';
 import PurchaseOrderModel from '../models/PurchaseOrder';
 import { backfillPurchaseReturns } from '../utils/purchaseReturnBackfill';
+import { createFixtureDb, cleanupFixtureDbs } from './helpers/productionSchema';
+
+afterAll(() => cleanupFixtureDbs());
+
+/** createFixtureDb() clones schema only, so the rows add-gl-foundation.sql and
+ * add-expired-stock.sql seed as DATA are absent. Purchase posting, the
+ * disposition GL and the cash funds guard resolve accounts by code. */
+function seedProductionReferenceData(db: Database.Database): void {
+  db.exec(`
+    INSERT OR IGNORE INTO opening_balances (account_key, amount) VALUES
+      ('cash', 0), ('bank', 0), ('easypaisa', 0), ('jazzcash', 0), ('upaisa', 0);
+  `);
+  db.exec(`
+    INSERT OR IGNORE INTO chart_of_accounts (code, name, type, normal_balance, text_code, description) VALUES
+      ('1000', 'Cash', 'asset', 'debit', 'cash', 'On-hand cash'),
+      ('1010', 'Bank', 'asset', 'debit', 'bank', 'Bank balances'),
+      ('1020', 'Easypaisa / Mobile Wallet', 'asset', 'debit', 'easypaisa', 'Easypaisa / mobile wallet balances'),
+      ('1030', 'JazzCash', 'asset', 'debit', 'jazzcash', 'JazzCash wallet balances'),
+      ('1040', 'UPaisa', 'asset', 'debit', 'upaisa', 'UPaisa wallet balances'),
+      ('1100', 'Accounts Receivable', 'asset', 'debit', 'accounts_receivable', 'Customer balances'),
+      ('1110', 'Customer Credit', 'asset', 'credit', 'customer_credit', 'Customer credit balances'),
+      ('1200', 'Inventory Asset', 'asset', 'debit', 'inventory_asset', 'On-hand inventory at cost'),
+      ('1300', 'Employee Loan Receivable', 'asset', 'debit', 'employee_loan_receivable', 'Loans advanced to employees'),
+      ('2000', 'Accounts Payable', 'liability', 'credit', 'accounts_payable', 'Supplier balances'),
+      ('2100', 'Tax Payable', 'liability', 'credit', 'tax_payable', 'Sales tax collected'),
+      ('3000', 'Owner''s Equity', 'equity', 'credit', 'owners_equity', 'Capital contributions'),
+      ('3100', 'Retained Earnings', 'equity', 'credit', 'opening_retained_earnings', 'Cumulative profit/loss carried forward'),
+      ('3200', 'Owner Capital', 'equity', 'credit', 'owner_capital', 'Cash contributed by the owner'),
+      ('3300', 'Owner Drawings', 'equity', 'debit', 'owner_drawings', 'Cash/goods taken by the owner (contra-equity)'),
+      ('4000', 'Sales Revenue', 'revenue', 'credit', 'sales_revenue', 'Revenue from invoices and POS'),
+      ('4100', 'Sales Returns', 'revenue', 'debit', 'sales_returns', 'Contra-revenue: returned/credited sales'),
+      ('4150', 'Restocking Fee Income', 'revenue', 'credit', 'restocking_fee_income', 'Fees charged on returned items'),
+      ('5000', 'Cost of Goods Sold', 'expense', 'debit', 'cogs', 'Cost of items sold'),
+      ('6000', 'Operating Expenses', 'expense', 'debit', 'operating_expenses', 'General operating costs'),
+      ('6100', 'Wages & Salaries', 'expense', 'debit', 'wages_salaries', 'Payroll'),
+      ('6300', 'Loan Write-off', 'expense', 'debit', 'loan_write_off', 'Employee loans written off / forgiven'),
+      ('7000', 'Production Clearing', 'expense', 'debit', 'production_clearing', 'Clearing account for production cost flow'),
+      ('7100', 'Inventory Correction', 'expense', 'debit', 'inventory_correction', 'Adjustments adding to inventory'),
+      ('7200', 'Inventory Shrinkage', 'expense', 'debit', 'inventory_shrinkage', 'Losses / removals from inventory'),
+      ('7201', 'Expired Goods Loss', 'expense', 'debit', 'expired_goods_loss', 'Written-off expired stock (write-off endpoint)'),
+      ('7202', 'Damaged Goods Loss', 'expense', 'debit', 'damaged_goods_loss', 'Written-off damaged stock'),
+      ('7203', 'Stock Shortage Loss', 'expense', 'debit', 'stock_shortage_loss', 'Physical count shortages written off'),
+      ('7204', 'Obsolete Stock Loss', 'expense', 'debit', 'obsolete_stock_loss', 'Written-off obsolete stock')
+  `);
+  // EXPIRED/DAMAGED system warehouses add-expired-stock.sql seeds.
+  db.prepare(`INSERT OR IGNORE INTO warehouses (warehouse_code, warehouse_name, is_system, is_active)
+              VALUES ('EXPIRED','Expired Stock',1,1), ('DAMAGED','Damaged Stock',1,1)`).run();
+}
 
 /**
- * Fixture: replay the real migration chain on an in-memory DB so the model
- * runs against the same schema production boots with. init.sql is the base
- * schema; the incremental migrations add purchases, stock_batches, the
- * financial/GL tables and the new purchase-returns tables.
+ * Fixture: the real production schema from helpers/productionSchema, so the
+ * model runs against the same schema production boots with.
  */
 function createFixture(): Database.Database {
-  const db = new Database(':memory:');
-  db.pragma('foreign_keys = ON');
-
-  const migrations = [
-    'init.sql',
-    'add-purchases-table.sql',
-    'add-purchase-return-fields.sql',
-    'add-batch-costing.sql',
-    'add-stock-adjustment-financial.sql',
-    'create-supplier-ledger.sql',
-    'add-gl-foundation.sql',
-    'create-payment-allocations.sql',
-    'add-supplier-payment-support.sql',
-    'add-purchase-supplier-payment.sql',
-    'add-purchase-returns-tables.sql',
-    'add-purchase-return-batches.sql',
-    'add-disposition-and-supplier-refunds.sql',
-    'create-customer-ledger.sql',
-    'add-gl-void-attribution.sql',
-    'add-salary-payments.sql',
-    'add-payment-salary-void-columns.sql',
-    'add-production-tables.sql',
-    'add-payments-purchase-order-id.sql',
-    'add-invoice-soft-delete.sql',
-    'add-audit-trail-fields.sql',
-  ];
-
-  for (const file of migrations) {
-    const sql = fs.readFileSync(path.join(__dirname, '..', 'migrations', file), 'utf8');
-    db.exec(sql);
-  }
-
-  // suppliers.current_balance is added programmatically at boot
-  // (config/database.ts) — replicate for rebuildBalances.
-  const supCols = db.prepare(`SELECT name FROM pragma_table_info('suppliers')`).all() as { name: string }[];
-  if (!supCols.some((c) => c.name === 'current_balance')) {
-    db.exec('ALTER TABLE suppliers ADD COLUMN current_balance DECIMAL(15,2) DEFAULT 0');
-  }
-
-  // Replicate the programmatic ALTERs from runBatchCostingMigration (the
-  // SQL file only creates stock_batches; the column adds are applied in
-  // code on boot).
-  const cols = db.prepare(`SELECT name FROM pragma_table_info('stock_movements')`).all() as { name: string }[];
-  const has = (n: string) => cols.some((c) => c.name === n);
-  if (!has('batch_id')) db.exec('ALTER TABLE stock_movements ADD COLUMN batch_id INTEGER REFERENCES stock_batches(id)');
-  if (!has('financial_value')) db.exec('ALTER TABLE stock_movements ADD COLUMN financial_value DECIMAL(15,4) DEFAULT 0');
-  if (!has('financial_posted')) db.exec('ALTER TABLE stock_movements ADD COLUMN financial_posted BOOLEAN DEFAULT FALSE');
-  if (!has('journal_entry_id')) db.exec('ALTER TABLE stock_movements ADD COLUMN journal_entry_id INTEGER REFERENCES journal_entries(id)');
-
-  for (const file of ['add-item-expiry-tracking.sql', 'add-expired-stock.sql']) {
-    db.exec(fs.readFileSync(path.join(__dirname, '..', 'migrations', file), 'utf8'));
-  }
+  const db = createFixtureDb();
+  seedProductionReferenceData(db);
 
   // Seed the minimal master data the flows need.
   db.prepare(`
@@ -758,43 +752,13 @@ describe('PurchaseReturnModel', () => {
       const db = createFixture();
       const purchaseId = seedPurchase(db, { quantity: 10 });
       // Fully settled by an allocation.
-      // payment_allocations/payment rows need a parent; use a real payment.
-      // The base init.sql payments table requires customer_id NOT NULL;
-      // relax it for this supplier-payment fixture row.
-      // legacy_alter_table so the rename does not retarget purchase_allocations' FK.
-      db.pragma('legacy_alter_table = ON');
-      db.exec('ALTER TABLE payments RENAME TO payments_old');
-      db.exec(`CREATE TABLE payments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        payment_no VARCHAR(50) UNIQUE NOT NULL,
-        customer_id INTEGER,
-        supplier_id INTEGER REFERENCES suppliers(id),
-        invoice_id INTEGER,
-        payment_date DATE NOT NULL,
-        amount DECIMAL(15,2) NOT NULL,
-        payment_method VARCHAR(50),
-        voided_at TEXT
-      )`);
-      db.exec(`INSERT INTO payments (id, payment_no, customer_id, invoice_id, payment_date, amount)
-        SELECT id, payment_no, customer_id, invoice_id, payment_date, amount FROM payments_old`);
-      db.exec('DROP TABLE payments_old');
-      db.pragma('legacy_alter_table = OFF');
+      // Production's payments table has a nullable customer_id (the old base
+      // init.sql did not), so a supplier payment inserts directly.
       db.prepare(`
         INSERT INTO payments (payment_no, supplier_id, payment_date, amount, payment_method)
         VALUES ('PAYD1', 1, '2026-07-15', 100, 'Cash')
       `).run();
       const payId = (db.prepare(`SELECT id FROM payments WHERE payment_no='PAYD1'`).get() as { id: number }).id;
-      // The RENAME retargeted purchase_allocations' payment FK to
-      // payments_old; repoint it at the rebuilt payments table.
-      db.exec('DROP TABLE purchase_allocations');
-      db.exec(`CREATE TABLE purchase_allocations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        payment_id INTEGER NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
-        purchase_id INTEGER NOT NULL REFERENCES purchases(id),
-        amount DECIMAL(15,2) NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        voided_at TEXT
-      )`);
       db.prepare(`
         INSERT INTO purchase_allocations (payment_id, purchase_id, amount) VALUES (?, ?, ?)
       `).run(payId, purchaseId, 100);
