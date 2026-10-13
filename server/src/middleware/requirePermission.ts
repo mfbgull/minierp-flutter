@@ -17,6 +17,29 @@ import { AuthRequest } from '../types';
 import db from '../config/database';
 import logger from '../utils/logger';
 
+/**
+ * Programmatic permission check (same rules as requirePermission): admins pass,
+ * everyone else needs the role permission. Used where the module being
+ * authorised depends on request content (e.g. the custom-report entity).
+ */
+export function userHasPermission(
+  user: { id: number; role?: string } | undefined,
+  module: string,
+  action: string
+): boolean {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  const row = db.prepare('SELECT role_id FROM users WHERE id = ?').get(user.id) as { role_id: number | null } | undefined;
+  if (!row || !row.role_id) return false;
+  const granted = db.prepare(`
+    SELECT 1
+    FROM role_permissions rp
+    JOIN permissions p ON p.id = rp.permission_id
+    WHERE rp.role_id = ? AND p.module = ? AND p.action = ?
+  `).get(row.role_id, module, action);
+  return !!granted;
+}
+
 export function requirePermission(module: string, action: string) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {

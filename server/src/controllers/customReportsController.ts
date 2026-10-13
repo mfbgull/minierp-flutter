@@ -6,7 +6,8 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../types';
 import CustomReport from '../models/CustomReport';
-import { getAllEntities, getEntity } from '../services/entityRegistry';
+import { getAllEntities, getEntity, getEntityPermissionModule } from '../services/entityRegistry';
+import { userHasPermission } from '../middleware/requirePermission';
 import { executeReport } from '../services/reportQueryEngine';
 import type { ReportConfig, ColumnDef, ComputedColumnDef, SortDef } from '../services/reportQueryEngine';
 import { validateConfigExpressions, ExpressionValidationError } from '../services/expressionValidator';
@@ -336,6 +337,17 @@ function runReport(req: AuthRequest, res: Response): void {
       return;
     }
 
+    // REP-001: the report reads the entity's table directly, so the caller
+    // needs read access to the module that owns that data. Saved reports are
+    // re-checked on every run (permissions can change after saving).
+    const requiredModule = getEntityPermissionModule(String(config?.entity));
+    if (!userHasPermission(req.user, requiredModule, 'read')) {
+      res.status(403).json({
+        error: `Access denied: running this report requires "read" permission for "${requiredModule}"`,
+      });
+      return;
+    }
+
     const result = executeReport(config);
     res.json({
       success: true,
@@ -360,9 +372,10 @@ function runReport(req: AuthRequest, res: Response): void {
  * GET /api/reports/custom/entities
  * List all available entities with their fields and join info.
  */
-function listEntities(_req: Request, res: Response): void {
+function listEntities(req: AuthRequest, res: Response): void {
   try {
-    const entities = getAllEntities();
+    // Only advertise the entities this user could actually run (REP-001).
+    const entities = getAllEntities().filter((e) => userHasPermission(req.user, getEntityPermissionModule(e.key), 'read'));
     res.json({ success: true, data: entities });
   } catch (error: unknown) {
     logger.error('List entities error:', errorMessage(error));
@@ -374,9 +387,13 @@ function listEntities(_req: Request, res: Response): void {
  * GET /api/reports/custom/entities/:key
  * Get a single entity definition by key.
  */
-function getEntityDetail(req: Request, res: Response): void {
+function getEntityDetail(req: AuthRequest, res: Response): void {
   try {
     const entityKey = String(req.params.key);
+    if (!userHasPermission(req.user, getEntityPermissionModule(entityKey), 'read')) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
     const entity = getEntity(entityKey);
     if (!entity) {
       res.status(404).json({ error: 'Entity not found' });

@@ -100,10 +100,10 @@ Paths in evidence are repository files: models under `server/src/models/`, contr
 | AUTHZ-002 | NOT-FIXED | — | auditRegression7 AUTHZ-002 | userController.ts:150-190 password/status mutations lack admin-target privilege protection; three regression7 cases fail. | Apply round8. |
 | AUTHZ-003 | NOT-FIXED | — | auditRegression7 AUTHZ-003 | userController.ts:32-65 permits privileged role assignment without required actor check; two regression7 cases fail. | Apply round8. |
 | AUTHZ-004 | NOT-FIXED | — | auditRegression7 AUTHZ-004 | rolesController.ts:48-49,83-90 accepts permission grants without possession checks; two regression7 cases fail. | Apply round8 after round7 middleware prerequisite. |
-| REP-001 | NOT-FIXED | — | auditRegression6 REP-001 | customReportsController.ts:339,365 executes/lists entities without entity permission checks; three regression6 cases fail. | Apply round7 controller/middleware changes. |
-| REP-002 | NOT-FIXED | — | auditRegression6 REP-002 | reportQueryEngine.ts:428-450 omits HAVING field whitelist enforcement; computed aliases also need protection; three regression6 cases fail. | Apply round7 engine validation. |
-| REP-003 | NOT-FIXED | — | auditRegression6 REP-003 | entityRegistry.ts:214,380 advertises nonexistent stock_balances.id / BOM quantity fields; regression6 fails. | Apply round7 registry corrections. |
-| REP-004 | NOT-FIXED | — | auditRegression6 REP-004 | reportQueryEngine.ts:239-261 count construction omits grouped/HAVING query structure while sharing bindings; regression6 fails. | Apply round7 grouped-count fix. |
+| REP-001 | GREEN | pending | auditRegression6 REP-001 (3 cases) | Custom reports now require the entity's read permission to execute or list it; all regression6 cases pass. | Verified by targeted and full-suite runs. |
+| REP-002 | GREEN | pending | auditRegression6 REP-002 | HAVING fields are whitelist-enforced and computed aliases are protected in `reportQueryEngine`. | Verified by targeted and full-suite runs. |
+| REP-003 | GREEN | pending | auditRegression6 REP-003 | `entityRegistry` no longer advertises the nonexistent `stock_balances.id` and BOM quantity fields. | Verified by targeted and full-suite runs. |
+| REP-004 | GREEN | pending | auditRegression6 REP-004 | COUNT construction now carries the grouped/HAVING query structure while sharing the existing bindings. | Verified by targeted and full-suite runs. |
 | REP-005 | NOT-FIXED | — | Source reasoning; later new | reportQueryEngine.ts:294-324 ignores requested group aggregates; :249 permits unbounded limit; :497-503 passes LIKE wildcards. Source reasoning only. | Regression9 first for aggregates, cap, literal wildcard matching. |
 | FILE-001 | NOT-FIXED | — | auditRegression8 FILE-001 | employeeController.ts:550 trusts supplied file_path; :583-587 deletes by document ID without employee ownership/path containment; two regression8 cases fail. | Apply round9. |
 | FILE-002 | NOT-FIXED | — | auditRegression8 FILE-002 | upload.ts:19,37 trusts extension/MIME; employees.ts:47 serves inline. Regression8 fails. | Apply round9 upload/content serving changes. |
@@ -227,3 +227,10 @@ Phase 0b completed. The user authorized Phase 1 and then clarified D6: overhead 
 2. `accountingService.postLegacyStockEntry` rounds the amount once via `roundCurrency` and throws when it rounds to zero, then uses that value for the header and both lines.
 
 The hunk context had shifted because round5 inserted the closed-period guard into `postLegacyStockEntry`; the patch's own content was otherwise unchanged.
+
+## Phase 2, round7 custom report engine
+
+- Targeted `auditRegression6.test.ts`: `Test Suites: 1 passed, 1 total`; `Tests: 13 passed, 13 total`; `Time: 42.708 s`.
+- Full `npx jest --silent`: `Test Suites: 2 failed, 134 passed, 136 total`; `Tests: 15 failed, 1191 passed, 1206 total`; `Snapshots: 0 total`; `Time: 662.787 s`. Failures fell from 23 to 15; only regressions 7-8 remain. Log: `/tmp/phase2-round7-full.log`.
+- Typecheck passed. All four files applied cleanly with `git apply --3way`; no deviation from the supplied patch.
+- **REP-005 is still open** and was deliberately not touched: the supplied patch does not address group aggregates, the unbounded limit, or the remaining items recorded against it. It has no regression test yet, so it needs one written before any fix (see below).

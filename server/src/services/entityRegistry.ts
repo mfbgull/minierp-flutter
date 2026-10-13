@@ -211,7 +211,6 @@ const ENTITY_REGISTRY: Record<string, EntityDefinition> = {
     table: 'stock_balances',
     label: 'Stock Balances',
     fields: [
-      { name: 'id', column: 'id', type: 'number' },
       { name: 'quantity', column: 'quantity', type: 'number', aggregateFns: ['SUM', 'AVG'] },
     ],
     joins: [
@@ -379,7 +378,6 @@ const ENTITY_REGISTRY: Record<string, EntityDefinition> = {
       { name: 'bom_name', column: 'bom_name', type: 'string' },
       { name: 'quantity', column: 'quantity', type: 'number', aggregateFns: ['SUM', 'AVG'] },
       { name: 'is_active', column: 'is_active', type: 'boolean' },
-      { name: 'notes', column: 'notes', type: 'string' },
       { name: 'created_at', column: 'created_at', type: 'date' },
     ],
     joins: [
@@ -425,6 +423,36 @@ const ENTITY_REGISTRY: Record<string, EntityDefinition> = {
     joins: [],
   },
 };
+
+// ── Authorisation ────────────────────────────────────────────
+// A report reads the entity's table directly, so running one must require the
+// same read permission as the module that owns that data (REP-001).
+const ENTITY_PERMISSION_MODULE: Record<string, string> = {
+  invoices: 'invoices',
+  invoice_items: 'invoices',
+  sales_orders: 'sales_orders',
+  sales_order_items: 'sales_orders',
+  purchase_orders: 'purchase_orders',
+  purchase_order_items: 'purchase_orders',
+  items: 'inventory',
+  stock_movements: 'inventory',
+  stock_balances: 'inventory',
+  warehouses: 'inventory',
+  customers: 'customers',
+  suppliers: 'suppliers',
+  payments: 'payments',
+  expenses: 'expenses',
+  employees: 'employees',
+  productions: 'production',
+  boms: 'bom',
+  quotations: 'quotations',
+  activity_log: 'activity_log',
+};
+
+/** Permission module required to read an entity; unknown entities are admin-only. */
+export function getEntityPermissionModule(entityKey: string): string {
+  return ENTITY_PERMISSION_MODULE[entityKey] ?? 'admin';
+}
 
 // ── Public API ───────────────────────────────────────────────
 
