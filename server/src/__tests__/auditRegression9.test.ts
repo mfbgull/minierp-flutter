@@ -114,3 +114,105 @@ describe('AUTHZ-001: every guarded permission code is grantable', () => {
     expect(grantedElsewhere).toEqual([]);
   });
 });
+
+describe('REP-005: report engine gaps', () => {
+  let adminCookie: string;
+  const report = (config: unknown) =>
+    request(app).post('/api/reports/custom/run').set('Cookie', adminCookie).send({ config });
+
+  const seedEmployee = async (code: string, department: string, salary: number): Promise<void> => {
+    const made = await request(app).post('/api/employees').set('Cookie', adminCookie).send({
+      first_name: 'Rep', last_name: code, employee_code: code,
+      email: `${code.toLowerCase()}@example.test`,
+      department, designation: 'Clerk', hire_date: '2026-01-01', salary,
+    });
+    expect(made.status).toBe(201);
+  };
+
+  beforeAll(async () => {
+    adminCookie = await getAuthCookie();
+    await seedEmployee('REP5-A1', 'REP5Alpha', 1000);
+    await seedEmployee('REP5-A2', 'REP5Alpha', 2000);
+    await seedEmployee('REP5-B1', 'REP5Beta', 500);
+
+    db.transaction(() => {
+      const insert = db.prepare(`
+        INSERT INTO employees (employee_code, first_name, last_name, department, designation,
+          date_of_joining, salary, is_active, created_by)
+        VALUES (?, 'Bulk', ?, 'REP5Bulk', 'Clerk', '2026-01-01', 10, 1,
+          (SELECT id FROM users ORDER BY id LIMIT 1))
+      `);
+      for (let i = 0; i < 1200; i += 1) {
+        insert.run(`REP5-BULK-${i}`, `row${i}`);
+      }
+    })();
+  });
+
+  it('computes requested group aggregates instead of returning an arbitrary row value', async () => {
+    const res = await report({
+      entity: 'employees',
+      columns: [{ field: 'department' }],
+      // The employees API assigns its own employee_code, so the fixture is
+      // selected by salary: the 1,200-row bulk fixture is paid 10 each.
+      filters: [{ field: 'salary', operator: 'greater_than', value: 100 }],
+      groupBy: {
+        enabled: true,
+        fields: ['department'],
+        aggregates: [{ field: 'salary', fn: 'SUM', alias: 'total_salary' }],
+      },
+    });
+    expect(res.status).toBe(200);
+    const rows = res.body.data.rows as Array<{ department: string; total_salary: number }>;
+    const totals = rows.map((r) => Number(r.total_salary)).sort((a, b) => a - b);
+    expect(totals).toEqual([500, 3000]);
+  });
+
+  const bulkRows = () =>
+    report({
+      entity: 'employees',
+      columns: [{ field: 'employee_code' }],
+      filters: [{ field: 'employee_code', operator: 'starts_with', value: 'REP5-BULK-' }],
+    });
+
+  it('caps an absurd requested row limit instead of accepting it', async () => {
+    const res = await report({
+      entity: 'employees',
+      columns: [{ field: 'employee_code' }],
+      filters: [{ field: 'employee_code', operator: 'starts_with', value: 'REP5-BULK-' }],
+      limit: 1e12,
+    });
+    expect(res.status).toBe(200);
+    expect((res.body.data.rows as unknown[]).length).toBeLessThanOrEqual(1000);
+  });
+
+  it('applies a default row limit when the report does not ask for one', async () => {
+    const res = await bulkRows();
+    expect(res.status).toBe(200);
+    expect((res.body.data.rows as unknown[]).length).toBeGreaterThan(0);
+    expect((res.body.data.rows as unknown[]).length).toBeLessThanOrEqual(1000);
+  });
+
+  it('treats LIKE wildcards in contains as literal characters', async () => {
+    // Unescaped, '%' is a metacharacter, so '%REP5Alpha%' matches every value
+    // merely CONTAINING 'REP5Alpha' - here the other department too.
+    const wildcard = await report({
+      entity: 'employees',
+      columns: [{ field: 'department' }],
+      filters: [{ field: 'department', operator: 'contains', value: '%REP5Alpha%' }],
+      limit: 50,
+    });
+    expect(wildcard.status).toBe(200);
+    const departments = (wildcard.body.data.rows as Array<{ department: string }>)
+      .map((r) => r.department);
+    expect(departments).not.toContain('REP5Beta');
+
+    const literal = await report({
+      entity: 'employees',
+      columns: [{ field: 'department' }],
+      filters: [{ field: 'department', operator: 'contains', value: 'REP5Alpha' }],
+      limit: 50,
+    });
+    expect(literal.status).toBe(200);
+    expect((literal.body.data.rows as unknown[]).length).toBeGreaterThan(0);
+  });
+});

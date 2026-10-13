@@ -301,10 +301,8 @@ export function executeReport(config: ReportConfig): QueryResult {
   }
 
   // Now append LIMIT to the main query (after count SQL is built)
-  if (config.limit && config.limit > 0) {
-    sql += `\nLIMIT ?`;
-    ctx.paramValues.push(config.limit);
-  }
+  sql += `\nLIMIT ?`;
+  ctx.paramValues.push(effectiveRowLimit(config.limit));
 
   const params = ctx.paramValues.slice(startIdx);
 
@@ -312,7 +310,7 @@ export function executeReport(config: ReportConfig): QueryResult {
 
   try {
     // Execute count query (uses same params as main query, minus any LIMIT param)
-    const countParams = ctx.paramValues.slice(startIdx, config.limit ? params.length - 1 : params.length);
+    const countParams = ctx.paramValues.slice(startIdx, params.length - 1);
     const countResult = db.prepare(countSql).get(...countParams) as { total: number } | undefined;
     const totalCount = countResult?.total ?? 0;
 
@@ -379,6 +377,12 @@ function buildSelectClause(
     }
   }
 
+  // REP-005: `groupBy.aggregates` was validated but never rendered, so a grouped
+  // report returned SQLite's arbitrary bare-column value per group. Emit them here.
+  if (isGrouped) {
+    items.push(...buildAggregateItems(config.groupBy!, entityDef, ctx));
+  }
+
   // Add computed columns referenced in ORDER BY that aren't already in the SELECT
   if (config.computedColumns && config.sort) {
     const sortFieldNames = new Set(config.sort.map(s => s.field));
@@ -387,6 +391,65 @@ function buildSelectClause(
         items.push(`${cc.expression} AS ${quoteIdentifier(cc.name)}`);
       }
     }
+  }
+
+  return items;
+}
+
+/**
+ * REP-005: LIKE wildcards are metacharacters, so a user's literal `%` or `_`
+ * matched everything or any single character instead of the text they typed.
+ * Escape them and declare the escape character on every generated LIKE.
+ */
+function escapeLikeWildcards(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+/** REP-005: a report may never ask for an unbounded number of rows. */
+export const MAX_REPORT_ROWS = 1000;
+export const DEFAULT_REPORT_ROWS = 500;
+
+function effectiveRowLimit(requested: number | undefined): number {
+  if (requested === undefined || !Number.isFinite(requested)) return DEFAULT_REPORT_ROWS;
+  const whole = Math.floor(requested);
+  if (whole <= 0) return DEFAULT_REPORT_ROWS;
+  return Math.min(whole, MAX_REPORT_ROWS);
+}
+
+/**
+ * REP-005: render `groupBy.aggregates` as SELECT items. Each aggregate is
+ * restricted to a field the entity advertises, to an aggregate function the
+ * registry lists for that field, and to a non-colliding alias.
+ */
+function buildAggregateItems(
+  groupBy: GroupByDef,
+  entityDef: EntityDefinition,
+  ctx: BuildContext
+): string[] {
+  const items: string[] = [];
+  const used = new Set(ctx.validFieldNames);
+
+  for (const aggregate of groupBy.aggregates ?? []) {
+    if (!ctx.validFieldNames.has(aggregate.field)) {
+      throw new Error(`Aggregate field "${aggregate.field}" not found on entity "${entityDef.key}"`);
+    }
+    const fieldDef = entityDef.fields.find((f) => f.name === aggregate.field);
+    const allowed = fieldDef?.aggregateFns ?? [];
+    const fn = aggregate.fn.toUpperCase();
+    if (!allowed.includes(fn as (typeof allowed)[number])) {
+      throw new Error(
+        `Aggregate function "${aggregate.fn}" is not available for field "${aggregate.field}"`
+      );
+    }
+
+    const rawAlias = aggregate.alias || `${fn.toLowerCase()}_${aggregate.field}`;
+    if (used.has(rawAlias)) {
+      throw new Error(`Aggregate alias "${rawAlias}" collides with an existing column`);
+    }
+    used.add(rawAlias);
+    ctx.validFieldNames.add(rawAlias);
+
+    items.push(`${fn}(${ctx.primaryTableAlias}.${quoteIdentifier(aggregate.field)}) AS ${quoteIdentifier(rawAlias)}`);
   }
 
   return items;
@@ -550,16 +613,16 @@ function buildFilterExpression(
       return `${col} <= ?`;
     }
     case 'contains': {
-      ctx.paramValues.push(`%${value}%`);
-      return `${col} LIKE ?`;
+      ctx.paramValues.push(`%${escapeLikeWildcards(String(value))}%`);
+      return `${col} LIKE ? ESCAPE '\\'`;
     }
     case 'starts_with': {
-      ctx.paramValues.push(`${value}%`);
-      return `${col} LIKE ?`;
+      ctx.paramValues.push(`${escapeLikeWildcards(String(value))}%`);
+      return `${col} LIKE ? ESCAPE '\\'`;
     }
     case 'ends_with': {
-      ctx.paramValues.push(`%${value}`);
-      return `${col} LIKE ?`;
+      ctx.paramValues.push(`%${escapeLikeWildcards(String(value))}`);
+      return `${col} LIKE ? ESCAPE '\\'`;
     }
     case 'in_list': {
       if (!Array.isArray(value) || value.length === 0) return '1=0';

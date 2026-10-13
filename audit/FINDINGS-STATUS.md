@@ -104,7 +104,7 @@ Paths in evidence are repository files: models under `server/src/models/`, contr
 | REP-002 | GREEN | 32c13c05 | auditRegression6 REP-002 | HAVING fields are whitelist-enforced and computed aliases are protected in `reportQueryEngine`. | Verified by targeted and full-suite runs. |
 | REP-003 | GREEN | 32c13c05 | auditRegression6 REP-003 | `entityRegistry` no longer advertises the nonexistent `stock_balances.id` and BOM quantity fields. | Verified by targeted and full-suite runs. |
 | REP-004 | GREEN | 32c13c05 | auditRegression6 REP-004 | COUNT construction now carries the grouped/HAVING query structure while sharing the existing bindings. | Verified by targeted and full-suite runs. |
-| REP-005 | NOT-FIXED | — | Source reasoning; later new | reportQueryEngine.ts:294-324 ignores requested group aggregates; :249 permits unbounded limit; :497-503 passes LIKE wildcards. Source reasoning only. | Regression9 first for aggregates, cap, literal wildcard matching. |
+| REP-005 | GREEN | pending | auditRegression9 REP-005 (4 cases) | `groupBy.aggregates` is now rendered as SELECT items, restricted to an advertised field and an aggregate function the registry lists for it, with a non-colliding alias. Reports always get a bounded row count (`DEFAULT_REPORT_ROWS` 500, `MAX_REPORT_ROWS` 1000). `contains`/`starts_with`/`ends_with` escape `%`, `_` and `\\` and declare `ESCAPE`. | Verified by targeted and full-suite runs. |
 | FILE-001 | GREEN | 73b6ccfc | auditRegression8 FILE-001 (3 cases) | Employee document upload no longer trusts a supplied `file_path`, and deletion requires employee ownership; all 9 regression8 tests pass. | Verified by targeted and full-suite runs. |
 | FILE-002 | GREEN | 73b6ccfc | auditRegression8 FILE-002 | Uploads validate extension and MIME, and employee documents are served as attachments rather than inline. | Verified by targeted and full-suite runs. |
 | BK-001 | GREEN | 73b6ccfc | auditRegression8 BK-001 | The `VACUUM INTO` path is quoted, so a data path containing an apostrophe no longer breaks backup. | Verified by targeted and full-suite runs. |
@@ -312,3 +312,42 @@ would hand out a permission D5 says to grant to nobody. **Left unchanged - needs
    existing installation would otherwise lose access to `owner_equity:*`, `admin:*`, `dashboard:*`
    and `invoices:void`. D5's "grant none by default" is read as protecting non-Admin roles; the
    test asserts exactly that. Confirm this reading.
+
+## Phase 3, REP-005 report engine gaps
+
+- Red first: all four new cases failed on the current engine, then passed after the fix.
+- Targeted `auditRegression9.test.ts`: `Test Suites: 1 passed, 1 total`; `Tests: 8 passed, 8 total`.
+- Also re-run `auditRegression6.test.ts` (13 passed), `reportExpressionSecurity.test.ts` and
+  `apReporting.test.ts` (8 passed) as guardrails on the engine change.
+- Full `npx jest --silent`: `Test Suites: 136 passed, 136 total`; `Tests: 1213 passed, 1213 total`;
+  `Snapshots: 0 total`; `Time: 703.231 s`. Log: `/tmp/phase3-rep005-full.log`.
+- Typecheck passed.
+
+### Changes to `reportQueryEngine.ts`
+
+1. **Aggregates are rendered.** `buildSelectClause` now emits
+   `FN(table.field) AS alias` for each `groupBy.aggregates` entry. Each is validated: the field must
+   be in the entity whitelist, the function must be one the registry lists in that field's
+   `aggregateFns`, and the alias must not collide with an existing column. This closes the alias
+   gap REP-002 closed on the HAVING side - an aggregate alias is now a real column rather than a
+   name only HAVING could see.
+2. **Every report is bounded.** `LIMIT` is now always emitted with `effectiveRowLimit()`: absent,
+   non-finite or non-positive requests fall back to 500, and anything above 1000 is clamped. The
+   count query drops exactly one trailing parameter, so the shared-binding fix from REP-004 still
+   holds now that the LIMIT parameter is unconditional.
+3. **LIKE metacharacters are literal.** `contains`, `starts_with` and `ends_with` escape `\`, `%`
+   and `_` in the user's value and emit `LIKE ... ESCAPE '\\'`. Previously `contains: '%Alice'`
+   matched every value merely *containing* 'Alice'.
+
+### Test-fixture correction worth recording
+
+The first draft of the aggregate case filtered on `employee_code`, assuming the employees API honours
+a supplied code. **It does not** - it assigns its own `EMP-<year>-<n>` code. The filter silently
+matched nothing and the case looked like an engine failure. The fixture now selects on `salary > 100`
+so it is independent of generated codes. Two row-limit cases were also initially vacuous because the
+database held too few rows to exceed any cap; the fixture now bulk-inserts 1,200 rows so the cap is
+observable.
+
+### Still open
+
+WO-002 needs decision D7 and has no test yet. See the decisions listed under AUTHZ-001 above.
