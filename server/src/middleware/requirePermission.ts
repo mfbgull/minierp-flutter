@@ -40,6 +40,44 @@ export function userHasPermission(
   return !!granted;
 }
 
+/** 'module:action' keys granted to a role. */
+export function rolePermissionKeys(roleId: number): Set<string> {
+  const rows = db.prepare(`
+    SELECT p.module AS module, p.action AS action
+    FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
+    WHERE rp.role_id = ?
+  `).all(roleId) as Array<{ module: string; action: string }>;
+  return new Set(rows.map(r => `${r.module}:${r.action}`));
+}
+
+/** 'module:action' keys for a list of permission ids. */
+export function permissionKeysForIds(ids: number[]): Set<string> {
+  const keys = new Set<string>();
+  const stmt = db.prepare('SELECT module, action FROM permissions WHERE id = ?');
+  for (const id of ids) {
+    const row = stmt.get(Number(id)) as { module: string; action: string } | undefined;
+    if (row) keys.add(`${row.module}:${row.action}`);
+  }
+  return keys;
+}
+
+/**
+ * Permissions in `wanted` that the acting user does not hold themselves.
+ * Administrators are unrestricted (empty result). Used to stop a delegated
+ * user/role manager from minting access beyond their own (AUTHZ-003/004).
+ */
+export function permissionsBeyondActor(
+  user: { id: number; role?: string } | undefined,
+  wanted: Set<string>
+): string[] {
+  if (user?.role === 'admin') return [];
+  const actorRow = user
+    ? db.prepare('SELECT role_id FROM users WHERE id = ?').get(user.id) as { role_id: number | null } | undefined
+    : undefined;
+  const held = actorRow?.role_id ? rolePermissionKeys(actorRow.role_id) : new Set<string>();
+  return [...wanted].filter(k => !held.has(k));
+}
+
 export function requirePermission(module: string, action: string) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {

@@ -5,6 +5,37 @@ import bcrypt from 'bcrypt';
 import { log, logAuth, ActionType } from '../services/activityLogger';
 import logger from '../utils/logger';
 import UserModel from '../models/User';
+import { rolePermissionKeys, permissionsBeyondActor } from '../middleware/requirePermission';
+
+/**
+ * AUTHZ-002: administrator accounts are only manageable by administrators.
+ * Without this, anyone holding users:update could reset the admin's password
+ * (or change its e-mail) and take the account over.
+ */
+function denyIfTargetIsAdmin(req: AuthRequest, res: Response, target: { role?: string }): boolean {
+  if (target.role === 'admin' && req.user?.role !== 'admin') {
+    res.status(403).json({ error: 'Only administrators can modify administrator accounts' });
+    return true;
+  }
+  return false;
+}
+
+/**
+ * AUTHZ-003: a non-admin may only assign roles whose permissions they hold
+ * themselves, so users:create / users:update cannot be used to mint access
+ * (e.g. the system Admin role) beyond the assigner's own.
+ */
+function denyIfRoleExceedsActor(req: AuthRequest, res: Response, roleId: number): boolean {
+  const beyond = permissionsBeyondActor(req.user, rolePermissionKeys(Number(roleId)));
+  if (beyond.length > 0) {
+    res.status(403).json({
+      error: 'You cannot assign a role that grants permissions you do not hold yourself',
+      missing_permissions: beyond.slice(0, 10),
+    });
+    return true;
+  }
+  return false;
+}
 
 function getUsers(req: AuthRequest, res: Response): void {
   try {
@@ -42,6 +73,7 @@ async function createUser(req: AuthRequest, res: Response): Promise<void> {
       res.status(400).json({ error: 'Invalid role' });
       return;
     }
+    if (denyIfRoleExceedsActor(req, res, role_id)) return;
 
     if (UserModel.usernameExists(db, username)) {
       res.status(409).json({ error: 'Username already exists' });
@@ -80,6 +112,7 @@ function updateUser(req: AuthRequest, res: Response): void {
 
     const existingUser = UserModel.getPublicById(userId, db);
     if (!existingUser) { res.status(404).json({ error: 'User not found' }); return; }
+    if (denyIfTargetIsAdmin(req, res, existingUser)) return;
 
     // SEC-04: own role is immutable through self-edit, full stop.
     // Reject any self-edit containing role_id regardless of target role —
@@ -93,6 +126,7 @@ function updateUser(req: AuthRequest, res: Response): void {
       res.status(400).json({ error: 'Invalid role' });
       return;
     }
+    if (role_id && denyIfRoleExceedsActor(req, res, role_id)) return;
 
     if (username && username !== existingUser.username && UserModel.usernameExists(db, username, userId)) {
       res.status(409).json({ error: 'Username already exists' });
@@ -129,6 +163,7 @@ function deleteUser(req: AuthRequest, res: Response): void {
     const userId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
     const existingUser = UserModel.getPublicById(userId, db);
     if (!existingUser) { res.status(404).json({ error: 'User not found' }); return; }
+    if (denyIfTargetIsAdmin(req, res, existingUser)) return;
     if (req.user!.id === userId) { res.status(400).json({ error: 'Cannot delete your own account' }); return; }
     if (existingUser.role === 'admin' && UserModel.getAdminCount(db) <= 1) {
       res.status(400).json({ error: 'Cannot delete the last active admin user' });
@@ -157,6 +192,7 @@ async function resetPassword(req: AuthRequest, res: Response): Promise<void> {
 
     const existingUser = UserModel.getPublicById(userId, db);
     if (!existingUser) { res.status(404).json({ error: 'User not found' }); return; }
+    if (denyIfTargetIsAdmin(req, res, existingUser)) return;
 
     // Async bcrypt (spec 2.1) — hashSync blocked the event loop ~300ms.
     const passwordHash = await bcrypt.hash(newPassword, 12);
@@ -181,6 +217,7 @@ function toggleUserStatus(req: AuthRequest, res: Response): void {
 
     const existingUser = UserModel.getPublicById(userId, db);
     if (!existingUser) { res.status(404).json({ error: 'User not found' }); return; }
+    if (denyIfTargetIsAdmin(req, res, existingUser)) return;
     if (req.user!.id === userId) { res.status(400).json({ error: 'Cannot deactivate your own account' }); return; }
     if (existingUser.role === 'admin' && !is_active && UserModel.getAdminCount(db) <= 1) {
       res.status(400).json({ error: 'Cannot deactivate the last active admin user' });
