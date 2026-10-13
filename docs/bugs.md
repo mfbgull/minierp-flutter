@@ -178,10 +178,21 @@ finding sits on the layer that rewrite replaces. No code has been touched.
 
 ---
 
-## BUG-005 · `journal_lines` has no database-level *prevention* of unbalanced entries (DB-002)
+## BUG-005 · Database-level prevention of unbalanced journals (DB-002)
 
-**Status:** `OPEN` (detection half shipped) — prevention needs an architectural decision · **Severity:** HIGH
-**Audit row:** DB-002, still `planned` in the ledger — correctly, since prevention is undone
+**Status:** `FIXED` — detection and commit-time prevention shipped · **Severity:** HIGH
+**Audit row:** DB-002
+
+The production-schema fixture migration removed the old test-harness blocker.
+The new `add-journal-balance-commit-guard.sql` uses trigger-maintained integer
+balances and a deferred foreign key to zero. Every group must balance at commit;
+intermediate states inside a transaction are allowed. This supports complete
+posting, voiding, restoration, deletion, and balanced corrections without a
+separate application seal call. See [design and validation](database-journal-seal.md).
+
+### Historical analysis and reverted attempts (superseded)
+
+The notes below record the earlier investigation, not the current constraints.
 
 ### The finding
 
@@ -203,8 +214,8 @@ adding one would break the system rather than protect it:
   `UPDATE ... SET voided = 1`.** A per-row trigger would observe a half-voided
   group and abort every void in the system.
 
-SQLite has no `DEFERRABLE` constraint, so there is no way to defer the check to
-statement or transaction end.
+SQLite cannot defer a `CHECK` constraint. It does support deferred foreign keys;
+the final implementation uses that distinction to enforce balance at commit.
 
 ### The only sound option, and its cost
 

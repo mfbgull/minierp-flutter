@@ -9,6 +9,7 @@
  * not a hand-applied fixture, so they test the same boot path production uses.
  */
 import fs from 'fs';
+import { afterEach, describe, expect, it } from '@jest/globals';
 import path from 'path';
 import db from '../config/database';
 import PurchaseOrderModel from '../models/PurchaseOrder';
@@ -376,6 +377,19 @@ describe('DB-003 — migration checksum verification covers inline runners', () 
 });
 
 describe('DB-002 — the boot gate detects an unbalanced journal entry', () => {
+  // Simulate privileged maintenance bypassing foreign keys. Detection must
+  // still catch that committed corruption after enforcement is restored.
+  function historicalWrite(write: () => void): void {
+    expect(db.inTransaction).toBe(false);
+    db.pragma('foreign_keys = OFF');
+    try {
+      write();
+    } finally {
+      db.pragma('foreign_keys = ON');
+    }
+    expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
+  }
+
   // These fixtures deliberately create UNBALANCED groups, and the assertion
   // scans every group in the table. Without this cleanup one test's drift
   // fails the next test's "does not throw" case.
@@ -392,13 +406,15 @@ describe('DB-002 — the boot gate detects an unbalanced journal entry', () => {
   };
 
   const addEntry = (entryId: number, legs: Array<{ account: number; debit: number; credit: number }>) => {
-    for (const leg of legs) {
-      db.prepare(
-        `INSERT INTO journal_lines
-           (journal_entry_id, account_id, debit, credit, line_date, reference_type, reference_id)
-         VALUES (?, ?, ?, ?, '2026-03-01', 'DBI', ?)`,
-      ).run(entryId, leg.account, leg.debit, leg.credit, entryId);
-    }
+    historicalWrite(() => {
+      for (const leg of legs) {
+        db.prepare(
+          `INSERT INTO journal_lines
+             (journal_entry_id, account_id, debit, credit, line_date, reference_type, reference_id)
+           VALUES (?, ?, ?, ?, '2026-03-01', 'DBI', ?)`,
+        ).run(entryId, leg.account, leg.debit, leg.credit, entryId);
+      }
+    });
   };
 
   it('passes on a balanced entry', () => {
@@ -437,15 +453,15 @@ describe('DB-002 — the boot gate detects an unbalanced journal entry', () => {
   });
 
   it('a void that leaves a half-voided entry unbalanced is detected', () => {
-    // The shape a per-row trigger could never catch without also aborting the
-    // legitimate bulk void: this is why the invariant is asserted, not triggered.
     const { ar, ap } = accounts();
     addEntry(9005, [
       { account: ar, debit: 120, credit: 0 },
       { account: ap, debit: 0, credit: 120 },
     ]);
-    db.prepare('UPDATE journal_lines SET voided = 1 WHERE journal_entry_id = 9005 AND account_id = ?')
-      .run(ar);
+    historicalWrite(() => {
+      db.prepare('UPDATE journal_lines SET voided = 1 WHERE journal_entry_id = 9005 AND account_id = ?')
+        .run(ar);
+    });
     expect(() => assertJournalEntriesBalance(db)).toThrow(/#9005/);
   });
 });

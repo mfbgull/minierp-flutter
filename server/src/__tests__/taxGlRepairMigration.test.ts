@@ -6,6 +6,7 @@
  * Revenue ↔ Tax Payable split by the delta, keeps every group balanced,
  * stays idempotent, and leaves excluded documents alone.
  */
+import { beforeAll, describe, expect, it } from '@jest/globals';
 import db from '../config/database';
 import { runBackfillInvoiceTaxGl } from '../migrations/backfillInvoiceTaxGl';
 import {
@@ -64,14 +65,16 @@ function corruptToGrossTax(invoiceId: number, badTax: number): void {
   const total = parseCurrency(
     (db.prepare('SELECT total_amount FROM invoices WHERE id = ?').get(invoiceId) as { total_amount: number }).total_amount
   );
-  db.prepare(`
-    UPDATE journal_lines SET credit = ? WHERE reference_type = 'INVOICE'
-      AND reference_id = ? AND account_id = ? AND voided = 0
-  `).run(badTax, invoiceId, taxId);
-  db.prepare(`
-    UPDATE journal_lines SET credit = ? WHERE reference_type = 'INVOICE'
-      AND reference_id = ? AND account_id = ? AND voided = 0
-  `).run(parseCurrency(total - badTax), invoiceId, revId);
+  db.transaction(() => {
+    db.prepare(`
+      UPDATE journal_lines SET credit = ? WHERE reference_type = 'INVOICE'
+        AND reference_id = ? AND account_id = ? AND voided = 0
+    `).run(badTax, invoiceId, taxId);
+    db.prepare(`
+      UPDATE journal_lines SET credit = ? WHERE reference_type = 'INVOICE'
+        AND reference_id = ? AND account_id = ? AND voided = 0
+    `).run(parseCurrency(total - badTax), invoiceId, revId);
+  })();
 }
 
 describe('H3 repair migration — backfillInvoiceTaxGl', () => {

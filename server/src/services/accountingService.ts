@@ -466,38 +466,40 @@ export class AccountingService {
       );
     }
 
-    const header = db.prepare(`
-      INSERT INTO journal_entries
-        (reference_type, reference_id, entry_date, description,
-         debit_account, credit_account, amount, created_by, voided)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
-    `).run(
-      args.referenceType,
-      args.referenceId,
-      args.entryDate,
-      args.description,
-      args.debitTextCode,
-      args.creditTextCode,
-      args.amount,
-      args.createdBy || null
-    );
-    const journalEntryId = Number(header.lastInsertRowid);
+    return db.transaction(() => {
+      const header = db.prepare(`
+        INSERT INTO journal_entries
+          (reference_type, reference_id, entry_date, description,
+           debit_account, credit_account, amount, created_by, voided)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+      `).run(
+        args.referenceType,
+        args.referenceId,
+        args.entryDate,
+        args.description,
+        args.debitTextCode,
+        args.creditTextCode,
+        args.amount,
+        args.createdBy || null
+      );
+      const journalEntryId = Number(header.lastInsertRowid);
 
-    const insertLine = db.prepare(`
-      INSERT INTO journal_lines (
-        journal_entry_id, account_id, debit, credit, description,
-        line_date, reference_type, reference_id, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertLine.run(
-      journalEntryId, debitAcct.id, args.amount, 0,
-      args.description, args.entryDate, args.referenceType, args.referenceId, args.createdBy || null
-    );
-    insertLine.run(
-      journalEntryId, creditAcct.id, 0, args.amount,
-      args.description, args.entryDate, args.referenceType, args.referenceId, args.createdBy || null
-    );
-    return journalEntryId;
+      const insertLine = db.prepare(`
+        INSERT INTO journal_lines (
+          journal_entry_id, account_id, debit, credit, description,
+          line_date, reference_type, reference_id, created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      insertLine.run(
+        journalEntryId, debitAcct.id, args.amount, 0,
+        args.description, args.entryDate, args.referenceType, args.referenceId, args.createdBy || null
+      );
+      insertLine.run(
+        journalEntryId, creditAcct.id, 0, args.amount,
+        args.description, args.entryDate, args.referenceType, args.referenceId, args.createdBy || null
+      );
+      return journalEntryId;
+    })();
   }
 
   // ------------------------------------------------------------------
