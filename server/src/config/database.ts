@@ -1923,6 +1923,7 @@ runLedgered('fn.verifyOwnerEquityAccounts', () => {
 // attribution, never hard-deleted. Additive columns only.
 runLedgered('add-payment-salary-void-columns.sql');
 runLedgered('add-employee-loan-void-columns.sql');
+runLedgered('add-salary-advance-link.sql');
 
 // Expired Stock Management (Phase 1): GL loss accounts 7201-7204 under the
 // existing 7200 parent, warehouses.is_system + EXPIRED/DAMAGED seeds,

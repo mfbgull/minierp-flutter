@@ -168,10 +168,6 @@ export function collectFlows(
     add(row.payment_method, 0, row.outflow);
   }
 
-  // Employee loans (pre-floor fold): the disbursement moved cash out
-  // regardless of later status (written-off loans were still paid out);
-  // direct repayments move cash back in (salary deductions are already
-  // counted via salary_payments).
   const loanPreFloor = db.prepare(`
     SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
     FROM employee_loans
@@ -181,7 +177,7 @@ export function collectFlows(
   const loanRepayPreFloor = db.prepare(`
     SELECT payment_method, COALESCE(SUM(amount), 0) as inflow
     FROM employee_loan_repayments
-    WHERE repayment_type = 'direct' AND voided_at IS NULL AND payment_date < ? AND payment_date <= ?
+    WHERE (repayment_type = 'direct' OR journal_entry_id IS NOT NULL) AND voided_at IS NULL AND payment_date < ? AND payment_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number }>;
   for (const row of loanPreFloor) {
@@ -290,7 +286,7 @@ export function collectFlows(
   const loanRepayments = db.prepare(`
     SELECT payment_method, COALESCE(SUM(amount), 0) as inflow
     FROM employee_loan_repayments
-    WHERE repayment_type = 'direct' AND voided_at IS NULL AND payment_date > ? AND payment_date <= ?
+    WHERE (repayment_type = 'direct' OR journal_entry_id IS NOT NULL) AND voided_at IS NULL AND payment_date > ? AND payment_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number }>;
   for (const row of loanRepayments) {
@@ -633,7 +629,7 @@ export function getCashAccountTransactions(
     SELECT payment_date as date, payment_method as method, reference_no as reference,
            notes as description, amount
     FROM employee_loan_repayments
-    WHERE repayment_type = 'direct' AND voided_at IS NULL AND payment_date <= ?
+    WHERE (repayment_type = 'direct' OR journal_entry_id IS NOT NULL) AND voided_at IS NULL AND payment_date <= ?
   `).all(uptoDate) as Array<Record<string, unknown>>) {
     push({
       method: r.method as string | null,

@@ -1056,8 +1056,6 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
     push({ ...r, type: 'owner_withdrawal', amount: -r.amount });
   }
 
-  // Employee loan disbursements (money out) and direct repayments
-  // (money in); salary deductions are already inside the salary rows.
   const loanRows = db.prepare(`
     SELECT l.disbursement_date as date, l.id as reference,
            TRIM(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')) as party,
@@ -1076,7 +1074,7 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
            lr.payment_method as method, lr.notes as description, lr.amount
     FROM employee_loan_repayments lr
     LEFT JOIN employees e ON e.id = lr.employee_id
-    WHERE lr.repayment_type = 'direct' AND lr.payment_date BETWEEN ? AND ? AND lr.voided_at IS NULL
+    WHERE (lr.repayment_type = 'direct' OR lr.journal_entry_id IS NOT NULL) AND lr.payment_date BETWEEN ? AND ? AND lr.voided_at IS NULL
     ORDER BY lr.payment_date DESC
   `).all(startDate, endDate) as Array<{ date: string; reference: string | number; party: string | null; method: string | null; description: string | null; amount: number }>;
   for (const r of loanRepayRows) {
