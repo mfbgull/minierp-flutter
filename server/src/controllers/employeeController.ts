@@ -18,6 +18,9 @@ import {
 } from '../utils/idempotency';
 
 import { errorMessage, errorCode } from '../utils/errorMessage';
+import { roundCurrency } from '../utils/currency';
+import { BusinessRuleError, handleBusinessError } from '../utils/businessRuleError';
+import { assertCashTimeline } from '../services/cashBalanceGuard';
 
 function getEmployees(req: Request, res: Response): void {
   try {
@@ -223,7 +226,7 @@ function paySalary(req: Request, res: Response): void {
     }
 
     const { amount, payment_date, payment_method, reference_no, notes, payment_type } = req.body;
-    if (!amount || amount <= 0) {
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || roundCurrency(amount) <= 0) {
       res.status(422).json({ success: false, error: 'Valid amount is required' });
       return;
     }
@@ -281,9 +284,17 @@ function paySalary(req: Request, res: Response): void {
     }
 
     const trx = db.transaction(() => {
+      const paidAmount = roundCurrency(Number(amount));
+      const payPeriod = payment_date.substring(0, 7);
+      const paid = db.prepare<[number, string], { total: number }>(
+        'SELECT COALESCE(SUM(amount), 0) AS total FROM salary_payments WHERE employee_id = ? AND pay_period = ? AND voided_at IS NULL'
+      ).get(employeeId, payPeriod);
+      const remaining = Math.max(0, roundCurrency(employee.salary - (paid?.total ?? 0)));
+      const salaryAmount = employee.salary > 0 ? Math.min(paidAmount, remaining) : paidAmount;
+      const excess = roundCurrency(paidAmount - salaryAmount);
       const paymentId = EmployeeModel.addSalaryPayment({
         employee_id: employeeId,
-        amount,
+        amount: salaryAmount,
         payment_date,
         payment_method: method,
         reference_no,
@@ -302,7 +313,7 @@ function paySalary(req: Request, res: Response): void {
           salaryPaymentId: paymentId,
           employeeName: `${employee.first_name} ${employee.last_name}`,
           employeeCode: employee.employee_code,
-          amount,
+          amount: salaryAmount,
           paymentDate: payment_date,
           paymentMethod: method,
           userId: authReq.user?.id,
@@ -317,51 +328,36 @@ function paySalary(req: Request, res: Response): void {
           .run(journalEntryId, paymentId);
       }
 
-      // Overpayment: if total payments this month exceed salary, create advance for next month
       let advanceCreated: number | null = null;
-      if (employee.salary > 0) {
-        const payPeriod = payment_date.substring(0, 7);
-        const totalRow = db.prepare(
-          `SELECT SUM(amount) AS total_paid FROM salary_payments WHERE employee_id = ? AND pay_period = ? AND voided_at IS NULL`
-        ).get(employeeId, payPeriod) as { total_paid: number } | undefined;
-        const totalPaid = totalRow?.total_paid ?? 0;
-        if (totalPaid > employee.salary) {
-          const excess = totalPaid - employee.salary;
-          // Compute next month's pay_period
-          const [year, month] = payPeriod.split('-').map(Number);
-          const nextDate = new Date(year, month, 1); // First day of next month
-          const nextPayPeriod = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
-          const nextPaymentDate = `${nextPayPeriod}-01`;
-
-          advanceCreated = EmployeeModel.addSalaryPayment({
-            employee_id: employeeId,
-            amount: excess,
-            payment_date: nextPaymentDate,
-            payment_method: method,
-            reference_no: `ADV-${payPeriod}`,
-            notes: `Auto-advance from overpayment in ${payPeriod}`,
-            paid_by: authReq.user?.id,
-            payment_type: 'advance',
-          }, db);
-
-          // C7 (reversal-rules): the advance GL posting is not optional.
-          // The old catch-then-log let the advance salary row commit with
-          // no GL posting — a silent partial commit inside the outer
-          // transaction. Any GL failure now throws and rolls back the
-          // whole payment, mirroring the primary posting above.
-          const advResult = AccountingService.postSalaryEntry(db, {
-            salaryPaymentId: advanceCreated,
-            employeeName: `${employee.first_name} ${employee.last_name}`,
-            employeeCode: employee.employee_code,
-            amount: excess,
-            paymentDate: nextPaymentDate,
-            paymentMethod: method,
-            userId: authReq.user?.id,
-          });
-          if (advResult) {
-            db.prepare(`UPDATE salary_payments SET journal_entry_id = ? WHERE id = ?`)
-              .run(advResult.journal_entry_id, advanceCreated);
-          }
+      if (excess > 0) {
+        const [year, month] = payPeriod.split('-').map(Number);
+        const nextDate = new Date(year, month, 1);
+        const nextPayPeriod = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+        advanceCreated = EmployeeModel.addSalaryPayment({
+          employee_id: employeeId,
+          amount: excess,
+          payment_date,
+          payment_method: method,
+          reference_no: `ADV-${payPeriod}`,
+          notes: `Auto-advance from overpayment in ${payPeriod}`,
+          paid_by: authReq.user?.id,
+          payment_type: 'advance',
+          parent_payment_id: paymentId,
+          pay_period: nextPayPeriod,
+        }, db);
+        const advanceEntry = AccountingService.postSalaryEntry(db, {
+          salaryPaymentId: advanceCreated,
+          employeeName: `${employee.first_name} ${employee.last_name}`,
+          employeeCode: employee.employee_code,
+          amount: excess,
+          paymentDate: payment_date,
+          paymentMethod: method,
+          userId: authReq.user?.id,
+          postingKind: 'advance',
+        });
+        if (advanceEntry) {
+          db.prepare('UPDATE salary_payments SET journal_entry_id = ? WHERE id = ?')
+            .run(advanceEntry.journal_entry_id, advanceCreated);
         }
       }
 
@@ -379,8 +375,7 @@ function paySalary(req: Request, res: Response): void {
       data: { id: result.paymentId, journal_entry_id: result.journalEntryId, advance_created: result.advanceCreated },
     });
   } catch (error: unknown) {
-    logger.error('Error paying salary:', error);
-    res.status(500).json({ success: false, error: errorMessage(error) || 'Failed to process salary payment' });
+    handleBusinessError(res, error, 'Pay salary', 'Failed to process salary payment', { success: true });
   }
 }
 
@@ -436,13 +431,17 @@ function deleteSalaryPayment(req: Request, res: Response): void {
       return;
     }
 
-    const payment = EmployeeModel.getSalaryPayment(salaryPaymentId, db) as { employee_id: number; journal_entry_id?: number | null; amount: number; payment_date: string; voided_at?: string | null } | undefined;
+    const payment = EmployeeModel.getSalaryPayment(salaryPaymentId, db);
     if (!payment || payment.employee_id !== employeeId) {
       res.status(404).json({ success: false, error: 'Salary payment not found' });
       return;
     }
     if (payment.voided_at) {
       res.status(409).json({ success: false, error: 'Salary payment is already voided' });
+      return;
+    }
+    if (payment.parent_payment_id) {
+      res.status(409).json({ success: false, error: `Void parent salary payment #${payment.parent_payment_id} to reverse its linked advance.` });
       return;
     }
 
@@ -456,6 +455,17 @@ function deleteSalaryPayment(req: Request, res: Response): void {
     // the void on a NULL link orphans those lines forever and corrupts
     // the cash/bank GL balances.
     const trx = db.transaction(() => {
+      const advances = db.prepare<[number], { id: number; payment_date: string }>(
+        'SELECT id, payment_date FROM salary_payments WHERE parent_payment_id = ? AND voided_at IS NULL'
+      ).all(salaryPaymentId);
+      for (const advance of advances) {
+        AccountingService.assertPeriodNotClosed(db, advance.payment_date, `Salary advance #${advance.id}`);
+        AccountingService.voidJournalLinesByReference(db, 'SALARY_PAYMENT', advance.id, {
+          voidedBy: authReq.user?.id, voidReason: `Parent salary payment ${salaryPaymentId} voided`,
+        });
+        EmployeeModel.deleteSalaryPayment(advance.id, db, authReq.user?.id ?? null,
+          `Parent salary payment ${salaryPaymentId} voided`);
+      }
       AccountingService.voidJournalLinesByReference(db, 'SALARY_PAYMENT', salaryPaymentId, {
         voidedBy: authReq.user?.id,
         voidReason: `Salary payment voided for ${employee.first_name} ${employee.last_name}`,
@@ -465,9 +475,13 @@ function deleteSalaryPayment(req: Request, res: Response): void {
       // voided with it — otherwise the loan stays 'repaid' while the
       // salary cash is reversed. Restore each loan balance first.
       const linkedRepayments = db.prepare(
-        'SELECT id, loan_id, amount FROM employee_loan_repayments WHERE salary_payment_id = ? AND voided_at IS NULL'
-      ).all(salaryPaymentId) as Array<{ id: number; loan_id: number; amount: number }>;
+        'SELECT id, loan_id, amount, payment_date FROM employee_loan_repayments WHERE salary_payment_id = ? AND voided_at IS NULL'
+      ).all(salaryPaymentId) as Array<{ id: number; loan_id: number; amount: number; payment_date: string }>;
       for (const repayment of linkedRepayments) {
+        AccountingService.assertPeriodNotClosed(db, repayment.payment_date, `Loan repayment #${repayment.id}`);
+        AccountingService.voidJournalLinesByReference(db, 'LOAN_REPAYMENT', repayment.id, {
+          voidedBy: authReq.user?.id, voidReason: `Salary payment ${salaryPaymentId} voided`,
+        });
         EmployeeLoanModel.restoreBalance(repayment.loan_id, repayment.amount, db);
         EmployeeLoanModel.deleteRepayment(repayment.id, db, authReq.user?.id ?? null,
           `Salary payment ${salaryPaymentId} voided`);
@@ -634,7 +648,7 @@ function createLoan(req: Request, res: Response): void {
     }
 
     const { amount, disbursement_date, due_date, purpose, payment_method, monthly_installment, notes } = req.body;
-    if (!amount || amount <= 0) {
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || roundCurrency(amount) <= 0) {
       res.status(422).json({ success: false, error: 'Valid amount is required' });
       return;
     }
@@ -684,20 +698,19 @@ function createLoan(req: Request, res: Response): void {
         EmployeeLoanModel.updateJournalEntry(loanId, journalEntryId, db);
       }
 
-      const loan = EmployeeLoanModel.getById(loanId, db);
-      res.status(201).json({ success: true, data: loan });
+      return EmployeeLoanModel.getById(loanId, db);
     });
 
-    trx();
+    const loan = trx();
+    res.status(201).json({ success: true, data: loan });
   } catch (error: unknown) {
-    logger.error('Create loan error:', error);
-    res.status(500).json({ success: false, error: errorMessage(error) || 'Failed to create loan' });
+    handleBusinessError(res, error, 'Create employee loan', 'Failed to create loan', { success: true });
   }
 }
 
 function getLoanDetail(req: Request, res: Response): void {
   try {
-    const { id, loanId } = req.params;
+    const { loanId } = req.params;
     const parsedLoanId = parseInt(Array.isArray(loanId) ? loanId[0] : loanId, 10);
 
     const loan = EmployeeLoanModel.getById(parsedLoanId, db);
@@ -726,7 +739,7 @@ function repayLoan(req: Request, res: Response): void {
     const authReq = req as AuthRequest;
 
     const loan = EmployeeLoanModel.getById(parsedLoanId, db);
-    if (!loan) {
+    if (!loan || loan.employee_id !== employeeId || loan.voided_at) {
       res.status(404).json({ success: false, error: 'Loan not found' });
       return;
     }
@@ -736,7 +749,7 @@ function repayLoan(req: Request, res: Response): void {
     }
 
     const { amount, payment_date, payment_method, reference_no, notes, salary_payment_id } = req.body;
-    if (!amount || amount <= 0) {
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || roundCurrency(amount) <= 0) {
       res.status(422).json({ success: false, error: 'Valid amount is required' });
       return;
     }
@@ -762,12 +775,33 @@ function repayLoan(req: Request, res: Response): void {
     const employee = EmployeeModel.getById(employeeId, db);
 
     const trx = db.transaction(() => {
+      let repaymentMethod: string = payment_method || 'cash';
+      if (isSalaryDeduction) {
+        const salaryPayment = EmployeeModel.getSalaryPayment(Number(salary_payment_id), db);
+        if (!salaryPayment || salaryPayment.employee_id !== employeeId || salaryPayment.voided_at || salaryPayment.parent_payment_id) {
+          throw new BusinessRuleError(400, 'Salary deduction requires an active salary payment for this employee');
+        }
+        if (payment_date < salaryPayment.payment_date) {
+          throw new BusinessRuleError(400, 'Salary deduction cannot precede its salary payment');
+        }
+        if (payment_method && AccountingService._cashOrBankAccountCode(payment_method) !==
+            AccountingService._cashOrBankAccountCode(salaryPayment.payment_method)) {
+          throw new BusinessRuleError(400, 'Salary deduction must use the salary payment account');
+        }
+        const deducted = db.prepare<[number], { total: number }>(
+          'SELECT COALESCE(SUM(amount), 0) AS total FROM employee_loan_repayments WHERE salary_payment_id = ? AND voided_at IS NULL'
+        ).get(salaryPayment.id);
+        if (roundCurrency((deducted?.total ?? 0) + Number(amount)) > salaryPayment.amount) {
+          throw new BusinessRuleError(400, 'Salary deductions exceed the salary payment amount');
+        }
+        repaymentMethod = salaryPayment.payment_method;
+      }
       const repaymentId = EmployeeLoanModel.addRepayment({
         loan_id: parsedLoanId,
         employee_id: employeeId,
         amount,
         payment_date,
-        payment_method,
+        payment_method: repaymentMethod,
         reference_no,
         notes,
         repayment_type: repaymentType,
@@ -778,9 +812,8 @@ function repayLoan(req: Request, res: Response): void {
       // Deduct from loan balance
       EmployeeLoanModel.deductBalance(parsedLoanId, amount, db);
 
-      // Post GL entry only for direct repayments
       let journalEntryId: number | null = null;
-      if (!isSalaryDeduction && employee) {
+      if (employee) {
         try {
           const result = AccountingService.postLoanRepayment(db, {
             repaymentId,
@@ -789,7 +822,7 @@ function repayLoan(req: Request, res: Response): void {
             employeeCode: employee.employee_code,
             amount,
             paymentDate: payment_date,
-            paymentMethod: payment_method,
+            paymentMethod: repaymentMethod,
             userId: authReq.user?.id,
           });
           if (result) journalEntryId = result.journal_entry_id;
@@ -803,28 +836,25 @@ function repayLoan(req: Request, res: Response): void {
       }
 
       const updatedLoan = EmployeeLoanModel.getById(parsedLoanId, db);
-      res.status(201).json({
-        success: true,
-        data: {
-          id: repaymentId,
-          amount,
-          loan_balance: updatedLoan?.balance ?? 0,
-          loan_status: updatedLoan?.status ?? 'active',
-          journal_entry_id: journalEntryId,
-        },
-      });
+      return {
+        id: repaymentId,
+        amount,
+        loan_balance: updatedLoan?.balance ?? 0,
+        loan_status: updatedLoan?.status ?? 'active',
+        journal_entry_id: journalEntryId,
+      };
     });
 
-    trx();
+    const repayment = trx();
+    res.status(201).json({ success: true, data: repayment });
   } catch (error: unknown) {
-    logger.error('Repay loan error:', error);
-    res.status(500).json({ success: false, error: errorMessage(error) || 'Failed to record repayment' });
+    handleBusinessError(res, error, 'Repay employee loan', 'Failed to record repayment', { success: true });
   }
 }
 
 function writeOffLoan(req: Request, res: Response): void {
   try {
-    const { id, loanId } = req.params;
+    const { loanId } = req.params;
     const parsedLoanId = parseInt(Array.isArray(loanId) ? loanId[0] : loanId, 10);
     const authReq = req as AuthRequest;
 
@@ -867,7 +897,6 @@ function writeOffLoan(req: Request, res: Response): void {
         EmployeeLoanModel.updateJournalEntry(parsedLoanId, journalEntryId, db);
       }
 
-      const updatedLoan = EmployeeLoanModel.getById(parsedLoanId, db);
       res.json({
         success: true,
         data: {
@@ -889,7 +918,7 @@ function writeOffLoan(req: Request, res: Response): void {
 
 function deleteLoan(req: Request, res: Response): void {
   try {
-    const { id, loanId } = req.params;
+    const { loanId } = req.params;
     const parsedLoanId = parseInt(Array.isArray(loanId) ? loanId[0] : loanId, 10);
     const authReq = req as AuthRequest;
 
@@ -936,7 +965,8 @@ function voidLoanRepayment(req: Request, res: Response): void {
     const authReq = req as AuthRequest;
 
     const repayment = EmployeeLoanModel.getRepaymentById(parsedRepaymentId, db);
-    if (!repayment) {
+    const employeeId = parseInt(Array.isArray(id) ? id[0] : id, 10);
+    if (!repayment || repayment.loan_id !== parsedLoanId || repayment.employee_id !== employeeId) {
       res.status(404).json({ success: false, error: 'Repayment not found' });
       return;
     }
@@ -948,16 +978,11 @@ function voidLoanRepayment(req: Request, res: Response): void {
     AccountingService.assertPeriodNotClosed(db, repayment.payment_date, `Loan repayment ${parsedRepaymentId}`);
 
     const trx = db.transaction(() => {
-      // C5 (reversal-rules): void by reference unconditionally for direct
-      // repayments — legacy rows can carry a NULL journal link while their
-      // GL lines exist keyed by reference. Salary-deduction repayments
-      // never posted their own GL (the salary payment carries it).
-      if (repayment.repayment_type === 'direct') {
-        AccountingService.voidJournalLinesByReference(db, 'LOAN_REPAYMENT', parsedRepaymentId, {
-          voidedBy: authReq.user?.id,
-          voidReason: 'Repayment voided',
-        });
-      }
+      AccountingService.voidJournalLinesByReference(db, 'LOAN_REPAYMENT', parsedRepaymentId, {
+        voidedBy: authReq.user?.id,
+        voidReason: 'Repayment voided',
+      });
+      assertCashTimeline(db, { paymentMethod: repayment.payment_method, fromDate: repayment.payment_date });
 
       // Restore loan balance
       EmployeeLoanModel.restoreBalance(parsedLoanId, repayment.amount, db);
@@ -978,13 +1003,7 @@ function voidLoanRepayment(req: Request, res: Response): void {
 
     trx();
   } catch (error: unknown) {
-    const message = errorMessage(error) || 'Failed to void repayment';
-    if (message.includes('inside closed accounting period')) {
-      res.status(409).json({ success: false, error: message });
-      return;
-    }
-    logger.error('Void loan repayment error:', error);
-    res.status(500).json({ success: false, error: message });
+    handleBusinessError(res, error, 'Void loan repayment', 'Failed to void repayment', { success: true });
   }
 }
 

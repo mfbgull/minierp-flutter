@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
+import { assertCashTimeline } from '../services/cashBalanceGuard';
 import { getNextSequenceNumber } from '../utils/sequence';
 
 export interface OwnerCapitalFilters {
@@ -192,6 +193,8 @@ function update(
         paymentMethod: newMethod ?? undefined,
         userId: opts.userId,
       });
+      assertCashTimeline(db, { paymentMethod: existing.payment_method, fromDate: existing.capital_date });
+      assertCashTimeline(db, { paymentMethod: newMethod, fromDate: newDate });
     } else {
       db.prepare(`
         UPDATE owner_capital SET note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
@@ -219,6 +222,7 @@ function softVoid(
       voidedBy: opts.userId ?? null,
       voidReason: opts.reason || 'Owner capital voided',
     });
+    assertCashTimeline(db, { paymentMethod: existing.payment_method, fromDate: existing.capital_date });
     db.prepare(`
       UPDATE owner_capital SET status = 'voided', voided_at = CURRENT_TIMESTAMP,
         voided_by = ?, void_reason = ?, updated_at = CURRENT_TIMESTAMP

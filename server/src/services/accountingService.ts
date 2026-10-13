@@ -1045,7 +1045,7 @@ export class AccountingService {
     args: { accountId: number; amount: number; asOfDate: string; label?: string }
   ): void {
     const bal = AccountingService.getAccountBalance(db, args.accountId, args.asOfDate);
-    if (bal.balance < args.amount - 0.01) {
+    if (toMinorUnits(bal.balance) < toMinorUnits(args.amount)) {
       // Fresh shops seed opening_balances at 0 → every cash-out fails
       // before onboarding. Keep the guard (never bypass it) but make the
       // 400 actionable so the client can offer the opening-balance CTA.
@@ -1562,18 +1562,24 @@ export class AccountingService {
       paymentDate: string;
       paymentMethod?: string;
       userId?: number;
+      postingKind?: 'salary' | 'advance';
     }
   ): PostedEntry | null {
     if (!args.amount || args.amount <= 0) return null;
 
-    const wageAcct = AccountingService.getAccountByCode(db, '6100');
+    const wageCode = args.postingKind === 'advance' ? '1310' : '6100';
+    const wageAcct = AccountingService.getAccountByCode(db, wageCode);
     const cashCode = AccountingService._cashOrBankAccountCode(args.paymentMethod);
     const cashAcct = AccountingService.getAccountByCode(db, cashCode);
     if (!wageAcct || !cashAcct) {
       throw new Error(
-        `Chart of accounts is missing: 6100 (Wages & Salaries) or ${cashCode}`
+        `Chart of accounts is missing: ${wageCode} (Salary or Advance) or ${cashCode}`
       );
     }
+
+    AccountingService.assertSufficientFunds(db, {
+      accountId: cashAcct.id, amount: args.amount, asOfDate: args.paymentDate, label: 'Salary payment',
+    });
 
     return AccountingService.postEntry(db, {
       entry_date: args.paymentDate,
@@ -1617,6 +1623,10 @@ export class AccountingService {
         `Chart of accounts is missing: 1300 (Employee Loan Receivable) or ${cashCode}`
       );
     }
+
+    AccountingService.assertSufficientFunds(db, {
+      accountId: cashAcct.id, amount: args.amount, asOfDate: args.disbursementDate, label: 'Employee loan',
+    });
 
     return AccountingService.postEntry(db, {
       entry_date: args.disbursementDate,

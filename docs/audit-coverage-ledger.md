@@ -3,6 +3,7 @@
 One row per canonical finding from Part 0 of `audit/prompts.md` (65 rows), plus
 five IDs that appear in Part 3 or the CONSOLIDATED remediation table without
 their own Part 0 row: DB-004, DB-005/006/007/008, SALES-020, PRET-001, RET-008.
+The recovered owner-equity/payroll audit adds ACCT-013 and PAY-001 through PAY-004.
 
 **This file is the answer to "did we leave anything?"** It is generated from the
 audit, not from memory. `status` is one of `planned`, `in-progress`, `landed`,
@@ -11,7 +12,7 @@ every `won't-fix` row carries a reason. Nothing may be silently absent.
 
 ## Invariants this file must satisfy
 
-1. Every canonical ID from Part 0 appears exactly once. (65 Part-0 rows; 67 total)
+1. Every canonical ID from Part 0 appears exactly once. (65 Part-0 rows; 72 total including recovered findings)
 2. Every row resolves to a change or an explicit `won't-fix`.
 3. Every `deferred` row has a reason **and** a review date.
 4. No row is blank in both `change` and `status`.
@@ -27,12 +28,12 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 
 ## Summary
 
-- `landed`: **28**
+- `landed`: **33**
 - `planned`: **35**
 - `deferred`: **1**
 - `won't-fix`: **3**
-- Total rows: **67** (Part 0 = 65, plus DB-004, DB-005/006/007/008, SALES-020, PRET-001, RET-008)
-- Changes: **18**
+- Total rows: **72** (including five recovered owner-equity/payroll findings)
+- Changes: **19**
 
 ## Changes and what each closes
 
@@ -51,6 +52,7 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 | `ledger-single-derivation` | PUR-002 · PUR-004 · PUR-006 · SALES-007 · ACCT-004 · H-04 · SALES-017 · SALES-021 |
 | `live-data-repair` | PUR-016 |
 | `money-rounding-boundary` | PUR-009 · GL-003 · GL-006 |
+| `accounting-recovery` | ACCT-013 · PAY-001 · PAY-002 · PAY-003 · PAY-004 |
 | `period-protection-primitive` | PUR-003 · PUR-005 · SALES-011 · CODE-001 · ACCT-007 · GL-004 · SALES-013 |
 | `purchase-return-refund-void` | PRET-001 |
 | `reversal-symmetry` | PUR-001 · C-05 |
@@ -96,6 +98,11 @@ and SEC-002 (both CRITICAL, both verified reachable) fall out of the prior plan.
 | **ACCT-003** | MEDIUM-HIGH | `inventory-layer-truth` | batch-source-typing | a zero-cost adjustment batch is refused rather than silently understating COGS | `planned` | — |
 | **ACCT-004** | MEDIUM | `2026-10-08-ledger-single-derivation` (archived) | report-query-integrity | aging buckets foot to the total with a NULL due_date, in both getARAgingReport and getReceivablesSummary | `landed` | — |
 | **ACCT-007** | LOW-MEDIUM | `period-protection-primitive` | closed-period-immutability (new) | supplier-refund void in a closed period returns 409 | `planned` | — |
+| **ACCT-013** | HIGH | `accounting-recovery` | cash-inflow-reversal | capital edits/voids and customer receipt edits/voids reject any later negative daily cash balance and roll back every write | `landed` | D2; `cashInflowReversal.test.ts`, `auditRegression3Recovered.test.ts` |
+| **PAY-001** | HIGH | `accounting-recovery` | salary-advance-accounting | a 1,500 payout against 1,000 salary posts exactly 1,500 cash, 1,000 wages, and 500 advance receivable, with linked rows totaling 1,500 | `landed` | D3; `auditRegression3Recovered.test.ts`, `payrollRecoveryLifecycle.test.ts` |
+| **PAY-002** | HIGH | `accounting-recovery` | salary-advance-accounting | voiding the salary voids its linked advance and both GL postings atomically; child-only void is rejected | `landed` | D3; `payrollRecoveryLifecycle.test.ts` |
+| **PAY-003** | HIGH | `accounting-recovery` | payout-funds-guard | salary and employee-loan payouts exceeding available funds, including one cent, fail without partial writes | `landed` | D1; `payrollRecoveryLifecycle.test.ts` |
+| **PAY-004** | HIGH | `accounting-recovery` | employee-loan-reconciliation | salary deductions post Dr Cash / Cr 1300; cash reports and loan balances agree; salary and repayment voids reverse both records and GL | `landed` | D4; `auditRegression3Recovered.test.ts`, `payrollRecoveryLifecycle.test.ts` |
 | **C-01** | CRITICAL | `settlement-cash-integrity` | invoice-returns | voiding an adjust settlement voids the CREDIT_OFFSET group and does not free the cap | `landed` | — |
 | **C-02** | CRITICAL | `settlement-cash-integrity` | purchase-returns | refund_expected on a document with zero collected cash is refused | `landed` | — |
 | **C-04** | CRITICAL | `inventory-layer-truth` | batch-source-typing | with feature_batch_locations on, a purchase batch has location coverage; COGS uses the layer cost | `planned` | BLOCKED: inventory-batch-lot-spec is a BREAKING rewrite of batch_stock_by_location. Do not spec against the current substrate. |

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { getNextSequenceNumber } from '../utils/sequence';
 import ledgerUtils from '../utils/ledgerUtils';
 import AccountingService from '../services/accountingService';
+import { assertCashTimeline } from '../services/cashBalanceGuard';
 import { parseCurrency } from '../utils/currency';
 import SupplierLedgerModel from './SupplierLedger';
 import { isValidPaymentMethod } from '../services/cashService';
@@ -545,6 +546,11 @@ export class PaymentModel {
         }
       }
 
+      if (voidedLines > 0 && existing.customer_id && Number(existing.amount) > 0) {
+        assertCashTimeline(db, { paymentMethod: existing.payment_method, fromDate: existing.payment_date });
+        assertCashTimeline(db, { paymentMethod: finalPayment.payment_method, fromDate: finalPayment.payment_date });
+      }
+
       // H8: a date edit must also move the subledger row — otherwise the
       // ledger keeps posting on the old date while the payment row carries
       // the new one. Reverse the active PAYMENT row append-only and reissue
@@ -617,6 +623,9 @@ export class PaymentModel {
       // Cr AR, or supplier-side) must not survive as active orphans once
       // the payment is voided.
       AccountingService.voidJournalLinesByReference(db, 'PAYMENT', id);
+      if (existing.customer_id && Number(existing.amount) > 0) {
+        assertCashTimeline(db, { paymentMethod: existing.payment_method, fromDate: existing.payment_date });
+      }
 
       // C6 (reversal-rules): a payment moved money, so it is never
       // hard-deleted. Void the row and its allocations with attribution;

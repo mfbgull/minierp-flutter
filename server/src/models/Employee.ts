@@ -130,6 +130,7 @@ export type SalaryPaymentRow = {
   reference_no: string | null;
   notes: string | null;
   journal_entry_id: number | null;
+  parent_payment_id: number | null;
   status: 'paid' | 'cancelled';
   paid_by: number | null;
   voided_at: string | null;
@@ -514,13 +515,15 @@ class EmployeeModel {
     journal_entry_id?: number;
     paid_by?: number;
     payment_type?: string;
+    parent_payment_id?: number;
+    pay_period?: string;
   }, db: Database.Database): number {
     const payPeriod = data.payment_date.substring(0, 7); // YYYY-MM
     const result = db.prepare(`
       INSERT INTO salary_payments (
         employee_id, amount, payment_date, payment_method,
-        reference_no, notes, journal_entry_id, paid_by, pay_period, payment_type
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        reference_no, notes, journal_entry_id, paid_by, pay_period, payment_type, parent_payment_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.employee_id,
       data.amount,
@@ -530,8 +533,9 @@ class EmployeeModel {
       data.notes || null,
       data.journal_entry_id || null,
       data.paid_by || null,
-      payPeriod,
-      data.payment_type || 'full'
+      data.pay_period ?? payPeriod,
+      data.payment_type || 'full',
+      data.parent_payment_id ?? null
     );
     return result.lastInsertRowid as number;
   }
