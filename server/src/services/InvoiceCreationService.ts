@@ -7,6 +7,7 @@ import { PaymentRecordingService } from './PaymentRecordingService';
 import { addCurrency, computeInvoiceGrandTotal, parseCurrency, subtractCurrency } from '../utils/currency';
 import { isValidPaymentMethod } from './cashService';
 import { claimIdempotencyKey, findIdempotencyRecord } from '../utils/idempotency';
+import { assertLinesNotRetroactive } from './inventoryEffectiveDate';
 import { generateDocNo } from '../utils/sequence';
 import type {
   InvoiceCreationInput,
@@ -152,6 +153,14 @@ export class InvoiceCreationService {
       : input.dueDate;
 
     const transaction = this.db.transaction((): InvoiceCreationResult => {
+      // The closed-period rule is the stronger and more specific one, and it
+      // must keep precedence: a date inside a closed period is rejected as
+      // such even when it is also retroactive, otherwise the user is told
+      // about FIFO ordering when the real blocker is that the period is shut.
+      AccountingService.assertPeriodNotClosed(
+        this.db, input.invoiceDate, `Invoice dated ${input.invoiceDate}`,
+      );
+
       if (input.idempotency) {
         const existing = findIdempotencyRecord(this.db, input.idempotency.scope, input.idempotency.key);
         if (existing) {
@@ -207,8 +216,20 @@ export class InvoiceCreationService {
       const itemResults: InvoiceCreationItemResult[] = [];
       const consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }> = [];
       let cogsAmount = 0;
+
+      // ACCT-006: the warehouse each line will draw from is resolved first so
+      // the retroactivity guard can be applied per line BEFORE anything is
+      // consumed. Rejecting here rolls back the whole transaction, so a
+      // refusal leaves no partial stock, ledger or GL write behind.
+      const lineWarehouses: Array<{ itemId: number; warehouseId: number }> = [];
       for (const item of input.items) {
         const warehouseId = item.warehouse_id || input.warehouseId || InvoiceModel.findWarehouseForItem(this.db, item.item_id, item.quantity);
+        lineWarehouses.push({ itemId: item.item_id, warehouseId });
+      }
+
+      for (let li = 0; li < input.items.length; li++) {
+        const item = input.items[li];
+        const warehouseId = lineWarehouses[li].warehouseId;
         InvoiceModel.createInvoiceItem(this.db, invoiceId, {
           item_id: item.item_id,
           quantity: item.quantity,
@@ -218,7 +239,7 @@ export class InvoiceCreationService {
           discount_value: item.discount_value,
           amount: item.amount,
         });
-        const consumption = InvoiceModel.consumeFromOldestBatches(item.item_id, warehouseId, item.quantity, this.db);
+        const consumption = InvoiceModel.consumeFromOldestBatches(item.item_id, warehouseId, item.quantity, this.db, input.invoiceDate);
         const batchIds: Array<number | null> = [];
         for (const entry of consumption) {
           StockMovementModel.recordMovement({

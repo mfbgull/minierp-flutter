@@ -55,7 +55,7 @@ beforeAll(async () => {
   const wh = db.prepare('SELECT id FROM warehouses ORDER BY id LIMIT 1').get() as { id: number };
   warehouseId = wh.id;
   itemId = await createItem('H4 AR Return Item', token);
-  await purchaseStock(itemId, warehouseId, 200, 50, token);
+  await purchaseStock(itemId, warehouseId, 200, 50, token, '2026-01-01');
 });
 
 type AgingRow = {

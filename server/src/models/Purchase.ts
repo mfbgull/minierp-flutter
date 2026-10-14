@@ -9,6 +9,7 @@ import ledgerUtils from '../utils/ledgerUtils';
 import { requireSupplierForPurchase } from '../utils/purchaseValidation';
 import { roundQty } from '../utils/quantity';
 import { SqlParam } from '../utils/sqlTypes';
+import { assertInboundDateNotRetroactive } from '../services/inventoryEffectiveDate';
 
 interface Purchase {
   id: number;
@@ -178,6 +179,16 @@ class PurchaseModel {
     db: Database.Database
   ): Purchase {
     const { item_id, warehouse_id, quantity, unit_cost, purchase_date, invoice_no, remarks, expiry_date } = data;
+
+    // ACCT-006 D4: a receipt dated before an existing movement would insert a
+    // batch that becomes FIFO-oldest beneath sales already costed and posted,
+    // silently restating history the system cannot re-derive.
+    assertInboundDateNotRetroactive(db, {
+      itemId: item_id,
+      warehouseId: warehouse_id,
+      effectiveDate: purchase_date,
+      documentLabel: `Purchase dated ${purchase_date}`,
+    });
 
     const purchaseNo = this.generatePurchaseNo(db);
     const batchNo = this.generateBatchNo(db);

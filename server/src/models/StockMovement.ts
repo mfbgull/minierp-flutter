@@ -817,8 +817,11 @@ class StockMovementModel {
     itemId: number,
     warehouseId: number,
     quantity: number,
-    db: Database.Database
+    db: Database.Database,
+    asOfDate?: string
   ): Array<{ batchId: number | null; consumed: number; unitCost: number }> {
+    // Eligibility is judged as of the document date; absent one, today.
+    const asOf = asOfDate ?? new Date().toISOString().slice(0, 10);
     const roundedQty = roundQty(quantity);
     if (roundedQty <= 0) {
       throw new Error(`consumeFromOldestBatches: quantity must be positive, got ${roundedQty}`);
@@ -876,7 +879,7 @@ class StockMovementModel {
       // respecting per-location status_override (skip non-ACTIVE locations).
       const locationFilter = useFEFO
         ? `AND sb.halted = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'
-           AND (sb.expiry_date IS NULL OR sb.expiry_date >= date('now'))`
+           AND (sb.expiry_date IS NULL OR sb.expiry_date >= @asOf)`
         : `AND sb.halted = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'`;
 
       const batchRows = db.prepare(`
@@ -887,6 +890,7 @@ class StockMovementModel {
         JOIN locations l ON bsl.location_id = l.id
         WHERE sb.item_id = ? AND l.warehouse_id = ?
           AND bsl.quantity_available > 0
+          AND sb.received_date <= @asOf
           ${locationFilter}
         GROUP BY sb.id
         ORDER BY
@@ -894,7 +898,7 @@ class StockMovementModel {
           sb.expiry_date ASC,
           sb.received_date ASC,
           sb.id ASC
-      `).all(itemId, warehouseId) as Array<{
+      `).all(itemId, warehouseId, { asOf }) as Array<{
         id: number;
         unit_cost: number;
         received_date: string;
@@ -1006,13 +1010,14 @@ class StockMovementModel {
         FROM stock_batches
         WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
           AND (halted = 0 OR halted IS NULL)
-          AND (expiry_date IS NULL OR expiry_date >= date('now'))
+          AND received_date <= @asOf
+          AND (expiry_date IS NULL OR expiry_date >= @asOf)
         ORDER BY
           CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END,
           expiry_date ASC,
           received_date ASC,
           id ASC
-      `).all(itemId, warehouseId) as Array<{
+      `).all(itemId, warehouseId, { asOf }) as Array<{
         id: number;
         quantity_remaining: number;
         unit_cost: number;
@@ -1031,8 +1036,9 @@ class StockMovementModel {
         SELECT id, quantity_remaining, unit_cost
         FROM stock_batches
         WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+          AND received_date <= @asOf
         ORDER BY received_date ASC, id ASC
-      `).all(itemId, warehouseId) as Array<{
+      `).all(itemId, warehouseId, { asOf }) as Array<{
         id: number;
         quantity_remaining: number;
         unit_cost: number;

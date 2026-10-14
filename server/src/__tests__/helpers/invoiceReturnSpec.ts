@@ -85,6 +85,7 @@ let stockSupplierId: number | undefined;
 
 export async function purchaseStock(
   itemId: number, warehouseId: number, quantity: number, unitCost: number, authCookie: string,
+  purchaseDate = '2026-09-01',
 ): Promise<void> {
   if (stockSupplierId === undefined) {
     const existing = db.prepare(
@@ -103,7 +104,7 @@ export async function purchaseStock(
       warehouse_id: warehouseId,
       quantity,
       unit_cost: unitCost,
-      purchase_date: '2026-09-01',
+      purchase_date: purchaseDate,
       supplier_id: stockSupplierId,
     });
   if (res.status !== 201 && res.status !== 200) {
