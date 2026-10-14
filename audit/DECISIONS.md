@@ -147,3 +147,35 @@ The following records the seven decisions agreed for the current MiniERP work. T
   outputs whose item actually tracks expiry. Regression test:
   `auditRegression9` "stamps the expiry date only on outputs that track expiry".
   Note this is production-specific: purchases set expiry per line, which is user intent.
+
+---
+
+## D11 — D6 post-review: two corrections to D10
+
+**Reference:** D6 verification pass (joint-production cost preview + batch-expiry audit)
+
+D10's two conclusions below were reasoned but not yet verified end to end. Both are
+now superseded. Neither changes a server accounting or allocation rule.
+
+- **D10 "cost-per-unit tile" is corrected.** D10 fixed the divisor from *the primary's
+  quantity* to *all output units*, which removed one contradiction but introduced a worse
+  one: a joint run can mix units of measure, so `totalCost / Σ quantities` is neither
+  co-product's unit cost. Measured case — 10 Litre of oil + 50 kg of cake, pool 1,000:
+  the tile showed **16.67** while the allocation table beneath it correctly showed oil at
+  **100.00** and cake at **0.00**. The tile is now omitted for multi-output runs and the
+  allocation table is the sole source of a per-unit figure. Single-output runs are
+  unchanged. The allocation **rule** (relative sales value, quantity fallback, last line
+  absorbs the remainder) is untouched on both client and server.
+- **D10 "purchases set expiry per line, which is user intent" is rejected.** The guard was
+  applied to production only, leaving purchase, goods receipt and the batch PATCH endpoint
+  free to stamp an expiry date on an item with `has_expiry = 0`. That is not harmless user
+  intent, because the sweep's own gate is `has_expiry`: the stray date sits inert until
+  someone switches expiry tracking on for that item, at which point **every** such
+  historical batch becomes sweep-eligible and is relocated to the EXPIRED warehouse in a
+  single boot. `expiryDetection.test.ts` already demonstrates that flip. Until then the
+  batches also surface on the expiry report as goods that never expire.
+  The invariant now lives in one place — `ItemModel.batchExpiryDate` — and every batch
+  write routes through it. A missing item row counts as "does not track expiry" so the
+  sweep's LEFT JOIN still surfaces such batches loudly instead of dropping them.
+  This is the "fix the source, not the symptom" rule: D10 guarded one caller while three
+  others still produced the bad data.
