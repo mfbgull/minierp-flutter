@@ -27,6 +27,15 @@ openspec/
 # is commented out by default.
 #.vscode/
 
+# Editor/backup droppings — never sources (two stale *.dart.bak files
+# were tracked until 2026-10; the .bak suffix keeps them inert but they
+# still showed up in diffs and file navigation).
+*.bak
+
+# Jest per-file temp databases (server/src/__tests__/setup.ts). Rooted here
+# instead of os.tmpdir() so a runaway run is recoverable by deleting one dir.
+.tmp-test/
+
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id

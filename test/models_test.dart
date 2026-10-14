@@ -525,6 +525,61 @@ void main() {
       expect(input.quantity, 8.5);
       expect(input.warehouseName, 'RM Warehouse');
     });
+
+    test('parses detail outputs (D6 joint products)', () {
+      final p = Production.fromJson({
+        'id': 9,
+        'production_no': 'PROD-2026-011',
+        'output_item_id': 5,
+        'output_quantity': 10,
+        'warehouse_id': 1,
+        'production_date': '2026-09-12',
+        'outputs': [
+          {
+            'id': 1,
+            'production_id': 9,
+            'item_id': 5,
+            'quantity': 10,
+            'unit_cost': 100,
+            'allocated_cost': 1000,
+            'item_code': 'OIL-005',
+            'item_name': 'Mustard Oil',
+            'unit_of_measure': 'Litre',
+          },
+          {
+            'id': 2,
+            'production_id': 9,
+            'item_id': 6,
+            'quantity': 50,
+            'unit_cost': 10,
+            'allocated_cost': 500,
+            'item_code': 'CAKE-006',
+            'item_name': 'Mustard Cake',
+            'unit_of_measure': 'kg',
+          },
+        ],
+      });
+      expect(p.outputs, hasLength(2));
+      final cake = p.outputs[1];
+      expect(cake.itemId, 6);
+      expect(cake.quantity, 50);
+      expect(cake.unitCost, 10);
+      expect(cake.allocatedCost, 500);
+      expect(cake.itemCode, 'CAKE-006');
+      expect(cake.unitOfMeasure, 'kg');
+    });
+
+    test('outputs default to empty on a list row', () {
+      final p = Production.fromJson({
+        'id': 10,
+        'production_no': 'PROD-2026-012',
+        'output_item_id': 5,
+        'output_quantity': 4,
+        'warehouse_id': 1,
+        'production_date': '2026-09-13',
+      });
+      expect(p.outputs, isEmpty);
+    });
   });
 
   group('Bom', () {

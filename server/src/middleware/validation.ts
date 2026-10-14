@@ -8,6 +8,53 @@ import { z } from 'zod';
 /**
  * Common Zod validation schemas for reuse across controllers
  */
+/**
+ * ACCT-006: a date string that reaches a journal entry must name a day that
+ * actually exists. `2026-13-45` passed a bare `.min(1)` and then produced an
+ * accounting period literally named "2026-13".
+ */
+export const MAX_DOCUMENT_YEAR = new Date().getUTCFullYear() + 1;
+
+export const documentDate = (field: string) =>
+  z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: `${field} must be YYYY-MM-DD` })
+    .refine((value) => {
+      const parsed = new Date(`${value}T00:00:00Z`);
+      return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+    }, { message: `${field} is not a real calendar date` })
+    .refine((value) => Number(value.slice(0, 4)) <= MAX_DOCUMENT_YEAR, {
+      message: `${field} is implausibly far in the future`,
+    });
+
+/** ACCT-007: money in a document is bounded and positive, tax and discount included. */
+export const MAX_DOCUMENT_MONEY = 1_000_000_000;
+
+const money = (field: string, { allowZero = false } = {}) =>
+  z.number().refine((v) => (allowZero ? v >= 0 : v > 0), {
+    message: `${field} must be ${allowZero ? 'zero or' : ''} positive`,
+  }).refine((v) => v <= MAX_DOCUMENT_MONEY, { message: `${field} is implausibly large` });
+
+/**
+ * ACCT-007: invoice items were `z.array(z.any())`, so nothing bounded them.
+ * A negative tax_rate posted as extra revenue, a 500% rate was accepted, a
+ * zero price was accepted, and a percentage discount above 100 silently
+ * clamped the total to zero while COGS was still posted.
+ */
+export const invoiceLine = z.object({
+  item_id: z.union([z.number(), z.string()]).refine((v) => String(v).length > 0, { message: 'Required' }),
+  quantity: z.union([z.number(), z.string()]).refine((v) => Number(v) > 0, { message: 'Must be positive' }),
+  unit_price: money('unit_price'),
+  tax_rate: z.number().min(0).max(100).optional(),
+  discount_type: z.enum(['none', 'percentage', 'flat']).optional(),
+  discount_value: z.number().min(0).optional(),
+}).passthrough().superRefine((line, ctx) => {
+  if (line.discount_type === 'percentage' && Number(line.discount_value ?? 0) > 100) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'percentage discount cannot exceed 100' });
+  }
+  if ((line.discount_value ?? 0) !== 0 && line.discount_type === 'none') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'discount_value requires a discount_type' });
+  }
+});
+
 export const zodSchemas = {
   pagination: z.object({
     page: z.string().regex(/^\d+$/).default('1').transform(Number),
@@ -103,19 +150,20 @@ export const zodBodySchemas = {
 
   invoiceCreate: z.object({
     customer_id: z.union([z.number(), z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
-    invoice_date: z.string().min(1),
-    items: z.array(z.any()).min(1),
+    invoice_date: documentDate('invoice_date'),
+    due_date: documentDate('due_date').optional(),
+    items: z.array(invoiceLine).min(1),
   }).passthrough(),
 
   paymentCreate: z.object({
-    payment_date: z.string().min(1),
+    payment_date: documentDate('payment_date'),
     amount: z.union([z.number(), z.string()]),
   }).passthrough(),
 
   expenseCreate: z.object({
     expense_category: z.string().min(1),
     amount: z.union([z.number(), z.string()]),
-    expense_date: z.string().min(1),
+    expense_date: documentDate('expense_date'),
   }).passthrough(),
 
   expenseCategoryCreate: z.object({
@@ -173,7 +221,7 @@ export const zodBodySchemas = {
   // POS
   posSale: z.object({
     warehouse_id: z.union([z.number(), z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
-    sale_date: z.string().min(1),
+    sale_date: documentDate('sale_date'),
     items: z.array(z.object({
       item_id: z.number().int().positive(),
       quantity: z.number().positive(),
@@ -196,12 +244,19 @@ export const zodBodySchemas = {
     })).max(10).optional(),
   }).passthrough(),
 
-  // Production
+  // Production — D6: either the legacy single output (output_item_id +
+  // output_quantity) or the joint-product `outputs` array. The cross-field
+  // "at least one shape" rule is enforced in the controller, which knows
+  // both fields; here each field that IS present must be well-formed.
   productionCreate: z.object({
-    output_item_id: z.union([z.number(), z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
-    output_quantity: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+    output_item_id: z.union([z.number(), z.string()]).optional(),
+    output_quantity: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }).optional(),
+    outputs: z.array(z.object({
+      item_id: z.union([z.number(), z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
+      quantity: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
+    })).min(1, { message: 'At least one output is required' }).optional(),
     warehouse_id: z.union([z.number(), z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
-    production_date: z.string().min(1),
+    production_date: documentDate('production_date'),
     input_items: z.array(z.any()).min(1),
   }).passthrough(),
 
@@ -257,12 +312,12 @@ export const zodBodySchemas = {
   personalLoanCreate: z.object({
     borrower_name: z.string().min(1),
     amount: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
-    loan_date: z.string().min(1),
+    loan_date: documentDate('loan_date'),
   }).passthrough(),
 
   repaymentCreate: z.object({
     amount: z.union([z.number(), z.string()]).refine(v => Number(v) > 0, { message: 'Must be positive' }),
-    payment_date: z.string().min(1),
+    payment_date: documentDate('payment_date'),
   }).passthrough(),
 
   // Dashboard

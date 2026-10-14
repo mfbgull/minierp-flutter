@@ -58,13 +58,24 @@ export function runExpiryDetection(db: Database.Database): {
   //    idx_stock_movements_batch_type, both created by the Phase 1 migration).
   //    Replaces the old invalid `status NOT IN (...)` filter — batch status
   //    is derived, not stored; idempotency comes from the movement ledger.
+  //    Gated on items.has_expiry: only goods that DECLARE expiry tracking may
+  //    be auto-swept. Without this, any batch carrying a date (e.g. a joint
+  //    production's co-product, before D6 stamped expiry per-line) would be
+  //    moved to EXPIRED even though the item never expires.
+  //
+  //    LEFT JOIN + `i.id IS NULL OR ...`: a batch whose item row is MISSING
+  //    must stay in the candidate list so it fails loudly in the per-batch
+  //    handler below. An INNER JOIN would quietly drop it, turning a
+  //    surfaced integrity error into a silent no-op.
   const candidates = db.prepare(`
     SELECT sb.id, sb.batch_no, sb.item_id, sb.warehouse_id,
            sb.quantity_remaining, sb.unit_cost, sb.expiry_date
     FROM stock_batches sb
+    LEFT JOIN items i ON i.id = sb.item_id
     WHERE sb.expiry_date < ?
       AND sb.quantity_remaining > 0
       AND sb.warehouse_id <> ?
+      AND (i.id IS NULL OR COALESCE(i.has_expiry, 0) = 1)
       AND NOT EXISTS (
         SELECT 1 FROM stock_movements sm
         WHERE sm.batch_id = sb.id AND sm.movement_type = 'EXPIRY_TRANSFER'

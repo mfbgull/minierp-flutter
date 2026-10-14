@@ -11,6 +11,14 @@
 // line qty × outputQuantity / bomQuantity. The lines stay
 // "BOM-derived" — the preview rescales on output-qty changes — until
 // the user edits a line by hand.
+//
+// D6 joint products: additional output lines can be added under the
+// primary one (e.g. mustard oil + mustard cake). With any extra line
+// the payload switches to the server's `outputs: [...]` shape; with
+// none it stays the legacy single-output shape, so existing
+// single-product productions are unchanged. The BOM still has to match
+// the PRIMARY output — the server checks `finished_item_id` against
+// `output_item_id`, which is the first line.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -52,6 +60,20 @@ class _BomInputRow {
   final num available;
 }
 
+/// One additional (joint-product) output line of the production form —
+/// D6. The primary output keeps its own dedicated fields so a
+/// single-product production posts the legacy payload unchanged.
+class _ExtraOutputLine {
+  _ExtraOutputLine();
+
+  /// Picked item; null until chosen.
+  int? itemId;
+
+  final quantityController = TextEditingController();
+
+  num get quantity => double.tryParse(quantityController.text) ?? 0;
+}
+
 /// Opens the record-production form dialog.
 Future<void> showProductionFormDialog(BuildContext context) {
   return showDialog<void>(
@@ -83,6 +105,9 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
   /// output item tracks expiry).
   DateTime? _expiryDate;
 
+  /// D6 — additional (joint-product) output lines beyond the primary one.
+  final List<_ExtraOutputLine> _extraOutputs = [];
+
   /// The selected BOM's detail (material lines) — fetched on pick.
   BomDetail? _bomDetail;
   late DateTime _productionDate;
@@ -102,6 +127,9 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
     _quantityController.dispose();
     _overheadController.dispose();
     _remarksController.dispose();
+    for (final line in _extraOutputs) {
+      line.quantityController.dispose();
+    }
     super.dispose();
   }
 
@@ -120,6 +148,18 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
   num get _overhead => double.tryParse(_overheadController.text) ?? 0;
 
   num get _outputQuantity => double.tryParse(_quantityController.text) ?? 0;
+
+  /// D6: every output unit this run yields — the primary plus the
+  /// co-products. The cost preview's per-unit figure spreads the joint
+  /// cost over ALL of them; dividing by the primary quantity alone would
+  /// contradict the allocation table below it.
+  num get _totalOutputQuantity {
+    var total = _outputQuantity;
+    for (final line in _completeExtraOutputs) {
+      total += line.quantity;
+    }
+    return total;
+  }
 
   /// The BOM-derived material needs, scaled to [outputQuantity]
   /// (empty until a BOM is selected).
@@ -191,7 +231,7 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
           ),
       ],
       overhead: _overhead,
-      outputQuantity: _outputQuantity,
+      outputQuantity: _totalOutputQuantity,
     );
   }
 
@@ -203,6 +243,68 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
     available: _availableByItem,
     nameOf: (id) => _itemById(id)?.itemName ?? '$id',
   );
+
+  // ── D6 joint-product outputs ───────────────────────────────
+
+  /// The extra lines that are ready to submit (item picked + positive
+  /// quantity). Incomplete rows are ignored here and flagged by the
+  /// per-row validator instead.
+  List<_ExtraOutputLine> get _completeExtraOutputs => [
+    for (final line in _extraOutputs)
+      if (line.itemId != null && line.quantity > 0) line,
+  ];
+
+  /// Every output item id in submit order — the primary first, then the
+  /// extras. Duplicates are rejected server-side, so the form flags them
+  /// before submit.
+  List<int> get _outputItemIds => [
+    ?_outputItemId,
+    for (final line in _completeExtraOutputs) line.itemId!,
+  ];
+
+  /// Mirrors the server's D6 output guards (unique items, never an item
+  /// produced from itself) so the user sees them before the round trip.
+  /// Returns null when the outputs are valid.
+  String? get _outputsValidationError {
+    final seen = <int>{};
+    final inputIds = _needs.map((n) => n.itemId).toSet();
+    for (final id in _outputItemIds) {
+      if (!seen.add(id)) return _l10n.productionOutputduplicate;
+      if (inputIds.contains(id)) return _l10n.productionOutputisinput;
+    }
+    return null;
+  }
+
+  /// Advisory split of the joint cost across every output line by
+  /// relative sales value — mirrors the server's allocation so the form
+  /// can preview it. The server recomputes the actuals.
+  List<ProductionOutputAllocation> get _allocations {
+    final lines = <ProductionOutputLine>[
+      if (_outputItemId != null)
+        ProductionOutputLine(
+          itemId: _outputItemId!,
+          quantity: _outputQuantity,
+          salesPrice: _itemById(_outputItemId!)?.standardSellingPrice ?? 0,
+        ),
+      for (final line in _completeExtraOutputs)
+        ProductionOutputLine(
+          itemId: line.itemId!,
+          quantity: line.quantity,
+          salesPrice: _itemById(line.itemId!)?.standardSellingPrice ?? 0,
+        ),
+    ];
+    return allocateJointCost(outputs: lines, totalCost: _preview.totalCost);
+  }
+
+  void _addExtraOutput() {
+    setState(() => _extraOutputs.add(_ExtraOutputLine()));
+  }
+
+  void _removeExtraOutput(int index) {
+    final removed = _extraOutputs.removeAt(index);
+    removed.quantityController.dispose();
+    setState(() {});
+  }
 
   /// Loads the selected BOM's detail (`GET /boms/:id` — the list rows
   /// carry only aggregates) and applies it when its output matches the
@@ -298,15 +400,41 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
       return;
     }
 
+    // D6: a half-filled extra row (item picked, no quantity) would post
+    // a zero-quantity line — block it with a row-level message.
+    for (final line in _extraOutputs) {
+      if (line.itemId != null && line.quantity <= 0) {
+        setState(() => _error = _l10n.productionErrorOutputquantityrequired);
+        return;
+      }
+    }
+    // D6: mirror the server's output guards (unique, never an input).
+    final outputsError = _outputsValidationError;
+    if (outputsError != null) {
+      setState(() => _error = outputsError);
+      return;
+    }
+
     setState(() {
       _submitting = true;
       _error = null;
     });
 
     final remarks = _remarksController.text.trim();
+    final extras = _completeExtraOutputs;
     final payload = <String, dynamic>{
-      'output_item_id': _outputItemId,
-      'output_quantity': _outputQuantity,
+      // D6: with joint products the payload switches to the `outputs[]`
+      // shape; otherwise the legacy single-output fields are sent so
+      // existing productions are untouched.
+      if (extras.isEmpty) ...{
+        'output_item_id': _outputItemId,
+        'output_quantity': _outputQuantity,
+      } else
+        'outputs': [
+          {'item_id': _outputItemId, 'quantity': _outputQuantity},
+          for (final line in extras)
+            {'item_id': line.itemId, 'quantity': line.quantity},
+        ],
       'warehouse_id': _warehouseId,
       if (_rawMaterialsWarehouseId != null)
         'raw_materials_warehouse_id': _rawMaterialsWarehouseId,
@@ -498,6 +626,91 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
                         ),
                       ],
                       const SizedBox(height: 12),
+                      // ── D6: additional (joint-product) outputs ───
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l10n.productionAdditionaloutputs,
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: _submitting ? null : _addExtraOutput,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: Text(l10n.productionAddoutput),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      if (_extraOutputs.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Text(
+                            l10n.productionAdditionaloutputshint,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        )
+                      else ...[
+                        for (var i = 0; i < _extraOutputs.length; i++)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  flex: 2,
+                                  child: SearchableSelect<int>(
+                                    items: [for (final it in outputItems) it.id],
+                                    selected: _extraOutputs[i].itemId,
+                                    labelBuilder: (id) {
+                                      for (final it in outputItems) {
+                                        if (it.id == id) return _itemLabel(it);
+                                      }
+                                      return '$id';
+                                    },
+                                    validator: (v) =>
+                                        v == null ? l10n.commonRequired : null,
+                                    onChanged: (value) => setState(
+                                      () => _extraOutputs[i].itemId = value,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                SizedBox(
+                                  width: 150,
+                                  child: TextFormField(
+                                    controller: _extraOutputs[i]
+                                        .quantityController,
+                                    enabled: !_submitting,
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                    decoration: deco(),
+                                    validator: (v) =>
+                                        (double.tryParse(v ?? '') ?? -1) > 0
+                                        ? null
+                                        : l10n.commonRequired,
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: l10n.commonDelete,
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: _submitting
+                                      ? null
+                                      : () => _removeExtraOutput(i),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                      const SizedBox(height: 12),
                       // ── Warehouses + BOM ───────────────────────
                       Row(
                         children: [
@@ -651,6 +864,22 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
                       ),
                       const SizedBox(height: 8),
                       _CostPreviewRow(preview: preview, l10n: l10n),
+                      // D6: with joint products the client previews the
+                      // relative-sales-value split (the server recomputes
+                      // the actuals from its own prices).
+                      if (_allocations.length > 1) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          l10n.productionAllocationtitle,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 6),
+                        _AllocationTable(
+                          allocations: _allocations,
+                          nameOf: (id) => _itemById(id)?.itemName ?? '$id',
+                          uomOf: (id) => _itemById(id)?.unitOfMeasure ?? '',
+                        ),
+                      ],
                       const SizedBox(height: 12),
                     ],
                   ),
@@ -867,6 +1096,72 @@ class _CostPreviewRow extends StatelessWidget {
           Formatters.currency(preview.costPerUnit),
         ),
       ],
+    );
+  }
+}
+
+/// D6 joint-cost allocation preview — one row per output showing its
+/// share of the batch cost split by relative sales value. Advisory only:
+/// the server recomputes the allocation from its own price data inside
+/// the transaction.
+class _AllocationTable extends StatelessWidget {
+  const _AllocationTable({
+    required this.allocations,
+    required this.nameOf,
+    required this.uomOf,
+  });
+
+  final List<ProductionOutputAllocation> allocations;
+  final String Function(int itemId) nameOf;
+  final String Function(int itemId) uomOf;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: AppBorderRadius.smRadius,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowHeight: 36,
+          dataRowMinHeight: 38,
+          dataRowMaxHeight: 44,
+          columnSpacing: 28,
+          columns: [
+            DataColumn(
+              label: Text(l10n.fieldsItem),
+              columnWidth: const FixedColumnWidth(220),
+            ),
+            DataColumn(label: Text(l10n.purchasesQuantitycol), numeric: true),
+            DataColumn(label: Text(l10n.commonUom)),
+            DataColumn(
+              label: Text(l10n.productionAllocatedcost),
+              numeric: true,
+            ),
+            DataColumn(
+              label: Text(l10n.productionCostperunit),
+              numeric: true,
+            ),
+          ],
+          rows: [
+            for (final a in allocations)
+              DataRow(
+                cells: [
+                  DataCell(Text(nameOf(a.itemId), overflow: TextOverflow.ellipsis)),
+                  DataCell(Text(Formatters.number(a.quantity))),
+                  DataCell(Text(uomOf(a.itemId))),
+                  DataCell(Text(Formatters.currency(a.allocatedCost))),
+                  DataCell(Text(Formatters.currency(a.unitCost))),
+                ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

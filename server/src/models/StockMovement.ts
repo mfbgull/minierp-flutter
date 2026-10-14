@@ -1451,7 +1451,19 @@ class StockMovementModel {
    * Idempotency: refuses a batch that already has a WRITE_OFF movement.
    */
   static writeOffBatch(
-    args: { batchId: number; expiredWarehouseId: number; reason: string; lossAccountCode: string },
+    args: {
+      batchId: number;
+      /** Warehouse the written-off batch ends up in: EXPIRED or DAMAGED. */
+      targetWarehouseId: number;
+      /**
+       * WO-002: 'expired' still requires a past expiry date; 'damaged'
+       * accepts any batch, so stock with no expiry at all can be written
+       * off after a damage transfer.
+       */
+      disposition: 'expired' | 'damaged';
+      reason: string;
+      lossAccountCode: string;
+    },
     userId: number,
     db: Database.Database
   ): { movementNo: string; journalEntryId: number | null; transferred: boolean; qty: number; value: number } {
@@ -1468,19 +1480,27 @@ class StockMovementModel {
       } | undefined;
 
       if (!batch) throw new Error(`Batch ${args.batchId} not found`);
-      if (!batch.expiry_date || batch.expiry_date >= today) {
+      if (args.disposition === 'expired' && (!batch.expiry_date || batch.expiry_date >= today)) {
         throw new Error(`Batch ${batch.batch_no} is not expired (expiry ${batch.expiry_date ?? 'none'})`);
       }
 
-      // 1. Auto-transfer to EXPIRED when the batch is still elsewhere.
+      // 1. Auto-transfer to the disposition warehouse when the batch is
+      //    still elsewhere (EXPIRY_TRANSFER for expired, DAMAGE_TRANSFER
+      //    for damaged — each keeps its own movement-type audit trail).
       let targetBatchId = batch.id;
       let transferred = false;
-      if (batch.warehouse_id !== args.expiredWarehouseId) {
-        const transfer = this.recordExpiryTransfer(
-          { batchId: batch.id, toWarehouseId: args.expiredWarehouseId },
-          userId,
-          db
-        );
+      if (batch.warehouse_id !== args.targetWarehouseId) {
+        const transfer = args.disposition === 'damaged'
+          ? this.recordDamageTransfer(
+              { batchId: batch.id, toWarehouseId: args.targetWarehouseId },
+              userId,
+              db
+            )
+          : this.recordExpiryTransfer(
+              { batchId: batch.id, toWarehouseId: args.targetWarehouseId },
+              userId,
+              db
+            );
         targetBatchId = transfer.mirrorBatchId;
         transferred = true;
       }
@@ -1512,7 +1532,7 @@ class StockMovementModel {
       const remarks = `[WRITE_OFF] reason=${args.reason} gl=${args.lossAccountCode} batch=${batch.batch_no}`;
       const movement = this.recordMovement({
         item_id: batch.item_id,
-        warehouse_id: args.expiredWarehouseId,
+        warehouse_id: args.targetWarehouseId,
         movement_type: 'WRITE_OFF',
         quantity: -qty,
         unit_cost: unitCost || undefined,

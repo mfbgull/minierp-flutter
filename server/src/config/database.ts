@@ -1963,6 +1963,12 @@ runLedgered('fn.verifyProductionOverheadPayableAccount', () => {
   }
 });
 
+// D6: joint production. Output lines move to production_outputs so one
+// production can yield several items (mustard oil + mustard cake) with the
+// joint cost split by relative sales value. Backfills legacy single-output
+// productions with their one line.
+runLedgered('add-production-outputs.sql');
+
 // Invoice Returns (invoice-return-spec.md Milestone 1): first-class return
 // documents — invoice_returns / invoice_return_items / return_settlements.
 // FK-free on purpose (SQLite FKs to invoices/customers/users already exist),

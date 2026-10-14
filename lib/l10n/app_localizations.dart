@@ -9146,6 +9146,60 @@ abstract class AppLocalizations {
   /// **'Insufficient stock for these inputs'**
   String get productionShortfallTitle;
 
+  /// No description provided for @productionAdditionaloutputs.
+  ///
+  /// In en, this message translates to:
+  /// **'Additional Outputs (joint products)'**
+  String get productionAdditionaloutputs;
+
+  /// No description provided for @productionAddoutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Add output'**
+  String get productionAddoutput;
+
+  /// No description provided for @productionAdditionaloutputshint.
+  ///
+  /// In en, this message translates to:
+  /// **'A production can yield more than one item — add the co-products here (e.g. mustard cake beside mustard oil). Leave empty for a single-product run.'**
+  String get productionAdditionaloutputshint;
+
+  /// No description provided for @productionAllocatedcost.
+  ///
+  /// In en, this message translates to:
+  /// **'Allocated Cost'**
+  String get productionAllocatedcost;
+
+  /// No description provided for @productionAllocationtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost Allocation (by relative sales value)'**
+  String get productionAllocationtitle;
+
+  /// No description provided for @productionOutputduplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Each output item may appear only once'**
+  String get productionOutputduplicate;
+
+  /// No description provided for @productionOutputisinput.
+  ///
+  /// In en, this message translates to:
+  /// **'An item cannot be both an output and an input'**
+  String get productionOutputisinput;
+
+  /// No description provided for @productionOutputs.
+  ///
+  /// In en, this message translates to:
+  /// **'Outputs'**
+  String get productionOutputs;
+
+  /// No description provided for @productionErrorOutputquantityrequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Every output needs a quantity'**
+  String get productionErrorOutputquantityrequired;
+
   /// No description provided for @purchaseordersAdditem.
   ///
   /// In en, this message translates to:

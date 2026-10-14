@@ -5,7 +5,7 @@ import 'json_helpers.dart';
 /// `ProductionModel` shapes:
 ///
 /// - `GET /productions` → bare `[Production]` (list rows)
-/// - `GET /productions/:id` → bare `Production` (adds `inputs`)
+/// - `GET /productions/:id` → bare `Production` (adds `inputs` + `outputs`)
 /// - `POST /productions` → bare `Production` (201)
 /// - `DELETE /productions/:id` → `{success, message}`
 ///
@@ -57,6 +57,55 @@ class ProductionInput {
   final String? warehouseName;
 }
 
+/// One output line of a production run (`production_outputs` row joined
+/// with item) — D6 joint products.
+///
+/// A legacy single-output production carries exactly one line; the
+/// server backfilled those rows in the migration, so `outputs` is never
+/// empty on the detail payload. The joint cost (materials + overhead)
+/// is allocated server-side by relative sales value; `allocatedCost` /
+/// `unitCost` are actuals, never client-computed.
+class ProductionOutput {
+  const ProductionOutput({
+    required this.id,
+    required this.productionId,
+    required this.itemId,
+    required this.quantity,
+    this.unitCost = 0,
+    this.allocatedCost = 0,
+    this.itemCode = '',
+    this.itemName = '',
+    this.unitOfMeasure,
+  });
+
+  factory ProductionOutput.fromJson(Map<String, dynamic> json) =>
+      ProductionOutput(
+        id: asInt(json['id']) ?? 0,
+        productionId: asInt(json['production_id']) ?? 0,
+        itemId: asInt(json['item_id']) ?? 0,
+        quantity: asNum(json['quantity']) ?? 0,
+        unitCost: asNum(json['unit_cost']) ?? 0,
+        allocatedCost: asNum(json['allocated_cost']) ?? 0,
+        itemCode: asString(json['item_code']) ?? '',
+        itemName: asString(json['item_name']) ?? '',
+        unitOfMeasure: asString(json['unit_of_measure']),
+      );
+
+  final int id;
+  final int productionId;
+  final int itemId;
+  final num quantity;
+
+  /// This line's share of the joint cost (`allocated_cost / quantity`).
+  final num unitCost;
+
+  /// Share of the joint cost allocated by relative sales value.
+  final num allocatedCost;
+  final String itemCode;
+  final String itemName;
+  final String? unitOfMeasure;
+}
+
 /// One production run — the row of `GET /productions` / detail.
 class Production {
   const Production({
@@ -87,6 +136,7 @@ class Production {
     this.rawMaterialsWarehouseName,
     this.createdByUsername,
     this.inputs = const [],
+    this.outputs = const [],
   });
 
   factory Production.fromJson(Map<String, dynamic> json) => Production(
@@ -122,6 +172,12 @@ class Production {
               if (row is Map<String, dynamic>) ProductionInput.fromJson(row),
           ]
         : const [],
+    outputs: json['outputs'] is List
+        ? [
+            for (final row in json['outputs'] as List)
+              if (row is Map<String, dynamic>) ProductionOutput.fromJson(row),
+          ]
+        : const [],
   );
 
   final int id;
@@ -155,4 +211,8 @@ class Production {
 
   /// Detail payload only — raw material consumption lines.
   final List<ProductionInput> inputs;
+
+  /// Detail payload only — the output split (D6). One line for a
+  /// single-output production, one per joint product otherwise.
+  final List<ProductionOutput> outputs;
 }

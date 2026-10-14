@@ -60,6 +60,11 @@ router.post('/expired/write-off', requirePermission('inventory', 'update'), sens
 // Damage transfer: move batch to DAMAGED warehouse (no GL impact).
 router.post('/damaged/transfer', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.damageTransferBatch);
 
+// WO-002: damaged-stock write-off — same GL-impacting loss posting as the
+// expired path (Dr 7201-7204 / Cr 1200) but with no expiry-date requirement,
+// targeting the DAMAGED warehouse.
+router.post('/damaged/write-off', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.writeOffDamagedBatches);
+
 // Reservations
 router.post('/reservations', requirePermission('inventory', 'create'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), inventoryController.createReservation);
 router.delete('/reservations/:id/release', requirePermission('inventory', 'update'), sensitiveOperationLimiter, inventoryController.releaseReservation);
