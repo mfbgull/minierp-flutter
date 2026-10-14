@@ -171,6 +171,21 @@ num _parseCurrency(String formatted) {
   return match == null ? 0 : num.parse(match.replaceAll(',', ''));
 }
 
+/// Cell text at [column] of the allocation-table row whose first cell is
+/// [itemName].
+String? _tableCell(WidgetTester tester, String itemName, int column) {
+  for (final table in tester.widgetList<DataTable>(find.byType(DataTable))) {
+    for (final row in table.rows) {
+      final first = row.cells.first.child;
+      if (first is Text && first.data == itemName) {
+        final cell = row.cells[column].child;
+        return cell is Text ? cell.data : null;
+      }
+    }
+  }
+  return null;
+}
+
 Future<void> _save(WidgetTester tester) async {
   await tester.ensureVisible(find.text('Save'));
   await tester.tap(find.text('Save'));
@@ -222,12 +237,21 @@ void main() {
     await tester.enterText(find.byType(TextFormField).at(1), '50');
     await tester.pumpAndSettle();
 
-    // The per-unit tile must spread the joint cost over EVERY output unit
-    // (60), not the primary's 10 — otherwise it contradicts the
-    // allocation table beneath it (oil's own unit cost is 1000/10).
-    final perUnit = _tileValue(tester, 'Cost per Unit');
-    expect(perUnit, isNotNull);
-    expect(_parseCurrency(perUnit!), closeTo(1000 / 60, 0.01));
+    // The blended per-unit tile must NOT be shown for a joint production.
+    // Oil is measured in Litre and cake in kg, so `1000 / (10 + 50)` is a
+    // number that is neither oil's unit cost nor cake's — it matches no
+    // stock line and would contradict the allocation table beneath it.
+    expect(
+      _tileValue(tester, 'Cost per Unit'),
+      isNull,
+      reason: 'joint production must not show a blended per-unit cost',
+    );
+
+    // The allocation table carries the only meaningful per-unit figures:
+    // oil is the sole priced output so it absorbs the whole pool (1,000 over
+    // its 10 Litre = 100/unit) and the unpriced cake takes the 0 remainder.
+    expect(_tableCell(tester, 'Mustard Oil', 4), 'Rs. 100.00');
+    expect(_tableCell(tester, 'Mustard Cake', 4), 'Rs. 0.00');
 
     await _save(tester);
 
