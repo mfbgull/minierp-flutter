@@ -5896,6 +5896,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get expiryNotice => 'Expiry Notice';
 
   @override
+  String get expiryNotTrackedByItem =>
+      'This item does not track expiry, so no expiry date can be set. Enable expiry tracking on the item first.';
+
+  @override
   String get nearExpiryNotice => 'Near-Expiry Notice';
 
   @override

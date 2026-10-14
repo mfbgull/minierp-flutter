@@ -5891,6 +5891,10 @@ class AppLocalizationsUr extends AppLocalizations {
   String get expiryNotice => 'مونثی کا نوٹس';
 
   @override
+  String get expiryNotTrackedByItem =>
+      'یہ آئٹم مونثی ٹریک نہیں کرتا، اس لیے مونثی کی تاریخ مقرر نہیں ہو سکتی۔ پہلے آئٹم پر مونثی ٹریکنگ فعال کریں۔';
+
+  @override
   String get nearExpiryNotice => 'قریبی مونثی کا نوٹس';
 
   @override

@@ -113,6 +113,16 @@ class _BatchManagementScreenState
   }
 
   Future<void> _pickExpiry(StockBatch batch) async {
+    final l10n = AppLocalizations.of(context)!;
+    // The server drops an expiry date for an item that does not track
+    // expiry (ItemModel.batchExpiryDate). Sending one anyway produced a
+    // "Saved" toast over a value that was never stored, so the user was
+    // told a change had happened when nothing had.
+    final item = _itemById(batch.itemId);
+    if (item != null && !item.hasExpiry) {
+      showAppToast(context, l10n.expiryNotTrackedByItem, isError: true);
+      return;
+    }
     final picked = await pickDate(
       context,
       initialDate: batch.expiryDate != null
@@ -121,7 +131,6 @@ class _BatchManagementScreenState
       firstDate: DateTime(2000),
     );
     if (picked == null || !mounted) return;
-    final l10n = AppLocalizations.of(context)!;
     final newDate = isoDate(picked);
     final result = await ref
         .read(inventoryRepositoryProvider)
