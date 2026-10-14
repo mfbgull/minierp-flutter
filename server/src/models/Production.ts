@@ -4,6 +4,7 @@ import { roundQty } from '../utils/quantity';
 import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, PRODUCTION_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
+import ItemModel from './Item';
 import AccountingService from '../services/accountingService';
 import { SqlParam } from '../utils/sqlTypes';
 
@@ -418,24 +419,17 @@ class ProductionModel {
       // expiry may carry it — the boot-time expiry sweep filters batches
       // on expiry_date alone, so stamping a non-expiry co-product would
       // later move it to the EXPIRED warehouse.
-      const tracksExpiryStmt = db.prepare(
-        'SELECT has_expiry FROM items WHERE id = ?',
-      );
-      const itemTracksExpiry = (itemId: number): boolean => {
-        const row = tracksExpiryStmt.get(itemId) as
-          { has_expiry: number | null } | undefined;
-        return row?.has_expiry === 1;
-      };
-
       for (let index = 0; index < outputLines.length; index++) {
         const line = outputLines[index];
         const lineQty = Number(line.quantity);
         const allocated = allocations[index];
         const lineBatchNo = this.generateBatchNo(db);
         const lineUnitCost = lineQty > 0 ? roundQty(allocated / lineQty, 6) : 0;
-        const lineExpiryDate = itemTracksExpiry(line.item_id)
-          ? expiry_date || null
-          : null;
+        const lineExpiryDate = ItemModel.batchExpiryDate(
+          db,
+          line.item_id,
+          expiry_date,
+        );
 
         db.prepare(`
           INSERT INTO stock_batches (

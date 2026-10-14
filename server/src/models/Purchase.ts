@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, PURCHASE_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
+import ItemModel from './Item';
 import SupplierLedgerModel from './SupplierLedger';
 import AccountingService from '../services/accountingService';
 import ledgerUtils from '../utils/ledgerUtils';
@@ -226,7 +227,7 @@ class PurchaseModel {
       quantity,
       unit_cost,
       purchase_date,
-      expiry_date || null
+      ItemModel.batchExpiryDate(db, item_id, expiry_date)
     );
     const outputBatchId = Number(batchResult.lastInsertRowid);
 
