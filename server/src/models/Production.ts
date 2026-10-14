@@ -4,6 +4,7 @@ import { roundQty } from '../utils/quantity';
 import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, PRODUCTION_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
+import { assertInventoryDateNotRetroactive } from '../services/inventoryEffectiveDate';
 import ItemModel from './Item';
 import AccountingService from '../services/accountingService';
 import { SqlParam } from '../utils/sqlTypes';
@@ -164,9 +165,10 @@ class ProductionModel {
     itemId: number,
     warehouseId: number,
     quantity: number,
-    db: Database.Database
+    db: Database.Database,
+    asOfDate?: string
   ): Array<{ batchId: number | null; consumed: number; unitCost: number }> {
-    return StockMovementModel.consumeFromOldestBatches(itemId, warehouseId, quantity, db);
+    return StockMovementModel.consumeFromOldestBatches(itemId, warehouseId, quantity, db, asOfDate);
   }
 
   static generateBatchNo(db: Database.Database): string {
@@ -283,10 +285,13 @@ class ProductionModel {
           throw new Error(`Insufficient stock for ${item.item_name} in warehouse. Available: ${availableStock}, Required: ${requiredQty}`);
         }
 
+        // ACCT-006: a production dated before the material it consumes was
+        // received would post consumption and COGS to a day the stock did
+        // not exist.
         inputStmt.run(productionId, input.item_id, input.quantity, materialsWarehouseId);
 
         // FIFO consumption from oldest batches
-        const consumption = this.consumeFromOldestBatches(input.item_id, materialsWarehouseId, input.quantity, db);
+        const consumption = this.consumeFromOldestBatches(input.item_id, materialsWarehouseId, input.quantity, db, production_date);
 
         // Create one stock_movement per consumed batch for full traceability
         for (const entry of consumption) {

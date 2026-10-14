@@ -117,7 +117,7 @@ function seedBatch(
   const batchResult = dbInner
     .prepare(
       `INSERT INTO stock_batches (item_id, warehouse_id, batch_no, source_type, source_id, quantity_original, quantity_remaining, unit_cost, received_date, expiry_date)
-       VALUES (?, ?, ?, 'PURCHASE', 0, ?, ?, 10, date('now'), ?)`
+       VALUES (?, ?, ?, 'PURCHASE', 0, ?, ?, 10, '2026-09-01', ?)`
     )
     .run(opts.itemId, opts.warehouseId, opts.batchNo, opts.qty, opts.qty, opts.expiry);
   const batchId = Number((batchResult as { lastInsertRowid?: number }).lastInsertRowid);

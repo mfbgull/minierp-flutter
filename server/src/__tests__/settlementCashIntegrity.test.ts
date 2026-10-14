@@ -600,7 +600,7 @@ describe('SALES-008 — INVOICE_SETTLEMENT stays creation-only', () => {
     // Joined into one string so a failure diff names the offending call sites
     // directly. `@types/jest` here does not declare `expect(actual, message)`.
     const sites = callSites().map((s) => `${s.file}:${s.line}`);
-    expect(sites.join(', ') || '(no production callers)').toBe('services/InvoiceCreationService.ts:256');
+    expect(sites.join(', ') || '(no production callers)').toBe('services/InvoiceCreationService.ts:277');
   });
 
   it('still resolves the ceiling from total minus returned, not from balance', () => {

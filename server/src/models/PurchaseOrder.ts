@@ -8,6 +8,7 @@ import { StockBalance } from '../types';
 import logger from '../utils/logger';
 import { addCurrency, multiplyCurrency, roundCurrency } from '../utils/currency';
 import { requireSupplierForPurchase } from '../utils/purchaseValidation';
+import { assertInboundDateNotRetroactive } from '../services/inventoryEffectiveDate';
 import { roundQty, qtyEpsilon } from '../utils/quantity';
 import { BusinessRuleError } from '../utils/businessRuleError';
 
@@ -983,6 +984,15 @@ class PurchaseOrderModel {
         // this, receipts added stock to stock_balances but no stock_batches
         // row, so the received value was invisible to every batch-based
         // figure.
+        // ACCT-006 D4: same retroactivity rule as a direct purchase — a
+        // receipt dated before an existing movement would reorder FIFO under
+        // sales already posted.
+        assertInboundDateNotRetroactive(db, {
+          itemId: poItem.item_id,
+          warehouseId: warehouse_id,
+          effectiveDate: receipt_date,
+          documentLabel: `Goods receipt dated ${receipt_date}`,
+        });
         const batchNo = this.generateBatchNo(db);
         const batchResult = db.prepare(`
           INSERT INTO stock_batches (

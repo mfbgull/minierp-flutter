@@ -215,9 +215,10 @@ class InvoiceModel {
     itemId: number,
     warehouseId: number,
     quantity: number,
-    db: Database.Database
+    db: Database.Database,
+    asOfDate?: string
   ): Array<{ batchId: number | null; consumed: number; unitCost: number }> {
-    return StockMovementModel.consumeFromOldestBatches(itemId, warehouseId, quantity, db);
+    return StockMovementModel.consumeFromOldestBatches(itemId, warehouseId, quantity, db, asOfDate);
   }
 
   /**

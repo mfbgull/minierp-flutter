@@ -45,7 +45,7 @@ beforeAll(async () => {
   itemId = await createItem('H8 Payment Edit Item', token);
   // sellable stock for the customer invoices (bought on credit — cash is
   // left untouched so the seeded capital is what the tests see)
-  await purchaseStock(itemId, warehouseId, 200, 20, token);
+  await purchaseStock(itemId, warehouseId, 200, 20, token, '2026-01-01');
 
   // Seed operating cash in Cash AND Bank so supplier payments clear the
   // funds guard and every bucket starts above zero. (The repost an edit
