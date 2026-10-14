@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { sanitizeSortParams, ITEM_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
+import logger from '../utils/logger';
 import { SqlParam } from '../utils/sqlTypes';
 
 interface Item {
@@ -365,7 +366,15 @@ class ItemModel {
     const row = db
       .prepare('SELECT has_expiry FROM items WHERE id = ?')
       .get(itemId) as { has_expiry: number | null } | undefined;
-    if (row?.has_expiry !== 1) return null;
+    if (row?.has_expiry !== 1) {
+      if (requested) {
+        logger.warn(
+          `Discarded expiry_date ${requested} for item ${itemId}: the item does not track expiry ` +
+            '(has_expiry is not 1). The batch was left without an expiry date.',
+        );
+      }
+      return null;
+    }
     return requested || null;
   }
 }
