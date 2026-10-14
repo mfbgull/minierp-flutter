@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import type Database from 'better-sqlite3';
+import logger from './logger';
 
 /**
  * P11 — request idempotency (audit-remediation task 16).
@@ -162,6 +163,40 @@ export function pruneIdempotencyKeys(
     WHERE completed_at IS NOT NULL AND completed_at < ?
   `).run(cutoff);
   return result.changes;
+}
+
+/**
+ * ACCT-008 stage one: observe keyless writes before enforcing.
+ *
+ * Mandatory enforcement is blocked by the deprecated /api/mobile-invoices
+ * consumer, which lives outside this repository and cannot be verified here.
+ * The staged plan is therefore: log first, measure, then reject. This
+ * records what would be rejected WITHOUT rejecting anything, so the next
+ * release can prove compatibility instead of assuming it.
+ *
+ * Nothing about the document is recorded. No amounts, no customer, no item
+ * lines, no invoice number — an invoice payload is financial and personal
+ * data, and a log line is not the place for it. Only the facts needed to
+ * decide enforcement are kept: which operation, from where, by whom.
+ */
+export function logKeylessIdempotentWrite(
+  scope: string,
+  meta: { userId?: number | null; route?: string; userAgent?: unknown; correlationId?: string },
+): void {
+  const ua = Array.isArray(meta.userAgent) ? meta.userAgent[0] : meta.userAgent;
+  logger.warn(
+    `[idempotency] keyless write — ${scope} accepted without Idempotency-Key ` +
+      `(stage-1 observation, not a rejection)`,
+    {
+      scope,
+      route: meta.route,
+      userId: meta.userId ?? null,
+      correlationId: meta.correlationId,
+      // Truncated: enough to tell the desktop app from a mobile client
+      // without storing a fingerprint.
+      userAgent: typeof ua === 'string' ? ua.slice(0, 120) : undefined,
+    },
+  );
 }
 
 /**
