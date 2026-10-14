@@ -486,6 +486,9 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
         ref.watch(productionBomOptionsProvider).valueOrNull ?? const <Bom>[];
     final shortfalls = _shortfalls;
     final preview = _preview;
+    // Computed once: the preview's per-unit tile and the allocation table
+    // must agree on whether this is a joint production.
+    final allocations = _allocations;
 
     InputDecoration deco() => formInputDecoration();
 
@@ -863,11 +866,15 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       const SizedBox(height: 8),
-                      _CostPreviewRow(preview: preview, l10n: l10n),
+                      _CostPreviewRow(
+                        preview: preview,
+                        l10n: l10n,
+                        jointProduction: allocations.length > 1,
+                      ),
                       // D6: with joint products the client previews the
                       // relative-sales-value split (the server recomputes
                       // the actuals from its own prices).
-                      if (_allocations.length > 1) ...[
+                      if (allocations.length > 1) ...[
                         const SizedBox(height: 12),
                         Text(
                           l10n.productionAllocationtitle,
@@ -875,7 +882,7 @@ class _ProductionFormDialogState extends ConsumerState<ProductionFormDialog> {
                         ),
                         const SizedBox(height: 6),
                         _AllocationTable(
-                          allocations: _allocations,
+                          allocations: allocations,
                           nameOf: (id) => _itemById(id)?.itemName ?? '$id',
                           uomOf: (id) => _itemById(id)?.unitOfMeasure ?? '',
                         ),
@@ -1039,11 +1046,27 @@ class _ShortfallPanel extends StatelessWidget {
 
 /// The live cost preview tile row (material | overhead | total |
 /// per-unit) — the web app's CostPreview panel.
+///
+/// When [jointProduction] is set the "per-unit" tile is omitted entirely.
+/// The joint cost is split across co-products that may carry DIFFERENT
+/// units of measure, so `totalCost / (Σ quantities)` is neither A's nor
+/// B's unit cost — it is a blended number that matches no stock line and
+/// contradicts the allocation table rendered directly beneath. The
+/// per-output allocated unit cost is the only figure that means anything,
+/// and [_AllocationTable] already carries it. Server allocation rules are
+/// untouched; this is presentation only.
 class _CostPreviewRow extends StatelessWidget {
-  const _CostPreviewRow({required this.preview, required this.l10n});
+  const _CostPreviewRow({
+    required this.preview,
+    required this.l10n,
+    required this.jointProduction,
+  });
 
   final ProductionCostPreview preview;
   final AppLocalizations l10n;
+
+  /// True when the run yields more than one output (D6 joint products).
+  final bool jointProduction;
 
   @override
   Widget build(BuildContext context) {
@@ -1091,10 +1114,13 @@ class _CostPreviewRow extends StatelessWidget {
           Formatters.currency(preview.totalCost),
           emphasize: true,
         ),
-        tile(
-          l10n.productionCostperunit,
-          Formatters.currency(preview.costPerUnit),
-        ),
+        // A blended per-unit figure is only meaningful for a single
+        // output; for joint production the allocation table owns it.
+        if (!jointProduction)
+          tile(
+            l10n.productionCostperunit,
+            Formatters.currency(preview.costPerUnit),
+          ),
       ],
     );
   }
