@@ -1867,6 +1867,7 @@
   "haltReasonHint": "وجہ (اختیاری)",
   "manageBatches": "بیچز منظم کریں",
   "expiryNotice": "مونثی کا نوٹس",
+  "expiryNotTrackedByItem": "یہ آئٹم مونثی ٹریک نہیں کرتا، اس لیے مونثی کی تاریخ مقرر نہیں ہو سکتی۔ پہلے آئٹم پر مونثی ٹریکنگ فعال کریں۔",
   "nearExpiryNotice": "قریبی مونثی کا نوٹس",
   "expiringSoon": "جلد ختم ہو رہا ہے",
   "expiryReport": "مونثی رپورٹ",

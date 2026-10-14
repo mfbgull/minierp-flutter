@@ -1920,6 +1920,7 @@
   "haltReasonHint": "Reason (optional)",
   "manageBatches": "Manage Batches",
   "expiryNotice": "Expiry Notice",
+  "expiryNotTrackedByItem": "This item does not track expiry, so no expiry date can be set. Enable expiry tracking on the item first.",
   "nearExpiryNotice": "Near-Expiry Notice",
   "expiringSoon": "Expiring Soon",
   "expiryReport": "Expiry Report",

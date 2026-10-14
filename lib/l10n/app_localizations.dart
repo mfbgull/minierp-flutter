@@ -11516,6 +11516,12 @@ abstract class AppLocalizations {
   /// **'Expiry Notice'**
   String get expiryNotice;
 
+  /// No description provided for @expiryNotTrackedByItem.
+  ///
+  /// In en, this message translates to:
+  /// **'This item does not track expiry, so no expiry date can be set. Enable expiry tracking on the item first.'**
+  String get expiryNotTrackedByItem;
+
   /// No description provided for @nearExpiryNotice.
   ///
   /// In en, this message translates to:
