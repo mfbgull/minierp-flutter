@@ -4652,6 +4652,38 @@ class AppLocalizationsUr extends AppLocalizations {
   String get productionShortfallTitle => 'ان اشیاء کا اسٹاک ناکافی ہے';
 
   @override
+  String get productionAdditionaloutputs => 'اضافی آؤٹ پٹ (مشترکہ مصنوعات)';
+
+  @override
+  String get productionAddoutput => 'آؤٹ پٹ شامل کریں';
+
+  @override
+  String get productionAdditionaloutputshint =>
+      'پیداوار ایک سے زیادہ اشیاء پیدا کر سکتی ہے — یہاں مربوط مصنوعات شامل کریں (مثلاً سرسو کے تیل کے ساتھ سرسو کی کیک)۔ واحد مصنوعات کے لیے خالی رہنے دیں۔';
+
+  @override
+  String get productionAllocatedcost => 'مختص شدہ لاگت';
+
+  @override
+  String get productionAllocationtitle =>
+      'لاگت کی تقسیم (نسبتی فروخت کی قیمت کے مطابق)';
+
+  @override
+  String get productionOutputduplicate =>
+      'ہر آؤٹ پٹ آئیٹم صرف ایک بار آ سکتا ہے';
+
+  @override
+  String get productionOutputisinput =>
+      'کسی آئیٹم کو آؤٹ پٹ اور ان پٹ دونوں نہیں بنایا جا سکتا';
+
+  @override
+  String get productionOutputs => 'آؤٹ پٹ';
+
+  @override
+  String get productionErrorOutputquantityrequired =>
+      'ہر آؤٹ پٹ کو مقدار درکار ہے';
+
+  @override
   String get purchaseordersAdditem => 'آئٹم شامل کریں';
 
   @override

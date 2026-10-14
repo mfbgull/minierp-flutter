@@ -41,8 +41,8 @@ function seedExpiredBatch(opts: {
   const wh = opts.warehouseId ?? expiredWhId();
   // Dedicated item per batch (created_by references the admin user row).
   const item = db.prepare(`
-    INSERT INTO items (item_code,item_name,unit_of_measure,standard_cost,is_purchased,is_active,created_by)
-    VALUES (?, 'Write-off Test Item', 'Nos', ?, 1, 1,
+    INSERT INTO items (item_code,item_name,unit_of_measure,standard_cost,is_purchased,is_active,has_expiry,created_by)
+    VALUES (?, 'Write-off Test Item', 'Nos', ?, 1, 1, 1,
       (SELECT id FROM users ORDER BY id LIMIT 1))
   `).run(opts.batchNo, opts.cost);
   const r = db.prepare(`

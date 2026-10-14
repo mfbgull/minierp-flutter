@@ -995,13 +995,19 @@ function deletePhysicalCount(req: AuthRequest, res: Response): void {
 }
 
 // Expired-stock plan Phase 3: POST /inventory/expired/write-off
+// WO-002: POST /inventory/damaged/write-off
 // Body: { batchIds: number[], reason: string (1-500 chars), glAccount: '7201'..'7204' }
-// Per batch (one transaction each): auto-transfers to EXPIRED when needed
-// (shared recordExpiryTransfer path), records a WRITE_OFF movement, and
-// posts Dr <loss 7201-7204> / Cr inventory_asset (1200) at batch cost.
+// Per batch (one transaction each): auto-transfers to the EXPIRED/DAMAGED
+// warehouse when needed (shared transfer path), records a WRITE_OFF movement,
+// and posts Dr <loss 7201-7204> / Cr inventory_asset (1200) at batch cost.
 const WRITE_OFF_LOSS_ACCOUNTS = new Set(['7201', '7202', '7203', '7204']);
 
-function writeOffExpiredBatches(req: AuthRequest, res: Response): void {
+function runWriteOff(
+  req: AuthRequest,
+  res: Response,
+  disposition: 'expired' | 'damaged',
+): void {
+  const systemWarehouseCode = disposition === 'damaged' ? 'DAMAGED' : 'EXPIRED';
   try {
     const { batchIds, reason, glAccount } = req.body as {
       batchIds?: unknown;
@@ -1041,11 +1047,11 @@ function writeOffExpiredBatches(req: AuthRequest, res: Response): void {
       return;
     }
 
-    const expiredWarehouse = db.prepare(
-      `SELECT id FROM warehouses WHERE warehouse_code = 'EXPIRED' AND is_active = 1`
-    ).get() as { id: number } | undefined;
-    if (!expiredWarehouse) {
-      res.status(500).json({ error: "System warehouse 'EXPIRED' is missing — run migrations" });
+    const dispositionWarehouse = db.prepare(
+      `SELECT id FROM warehouses WHERE warehouse_code = ? AND is_active = 1`
+    ).get(systemWarehouseCode) as { id: number } | undefined;
+    if (!dispositionWarehouse) {
+      res.status(500).json({ error: `System warehouse '${systemWarehouseCode}' is missing — run migrations` });
       return;
     }
 
@@ -1057,7 +1063,13 @@ function writeOffExpiredBatches(req: AuthRequest, res: Response): void {
     for (const batchId of batchIds as number[]) {
       try {
         const r = StockMovementModel.writeOffBatch(
-          { batchId, expiredWarehouseId: expiredWarehouse.id, reason: reasonText, lossAccountCode: account.code },
+          {
+            batchId,
+            targetWarehouseId: dispositionWarehouse.id,
+            disposition,
+            reason: reasonText,
+            lossAccountCode: account.code,
+          },
           req.user!.id,
           db
         );
@@ -1076,8 +1088,8 @@ function writeOffExpiredBatches(req: AuthRequest, res: Response): void {
     }
 
     logCRUD(ActionType.STOCK_WRITE_OFF, 'StockBatch', 0,
-      `Write-off of ${succeeded} expired batch(es): ${reasonText}`, req.user!.id,
-      { batchIds: batchIds, glAccount: account.code });
+      `Write-off of ${succeeded} ${disposition} batch(es): ${reasonText}`, req.user!.id,
+      { batchIds: batchIds, glAccount: account.code, disposition });
     req.activityLogged = true;
 
     res.json({
@@ -1090,6 +1102,18 @@ function writeOffExpiredBatches(req: AuthRequest, res: Response): void {
     logger.error('Write-off endpoint error:', error);
     res.status(500).json({ error: 'Failed to write off batches' });
   }
+}
+
+function writeOffExpiredBatches(req: AuthRequest, res: Response): void {
+  runWriteOff(req, res, 'expired');
+}
+
+// WO-002: a damaged batch (or any batch, really) with NO expiry date could not
+// be written off — the expired path rejects `expiry_date IS NULL` as "not
+// expired", and the damage-transfer route has no GL effect, so damaged stock
+// was stuck on the books as inventory forever. Same flow, DAMAGED warehouse.
+function writeOffDamagedBatches(req: AuthRequest, res: Response): void {
+  runWriteOff(req, res, 'damaged');
 }
 
 // Damage transfer: POST /inventory/damaged/transfer
@@ -1164,6 +1188,7 @@ export default {
   correctBatchReconciliation,
   updateBatchStatus,
   writeOffExpiredBatches,
+  writeOffDamagedBatches,
   damageTransferBatch,
   createReservation,
   releaseReservation,

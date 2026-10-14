@@ -3,6 +3,11 @@ arb-dir: lib/l10n
 template-arb-file: en.arb
 output-localization-file: app_localizations.dart
 output-class: AppLocalizations
-# ur.arb has 764 keys vs en's 812 — fall back to en for missing keys
-# (same behavior as the web app) and log the gaps here:
+# Missing ur.arb keys fall back to en (same behavior as the web app);
+# gen-l10n logs the gaps here:
 untranslated-messages-file: build/untranslated-messages.txt
+#
+# Do not record key COUNTS here — they go stale on the next added key (this
+# comment once claimed 764/812 when the real counts were 2100/2045). Run
+# `node scripts/l10n-drift.js` for the live numbers; it also fails on orphaned
+# translations and on the fallback gap regressing past its cap.

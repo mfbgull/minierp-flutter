@@ -15,17 +15,84 @@ function recordProduction(req: AuthRequest, res: Response): void {
       raw_materials_warehouse_id,
       production_date,
       input_items,
-      overhead_cost
+      overhead_cost,
+      bom_id
     } = req.body;
 
-    if (!output_item_id || !output_quantity || !warehouse_id || !production_date || !input_items || !input_items.length) {
-      res.status(400).json({ error: 'Output item, quantity, warehouse, date, and input items are required' });
+    const outputs: unknown = req.body.outputs;
+    const hasOutputLines = Array.isArray(outputs) && outputs.length > 0;
+    const hasSingleOutput = Boolean(output_item_id) && output_quantity !== undefined;
+
+    if (!hasSingleOutput && !hasOutputLines) {
+      res.status(400).json({
+        error: 'Provide either outputs[] (D6 joint products) or output_item_id + output_quantity',
+      });
       return;
     }
 
-    if (output_quantity <= 0) {
+    if (!warehouse_id || !production_date || !input_items || !input_items.length) {
+      res.status(400).json({ error: 'Warehouse, date, and input items are required' });
+      return;
+    }
+
+    if (output_quantity !== undefined && Number(output_quantity) <= 0) {
       res.status(400).json({ error: 'Output quantity must be positive' });
       return;
+    }
+
+    // D6 guards: an output line must be positive, unique, and never an input
+    // (an item cannot be produced from itself). Reject with 400 before the
+    // model opens a transaction.
+    if (hasOutputLines) {
+      const lines = outputs as Array<{ item_id?: unknown; quantity?: unknown }>;
+      const seen = new Set<number>();
+      const inputIds = new Set(
+        (input_items as Array<{ item_id: unknown }>).map((line) => Number(line.item_id)),
+      );
+      for (const line of lines) {
+        const itemId = Number(line.item_id);
+        const quantity = Number(line.quantity);
+        if (!Number.isInteger(itemId) || itemId <= 0) {
+          res.status(400).json({ error: 'Each output needs a valid item_id' });
+          return;
+        }
+        if (!Number.isFinite(quantity) || quantity <= 0) {
+          res.status(400).json({ error: 'Output quantity must be positive' });
+          return;
+        }
+        if (seen.has(itemId)) {
+          res.status(400).json({ error: `Output item ${itemId} is listed more than once` });
+          return;
+        }
+        if (inputIds.has(itemId)) {
+          res.status(400).json({ error: 'An item cannot be produced from itself' });
+          return;
+        }
+        seen.add(itemId);
+      }
+    }
+
+    // D6: the BOM must produce the PRIMARY output (the first line). The model
+    // enforces the same rule, but there it throws into a 500 that hides the
+    // reason — so a mismatched BOM is answered here as a 400 the client can act
+    // on (e.g. a joint production whose co-product was listed first).
+    if (bom_id) {
+      const primaryId = hasOutputLines
+        ? Number((outputs as Array<{ item_id?: unknown }>)[0]?.item_id)
+        : Number(output_item_id);
+      const bom = db
+        .prepare('SELECT finished_item_id FROM boms WHERE id = ?')
+        .get(Number(bom_id)) as { finished_item_id: number } | undefined;
+      if (!bom) {
+        res.status(400).json({ error: `BOM ${bom_id} not found` });
+        return;
+      }
+      if (bom.finished_item_id !== primaryId) {
+        res.status(400).json({
+          error: `BOM ${bom_id} produces item ${bom.finished_item_id}, but the primary output is item ${primaryId}`,
+        });
+        return;
+      }
     }
 
     const productionData = {

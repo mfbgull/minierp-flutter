@@ -91,3 +91,59 @@ The following records the seven decisions agreed for the current MiniERP work. T
   and no new warehouse are required.
 - **Next scope.** ACCT-006 / ACCT-007 / ACCT-008 (date, tax and discount bounds) are addressed
   before CODE-002/003/004, PRET-002, ACCT-013 and PAY-002.
+
+---
+
+## D9 — Two items raised during Phase 3 implementation (not guessed)
+
+**Reference:** ACCT-006 (third sub-item), ACCT-008
+
+- **ACCT-006 backdated sales.** Rejecting an invoice dated before the item's first
+  purchase was implemented and tested, then **removed**. 16 tests across
+  `expiredStockSaleBlocking`, `paymentEditReposting` and `arPartialReturn` purchase
+  stock and then invoice it at an earlier date — an established, deliberate pattern in
+  this codebase. A hard 400 broke all three suites. The other two sub-3 items
+  (non-calendar dates, implausibly far-future dates) shipped and are green.
+  **Needed:** should a sale dated before the item's first receipt be blocked outright,
+  allowed with a warning, or left unrestricted? The stock allocator already refuses to
+  oversell *current* sellable stock, so the practical risk is limited to backdated
+  COGS reporting.
+
+- **ACCT-008 duplicate submissions.** `Idempotency-Key` handling exists and replays
+  correctly, but only when the client sends the header. Making it mandatory would break
+  the Flutter client (CODE-004); a server-side dedupe heuristic would reject two
+  genuinely identical invoices, which are legitimate. **Needed:** either mandate the key
+  on all invoice writes (with a client change), or accept no-key duplicates as-is.
+
+---
+
+## D10 — D6 completed on the Flutter client, plus one defect it exposed
+
+**Reference:** D6 / D8 (joint production, "Schema, API and Flutter changes are all in scope")
+
+- **Flutter entry UI.** The record-production dialog keeps its dedicated primary output
+  item + quantity fields, and gains repeatable *additional output* lines. With no extra
+  line the payload stays the legacy `output_item_id` / `output_quantity` shape, so
+  existing single-product productions are byte-for-byte unchanged. With any extra line it
+  switches to `outputs: [...]`, primary first — the server validates the BOM's finished
+  item against the **first** line, so the primary must stay first.
+- **Client guards mirror the server's** (`productionController.ts`): duplicate output
+  items and an item that is both output and input are blocked before the round trip. A
+  half-filled extra row (item picked, no quantity) is blocked rather than posted as zero.
+- **Preview only.** The form previews the relative-sales-value split via a pure
+  `allocateJointCost` that mirrors the server's rule (relative sales value, quantity
+  fallback when nothing is priced, last line absorbs the rounding remainder). The server
+  recomputes the actuals inside its transaction; nothing client-side is trusted.
+- **Cost-per-unit tile.** For a joint run the preview's per-unit figure now spreads the
+  batch cost over **all** output units, not the primary's quantity alone — the old
+  divisor contradicted the allocation table directly beneath it (it showed 150/unit for
+  the oil while the table showed the oil's real 100/unit). Single-output behaviour is
+  unchanged; both cases are pinned by widget tests.
+- **Defect found while wiring this up — fixed.** `recordProduction` applied the request's
+  single `expiry_date` to **every** output batch. The boot-time expiry sweep
+  (`boot/expiryDetection.ts`) selects batches on `expiry_date < today` alone, with no
+  `items.has_expiry` gate — so a joint production would later move a non-expiry
+  co-product (mustard cake) to the EXPIRED warehouse. Expiry is now stamped only on
+  outputs whose item actually tracks expiry. Regression test:
+  `auditRegression9` "stamps the expiry date only on outputs that track expiry".
+  Note this is production-specific: purchases set expiry per line, which is user intent.

@@ -20,7 +20,8 @@ function createFixture(): Database.Database {
   const db = createFixtureDb({ reference: true });
 
   db.prepare(`INSERT INTO users (username,email,password_hash,full_name,role,is_active) VALUES ('admin','a@b.c','x','A','admin',1)`).run();
-  db.prepare(`INSERT INTO items (item_code,item_name,unit_of_measure,standard_cost,is_purchased,is_active) VALUES ('IT-1','Widget','Nos',10,1,1)`).run();
+  // has_expiry=1: the sweep only moves goods that declare expiry tracking.
+  db.prepare(`INSERT INTO items (item_code,item_name,unit_of_measure,standard_cost,is_purchased,is_active,has_expiry) VALUES ('IT-1','Widget','Nos',10,1,1,1)`).run();
   // WH-001 is created by runtime code in database.ts, not init.sql — seed it.
   db.prepare(`INSERT INTO warehouses (warehouse_code,warehouse_name,is_active) VALUES ('WH-001','Main',1)`).run();
 
@@ -151,6 +152,33 @@ describe('expiryDetection boot task', () => {
     // The good batch is fully processed despite the bad one
     const ok = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE batch_no = 'BOOT-OK'`).get() as { quantity_remaining: number };
     expect(ok.quantity_remaining).toBe(0);
+    db.close();
+  });
+
+  it('never sweeps an item that does not track expiry', () => {
+    const db = createFixture();
+    // D6 guard: a batch carrying a date must not be swept when the ITEM does
+    // not declare expiry tracking (a joint production's co-product is the
+    // motivating case — it inherits no expiry of its own).
+    db.prepare('UPDATE items SET has_expiry = 0 WHERE id = 1').run();
+    seedBatch(db, 'BOOT-NOEXP', { qty: 4, expiry: '2020-01-01' });
+
+    const result = runExpiryDetection(db);
+    expect(result.candidates).toBe(0);
+    expect(result.moved).toBe(0);
+
+    // Still sitting in its original warehouse, untouched.
+    const row = db.prepare(
+      `SELECT quantity_remaining, warehouse_id FROM stock_batches WHERE batch_no = 'BOOT-NOEXP'`
+    ).get() as { quantity_remaining: number; warehouse_id: number };
+    expect(row.quantity_remaining).toBe(4);
+    expect(row.warehouse_id).toBe(1); // WH-001, not EXPIRED
+
+    // ...and flipping the flag on makes the very same batch sweepable.
+    db.prepare('UPDATE items SET has_expiry = 1 WHERE id = 1').run();
+    const retry = runExpiryDetection(db);
+    expect(retry.candidates).toBe(1);
+    expect(retry.moved).toBe(1);
     db.close();
   });
 

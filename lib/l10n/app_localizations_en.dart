@@ -4653,6 +4653,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get productionShortfallTitle => 'Insufficient stock for these inputs';
 
   @override
+  String get productionAdditionaloutputs =>
+      'Additional Outputs (joint products)';
+
+  @override
+  String get productionAddoutput => 'Add output';
+
+  @override
+  String get productionAdditionaloutputshint =>
+      'A production can yield more than one item — add the co-products here (e.g. mustard cake beside mustard oil). Leave empty for a single-product run.';
+
+  @override
+  String get productionAllocatedcost => 'Allocated Cost';
+
+  @override
+  String get productionAllocationtitle =>
+      'Cost Allocation (by relative sales value)';
+
+  @override
+  String get productionOutputduplicate =>
+      'Each output item may appear only once';
+
+  @override
+  String get productionOutputisinput =>
+      'An item cannot be both an output and an input';
+
+  @override
+  String get productionOutputs => 'Outputs';
+
+  @override
+  String get productionErrorOutputquantityrequired =>
+      'Every output needs a quantity';
+
+  @override
   String get purchaseordersAdditem => 'Add Item';
 
   @override

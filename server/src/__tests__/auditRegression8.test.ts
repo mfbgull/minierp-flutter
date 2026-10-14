@@ -180,7 +180,9 @@ describe('BK-001 / BK-005: backup location handling', () => {
     Object.assign(process.env, env);
     let result: string | null = null;
     jest.isolateModules(() => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      // Lazy require is the point of isolateModules: a static import would
+      // hand back the module cached outside this isolated registry.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const svc = require('../services/backupService');
       result = svc.runBackup({ trigger: 'manual' });
     });

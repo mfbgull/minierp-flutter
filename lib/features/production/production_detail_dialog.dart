@@ -128,7 +128,7 @@ class _DetailBody extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      d.outputItemName ?? '',
+                      _outputLabel(d),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -155,7 +155,7 @@ class _DetailBody extends ConsumerWidget {
                 DetailInfoRows(
                   rows: [
                     (l10n.commonDate, Formatters.date(d.productionDate)),
-                    (l10n.productionOutputitem, detailDash(d.outputItemName)),
+                    (l10n.productionOutputitem, detailDash(_outputLabel(d))),
                     (l10n.productionWarehouse, detailDash(fg)),
                     (l10n.productionRawmaterialsWarehouse, detailDash(rm)),
                     (l10n.productionBatchno, detailDash(d.batchNo)),
@@ -194,6 +194,15 @@ class _DetailBody extends ConsumerWidget {
                   const SizedBox(height: 14),
                   Text(l10n.productionNoinputs),
                 ],
+                // D6: the output split — one line for a single-output
+                // production (already in the header), one per joint
+                // product otherwise.
+                if (d.outputs.length > 1) ...[
+                  const SizedBox(height: 14),
+                  detailSectionLabel(context, l10n.productionOutputs),
+                  const SizedBox(height: 6),
+                  _OutputsTable(outputs: d.outputs),
+                ],
               ],
             ),
           ),
@@ -204,6 +213,12 @@ class _DetailBody extends ConsumerWidget {
 
   String detailDash(String? value) =>
       (value == null || value.isEmpty) ? '—' : value;
+
+  /// Header label — the joined names when the production yields several
+  /// outputs (D6), otherwise the single output item.
+  String _outputLabel(Production d) => d.outputs.length > 1
+      ? [for (final o in d.outputs) o.itemName].join(' + ')
+      : (d.outputItemName ?? '');
 
   String detailCash(num? value) => Formatters.currency(value ?? 0);
 }
@@ -259,4 +274,58 @@ class _InputsTable extends StatelessWidget {
 
   String detailDash(String? value) =>
       (value == null || value.isEmpty) ? '—' : value;
+}
+
+/// D6 output split — item, quantity, UOM, and the cost actually
+/// allocated to that line by the server (relative sales value).
+class _OutputsTable extends StatelessWidget {
+  const _OutputsTable({required this.outputs});
+
+  final List<ProductionOutput> outputs;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: AppBorderRadius.smRadius,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowHeight: 36,
+          dataRowMinHeight: 36,
+          dataRowMaxHeight: 44,
+          columns: [
+            DataColumn(label: Text(l10n.fieldsItem)),
+            DataColumn(label: Text(l10n.purchasesQuantitycol)),
+            DataColumn(label: Text(l10n.commonUom)),
+            DataColumn(label: Text(l10n.productionAllocatedcost)),
+            DataColumn(label: Text(l10n.productionUnitcost)),
+          ],
+          rows: [
+            for (final o in outputs)
+              DataRow(
+                cells: [
+                  DataCell(
+                    Text(
+                      o.itemCode.isEmpty
+                          ? o.itemName
+                          : '${o.itemCode} — ${o.itemName}',
+                    ),
+                  ),
+                  DataCell(Text(Formatters.number(o.quantity))),
+                  DataCell(Text(o.unitOfMeasure ?? '—')),
+                  DataCell(Text(Formatters.currency(o.allocatedCost))),
+                  DataCell(Text(Formatters.currency(o.unitCost))),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }

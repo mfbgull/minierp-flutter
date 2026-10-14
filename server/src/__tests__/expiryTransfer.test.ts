@@ -20,7 +20,8 @@ function createFixture(): Database.Database {
   const db = createFixtureDb();
 
 db.prepare(`INSERT INTO users (username,email,password_hash,full_name,role,is_active) VALUES ('admin','a@b.c','x','A','admin',1)`).run();
-  db.prepare(`INSERT INTO items (item_code,item_name,unit_of_measure,standard_cost,is_purchased,is_active) VALUES ('IT-1','Widget','Nos',10,1,1)`).run();
+  // has_expiry=1: the sweep only moves goods that declare expiry tracking.
+  db.prepare(`INSERT INTO items (item_code,item_name,unit_of_measure,standard_cost,is_purchased,is_active,has_expiry) VALUES ('IT-1','Widget','Nos',10,1,1,1)`).run();
   db.prepare(`INSERT INTO warehouses (warehouse_code,warehouse_name,is_active) VALUES ('WH-1','Main',1)`).run();
   db.prepare(`INSERT INTO warehouses (warehouse_code,warehouse_name,is_active) VALUES ('EXPIRED','Expired Stock',1)`).run();
   return db;

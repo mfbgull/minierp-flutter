@@ -19,8 +19,10 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm ci
       - run: npm run typecheck
+      # Delegates to `npm run lint` so the rule set and flags have ONE
+      # source of truth (scripts/check.sh runs the same command locally).
       - name: ESLint (zero errors gate)
-        run: npx eslint . --quiet
+        run: npm run lint
       - run: npm test
       # Case count is asserted by the script itself (EXPECTED_ASSERTIONS),
       # so it is deliberately not repeated in this label.
@@ -47,7 +49,15 @@ jobs:
           echo 'PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig' >> "$GITHUB_ENV"
       - uses: subosito/flutter-action@v2
         with:
+          # Pinned to the same version release.yml builds with — an
+          # unpinned `stable` lets CI compile syntax that the shipped
+          # desktop build (and developers' local toolchains) cannot.
+          flutter-version: 3.47.2
           channel: stable
       - run: flutter pub get
       - run: flutter analyze
+      # Fails on orphaned ur.arb translations and on the en→ur fallback gap
+      # regressing past its cap (see scripts/l10n-drift.js).
+      - name: l10n drift
+        run: node scripts/l10n-drift.js
       - run: flutter test

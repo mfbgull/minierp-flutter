@@ -19,6 +19,10 @@ const DB_DIR = process.env.DATABASE_PATH || path.join(__dirname, '../../database
 // BACKUP_DIR (same variable the CLI script honours) lets backups go to another
 // drive; defaults to <db-dir>/backups. (BK-005)
 const BACKUP_DIR = process.env.BACKUP_DIR || path.join(DB_DIR, 'backups');
+// D7: employee documents and other uploads live outside the database, so a
+// database-only restore recovered rows whose files were gone. Every backup now
+// carries a sibling <name>.uploads snapshot of this directory.
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../../uploads');
 const DAILY_KEEP = 7;
 const WEEKLY_KEEP = 4;
 const INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -31,6 +35,50 @@ function lastBackupAgeMs(): number {
   const marker = path.join(BACKUP_DIR, '.last_backup');
   if (!fs.existsSync(marker)) return Infinity;
   return Date.now() - fs.statSync(marker).mtimeMs;
+}
+
+/**
+ * The uploads snapshot that belongs to a given database backup file:
+ * erp-<stamp>.db -> erp-<stamp>.uploads (same directory, same identity, so a
+ * restore finds the matching files by name alone).
+ */
+export function uploadsSnapshotPathFor(backupPath: string): string {
+  return backupPath.replace(/\.db$/, '.uploads');
+}
+
+/**
+ * Copies UPLOADS_DIR next to the backup. Non-fatal: an uploads failure must
+ * not discard an otherwise good database backup, but it is logged loudly.
+ */
+function snapshotUploads(backupPath: string): boolean {
+  const snapshot = uploadsSnapshotPathFor(backupPath);
+  try {
+    fs.rmSync(snapshot, { recursive: true, force: true });
+    fs.mkdirSync(snapshot, { recursive: true });
+    if (fs.existsSync(UPLOADS_DIR)) {
+      fs.cpSync(UPLOADS_DIR, snapshot, { recursive: true });
+    }
+    logger.info(`[Backup] uploads snapshot ${path.basename(snapshot)}`);
+    return true;
+  } catch (err) {
+    logger.error(`[Backup] uploads snapshot FAILED for ${path.basename(backupPath)}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Removes .uploads snapshots whose .db partner no longer exists, so uploads
+ * never outlive the database snapshot they were taken with (D7 retention).
+ */
+function pruneOrphanedUploads(): void {
+  if (!fs.existsSync(BACKUP_DIR)) return;
+  for (const name of fs.readdirSync(BACKUP_DIR)) {
+    if (!name.endsWith('.uploads')) continue;
+    const partner = path.join(BACKUP_DIR, `${name.slice(0, -'.uploads'.length)}.db`);
+    if (fs.existsSync(partner)) continue;
+    fs.rmSync(path.join(BACKUP_DIR, name), { recursive: true, force: true });
+    logger.info(`[Backup] pruned orphaned uploads ${name}`);
+  }
 }
 
 export interface BackupFileInfo {
@@ -136,10 +184,13 @@ export function runBackup(opts?: RunBackupOptions): string | null {
     }
 
     fs.utimesSync(target, new Date(), new Date());
+    // D7: pair the database snapshot with the files it references.
+    snapshotUploads(target);
     // Staleness marker for startBackupScheduler — previously never written,
     // which made the >24h check true on every boot.
     fs.writeFileSync(path.join(BACKUP_DIR, '.last_backup'), new Date().toISOString());
     pruneRetention();
+    pruneOrphanedUploads();
 
     try {
       const description = `${triggerLabel} backup ${path.basename(target)} (integrity ok)`;
@@ -188,6 +239,9 @@ export function deleteBackupFile(name: string): boolean {
   const target = resolveBackupFilePath(name);
   if (!target) return false;
   fs.rmSync(target);
+  // D7: the paired uploads snapshot dies with its database backup, otherwise
+  // deleted backups keep leaving orphaned employee documents behind.
+  fs.rmSync(uploadsSnapshotPathFor(target), { recursive: true, force: true });
   logger.info(`[Backup] deleted ${name}`);
   return true;
 }

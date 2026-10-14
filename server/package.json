@@ -10,6 +10,7 @@
     "start:prod": "node dist/server.js",
     "test": "jest",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint . --quiet",
     "verify:reversal-rules": "ts-node --transpile-only scripts/verify-reversal-rules.ts",
     "db:backup": "node scripts/backup-db.js",
     "db:verify-backup": "node scripts/verify-backup.js",

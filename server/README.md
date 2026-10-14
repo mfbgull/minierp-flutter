@@ -6,6 +6,8 @@ The server runs an in-process backup scheduler:
 
 - Fires shortly after boot if the last backup is older than 24h, then nightly.
 - Each backup: `wal_checkpoint(TRUNCATE)` → `VACUUM INTO backups/erp-<timestamp>.db`
+  → a sibling `backups/erp-<timestamp>.uploads/` copy of `server/uploads/` (D7),
+  so a restore recovers employee document files as well as rows.
   → `integrity_check` on the copy → retention prune (7 daily + 4 weekly).
 - A `BACKUP_CREATE` row is written to `activity_log`.
 
@@ -83,9 +85,21 @@ and backfill paths needed by existing databases.
    npm start   # or the installer's launcher
    ```
 
-6. **Restore uploads** (if lost): untar the most recent `uploads` archive back
-   into `server/uploads/`. Backups of uploads are included in installer-level
-   backups; the nightly DB backup covers database state only.
+6. **Restore uploads** (if lost): copy the snapshot taken with that same backup
+   back over `server/uploads/`. Each `backups/erp-<timestamp>.db` has a sibling
+   `backups/erp-<timestamp>.uploads/` holding `server/uploads/` as of that
+   moment, so the pairing is by name:
+   ```bash
+   cd server
+   # list what is available (snapshot name = backup name with .db -> .uploads)
+   ls -d database/backups/*.uploads/
+   # restore employee documents alongside the database you just swapped in
+   rm -rf uploads.pre-restore && mv uploads uploads.pre-restore 2>/dev/null
+   cp -r database/backups/erp-<timestamp>.uploads uploads
+   ```
+   If the snapshot is missing (it is only written when a backup runs, and an
+   uploads copy failure never fails the database backup), fall back to the most
+   recent installer-level `uploads` archive and log the gap.
 
 7. **Post-restore checks**
    ```bash
