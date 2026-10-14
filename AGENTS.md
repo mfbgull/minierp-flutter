@@ -35,6 +35,34 @@ changing both — a local check that passes while CI fails teaches you to ignore
 A green build is not a verified change. For anything touching an interface, exercise it
 the way the user will: a mounted route, a real POST body, a widget driven by taps.
 
+### Risk-based test execution
+
+Do not run the full test suites after every fix. Use incremental, risk-based testing
+without compromising regression coverage.
+
+- **After each fix:** Run the directly affected tests and relevant regression tests.
+  Follow the dependency path to include tests for affected callers and consumers.
+- **Shared or critical logic:** For changes involving accounting, GL, payments,
+  inventory, FIFO/FEFO, stock batches, database transactions, or reversals, run
+  relevant dependent-module tests and the accounting invariants A–J.
+- **Static checks:** Run typecheck, lint, analyze, and l10n drift checks as relevant
+  to the changed files. Use `scripts/check.sh --quick` at suitable checkpoints.
+- **Before a commit:** Ensure affected tests and relevant static checks pass.
+  A focused commit does not require both complete test suites every time.
+- **At the end of a completed task or implementation phase:** Run the full suite
+  for each affected side. Run `scripts/check.sh` when both sides or their shared
+  API contracts are affected, or when preparing a release or final CI verification.
+- **Unchanged side:** Do not rerun its full suite solely out of habit. Server-only
+  changes do not automatically require all Flutter tests, and vice versa, unless
+  behavior, API contracts, or dependencies could affect that side.
+- **Failures:** Investigate targeted failures before expanding the test scope.
+  Never weaken, delete, or bypass valid tests to make a change appear green.
+- **Report:** State which tests and checks ran, their results, and which full suites
+  were intentionally not rerun. Do not claim full-suite verification unless it ran.
+
+The CI gates remain unchanged. This policy controls *when* to run them locally,
+not what CI requires.
+
 ---
 
 ## Read before you edit
