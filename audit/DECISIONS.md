@@ -179,3 +179,54 @@ now superseded. Neither changes a server accounting or allocation rule.
   sweep's LEFT JOIN still surfaces such batches loudly instead of dropping them.
   This is the "fix the source, not the symptom" rule: D10 guarded one caller while three
   others still produced the bad data.
+
+---
+
+## D12 — Two calls that need the user, not a guess (ACCT-006, ACCT-008)
+
+**Reference:** ACCT-006 sub-item 3, ACCT-008 mandatory enforcement
+
+### ACCT-008 — mandatory `Idempotency-Key` on invoice writes
+
+The original finding is **out of date**. Idempotency is already implemented end to end
+and locked by 50+ tests (client key per body, claim inside the create transaction,
+409 on payload conflict, concurrent-same-key creates one invoice). The open question is
+only whether to make the header **mandatory**.
+
+- **In favour now:** every in-repo client (Flutter desktop, POS) already sends it.
+- **Blocker:** `/api/mobile-invoices/*` is deprecated but retained for compatibility and
+  is consumed by a mobile app **that is not in this repository**. Whether that app sends
+  the key cannot be verified from here, so making the header mandatory would break an
+  external consumer we cannot see or test.
+
+**Recommendation: staged enforcement.** Release 1 — server logs a warning on any
+keyless invoice write and reports the count. Release 2 — reject with 400 once the mobile
+consumer is confirmed migrated or the mobile API is retired. A server-side dedupe
+heuristic was rejected: two genuinely identical invoices are legitimate and cannot be
+distinguished from a retry by content alone.
+
+### ACCT-006 — backdated sales cannot be fixed as a validation rule
+
+Sub-item 3 (reject a sale dated before the item's first purchase) was implemented and
+removed because it broke 16 tests. The probe shows the deeper reason it should not simply
+be re-added:
+
+- `StockMovement.consumeFromOldestBatches` takes **no date parameter**. Allocation reads
+  current `stock_balances` and current batches. A backdated invoice therefore consumes
+  goods that had not been received yet, and books them to a date when they did not exist.
+- The FEFO expiry filter compares against `date('now')`, not the invoice date, so a
+  backdated sale of goods that were **valid at the time** is rejected as expired today.
+- `documentDate` sets no lower bound, so `1999-01-01` is accepted and auto-creates a
+  1999-01 accounting period.
+- Closed periods are correctly enforced (409 through `postEntry`) — that part is sound.
+
+A correct fix is an **as-of-time allocation**: thread the document date into
+`consumeFromOldestBatches`, filter `received_date <= asOf` and `expiry_date >= asOf`, and
+price COGS from the batches that existed then. That changes historical costing, so it is a
+product call, not a bug fix. It also needs a decision on whether `stock_balances` becomes
+a time series or whether as-of stock is reconstructed from `stock_movements`.
+
+**Recommendation:** do not implement until the user chooses. Option (b) — allow with a
+clear warning and leave costing as-is — preserves today's behaviour and costs nothing;
+option (a) — full as-of allocation — is correct but is an accounting-model change with a
+performance and migration cost.
