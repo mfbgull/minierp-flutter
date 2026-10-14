@@ -7,6 +7,7 @@ import logger from '../utils/logger';
 import { parsePageParams, envelope } from '../utils/paginate';
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { getEffectiveBatchStatus, type BatchStatus } from '../utils/batchStatus';
+import ItemModel from '../models/Item';
 import { SqlParam, SqlRow } from '../utils/sqlTypes';
 
 const router = Router();
@@ -154,7 +155,7 @@ router.patch('/stock-batches/:id', requirePermission('inventory', 'update'), val
     const batchId = Number(req.params.id);
     const { expiry_date } = req.body;
 
-    const batch = db.prepare('SELECT id, quantity_remaining FROM stock_batches WHERE id = ?').get(batchId) as { id: number; quantity_remaining: number } | undefined;
+    const batch = db.prepare('SELECT id, item_id, quantity_remaining FROM stock_batches WHERE id = ?').get(batchId) as { id: number; item_id: number; quantity_remaining: number } | undefined;
     if (!batch) {
       res.status(404).json({ error: 'Batch not found' });
       return;
@@ -164,7 +165,7 @@ router.patch('/stock-batches/:id', requirePermission('inventory', 'update'), val
     // have its expiry cleared or moved into the past — that would re-open
     // a sale path for already-expired goods. Future dates and edits on
     // fully consumed batches stay allowed.
-    const newDate = expiry_date || null;
+    const newDate = ItemModel.batchExpiryDate(db, batch.item_id, expiry_date);
     if (batch.quantity_remaining > 0 && (!newDate || newDate < new Date().toISOString().split('T')[0])) {
       logger.warn('Blocked batch expiry edit that would unblock expired stock:', { batchId, requested: newDate });
       res.status(400).json({ error: 'Cannot clear or backdate expiry_date on a batch with remaining stock' });

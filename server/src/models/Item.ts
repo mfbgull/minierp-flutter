@@ -336,6 +336,38 @@ class ItemModel {
     // definition (and the same low-stock predicates).
     return ItemModel.getAll({ lowStock: true }, db).rows;
   }
+
+  /**
+   * The expiry date a stock batch may carry, or null.
+   *
+   * Single source of truth for the invariant: **a batch whose item does not
+   * track expiry never carries an expiry_date**. Every batch write path
+   * (purchase, goods receipt, production output, batch PATCH) must route
+   * its requested date through here rather than deciding for itself.
+   *
+   * This has to live in one place, not per caller. The boot sweep
+   * (`boot/expiryDetection.ts`) filters on `has_expiry`, so a stray date on
+   * a non-expiry item is invisible to the sweep today — but it surfaces on
+   * the expiry report as soon as `has_expiry` is switched on for that item,
+   * and every such historical batch then becomes sweep-eligible and is
+   * relocated to the EXPIRED warehouse in one pass. D6 guarded the
+   * production path only; purchase and goods receipt could still write it.
+   *
+   * A missing item row counts as "does not track expiry" — there is nothing
+   * to expire against, and the sweep's LEFT JOIN keeps such batches visible
+   * so they fail loudly there instead.
+   */
+  static batchExpiryDate(
+    db: Database.Database,
+    itemId: number,
+    requested?: string | null,
+  ): string | null {
+    const row = db
+      .prepare('SELECT has_expiry FROM items WHERE id = ?')
+      .get(itemId) as { has_expiry: number | null } | undefined;
+    if (row?.has_expiry !== 1) return null;
+    return requested || null;
+  }
 }
 
 export default ItemModel;

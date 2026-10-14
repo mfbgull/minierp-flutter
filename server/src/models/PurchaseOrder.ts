@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import StockMovementModel from './StockMovement';
+import ItemModel from './Item';
 import AccountingService from '../services/accountingService';
 import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, PURCHASE_ORDER_SORT_COLUMNS } from '../utils/sqlSanitizer';
@@ -998,7 +999,7 @@ class PurchaseOrderModel {
           receiptItem.received_quantity,
           poItem.unit_price,
           receipt_date,
-          poItem.expiry_date || null
+          ItemModel.batchExpiryDate(db, poItem.item_id, poItem.expiry_date)
         );
         const batchId = batchResult.lastInsertRowid as number;
 
