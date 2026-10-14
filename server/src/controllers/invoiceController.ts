@@ -33,6 +33,7 @@ import {
   IDEMPOTENCY_SCOPES,
   INVOICE_CREATE_SCOPE,
   normalizeIdempotencyKey,
+  logKeylessIdempotentWrite,
   hashRequestPayload,
   claimIdempotencyKey,
   startIdempotentRequest,
@@ -213,6 +214,13 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
       idemKey = normalizeIdempotencyKey(req.headers[IDEMPOTENCY_KEY_HEADER]);
     } catch (keyError) {
       return res.status(400).json({ error: (keyError as Error).message });
+    }
+    if (idemKey === null) {
+      logKeylessIdempotentWrite(INVOICE_CREATE_SCOPE, {
+        userId: req.user.id,
+        route: 'POST /api/invoices',
+        userAgent: req.headers['user-agent'],
+      });
     }
 
     const service = new InvoiceCreationService(db);
