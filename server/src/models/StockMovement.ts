@@ -905,7 +905,7 @@ class StockMovementModel {
       // Check if stock exists but all batches/locations are blocked/expired.
       if (batchRows.length === 0 && availableQty > 0) {
         const allBatchStock = db.prepare(`
-          SELECT SUM(bsl.quantity_available) as total
+          SELECT SUM(bsl.quantity_available) as total, COUNT(*) as rows_count
           FROM batch_stock_by_location bsl
           JOIN locations l ON bsl.location_id = l.id
           WHERE l.warehouse_id = ?
@@ -913,9 +913,10 @@ class StockMovementModel {
               SELECT 1 FROM stock_batches sb
               WHERE sb.id = bsl.batch_id AND sb.item_id = ?
             )
-        `).get(warehouseId, itemId) as { total: number } | undefined;
+        `).get(warehouseId, itemId) as { total: number; rows_count: number } | undefined;
         const totalBlocked = allBatchStock?.total ?? 0;
-        if (totalBlocked > 0) {
+        const coverageRows = allBatchStock?.rows_count ?? 0;
+        if (totalBlocked > 0 || coverageRows > 0) {
           const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
           throw new SellableStockUnavailableError(
             item?.item_name || `item ${itemId}`,
@@ -1045,6 +1046,25 @@ class StockMovementModel {
           quantity,
           0
         );
+      }
+
+      // Same distinction as the feature-flagged path above. If this item HAS
+      // batches in this warehouse and all of them are exhausted, that is "no
+      // sellable stock", not legacy unbatched stock. Falling through would
+      // fabricate the quantity at standard cost out of a balance no batch
+      // backs, creating stock that does not exist.
+      if (!useFEFO) {
+        const tracked = db.prepare(`
+          SELECT COUNT(*) AS batches FROM stock_batches
+          WHERE item_id = ? AND warehouse_id = ?
+        `).get(itemId, warehouseId) as { batches: number };
+        if (Number(tracked.batches) > 0) {
+          throw new SellableStockUnavailableError(
+            itemRow?.item_name || `item ${itemId}`,
+            quantity,
+            0
+          );
+        }
       }
 
       const fallbackCost = itemRow?.standard_cost ?? 0;
