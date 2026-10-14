@@ -191,13 +191,19 @@ function deleteProduction(req: AuthRequest, res: Response): void {
     const productionId = Number(req.params.id);
     const production = ProductionModel.getById(productionId, db);
 
+    // ProductionModel.delete throws 'Production not found', which the catch
+    // below would turn into a 500. A double delete is a missing resource,
+    // not a server fault — and checking first also stops the reversal path
+    // from starting against a row that is not there.
+    if (!production) {
+      res.status(404).json({ error: 'Production not found' });
+      return;
+    }
+
     ProductionModel.delete(productionId, req.user!.id, db);
 
-    // Log production deletion using activity logger
-    if (production) {
-      logCRUD(ActionType.WO_DELETE, 'WorkOrder', productionId, `Deleted production: ${production.production_no}`, req.user!.id);
-      req.activityLogged = true;
-    }
+    logCRUD(ActionType.WO_DELETE, 'WorkOrder', productionId, `Deleted production: ${production.production_no}`, req.user!.id);
+    req.activityLogged = true;
 
     res.json({ success: true, message: 'Production deleted successfully' });
   } catch (error: unknown) {
