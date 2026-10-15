@@ -23,8 +23,10 @@
 
 import path from 'path';
 import fs from 'fs';
-import db from '../src/config/database';
+import db, { applyPendingMigrations } from '../src/config/database';
 import { getNextSequenceNumber } from '../src/utils/sequence';
+
+applyPendingMigrations();
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../src/migrations');
 const logger = {

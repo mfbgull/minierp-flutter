@@ -82,11 +82,11 @@ process.on('SIGTERM', () => {
   process.exit(143);
 });
 
-// 5. Async seed gate (spec 2.1): the admin user is bcrypt-hashed off the
-// event loop now, so hold the suites until the seeded row is committed.
-import { dbSeedReady } from '../config/database';
+// 5. Apply schema, then gate the suites on the admin seed.
+import { applyPendingMigrations, dbSeedReady } from '../config/database';
 
 beforeAll(async () => {
+  applyPendingMigrations();
   await dbSeedReady;
 }, 15000);
 

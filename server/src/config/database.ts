@@ -1697,345 +1697,361 @@ function runGLVoidAttributionMigration(): void {
   }
 }
 
-// Boot migration sequence - each entry recorded in schema_migrations.
-// Historical guards inside each runner make first-boot backfill safe:
-// already-applied work no-ops and gets registered without re-executing bodies.
-// Audit-remediation task 37: abort BEFORE the sequence if any recorded
-// migration no longer matches the checksum it was applied with (an edited
-// historical migration). One pass per boot over the whole ledger; fails
-// exactly like runLedgered — logger.error + process.exit(1) at import time,
-// i.e. before HTTP listen — and never writes to the database.
-try {
-  ensureMigrationsTable();
-  verifyMigrationChecksums(db, MIGRATIONS_DIR);
-} catch (err: unknown) {
-  logger.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-}
-
-
-runLedgered('fn.initializeDatabase', initializeDatabase);
-runLedgered('fn.runExpensesMigration', runExpensesMigration);
-runLedgered('fn.runPurchasesMigration', runPurchasesMigration);
-runLedgered('fn.runPurchaseSupplierPaymentMigration', runPurchaseSupplierPaymentMigration);
-runLedgered('fn.runPurchaseReturnMigration', runPurchaseReturnMigration);
-runLedgered('fn.runPurchaseReturnsTablesMigration', runPurchaseReturnsTablesMigration);
-runLedgered('fn.runPurchaseReturnsBackfill', runPurchaseReturnsBackfill);
-runLedgered('fn.runProductionsMigration', runProductionsMigration);
-runLedgered('fn.runBOMMigration', runBOMMigration);
-runLedgered('fn.runBOMItemsColumnMigration', runBOMItemsColumnMigration);
-runLedgered('fn.runSalesMigration', runSalesMigration);
-runLedgered('fn.runSupplierLedgerMigration', runSupplierLedgerMigration);
-runLedgered('fn.runActivityLogMigration', runActivityLogMigration);
-runLedgered('fn.runSupplierPaymentMigration', runSupplierPaymentMigration);
-runLedgered('fn.runPaymentsPurchaseOrderIdMigration', runPaymentsPurchaseOrderIdMigration);
-runLedgered('fn.runSupplierBalanceMigration', runSupplierBalanceMigration);
-runLedgered('fn.runRawMaterialsWarehouseMigration', runRawMaterialsWarehouseMigration);
-runLedgered('fn.runProductionInputsWarehouseMigration', runProductionInputsWarehouseMigration);
-runLedgered('fn.runMobileInvoiceMigration', runMobileInvoiceMigration);
-runLedgered('fn.runPerformanceIndexesMigration', runPerformanceIndexesMigration);
-runLedgered('fn.runMissingIndexesMigration', runMissingIndexesMigration);
-runLedgered('fn.runMissingFKIndexesMigration', runMissingFKIndexesMigration);
-runLedgered('fn.runProductionOverheadMigration', runProductionOverheadMigration);
-runLedgered('fn.runProductionBOMIdMigration', runProductionBOMIdMigration);
-runLedgered('fn.runRolesPermissionsMigration', runRolesPermissionsMigration);
-runLedgered('fn.runStockAdjustmentFinancialMigration', runStockAdjustmentFinancialMigration);
-runLedgered('fn.runForecastsMigration', runForecastsMigration);
-runLedgered('fn.runBatchCostingMigration', runBatchCostingMigration);
-runLedgered('fn.runGLFoundationMigration', runGLFoundationMigration);
-runLedgered('fn.runSalaryPaymentsMigration', runSalaryPaymentsMigration);
-runLedgered('fn.runCreditBalanceMigration', runCreditBalanceMigration);
-runLedgered('add-customer-credit-account.sql');
-runLedgered('fn.runEmployeesMigration', runEmployeesMigration);
-runLedgered('fn.runPhysicalCountsMigration', runPhysicalCountsMigration);
-runLedgered('fn.runForecastEnhancementsMigration', runForecastEnhancementsMigration);
-runLedgered('fn.runCustomReportsMigration', runCustomReportsMigration);
-runLedgered('fn.runExpiryTrackingMigration', runExpiryTrackingMigration);
-runLedgered('fn.runOverrideSaleMigration', runOverrideSaleMigration);
-runLedgered('fn.runDashboardLayoutsMigration', runDashboardLayoutsMigration);
-runLedgered('fn.runLooseItemMigration', runLooseItemMigration);
-runLedgered('fn.runCashAccountsMigration', runCashAccountsMigration);
-runLedgered('fn.runOpeningBalancesMigration', runOpeningBalancesMigration);
-runLedgered('fn.runUserPreferencesMigration', runUserPreferencesMigration);
-runLedgered('fn.runEmployeeLoansMigration', runEmployeeLoansMigration);
-runLedgered('fn.runOwnerPersonalLoansMigration', runOwnerPersonalLoansMigration);
-runLedgered('fix-invoice-ledger-reference.sql');
-// INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
-// INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
-runLedgered('fn.runGLVoidAttributionMigration', runGLVoidAttributionMigration);
-// FK-off table rebuild must NOT sit inside another transaction
-runLedgered('fn.runPaymentsCustomerNullableRebuild', runPaymentsCustomerNullableRebuild, { noTxn: true });
-// stock_batches source_type widening — FK-off table rebuild
-runLedgered('fn.runBatchSourceTypeRebuild', runBatchSourceTypeRebuild, { noTxn: true });
-runLedgered('add-search-indexes.sql');
-// reporting-search-remediation: those indexes can never serve '%term%' LIKE — drop them.
-runLedgered('drop-search-indexes.sql');
-runLedgered('add-audit-trail-fields.sql');
-runLedgered('add-activity-log-purge-permission.sql');
-runLedgered('add-invoice-soft-delete.sql');
-// Pre-delete status capture so the invoice restore endpoint (undo
-// pattern) can bring the invoice back to exactly its prior state.
-runLedgered('add-invoice-restore-status.sql');
-runLedgered('add-invoice-credit-offset.sql');
-runLedgered('add-customer-item-soft-delete.sql');
-runLedgered('add-hot-path-indexes.sql');
-runLedgered('normalize-payment-methods.sql', undefined, { noTxn: true }); // rebuilds payments — FK off required
-runLedgered('add-payments-counterparty-check.sql', undefined, { noTxn: true });
-// financial-audit-p0-remediation task 2.4: recover purchase_order_id for
-// historical single-PO payments (PAY-06 residue — the rebuild nulled it).
-runLedgered('fn.backfillPaymentsPurchaseOrderId', backfillPaymentsPurchaseOrderId);
-// financial-audit-p0-remediation task 3.1: purchases get a void lifecycle
-// (PUR-03) — voided_at/by/reason, no more hard deletes.
-runLedgered('add-purchase-void-columns.sql');
-runLedgered('add-purchase-return-batches.sql');
-// Phase 4 (reversal-rules): goods-receipt void attribution — GRNs move
-// stock, so they are voided (append-only), never hard-deleted.
-runLedgered('add-goods-receipt-void-columns.sql');
-// Phase 4 (reversal-rules): count-correction workflow — POSTED counts are
-// immutable; corrections are single-shot reversal + re-application, so the
-// count needs corrected_at/corrected_by markers.
-runLedgered('add-count-correction-columns.sql');
-// refund-expected-cash: disposition columns + supplier_refunds table.
-// Guarded ALTERs — only applies the SQL when the columns/table are missing
-// (the runLedgered checksum covers first-time databases; this keeps partial
-// states repairable like the runPurchaseReturnsTablesMigration recovery).
-runLedgered('fn.runDispositionAndSupplierRefundsMigration', runDispositionAndSupplierRefundsMigration);
-runLedgered('seed-expense-sequence.sql');
-runLedgered('normalize-expense-statuses.sql');
-runLedgered('normalize-expense-payment-methods.sql');
-// P23: Split invoice status into payment_status + return_status so
-// 'Partially Returned' no longer hides whether money is still due.
-// Must run BEFORE recalcInvoiceBalances and updateInvoiceStatus, which
-// reference these columns in their UPDATE statements.
-runLedgered('fn.addInvoiceSplitStatus', () => {
-  const cols = (db.prepare(`SELECT name FROM pragma_table_info('invoices')`).all() as Array<{ name: string }>).map(c => c.name);
-  const has = (name: string) => cols.includes(name);
-
-  if (!has('payment_status')) {
-    db.exec(`ALTER TABLE invoices ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'Unpaid'`);
-  }
-  if (!has('return_status')) {
-    db.exec(`ALTER TABLE invoices ADD COLUMN return_status TEXT NOT NULL DEFAULT 'None'`);
-  }
-  if (!has('deleted_from_payment_status')) {
-    db.exec(`ALTER TABLE invoices ADD COLUMN deleted_from_payment_status TEXT`);
-  }
-  if (!has('deleted_from_return_status')) {
-    db.exec(`ALTER TABLE invoices ADD COLUMN deleted_from_return_status TEXT`);
+/**
+ * Apply every pending schema migration, then run the boot-time integrity guards.
+ *
+ * This is the ONLY code path that mutates schema, and it is deliberately NOT
+ * invoked at import time. Importing this module opens a connection and nothing
+ * else, so a read-only diagnostic (reporting, reconciliation, an audit script)
+ * can reuse the exported `db` without being able to alter the ledger it reads.
+ *
+ * Callers that need the migrated schema call this explicitly, before any code
+ * that touches schema:
+ *   - `server.ts`               production boot, before `app` is imported
+ *   - `src/__tests__/setup.ts` per-file temporary database
+ */
+export function applyPendingMigrations(): void {
+  // Boot migration sequence - each entry recorded in schema_migrations.
+  // Historical guards inside each runner make first-boot backfill safe:
+  // already-applied work no-ops and gets registered without re-executing bodies.
+  // Audit-remediation task 37: abort BEFORE the sequence if any recorded
+  // migration no longer matches the checksum it was applied with (an edited
+  // historical migration). One pass per boot over the whole ledger; fails
+  // exactly like runLedgered — logger.error + process.exit(1) during boot,
+  // i.e. before HTTP listen — and never writes to the database.
+  try {
+    ensureMigrationsTable();
+    verifyMigrationChecksums(db, MIGRATIONS_DIR);
+  } catch (err: unknown) {
+    logger.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
   }
 
-  db.exec(`UPDATE invoices SET return_status = 'Fully Returned' WHERE status = 'Returned'`);
-  db.exec(`UPDATE invoices SET return_status = 'Partially Returned' WHERE status = 'Partially Returned'`);
-  db.exec(`UPDATE invoices SET payment_status = 'Paid' WHERE status = 'Paid' AND return_status = 'None'`);
-  db.exec(`UPDATE invoices SET payment_status = 'Partially Paid' WHERE status = 'Partially Paid' AND return_status = 'None'`);
-  db.exec(`UPDATE invoices SET payment_status = 'Overdue' WHERE status = 'Overdue' AND return_status = 'None'`);
-  db.exec(`UPDATE invoices SET payment_status = 'Unpaid' WHERE status = 'Unpaid' AND return_status = 'None'`);
 
-  db.exec(`UPDATE invoices SET payment_status = CASE
-    WHEN paid_amount >= total_amount THEN 'Paid'
-    WHEN paid_amount > 0 THEN 'Partially Paid'
-    ELSE 'Unpaid'
-  END
-  WHERE return_status != 'None'`);
+  runLedgered('fn.initializeDatabase', initializeDatabase);
+  runLedgered('fn.runExpensesMigration', runExpensesMigration);
+  runLedgered('fn.runPurchasesMigration', runPurchasesMigration);
+  runLedgered('fn.runPurchaseSupplierPaymentMigration', runPurchaseSupplierPaymentMigration);
+  runLedgered('fn.runPurchaseReturnMigration', runPurchaseReturnMigration);
+  runLedgered('fn.runPurchaseReturnsTablesMigration', runPurchaseReturnsTablesMigration);
+  runLedgered('fn.runPurchaseReturnsBackfill', runPurchaseReturnsBackfill);
+  runLedgered('fn.runProductionsMigration', runProductionsMigration);
+  runLedgered('fn.runBOMMigration', runBOMMigration);
+  runLedgered('fn.runBOMItemsColumnMigration', runBOMItemsColumnMigration);
+  runLedgered('fn.runSalesMigration', runSalesMigration);
+  runLedgered('fn.runSupplierLedgerMigration', runSupplierLedgerMigration);
+  runLedgered('fn.runActivityLogMigration', runActivityLogMigration);
+  runLedgered('fn.runSupplierPaymentMigration', runSupplierPaymentMigration);
+  runLedgered('fn.runPaymentsPurchaseOrderIdMigration', runPaymentsPurchaseOrderIdMigration);
+  runLedgered('fn.runSupplierBalanceMigration', runSupplierBalanceMigration);
+  runLedgered('fn.runRawMaterialsWarehouseMigration', runRawMaterialsWarehouseMigration);
+  runLedgered('fn.runProductionInputsWarehouseMigration', runProductionInputsWarehouseMigration);
+  runLedgered('fn.runMobileInvoiceMigration', runMobileInvoiceMigration);
+  runLedgered('fn.runPerformanceIndexesMigration', runPerformanceIndexesMigration);
+  runLedgered('fn.runMissingIndexesMigration', runMissingIndexesMigration);
+  runLedgered('fn.runMissingFKIndexesMigration', runMissingFKIndexesMigration);
+  runLedgered('fn.runProductionOverheadMigration', runProductionOverheadMigration);
+  runLedgered('fn.runProductionBOMIdMigration', runProductionBOMIdMigration);
+  runLedgered('fn.runRolesPermissionsMigration', runRolesPermissionsMigration);
+  runLedgered('fn.runStockAdjustmentFinancialMigration', runStockAdjustmentFinancialMigration);
+  runLedgered('fn.runForecastsMigration', runForecastsMigration);
+  runLedgered('fn.runBatchCostingMigration', runBatchCostingMigration);
+  runLedgered('fn.runGLFoundationMigration', runGLFoundationMigration);
+  runLedgered('fn.runSalaryPaymentsMigration', runSalaryPaymentsMigration);
+  runLedgered('fn.runCreditBalanceMigration', runCreditBalanceMigration);
+  runLedgered('add-customer-credit-account.sql');
+  runLedgered('fn.runEmployeesMigration', runEmployeesMigration);
+  runLedgered('fn.runPhysicalCountsMigration', runPhysicalCountsMigration);
+  runLedgered('fn.runForecastEnhancementsMigration', runForecastEnhancementsMigration);
+  runLedgered('fn.runCustomReportsMigration', runCustomReportsMigration);
+  runLedgered('fn.runExpiryTrackingMigration', runExpiryTrackingMigration);
+  runLedgered('fn.runOverrideSaleMigration', runOverrideSaleMigration);
+  runLedgered('fn.runDashboardLayoutsMigration', runDashboardLayoutsMigration);
+  runLedgered('fn.runLooseItemMigration', runLooseItemMigration);
+  runLedgered('fn.runCashAccountsMigration', runCashAccountsMigration);
+  runLedgered('fn.runOpeningBalancesMigration', runOpeningBalancesMigration);
+  runLedgered('fn.runUserPreferencesMigration', runUserPreferencesMigration);
+  runLedgered('fn.runEmployeeLoansMigration', runEmployeeLoansMigration);
+  runLedgered('fn.runOwnerPersonalLoansMigration', runOwnerPersonalLoansMigration);
+  runLedgered('fix-invoice-ledger-reference.sql');
+  // INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
+  // INV-04/INV-05: reconciliation/cleanup moved out of boot — see scripts/repair-stock.ts (boot-task-gating spec)
+  runLedgered('fn.runGLVoidAttributionMigration', runGLVoidAttributionMigration);
+  // FK-off table rebuild must NOT sit inside another transaction
+  runLedgered('fn.runPaymentsCustomerNullableRebuild', runPaymentsCustomerNullableRebuild, { noTxn: true });
+  // stock_batches source_type widening — FK-off table rebuild
+  runLedgered('fn.runBatchSourceTypeRebuild', runBatchSourceTypeRebuild, { noTxn: true });
+  runLedgered('add-search-indexes.sql');
+  // reporting-search-remediation: those indexes can never serve '%term%' LIKE — drop them.
+  runLedgered('drop-search-indexes.sql');
+  runLedgered('add-audit-trail-fields.sql');
+  runLedgered('add-activity-log-purge-permission.sql');
+  runLedgered('add-invoice-soft-delete.sql');
+  // Pre-delete status capture so the invoice restore endpoint (undo
+  // pattern) can bring the invoice back to exactly its prior state.
+  runLedgered('add-invoice-restore-status.sql');
+  runLedgered('add-invoice-credit-offset.sql');
+  runLedgered('add-customer-item-soft-delete.sql');
+  runLedgered('add-hot-path-indexes.sql');
+  runLedgered('normalize-payment-methods.sql', undefined, { noTxn: true }); // rebuilds payments — FK off required
+  runLedgered('add-payments-counterparty-check.sql', undefined, { noTxn: true });
+  // financial-audit-p0-remediation task 2.4: recover purchase_order_id for
+  // historical single-PO payments (PAY-06 residue — the rebuild nulled it).
+  runLedgered('fn.backfillPaymentsPurchaseOrderId', backfillPaymentsPurchaseOrderId);
+  // financial-audit-p0-remediation task 3.1: purchases get a void lifecycle
+  // (PUR-03) — voided_at/by/reason, no more hard deletes.
+  runLedgered('add-purchase-void-columns.sql');
+  runLedgered('add-purchase-return-batches.sql');
+  // Phase 4 (reversal-rules): goods-receipt void attribution — GRNs move
+  // stock, so they are voided (append-only), never hard-deleted.
+  runLedgered('add-goods-receipt-void-columns.sql');
+  // Phase 4 (reversal-rules): count-correction workflow — POSTED counts are
+  // immutable; corrections are single-shot reversal + re-application, so the
+  // count needs corrected_at/corrected_by markers.
+  runLedgered('add-count-correction-columns.sql');
+  // refund-expected-cash: disposition columns + supplier_refunds table.
+  // Guarded ALTERs — only applies the SQL when the columns/table are missing
+  // (the runLedgered checksum covers first-time databases; this keeps partial
+  // states repairable like the runPurchaseReturnsTablesMigration recovery).
+  runLedgered('fn.runDispositionAndSupplierRefundsMigration', runDispositionAndSupplierRefundsMigration);
+  runLedgered('seed-expense-sequence.sql');
+  runLedgered('normalize-expense-statuses.sql');
+  runLedgered('normalize-expense-payment-methods.sql');
+  // P23: Split invoice status into payment_status + return_status so
+  // 'Partially Returned' no longer hides whether money is still due.
+  // Must run BEFORE recalcInvoiceBalances and updateInvoiceStatus, which
+  // reference these columns in their UPDATE statements.
+  runLedgered('fn.addInvoiceSplitStatus', () => {
+    const cols = (db.prepare(`SELECT name FROM pragma_table_info('invoices')`).all() as Array<{ name: string }>).map(c => c.name);
+    const has = (name: string) => cols.includes(name);
 
-  db.exec(`UPDATE invoices SET payment_status = 'Overpaid'
-  WHERE paid_amount > total_amount AND total_amount > 0 AND return_status = 'None'`);
+    if (!has('payment_status')) {
+      db.exec(`ALTER TABLE invoices ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'Unpaid'`);
+    }
+    if (!has('return_status')) {
+      db.exec(`ALTER TABLE invoices ADD COLUMN return_status TEXT NOT NULL DEFAULT 'None'`);
+    }
+    if (!has('deleted_from_payment_status')) {
+      db.exec(`ALTER TABLE invoices ADD COLUMN deleted_from_payment_status TEXT`);
+    }
+    if (!has('deleted_from_return_status')) {
+      db.exec(`ALTER TABLE invoices ADD COLUMN deleted_from_return_status TEXT`);
+    }
 
-  db.exec(`UPDATE invoices SET
-    deleted_from_payment_status = payment_status,
-    deleted_from_return_status = return_status
-  WHERE deleted_at IS NOT NULL`);
-});
+    db.exec(`UPDATE invoices SET return_status = 'Fully Returned' WHERE status = 'Returned'`);
+    db.exec(`UPDATE invoices SET return_status = 'Partially Returned' WHERE status = 'Partially Returned'`);
+    db.exec(`UPDATE invoices SET payment_status = 'Paid' WHERE status = 'Paid' AND return_status = 'None'`);
+    db.exec(`UPDATE invoices SET payment_status = 'Partially Paid' WHERE status = 'Partially Paid' AND return_status = 'None'`);
+    db.exec(`UPDATE invoices SET payment_status = 'Overdue' WHERE status = 'Overdue' AND return_status = 'None'`);
+    db.exec(`UPDATE invoices SET payment_status = 'Unpaid' WHERE status = 'Unpaid' AND return_status = 'None'`);
 
-// One-time data backfills (audit-remediation 3.2/3.3) — ledgered so they run
-// exactly once per database, never again on reboot.
-runLedgered('fn.recalcInvoiceBalances', recalcInvoiceBalancesBackfill);
-runLedgered('fn.paymentLedgerDescriptions', paymentLedgerDescriptionsBackfill);
-runLedgered('fn.recoverPaymentsInvoiceId', recoverPaymentsInvoiceId);
-runLedgered('fn.reconcileOrphanedJournalLines', reconcileOrphanedJournalLines);
-// GL backfill for documents created before live posting (reporting-search-remediation):
-// posts purchases/payments/expenses/salaries + opening capital; skips docs already posted.
-runLedgered('fn.backfillGlPreposting', () => runBackfillGlPreposting(db));
-// Phase 3 (GL unification): re-link orphaned/mis-linked journal_lines to
-// fresh headers and give line-less legacy journal_entries canonical lines,
-// so journal_lines is the single source of GL truth.
-runLedgered('fn.backfillGlUnification', () => runBackfillGlUnification(db));
-// Per-line tax decomposition (report-query-integrity): columns first, then the
-// one-time decomposition of stored amounts into net_amount + tax_amount.
-runLedgered('add-invoice-item-tax-columns.sql');
-runLedgered('fn.backfillInvoiceItemTax', () => runBackfillInvoiceItemTax(db));
-// H3 repair: with the stored tax authoritative, move the historical GL Tax
-// Payable split by the delta (AR/COGS/returns untouched; idempotent).
-runLedgered('fn.backfillInvoiceTaxGl', () => runBackfillInvoiceTaxGl(db));
-// H2 repair: recover the header discount that createInvoice never
-// persisted (stored total < line sum), so returns give it back.
-runLedgered('fn.backfillInvoiceHeaderDiscount', () => runBackfillInvoiceHeaderDiscount(db));
-// INV-21 prerequisite: reconcile live batch/balance drift before CHECK constraints land
-runLedgered('fn.runStockCoverageReconciliation', runStockCoverageReconciliation);
-// INV-21: database-level invariants — applied only after live data reconciled
-runLedgered('fn.runStockInvariantChecksRebuild', runStockInvariantChecksRebuild, { noTxn: true });
-// Repair: re-add stock_batches halted/halted_reason when an older rebuild
-// dropped them (FEFO consumption hard-fails without the column).
-runLedgered('fn.runBatchHaltColumnsRepairMigration', runBatchHaltColumnsRepairMigration);
-// Order matters: the schema (tables) must exist before the backfill
-// queries them — on a fresh database the backfill would otherwise
-// hard-fail on missing batch_stock_by_location/locations tables. The
-// purchase_return_batches.location_id column also references locations,
-// so its guarded add runs after this file too.
-runLedgered("add-batch-location-model.sql");
-runLedgered('fn.runPurchaseReturnBatchesLocationMigration', runPurchaseReturnBatchesLocationMigration);
-runLedgered("fn.backfillBatchLocations", () => runBackfillBatchLocations(db));
-// TASK 17: mobile-invoice SALE movements were keyed to the invoice ID while
-// every reversal resolves them by invoice_no, so a cancelled mobile invoice
-// left stock permanently reduced. Re-key the legacy movements and restore the
-// stock of invoices already cancelled under the old key (idempotent).
-runLedgered('fn.backfillMobileInvoiceStockReference', () => runBackfillMobileInvoiceStockReference(db));
+    db.exec(`UPDATE invoices SET payment_status = CASE
+      WHEN paid_amount >= total_amount THEN 'Paid'
+      WHEN paid_amount > 0 THEN 'Partially Paid'
+      ELSE 'Unpaid'
+    END
+    WHERE return_status != 'None'`);
 
-// Salary payment duplicate guard: pay_period column + unique index
-runLedgered('add-salary-pay-period.sql');
-// Salary payment type: full / advance / partial
-runLedgered('add-salary-payment-type.sql');
-// Allow multiple salary payments per month (advance/partial)
-runLedgered('drop-salary-unique-period.sql');
+    db.exec(`UPDATE invoices SET payment_status = 'Overpaid'
+    WHERE paid_amount > total_amount AND total_amount > 0 AND return_status = 'None'`);
 
-// Owner Capital & Withdrawals: equity children 3200/3300 + transaction tables.
-runLedgered('add-owner-equity.sql');
-// Post-apply assertion — runtime posting resolves these by text_code, so an
-// unexpected occupant of either slot must fail the boot, never mis-post.
-runLedgered('fn.verifyOwnerEquityAccounts', () => {
-  for (const [textCode, expected] of [
-    ['owner_capital', '3200'],
-    ['owner_drawings', '3300'],
-  ] as const) {
+    db.exec(`UPDATE invoices SET
+      deleted_from_payment_status = payment_status,
+      deleted_from_return_status = return_status
+    WHERE deleted_at IS NOT NULL`);
+  });
+
+  // One-time data backfills (audit-remediation 3.2/3.3) — ledgered so they run
+  // exactly once per database, never again on reboot.
+  runLedgered('fn.recalcInvoiceBalances', recalcInvoiceBalancesBackfill);
+  runLedgered('fn.paymentLedgerDescriptions', paymentLedgerDescriptionsBackfill);
+  runLedgered('fn.recoverPaymentsInvoiceId', recoverPaymentsInvoiceId);
+  runLedgered('fn.reconcileOrphanedJournalLines', reconcileOrphanedJournalLines);
+  // GL backfill for documents created before live posting (reporting-search-remediation):
+  // posts purchases/payments/expenses/salaries + opening capital; skips docs already posted.
+  runLedgered('fn.backfillGlPreposting', () => runBackfillGlPreposting(db));
+  // Phase 3 (GL unification): re-link orphaned/mis-linked journal_lines to
+  // fresh headers and give line-less legacy journal_entries canonical lines,
+  // so journal_lines is the single source of GL truth.
+  runLedgered('fn.backfillGlUnification', () => runBackfillGlUnification(db));
+  // Per-line tax decomposition (report-query-integrity): columns first, then the
+  // one-time decomposition of stored amounts into net_amount + tax_amount.
+  runLedgered('add-invoice-item-tax-columns.sql');
+  runLedgered('fn.backfillInvoiceItemTax', () => runBackfillInvoiceItemTax(db));
+  // H3 repair: with the stored tax authoritative, move the historical GL Tax
+  // Payable split by the delta (AR/COGS/returns untouched; idempotent).
+  runLedgered('fn.backfillInvoiceTaxGl', () => runBackfillInvoiceTaxGl(db));
+  // H2 repair: recover the header discount that createInvoice never
+  // persisted (stored total < line sum), so returns give it back.
+  runLedgered('fn.backfillInvoiceHeaderDiscount', () => runBackfillInvoiceHeaderDiscount(db));
+  // INV-21 prerequisite: reconcile live batch/balance drift before CHECK constraints land
+  runLedgered('fn.runStockCoverageReconciliation', runStockCoverageReconciliation);
+  // INV-21: database-level invariants — applied only after live data reconciled
+  runLedgered('fn.runStockInvariantChecksRebuild', runStockInvariantChecksRebuild, { noTxn: true });
+  // Repair: re-add stock_batches halted/halted_reason when an older rebuild
+  // dropped them (FEFO consumption hard-fails without the column).
+  runLedgered('fn.runBatchHaltColumnsRepairMigration', runBatchHaltColumnsRepairMigration);
+  // Order matters: the schema (tables) must exist before the backfill
+  // queries them — on a fresh database the backfill would otherwise
+  // hard-fail on missing batch_stock_by_location/locations tables. The
+  // purchase_return_batches.location_id column also references locations,
+  // so its guarded add runs after this file too.
+  runLedgered("add-batch-location-model.sql");
+  runLedgered('fn.runPurchaseReturnBatchesLocationMigration', runPurchaseReturnBatchesLocationMigration);
+  runLedgered("fn.backfillBatchLocations", () => runBackfillBatchLocations(db));
+  // TASK 17: mobile-invoice SALE movements were keyed to the invoice ID while
+  // every reversal resolves them by invoice_no, so a cancelled mobile invoice
+  // left stock permanently reduced. Re-key the legacy movements and restore the
+  // stock of invoices already cancelled under the old key (idempotent).
+  runLedgered('fn.backfillMobileInvoiceStockReference', () => runBackfillMobileInvoiceStockReference(db));
+
+  // Salary payment duplicate guard: pay_period column + unique index
+  runLedgered('add-salary-pay-period.sql');
+  // Salary payment type: full / advance / partial
+  runLedgered('add-salary-payment-type.sql');
+  // Allow multiple salary payments per month (advance/partial)
+  runLedgered('drop-salary-unique-period.sql');
+
+  // Owner Capital & Withdrawals: equity children 3200/3300 + transaction tables.
+  runLedgered('add-owner-equity.sql');
+  // Post-apply assertion — runtime posting resolves these by text_code, so an
+  // unexpected occupant of either slot must fail the boot, never mis-post.
+  runLedgered('fn.verifyOwnerEquityAccounts', () => {
+    for (const [textCode, expected] of [
+      ['owner_capital', '3200'],
+      ['owner_drawings', '3300'],
+    ] as const) {
+      const rows = db.prepare(
+        `SELECT code, name, type, normal_balance FROM chart_of_accounts WHERE text_code = ?`
+      ).all(textCode) as Array<{ code: string; name: string; type: string; normal_balance: string }>;
+      if (rows.length !== 1 || rows[0].code !== expected || rows[0].type !== 'equity') {
+        throw new Error(
+          `Owner equity account check failed for text_code '${textCode}': expected exactly one ` +
+          `equity account ${expected}, found ${JSON.stringify(rows)}`
+        );
+      }
+    }
+  });
+
+  // C5/C6 (reversal-rules): financially-touched money rows are voided with
+  // attribution, never hard-deleted. Additive columns only.
+  runLedgered('add-payment-salary-void-columns.sql');
+  runLedgered('add-employee-loan-void-columns.sql');
+  runLedgered('add-salary-advance-link.sql');
+
+  // Expired Stock Management (Phase 1): GL loss accounts 7201-7204 under the
+  // existing 7200 parent, warehouses.is_system + EXPIRED/DAMAGED seeds,
+  // system-warehouse delete trigger, boot-task sweep indexes.
+  // Requires: chart_of_accounts (GL foundation), warehouses (init),
+  // stock_batches/stock_movements (init + rebuilds) — all applied above.
+  runLedgered('add-expired-stock.sql');
+
+  // D6: production overhead accrues as an unpaid payable (2200) instead of a
+  // separately recorded expense. Dedicated liability, because GL 2000 is
+  // reconciled against the supplier ledger.
+  runLedgered('add-missing-guarded-permissions.sql');
+
+  runLedgered('add-production-overhead-payable.sql');
+  // Post-apply assertion - production resolves this by text_code and aborts the
+  // post when it is absent, so a wrong occupant must fail the boot, never
+  // silently mis-post.
+  runLedgered('fn.verifyProductionOverheadPayableAccount', () => {
     const rows = db.prepare(
       `SELECT code, name, type, normal_balance FROM chart_of_accounts WHERE text_code = ?`
-    ).all(textCode) as Array<{ code: string; name: string; type: string; normal_balance: string }>;
-    if (rows.length !== 1 || rows[0].code !== expected || rows[0].type !== 'equity') {
+    ).all('production_overhead_payable') as Array<{
+      code: string;
+      name: string;
+      type: string;
+      normal_balance: string;
+    }>;
+    if (
+      rows.length !== 1 ||
+      rows[0].code !== '2200' ||
+      rows[0].type !== 'liability' ||
+      rows[0].normal_balance !== 'credit'
+    ) {
       throw new Error(
-        `Owner equity account check failed for text_code '${textCode}': expected exactly one ` +
-        `equity account ${expected}, found ${JSON.stringify(rows)}`
+        `Production overhead payable account check failed: expected exactly one credit ` +
+        `liability account 2200, found ${JSON.stringify(rows)}`
+      );
+    }
+  });
+
+  // D6: joint production. Output lines move to production_outputs so one
+  // production can yield several items (mustard oil + mustard cake) with the
+  // joint cost split by relative sales value. Backfills legacy single-output
+  // productions with their one line.
+  runLedgered('add-production-outputs.sql');
+
+  // Invoice Returns (invoice-return-spec.md Milestone 1): first-class return
+  // documents — invoice_returns / invoice_return_items / return_settlements.
+  // FK-free on purpose (SQLite FKs to invoices/customers/users already exist),
+  // so position in the runner is flexible; kept near the other invoice
+  // migrations. No legacy backfill (spec D11).
+  runLedgered('add-invoice-returns.sql');
+  // Milestone 2: per-line stock-movement attribution + settlement voided_by,
+  // so voiding one return reverses exactly that return (spec §5.3).
+  runLedgered('add-invoice-return-void-attribution.sql');
+  // P11: idempotency_keys table — retries of a timed-out create request must
+  // replay the original result, not create a second document.
+  runLedgered('add-idempotency-keys.sql');
+  // audit-3 task 08 (8.3): keys are unique per (scope, key), not globally.
+  // The old global UNIQUE meant an upsert on a colliding key overwrote
+  // another operation's resource_id — a wrong dedupe on a money write.
+  runLedgered('scope-idempotency-keys.sql');
+  // audit DB-001: goods_receipt_items carried three FK columns and no indexes
+  // at all, so the goods_receipts ON DELETE CASCADE and every parent update
+  // full-scanned the receipt hot path.
+  runLedgered('add-goods-receipt-item-indexes.sql');
+  // audit RET-008: settled_amount shipped with a floor at 0 and no ceiling, so a
+  // return could settle for more than the net owed back. A trigger, not a CHECK,
+  // so existing installs get the guard without a table rebuild.
+  runLedgered('add-invoice-return-settled-ceiling.sql');
+  runLedgered('add-journal-balance-commit-guard.sql');
+  // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
+  // return time — a legacy COA predating GL foundation must fail the boot
+  // with a clear error, never mis-post.
+  {
+    const feeAcct = db.prepare(
+      `SELECT id FROM chart_of_accounts WHERE code = '4150'`
+    ).get() as { id: number } | undefined;
+    if (!feeAcct) {
+      throw new Error(
+        'Invoice returns migration check failed: chart_of_accounts is missing ' +
+        "account 4150 (Restocking Fee Income). Run add-gl-foundation.sql or add " +
+        "the account manually before booting."
       );
     }
   }
-});
 
-// C5/C6 (reversal-rules): financially-touched money rows are voided with
-// attribution, never hard-deleted. Additive columns only.
-runLedgered('add-payment-salary-void-columns.sql');
-runLedgered('add-employee-loan-void-columns.sql');
-runLedgered('add-salary-advance-link.sql');
-
-// Expired Stock Management (Phase 1): GL loss accounts 7201-7204 under the
-// existing 7200 parent, warehouses.is_system + EXPIRED/DAMAGED seeds,
-// system-warehouse delete trigger, boot-task sweep indexes.
-// Requires: chart_of_accounts (GL foundation), warehouses (init),
-// stock_batches/stock_movements (init + rebuilds) — all applied above.
-runLedgered('add-expired-stock.sql');
-
-// D6: production overhead accrues as an unpaid payable (2200) instead of a
-// separately recorded expense. Dedicated liability, because GL 2000 is
-// reconciled against the supplier ledger.
-runLedgered('add-missing-guarded-permissions.sql');
-
-runLedgered('add-production-overhead-payable.sql');
-// Post-apply assertion - production resolves this by text_code and aborts the
-// post when it is absent, so a wrong occupant must fail the boot, never
-// silently mis-post.
-runLedgered('fn.verifyProductionOverheadPayableAccount', () => {
-  const rows = db.prepare(
-    `SELECT code, name, type, normal_balance FROM chart_of_accounts WHERE text_code = ?`
-  ).all('production_overhead_payable') as Array<{
-    code: string;
-    name: string;
-    type: string;
-    normal_balance: string;
-  }>;
-  if (
-    rows.length !== 1 ||
-    rows[0].code !== '2200' ||
-    rows[0].type !== 'liability' ||
-    rows[0].normal_balance !== 'credit'
-  ) {
-    throw new Error(
-      `Production overhead payable account check failed: expected exactly one credit ` +
-      `liability account 2200, found ${JSON.stringify(rows)}`
-    );
+  // DB-002 (detection half): assert every journal entry balances. Placed AFTER the
+  // migration sequence so a first boot has its tables, and before any HTTP
+  // listen, so a maintenance path that wrote raw journal lines fails loudly
+  // rather than leaving unbalanced books that every report then reads.
+  try {
+    assertJournalEntriesBalance(db);
+  } catch (err: unknown) {
+    logger.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
   }
-});
 
-// D6: joint production. Output lines move to production_outputs so one
-// production can yield several items (mustard oil + mustard cake) with the
-// joint cost split by relative sales value. Backfills legacy single-output
-// productions with their one line.
-runLedgered('add-production-outputs.sql');
+  // Ensure dbSeedReady resolves on every boot — createDefaultUser() is
+  // only called from initializeDatabase(), which runLedgered() skips on
+  // existing databases (already recorded in schema_migrations).
+  createDefaultUser();
 
-// Invoice Returns (invoice-return-spec.md Milestone 1): first-class return
-// documents — invoice_returns / invoice_return_items / return_settlements.
-// FK-free on purpose (SQLite FKs to invoices/customers/users already exist),
-// so position in the runner is flexible; kept near the other invoice
-// migrations. No legacy backfill (spec D11).
-runLedgered('add-invoice-returns.sql');
-// Milestone 2: per-line stock-movement attribution + settlement voided_by,
-// so voiding one return reverses exactly that return (spec §5.3).
-runLedgered('add-invoice-return-void-attribution.sql');
-// P11: idempotency_keys table — retries of a timed-out create request must
-// replay the original result, not create a second document.
-runLedgered('add-idempotency-keys.sql');
-// audit-3 task 08 (8.3): keys are unique per (scope, key), not globally.
-// The old global UNIQUE meant an upsert on a colliding key overwrote
-// another operation's resource_id — a wrong dedupe on a money write.
-runLedgered('scope-idempotency-keys.sql');
-// audit DB-001: goods_receipt_items carried three FK columns and no indexes
-// at all, so the goods_receipts ON DELETE CASCADE and every parent update
-// full-scanned the receipt hot path.
-runLedgered('add-goods-receipt-item-indexes.sql');
-// audit RET-008: settled_amount shipped with a floor at 0 and no ceiling, so a
-// return could settle for more than the net owed back. A trigger, not a CHECK,
-// so existing installs get the guard without a table rebuild.
-runLedgered('add-invoice-return-settled-ceiling.sql');
-runLedgered('add-journal-balance-commit-guard.sql');
-// Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
-// return time — a legacy COA predating GL foundation must fail the boot
-// with a clear error, never mis-post.
-{
-  const feeAcct = db.prepare(
-    `SELECT id FROM chart_of_accounts WHERE code = '4150'`
-  ).get() as { id: number } | undefined;
-  if (!feeAcct) {
-    throw new Error(
-      'Invoice returns migration check failed: chart_of_accounts is missing ' +
-      "account 4150 (Restocking Fee Income). Run add-gl-foundation.sql or add " +
-      "the account manually before booting."
-    );
+  // Rollback support: run if --rollback flag is passed
+  if (process.argv.includes('--rollback')) {
+    const targetMigration = process.argv.find(arg => arg.startsWith('--rollback='));
+    if (targetMigration) {
+      const migrationName = targetMigration.split('=')[1];
+      runRollback(migrationName);
+    } else {
+      runRollbackAll();
+    }
   }
 }
 
-// DB-002 (detection half): assert every journal entry balances. Placed AFTER the
-// migration sequence so a first boot has its tables, and before any HTTP
-// listen, so a maintenance path that wrote raw journal lines fails loudly
-// rather than leaving unbalanced books that every report then reads.
-try {
-  assertJournalEntriesBalance(db);
-} catch (err: unknown) {
-  logger.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-}
-
-// Ensure dbSeedReady resolves on every boot — createDefaultUser() is
-// only called from initializeDatabase(), which runLedgered() skips on
-// existing databases (already recorded in schema_migrations).
-createDefaultUser();
-
-// Rollback support: run if --rollback flag is passed
-if (process.argv.includes('--rollback')) {
-  const targetMigration = process.argv.find(arg => arg.startsWith('--rollback='));
-  if (targetMigration) {
-    const migrationName = targetMigration.split('=')[1];
-    runRollback(migrationName);
-  } else {
-    runRollbackAll();
-  }
-}
 
 export default db;
 
