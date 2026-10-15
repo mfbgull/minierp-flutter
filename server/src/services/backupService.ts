@@ -8,21 +8,22 @@
 import fs from 'fs';
 import path from 'path';
 import Database from 'better-sqlite3';
-import db from '../config/database';
+import db, { dbDir } from '../config/database';
 import logger from '../utils/logger';
 import { ActionType } from './activityLogger';
 import { pruneIdempotencyKeys } from '../utils/idempotency';
+import { defaultUploadsDir } from '../utils/serverRoot';
 
-// DATABASE_PATH is the database *directory* (see config/database.ts);
-// backups live alongside erp.db inside <db-dir>/backups.
-const DB_DIR = process.env.DATABASE_PATH || path.join(__dirname, '../../database');
+// Take the resolved dir from config/database so backups always land beside the
+// erp.db this process opened, instead of re-deriving it with other arithmetic.
+const DB_DIR = dbDir;
 // BACKUP_DIR (same variable the CLI script honours) lets backups go to another
 // drive; defaults to <db-dir>/backups. (BK-005)
-const BACKUP_DIR = process.env.BACKUP_DIR || path.join(DB_DIR, 'backups');
+export const BACKUP_DIR = process.env.BACKUP_DIR || path.join(DB_DIR, 'backups');
 // D7: employee documents and other uploads live outside the database, so a
 // database-only restore recovered rows whose files were gone. Every backup now
 // carries a sibling <name>.uploads snapshot of this directory.
-const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(__dirname, '../../uploads');
+export const UPLOADS_DIR = process.env.UPLOADS_DIR || defaultUploadsDir();
 const DAILY_KEEP = 7;
 const WEEKLY_KEEP = 4;
 const INTERVAL_MS = 24 * 60 * 60 * 1000;

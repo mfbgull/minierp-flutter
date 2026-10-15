@@ -13,13 +13,14 @@
 import path from 'path';
 import Database from 'better-sqlite3';
 import { scanHistoricalDataIntegrity } from './historical-data-integrity';
+import { defaultDbDir } from '../src/utils/serverRoot';
 
 function resolveDatabasePath(): string {
   const argumentPath = process.argv[2];
   if (argumentPath) return path.resolve(argumentPath);
 
   const configuredDatabasePath = process.env.DATABASE_PATH;
-  const databaseDirectory = configuredDatabasePath || path.join(__dirname, '../database');
+  const databaseDirectory = configuredDatabasePath || defaultDbDir();
   return path.join(databaseDirectory, 'erp.db');
 }
 

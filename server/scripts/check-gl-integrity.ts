@@ -7,8 +7,9 @@
  */
 import Database from 'better-sqlite3';
 import path from 'path';
+import { defaultDbDir } from '../src/utils/serverRoot';
 
-const dbDir = process.env.DATABASE_PATH || path.join(__dirname, '../database');
+const dbDir = process.env.DATABASE_PATH || defaultDbDir();
 const db = new Database(path.join(dbDir, 'erp.db'), { readonly: true });
 db.pragma('query_only = 1');
 
