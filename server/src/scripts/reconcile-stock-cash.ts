@@ -25,20 +25,11 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { defaultDbDir } from '../utils/serverRoot';
 
-// Resolve the DB path. The compiled script lives at dist/src/scripts
-// (where ../../../database is correct, like database.ts), while running
-// via ts-node from src/scripts needs ../../database — try both plus the
-// DATABASE_PATH override (Electron).
-const candidates = [
-  process.env.DATABASE_PATH && path.join(process.env.DATABASE_PATH, 'erp.db'),
-  path.join(__dirname, '../../../database/erp.db'),
-  path.join(__dirname, '../../database/erp.db'),
-].filter(Boolean) as string[];
-
-const dbPath = candidates.find((p) => fs.existsSync(p));
-if (!dbPath) {
-  console.error(`Database not found. Tried:\n  ${candidates.join('\n  ')}`);
+const dbPath = path.join(process.env.DATABASE_PATH || defaultDbDir(), 'erp.db');
+if (!fs.existsSync(dbPath)) {
+  console.error(`Database not found at ${dbPath}`);
   process.exit(1);
 }
 

@@ -21,6 +21,7 @@
  */
 import Database from 'better-sqlite3';
 import path from 'path';
+import { defaultDbDir } from '../src/utils/serverRoot';
 
 const apply = process.argv.includes('--apply');
 
@@ -28,7 +29,7 @@ const apply = process.argv.includes('--apply');
 // Importing src/config/database would drag in the whole boot/migration chain
 // and — under ts-node's __dirname — resolve to <repo-root>/database/erp.db,
 // a fresh empty DB instead of the real server/database/erp.db.
-const dbDir = process.env.DATABASE_PATH || path.join(__dirname, '../database');
+const dbDir = process.env.DATABASE_PATH || defaultDbDir();
 const db = new Database(path.join(dbDir, 'erp.db'), { readonly: !apply });
 if (apply) {
   db.pragma('busy_timeout = 5000');

@@ -21,16 +21,11 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import StockMovementModel from '../models/StockMovement';
+import { defaultDbDir } from '../utils/serverRoot';
 
-const candidates = [
-  process.env.DATABASE_PATH && path.join(process.env.DATABASE_PATH, 'erp.db'),
-  path.join(__dirname, '../../../database/erp.db'),
-  path.join(__dirname, '../../database/erp.db'),
-].filter(Boolean) as string[];
-
-const dbPath = candidates.find((p) => fs.existsSync(p));
-if (!dbPath) {
-  console.error(`Database not found. Tried:\n  ${candidates.join('\n  ')}`);
+const dbPath = path.join(process.env.DATABASE_PATH || defaultDbDir(), 'erp.db');
+if (!fs.existsSync(dbPath)) {
+  console.error(`Database not found at ${dbPath}`);
   process.exit(1);
 }
 

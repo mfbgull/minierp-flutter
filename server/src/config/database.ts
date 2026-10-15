@@ -14,6 +14,7 @@ import { runBackfillMobileInvoiceStockReference } from '../migrations/backfillMo
 import { runBackfillInvoiceHeaderDiscount } from '../migrations/backfillInvoiceHeaderDiscount';
 import { runBackfillBatchLocations } from "../migrations/backfillBatchLocations";
 import { errorMessage } from '../utils/errorMessage';
+import { defaultDbDir } from '../utils/serverRoot';
 
 // Fail-closed: tests must never fall through to a shared dev DB by accident
 if (process.env.NODE_ENV === 'test' && !process.env.DATABASE_PATH) {
@@ -21,7 +22,7 @@ if (process.env.NODE_ENV === 'test' && !process.env.DATABASE_PATH) {
 }
 
 // Database file path - use DATABASE_PATH env var if set (Electron), otherwise default
-const dbDir = process.env.DATABASE_PATH || path.join(__dirname, '../../../database');
+export const dbDir = process.env.DATABASE_PATH || defaultDbDir();
 const dbPath = path.join(dbDir, 'erp.db');
 
 // Ensure database directory exists

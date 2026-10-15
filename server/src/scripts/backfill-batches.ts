@@ -10,8 +10,9 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { defaultDbDir } from '../utils/serverRoot';
 
-const dbDir = process.env.DATABASE_PATH || path.join(__dirname, '../../../database');
+const dbDir = process.env.DATABASE_PATH || defaultDbDir();
 const dbPath = path.join(dbDir, 'erp.db');
 
 if (!fs.existsSync(dbPath)) {
