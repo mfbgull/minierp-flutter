@@ -246,17 +246,39 @@ GL total 5350 less sub-ledger 1800 leaves 3550 unrepresented, while F reports a 
 the header while carrying a sub-ledger row anyway. The historical records are internally
 inconsistent in more than one direction, so this is not a mechanical missing-row gap.
 
-An append-only reversal of the two `CREDIT_OFFSET` rows was prototyped on an isolated
-copy and **rejected**: it moved F from +1800 to −3600 and left customer 15 showing a
-+5400 receivable, because those rows agree with the GL at 1800 and removing them
-desynchronises the sub-ledger instead of repairing it. See D2b.
+An earlier prototype of reversing the two `CREDIT_OFFSET` rows was reported as **rejected**
+here, on the grounds that it moved F from +1800 to −3600 and left customer 15 showing a
++5400 receivable. **That report was wrong: the prototype was buggy.** It voided the
+original rows while leaving its own `REVERSAL:CREDIT_OFFSET` rows countable, but invariant
+F filters on `voided = 0 AND reversed_by IS NULL`. The +5400 was a double count in the
+prototype, not a property of the correction. Correctly implemented and re-run on isolated
+copies, the reversal moves F from +1800 to **0**. See D2b.
 
-**D2b — how to reconcile F, if it is reconciled at all.** This is a data decision, not a
-code one, and it is explicitly out of scope for the current pass. Options, none yet chosen:
-(a) leave the history and accept F stays red, recording why; (b) rebuild customer 15's
-sub-ledger from source documents; (c) restate the three invoices whose headers claim a
-credit offset the ledger never recorded. Each rewrites recorded financial history and
-needs its own approval. **Not started.**
+**D2b — how to reconcile F, if it is reconciled at all.** A data decision, not a code one.
+Investigation and simulation completed 2026-10-15 on isolated copies; **nothing has been
+applied and no live correction is authorised.** Proven root cause: invoices 50 and 51 were
+each settled twice — cash plus credit offset on 2026-09-17, then again in full by cash on
+2026-10-10 (`PAY-1026-00060`, `PAY-1026-00061`). The 2026-09-17 credit offsets were valid
+when written and were invalidated by later data, so this is a historical accounting error
+rather than a live code defect. Full evidence in `audit/FINDINGS-STATUS.md`.
+
+Simulated options, all `integrity_check=ok` with no unbalanced entries:
+
+- **Option A (recommended, proven, not applied)** — reverse ledger rows #104/#108 *and*
+  void the matching GL `CREDIT_OFFSET` groups for invoices 50/51 together. F +1800 → **0**;
+  A, D, E, J still pass; B/C, G, H, I unchanged; other customers byte-identical; rollback
+  verified exact.
+- Option B — void only the GL groups. F stays +1800; orphans the sub-ledger. Rejected.
+- Option C — A plus restating invoice 50/51 headers. No additional effect; the headers
+  already read `credit_offset = 0`, `balance = 0`, paid in full, which is what makes the
+  GL/sub-ledger postings the orphan.
+
+Two caveats travel with option A. It leaves customer 15 `current_balance = 1,800` against
+`SUM(invoice.balance_amount)` = −1,200 — a separate denormalised-header divergence that no
+option repairs, and the same pattern exists untouched for customer 14. And the GL/sub-ledger
+1,800-vs-3,550 comparison above is *not* F and must not be reported as such.
+
+Applying option A rewrites recorded financial history and still requires explicit approval.
 
 **D3 — purchase-order commitments (G).** Should a PO commitment appear in the
 supplier ledger at all, given GL recognises payables only at receipt? Options:
@@ -279,8 +301,11 @@ data with no code defect behind it, so nothing can be fixed forward.
 
 1. **D3** is now the only item with a clean non-destructive resolution — scoping the
    invariant resolves the red without touching data or changing accounting policy.
-2. **D2b**, if reconciliation is wanted, is a separate data exercise requiring its own
-   approval. The prototyped reversal was tested and rejected on the numbers.
+2. **D2b** has a proven, non-speculative answer for the first time. Option A takes F to 0
+   with no invariant regressions and exact rollback, and the root cause is established
+   (invoices 50/51 double-settled). It is still **not applied** — it rewrites recorded
+   financial history and needs explicit approval. Recommended as the D2b action, ahead of
+   the broader invoice-header reconciliation it does not include.
 3. **D1 and D4** both rewrite historical financial/inventory rows and need explicit
    go-ahead; per the project rules a genuinely open product call is recorded in
    `audit/DECISIONS.md` as `OPEN-DECISION` rather than guessed.

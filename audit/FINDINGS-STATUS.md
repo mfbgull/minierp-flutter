@@ -460,12 +460,110 @@ sub-ledger representation, and F still reports 1800. `CREDIT_OFFSET` survives on
 historical rows (customer 15, invoices 50 and 51) whose writer no longer exists.
 
 An append-only reversal of those two rows was prototyped on an isolated copy and
-**rejected on the numbers**: F moved from +1800 to −3600 and customer 15 ended at a
-+5400 receivable. Those rows agree with the GL at 1800, so reversing them desynchronises
-the sub-ledger rather than repairing it.
+reported as **rejected on the numbers**: F moved from +1800 to −3600 and customer 15
+ended at a +5400 receivable. **That report was wrong — the prototype was buggy.** See the
+D2b section below for the corrected implementation and result.
 
 **Status: OPEN — historical-data reconciliation.** Not marked GREEN; live reconciliation
 has not passed. Tracked as D2/D2b in `audit/ACCOUNTING-REMEDIATION-PLAN.md`. No live
 financial data was modified; the live digest is unchanged at
 `01359308f37ed33fb506cc42a829c170`.
+
+## D2b — historical customer credit reconciliation, investigation complete (2026-10-15)
+
+Investigation and simulation only. **No live data modified** — digest
+`01359308f37ed33fb506cc42a829c170` and mtime unchanged, 10 existing backups intact.
+All work ran against isolated copies created with the SQLite backup API
+(`integrity_check=ok`, `user_version=107`, logical checksums identical to live across
+customers / invoices / payments / payment_allocations / customer_ledger / journal_entries /
+journal_lines).
+
+### Scope correction
+
+The previous entry above proposed reversing ledger rows #104/#108 and reported that doing
+so moved F to −3600 and customer 15 to +5400. **That result was a bug in the prototype,
+not a property of the correction.** The script voided the original rows *and* left the
+newly inserted `REVERSAL:CREDIT_OFFSET` rows countable, while invariant F's own filter
+(`voided = 0 AND reversed_by IS NULL`) excludes them. The 5400 was a double count. The
+correctly-implemented reversal is simulated below.
+
+### Invariant F, exactly as implemented
+
+```
+glBalance   = |GL_BALANCE(1100) + GL_BALANCE(1110)|        // Σ(debit−credit), voided = 0
+custBalance = |Σ customers.current_balance − Σ customers.credit_balance|
+```
+
+Two different Rs 3,550 figures exist and neither is F's Rs 1,800:
+
+- GL 1110 `Dr` total = **5,350**; `customer_ledger` `CREDIT_OFFSET` `Cr` total = **1,800**;
+  difference **3,550**. This compares GL credit-offset postings against subledger
+  credit-offset rows. It is **not** F.
+- F's own 1,800 = glBalance 3,499.80 − custBalance 1,699.80. The two differ because GL
+  1100 is −1,850.20 (credit-normal) and F adds the accounts before taking the absolute
+  value.
+
+### Proven root cause — invoices 50 and 51 were settled twice
+
+Timeline reconstructed from `payment_allocations`, `payments`, `invoice_returns` and
+`customer_ledger`, not from headers:
+
+| Invoice | Total | Date | Cash settled | Credit offset | Verdict |
+|---|---:|---|---:|---:|---|
+| 50 `INV-0926-00008` | 1,200 | 2026-09-17 | 600 | 600 | correct **then** |
+| 50 | | 2026-10-10 | +600 (`PAY-1026-00061`) | | **double-settled +600** |
+| 51 `INV-0926-00009` | 1,800 | 2026-09-17 | 600 | 1,200 | correct **then** |
+| 51 | | 2026-10-10 | +1,200 (`PAY-1026-00060`) | | **double-settled +1,200** |
+
+On 2026-09-17 both invoices were settled exactly once: invoice 50 = 600 cash + 600 credit,
+invoice 51 = 600 cash + 1,200 credit. Both credit offsets were backed by real return
+credits (ledger #102 and #106, `RETURN Cr 600` each on `INV-0926-00007`) — legitimate when
+written. Later cash payments on 2026-10-10 then settled the same invoices again in full
+(allocations now total 1,200 and 1,800 respectively), making the original credit offsets
+redundant.
+
+Invoice headers corroborate: 50 and 51 both record `credit_offset = 0`, `paid_amount` =
+full total, `balance_amount = 0`. The headers say "settled by cash alone" while the GL
+and subledger carry a credit offset for each. The headers are right and the postings are
+the orphan.
+
+### Root-cause classification
+
+| Discrepancy | Classification | Provable cause | Reproducible by current code? |
+|---|---|---|---|
+| F = 1,800 | Accounting error (duplicate settlement) | Invoices 50/51 credited twice; later cash payments superseded earlier credit offsets | No — no allocation-capacity guard in the historical data |
+| GL 1110 vs subledger 3,550 | Two different comparisons | GL 5,350 across 5 invoices vs subledger 1,800 across 2; the other 3 (52/54/59) legitimately have no ledger row | No |
+| `current_balance` 0 vs `SUM(invoice.balance)` −1,200 | Denormalised-header divergence, **separate axis** | Subledger is internally consistent (`current_balance == ledger net` for all 5 customers); invoice headers disagree with it | Pre-existing; untouched by any option |
+
+Current production code does **not** reproduce any of this: the offsets were valid when
+posted and were invalidated by later data, not by a logic fault.
+
+### Simulations (isolated copies, all `integrity_check=ok`, no unbalanced entries)
+
+| Option | Records changed | F before | F after | Other invariants | Accounting valid? |
+|---|---|---:|---:|---|---|
+| A — reverse #104/#108 **and** void the matching GL `CREDIT_OFFSET` groups for inv 50/51 | 2 ledger + 2 reversal rows + 4 journal lines | +1,800 | **0** | A, D, E, J pass; B/C, G, H, I unchanged | **Yes** — removes the duplicate settlement on both ledgers together |
+| B — void only the GL groups | 4 journal lines | +1,800 | +1,800 | unchanged | No — leaves the subledger orphaned |
+| C — A + restate inv 50/51 headers | as A + 2 invoice rows | +1,800 | 0 | unchanged | Pointless — headers already correct |
+
+GL total is unchanged by option A (3,499.80) because voiding a credit offset removes
+`Dr 1110` and `Cr 1100` together; the correction moves the subledger side only. Other
+customers are byte-identical across all options (checksum `ce54cd497fca68de`).
+
+**Rollback verified**: restoring `voided = 0` on rows #104/#108, deleting the two
+`REVERSAL:CREDIT_OFFSET` rows and unvoiding the journal lines returns F to +1,800 and
+customer 15 to 0 exactly.
+
+### Caveat — F green is necessary, not sufficient
+
+Option A leaves customer 15 `current_balance = 1,800` while `SUM(invoice.balance_amount)`
+= −1,200, a 3,000 divergence. That is the *second* axis above and is **not** repaired by
+any option. Customer 14 shows the same pattern (600.20 divergence) and is untouched by
+this correction entirely. A full reconciliation of customer 15 and 14 against their
+invoice headers is a larger exercise than D2b and is not started.
+
+### Status
+
+**OPEN.** Option A is proven on the numbers and is recommended, but it has **not** been
+applied — no live correction has been made or is authorised. Awaiting explicit approval.
 
