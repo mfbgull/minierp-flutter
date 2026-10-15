@@ -622,8 +622,9 @@ export class AccountingService {
   /**
    * Post a customer credit offset applied to an invoice.
    * Dr Customer Credit (1110) / Cr Accounts Receivable (1100).
-   * The customer credit balance is also tracked in customer_ledger/
-   * customers.current_balance for sub-ledger reporting.
+   *
+   * GL only. This does not write customer_ledger or customers.current_balance;
+   * whoever needs a sub-ledger row must write it in the same transaction.
    */
   static postCreditOffsetEntry(
     db: Database.Database,
