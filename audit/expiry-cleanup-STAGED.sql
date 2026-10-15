@@ -38,6 +38,27 @@
 --   is_expired_at_sale compliance flags. The staged file's "silently blocks
 --   legitimate sales" framing was a real risk in general but had no
 --   sellable-quantity effect for these particular rows.
+--
+--   DISCLOSED SIDE EFFECT — 4 SCHEMA MIGRATIONS, NOT PART OF THIS CLEANUP
+--   Verifying invariants A-J required importing config/database, which runs
+--   the migration ledger on import. The live database was 4 migrations behind
+--   the shipped code (user_version 103 vs 107), so that import applied:
+--     add-missing-guarded-permissions.sql
+--     add-production-overhead-payable.sql
+--     fn.verifyProductionOverheadPayableAccount
+--     add-production-outputs.sql
+--   Net effect, diffed against the pre-change backup: new empty table
+--   production_outputs (+2 indexes), +1 chart_of_accounts row (2200 Accrued
+--   Production Overhead, referenced by 0 journal_lines), +15 permissions and
+--   +15 role_permissions rows. No column added to any existing table. All 15
+--   grants went to the Admin role only; the User role is unchanged at 24.
+--   No invoice, stock, batch, payment or journal row was touched, and the
+--   journal balance stayed 0.
+--
+--   These are the application's own intended startup migrations and would have
+--   run on the next normal boot regardless; this simply happened earlier and
+--   is disclosed rather than concealed. Reverting them would desynchronise the
+--   database from the shipped code, so they were left in place.
 -- ---------------------------------------------------------------------------
 -- Scope  : items that do NOT track expiry (items.has_expiry = 0) but which
 --          nonetheless carry an expiry_date on their stock batches or invoice
