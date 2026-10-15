@@ -422,3 +422,50 @@ Full server suite: `Test Suites: 141 passed, 141 total`; `Tests: 1278 passed, 12
 `.gitignore` ignored `*.bak` but not `*.bak-shm` / `*.bak-wal`, so `database/erp.db.bak-shm` and
 `database/erp.db.bak-wal` were visible to git. Both patterns added.
 
+## ACCT-F-CREDIT-OFFSET — correction to the earlier F finding (2026-10-15)
+
+The previous commit (`c4b970b8`) recorded invariant F as an **open production defect that
+reproduces on every new credit offset**, on the grounds that no current code writes a
+`customer_ledger` row with `transaction_type='CREDIT_OFFSET'`. **That conclusion was wrong
+and is withdrawn.**
+
+### What the investigation found
+
+Two callers post a GL credit offset, and they differ on purpose:
+
+- `PaymentRecordingService` posts GL only for `CREDIT_APPLICATION`, with no ledger row,
+  because the originating return already wrote a `RETURN` credit row.
+- `InvoiceCreationService` writes a `CREDIT` ledger row only for the portion drawn from
+  the `customers.credit_balance` pool. Credit held as a negative `current_balance` on the
+  ledger is extinguished by the new invoice's own `INVOICE` row, which is correct.
+
+A grep finding "no writer exists" was the wrong inference: the sub-ledger event is named
+`CREDIT`, not `CREDIT_OFFSET`, and is conditional on the credit's source.
+
+### Why no code change was made
+
+The fix originally proposed — write a `CREDIT_OFFSET` ledger row on every offset — would
+have credited each invoice settled by ledger credit a second time and corrupted customer
+balances. It was not implemented.
+
+`server/src/__tests__/creditOffsetSubledger.test.ts` now pins the real behaviour for both
+credit sources, asserting financial values and ledger events rather than HTTP status:
+exactly one economic credit event per credit, correct invoice settlement, and no cash
+movement on a credit-offset group.
+
+### Historical remainder
+
+The live database still holds five GL credit-offset groups (total 5350) against 1800 of
+sub-ledger representation, and F still reports 1800. `CREDIT_OFFSET` survives only as two
+historical rows (customer 15, invoices 50 and 51) whose writer no longer exists.
+
+An append-only reversal of those two rows was prototyped on an isolated copy and
+**rejected on the numbers**: F moved from +1800 to −3600 and customer 15 ended at a
++5400 receivable. Those rows agree with the GL at 1800, so reversing them desynchronises
+the sub-ledger rather than repairing it.
+
+**Status: OPEN — historical-data reconciliation.** Not marked GREEN; live reconciliation
+has not passed. Tracked as D2/D2b in `audit/ACCOUNTING-REMEDIATION-PLAN.md`. No live
+financial data was modified; the live digest is unchanged at
+`01359308f37ed33fb506cc42a829c170`.
+
