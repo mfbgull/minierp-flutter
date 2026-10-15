@@ -89,21 +89,33 @@ GL AR 3499.8 vs customer balances 1699.8. The credit-offset trail:
 So the GL recognised credit offsets against five invoices while the sub-ledger
 recorded only two of them.
 
-**Verified against current code (2026-10-15).** `grep` across `src/` finds **no
-current writer of `customer_ledger` rows with `transaction_type='CREDIT_OFFSET'`.
-The only writers of `customer_ledger` at all are `Customer.ts:245`, `Invoice.ts:926`
-and `ledgerUtils.ts:41`, and none emits `CREDIT_OFFSET`. The two existing ledger rows
-pre-date the current code.
+**Corrected 2026-10-15 — this finding was wrong.** It was previously recorded here
+as an open defect that reproduced on every new credit offset. Investigation of the
+actual posting paths shows the opposite: the subledger and the GL already move
+together, and there is no missing write.
 
-So this is **not merely legacy drift — it is an open defect that reproduces.** Every
-credit offset posted by current code moves the GL and leaves the sub-ledger behind.
-Invoices 52, 54 and 59 already carry `credit_offset` of 1200, 550 and 1800.
+Two callers post a GL credit offset, and they differ on purpose:
 
-**Classification: current-code defect (sub-ledger write missing).**
+- `PaymentRecordingService` (`CREDIT_APPLICATION`) posts GL only, with no ledger row,
+  because the originating return already wrote a `RETURN` credit row. Its comment
+  says so: "the return already credited the ledger."
+- `InvoiceCreationService` writes a `CREDIT` ledger row, but only for the part drawn
+  from the `customers.credit_balance` **pool** — `poolApplied = min(creditOffset, credit_balance)`.
+  Credit that lives on the ledger as a negative `current_balance` is extinguished by
+  the new invoice's own `INVOICE` row and correctly gets no extra row.
 
-The docstring defect noted above is the documentation half of the same bug; it is now
-corrected. The missing `customer_ledger` write is the behavioural half and is **not**
-fixed here, because every candidate fix writes historical financial rows.
+Verified end to end against a live test database (`server/src/__tests__/creditOffsetSubledger.test.ts`):
+a 200 offset drawn from ledger credit posts `Dr 1110 / Cr 1100`, moves no cash, leaves
+exactly one economic credit event, and settles the invoice to 0; a 200 offset drawn from
+the pool writes one `CREDIT` row and draws the pool down. Neither path double-credits.
+
+**The originally proposed fix — writing a `CREDIT_OFFSET` ledger row on every offset —
+was not implemented.** It would have credited each invoice settled by ledger credit a
+second time and corrupted customer balances. `CREDIT_OFFSET` exists in the live database
+only as two historical rows (customer 15, invoices 50 and 51) whose writers no longer exist.
+
+**Classification: historical-data reconciliation issue. Not an ongoing production defect.**
+`docs/ACCOUNTING-REMEDIATION-PLAN.md` section F remains OPEN until live reconciliation passes.
 
 See decision D2.
 
@@ -217,17 +229,34 @@ Note this is *not* a missing-`invoice_returns` question — that table holds onl
 in the whole database, and the negative allocations on these invoices are the
 deliberate REFUND path, which by design does not shrink `paid_amount`.
 
-**D2 — customer credit sub-ledger (F). This is now the most urgent item, because
-the defect reproduces.** Verified: no current code writes a `customer_ledger` row with
-`transaction_type='CREDIT_OFFSET'`. Every credit offset posted from now on widens the
-GL/sub-ledger gap. Three questions, in order:
+**D2 — customer credit sub-ledger (F). RECLASSIFIED 2026-10-15: historical data, not a
+code defect.** No code change is required or proposed. The live database carries five GL
+credit-offset groups totalling 5350, of which the sub-ledger represents 1800:
 
-1. Should current code write a `customer_ledger` row inside the same transaction as
-   the GL entry? (Code-only for *future* offsets; does not repair history.)
-2. Should the three existing offsets on invoices 52, 54 and 59 (1200, 550, 1800) be
-   backfilled? (Historical write.)
-3. If the sub-ledger is not intended to track credit offsets, what should invariant F
-   actually compare?
+| Invoice | `credit_offset` header | GL `Dr 1110` | Sub-ledger row | Status |
+|---|---:|---:|---:|---|
+| 50 `INV-0926-00008` | 0 | 600 | 600 | present, but header disagrees |
+| 51 `INV-0926-00009` | 0 | 1200 | 1200 | present, but header disagrees |
+| 52 `INV-0926-00010` | 1200 | 1200 | none | absent |
+| 54 `INV-1026-00002` | 550 | 550 | none | absent |
+| 59 `INV-1026-00007` | 1800 | 1800 | none | absent |
+
+GL total 5350 less sub-ledger 1800 leaves 3550 unrepresented, while F reports a net
+1800. The two are not equal because invoices 50 and 51 record `credit_offset = 0` on
+the header while carrying a sub-ledger row anyway. The historical records are internally
+inconsistent in more than one direction, so this is not a mechanical missing-row gap.
+
+An append-only reversal of the two `CREDIT_OFFSET` rows was prototyped on an isolated
+copy and **rejected**: it moved F from +1800 to −3600 and left customer 15 showing a
++5400 receivable, because those rows agree with the GL at 1800 and removing them
+desynchronises the sub-ledger instead of repairing it. See D2b.
+
+**D2b — how to reconcile F, if it is reconciled at all.** This is a data decision, not a
+code one, and it is explicitly out of scope for the current pass. Options, none yet chosen:
+(a) leave the history and accept F stays red, recording why; (b) rebuild customer 15's
+sub-ledger from source documents; (c) restate the three invoices whose headers claim a
+credit offset the ledger never recorded. Each rewrites recorded financial history and
+needs its own approval. **Not started.**
 
 **D3 — purchase-order commitments (G).** Should a PO commitment appear in the
 supplier ledger at all, given GL recognises payables only at receipt? Options:
@@ -245,15 +274,22 @@ on this database. Needs its own trace; recommend not bundling it with D1–D4.
 
 ## Recommendation
 
-Priority order, on verified evidence rather than magnitude alone:
+Reordered 2026-10-15 after F was reclassified. D2 no longer leads: it is historical
+data with no code defect behind it, so nothing can be fixed forward.
 
-1. **D2, part 1.** It is the only confirmed defect that *keeps producing wrong data*.
-   Writing the sub-ledger row in the same transaction is forward-only, changes no
-   historical figure, and needs no product decision about what the sub-ledger means —
-   only confirmation that a credit offset is a sub-ledger event.
-2. **D3.** The cheapest fully non-destructive resolution: scoping the invariant resolves
-   the red without touching data or changing accounting policy.
-3. **D1 and D4** both rewrite historical financial/inventory rows. Both need an explicit
-   go-ahead, and per the project rules a genuinely open product call is recorded in
+1. **D3** is now the only item with a clean non-destructive resolution — scoping the
+   invariant resolves the red without touching data or changing accounting policy.
+2. **D2b**, if reconciliation is wanted, is a separate data exercise requiring its own
+   approval. The prototyped reversal was tested and rejected on the numbers.
+3. **D1 and D4** both rewrite historical financial/inventory rows and need explicit
+   go-ahead; per the project rules a genuinely open product call is recorded in
    `audit/DECISIONS.md` as `OPEN-DECISION` rather than guessed.
 4. **D5** stays separate.
+
+## Regression coverage added
+
+`server/src/__tests__/creditOffsetSubledger.test.ts` pins the corrected contract for
+both credit sources — a ledger-credit offset (one credit event, no extra row, invoice
+settles to 0) and a store-credit-pool offset (one `CREDIT` row, pool drawn down) — and
+asserts no cash account is touched by a `CREDIT_OFFSET` group. It exists to stop the
+"missing sub-ledger row" reading from being reintroduced as a code fix.
