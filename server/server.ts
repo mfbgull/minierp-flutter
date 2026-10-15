@@ -1,6 +1,11 @@
 import dotenv from 'dotenv';
 dotenv.config();
 import { Server } from 'http';
+import { applyPendingMigrations } from './src/config/database';
+// Must stay above the `app` import: app.ts builds the route tree against the
+// migrated schema. Only CommonJS emit makes statement order between imports
+// significant, so reordering these lines silently boots without a schema.
+applyPendingMigrations();
 import app from './src/app';
 import db, { dbSeedReady } from './src/config/database';
 import settingsController from './src/controllers/settingsController';

@@ -22,8 +22,10 @@
  *   npm run repair:ledger -- --apply  — apply the corrections
  */
 
-import db from '../src/config/database';
+import db, { applyPendingMigrations } from '../src/config/database';
 import ledgerUtils from '../src/utils/ledgerUtils';
+
+applyPendingMigrations();
 
 const apply = process.argv.includes('--apply');
 

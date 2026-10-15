@@ -353,3 +353,72 @@ observable.
 ### Still open
 
 WO-002 needs decision D7 and has no test yet. See the decisions listed under AUTHZ-001 above.
+
+## DB-INIT-001 importing the database module executed all 107 migrations
+
+`config/database.ts` opened the connection and then ran its entire migration ledger as
+top-level statements, so merely importing the module wrote to the database. Anything that
+imported it for read-only reasons inherited the write.
+
+### How it was triggered
+
+`scripts/verify-invariants-live.ts` imports the A-J collectors from
+`src/__tests__/helpers/accountingInvariants.ts`. That helper imports `db` from
+`config/database`, so the diagnostic reached the migration ledger transitively and advanced the
+live database from `user_version` 103 to 107. A report-only script changed the ledger it was
+reporting on.
+
+### What the four accidental migrations did
+
+| Migration | Effect |
+|---|---|
+| `add-missing-guarded-permissions.sql` | 15 permission rows + 15 role grants, Admin only |
+| `add-production-overhead-payable.sql` | account `2200` Production Overhead Payable |
+| `fn.verifyProductionOverheadPayableAccount` | verification of the above |
+| `add-production-outputs.sql` | `production_outputs` table + 2 indexes |
+
+All four are additive and inert with respect to accounting data: no journal entry, no journal
+line, and no stock movement was written. Live verification after the fix reports
+`user_version=107`, `integrity_check=ok`, 107 migration rows and 218 journal entries, unchanged.
+The migrations are **not** reverted — reversing applied schema is out of scope and prohibited.
+
+### Fix
+
+The boot sequence (checksum verification, all 107 `runLedgered` calls, the account-4150 guard,
+the journal-balance assertion, the admin seed and rollback handling) moved into an exported
+`applyPendingMigrations()`. Importing the module now opens a connection and nothing else; the
+schema write is opt-in and explicit.
+
+Call sites that legitimately need the migrated schema call it before touching any table:
+
+- `server.ts` — before the `app` import, because `app.ts` builds the route tree against it.
+- `src/__tests__/setup.ts` — before the `dbSeedReady` gate, per test file.
+- `scripts/repair-orphaned-ledger.ts`, `scripts/repair-stock.ts` — operator tools that write.
+
+Read-only callers were deliberately left unmigrated, which is the point of the fix:
+`verify-invariants-live.ts` and `verify-reversal-rules.ts` now report against the ledger without
+being able to alter it.
+
+### Latent defect found while fixing it
+
+`migrationReplay.test.ts` asserted a clean double boot, but its first "boot" reused the module
+instance `setup.ts` had already imported — pointing at setup's temp database, not the temp
+directory the test itself created. Only the second boot, taken after `jest.resetModules()`,
+actually opened the directory under test. The assertion passed for the wrong reason. Both boots
+are now explicit and both run against the directory the test creates.
+
+### Tests
+
+`src/__tests__/databaseInitialization.test.ts` pins the boundary: importing applies nothing,
+`applyPendingMigrations()` applies the full set, a second call adds no ledger rows, a tampered
+checksum aborts the boot, and the invariant collectors import cleanly against an unmigrated
+database. Written red first — importing created `schema_migrations` with 0 expected.
+
+Full server suite: `Test Suites: 141 passed, 141 total`; `Tests: 1278 passed, 1278 total`;
+`Time: 618.845 s`. Typecheck and lint clean.
+
+### Also fixed
+
+`.gitignore` ignored `*.bak` but not `*.bak-shm` / `*.bak-wal`, so `database/erp.db.bak-shm` and
+`database/erp.db.bak-wal` were visible to git. Both patterns added.
+
