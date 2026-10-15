@@ -471,6 +471,12 @@ financial data was modified; the live digest is unchanged at
 
 ## D2b — historical customer credit reconciliation, investigation complete (2026-10-15)
 
+**Update 2026-10-15:** the invoice-49 sub-question that held the Strategy C′ correction on
+hold (whether the second Rs 600 return was genuine) is now resolved — **both returns are
+genuine**; the divergence is missing *physical* stock and one spurious GL leg, not a duplicate
+return. See `audit/FINDING-invoice-49-return-reconciliation.md`. The correction itself remains
+**not applied and not authorised**; the historical repair stays deferred by decision.
+
 Investigation and simulation only. **No live data modified** — digest
 `01359308f37ed33fb506cc42a829c170` and mtime unchanged, 10 existing backups intact.
 All work ran against isolated copies created with the SQLite backup API
