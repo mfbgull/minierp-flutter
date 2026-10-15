@@ -62,6 +62,8 @@ server/database/*.db
 database/*.db
 *.db-shm
 *.db-wal
+*.bak-shm
+*.bak-wal
 server/database/backups/
 
 # Audit-remediation 7.1: never track server runtime data
