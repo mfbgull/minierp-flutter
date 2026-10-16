@@ -1,9 +1,9 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 25** · 2026-10-16 · Backend + API only
+**Revision 26** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–24. Twenty-one defects were found — eleven by *executing*
-this document or checking it against the real API, and ten more by auditing
+Supersedes revisions 1–25. Twenty-two defects were found — eleven by *executing*
+this document or checking it against the real API, and eleven more by auditing
 whether sections still agree with each other:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -148,6 +148,12 @@ it.
   the instrument built to check the document never looked at the document's
   own skeleton, and I only found it by listing every header and reading the
   line numbers.
+- **rev 26** — a duplicated `| created_at | TIMESTAMP NOT NULL | |` row sat at
+  the end of §3.2, *after* the prose that followed the table, separated from the
+  row it duplicated (line 336). Harmless to a parser, and the structural
+  checker did not flag it — a one-row fragment sits below the run threshold
+  tables need. Cosmetic, but it means §3.2's column list read as if it had a
+  duplicate. Removed.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -361,7 +367,6 @@ counters in the same transaction.
 Executed against SQLite 3.51.2: creates cleanly, `invoice_id` is nullable so a
 `REFUND` row inserts without one, and `amount > 0` plus the `kind` CHECK both
 reject bad rows.
-| `created_at` | TIMESTAMP NOT NULL | |
 
 ### 3.3 `credit_applications`
 
