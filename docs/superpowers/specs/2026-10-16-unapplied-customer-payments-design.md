@@ -1,8 +1,8 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 7** · 2026-10-16 · Backend + API only
+**Revision 8** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–6. Three blockers have been found by *executing* this
+Supersedes revisions 1–7. Four blockers have been found by *executing* this
 document rather than reading it, and each was invisible to careful review:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -17,14 +17,23 @@ document rather than reading it, and each was invisible to careful review:
   **already fails by exactly 1800.00**, independent of this feature. §12's tests
   must therefore assert *no new* violations against a captured baseline, never
   absolute green, which is now specified in §12.1.
+- **rev 8** — invariant K omitted `Math.abs`. `GL_BALANCE` computes
+  `SUM(debit) − SUM(credit)`, so a `Cr 2110` receipt of 500 reads −500. K is
+  now `Math.abs(GL_BALANCE('2110')) == Σ remaining_amount`, matching how the
+  collector already treats credit-normal accounts at `accountingInvariants.ts:237`
+  and `:250`.
+
+Sign errors have now cost two blockers in this document (§5.2's `current_balance`
+and §6's K). Both were arithmetic that reads correctly and inverts in code.
 
 Every factual claim below was verified against `server/database/erp.db`, the
 current source tree, by executing the proposed DDL against SQLite 3.51.2, by
 running the §8 backfill arithmetic against live data, by reproducing
-`arImbalances()` verbatim, and by executing migration 108 end-to-end against a
-replica of the live `payments` / `chart_of_accounts` shape.
+`arImbalances()` verbatim, by executing migration 108 end-to-end against a
+replica of the live `payments` / `chart_of_accounts` shape, and by evaluating
+K's arithmetic in isolation.
 
-That last run is clean: `ALTER TABLE payments ADD COLUMN` accepts
+The migration run is clean: `ALTER TABLE payments ADD COLUMN` accepts
 `NOT NULL DEFAULT 'RECEIPT' CHECK (...)` on a populated table, preserves every
 row, enforces the CHECK on both INSERT and UPDATE, and — the one that matters
 for compatibility — still accepts legacy `INSERT`s that omit the column, which
@@ -385,7 +394,7 @@ Un-apply is out of scope for this change.
 | ID | Assertion |
 |---|---|
 | **F** | `abs(GL(1100)+GL(1110)) == abs(Σ current_balance − Σ credit_balance)` — **unchanged**. This feature writes neither column on receipt |
-| **K** | `GL(2110) == Σ remaining_amount` over live `UNAPPLIED_CASH` sources, credit-normal |
+| **K** | `Math.abs(GL_BALANCE('2110')) == Σ remaining_amount` over live `UNAPPLIED_CASH` sources. The `Math.abs` is required, not cosmetic: `GL_BALANCE` computes `SUM(debit) − SUM(credit)`, so a `Cr 2110` receipt of 500 reads **−500**, not +500. This matches how the existing collector treats credit-normal accounts — see `Math.abs(GL_BALANCE('2000'))` at `accountingInvariants.ts:237` and `:250` |
 | **L** | For every source, `remaining_amount == credited_amount − Σ active consumption amounts`. Computed from `credit_source_consumptions` in code, since the generated column alone cannot detect a missing base-counter update |
 | **M** | For every source, `refunded_amount <= credited_amount` **and** `0 <= refundable_cash_amount <= remaining_amount` |
 | **N** | Per receipt: `Σ payment_allocations (voided_at IS NULL) <= payment.amount` |
