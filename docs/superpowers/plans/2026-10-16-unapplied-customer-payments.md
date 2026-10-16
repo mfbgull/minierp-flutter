@@ -133,44 +133,56 @@ Each stage is independently verifiable and independently revertable. Do not star
 
 ### Task 0.1: Live-database write guard
 
-This is the task that makes constraints 1 and 2 enforceable rather than aspirational. It fails loudly if any test path reaches the canonical file.
+**What this actually protects.** The canonical database is `server/database/erp.db`.
+From `server/src/__tests__/helpers/`, that is **four** levels up plus
+`database/erp.db` (`../../../..`). The earlier draft used two levels, which
+resolved to `server/src/database/erp.db` — a path that does not exist, so the
+guard compared against nothing and passed vacuously. The path below is verified
+by the test itself.
 
-**Files:**
-- Create: `server/src/__tests__/helpers/liveDbGuard.ts`
+`openForWrite` is **not** a decoration: it wraps the real `better-sqlite3`
+constructor used by `config/database.ts`, so any code path that opens the
+canonical file for writing throws at open time. There is no second "entry point
+to remember to call".
+
+The hash sentinel is **not** delegated to `scripts/check.sh` — that script has
+no such check, and the earlier draft claimed it did. The sentinel is captured
+here, before and after, by a test that runs in the same process as the suite.
 
 - [ ] **Step 1: Write the failing test**
 
 `server/src/__tests__/liveDbGuard.test.ts`:
 
 ```ts
+import * as crypto from 'crypto';
 import * as fs from 'fs';
-import * as path from 'path';
-import { resolveLiveDbPath } from './helpers/liveDbGuard';
-
-const LIVE = path.resolve(__dirname, '../../database/erp.db');
+import { resolveLiveDbPath, openForWrite, sha256 } from './helpers/liveDbGuard';
 
 describe('live database write guard', () => {
-  it('resolves the canonical live database path', () => {
-    expect(resolveLiveDbPath()).toBe(LIVE);
+  it('resolves the CANONICAL live path, not a nonexistent sibling', () => {
+    const live = resolveLiveDbPath();
+    expect(fs.existsSync(live)).toBe(true);
+    expect(live.endsWith('/server/database/erp.db')).toBe(true);
+    // The two-level path resolves to server/src/database/erp.db, which does
+    // not exist. Assert it is NOT the live path: a future edit that regresses
+    // the guard to two levels fails here instead of passing vacuously.
+    const twoLevel = require('path').resolve(__dirname, '../../database/erp.db');
+    expect(twoLevel).not.toBe(live);
+    expect(fs.existsSync(twoLevel)).toBe(false);
   });
 
-  it('refuses to open the live database for writing', () => {
-    const open = () => resolveLiveDbPath();
-    expect(() => open()).not.toThrow(); // path resolution alone is fine
-
-    // the guard itself must reject a write-mode open
-    const { openForWrite } = require('./helpers/liveDbGuard');
-    expect(() => openForWrite(LIVE)).toThrow(/refus/i);
+  it('refuses to open the canonical database for writing', () => {
+    expect(() => openForWrite(resolveLiveDbPath())).toThrow(/refused/i);
   });
 
-  it('excludes the live database file from writes by hash sentinel', () => {
-    const before = fs.readFileSync(LIVE);
-    // any accidental write would be caught by the suite-level hash check in
-    // scripts/check.sh; here we only assert the guard is wired
-    expect(before.length).toBeGreaterThan(0);
+  it('leaves the canonical database byte-identical across the suite', () => {
+    const live = resolveLiveDbPath();
+    expect(sha256(live)).toBe(BASELINE_SHA256);
   });
 });
 ```
+
+`BASELINE_SHA256` is defined in Step 3.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -182,30 +194,49 @@ Expected: FAIL — `Cannot find module './helpers/liveDbGuard'`
 `server/src/__tests__/helpers/liveDbGuard.ts`:
 
 ```ts
+import * as crypto from 'crypto';
+import * as fs from 'fs';
 import * as path from 'path';
+import Database from 'better-sqlite3';
 
 /**
- * Absolute path to the canonical live database. Tests must never open this
- * file for writing. See AGENTS.md: no live corrections without approval.
+ * Canonical production database. Tests must never open this file for writing.
+ *
+ * FOUR levels up from server/src/__tests__/helpers -> server/, then database/.
+ * Two levels resolves to server/src/database/, which does not exist; a guard
+ * comparing against that path passes vacuously and protects nothing.
  */
 export function resolveLiveDbPath(): string {
-  return path.resolve(__dirname, '../../database/erp.db');
+  return path.resolve(__dirname, '../../../../database/erp.db');
+}
+
+export function sha256(file: string): string {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
 /**
- * Guard for any code path that intends to open a database for writing.
- * Throws when handed the canonical live database.
+ * Open a database for writing, refusing the canonical one.
+ *
+ * Every write-open in this feature's tests goes through here. Note the refusal
+ * keys on RESOLUTION, not on the literal string: a caller passing a symlink or
+ * a relative path that resolves to the canonical file is still refused.
  */
-export function openForWrite(dbPath: string): never {
-  if (path.resolve(dbPath) === resolveLiveDbPath()) {
+export function openForWrite(dbPath: string): Database.Database {
+  const resolved = path.resolve(dbPath);
+  if (resolved === resolveLiveDbPath()) {
     throw new Error(
-      `refused to open the canonical live database for writing: ${dbPath}`
+      `refused to open the canonical live database for writing: ${resolved}`
     );
   }
-  throw new Error(
-    'openForWrite is a guard only; tests must open an isolated copy instead'
-  );
+  return new Database(resolved);
 }
+```
+
+Record the baseline at the top of the test file:
+
+```ts
+const BASELINE_SHA256 =
+  '63e61c6a77991c4b1172abfd9da7135f80cd359b70a911f9c833c0379ee9b50f';
 ```
 
 - [ ] **Step 4: Run the test to verify it passes**
@@ -213,12 +244,14 @@ export function openForWrite(dbPath: string): never {
 Run: `cd server && npx jest src/__tests__/liveDbGuard.test.ts`
 Expected: PASS (3 tests)
 
-- [ ] **Step 5: Verify the live database is untouched**
+- [ ] **Step 5: Verify the baseline is current**
 
 Run: `sha256sum server/database/erp.db`
 Expected: `63e61c6a77991c4b1172abfd9da7135f80cd359b70a911f9c833c0379ee9b50f`
 
-If this hash differs, **stop immediately** and report. Do not continue.
+If it differs, **stop** — do not update the constant to make the test pass.
+A changed canonical hash means the live database moved; that is a finding to
+report, not a constant to refresh.
 
 - [ ] **Step 6: Commit**
 
@@ -229,23 +262,135 @@ git commit -m "test(server): guard against opening the canonical live database f
 
 ---
 
-### Task 0.2: Confirm the fixture path before writing tests
+### Task 0.2: Fixture strategy — decided once, used everywhere
 
-Do NOT add a database helper. `server/src/__tests__/helpers/productionSchema.ts`
+Do NOT create `isolatedDb.ts`. `server/src/__tests__/helpers/productionSchema.ts`
 already exports `createFixtureDb(options)` and `cleanupFixtureDbs()`, and
 `setup.ts` already runs `applyPendingMigrations()` per test file.
 
-- [ ] **Step 1: Read `productionSchema.ts:85-125` and confirm the contract**
+**`createFixtureDb()` returns an EMPTY database.** Two kinds of test need
+different fixtures, and mixing them is what produced the contradiction in the
+earlier draft:
 
-Expected: `createFixtureDb({ reference: true })` returns an **empty** database
-with the production schema plus seeded `chart_of_accounts`.
+| Kind | Needs | Use |
+|---|---|---|
+| **Feature** — invariants K/L/M, receive, apply, refund, reverse | schema + `chart_of_accounts` + at least one customer | `createFixtureDb({ reference: true })` + `seedCustomers(db)` |
+| **Historical evidence** — Stage B backfill, Stage C reconciliation | the historical ledger rows | `createFixtureDb({ reference: true })` + `seedHistoricalLedger(db)` |
 
-- [ ] **Step 2: Read one existing test that uses it** (e.g.
-`arSurfaceConsistency.test.ts:20`) and copy its fixture-insert shape.
+**Neither strategy reads the live database.** Tests that copy production data
+break the next time someone records a return. The historical fixture below
+replicates the *shape and figures* so the assertions stay meaningful and
+hermetic.
 
-- [ ] **Step 3: Do not create `isolatedDb.ts`.** Its job is already done, and a
-second helper is how the repo ended up with 24 divergent MIGRATIONS arrays
-before `productionSchema.ts` existed.
+- [ ] **Step 1: Add `seedCustomers` to `productionSchema.ts`**
+
+```ts
+export function seedCustomers(db: Database.Database, n = 3): void {
+  const ins = db.prepare(
+    `INSERT INTO customers (customer_code, customer_name, is_active, current_balance, credit_balance)
+     VALUES (?, ?, 1, 0, 0)`
+  );
+  for (let i = 1; i <= n; i += 1) {
+    ins.run(`SEED-${i}`, `Seed Customer ${i}`);
+  }
+}
+```
+
+- [ ] **Step 2: Add `seedHistoricalLedger` — deterministic, mirrors production**
+
+```ts
+/**
+ * Replicates the SHAPE and FIGURES of the production history so Stage B and
+ * Stage C assertions are hermetic. These numbers were read from the live
+ * database and are recorded here deliberately: they are evidence, not
+ * convenience. Do not "fix" a discrepancy they encode — report it.
+ */
+export function seedHistoricalLedger(db: Database.Database): void {
+  const cust = db.prepare(
+    `INSERT INTO customers (customer_code, customer_name, is_active, current_balance, credit_balance)
+     VALUES (?, ?, 1, 0, 0) RETURNING id`
+  );
+  const ids: Record<number, number> = {};
+  // RETURN row counts per customer: 2, 3, 2, 2, 4 = 13 total (matches production)
+  const plan: Array<[number, string, number[]]> = [
+    [1, 'C1', [450.20, 1000.00]],
+    [12, 'C12', [1000.00, 900.00, 500.00]],
+    [13, 'C13', [700.00, 500.00]],
+    [14, 'C14', [600.00, 600.00]],
+    [15, 'C15', [600.00, 600.00, 550.00, 550.00]],
+  ];
+  const ret = db.prepare(
+    `INSERT INTO customer_ledger
+       (customer_id, transaction_date, transaction_type, reference_no, credit, debit, created_at)
+     VALUES (?, '2026-09-01', 'RETURN', ?, ?, 0, ?) RETURNING id`
+  );
+  const ref = db.prepare(
+    `INSERT INTO customer_ledger
+       (customer_id, transaction_date, transaction_type, reference_no, credit, debit, created_at)
+     VALUES (?, ?, ?, ?, ?, 0, ?) RETURNING id`
+  );
+  const off = db.prepare(
+    `INSERT INTO customer_ledger
+       (customer_id, transaction_date, transaction_type, reference_no, credit, debit, created_at)
+     VALUES (?, ?, 'CREDIT_OFFSET', ?, ?, 0, ?) RETURNING id`
+  );
+  for (const [code, name, credits] of plan) {
+    const row = cust.get(code, name) as { id: number };
+    ids[code] = row.id;
+    credits.forEach((amount, i) => {
+      ret.get(row.id, `RET-${code}-${i}`, amount, `2026-09-0${i + 1} 10:00:00`);
+    });
+  }
+  // Refunds are transaction_type='REFUND' (debit) — NOT RETURN rows with a debit.
+  const refunds: Array<[number, number]> = [[1, 1200], [12, 2300], [13, 400], [15, 550]];
+  for (const [code, amount] of refunds) {
+    ref.get(ids[code], '2026-09-12', 'REFUND', `PAY-SEED-${code}`, amount, '2026-09-12 10:00:00');
+  }
+  // Customer 15 alone carries the CREDIT_OFFSET consumption.
+  [600, 600, 600].forEach((amount, i) => {
+    off.get(ids[15], '2026-09-13', `OFF-15-${i}`, amount, '2026-09-13 10:00:00');
+  });
+}
+```
+
+Seeded totals (assert these, so a silent seed edit is caught):
+
+| customer | RETURN credit rows | granted | refunded | consumed | derived |
+|---|---|---|---|---|---|
+| 1 | 2 | 1450.20 | 1200 | 0 | 250.20 |
+| 12 | 3 | 2400 | 2300 | 0 | 100 |
+| 13 | 2 | 1200 | 400 | 0 | 800 |
+| 14 | 2 | 1200 | 0 | 0 | 1200 |
+| 15 | 4 | 2300 | 550 | 1800 | -50 |
+| **total** | **13** | **8550.20** | **4450** | **1800** | |
+
+- [ ] **Step 3: Every feature test calls `cleanupFixtureDbs()` in `afterAll`**
+
+```ts
+afterAll(() => { cleanupFixtureDbs(); });
+```
+
+- [ ] **Step 4: Verify every example below already follows the strategy**
+
+The examples in this plan were converted to this strategy; confirm it held:
+
+```bash
+grep -n 'makeIsolatedCopy\|helpers/isolatedDb' docs/superpowers/plans/2026-10-16-unapplied-customer-payments.md
+grep -c 'createFixtureDb({ reference: true })' docs/superpowers/plans/2026-10-16-unapplied-customer-payments.md
+```
+
+Expected: the first returns only this step's own prose (no runnable example),
+and the second returns one hit per test. Expected fixture per file:
+
+| File | Seed |
+|---|---|
+| `unappliedCashMigration.test.ts` (Stage A) | none — schema only |
+| `unappliedCashBackfill.test.ts` (Stage B) | `seedHistoricalLedger(db)` |
+| `creditReconciliation.test.ts` (Stage C) | `seedHistoricalLedger(db)` |
+| `unappliedCashGl.test.ts` (Stage D) | `seedCustomers(db)` |
+| `unappliedCashApi.test.ts` (Stage E) | `seedCustomers(db)` |
+
+No second helper, no override table — one strategy per test kind, stated above.
 
 ---
 ### Task A.1: Migration 108 — account 2110
@@ -262,48 +407,53 @@ Do this first and alone so a failure isolates cleanly.
 `server/src/__tests__/unappliedCashMigration.test.ts`:
 
 ```ts
-import { makeIsolatedCopy } from './helpers/isolatedDb';
+import { createFixtureDb, cleanupFixtureDbs, seedCustomers, seedHistoricalLedger } from './helpers/productionSchema';
+
+afterAll(() => { cleanupFixtureDbs(); });
 import { applyPendingMigrations } from '../config/database';
 
 describe('migration 108 — account 2110', () => {
   it('creates 2110 with all four columns the GL layer needs', () => {
-    const { db, cleanup } = makeIsolatedCopy('mig2110');
-    try {
-      /* schema already migrated by setup.ts */;
-      const row = db
-        .prepare(`SELECT code, name, type, normal_balance, text_code
-                  FROM chart_of_accounts WHERE code = '2110'`)
-        .get();
-      expect(row).toMatchObject({
-        code: '2110',
-        type: 'liability',
-        normal_balance: 'credit',
-        text_code: 'unapplied_customer_payments',
-      });
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const row = db
+      .prepare(`SELECT code, name, type, normal_balance, text_code
+                FROM chart_of_accounts WHERE code = '2110'`)
+      .get();
+    expect(row).toMatchObject({
+      code: '2110',
+      type: 'liability',
+      normal_balance: 'credit',
+      text_code: 'unapplied_customer_payments',
+    });
+  
   });
 
   it('is idempotent — a second apply does not throw or duplicate', () => {
-    const { db, cleanup } = makeIsolatedCopy('mig2110-idem');
-    try {
-      /* schema already migrated by setup.ts */;
-      /* schema already migrated by setup.ts */;
-      const n = db
-        .prepare(`SELECT COUNT(*) AS n FROM chart_of_accounts WHERE code='2110'`)
-        .get() as { n: number };
-      expect(n.n).toBe(1);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    /* schema already migrated by setup.ts */;
+    const n = db
+      .prepare(`SELECT COUNT(*) AS n FROM chart_of_accounts WHERE code='2110'`)
+      .get() as { n: number };
+    expect(n.n).toBe(1);
+  
   });
 
   it('is addressable by text_code, which is how postEntry resolves it', () => {
-    const { db, cleanup } = makeIsolatedCopy('mig2110-tc');
-    try {
-      /* schema already migrated by setup.ts */;
-      const row = db
-        .prepare(`SELECT code FROM chart_of_accounts WHERE text_code = ?`)
-        .get('unapplied_customer_payments');
-      expect(row).toBeDefined();
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const row = db
+      .prepare(`SELECT code FROM chart_of_accounts WHERE text_code = ?`)
+      .get('unapplied_customer_payments');
+    expect(row).toBeDefined();
+  
   });
 });
 ```
@@ -388,85 +538,91 @@ Append to `unappliedCashMigration.test.ts`:
 ```ts
 describe('migration 108 — tables', () => {
   it('creates customer_credit_sources with a VIRTUAL generated remaining', () => {
-    const { db, cleanup } = makeIsolatedCopy('mig-src');
-    try {
-      /* schema already migrated by setup.ts */;
-      const sql = db
-        .prepare(`SELECT sql FROM sqlite_master
-                  WHERE type='table' AND name='customer_credit_sources'`)
-        .get() as { sql: string };
-      expect(sql.sql).toMatch(/remaining_amount/i);
-      expect(sql.sql).toMatch(/GENERATED ALWAYS AS/i);
-      expect(sql.sql).toMatch(/VIRTUAL/i);
-      // constraints must live INSIDE CREATE TABLE, not in a trailing block
-      expect(sql.sql).toMatch(/c_refund_le_credited/i);
-      expect(sql.sql).toMatch(/c_refundable_le_remaining/i);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const sql = db
+      .prepare(`SELECT sql FROM sqlite_master
+                WHERE type='table' AND name='customer_credit_sources'`)
+      .get() as { sql: string };
+    expect(sql.sql).toMatch(/remaining_amount/i);
+    expect(sql.sql).toMatch(/GENERATED ALWAYS AS/i);
+    expect(sql.sql).toMatch(/VIRTUAL/i);
+    // constraints must live INSIDE CREATE TABLE, not in a trailing block
+    expect(sql.sql).toMatch(/c_refund_le_credited/i);
+    expect(sql.sql).toMatch(/c_refundable_le_remaining/i);
+  
   });
 
   it('rejects a refund whose refunded_amount exceeds credited_amount', () => {
-    const { db, cleanup } = makeIsolatedCopy('mig-src-chk');
-    try {
-      /* schema already migrated by setup.ts */;
-      const c = db.prepare(`SELECT id FROM customers LIMIT 1`).get() as { id: number };
-      db.prepare(`INSERT INTO customer_credit_sources
-        (customer_id, kind, credited_amount, refundable_cash_amount)
-        VALUES (?, 'UNAPPLIED_CASH', 100, 0)`).run(c.id);
-      expect(() => db.prepare(`UPDATE customer_credit_sources
-        SET refunded_amount = 101`).run()).toThrow();
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const c = db.prepare(`SELECT id FROM customers LIMIT 1`).get() as { id: number };
+    db.prepare(`INSERT INTO customer_credit_sources
+      (customer_id, kind, credited_amount, refundable_cash_amount)
+      VALUES (?, 'UNAPPLIED_CASH', 100, 0)`).run(c.id);
+    expect(() => db.prepare(`UPDATE customer_credit_sources
+      SET refunded_amount = 101`).run()).toThrow();
+  
   });
 
   it('allows refunding the last 100 of a 500 source', () => {
     // regression for the rev-5 DDL bug: refunded_amount <= refundable_cash_amount
     // is unsatisfiable because refundable drains in the same operation
-    const { db, cleanup } = makeIsolatedCopy('mig-src-refund');
-    try {
-      /* schema already migrated by setup.ts */;
-      const c = db.prepare(`SELECT id FROM customers LIMIT 1`).get() as { id: number };
-      db.prepare(`INSERT INTO customer_credit_sources
-        (customer_id, kind, credited_amount, refundable_cash_amount)
-        VALUES (?, 'UNAPPLIED_CASH', 500, 500)`).run(c.id);
-      expect(() => db.prepare(`UPDATE customer_credit_sources
-        SET refunded_amount = 100, refundable_cash_amount = 400`).run()).not.toThrow();
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const c = db.prepare(`SELECT id FROM customers LIMIT 1`).get() as { id: number };
+    db.prepare(`INSERT INTO customer_credit_sources
+      (customer_id, kind, credited_amount, refundable_cash_amount)
+      VALUES (?, 'UNAPPLIED_CASH', 500, 500)`).run(c.id);
+    expect(() => db.prepare(`UPDATE customer_credit_sources
+      SET refunded_amount = 100, refundable_cash_amount = 400`).run()).not.toThrow();
+  
   });
 
   it('creates credit_source_consumptions with nullable invoice_id', () => {
-    const { db, cleanup } = makeIsolatedCopy('mig-cons');
-    try {
-      /* schema already migrated by setup.ts */;
-      const sql = db
-        .prepare(`SELECT sql FROM sqlite_master
-                  WHERE type='table' AND name='credit_source_consumptions'`)
-        .get() as { sql: string };
-      expect(sql.sql).toMatch(/invoice_id INTEGER(,|\s)/);
-      expect(sql.sql).not.toMatch(/invoice_id INTEGER NOT NULL/);
-      expect(sql.sql).toMatch(/amount DECIMAL\(15,2\) NOT NULL CHECK \(amount > 0\)/);
-      expect(sql.sql).toMatch(/voided_at/);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const sql = db
+      .prepare(`SELECT sql FROM sqlite_master
+                WHERE type='table' AND name='credit_source_consumptions'`)
+      .get() as { sql: string };
+    expect(sql.sql).toMatch(/invoice_id INTEGER(,|\s)/);
+    expect(sql.sql).not.toMatch(/invoice_id INTEGER NOT NULL/);
+    expect(sql.sql).toMatch(/amount DECIMAL\(15,2\) NOT NULL CHECK \(amount > 0\)/);
+    expect(sql.sql).toMatch(/voided_at/);
+  
   });
 
   it('creates credit_applications with an APPLY/REFUND CHECK', () => {
-    const { db, cleanup } = makeIsolatedCopy('mig-apps');
-    try {
-      /* schema already migrated by setup.ts */;
-      const sql = db
-        .prepare(`SELECT sql FROM sqlite_master
-                  WHERE type='table' AND name='credit_applications'`)
-        .get() as { sql: string };
-      expect(sql.sql).toMatch(/operation TEXT NOT NULL CHECK \(operation IN \('APPLY','REFUND'\)\)/);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const sql = db
+      .prepare(`SELECT sql FROM sqlite_master
+                WHERE type='table' AND name='credit_applications'`)
+      .get() as { sql: string };
+    expect(sql.sql).toMatch(/operation TEXT NOT NULL CHECK \(operation IN \('APPLY','REFUND'\)\)/);
+  
   });
 
   it('adds payments.payment_kind defaulting every existing row to RECEIPT', () => {
-    const { db, cleanup } = makeIsolatedCopy('mig-kind');
-    try {
-      /* schema already migrated by setup.ts */;
-      const rows = db.prepare(`SELECT DISTINCT payment_kind FROM payments`).all();
-      expect(rows.length).toBeGreaterThan(0);
-      expect(rows.every((r: any) => r.payment_kind === 'RECEIPT')).toBe(true);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const rows = db.prepare(`SELECT DISTINCT payment_kind FROM payments`).all();
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r: any) => r.payment_kind === 'RECEIPT')).toBe(true);
+  
   });
 });
 ```
@@ -577,7 +733,6 @@ git commit -m "feat(server): migration 108 adds credit source, consumption and a
 ```bash
 cd server && npx jest src/__tests__/unappliedCashMigration.test.ts \
                 src/__tests__/liveDbGuard.test.ts \
-                src/__tests__/isolatedDb.test.ts
 npm run typecheck && npm run lint
 sha256sum database/erp.db   # must equal the sentinel above
 ```
@@ -610,87 +765,95 @@ Validate instead on ledger self-consistency: per customer,
 `server/src/__tests__/unappliedCashBackfill.test.ts`:
 
 ```ts
-import { makeIsolatedCopy } from './helpers/isolatedDb';
+import { createFixtureDb, cleanupFixtureDbs, seedCustomers, seedHistoricalLedger } from './helpers/productionSchema';
+
+afterAll(() => { cleanupFixtureDbs(); });
 import { applyPendingMigrations } from '../config/database';
 
 const R2 = (n: number) => Math.round(n * 100) / 100;
 
 describe('migration 108 — historical provenance backfill', () => {
   it('creates one RETURN_CREDIT source per non-voided RETURN credit row', () => {
-    const { db, cleanup } = makeIsolatedCopy('bk-count');
-    try {
-      /* schema already migrated by setup.ts */;
-      const expected = db.prepare(`
-        SELECT COUNT(*) AS n FROM customer_ledger
-        WHERE transaction_type = 'RETURN' AND credit > 0
-          AND COALESCE(voided,0) = 0 AND reversed_by IS NULL`).get() as { n: number };
-      const actual = db.prepare(`
-        SELECT COUNT(*) AS n FROM customer_credit_sources
-        WHERE kind = 'RETURN_CREDIT'`).get() as { n: number };
-      expect(actual.n).toBe(expected.n);
-      expect(actual.n).toBe(13);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedHistoricalLedger(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const expected = db.prepare(`
+      SELECT COUNT(*) AS n FROM customer_ledger
+      WHERE transaction_type = 'RETURN' AND credit > 0
+        AND COALESCE(voided,0) = 0 AND reversed_by IS NULL`).get() as { n: number };
+    const actual = db.prepare(`
+      SELECT COUNT(*) AS n FROM customer_credit_sources
+      WHERE kind = 'RETURN_CREDIT'`).get() as { n: number };
+    expect(actual.n).toBe(expected.n);
+    expect(actual.n).toBe(13);
+  
   });
 
   it('credits each source with the RETURN amount', () => {
-    const { db, cleanup } = makeIsolatedCopy('bk-amount');
-    try {
-      /* schema already migrated by setup.ts */;
-      const total = db.prepare(`
-        SELECT COALESCE(SUM(credited_amount),0) AS v
-        FROM customer_credit_sources WHERE kind = 'RETURN_CREDIT'`).get() as { v: number };
-      expect(R2(total.v)).toBe(8550.20);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedHistoricalLedger(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const total = db.prepare(`
+      SELECT COALESCE(SUM(credited_amount),0) AS v
+      FROM customer_credit_sources WHERE kind = 'RETURN_CREDIT'`).get() as { v: number };
+    expect(R2(total.v)).toBe(8550.20);
+  
   });
 
   it('records consumed_amount from CREDIT_OFFSET applications', () => {
     // customer 15 granted 2300, 1800 consumed by CREDIT_OFFSET
-    const { db, cleanup } = makeIsolatedCopy('bk-consumed');
-    try {
-      /* schema already migrated by setup.ts */;
-      const row = db.prepare(`
-        SELECT credited_amount, consumed_amount, remaining_amount
-        FROM customer_credit_sources
-        WHERE kind='RETURN_CREDIT'
-          AND customer_id = (SELECT id FROM customers LIMIT 1 OFFSET 4)`).get() as any;
-      expect(row).toBeDefined();
-      expect(R2(row.credited_amount)).toBe(2300);
-      expect(R2(row.consumed_amount)).toBe(1800);
-      expect(R2(row.remaining_amount)).toBe(500);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedHistoricalLedger(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const row = db.prepare(`
+      SELECT credited_amount, consumed_amount, remaining_amount
+      FROM customer_credit_sources
+      WHERE kind='RETURN_CREDIT'
+        AND customer_id = (SELECT id FROM customers LIMIT 1 OFFSET 4)`).get() as any;
+    expect(row).toBeDefined();
+    expect(R2(row.credited_amount)).toBe(2300);
+    expect(R2(row.consumed_amount)).toBe(1800);
+    expect(R2(row.remaining_amount)).toBe(500);
+  
   });
 
   it('leaves every backfilled row NON-SPENDABLE (refundable_cash_amount = 0)', () => {
-    const { db, cleanup } = makeIsolatedCopy('bk-inert');
-    try {
-      /* schema already migrated by setup.ts */;
-      const bad = db.prepare(`
-        SELECT COUNT(*) AS n FROM customer_credit_sources
-        WHERE kind='RETURN_CREDIT' AND refundable_cash_amount <> 0`).get() as { n: number };
-      expect(bad.n).toBe(0);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedHistoricalLedger(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const bad = db.prepare(`
+      SELECT COUNT(*) AS n FROM customer_credit_sources
+      WHERE kind='RETURN_CREDIT' AND refundable_cash_amount <> 0`).get() as { n: number };
+    expect(bad.n).toBe(0);
+  
   });
 
   it('creates no UNAPPLIED_CASH sources — the backfill must not invent spendable cash', () => {
-    const { db, cleanup } = makeIsolatedCopy('bk-no-cash');
-    try {
-      /* schema already migrated by setup.ts */;
-      const n = db.prepare(`
-        SELECT COUNT(*) AS n FROM customer_credit_sources
-        WHERE kind='UNAPPLIED_CASH'`).get() as { n: number };
-      expect(n.n).toBe(0);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedHistoricalLedger(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const n = db.prepare(`
+      SELECT COUNT(*) AS n FROM customer_credit_sources
+      WHERE kind='UNAPPLIED_CASH'`).get() as { n: number };
+    expect(n.n).toBe(0);
+  
   });
 
   it('never consumes more than was credited, for any customer', () => {
-    const { db, cleanup } = makeIsolatedCopy('bk-selftest');
-    try {
-      /* schema already migrated by setup.ts */;
-      const bad = db.prepare(`
-        SELECT COUNT(*) AS n FROM customer_credit_sources
-        WHERE consumed_amount > credited_amount`).get() as { n: number };
-      expect(bad.n).toBe(0);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedHistoricalLedger(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const bad = db.prepare(`
+      SELECT COUNT(*) AS n FROM customer_credit_sources
+      WHERE consumed_amount > credited_amount`).get() as { n: number };
+    expect(bad.n).toBe(0);
+  
   });
 });
 ```
@@ -811,7 +974,9 @@ balance and ledger is the *finding*, not a bug to be patched.
 `server/src/__tests__/creditReconciliation.test.ts`:
 
 ```ts
-import { makeIsolatedCopy } from './helpers/isolatedDb';
+import { createFixtureDb, cleanupFixtureDbs, seedCustomers, seedHistoricalLedger } from './helpers/productionSchema';
+
+afterAll(() => { cleanupFixtureDbs(); });
 import { applyPendingMigrations } from '../config/database';
 import { reconcileCustomerCredits } from '../services/creditReconciliation';
 
@@ -819,62 +984,66 @@ const R2 = (n: number) => Math.round(n * 100) / 100;
 
 describe('credit reconciliation (read-only)', () => {
   it('reports every customer that has credit history', () => {
-    const { db, cleanup } = makeIsolatedCopy('recon');
-    try {
-      /* schema already migrated by setup.ts */;
-      const rows = reconcileCustomerCredits(db);
-      expect(rows.length).toBe(5);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedHistoricalLedger(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const rows = reconcileCustomerCredits(db);
+    expect(rows.length).toBe(5);
+  
   });
 
   it('reports stored balance and ledger-derived balance side by side', () => {
-    const { db, cleanup } = makeIsolatedCopy('recon-fields');
-    try {
-      /* schema already migrated by setup.ts */;
-      const [row] = reconcileCustomerCredits(db);
-      expect(row).toEqual(expect.objectContaining({
-        customerId: expect.any(Number),
-        storedCreditBalance: expect.any(Number),
-        ledgerGranted: expect.any(Number),
-        ledgerRefunded: expect.any(Number),
-        ledgerConsumed: expect.any(Number),
-        ledgerDerived: expect.any(Number),
-        agrees: expect.any(Boolean),
-      }));
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedHistoricalLedger(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const [row] = reconcileCustomerCredits(db);
+    expect(row).toEqual(expect.objectContaining({
+      customerId: expect.any(Number),
+      storedCreditBalance: expect.any(Number),
+      ledgerGranted: expect.any(Number),
+      ledgerRefunded: expect.any(Number),
+      ledgerConsumed: expect.any(Number),
+      ledgerDerived: expect.any(Number),
+      agrees: expect.any(Boolean),
+    }));
+  
   });
 
   it('flags customer 15 as disagreeing, since credit_balance is 0 against 2300 granted', () => {
-    const { db, cleanup } = makeIsolatedCopy('recon-15');
-    try {
-      /* schema already migrated by setup.ts */;
-      const rows = reconcileCustomerCredits(db);
-      const fifteen = rows.find(r => r.ledgerGranted === 2300);
-      expect(fifteen).toBeDefined();
-      expect(fifteen!.agrees).toBe(false);
-      // 2300 granted - 550 refunded in cash - 1800 consumed by CREDIT_OFFSET.
-      // The negative is the finding: Rs 550 was paid OUT as cash, so the
-      // customer was granted less credit than the ledger implies they hold.
-      expect(R2(fifteen!.ledgerDerived)).toBe(-50);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedHistoricalLedger(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const rows = reconcileCustomerCredits(db);
+    const fifteen = rows.find(r => r.ledgerGranted === 2300);
+    expect(fifteen).toBeDefined();
+    expect(fifteen!.agrees).toBe(false);
+    // 2300 granted - 550 refunded in cash - 1800 consumed by CREDIT_OFFSET.
+    // The negative is the finding: Rs 550 was paid OUT as cash, so the
+    // customer was granted less credit than the ledger implies they hold.
+    expect(R2(fifteen!.ledgerDerived)).toBe(-50);
+  
   });
 
   it('writes nothing — the report is read-only', () => {
-    const { db, cleanup } = makeIsolatedCopy('recon-readonly');
-    try {
-      /* schema already migrated by setup.ts */;
-      const before = db.prepare(
-        `SELECT COUNT(*) AS n FROM customer_credit_sources`).get() as { n: number };
-      const ledBefore = db.prepare(
-        `SELECT COUNT(*) AS n FROM customer_ledger`).get() as { n: number };
-      reconcileCustomerCredits(db);
-      const after = db.prepare(
-        `SELECT COUNT(*) AS n FROM customer_credit_sources`).get() as { n: number };
-      const ledAfter = db.prepare(
-        `SELECT COUNT(*) AS n FROM customer_ledger`).get() as { n: number };
-      expect(after.n).toBe(before.n);
-      expect(ledAfter.n).toBe(ledBefore.n);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedHistoricalLedger(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const before = db.prepare(
+      `SELECT COUNT(*) AS n FROM customer_credit_sources`).get() as { n: number };
+    const ledBefore = db.prepare(
+      `SELECT COUNT(*) AS n FROM customer_ledger`).get() as { n: number };
+    reconcileCustomerCredits(db);
+    const after = db.prepare(
+      `SELECT COUNT(*) AS n FROM customer_credit_sources`).get() as { n: number };
+    const ledAfter = db.prepare(
+      `SELECT COUNT(*) AS n FROM customer_ledger`).get() as { n: number };
+    expect(after.n).toBe(before.n);
+    expect(ledAfter.n).toBe(ledBefore.n);
+  
   });
 });
 ```
@@ -1028,7 +1197,9 @@ authoritative.**
 `server/src/__tests__/unappliedCashGl.test.ts` (opening):
 
 ```ts
-import { makeIsolatedCopy } from './helpers/isolatedDb';
+import { createFixtureDb, cleanupFixtureDbs, seedCustomers, seedHistoricalLedger } from './helpers/productionSchema';
+
+afterAll(() => { cleanupFixtureDbs(); });
 import { applyPendingMigrations } from '../config/database';
 import { collectCreditInvariants } from './helpers/accountingInvariants';
 
@@ -1036,53 +1207,58 @@ const R2 = (n: number) => Math.round(n * 100) / 100;
 
 describe('credit invariants K, L, M, N', () => {
   it('K holds when GL 2110 equals the sum of live unapplied source balances', () => {
-    const { db, cleanup } = makeIsolatedCopy('inv-K');
-    try {
-      /* schema already migrated by setup.ts */;
-      const v = collectCreditInvariants(db);
-      expect(R2(v.gl2110)).toBe(R2(v.sumUnappliedRemaining));
-      expect(v.ok.K).toBe(true);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const v = collectCreditInvariants(db);
+    expect(R2(v.gl2110)).toBe(R2(v.sumUnappliedRemaining));
+    expect(v.ok.K).toBe(true);
+  
   });
 
   it('K fails when a source is live but its GL leg is gone', () => {
-    const { db, cleanup } = makeIsolatedCopy('inv-K-bad');
-    try {
-      /* schema already migrated by setup.ts */;
-      const c = db.prepare(`SELECT id FROM customers LIMIT 1`).get() as { id: number };
-      db.prepare(`INSERT INTO customer_credit_sources
-        (customer_id, kind, credited_amount, refundable_cash_amount)
-        VALUES (?, 'UNAPPLIED_CASH', 500, 500)`).run(c.id);
-      const v = collectCreditInvariants(db);
-      expect(v.ok.K).toBe(false);   // 500 of credit, no GL backing it
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const c = db.prepare(`SELECT id FROM customers LIMIT 1`).get() as { id: number };
+    db.prepare(`INSERT INTO customer_credit_sources
+      (customer_id, kind, credited_amount, refundable_cash_amount)
+      VALUES (?, 'UNAPPLIED_CASH', 500, 500)`).run(c.id);
+    const v = collectCreditInvariants(db);
+    expect(v.ok.K).toBe(false);   // 500 of credit, no GL backing it
+  
   });
 
   it('L holds when every source has a consumption covering its consumed_amount', () => {
-    const { db, cleanup } = makeIsolatedCopy('inv-L');
-    try {
-      /* schema already migrated by setup.ts */;
-      const v = collectCreditInvariants(db);
-      expect(v.ok.L).toBe(true);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const v = collectCreditInvariants(db);
+    expect(v.ok.L).toBe(true);
+  
   });
 
   it('M holds when no source is over-refunded', () => {
-    const { db, cleanup } = makeIsolatedCopy('inv-M');
-    try {
-      /* schema already migrated by setup.ts */;
-      const v = collectCreditInvariants(db);
-      expect(v.ok.M).toBe(true);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const v = collectCreditInvariants(db);
+    expect(v.ok.M).toBe(true);
+  
   });
 
   it('N holds when no receipt is allocated beyond its own amount', () => {
-    const { db, cleanup } = makeIsolatedCopy('inv-N');
-    try {
-      /* schema already migrated by setup.ts */;
-      const v = collectCreditInvariants(db);
-      expect(v.ok.N).toBe(true);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const v = collectCreditInvariants(db);
+    expect(v.ok.N).toBe(true);
+  
   });
 });
 ```
@@ -1205,85 +1381,90 @@ import { receiveUnappliedCash } from '../services/unappliedCashService';
 
 describe('5.1 receive unapplied cash', () => {
   it('creates a UNAPPLIED_RECEIPT payment and a matching source', () => {
-    const { db, cleanup } = makeIsolatedCopy('op-recv');
-    try {
-      /* schema already migrated by setup.ts */;
-      const c = db.prepare(`SELECT id FROM customers
-                           WHERE current_balance = 0 LIMIT 1`).get() as { id: number };
-      const res = receiveUnappliedCash(db, { customerId: c.id, amount: 500 });
-      const pay = db.prepare(
-        `SELECT payment_kind, amount FROM payments WHERE id = ?`).get(res.paymentId) as any;
-      expect(pay.payment_kind).toBe('UNAPPLIED_RECEIPT');
-      expect(pay.amount).toBe(500);
-      const src = db.prepare(
-        `SELECT kind, credited_amount, refundable_cash_amount, remaining_amount
-         FROM customer_credit_sources WHERE origin_payment_id = ?`).get(res.paymentId) as any;
-      expect(src).toMatchObject({ kind: 'UNAPPLIED_CASH', credited_amount: 500,
-                                  refundable_cash_amount: 500, remaining_amount: 500 });
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const c = db.prepare(`SELECT id FROM customers
+                         WHERE current_balance = 0 LIMIT 1`).get() as { id: number };
+    const res = receiveUnappliedCash(db, { customerId: c.id, amount: 500 });
+    const pay = db.prepare(
+      `SELECT payment_kind, amount FROM payments WHERE id = ?`).get(res.paymentId) as any;
+    expect(pay.payment_kind).toBe('UNAPPLIED_RECEIPT');
+    expect(pay.amount).toBe(500);
+    const src = db.prepare(
+      `SELECT kind, credited_amount, refundable_cash_amount, remaining_amount
+       FROM customer_credit_sources WHERE origin_payment_id = ?`).get(res.paymentId) as any;
+    expect(src).toMatchObject({ kind: 'UNAPPLIED_CASH', credited_amount: 500,
+                                refundable_cash_amount: 500, remaining_amount: 500 });
+  
   });
 
   it('posts Dr cash / Cr 2110 keyed on the payment id', () => {
-    const { db, cleanup } = makeIsolatedCopy('op-recv-gl');
-    try {
-      /* schema already migrated by setup.ts */;
-      const c = db.prepare(`SELECT id FROM customers
-                           WHERE current_balance = 0 LIMIT 1`).get() as { id: number };
-      const res = receiveUnappliedCash(db, { customerId: c.id, amount: 500 });
-      const lines = db.prepare(`
-        SELECT a.code, jl.debit, jl.credit
-        FROM journal_lines jl
-        JOIN journal_entries je ON je.id = jl.journal_entry_id
-        JOIN chart_of_accounts a ON a.id = jl.account_id
-        WHERE je.reference_type = 'UNAPPLIED_RECEIPT' AND je.reference_id = ?`)
-        .all(res.paymentId) as Array<{ code: string; debit: number; credit: number }>;
-      expect(lines).toEqual(expect.arrayContaining([
-        expect.objectContaining({ code: '1000', debit: 500 }),
-        expect.objectContaining({ code: '2110', credit: 500 }),
-      ]));
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const c = db.prepare(`SELECT id FROM customers
+                         WHERE current_balance = 0 LIMIT 1`).get() as { id: number };
+    const res = receiveUnappliedCash(db, { customerId: c.id, amount: 500 });
+    const lines = db.prepare(`
+      SELECT a.code, jl.debit, jl.credit
+      FROM journal_lines jl
+      JOIN journal_entries je ON je.id = jl.journal_entry_id
+      JOIN chart_of_accounts a ON a.id = jl.account_id
+      WHERE je.reference_type = 'UNAPPLIED_RECEIPT' AND je.reference_id = ?`)
+      .all(res.paymentId) as Array<{ code: string; debit: number; credit: number }>;
+    expect(lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: '1000', debit: 500 }),
+      expect.objectContaining({ code: '2110', credit: 500 }),
+    ]));
+  
   });
 
   it('keeps invariant F unchanged — credit_balance is never touched', () => {
-    const { db, cleanup } = makeIsolatedCopy('op-recv-f');
-    try {
-      /* schema already migrated by setup.ts */;
-      const c = db.prepare(`SELECT id FROM customers
-                           WHERE current_balance = 0 LIMIT 1`).get() as { id: number };
-      const before = db.prepare(`SELECT credit_balance, current_balance FROM customers
-                                WHERE id = ?`).get(c.id) as any;
-      receiveUnappliedCash(db, { customerId: c.id, amount: 500 });
-      const after = db.prepare(`SELECT credit_balance, current_balance FROM customers
-                               WHERE id = ?`).get(c.id) as any;
-      expect(after).toEqual(before);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const c = db.prepare(`SELECT id FROM customers
+                         WHERE current_balance = 0 LIMIT 1`).get() as { id: number };
+    const before = db.prepare(`SELECT credit_balance, current_balance FROM customers
+                              WHERE id = ?`).get(c.id) as any;
+    receiveUnappliedCash(db, { customerId: c.id, amount: 500 });
+    const after = db.prepare(`SELECT credit_balance, current_balance FROM customers
+                             WHERE id = ?`).get(c.id) as any;
+    expect(after).toEqual(before);
+  
   });
 
   it('writes no customer_ledger row — the money has not moved', () => {
-    const { db, cleanup } = makeIsolatedCopy('op-recv-ledger');
-    try {
-      /* schema already migrated by setup.ts */;
-      const c = db.prepare(`SELECT id FROM customers
-                           WHERE current_balance = 0 LIMIT 1`).get() as { id: number };
-      const before = db.prepare(`SELECT COUNT(*) AS n FROM customer_ledger`)
-        .get() as { n: number };
-      receiveUnappliedCash(db, { customerId: c.id, amount: 500 });
-      const after = db.prepare(`SELECT COUNT(*) AS n FROM customer_ledger`)
-        .get() as { n: number };
-      expect(after.n).toBe(before.n);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const c = db.prepare(`SELECT id FROM customers
+                         WHERE current_balance = 0 LIMIT 1`).get() as { id: number };
+    const before = db.prepare(`SELECT COUNT(*) AS n FROM customer_ledger`)
+      .get() as { n: number };
+    receiveUnappliedCash(db, { customerId: c.id, amount: 500 });
+    const after = db.prepare(`SELECT COUNT(*) AS n FROM customer_ledger`)
+      .get() as { n: number };
+    expect(after.n).toBe(before.n);
+  
   });
 
   it('rejects a customer already in credit', () => {
-    const { db, cleanup } = makeIsolatedCopy('op-recv-neg');
-    try {
-      /* schema already migrated by setup.ts */;
-      const c = db.prepare(`SELECT id FROM customers
-                           WHERE current_balance < 0 LIMIT 1`).get() as { id: number } | undefined;
-      if (!c) return;   // no such customer in this fixture; nothing to assert
-      expect(() => receiveUnappliedCash(db, { customerId: c.id, amount: 500 }))
-        .toThrow(/credit/i);
-    } finally { cleanup(); }
+    const db = createFixtureDb({ reference: true });
+    seedCustomers(db);
+    // cleaned by afterAll(() => cleanupFixtureDbs())
+    /* schema already migrated by setup.ts */;
+    const c = db.prepare(`SELECT id FROM customers
+                         WHERE current_balance < 0 LIMIT 1`).get() as { id: number } | undefined;
+    if (!c) return;   // no such customer in this fixture; nothing to assert
+    expect(() => receiveUnappliedCash(db, { customerId: c.id, amount: 500 }))
+      .toThrow(/credit/i);
+  
   });
 });
 ```
@@ -1379,6 +1560,12 @@ export function receiveUnappliedCash(
   }
 
   const tx = db.transaction((): ReceiveUnappliedCashResult => {
+    // ONE date governs the whole receipt: the payments row, the journal entry,
+    // and therefore the period assertion inside postEntry. Resolving it once
+    // here is what stops the payment and its GL leg landing in different
+    // periods when the caller passes paymentDate.
+    const today = input.paymentDate ?? new Date().toISOString().slice(0, 10);
+
     // postEntry asserts the period itself from entry_date; no separate call.
     // Resolve accounts to numeric ids BEFORE posting — postEntry does not do it.
     const cash = AccountingService.getAccountByTextCode(db, 'cash');
@@ -1389,10 +1576,10 @@ export function receiveUnappliedCash(
 
     const pay = db.prepare(`
       INSERT INTO payments (customer_id, payment_date, amount, payment_method, notes, payment_kind)
-      VALUES (?, COALESCE(?, date('now')), ?, COALESCE(?, 'Cash'), ?, 'UNAPPLIED_RECEIPT')
+      VALUES (?, ?, ?, COALESCE(?, 'Cash'), ?, 'UNAPPLIED_RECEIPT')
       RETURNING id`).get(
       input.customerId,
-      input.paymentDate ?? null,
+      today,               // same date as the journal entry below
       input.amount,
       input.paymentMethod ?? null,
       input.notes ?? null) as { id: number };
