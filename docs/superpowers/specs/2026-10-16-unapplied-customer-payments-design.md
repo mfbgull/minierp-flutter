@@ -1,9 +1,9 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 21** · 2026-10-16 · Backend + API only
+**Revision 22** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–20. Seventeen defects were found — eleven by *executing*
-this document or checking it against the real API, and six more by auditing
+Supersedes revisions 1–21. Eighteen defects were found — eleven by *executing*
+this document or checking it against the real API, and seven more by auditing
 whether sections still agree with each other:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -111,6 +111,15 @@ whether sections still agree with each other:
   step 4, before the GL post, with `payment_kind='REFUND'` and a negative
   `amount` matching the existing convention (E7). Every other operation already
   created one; only the refund did not. Test 34 pins it.
+- **rev 22** — §5.2's apply posted its `UNAPPLIED_APPLY` GL entry without ever
+  naming a `reference_id`, while §4's table keys that group on
+  `credit_applications.id`. The void filters on
+  `(reference_type, reference_id)` and a NULL never equals a number, so the
+  entry would have been **unvoidable**. Rev 14 fixed the table but never
+  propagated the fix into the operation that posts it; revs 19 and 21 fixed the
+  same omission in §5.4 and §5.3. §5.2 was the last holdout. All three
+  assignments are now stated, and test 35 voids each group by the id §4 assigns
+  it.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -509,7 +518,15 @@ Applies held cash to one or more invoices. Reuses the original receipt's
    converted into invoice settlement is no longer refundable.
 6. Insert `payment_allocations` rows against `source.origin_payment_id`.
 7. Post one `UNAPPLIED_APPLY` GL entry for the total:
-   Dr `2110` / Cr `1100`.
+   Dr `2110` / Cr `1100`, with `reference_type='UNAPPLIED_APPLY'` and
+   `reference_id` = the `credit_applications.id` from step 5.
+
+   Omitting the `reference_id` posts an entry that
+   `voidJournalLinesByReference(db, 'UNAPPLIED_APPLY', applicationId)` can never
+   match, because the void filters on `(reference_type, reference_id)` and a
+   NULL never equals a number — the apply would be unvoidable and, if L or K
+   later flagged it, untraceable. This is the third operation to need this
+   stated; §5.3 step 7 and §5.4 step 3 were fixed in revs 21 and 19.
 8. Recompute the target invoices' `balance_amount`, and **decrease** each target
    customer's `current_balance` by the amount settled on their invoices.
 
@@ -805,6 +822,7 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 32 | **Invariant N.** After a receipt is fully, partly, and over-applied | `Σ payment_allocations (voided_at IS NULL) <= payments.amount` holds for the receipt in every case, including the rejected over-application from test 4. N is the schema-free backstop for round-2 blocker 3, where a 500 receipt could settle a 1500 invoice |
 | 33 | **Reverse, then read K.** Reverse an unapplied 500 receipt | `abs(GL_BALANCE('2110'))` and `Σ remaining_amount` both drop to 0. Then attempt to apply the voided source → **409**, not a phantom 500 settling an invoice. Reversing the GL leg without retiring the source would leave `0 != 500` and create money |
 | 34 | **Refund writes a `payments` row.** Refund 100 of a 500 source | a `payments` row exists with `payment_kind='REFUND'`, `amount=-100`, the right `customer_id`; the `UNAPPLIED_REFUND` GL group's `reference_id` equals its id; voiding by that id reverses the payout. Without the row there is no id to key the GL on and no trace of the payout |
+| 35 | **Every GL group is voidable by id.** Apply, refund, and receipt | for each of `UNAPPLIED_APPLY`, `UNAPPLIED_REFUND`, `UNAPPLIED_RECEIPT`, `voidJournalLinesByReference` reverses the whole group using the id §4 assigns it. Guards the three `reference_id` assignments from drifting or being omitted |
 
 ### 12.1 Assert no *new* violations, never absolute green
 
