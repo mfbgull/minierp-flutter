@@ -1,9 +1,9 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 8** · 2026-10-16 · Backend + API only
+**Revision 9** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–7. Four blockers have been found by *executing* this
-document rather than reading it, and each was invisible to careful review:
+Supersedes revisions 1–8. Four blockers were found by *executing* this document
+rather than reading it, and each was invisible to careful review:
 
 - **rev 5** — executing the DDL showed §3.1's
   `CHECK (refunded_amount <= refundable_cash_amount)` is unsatisfiable against
@@ -18,13 +18,18 @@ document rather than reading it, and each was invisible to careful review:
   must therefore assert *no new* violations against a captured baseline, never
   absolute green, which is now specified in §12.1.
 - **rev 8** — invariant K omitted `Math.abs`. `GL_BALANCE` computes
-  `SUM(debit) − SUM(credit)`, so a `Cr 2110` receipt of 500 reads −500. K is
-  now `Math.abs(GL_BALANCE('2110')) == Σ remaining_amount`, matching how the
-  collector already treats credit-normal accounts at `accountingInvariants.ts:237`
-  and `:250`.
+  `SUM(debit) − SUM(credit)`, so a `Cr 2110` receipt of 500 reads −500.
 
-Sign errors have now cost two blockers in this document (§5.2's `current_balance`
-and §6's K). Both were arithmetic that reads correctly and inverts in code.
+Revision 9 removes the last combined-pool figure. §2 had published
+`availableCredit = credit_balance + Σ unapplied cash` — the same shape as
+blocker 2, which let cash be spent through a path recording no consumption. No
+operation consumed it and `netBalance` was dead text in 581 lines, but a
+combined "available credit" number is a loaded name to hand an implementer.
+The pools now stay separate as `storeCredit` and `unappliedCash`, and no
+write path may read a combined figure.
+
+Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
+arithmetic that reads correctly and inverts in code.
 
 Every factual claim below was verified against `server/database/erp.db`, the
 current source tree, by executing the proposed DDL against SQLite 3.51.2, by
@@ -85,19 +90,31 @@ That was wrong twice over:
    reduction, leaving it spendable a second time through the apply endpoint.
 
 **Resolution.** `credit_balance` is untouched by this feature. Unapplied cash
-exists only in `customer_credit_sources` with `kind='UNAPPLIED_CASH'`. Customer
-available credit becomes a derived view, never a stored pool:
+exists only in `customer_credit_sources` with `kind='UNAPPLIED_CASH'`.
+
+The two pools stay **separate, including in derived values.** Revisions 2 and 6
+each published a single combined figure. That is the shape of blocker 2 above:
+merging them is what let cash be spent through a path recording no consumption.
+Neither is consumed by any operation in §5, but a combined number is a loaded
+name to hand an implementer — nothing stops a later write path from adopting it
+as a ceiling and reintroducing exactly the defect this section exists to prevent.
 
 ```
-availableCredit(customer) = credit_balance
-                          + Σ remaining_amount  (sources where kind='UNAPPLIED_CASH' AND live)
+storeCredit(customer)   = customers.credit_balance
+unappliedCash(customer) = Σ remaining_amount
+                          WHERE kind='UNAPPLIED_CASH' AND voided_at IS NULL
 ```
 
-Customer-facing balance owed by the customer:
+`unappliedCash` is spendable **only** through §5.2's apply endpoint.
+`storeCredit` is consumed **only** by the pre-existing invoice-creation offset.
+No operation may read a combined pool, and neither figure may be used as a
+ceiling outside the endpoint that spends it.
 
-```
-netBalance(customer) = current_balance − credit_balance − Σ remaining_amount (UNAPPLIED_CASH)
-```
+No customer-facing net-balance formula is specified. This change is backend and
+API only, defines no balance endpoint, and §10 puts the frontend out of scope —
+so a derived net figure would be unused text implying behaviour nothing
+implements. If one is later needed it belongs in that endpoint's contract, not
+here.
 
 Invariant F is therefore genuinely untouched: this feature writes neither
 `current_balance` nor `credit_balance` for receipts, and applies write
@@ -468,7 +485,7 @@ must void the original dated entry.
 
    The backfilled rows are **provenance only** and are deliberately inert:
    `refundable_cash_amount = 0` keeps them out of §5.3's refund draw, and §2's
-   `availableCredit` counts only `kind='UNAPPLIED_CASH'`, so they contribute
+   `unappliedCash` counts only `kind='UNAPPLIED_CASH'`, so they contribute
    nothing to what a customer may spend or apply. They exist solely so that a
    future refund of genuinely-cash-backed store credit has a row to draw from,
    and so historical grants are not invisible.
@@ -526,7 +543,7 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 21 | Receive 300, refund 300 in full without applying | **succeeds**, leaving `remaining=0, refunded=300, refundable=0` |
 | 22 | Attempt to refund beyond `credited_amount` | rejected by `c_refund_le_credited` |
 | 23 | Migration executes the §3.1 `CREATE TABLE` verbatim | CHECKs present in `sqlite_master`; dropping them fails a test |
-| 24 | Run §8's backfill, then assert each customer's spendable credit | **unchanged** by the migration — backfilled `RETURN_CREDIT` rows are `refundable_cash_amount = 0` and `kind != 'UNAPPLIED_CASH'`, so §2's `availableCredit` ignores them. Customer 12 gains no visible 2400 |
+| 24 | Run §8's backfill, then assert each customer's spendable credit | **unchanged** by the migration — backfilled `RETURN_CREDIT` rows are `refundable_cash_amount = 0` and `kind != 'UNAPPLIED_CASH'`, so §2's `unappliedCash` ignores them. Customer 12 gains no visible 2400 |
 | 25 | Attempt to refund against a backfilled `RETURN_CREDIT` source | 409 — §5.3's `refundable_cash_amount >= :drawn` guard |
 | 26 | Migration validation | asserts per-customer `RETURN credit >= CREDIT_OFFSET credit`; must **not** read `credit_balance`, whose divergence is expected and benign |
 | 27 | Baseline the invariant suite before writing any feature test | record which invariants are **already** failing. F fails by exactly 1800.00 today, independent of this feature |
