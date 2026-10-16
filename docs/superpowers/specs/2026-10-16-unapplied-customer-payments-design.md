@@ -2,7 +2,7 @@
 
 **Revision 28** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–27. Twenty-four defects were found — eleven by *executing*
+Supersedes revisions 1–27. Twenty-three defects were found — eleven by *executing*
 this document or checking it against the real API, and twelve more by auditing
 whether sections still agree with each other:
 
@@ -171,6 +171,22 @@ it.
   shows nobody validated its API claims. A spec that cites
   `accountingService.ts:251` is asserting something about that file, and the
   only way to know it is true is to read it.
+- **rev 28** — the backfill specified `consumed_amount` as a per-customer
+  scalar, and it was implemented as one: the customer's whole `CREDIT_OFFSET`
+  total replicated onto *every* one of their `RETURN` rows. Executed against the
+  real schema, it fails. Customer 15 has four `RETURN` rows (600, 600, 550, 550)
+  totalling 2,300 against 1,800 of offsets; replicating 1,800 onto the 600-row
+  gives `remaining = −1200`, and `c_refundable_le_remaining` (`0 <= −1200`)
+  rejects it. The migration aborts on the live database.
+
+  This is the third time the same failure has appeared, and the spec already
+  warned about it twice in its own closing note: revisions 1–10 were "checked by
+  executing code derived from *my reading* of the schema", and the rev 11
+  blocker survived precisely because a paraphrase of a table only proves the
+  paraphrase self-consistent. Twenty-seven revisions of checking this document's
+  internal agreement and arithmetic still never ran the migration against the
+  real database. The rule was written down and then not applied to the one thing
+  it was written about.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -792,8 +808,51 @@ must void the original dated entry.
 5. Backfill `customer_credit_sources` for existing return credit:
    for each non-voided `RETURN` ledger row with `credit > 0`, insert a
    `RETURN_CREDIT` source with `credited_amount = credit`,
-   `consumed_amount` = credit drawn by `CREDIT_OFFSET` applications against the
-   same customer, and `refundable_cash_amount = 0`.
+   `refundable_cash_amount = 0`, and a **`consumed_amount` allocated FIFO
+   across that customer's rows** — never the customer's whole `CREDIT_OFFSET`
+   total replicated onto each row.
+
+   Revisions 1–27 said "consumed_amount = credit drawn by `CREDIT_OFFSET`
+   applications against the same customer", which reads as a per-customer scalar
+   and was implemented as one. Customer 15 has four `RETURN` rows
+   (600, 600, 550, 550) totalling 2,300 against 1,800 of offsets. Replicating
+   1,800 onto every row drives the 600-row to
+   `remaining = 600 − 1800 = −1200`, and `c_refundable_le_remaining`
+   (`0 <= −1200`) rejects it. **Executed against the real schema this fails**, so
+   the migration aborts on the live database.
+
+   Allocate oldest-first, clamped to the row:
+
+   ```sql
+   WITH ret AS (
+     SELECT l.customer_id, l.credit, l.created_at,
+            COALESCE(SUM(l.credit) OVER (
+              PARTITION BY l.customer_id ORDER BY COALESCE(l.created_at, l.id), l.id
+              ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS cum_before
+     FROM customer_ledger l
+     WHERE l.transaction_type='RETURN' AND l.credit>0
+       AND COALESCE(l.voided,0)=0 AND l.reversed_by IS NULL
+   ),
+   cons AS (
+     SELECT customer_id, SUM(credit) c FROM customer_ledger
+     WHERE transaction_type='CREDIT_OFFSET' AND credit>0
+       AND COALESCE(voided,0)=0 AND reversed_by IS NULL
+     GROUP BY customer_id
+   )
+   INSERT INTO customer_credit_sources (
+     customer_id, kind, credited_amount, consumed_amount,
+     refundable_cash_amount, credited_at, origin_invoice_id
+   )
+   SELECT r.customer_id, 'RETURN_CREDIT', r.credit,
+          MAX(0, MIN(r.credit, COALESCE(c.c,0) - r.cum_before)),
+          0, COALESCE(r.created_at, CURRENT_TIMESTAMP), NULL
+   FROM ret r LEFT JOIN cons c ON c.customer_id = r.customer_id;
+   ```
+
+   Verified by execution against the live schema: 13 rows, 8,550.20 credited,
+   1,800 consumed in total, no negative `remaining_amount`, every
+   `refundable_cash_amount = 0`. Customer 15 lands 600→600, 600→600, 550→550,
+   550→50, leaving 500 on the last row.
 
    **Do not validate this against `credit_balance`.** Revision 5 proposed
    failing closed if the two disagreed. Measured, they disagree for all five

@@ -711,34 +711,33 @@ Append to `server/src/migrations/108_unapplied_customer_payments.sql`:
 -- Validation is ledger self-consistency instead: consumed_amount (CREDIT_OFFSET)
 -- must not exceed credited_amount (RETURN).
 
+-- FIFO allocation of CREDIT_OFFSET across each customer's RETURN rows.
+-- The rev-1 wording replicated the customer-level total onto every row; that
+-- drives customer 15's 600-row to remaining = -1200 and the CHECK aborts the
+-- migration. Verified by execution: 13 rows, 8550.20 credited, 1800 consumed.
+WITH ret AS (
+  SELECT l.customer_id, l.credit, l.created_at,
+         COALESCE(SUM(l.credit) OVER (
+           PARTITION BY l.customer_id ORDER BY COALESCE(l.created_at, l.id), l.id
+           ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS cum_before
+  FROM customer_ledger l
+  WHERE l.transaction_type='RETURN' AND l.credit>0
+    AND COALESCE(l.voided,0)=0 AND l.reversed_by IS NULL
+),
+cons AS (
+  SELECT customer_id, SUM(credit) c FROM customer_ledger
+  WHERE transaction_type='CREDIT_OFFSET' AND credit>0
+    AND COALESCE(voided,0)=0 AND reversed_by IS NULL
+  GROUP BY customer_id
+)
 INSERT INTO customer_credit_sources (
   customer_id, kind, credited_amount, consumed_amount,
   refundable_cash_amount, credited_at, origin_invoice_id
 )
-SELECT
-  l.customer_id,
-  'RETURN_CREDIT',
-  l.credit,
-  COALESCE((
-    SELECT SUM(o.credit) FROM customer_ledger o
-    WHERE o.customer_id = l.customer_id
-      AND o.transaction_type = 'CREDIT_OFFSET'
-      AND o.credit > 0
-      AND COALESCE(o.voided,0) = 0
-      AND o.reversed_by IS NULL
-  ), 0),
-  0,
-  COALESCE(l.created_at, CURRENT_TIMESTAMP),
-  NULL
-FROM customer_ledger l
-WHERE l.transaction_type = 'RETURN'
-  AND l.credit > 0
-  AND COALESCE(l.voided,0) = 0
-  AND l.reversed_by IS NULL;
-
--- consumed_amount is per-customer, so guard the invariant the schema cannot
--- express across the insert.
--- (The c_refund_le_credited CHECK covers refunded_amount only.)
+SELECT r.customer_id, 'RETURN_CREDIT', r.credit,
+       MAX(0, MIN(r.credit, COALESCE(c.c,0) - r.cum_before)),
+       0, COALESCE(r.created_at, CURRENT_TIMESTAMP), NULL
+FROM ret r LEFT JOIN cons c ON c.customer_id = r.customer_id;
 ```
 
 > If the SQLite version in use rejects the aggregate correlated subquery, split
