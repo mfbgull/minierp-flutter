@@ -42,6 +42,26 @@ Consequences that invalidate code elsewhere in this plan:
   empty database by default. `reference: true` copies only `chart_of_accounts`,
   which is what the GL layer needs.
 
+### Fixture behaviour, verified
+
+`productionSchema.ts` was read, not assumed:
+
+- `productionSchemaSql()` derives the fixture schema from the **already-migrated
+  test database's** `sqlite_master`, not from a hand-maintained list. Adding
+  migration 108 therefore needs **no change to this helper** — it picks the new
+  tables up automatically. This is the whole point of the file; do not add a
+  second helper or an entry to a list.
+- It emits tables first, then indexes, then views, then triggers. SQLite resolves
+  foreign-key targets lazily, so `credit_source_consumptions` referencing
+  `credit_applications` is order-safe.
+- `REFERENCE_TABLES = ['chart_of_accounts']` only. `reference: true` is
+  **required** for any GL test, because `postEntry` aborts when a required
+  account is absent. After migration 108 lands, 2110 is among the copied rows.
+- The four text codes the feature needs, confirmed against the live DB:
+  `cash` → 1000 (asset/debit), `accounts_receivable` → 1100 (asset/debit),
+  `unapplied_customer_payments` → 2110 (created by migration 108, absent until
+  then).
+
 ---
 
 ## Non-negotiable constraints
