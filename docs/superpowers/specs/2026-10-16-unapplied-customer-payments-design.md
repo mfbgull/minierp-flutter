@@ -20,8 +20,16 @@ document rather than reading it, and each was invisible to careful review:
 
 Every factual claim below was verified against `server/database/erp.db`, the
 current source tree, by executing the proposed DDL against SQLite 3.51.2, by
-running the §8 backfill arithmetic against live data, and by reproducing
-`arImbalances()` verbatim.
+running the §8 backfill arithmetic against live data, by reproducing
+`arImbalances()` verbatim, and by executing migration 108 end-to-end against a
+replica of the live `payments` / `chart_of_accounts` shape.
+
+That last run is clean: `ALTER TABLE payments ADD COLUMN` accepts
+`NOT NULL DEFAULT 'RECEIPT' CHECK (...)` on a populated table, preserves every
+row, enforces the CHECK on both INSERT and UPDATE, and — the one that matters
+for compatibility — still accepts legacy `INSERT`s that omit the column, which
+existing code will do. `2110` inserts without collision. The three new tables
+create and roll back cleanly inside one transaction.
 
 ---
 
