@@ -1,9 +1,9 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 18** · 2026-10-16 · Backend + API only
+**Revision 19** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–17. Fourteen defects were found — eleven by *executing*
-this document or checking it against the real API, and three more by auditing
+Supersedes revisions 1–18. Fifteen defects were found — eleven by *executing*
+this document or checking it against the real API, and four more by auditing
 whether sections still agree with each other:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -83,6 +83,16 @@ whether sections still agree with each other:
   reject bad values, a `REFUND` consumption inserts with `invoice_id` NULL, and
   §5.2 step 5's counter update yields exactly
   `{remaining:100, consumed:400, refundable:100}` from a 500 source applied 400.
+- **rev 19** — **Blocker, found by the same audit.** §5.4's reverse primitive
+  voided the `UNAPPLIED_RECEIPT` GL group and the `payments` row but never
+  retired the `customer_credit_sources` row. Reversing a 500 receipt therefore
+  drove `abs(GL_BALANCE('2110'))` to 0 while leaving 500 of live
+  `remaining_amount`: invariant K reads `0 != 500`, and the customer is left
+  holding credit backed by no GL — which they could then apply to an invoice,
+  settling it with cash never received. Voiding the payment row alone **creates
+  money**, the same severity class as round-2 blocker 3. §5.4 now retires the
+  source as step 4, atomic with the GL void, and §6's K states the
+  `voided_at IS NULL` filter that makes the two agree. Test 33 pins it.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -555,8 +565,19 @@ It is the only code path permitted to void an `UNAPPLIED_RECEIPT`, and it:
    `AccountingService.voidJournalLinesByReference(db, 'UNAPPLIED_RECEIPT', paymentId)`
    — `reference_id` is the payment id, because a receipt's GL group hangs off
    the payment itself rather than off an application row;
-4. voids the `payments` row; and
-5. rebuilds the customer ledger.
+4. **retires the source row** — `UPDATE customer_credit_sources SET voided_at =
+   CURRENT_TIMESTAMP WHERE origin_payment_id = ? AND voided_at IS NULL`.
+   This is not optional bookkeeping. The GL leg in step 3 removes the credit
+   from `2110`, and invariant K sums `remaining_amount` over live sources; if
+   the source stayed live, K would read `0 != 500` and the customer would be
+   left holding 500 of credit backed by no GL, which they could then apply to
+   an invoice — settling it with cash never received. Voiding the payment row
+   alone therefore creates money;
+5. voids the `payments` row; and
+6. rebuilds the customer ledger.
+
+Steps 3 and 4 must be atomic. A crash between them leaves exactly the phantom
+credit described above.
 
 `Payment.delete` is left unchanged and is never routed to for an
 `UNAPPLIED_RECEIPT`, precisely because it knows nothing about
@@ -572,7 +593,7 @@ Un-apply is out of scope for this change.
 | ID | Assertion |
 |---|---|
 | **F** | `abs(GL(1100)+GL(1110)) == abs(Σ current_balance − Σ credit_balance)` — **unchanged**. This feature writes neither column on receipt |
-| **K** | `Math.abs(GL_BALANCE('2110')) == Σ remaining_amount` over live `UNAPPLIED_CASH` sources. The `Math.abs` is required, not cosmetic: `GL_BALANCE` computes `SUM(debit) − SUM(credit)`, so a `Cr 2110` receipt of 500 reads **−500**, not +500. This matches how the existing collector treats credit-normal accounts — see `Math.abs(GL_BALANCE('2000'))` at `accountingInvariants.ts:237` and `:250` |
+| **K** | `Math.abs(GL_BALANCE('2110')) == Σ remaining_amount` over `UNAPPLIED_CASH` sources **where `voided_at IS NULL`**. The `Math.abs` is required, not cosmetic: `GL_BALANCE` computes `SUM(debit) − SUM(credit)`, so a `Cr 2110` receipt of 500 reads **−500**, not +500. This matches how the existing collector treats credit-normal accounts — see `Math.abs(GL_BALANCE('2000'))` at `accountingInvariants.ts:237` and `:250`. The `voided_at IS NULL` filter is what keeps a reversed receipt (§5.4 step 4) from reading as 500 of GL-backed credit after its GL leg is voided |
 | **L** | For every source, `remaining_amount == credited_amount − Σ active consumption amounts`. Computed from `credit_source_consumptions` in code, since the generated column alone cannot detect a missing base-counter update |
 | **M** | For every source, `refunded_amount <= credited_amount` **and** `0 <= refundable_cash_amount <= remaining_amount` |
 | **N** | Per receipt: `Σ payment_allocations (voided_at IS NULL) <= payment.amount` |
@@ -745,6 +766,7 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 30 | Allocation ceiling, exercised from **both** paths | `PaymentRecordingService.allocateExistingPayment` and `UnappliedCashService.apply` reject the same over-allocation with the same reason. Guards against the extracted helper drifting or being bypassed |
 | 31 | **Invariant K.** Receive, apply, refund, then read `GL(2110)` | `Math.abs(GL_BALANCE('2110')) == Σ remaining_amount` over live `UNAPPLIED_CASH` sources, at every step. Voided and reversed sources excluded. This is the only thing tying account `2110` to tracked credit — without it the account is an unverified bucket |
 | 32 | **Invariant N.** After a receipt is fully, partly, and over-applied | `Σ payment_allocations (voided_at IS NULL) <= payments.amount` holds for the receipt in every case, including the rejected over-application from test 4. N is the schema-free backstop for round-2 blocker 3, where a 500 receipt could settle a 1500 invoice |
+| 33 | **Reverse, then read K.** Reverse an unapplied 500 receipt | `abs(GL_BALANCE('2110'))` and `Σ remaining_amount` both drop to 0. Then attempt to apply the voided source → **409**, not a phantom 500 settling an invoice. Reversing the GL leg without retiring the source would leave `0 != 500` and create money |
 
 ### 12.1 Assert no *new* violations, never absolute green
 
