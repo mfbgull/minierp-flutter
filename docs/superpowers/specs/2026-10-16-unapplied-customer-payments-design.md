@@ -1,9 +1,10 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 14** · 2026-10-16 · Backend + API only
+**Revision 15** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–13. Ten defects were found by *executing* this document
-or checking it against the real API, and each was invisible to reading it:
+Supersedes revisions 1–14. Eleven defects were found by *executing* this
+document or checking it against the real API, and each was invisible to reading
+it:
 
 - **rev 5** — executing the DDL showed §3.1's
   `CHECK (refunded_amount <= refundable_cash_amount)` is unsatisfiable against
@@ -50,6 +51,14 @@ or checking it against the real API, and each was invisible to reading it:
   the caller in `PostEntryInput` (`accountingService.ts:64-67`), and the void
   matches exactly those. The returned entry is unrelated. §4 now carries an
   explicit table of what each reference type keys on.
+- **rev 15** — §5.2 step 9 and §5.4 step 5 both said "rebuild the customer
+  ledger" without naming a primitive. `rebuildLedgerBalances` is a plain
+  function declaration reachable only through `ledgerUtils`' **default export
+  object** (`utils/ledgerUtils.ts:263`, exported at `:347`) — a named-export
+  lookup finds nothing. Its signature is `(customerId, conn = db)`, so passing
+  this service's `db` matters when the rebuild must see uncommitted rows. It also
+  opens `conn.transaction()` internally, which nests via SAVEPOINT inside §5's
+  transaction; noted so that nesting is not later "corrected".
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -416,7 +425,22 @@ Applies held cash to one or more invoices. Reuses the original receipt's
    so the balance goes **down**. The `Cr 1100` leg moves `GL(1100)` — computed
    as `SUM(debit) − SUM(credit)` — down by the same amount, and that matched
    movement is precisely what keeps invariant F balanced.
-9. Rebuild the customer ledger for each affected customer.
+9. Rebuild the customer ledger for each affected customer, via
+   `ledgerUtils.rebuildLedgerBalances(customerId, db)`.
+
+   It is a member of `ledgerUtils`' **default export object**
+   (`utils/ledgerUtils.ts:341`), not a named export, so import it as
+   `import ledgerUtils from '../utils/ledgerUtils'`. The signature is
+   `rebuildLedgerBalances(customerId: number, conn: typeof db = db): void`
+   (`:263`) — `conn` defaults to the module singleton, which is why `Payment.ts:680`
+   passes only the id. Pass this service's `db` explicitly, as
+   `InvoiceCreationService.ts:300` does: a different connection cannot see this
+   transaction's uncommitted ledger rows.
+
+   It opens `conn.transaction()` internally, so calling it inside §5's
+   transaction nests. better-sqlite3 nests via SAVEPOINT, so this is correct and
+   needs no special handling — noted only so the nesting is not mistaken for a
+   bug and "corrected".
 
 Idempotency: scope `unapplied_cash.apply`, `resource_id` = the numeric
 `credit_applications.id`, replay returns the stored application row. The TEXT
