@@ -1,8 +1,8 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 15** · 2026-10-16 · Backend + API only
+**Revision 16** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–14. Eleven defects were found by *executing* this
+Supersedes revisions 1–15. Eleven defects were found by *executing* this
 document or checking it against the real API, and each was invisible to reading
 it:
 
@@ -618,6 +618,19 @@ must void the original dated entry.
    Validate instead on ledger self-consistency: per customer,
    `RETURN credit >= CREDIT_OFFSET credit` (so `consumed_amount` never exceeds
    `credited_amount`), which holds for all five.
+
+   **`refundable_cash_amount = 0` is corroborated, not merely conservative.**
+   `return_settlements` does carry the linkage (`payment_id`, `method`), so the
+   history is not wholly opaque. But the one populated row is
+   `type='refund', method='Cash', payment_id=51, amount=550` — cash already paid
+   *out* to customer 15, not credit awaiting refund. The remaining settlement is
+   `type='adjust'` with no `payment_id`, reallocating onto invoice 49.
+
+   So every cash-linked settlement in the database represents money that has
+   already left. What remains refundable cannot be reconstructed from this
+   history, and 0 fails safe: it can only under-claim refundable cash, never
+   over-claim it. Over-refunding is the dangerous direction, so 0 is correct
+   rather than merely safe.
 
 ## 9. Backfill of historical `CREDIT_OFFSET` applications
 
