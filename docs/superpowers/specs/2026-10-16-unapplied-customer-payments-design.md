@@ -1,9 +1,9 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 9** · 2026-10-16 · Backend + API only
+**Revision 10** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–8. Four blockers were found by *executing* this document
-rather than reading it, and each was invisible to careful review:
+Supersedes revisions 1–9. Six defects were found by *executing* this document or
+checking it against the real API, and each was invisible to reading it:
 
 - **rev 5** — executing the DDL showed §3.1's
   `CHECK (refunded_amount <= refundable_cash_amount)` is unsatisfiable against
@@ -15,18 +15,20 @@ rather than reading it, and each was invisible to careful review:
   the migration permanently.
 - **rev 7** — reproducing the collector's own arithmetic showed invariant F
   **already fails by exactly 1800.00**, independent of this feature. §12's tests
-  must therefore assert *no new* violations against a captured baseline, never
-  absolute green, which is now specified in §12.1.
+  must assert *no new* violations against a captured baseline, never absolute
+  green.
 - **rev 8** — invariant K omitted `Math.abs`. `GL_BALANCE` computes
   `SUM(debit) − SUM(credit)`, so a `Cr 2110` receipt of 500 reads −500.
-
-Revision 9 removes the last combined-pool figure. §2 had published
-`availableCredit = credit_balance + Σ unapplied cash` — the same shape as
-blocker 2, which let cash be spent through a path recording no consumption. No
-operation consumed it and `netBalance` was dead text in 581 lines, but a
-combined "available credit" number is a loaded name to hand an implementer.
-The pools now stay separate as `storeCredit` and `unappliedCash`, and no
-write path may read a combined figure.
+- **rev 9** — §2 published `availableCredit = credit_balance + Σ unapplied
+  cash`, the same shape as blocker 2. Nothing consumed it, but a combined
+  "available credit" is a loaded name to hand an implementer.
+- **rev 10** — §12.1 invented `expectAllInvariantsHoldViolations()`. The real
+  `expectAllInvariantsHold(context)` returns `void` and asserts internally; a
+  baseline must be built from the nine exported collectors. And
+  `GroupImbalance` has **no `label` field** — it carries `reference_type`,
+  `reference_id` and `diff`. The pseudocode's `g.label` rendered every group as
+  `undefined:0`, so the baseline compared noise and would have passed no matter
+  what the ledger did.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -556,19 +558,71 @@ returns a violation today, with `glBalance = 3499.80` against
 the gap is not a ledger-drift symptom; it is simply pre-existing.
 
 The suite therefore **cannot** be green before this feature, and a test written
-as `expect(expectAllInvariantsHold()).toBe(true)` would fail on a condition this
-change did not cause. Tests must instead assert that the violation set is
-**unchanged** relative to a baseline captured at the start:
+against the master gate would fail on a condition this change did not cause.
 
-```
-const before = expectAllInvariantsHoldViolations();   // recorded per test file
-... run the feature ...
-expect(after.filter(v => !before.some(b => b.label === v.label))).toEqual([]);
+`expectAllInvariantsHold(context)` returns `void` and asserts internally, so it
+cannot be used to build a baseline — there is no combined violation-list getter.
+Baseline from the nine exported collectors instead.
+
+The two result shapes differ, and this is easy to get wrong:
+
+```ts
+export interface Violation {          // the eight array-returning collectors
+  label: string; diff: number;
+  account?: string; expected?: number; actual?: number; reference?: string;
+}
+
+interface GroupImbalance {            // glImbalances() only — NOT exported,
+  reference_type: string;             // and it has no `label` field
+  reference_id: number;
+  diff: number;
+}
 ```
 
-Specifically: no new violation labels may appear, and F's diff must remain
-exactly 1800.00 — not merely "not worse". Asserting the exact figure catches a
-feature that perturbs the gap by a coincidentally offsetting amount.
+`GroupImbalance` has no `label`. Mapping it with `g.label` yields
+`undefined:0` for every group, so the baseline compares noise and passes
+regardless of what the ledger does. Key groups by `reference_type` and
+`reference_id` instead.
+
+```ts
+import {
+  glImbalances, customerArImbalances, supplierApImbalances, stockImbalances,
+  arImbalances, apImbalances, inventoryImbalances, cashImbalances,
+  orphanSourceBatches, type Violation,
+} from '../helpers/accountingInvariants';
+
+// Label *and* diff: a label alone cannot distinguish F's 1800.00 from 1900.00.
+const sig = (v: Violation[]): string[] =>
+  v.map(x => `${x.label}:${x.diff}`).sort();
+
+const baseline = () => {
+  const gl = glImbalances();
+  return {
+    glTotalDiff: gl.totalDiff,
+    glGroups: gl.groups
+      .map(g => `${g.reference_type}:${g.reference_id}:${g.diff}`)
+      .sort(),
+    customerAr: sig(customerArImbalances()),
+    supplierAp: sig(supplierApImbalances()),
+    stock:      sig(stockImbalances()),
+    ar:         sig(arImbalances()),
+    ap:         sig(apImbalances()),
+    inventory:  sig(inventoryImbalances()),
+    cash:       sig(cashImbalances()),
+    orphans:    sig(orphanSourceBatches()),
+  };
+};
+
+const before = baseline();
+// ... exercise the feature ...
+expect(baseline()).toEqual(before);
+```
+
+Including the `diff` is what makes "F's gap must remain exactly 1800.00" real
+rather than aspirational. A label-only comparison would pass if the feature moved
+the gap to 1900.00, since the label `GL AR vs customer balances` is present in
+both baseline and result. Comparing full signatures catches a perturbation that
+a coincidentally offsetting amount would otherwise hide.
 
 Two things are forbidden here: weakening a check to force it green, and deleting
 a failing assertion to clear the suite. Both turn a real pre-existing defect into
