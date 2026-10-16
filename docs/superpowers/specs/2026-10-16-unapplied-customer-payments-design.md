@@ -1,10 +1,10 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 16** · 2026-10-16 · Backend + API only
+**Revision 17** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–15. Eleven defects were found by *executing* this
-document or checking it against the real API, and each was invisible to reading
-it:
+Supersedes revisions 1–16. Twelve defects were found — eleven by *executing* this
+document or checking it against the real API, and the twelfth by auditing
+whether the sections still agree with each other:
 
 - **rev 5** — executing the DDL showed §3.1's
   `CHECK (refunded_amount <= refundable_cash_amount)` is unsatisfiable against
@@ -59,6 +59,18 @@ it:
   this service's `db` matters when the rebuild must see uncommitted rows. It also
   opens `conn.transaction()` internally, which nests via SAVEPOINT inside §5's
   transaction; noted so that nesting is not later "corrected".
+- **rev 17** — §12's tests contradicted §12.1. Tests 1 and 18 asserted "F still
+  passes", but rev 7 established F **fails today** by 1800.00; and test 2
+  reached for `expectAllInvariantsHold`, which rev 10 showed returns `void` and
+  cannot express "no new violation". All three now use the §12.1 baseline. Tests
+  10 and 12 still assert that L and M hold absolutely, which is correct — those
+  are new, feature-owned invariants, unlike pre-existing F.
+
+  This class escaped a mechanical consistency check that verifies step numbering,
+  cross-reference ranges, and test-row sequencing. Sixteen rounds of surgical
+  edits were checked for *internal* structure but never for whether sections
+  still agreed with each other after those edits. Revisions 4–16 each fixed one
+  section; this one asks whether the fix left the neighbours true.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -658,8 +670,8 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 
 | # | Test | Expectation |
 |---|---|---|
-| 1 | Receive 500 unapplied for a customer with zero balances | source created, `credit_balance` unchanged, F still passes |
-| 2 | Receive, then `expectAllInvariantsHold` | no new violation |
+| 1 | Receive 500 unapplied for a customer with zero balances | source created, `credit_balance` unchanged, F's violation set **unchanged** (§12.1) — not "F passes", which is false today |
+| 2 | Receive, then re-run the §12.1 baseline | no new violation label, and F's diff still exactly 1800.00 |
 | 3 | Apply 400 of a 500 source | Dr `2110` / Cr `1100`; `remaining_amount` 100; invoice balance down 400 |
 | 4 | Apply 1500 against a 500 receipt | **409**, receipt-ceiling assertion (§5.2) fires |
 | 5 | Apply 600 of a 500 source | **409**, per-source ceiling fires |
@@ -675,7 +687,7 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 15 | Apply, refund, reverse in a closed period | each returns the §7 status |
 | 16 | Apply 400, then attempt a second apply of 400 against the same 500 source | **409** — proves §5.2 step 5 moved `consumed_amount`, so `remaining_amount` fell to 100 |
 | 17 | Apply 400, then refund 400 | **409** — refundable cash fell with `consumed_amount`; the receipt holds no refundable cash once applied |
-| 18 | Apply 400 against a customer owing 499.80 | `current_balance` falls to 99.80; `GL(1100)` falls by 400; F still passes |
+| 18 | Apply 400 against a customer owing 499.80 | `current_balance` falls to 99.80; `GL(1100)` falls by 400; F's violation set unchanged and its diff still 1800.00 (§12.1) |
 | 19 | Apply spanning two sources in one call | both counters move; one `UNAPPLIED_APPLY` group; a single void by `credit_applications.id` clears every line |
 | 20 | Receive 500, apply 400, then refund the remaining 100 | **succeeds**, leaving `remaining=0, refunded=100, refundable=0`. This is the case revision 4's schema rejected outright (`100 <= 0`) |
 | 21 | Receive 300, refund 300 in full without applying | **succeeds**, leaving `remaining=0, refunded=300, refundable=0` |
