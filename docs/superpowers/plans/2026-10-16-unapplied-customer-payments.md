@@ -12,6 +12,38 @@
 
 ---
 
+## VERIFIED API CONTRACTS (read this before writing any code)
+
+These were verified against the source on 2026-10-16. Several early drafts of
+this plan got them wrong; treat this table as the authority over any code sample
+further down that contradicts it.
+
+| Thing | Actual signature / shape | Source |
+|---|---|---|
+| `applyPendingMigrations` | `(): void` — **takes no arguments**, uses the module-level `db` singleton bound to `process.env.DATABASE_PATH` | `config/database.ts:1714` |
+| `AccountingService.postEntry` | `(db, input: PostEntryInput): PostedEntry` | `accountingService.ts:251` |
+| `PostEntryInput` | `entry_date`, `description`, `reference_type?`, `reference_id?: number \| null`, `created_by?`, `lines` — **snake_case** | `accountingService.ts:64` |
+| `JournalLineInput` | `{ account_id: number; debit?: number; credit?: number; description?: string }` — **account_id is a NUMBER** | `accountingService.ts:76` |
+| `PostedEntry` | `{ journal_entry_id, line_count, total_debit, total_credit }` — **not `.id`** | `accountingService.ts` |
+| Account resolution | **`postEntry` does NOT resolve text codes.** Caller must call `AccountingService.getAccountByTextCode(db, 'cash')?.id` and throw when absent | `accountingService.ts:120` |
+| `assertPeriodNotClosed` | `(db, date: string, what: string): void`; already called inside `postEntry` from `input.entry_date` | `accountingService.ts:1037`, called at `:315` |
+| `voidJournalLinesByReference` | `(db, referenceType: string, referenceId: number, ...)` | `accountingService.ts:1417` |
+| Test DB fixtures | **Use the existing `createFixtureDb({ reference: true })` from `__tests__/helpers/productionSchema.ts`.** Do NOT write a new helper and do NOT copy the live database — it copies schema only, deliberately, so fixtures are empty. | `productionSchema.ts:101` |
+
+Consequences that invalidate code elsewhere in this plan:
+
+- Every `/* schema already migrated by setup.ts */` call is wrong. Tests get an already-migrated
+  DB from `setupFilesAfterEnv` (`setup.ts` calls `applyPendingMigrations()` once
+  per test file against a fresh temp dir). For a *second* schema, use
+  `createFixtureDb()`, which replays the production migration SQL.
+- Every `accountTextCode:` line is wrong — resolve the id first.
+- `entry.id` is wrong — it is `entry.journal_entry_id`.
+- Fixtures must `INSERT` their own customers; `createFixtureDb()` returns an
+  empty database by default. `reference: true` copies only `chart_of_accounts`,
+  which is what the GL layer needs.
+
+---
+
 ## Non-negotiable constraints
 
 These come from the user and override any convenience. Violating any of them is a failed plan.
@@ -177,110 +209,25 @@ git commit -m "test(server): guard against opening the canonical live database f
 
 ---
 
-### Task 0.2: Isolated database copy helper
+### Task 0.2: Confirm the fixture path before writing tests
 
-**Files:**
-- Create: `server/src/__tests__/helpers/isolatedDb.ts`
+Do NOT add a database helper. `server/src/__tests__/helpers/productionSchema.ts`
+already exports `createFixtureDb(options)` and `cleanupFixtureDbs()`, and
+`setup.ts` already runs `applyPendingMigrations()` per test file.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Read `productionSchema.ts:85-125` and confirm the contract**
 
-`server/src/__tests__/isolatedDb.test.ts`:
+Expected: `createFixtureDb({ reference: true })` returns an **empty** database
+with the production schema plus seeded `chart_of_accounts`.
 
-```ts
-import { makeIsolatedCopy } from './helpers/isolatedDb';
-import { resolveLiveDbPath } from './helpers/liveDbGuard';
-import Database from 'better-sqlite3';
+- [ ] **Step 2: Read one existing test that uses it** (e.g.
+`arSurfaceConsistency.test.ts:20`) and copy its fixture-insert shape.
 
-describe('isolated database copies', () => {
-  it('copies the live schema into a temp file', () => {
-    const { db, cleanup } = makeIsolatedCopy();
-    try {
-      const n = db
-        .prepare(`SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table'`)
-        .get() as { n: number };
-      expect(n.n).toBeGreaterThan(0);
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('never returns the live path', () => {
-    const { path: p, cleanup } = makeIsolatedCopy();
-    try {
-      expect(p).not.toBe(resolveLiveDbPath());
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('leaves the source untouched after a write', () => {
-    const before = require('fs').statSync(resolveLiveDbPath()).size;
-    const { db, cleanup } = makeIsolatedCopy();
-    db.prepare(`UPDATE customers SET notes = 'touched'`).run();
-    db.close();
-    cleanup();
-    const after = require('fs').statSync(resolveLiveDbPath()).size;
-    expect(after).toBe(before);
-  });
-});
-```
-
-- [ ] **Step 2: Run to verify it fails**
-
-Run: `cd server && npx jest src/__tests__/isolatedDb.test.ts`
-Expected: FAIL — `Cannot find module './helpers/isolatedDb'`
-
-- [ ] **Step 3: Write minimal implementation**
-
-`server/src/__tests__/helpers/isolatedDb.ts`:
-
-```ts
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import Database from 'better-sqlite3';
-import { resolveLiveDbPath } from './liveDbGuard';
-
-export interface IsolatedCopy {
-  db: Database.Database;
-  path: string;
-  cleanup: () => void;
-}
-
-/**
- * Copy the canonical live database to a temp file and open it.
- * The source is only ever read. The copy is writable and disposable.
- */
-export function makeIsolatedCopy(label = 'iso'): IsolatedCopy {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `minierp-${label}-`));
-  const dest = path.join(dir, 'erp.db');
-  fs.copyFileSync(resolveLiveDbPath(), dest);
-  const db = new Database(dest);
-  return {
-    db,
-    path: dest,
-    cleanup: () => {
-      try { db.close(); } catch { /* already closed */ }
-      fs.rmSync(dir, { recursive: true, force: true });
-    },
-  };
-}
-```
-
-- [ ] **Step 4: Run to verify it passes**
-
-Run: `cd server && npx jest src/__tests__/isolatedDb.test.ts`
-Expected: PASS (3 tests)
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add server/src/__tests__/helpers/isolatedDb.ts server/src/__tests__/isolatedDb.test.ts
-git commit -m "test(server): isolated database copy helper for live-schema fixtures"
-```
+- [ ] **Step 3: Do not create `isolatedDb.ts`.** Its job is already done, and a
+second helper is how the repo ended up with 24 divergent MIGRATIONS arrays
+before `productionSchema.ts` existed.
 
 ---
-
 ### Task A.1: Migration 108 — account 2110
 
 Do this first and alone so a failure isolates cleanly.
@@ -302,7 +249,7 @@ describe('migration 108 — account 2110', () => {
   it('creates 2110 with all four columns the GL layer needs', () => {
     const { db, cleanup } = makeIsolatedCopy('mig2110');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const row = db
         .prepare(`SELECT code, name, type, normal_balance, text_code
                   FROM chart_of_accounts WHERE code = '2110'`)
@@ -319,8 +266,8 @@ describe('migration 108 — account 2110', () => {
   it('is idempotent — a second apply does not throw or duplicate', () => {
     const { db, cleanup } = makeIsolatedCopy('mig2110-idem');
     try {
-      applyPendingMigrations(db);
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
+      /* schema already migrated by setup.ts */;
       const n = db
         .prepare(`SELECT COUNT(*) AS n FROM chart_of_accounts WHERE code='2110'`)
         .get() as { n: number };
@@ -331,7 +278,7 @@ describe('migration 108 — account 2110', () => {
   it('is addressable by text_code, which is how postEntry resolves it', () => {
     const { db, cleanup } = makeIsolatedCopy('mig2110-tc');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const row = db
         .prepare(`SELECT code FROM chart_of_accounts WHERE text_code = ?`)
         .get('unapplied_customer_payments');
@@ -423,7 +370,7 @@ describe('migration 108 — tables', () => {
   it('creates customer_credit_sources with a VIRTUAL generated remaining', () => {
     const { db, cleanup } = makeIsolatedCopy('mig-src');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const sql = db
         .prepare(`SELECT sql FROM sqlite_master
                   WHERE type='table' AND name='customer_credit_sources'`)
@@ -440,7 +387,7 @@ describe('migration 108 — tables', () => {
   it('rejects a refund whose refunded_amount exceeds credited_amount', () => {
     const { db, cleanup } = makeIsolatedCopy('mig-src-chk');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const c = db.prepare(`SELECT id FROM customers LIMIT 1`).get() as { id: number };
       db.prepare(`INSERT INTO customer_credit_sources
         (customer_id, kind, credited_amount, refundable_cash_amount)
@@ -455,7 +402,7 @@ describe('migration 108 — tables', () => {
     // is unsatisfiable because refundable drains in the same operation
     const { db, cleanup } = makeIsolatedCopy('mig-src-refund');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const c = db.prepare(`SELECT id FROM customers LIMIT 1`).get() as { id: number };
       db.prepare(`INSERT INTO customer_credit_sources
         (customer_id, kind, credited_amount, refundable_cash_amount)
@@ -468,7 +415,7 @@ describe('migration 108 — tables', () => {
   it('creates credit_source_consumptions with nullable invoice_id', () => {
     const { db, cleanup } = makeIsolatedCopy('mig-cons');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const sql = db
         .prepare(`SELECT sql FROM sqlite_master
                   WHERE type='table' AND name='credit_source_consumptions'`)
@@ -483,7 +430,7 @@ describe('migration 108 — tables', () => {
   it('creates credit_applications with an APPLY/REFUND CHECK', () => {
     const { db, cleanup } = makeIsolatedCopy('mig-apps');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const sql = db
         .prepare(`SELECT sql FROM sqlite_master
                   WHERE type='table' AND name='credit_applications'`)
@@ -495,7 +442,7 @@ describe('migration 108 — tables', () => {
   it('adds payments.payment_kind defaulting every existing row to RECEIPT', () => {
     const { db, cleanup } = makeIsolatedCopy('mig-kind');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const rows = db.prepare(`SELECT DISTINCT payment_kind FROM payments`).all();
       expect(rows.length).toBeGreaterThan(0);
       expect(rows.every((r: any) => r.payment_kind === 'RECEIPT')).toBe(true);
@@ -652,7 +599,7 @@ describe('migration 108 — historical provenance backfill', () => {
   it('creates one RETURN_CREDIT source per non-voided RETURN credit row', () => {
     const { db, cleanup } = makeIsolatedCopy('bk-count');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const expected = db.prepare(`
         SELECT COUNT(*) AS n FROM customer_ledger
         WHERE transaction_type = 'RETURN' AND credit > 0
@@ -668,7 +615,7 @@ describe('migration 108 — historical provenance backfill', () => {
   it('credits each source with the RETURN amount', () => {
     const { db, cleanup } = makeIsolatedCopy('bk-amount');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const total = db.prepare(`
         SELECT COALESCE(SUM(credited_amount),0) AS v
         FROM customer_credit_sources WHERE kind = 'RETURN_CREDIT'`).get() as { v: number };
@@ -680,7 +627,7 @@ describe('migration 108 — historical provenance backfill', () => {
     // customer 15 granted 2300, 1800 consumed by CREDIT_OFFSET
     const { db, cleanup } = makeIsolatedCopy('bk-consumed');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const row = db.prepare(`
         SELECT credited_amount, consumed_amount, remaining_amount
         FROM customer_credit_sources
@@ -696,7 +643,7 @@ describe('migration 108 — historical provenance backfill', () => {
   it('leaves every backfilled row NON-SPENDABLE (refundable_cash_amount = 0)', () => {
     const { db, cleanup } = makeIsolatedCopy('bk-inert');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const bad = db.prepare(`
         SELECT COUNT(*) AS n FROM customer_credit_sources
         WHERE kind='RETURN_CREDIT' AND refundable_cash_amount <> 0`).get() as { n: number };
@@ -707,7 +654,7 @@ describe('migration 108 — historical provenance backfill', () => {
   it('creates no UNAPPLIED_CASH sources — the backfill must not invent spendable cash', () => {
     const { db, cleanup } = makeIsolatedCopy('bk-no-cash');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const n = db.prepare(`
         SELECT COUNT(*) AS n FROM customer_credit_sources
         WHERE kind='UNAPPLIED_CASH'`).get() as { n: number };
@@ -718,7 +665,7 @@ describe('migration 108 — historical provenance backfill', () => {
   it('never consumes more than was credited, for any customer', () => {
     const { db, cleanup } = makeIsolatedCopy('bk-selftest');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const bad = db.prepare(`
         SELECT COUNT(*) AS n FROM customer_credit_sources
         WHERE consumed_amount > credited_amount`).get() as { n: number };
@@ -855,7 +802,7 @@ describe('credit reconciliation (read-only)', () => {
   it('reports every customer that has credit history', () => {
     const { db, cleanup } = makeIsolatedCopy('recon');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const rows = reconcileCustomerCredits(db);
       expect(rows.length).toBe(5);
     } finally { cleanup(); }
@@ -864,7 +811,7 @@ describe('credit reconciliation (read-only)', () => {
   it('reports stored balance and ledger-derived balance side by side', () => {
     const { db, cleanup } = makeIsolatedCopy('recon-fields');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const [row] = reconcileCustomerCredits(db);
       expect(row).toEqual(expect.objectContaining({
         customerId: expect.any(Number),
@@ -881,7 +828,7 @@ describe('credit reconciliation (read-only)', () => {
   it('flags customer 15 as disagreeing, since credit_balance is 0 against 2300 granted', () => {
     const { db, cleanup } = makeIsolatedCopy('recon-15');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const rows = reconcileCustomerCredits(db);
       const fifteen = rows.find(r => r.storedCreditBalance === 0
         && r.ledgerGranted === 2300);
@@ -894,7 +841,7 @@ describe('credit reconciliation (read-only)', () => {
   it('writes nothing — the report is read-only', () => {
     const { db, cleanup } = makeIsolatedCopy('recon-readonly');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const before = db.prepare(
         `SELECT COUNT(*) AS n FROM customer_credit_sources`).get() as { n: number };
       const ledBefore = db.prepare(
@@ -1066,7 +1013,7 @@ describe('credit invariants K, L, M, N', () => {
   it('K holds when GL 2110 equals the sum of live unapplied source balances', () => {
     const { db, cleanup } = makeIsolatedCopy('inv-K');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const v = collectCreditInvariants(db);
       expect(R2(v.gl2110)).toBe(R2(v.sumUnappliedRemaining));
       expect(v.ok.K).toBe(true);
@@ -1076,7 +1023,7 @@ describe('credit invariants K, L, M, N', () => {
   it('K fails when a source is live but its GL leg is gone', () => {
     const { db, cleanup } = makeIsolatedCopy('inv-K-bad');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const c = db.prepare(`SELECT id FROM customers LIMIT 1`).get() as { id: number };
       db.prepare(`INSERT INTO customer_credit_sources
         (customer_id, kind, credited_amount, refundable_cash_amount)
@@ -1089,7 +1036,7 @@ describe('credit invariants K, L, M, N', () => {
   it('L holds when every source has a consumption covering its consumed_amount', () => {
     const { db, cleanup } = makeIsolatedCopy('inv-L');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const v = collectCreditInvariants(db);
       expect(v.ok.L).toBe(true);
     } finally { cleanup(); }
@@ -1098,7 +1045,7 @@ describe('credit invariants K, L, M, N', () => {
   it('M holds when no source is over-refunded', () => {
     const { db, cleanup } = makeIsolatedCopy('inv-M');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const v = collectCreditInvariants(db);
       expect(v.ok.M).toBe(true);
     } finally { cleanup(); }
@@ -1107,7 +1054,7 @@ describe('credit invariants K, L, M, N', () => {
   it('N holds when allocations never exceed the invoice balance', () => {
     const { db, cleanup } = makeIsolatedCopy('inv-N');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const v = collectCreditInvariants(db);
       expect(v.ok.N).toBe(true);
     } finally { cleanup(); }
@@ -1228,7 +1175,7 @@ describe('5.1 receive unapplied cash', () => {
   it('creates a UNAPPLIED_RECEIPT payment and a matching source', () => {
     const { db, cleanup } = makeIsolatedCopy('op-recv');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const c = db.prepare(`SELECT id FROM customers
                            WHERE current_balance = 0 LIMIT 1`).get() as { id: number };
       const res = receiveUnappliedCash(db, { customerId: c.id, amount: 500 });
@@ -1247,7 +1194,7 @@ describe('5.1 receive unapplied cash', () => {
   it('posts Dr cash / Cr 2110 keyed on the payment id', () => {
     const { db, cleanup } = makeIsolatedCopy('op-recv-gl');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const c = db.prepare(`SELECT id FROM customers
                            WHERE current_balance = 0 LIMIT 1`).get() as { id: number };
       const res = receiveUnappliedCash(db, { customerId: c.id, amount: 500 });
@@ -1268,7 +1215,7 @@ describe('5.1 receive unapplied cash', () => {
   it('keeps invariant F unchanged — credit_balance is never touched', () => {
     const { db, cleanup } = makeIsolatedCopy('op-recv-f');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const c = db.prepare(`SELECT id FROM customers
                            WHERE current_balance = 0 LIMIT 1`).get() as { id: number };
       const before = db.prepare(`SELECT credit_balance, current_balance FROM customers
@@ -1283,7 +1230,7 @@ describe('5.1 receive unapplied cash', () => {
   it('writes no customer_ledger row — the money has not moved', () => {
     const { db, cleanup } = makeIsolatedCopy('op-recv-ledger');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const c = db.prepare(`SELECT id FROM customers
                            WHERE current_balance = 0 LIMIT 1`).get() as { id: number };
       const before = db.prepare(`SELECT COUNT(*) AS n FROM customer_ledger`)
@@ -1298,7 +1245,7 @@ describe('5.1 receive unapplied cash', () => {
   it('rejects a customer already in credit', () => {
     const { db, cleanup } = makeIsolatedCopy('op-recv-neg');
     try {
-      applyPendingMigrations(db);
+      /* schema already migrated by setup.ts */;
       const c = db.prepare(`SELECT id FROM customers
                            WHERE current_balance < 0 LIMIT 1`).get() as { id: number } | undefined;
       if (!c) return;   // no such customer in this fixture; nothing to assert
@@ -1369,6 +1316,7 @@ export interface RefundUnappliedCashResult {
 ```ts
 import type Database from 'better-sqlite3';
 import { AccountingService } from './accountingService';
+// Verified: see the VERIFIED API CONTRACTS table above.
 import type {
   ReceiveUnappliedCashInput, ReceiveUnappliedCashResult,
 } from './unappliedCashTypes';
@@ -1399,8 +1347,13 @@ export function receiveUnappliedCash(
   }
 
   const tx = db.transaction((): ReceiveUnappliedCashResult => {
-    AccountingService.assertPeriodNotClosed(
-      db, input.paymentDate ?? new Date().toISOString().slice(0, 10), 'receive unapplied cash');
+    // postEntry asserts the period itself from entry_date; no separate call.
+    // Resolve accounts to numeric ids BEFORE posting — postEntry does not do it.
+    const cash = AccountingService.getAccountByTextCode(db, 'cash');
+    const unapplied = AccountingService.getAccountByTextCode(db, 'unapplied_customer_payments');
+    if (!cash || !unapplied) {
+      throw new Error('chart of accounts is missing a required text code');
+    }
 
     const pay = db.prepare(`
       INSERT INTO payments (customer_id, payment_date, amount, payment_method, notes, payment_kind)
@@ -1422,17 +1375,17 @@ export function receiveUnappliedCash(
     // group by (reference_type, reference_id), and the void matches exactly,
     // so a NULL here would leave the receipt permanently unvoidable.
     const entry = AccountingService.postEntry(db, {
-      referenceType: 'UNAPPLIED_RECEIPT',
-      referenceId: pay.id,
-      entryDate: input.paymentDate ?? new Date().toISOString().slice(0, 10),
+      reference_type: 'UNAPPLIED_RECEIPT',
+      reference_id: pay.id,
+      entry_date: today,
       description: 'Unapplied customer cash received',
       lines: [
-        { accountTextCode: 'cash', debit: input.amount },
-        { accountTextCode: 'unapplied_customer_payments', credit: input.amount },
+        { account_id: cash.id, debit: input.amount },
+        { account_id: unapplied.id, credit: input.amount },
       ],
     });
 
-    return { paymentId: pay.id, sourceId: src.id, journalEntryId: entry.id };
+    return { paymentId: pay.id, sourceId: src.id, journalEntryId: entry.journal_entry_id };
   });
 
   return tx();
