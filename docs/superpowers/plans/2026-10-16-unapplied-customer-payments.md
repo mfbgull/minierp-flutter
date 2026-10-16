@@ -849,11 +849,13 @@ describe('credit reconciliation (read-only)', () => {
     try {
       /* schema already migrated by setup.ts */;
       const rows = reconcileCustomerCredits(db);
-      const fifteen = rows.find(r => r.storedCreditBalance === 0
-        && r.ledgerGranted === 2300);
+      const fifteen = rows.find(r => r.ledgerGranted === 2300);
       expect(fifteen).toBeDefined();
       expect(fifteen!.agrees).toBe(false);
-      expect(R2(fifteen!.ledgerDerived)).toBe(500); // 2300 - 1800 consumed
+      // 2300 granted - 550 refunded in cash - 1800 consumed by CREDIT_OFFSET.
+      // The negative is the finding: Rs 550 was paid OUT as cash, so the
+      // customer was granted less credit than the ledger implies they hold.
+      expect(R2(fifteen!.ledgerDerived)).toBe(-50);
     } finally { cleanup(); }
   });
 
@@ -929,22 +931,26 @@ export function reconcileCustomerCredits(db: Database.Database): ReconciliationR
       WHERE transaction_type='RETURN' AND credit > 0
         AND COALESCE(voided,0)=0 AND reversed_by IS NULL
       GROUP BY customer_id
-    ) gr ON gr.customerId = c.id
+    ) gr ON gr.customer_id = c.id
+    -- Refunds are their OWN transaction_type, not RETURN rows with a debit.
+    -- Filtering 'RETURN AND debit > 0' matches nothing: every RETURN row is a
+    -- credit, and the six refunds are transaction_type='REFUND'. That mistake
+    -- makes this column silently read 0 for every customer.
     LEFT JOIN (
       SELECT customer_id, SUM(debit) refunded FROM customer_ledger
-      WHERE transaction_type='RETURN' AND debit > 0
+      WHERE transaction_type='REFUND' AND debit > 0
         AND COALESCE(voided,0)=0 AND reversed_by IS NULL
       GROUP BY customer_id
-    ) rf ON rf.customerId = c.id
+    ) rf ON rf.customer_id = c.id
     LEFT JOIN (
       SELECT customer_id, SUM(credit) consumed FROM customer_ledger
       WHERE transaction_type='CREDIT_OFFSET' AND credit > 0
         AND COALESCE(voided,0)=0 AND reversed_by IS NULL
       GROUP BY customer_id
-    ) co ON co.customerId = c.id
-    WHERE gr.customerId IS NOT NULL
-       OR rf.customerId IS NOT NULL
-       OR co.customerId IS NOT NULL
+    ) co ON co.customer_id = c.id
+    WHERE gr.customer_id IS NOT NULL
+       OR rf.customer_id IS NOT NULL
+       OR co.customer_id IS NOT NULL
        OR c.credit_balance <> 0
     ORDER BY c.id
   `).all() as Array<Omit<ReconciliationRow, 'ledgerDerived' | 'agrees'>>;
