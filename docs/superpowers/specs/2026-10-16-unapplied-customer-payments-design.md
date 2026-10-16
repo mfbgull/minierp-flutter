@@ -1,9 +1,9 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 20** · 2026-10-16 · Backend + API only
+**Revision 21** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–19. Sixteen defects were found — eleven by *executing*
-this document or checking it against the real API, and five more by auditing
+Supersedes revisions 1–20. Seventeen defects were found — eleven by *executing*
+this document or checking it against the real API, and six more by auditing
 whether sections still agree with each other:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -103,6 +103,14 @@ whether sections still agree with each other:
   `payment_allocations` already has: mark the row `voided_at` and restore the
   base counters in one transaction. Rev 19's renumbering is what prompted
   re-reading this; it was latent from rev 4.
+- **rev 21** — §5.3's refund never created a `payments` row, while §4 keys
+  `UNAPPLIED_REFUND` on "the `payments.id` of the refund receipt" and voids it
+  via `voidJournalLinesByReference(db, 'UNAPPLIED_REFUND', paymentId)`. There
+  was therefore no id for the void to match and no record of the payout in
+  `payments` — cash left the till with no audit trail. §5.3 now inserts it as
+  step 4, before the GL post, with `payment_kind='REFUND'` and a negative
+  `amount` matching the existing convention (E7). Every other operation already
+  created one; only the refund did not. Test 34 pins it.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -550,11 +558,19 @@ Returns cash to the customer.
 2. Assert `total <= Σ refundable_cash_amount` over the sources actually drawn.
 3. Assert `total <= Σ` cash originally collected from this customer
    (`origin_payment_id` receipts, refunds excluded).
-4. Insert `credit_applications` (`operation='REFUND'`), one
+4. **Insert a `payments` row first** — `payment_kind='REFUND'`, `customer_id`
+   set, `amount = -total`, `payment_date` = today. This is the audit record of
+   cash paid out, and its id is what step 7 keys the GL group on. Negative
+   amounts match the existing convention (E7: six negative-amount payments,
+   all genuine refunds). Without it there is no id for
+   `voidJournalLinesByReference(db, 'UNAPPLIED_REFUND', paymentId)` to match and
+   no trace of the payout in `payments`.
+5. Insert `credit_applications` (`operation='REFUND'`), one
    `credit_source_consumptions` row per source drawn (`invoice_id` NULL).
-5. Increment `refunded_amount` and decrement `refundable_cash_amount` on each
+6. Increment `refunded_amount` and decrement `refundable_cash_amount` on each
    drawn source.
-6. Post `UNAPPLIED_REFUND` GL entry: Dr `2110` / Cr `1000`.
+7. Post `UNAPPLIED_REFUND` GL entry: Dr `2110` / Cr `1000`, with
+   `reference_id` = the `payments.id` from step 4.
 
 A return-credit source has `refundable_cash_amount = 0` unless its provenance is
 cash, so refunds can never be funded from non-cash store credit.
@@ -788,6 +804,7 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 31 | **Invariant K.** Receive, apply, refund, then read `GL(2110)` | `Math.abs(GL_BALANCE('2110')) == Σ remaining_amount` over live `UNAPPLIED_CASH` sources, at every step. Voided and reversed sources excluded. This is the only thing tying account `2110` to tracked credit — without it the account is an unverified bucket |
 | 32 | **Invariant N.** After a receipt is fully, partly, and over-applied | `Σ payment_allocations (voided_at IS NULL) <= payments.amount` holds for the receipt in every case, including the rejected over-application from test 4. N is the schema-free backstop for round-2 blocker 3, where a 500 receipt could settle a 1500 invoice |
 | 33 | **Reverse, then read K.** Reverse an unapplied 500 receipt | `abs(GL_BALANCE('2110'))` and `Σ remaining_amount` both drop to 0. Then attempt to apply the voided source → **409**, not a phantom 500 settling an invoice. Reversing the GL leg without retiring the source would leave `0 != 500` and create money |
+| 34 | **Refund writes a `payments` row.** Refund 100 of a 500 source | a `payments` row exists with `payment_kind='REFUND'`, `amount=-100`, the right `customer_id`; the `UNAPPLIED_REFUND` GL group's `reference_id` equals its id; voiding by that id reverses the payout. Without the row there is no id to key the GL on and no trace of the payout |
 
 ### 12.1 Assert no *new* violations, never absolute green
 
