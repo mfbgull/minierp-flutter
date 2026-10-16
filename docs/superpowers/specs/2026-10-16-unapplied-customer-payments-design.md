@@ -1,19 +1,21 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 4** · 2026-10-16 · Backend + API only
+**Revision 5** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–3. Revision 3 fixed all three blockers from review round 2.
-Revision 4 fixes five further defects found by self-review of revision 3, two of
-them blockers: §5.2 never moved the source counters, so `remaining_amount` would
-never fall and the same cash could be applied repeatedly; and §5.2 step 7 had the
-wrong sign on `current_balance`, which is positive when the customer *owes*. It
-also names the reversal primitive (an explicit demand of round 2 that revision 3
-had left unanswered), caps refund draws on `remaining_amount` as well as
-`refundable_cash_amount`, and records that the §7 status codes are new error
-mapping rather than existing behaviour.
+Supersedes revisions 1–4. Revision 4 fixed five defects found by self-review,
+two of them blockers. Revision 5 fixes one further blocker found by **executing**
+the schema rather than reading it: §3.1 declared
+`CHECK (refunded_amount <= refundable_cash_amount)` while §5.3 increments the
+first and decrements the second, so the two sections contradicted each other and
+the constraint made refunding impossible. Refunding the last 100 of a 500 source
+sets `refunded = 100, refundable = 0`; `100 <= 0` fails. That is the most
+ordinary refund in the feature, and revision 4's schema rejected it. The bound is
+now against `credited_amount`, and the CHECKs now live inside the
+`CREATE TABLE` — revision 4 listed them in a trailing block, which is dropped
+silently during implementation with no error to signal the loss.
 
-Every factual claim below was verified against `server/database/erp.db` and the
-current source tree.
+Every factual claim below was verified against `server/database/erp.db`, the
+current source tree, and by executing the proposed DDL against SQLite 3.51.2.
 
 ---
 
@@ -103,16 +105,51 @@ return flow, backfilled) or `UNAPPLIED_CASH` (this feature).
 | `voided_at` | TIMESTAMP NULL | |
 
 `remaining_amount` is generated **from** the three base counters. It is never the
-source of truth and never written. The CHECK below therefore validates whatever
-the base counters say — if a writer corrupts `consumed_amount` without recording a
-consumption, this CHECK still passes and only invariant L catches it. That is
-why L is asserted in code (§6), not delegated to the schema.
+source of truth and never written. The constraints therefore validate whatever
+the base counters say — if a writer corrupts `consumed_amount` without recording
+a consumption, they still pass and only invariant L catches it. That is why L is
+asserted in code (§6), not delegated to the schema.
+
+The constraints belong **inside** the `CREATE TABLE`, not in a trailing block.
+A separate block is easy to drop during implementation and fails silently — no
+error, just no enforcement:
 
 ```sql
-CHECK (consumed_amount >= 0)
-CHECK (refunded_amount >= 0)
-CHECK (refunded_amount <= refundable_cash_amount)
+CREATE TABLE customer_credit_sources (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  customer_id INTEGER NOT NULL REFERENCES customers(id),
+  kind TEXT NOT NULL CHECK (kind IN ('RETURN_CREDIT','UNAPPLIED_CASH')),
+  origin_payment_id INTEGER,
+  origin_invoice_id INTEGER,
+  credited_amount DECIMAL(15,2) NOT NULL,
+  consumed_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+  refunded_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+  remaining_amount DECIMAL(15,2)
+    GENERATED ALWAYS AS (credited_amount - consumed_amount - refunded_amount) VIRTUAL,
+  refundable_cash_amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+  credited_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  voided_at TIMESTAMP,
+  CONSTRAINT c_nonneg_consumed     CHECK (consumed_amount >= 0),
+  CONSTRAINT c_refund_le_credited  CHECK (refunded_amount <= credited_amount),
+  CONSTRAINT c_refundable_nonneg   CHECK (refundable_cash_amount >= 0),
+  CONSTRAINT c_refundable_le_remaining
+    CHECK (refundable_cash_amount <= remaining_amount)
+);
 ```
+
+Note what the refund constraint is **not**. It is not
+`refunded_amount <= refundable_cash_amount`. `refunded_amount` is a monotonic
+accumulator while `refundable_cash_amount` is a draining pool, and §5.3 moves
+them in opposite directions. Comparing an accumulator to a pool that has just
+been drained by the same operation makes the constraint unsatisfiable: refunding
+the last 100 of a 500 source sets `refunded = 100, refundable = 0`, and
+`100 <= 0` fails. Verified — that schema rejects the single most ordinary refund
+in the feature. The correct bound is against the total credited.
+
+Whether a *particular* source may be refunded from is not a schema question.
+`refundable_cash_amount = 0` is ambiguous between "non-cash store credit" and
+"cash already drained", so the non-cash restriction is enforced by §5.3's
+service-side `WHERE refundable_cash_amount >= :drawn`, not by a constraint.
 
 ### 3.2 `credit_source_consumptions`
 
@@ -336,7 +373,7 @@ Un-apply is out of scope for this change.
 | **F** | `abs(GL(1100)+GL(1110)) == abs(Σ current_balance − Σ credit_balance)` — **unchanged**. This feature writes neither column on receipt |
 | **K** | `GL(2110) == Σ remaining_amount` over live `UNAPPLIED_CASH` sources, credit-normal |
 | **L** | For every source, `remaining_amount == credited_amount − Σ active consumption amounts`. Computed from `credit_source_consumptions` in code, since the generated column alone cannot detect a missing base-counter update |
-| **M** | For every source, `refunded_amount <= refundable_cash_amount <= remaining_amount` |
+| **M** | For every source, `refunded_amount <= credited_amount` **and** `0 <= refundable_cash_amount <= remaining_amount` |
 | **N** | Per receipt: `Σ payment_allocations (voided_at IS NULL) <= payment.amount` |
 
 **F's pre-existing 1800.00 gap is untouched by this change.** It is a separate
@@ -438,6 +475,10 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 17 | Apply 400, then refund 400 | **409** — refundable cash fell with `consumed_amount`; the receipt holds no refundable cash once applied |
 | 18 | Apply 400 against a customer owing 499.80 | `current_balance` falls to 99.80; `GL(1100)` falls by 400; F still passes |
 | 19 | Apply spanning two sources in one call | both counters move; one `UNAPPLIED_APPLY` group; a single void by `credit_applications.id` clears every line |
+| 20 | Receive 500, apply 400, then refund the remaining 100 | **succeeds**, leaving `remaining=0, refunded=100, refundable=0`. This is the case revision 4's schema rejected outright (`100 <= 0`) |
+| 21 | Receive 300, refund 300 in full without applying | **succeeds**, leaving `remaining=0, refunded=300, refundable=0` |
+| 22 | Attempt to refund beyond `credited_amount` | rejected by `c_refund_le_credited` |
+| 23 | Migration executes the §3.1 `CREATE TABLE` verbatim | CHECKs present in `sqlite_master`; dropping them fails a test |
 
 ---
 
