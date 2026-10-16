@@ -573,3 +573,101 @@ invoice headers is a larger exercise than D2b and is not started.
 **OPEN.** Option A is proven on the numbers and is recommended, but it has **not** been
 applied — no live correction has been made or is authorised. Awaiting explicit approval.
 
+
+---
+
+## D2b final verification and correction readiness (2026-10-16)
+
+Investigation only. **No live modification.** Live SHA-256 `63e61c6a…` unchanged before
+and after; `integrity_check=ok`; `user_version=107`. Full write-up in
+`audit/D2B-INVOICE-49-INVESTIGATION.md`.
+
+### Invoice 49 — confirmed historical defects
+
+Both Rs 600 returns are **genuine**. The earlier open question ("is the second return
+spurious, making the correction Rs 2,400?") is **withdrawn — the correction stays Rs 1,800**.
+
+| Defect | Evidence | Status |
+|---|---|---|
+| `je#198` spurious inventory leg, Dr 1200 / Cr 7100 = **500** (standard cost) duplicating `je#200`'s FIFO 100 | per-account journal lines; `mv#197.unit_cost=100` vs `financial_value=500` | Historical; **fixable, evidence-complete, not applied** |
+| Return 2 created no `stock_movements` row | no movement carries `reference_docno='INV-0926-00007'` besides `#197` | Historical; **guard defect, forward-only fix** |
+| Return 1 restocked with `batch_id=null` | `#197` | Historical; attribution only |
+
+Corrected GL arithmetic (verified independently): `−300 (je196) + 500 (je198) + 100 (je200) +
+100 (je206) = **+400**`; correct is **−100**. Voiding `je#198` alone lands exactly on −100.
+**No third Rs 100 posting is proposed** — `je#200` and `je#206` already carry both units.
+
+Corroborated by `server/docs/known-issues.md` item 1, which names the same defect class and the
+forward-only fix (`skipAdjustmentFinancialPosting`).
+
+**Batch-51 correction.** `pi`'s finding (§4.1, §4.4) states the repair target is
+`quantity_remaining 0 → 2`. That `0` is the *clamped* stored value; the true balance is
+`10 − 12 = −2`, so crediting both units gives **0**. Setting 2 would push
+`SUM(batch.quantity_remaining)` to 21 against `items.current_stock`/`stock_balances` at 19 and
+**break Invariant E**. Corrected in place in that document. Item-level target is **19 → 20**,
+not 21 — only one restock movement is missing at item level.
+
+### Physical inventory — Scenario C, receipt cannot be established
+
+`physical_counts` and `physical_count_items` hold **zero rows** — no stock count has ever been
+run. No damaged/disposal/write-off record exists for item 1 (the only `WRITE_OFF`, `mv#180`, is
+expired batch 49). Per the standing instruction, a missing movement is not proof of
+non-receipt and a financial return is not proof of receipt. **Recorded as unresolved; requires a
+business decision or a physical count.** The existing decision to defer historical inventory
+repair is **preserved**.
+
+### October cash — disposition
+
+| Transaction | Received | Valid | Invalid | Treatment |
+|---|---:|---:|---:|---|
+| `PAY-1026-00060` | 1,400 | 200 → inv 57 | **1,200 → inv 51** | genuine receipt |
+| `PAY-1026-00061` | 600 | — | **600 → inv 50** | genuine receipt |
+
+The Rs 1,800 was genuinely received and its cash debit stands. Its allocations to invoices
+50/51 were **invalid** (both settled 2026-09-17). The spurious credit was consumed by invoice
+59's `credit_offset=1800`. **Customer intent is not provable from accounting records** — the
+offset is a posting, not an instruction. Invoice 59's header is internally inconsistent
+(`status='Unpaid'`, `payment_status='Paid'`, `balance=0`).
+
+### Strategy C′ — Case 1 vs Case 2
+
+| Case | Inv 59 balance | Cust 15 receivable | GL reconciled | Evidence |
+|---|---:|---:|---|---|
+| 1 — October cash applied to inv 59 | 0 | 0 | **No, F stays 1,800** | No — allocations provably invalid |
+| 2 — cash unapplied (C′) | 1,800 | 1,800 | **Yes, F → 0** | Yes |
+
+**Case 1 does not repair F**, measured: re-pointing the allocations changes neither GL nor the
+sub-ledger, so `GL_AR − Σ customer balances` is unchanged at 1,800. The gap originates in the
+**September CREDIT_OFFSET** mechanism, not the October allocation error. Case 2 is preferred on
+evidence, **not** because it makes F pass.
+
+**Product gap:** MiniERP has no unapplied-cash concept, so Case 2 must be represented as an
+outstanding invoice balance rather than a customer credit. Recorded as a separate requirement.
+
+**Assumptions carried by C′:** invoices 50/51 were settled before the October cash; the
+September return credits were validly earned and consumed; customer 15 is a single legal entity
+for balance purposes. All three are unverified assumptions, not findings.
+
+### Correction-script safety — `c1d0c120` had none
+
+`apply-customer15-correction.ts` and `rollback-customer15-correction.ts` shipped with **no
+safety surface**: both resolve their database through `config/database`, which falls back to
+the live `server/database/erp.db`. Neither had an authorization gate, identity check,
+precondition validation, or idempotency guard.
+
+Fixed in **`92d89486`**: `scripts/lib/correctionSafety.ts` adds four fail-closed gates
+(exact authorization token, explicit `DATABASE_PATH`, live exclusion bound to a measured
+SHA-256, `--apply` flag) plus ten preconditions that also make a repeat run a no-op. The
+accounting logic of both scripts is **unchanged**.
+
+Verified on isolated copies: 7 refusal paths, authorized happy path, idempotency refusal, and
+exact logical rollback of all 7 financial tables (`activity_log` append-only by design).
+**Note:** `eslint` does not cover `scripts/`, so these files rest on typecheck + behavioural
+tests only.
+
+### Status
+
+**F and H remain OPEN.** Neither is marked resolved; every result above is from isolated
+simulation. No live correction is authorised. Three decisions are outstanding and are
+**deliberately not bundled**: physical disposition of invoice 49's second unit; allocation or
+retention of the October Rs 1,800; and approval of any specific historical correction.

@@ -212,6 +212,26 @@ Both facts are separate and both are needed:
 
 **Batch 51 is short by 2 units** — not 1.
 
+> **Correction (D2b final verification, 2026-10-16).** The *diagnosis* above is right —
+> batch 51 is over-consumed by 2 and the clamp hides it. But the **repair target is wrong**.
+>
+> §4.1 concludes "the correct `quantity_remaining` for batch 51 is `0 + 2 = 2`". That `0` is the
+> **clamped** stored value, not the true balance. The true balance is
+> `quantity_original(10) − sold(12) = −2`. Crediting the two returned units gives
+> **`−2 + 2 = 0`**, not 2.
+>
+> This matters because setting `quantity_remaining = 2` inflates
+> `SUM(batch.quantity_remaining WHERE item_id=1)` from 19 to 21 while `items.current_stock` and
+> `stock_balances` stay at 19 — **Invariant E would then fail**. The batch-level target is
+> therefore **0**, which is already the stored value: at batch level the defect is *attribution*
+> (`stock_movements#197.batch_id` is null and return 2 has no movement), not a quantity.
+>
+> The corresponding item-level target is **19 → 20**, not 21: only *one* restock movement
+> (`#197`) is missing at item level, not two.
+>
+> This correction does not change the §4.4 GL conclusion, which stands independently:
+> voiding `je198` alone moves account 1200 by −500 and leaves invoice 49 at its correct −100.
+
 ### 4.2 Why the second restock was skipped — historical code evidence
 
 At the time of the returns (Sep 16–17), the live return writer was
