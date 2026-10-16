@@ -1,9 +1,9 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 10** · 2026-10-16 · Backend + API only
+**Revision 11** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–9. Six defects were found by *executing* this document or
-checking it against the real API, and each was invisible to reading it:
+Supersedes revisions 1–10. Seven defects were found by *executing* this document
+or checking it against the real API, and each was invisible to reading it:
 
 - **rev 5** — executing the DDL showed §3.1's
   `CHECK (refunded_amount <= refundable_cash_amount)` is unsatisfiable against
@@ -22,30 +22,39 @@ checking it against the real API, and each was invisible to reading it:
 - **rev 9** — §2 published `availableCredit = credit_balance + Σ unapplied
   cash`, the same shape as blocker 2. Nothing consumed it, but a combined
   "available credit" is a loaded name to hand an implementer.
-- **rev 10** — §12.1 invented `expectAllInvariantsHoldViolations()`. The real
-  `expectAllInvariantsHold(context)` returns `void` and asserts internally; a
-  baseline must be built from the nine exported collectors. And
-  `GroupImbalance` has **no `label` field** — it carries `reference_type`,
-  `reference_id` and `diff`. The pseudocode's `g.label` rendered every group as
-  `undefined:0`, so the baseline compared noise and would have passed no matter
-  what the ledger did.
+- **rev 10** — §12.1 invented `expectAllInvariantsHoldViolations()`, and
+  `GroupImbalance` has no `label` field, so the baseline compared `undefined:0`
+  for every GL group and could not have failed.
+- **rev 11** — §8's account insert carried only `(code, name, type)`. Executed
+  against the real `chart_of_accounts` DDL it is **rejected**:
+  `normal_balance` is `NOT NULL CHECK (...)`. A missing `text_code` would also
+  leave `2110` unresolvable by `postEntry`, which resolves by text code. Rev 10
+  had claimed the migration ran clean — against a replica whose
+  `chart_of_accounts` I had paraphrased without `normal_balance`. That claim was
+  false and is withdrawn. Separately, E11 asserted `1120` exists; it does not.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
 
+**On verification method.** Revisions 1–10 were checked by executing code derived
+from *my reading* of the schema. That is weaker than it looks: where I
+paraphrased a table rather than reusing its real DDL, the test proved only that
+my paraphrase was self-consistent. The rev 11 blocker survived precisely because
+the replica was mine. Future verification must load `sqlite_master.sql` and the
+live rows rather than re-typing a shape.
+
 Every factual claim below was verified against `server/database/erp.db`, the
 current source tree, by executing the proposed DDL against SQLite 3.51.2, by
 running the §8 backfill arithmetic against live data, by reproducing
-`arImbalances()` verbatim, by executing migration 108 end-to-end against a
-replica of the live `payments` / `chart_of_accounts` shape, and by evaluating
-K's arithmetic in isolation.
+`arImbalances()` verbatim, by evaluating K's arithmetic in isolation, and by
+running migration 108's account insert against the **real** `chart_of_accounts`
+DDL and rows.
 
-The migration run is clean: `ALTER TABLE payments ADD COLUMN` accepts
+What is verified: `ALTER TABLE payments ADD COLUMN` accepts
 `NOT NULL DEFAULT 'RECEIPT' CHECK (...)` on a populated table, preserves every
-row, enforces the CHECK on both INSERT and UPDATE, and — the one that matters
-for compatibility — still accepts legacy `INSERT`s that omit the column, which
-existing code will do. `2110` inserts without collision. The three new tables
-create and roll back cleanly inside one transaction.
+row, enforces the CHECK on INSERT and UPDATE, and still accepts legacy `INSERT`s
+that omit the column. The three new tables create and roll back cleanly. The
+account insert is now correct and confirmed against the real schema.
 
 ---
 
@@ -66,7 +75,8 @@ All figures from `server/database/erp.db`, read-only, `user_version=107`,
 | E8 | Triggers on `payment_allocations` | none |
 | E9 | `journal_lines.reference_id` | `INTEGER` |
 | E10 | `payment_allocations.invoice_id` | `NOT NULL` |
-| E11 | Accounts | `2100` = Tax Payable; `2110` free; `1100`, `1110`, `1120` exist |
+| E11 | Accounts | `2100` = Tax Payable; `2110` free. The 11xx range holds only `1100` and `1110` — **there is no `1120`**; revisions 1–10 said otherwise and were wrong. `1110` is `type=asset` with `normal_balance=credit`, which is the documented mismatch |
+| E12 | `chart_of_accounts` shape | `code TEXT UNIQUE NOT NULL`, `normal_balance TEXT NOT NULL CHECK (normal_balance IN ('debit','credit'))`, `text_code TEXT` — all 31 rows populated, so a new account without a `text_code` is unresolvable by the text-code posting primitives |
 
 ---
 
@@ -252,6 +262,24 @@ The existing `PAYMENT` reference type is **not** reused: it means
 Dr Cash / Cr AR, which is the wrong counter-account for unapplied cash. Storing
 the receipt under a distinct type keeps each reversal scoped to one group and
 leaves `Payment.delete`'s PAYMENT void logic untouched.
+
+All four entries post through `AccountingService.postEntry`
+(`accountingService.ts:251`), which resolves accounts by **`text_code`** and
+asserts the period is open itself (`:315`). Account text codes, confirmed present
+for all 31 accounts (E12):
+
+| Account | `text_code` | Used by |
+|---|---|---|
+| `1000` Cash | `cash` | `UNAPPLIED_RECEIPT` debit |
+| `2110` Unapplied | `unapplied_customer_payments` | created by migration §8 |
+| `1100` AR | `accounts_receivable` | `UNAPPLIED_APPLY` credit |
+| `1000` Cash | `cash` | `UNAPPLIED_REFUND` credit |
+
+`postEntry` returns the posted entry id; that id, not `credit_applications.id`,
+is what `voidJournalLinesByReference` later matches on for these groups. For
+`UNAPPLIED_RECEIPT` and `UNAPPLIED_REFUND` the group is keyed by the payment id;
+`UNAPPLIED_APPLY` posts once per call and is keyed by `credit_applications.id`
+as specified in §5.2 step 7.
 
 ---
 
@@ -453,7 +481,26 @@ must void the original dated entry.
 
 `108_unapplied_customer_payments.sql`, registered in `config/database.ts`.
 
-1. Create `2110` if absent.
+1. Create `2110` if absent. Three columns are mandatory, and omitting any of them
+   fails against the real table:
+
+   ```sql
+   INSERT INTO chart_of_accounts (code, name, type, normal_balance, text_code)
+   VALUES ('2110', 'Unapplied Customer Payments', 'liability', 'credit',
+           'unapplied_customer_payments')
+   ON CONFLICT(code) DO NOTHING;
+   ```
+
+   `normal_balance` is `NOT NULL CHECK (normal_balance IN ('debit','credit'))`,
+   so an insert carrying only `(code, name, type)` is rejected outright. And
+   `text_code` is not optional in practice: the text-code posting primitives
+   resolve accounts with `SELECT * FROM chart_of_accounts WHERE text_code = ?`,
+   and all 31 existing accounts are populated. An account without one cannot be
+   found by `postEntry`, so every GL entry below would throw "Account not found".
+
+   Revisions 1–10 said only "create `2110` if absent" and their migration test
+   passed — against a replica whose `chart_of_accounts` omitted
+   `normal_balance`. Executed against the real DDL, that insert is rejected.
 2. Create the three new tables (§3).
 3. Add `payments.payment_kind` (§3.4).
 4. Backfill `payment_kind`:
@@ -549,6 +596,8 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 25 | Attempt to refund against a backfilled `RETURN_CREDIT` source | 409 — §5.3's `refundable_cash_amount >= :drawn` guard |
 | 26 | Migration validation | asserts per-customer `RETURN credit >= CREDIT_OFFSET credit`; must **not** read `credit_balance`, whose divergence is expected and benign |
 | 27 | Baseline the invariant suite before writing any feature test | record which invariants are **already** failing. F fails by exactly 1800.00 today, independent of this feature |
+| 28 | Run the migration against the **real** `chart_of_accounts` DDL and rows | account `2110` inserts with `normal_balance='credit'` and a `text_code`; `getAccountByTextCode('unapplied_customer_payments')` resolves it. An insert omitting `normal_balance` must be rejected — that was rev 10's blocker |
+| 29 | Post one `UNAPPLIED_RECEIPT` through `postEntry` after the migration | resolves both `cash` and `unapplied_customer_payments` by text code; journal group balances |
 
 ### 12.1 Assert no *new* violations, never absolute green
 
