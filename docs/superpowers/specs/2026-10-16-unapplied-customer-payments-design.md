@@ -154,6 +154,23 @@ it.
   checker did not flag it — a one-row fragment sits below the run threshold
   tables need. Cosmetic, but it means §3.2's column list read as if it had a
   duplicate. Removed.
+- **rev 27** — §4 claimed `postEntry` "resolves accounts by `text_code`". It
+  does not. `JournalLineInput.account_id` is an INTEGER, so the caller must
+  resolve the id first via `getAccountByTextCode(db, 'cash').id` and throw when
+  it is missing. An implementer following §4 verbatim would hand `postEntry` an
+  account *string* where a numeric id is required, and every GL entry in the
+  feature would fail at runtime. §4 also described `PostEntryInput` as though it
+  were camelCase; it is snake_case (`entry_date`, `reference_type`,
+  `reference_id`), `reference_id` is `number | null`, and the returned
+  `PostedEntry` exposes `journal_entry_id`, not `id`.
+
+  Twenty-three revisions of verification missed this, because every check so
+  far examined *this document's* internal agreement and its arithmetic. This is
+  the first defect found by checking the document against **the code it names**.
+  Rev 25 showed the checker never validated the document's skeleton; rev 27
+  shows nobody validated its API claims. A spec that cites
+  `accountingService.ts:251` is asserting something about that file, and the
+  only way to know it is true is to read it.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
