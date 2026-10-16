@@ -1,9 +1,9 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 23** · 2026-10-16 · Backend + API only
+**Revision 24** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–22. Nineteen defects were found — eleven by *executing*
-this document or checking it against the real API, and eight more by auditing
+Supersedes revisions 1–23. Twenty defects were found — eleven by *executing*
+this document or checking it against the real API, and nine more by auditing
 whether sections still agree with each other:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -128,6 +128,15 @@ it.
   operations do — correcting it told nobody what to write. Each operation only
   learned its own `reference_id` when §4 was compared back against it, one
   revision at a time.
+- **rev 24** — §7 requires reverse to check **the receipt's own `payment_date`**,
+  but §5.4 named no period check at all. The generic preamble covers the other
+  three operations, whose dates are their own; only reverse inherits an earlier
+  date. `voidJournalLinesByReference` issues just
+  `UPDATE journal_lines SET voided = 1` and enforces nothing, so §5.4's missing
+  guard *was* the entire protection: following it literally would allow
+  reversing a receipt dated inside a closed period. §5.4 now guards explicitly
+  as step 2, and the renumbering that followed is caught by §6's live
+  cross-reference to step 5.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -626,23 +635,32 @@ The single reversal primitive is **`UnappliedCashService.reverse(paymentId, attr
 It is the only code path permitted to void an `UNAPPLIED_RECEIPT`, and it:
 
 1. guards on `payment_kind = 'UNAPPLIED_RECEIPT'`;
-2. refuses with the 409 above when live consumptions exist;
-3. voids the receipt's GL group via
+2. **guards the period, against the receipt's own `payment_date`** — not
+   today's date. `assertPeriodNotClosed(db, receipt.payment_date, ...)` before
+   anything is written, so a receipt dated inside a closed period cannot have
+   its GL leg voided. `voidJournalLinesByReference` only issues
+   `UPDATE journal_lines SET voided = 1`, so it enforces nothing itself; this
+   guard is the entire protection. §5's preamble covers the other three
+   operations, whose dates are their own; only reverse inherits an earlier
+   date, and the distinction decides whether a legitimate reversal is blocked
+   or an illegal one is allowed;
+3. refuses with the 409 above when live consumptions exist;
+4. voids the receipt's GL group via
    `AccountingService.voidJournalLinesByReference(db, 'UNAPPLIED_RECEIPT', paymentId)`
    — `reference_id` is the payment id, because a receipt's GL group hangs off
    the payment itself rather than off an application row;
-4. **retires the source row** — `UPDATE customer_credit_sources SET voided_at =
+5. **retires the source row** — `UPDATE customer_credit_sources SET voided_at =
    CURRENT_TIMESTAMP WHERE origin_payment_id = ? AND voided_at IS NULL`.
-   This is not optional bookkeeping. The GL leg in step 3 removes the credit
+   This is not optional bookkeeping. The GL leg in step 4 removes the credit
    from `2110`, and invariant K sums `remaining_amount` over live sources; if
    the source stayed live, K would read `0 != 500` and the customer would be
    left holding 500 of credit backed by no GL, which they could then apply to
    an invoice — settling it with cash never received. Voiding the payment row
    alone therefore creates money;
-5. voids the `payments` row; and
-6. rebuilds the customer ledger.
+6. voids the `payments` row; and
+7. rebuilds the customer ledger.
 
-Steps 3 and 4 must be atomic. A crash between them leaves exactly the phantom
+Steps 4 and 5 must be atomic. A crash between them leaves exactly the phantom
 credit described above.
 
 `Payment.delete` is left unchanged and is never routed to for an
@@ -659,7 +677,7 @@ Un-apply is out of scope for this change.
 | ID | Assertion |
 |---|---|
 | **F** | `abs(GL(1100)+GL(1110)) == abs(Σ current_balance − Σ credit_balance)` — **unchanged**. This feature writes neither column on receipt |
-| **K** | `Math.abs(GL_BALANCE('2110')) == Σ remaining_amount` over `UNAPPLIED_CASH` sources **where `voided_at IS NULL`**. The `Math.abs` is required, not cosmetic: `GL_BALANCE` computes `SUM(debit) − SUM(credit)`, so a `Cr 2110` receipt of 500 reads **−500**, not +500. This matches how the existing collector treats credit-normal accounts — see `Math.abs(GL_BALANCE('2000'))` at `accountingInvariants.ts:237` and `:250`. The `voided_at IS NULL` filter is what keeps a reversed receipt (§5.4 step 4) from reading as 500 of GL-backed credit after its GL leg is voided |
+| **K** | `Math.abs(GL_BALANCE('2110')) == Σ remaining_amount` over `UNAPPLIED_CASH` sources **where `voided_at IS NULL`**. The `Math.abs` is required, not cosmetic: `GL_BALANCE` computes `SUM(debit) − SUM(credit)`, so a `Cr 2110` receipt of 500 reads **−500**, not +500. This matches how the existing collector treats credit-normal accounts — see `Math.abs(GL_BALANCE('2000'))` at `accountingInvariants.ts:237` and `:250`. The `voided_at IS NULL` filter is what keeps a reversed receipt (§5.4 step 5) from reading as 500 of GL-backed credit after its GL leg is voided |
 | **L** | For every source, `remaining_amount == credited_amount − Σ consumption amounts **where `voided_at IS NULL`**`. Computed from `credit_source_consumptions` in code, since the generated column alone cannot detect a missing base-counter update. Voiding restores the base counters **and** sets `voided_at` in one transaction — a compensating row cannot do this job, because `amount > 0` forbids it |
 | **M** | For every source, `refunded_amount <= credited_amount` **and** `0 <= refundable_cash_amount <= remaining_amount` |
 | **N** | Per receipt: `Σ payment_allocations (voided_at IS NULL) <= payment.amount` |
