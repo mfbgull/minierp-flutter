@@ -1,23 +1,27 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 6** · 2026-10-16 · Backend + API only
+**Revision 7** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–5. Revision 5 fixed a blocker found by *executing* the
-schema: §3.1 declared `CHECK (refunded_amount <= refundable_cash_amount)` while
-§5.3 moves both in opposite directions, making the constraint unsatisfiable and
-refusing the most ordinary refund in the feature.
+Supersedes revisions 1–6. Three blockers have been found by *executing* this
+document rather than reading it, and each was invisible to careful review:
 
-Revision 6 fixes a blocker found by *running the migration arithmetic*: §8
-validated its backfill against `customers.credit_balance` and failed closed on
-disagreement. Measured, `credit_balance` disagrees for all five customers —
-customer 12 has 2400 returned less 2300 refunded and still reads 0 — so the
-column is not a historical record and the guard would have blocked the feature
-permanently. The backfill now validates on ledger self-consistency and its rows
-are explicitly inert.
+- **rev 5** — executing the DDL showed §3.1's
+  `CHECK (refunded_amount <= refundable_cash_amount)` is unsatisfiable against
+  §5.3, which moves both in opposite directions. The schema refused the most
+  ordinary refund in the feature.
+- **rev 6** — running the §8 backfill arithmetic showed
+  `customers.credit_balance` is not a historical record (customer 12: 2400
+  returned, 2300 refunded, balance 0). The fail-closed guard would have blocked
+  the migration permanently.
+- **rev 7** — reproducing the collector's own arithmetic showed invariant F
+  **already fails by exactly 1800.00**, independent of this feature. §12's tests
+  must therefore assert *no new* violations against a captured baseline, never
+  absolute green, which is now specified in §12.1.
 
 Every factual claim below was verified against `server/database/erp.db`, the
-current source tree, by executing the proposed DDL against SQLite 3.51.2, and by
-running the §8 backfill arithmetic against live data.
+current source tree, by executing the proposed DDL against SQLite 3.51.2, by
+running the §8 backfill arithmetic against live data, and by reproducing
+`arImbalances()` verbatim.
 
 ---
 
@@ -508,6 +512,34 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 24 | Run §8's backfill, then assert each customer's spendable credit | **unchanged** by the migration — backfilled `RETURN_CREDIT` rows are `refundable_cash_amount = 0` and `kind != 'UNAPPLIED_CASH'`, so §2's `availableCredit` ignores them. Customer 12 gains no visible 2400 |
 | 25 | Attempt to refund against a backfilled `RETURN_CREDIT` source | 409 — §5.3's `refundable_cash_amount >= :drawn` guard |
 | 26 | Migration validation | asserts per-customer `RETURN credit >= CREDIT_OFFSET credit`; must **not** read `credit_balance`, whose divergence is expected and benign |
+| 27 | Baseline the invariant suite before writing any feature test | record which invariants are **already** failing. F fails by exactly 1800.00 today, independent of this feature |
+
+### 12.1 Assert no *new* violations, never absolute green
+
+Reproduced the collector's own arithmetic against live data: `arImbalances()`
+returns a violation today, with `glBalance = 3499.80` against
+`custBalance = 1699.80` — a gap of 1800.00. E1 ties for all five customers, so
+the gap is not a ledger-drift symptom; it is simply pre-existing.
+
+The suite therefore **cannot** be green before this feature, and a test written
+as `expect(expectAllInvariantsHold()).toBe(true)` would fail on a condition this
+change did not cause. Tests must instead assert that the violation set is
+**unchanged** relative to a baseline captured at the start:
+
+```
+const before = expectAllInvariantsHoldViolations();   // recorded per test file
+... run the feature ...
+expect(after.filter(v => !before.some(b => b.label === v.label))).toEqual([]);
+```
+
+Specifically: no new violation labels may appear, and F's diff must remain
+exactly 1800.00 — not merely "not worse". Asserting the exact figure catches a
+feature that perturbs the gap by a coincidentally offsetting amount.
+
+Two things are forbidden here: weakening a check to force it green, and deleting
+a failing assertion to clear the suite. Both turn a real pre-existing defect into
+an invisible one. The 1800.00 gap is a data-repair decision recorded in §10, and
+this feature neither causes nor fixes it.
 
 ---
 
