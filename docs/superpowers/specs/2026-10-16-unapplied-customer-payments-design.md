@@ -1,12 +1,18 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 3** · 2026-10-16 · Backend + API only
+**Revision 4** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1 and 2. Revision 3 exists because review round 2 found three
-blockers: reusing `customers.credit_balance` for unapplied cash breaks invariant F,
-creates a double-spend through the invoice-creation credit-offset path, and
-`allocateExistingPayment` cannot enforce a partial-application capacity ceiling.
-Every factual claim below was re-verified against `server/database/erp.db` and the
+Supersedes revisions 1–3. Revision 3 fixed all three blockers from review round 2.
+Revision 4 fixes five further defects found by self-review of revision 3, two of
+them blockers: §5.2 never moved the source counters, so `remaining_amount` would
+never fall and the same cash could be applied repeatedly; and §5.2 step 7 had the
+wrong sign on `current_balance`, which is positive when the customer *owes*. It
+also names the reversal primitive (an explicit demand of round 2 that revision 3
+had left unanswered), caps refund draws on `remaining_amount` as well as
+`refundable_cash_amount`, and records that the §7 status codes are new error
+mapping rather than existing behaviour.
+
+Every factual claim below was verified against `server/database/erp.db` and the
 current source tree.
 
 ---
@@ -221,12 +227,37 @@ Applies held cash to one or more invoices. Reuses the original receipt's
    ceiling and ownership checks unchanged.
 4. Insert one `credit_applications` row (`operation='APPLY'`), then one
    `credit_source_consumptions` row per source drawn.
-5. Insert `payment_allocations` rows against `source.origin_payment_id`.
-6. Post one `UNAPPLIED_APPLY` GL entry for the total:
+5. **Move the source counters — mandatory, same transaction.** For each source
+   drawn:
+
+   ```sql
+   UPDATE customer_credit_sources
+      SET consumed_amount       = consumed_amount + :drawn,
+          refundable_cash_amount = refundable_cash_amount - :drawn
+    WHERE id = :source_id
+      AND consumed_amount + :drawn <= credited_amount
+      AND refundable_cash_amount >= :drawn
+   ```
+
+   Zero affected rows → throw and roll the whole transaction back.
+   `remaining_amount` is generated from these counters, so **omitting this step
+   leaves the full original amount apparently available forever** — the first
+   capacity assertion would never bite again and the same cash could be applied
+   repeatedly. `refundable_cash_amount` moves down here too, because cash
+   converted into invoice settlement is no longer refundable.
+6. Insert `payment_allocations` rows against `source.origin_payment_id`.
+7. Post one `UNAPPLIED_APPLY` GL entry for the total:
    Dr `2110` / Cr `1100`.
-7. Recompute the target invoices' `balance_amount`; increase each target
-   customer's `current_balance` by the settled amount.
-8. Rebuild the customer ledger for each affected customer.
+8. Recompute the target invoices' `balance_amount`, and **decrease** each target
+   customer's `current_balance` by the amount settled on their invoices.
+
+   Sign convention, verified against live data: `current_balance` is **positive
+   when the customer owes** (customers 1, 12 and 13 each equal their unpaid
+   invoice balance exactly). Settling an invoice therefore reduces what is owed,
+   so the balance goes **down**. The `Cr 1100` leg moves `GL(1100)` — computed
+   as `SUM(debit) − SUM(credit)` — down by the same amount, and that matched
+   movement is precisely what keeps invariant F balanced.
+9. Rebuild the customer ledger for each affected customer.
 
 Idempotency: scope `unapplied_cash.apply`, `resource_id` = the numeric
 `credit_applications.id`, replay returns the stored application row. The TEXT
@@ -238,10 +269,15 @@ Idempotency: scope `unapplied_cash.apply`, `resource_id` = the numeric
 Returns cash to the customer.
 
 1. **Source selection is deterministic and server-side.** The request body does
-   not name sources. The service draws only from sources with
-   `refundable_cash_amount > 0`, ordered `credited_at ASC, id ASC` (oldest
-   first), until the requested amount is covered. Declining a partially
-   refundable source is never allowed.
+   not name sources. The service draws only from sources where
+   `refundable_cash_amount > 0` **and** `remaining_amount > 0`, ordered
+   `credited_at ASC, id ASC` (oldest first), capping each source's contribution
+   at `min(refundable_cash_amount, remaining_amount)`.
+
+   Both conditions are required. `refundable_cash_amount` alone would let a
+   refund draw cash that apply has already converted into invoice settlement,
+   because §5.2 step 5 reduces both counters together and a source whose
+   `remaining_amount` has been consumed must contribute nothing.
 2. Assert `total <= Σ refundable_cash_amount` over the sources actually drawn.
 3. Assert `total <= Σ` cash originally collected from this customer
    (`origin_payment_id` receipts, refunds excluded).
@@ -272,9 +308,22 @@ order — which the consumption table cannot express, since it records the
 source's origin payment and not which receipt each invoice drew on first — the
 reverse path refuses and names exactly what is blocking it.
 
-`Payment.delete` is left unchanged: it voids `PAYMENT` GL, voids allocations by
-`payment_id`, and rebuilds. It is never used on an `UNAPPLIED_RECEIPT`, which is
-guarded precisely because that method knows nothing about `credit_source_consumptions`.
+The single reversal primitive is **`UnappliedCashService.reverse(paymentId, attribution)`**.
+It is the only code path permitted to void an `UNAPPLIED_RECEIPT`, and it:
+
+1. guards on `payment_kind = 'UNAPPLIED_RECEIPT'`;
+2. refuses with the 409 above when live consumptions exist;
+3. voids the receipt's GL group via
+   `AccountingService.voidJournalLinesByReference(db, 'UNAPPLIED_RECEIPT', paymentId)`
+   — `reference_id` is the payment id, because a receipt's GL group hangs off
+   the payment itself rather than off an application row;
+4. voids the `payments` row; and
+5. rebuilds the customer ledger.
+
+`Payment.delete` is left unchanged and is never routed to for an
+`UNAPPLIED_RECEIPT`, precisely because it knows nothing about
+`credit_source_consumptions` and would leave consumption rows live against a
+voided source.
 
 Un-apply is out of scope for this change.
 
@@ -303,6 +352,17 @@ data-repair decision and out of scope.
 | Apply | `assertPeriodNotClosed(applyDate)` — new date, independent of the receipt's date | 409 `PERIOD_CLOSED` |
 | Refund | `assertPeriodNotClosed(refundDate)` — new date | 409 `PERIOD_CLOSED` |
 | Reverse | the receipt's own `payment_date` must be open | 409 `PERIOD_CLOSED` |
+
+`AccountingService.assertPeriodNotClosed` throws a **plain `Error` carrying only
+a message string**, not a typed error with a status code. Mapping it onto the
+409s above is new work inside `UnappliedCashService`, called out here as
+outstanding rather than presented as existing behaviour.
+
+`getClosedPeriodCovering` blocks only a genuinely closed period. A date falling
+outside every existing period auto-creates an open one (ACC-11), which is why a
+receipt dated in a period that is later closed can still be applied or refunded:
+both post on a new date. Only reversal is blocked, because it must void the
+original dated entry.
 
 Cash received in a period that later closes may still be applied or refunded,
 because both post on a new date. It may **not** be reversed, because reversal
@@ -374,6 +434,10 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 13 | Corrupt `consumed_amount` without a consumption row | L fails, proving L is not delegated to the generated column |
 | 14 | Apply replayed with the same key | returns the same `credit_applications` row; no second GL entry |
 | 15 | Apply, refund, reverse in a closed period | each returns the §7 status |
+| 16 | Apply 400, then attempt a second apply of 400 against the same 500 source | **409** — proves §5.2 step 5 moved `consumed_amount`, so `remaining_amount` fell to 100 |
+| 17 | Apply 400, then refund 400 | **409** — refundable cash fell with `consumed_amount`; the receipt holds no refundable cash once applied |
+| 18 | Apply 400 against a customer owing 499.80 | `current_balance` falls to 99.80; `GL(1100)` falls by 400; F still passes |
+| 19 | Apply spanning two sources in one call | both counters move; one `UNAPPLIED_APPLY` group; a single void by `credit_applications.id` clears every line |
 
 ---
 
