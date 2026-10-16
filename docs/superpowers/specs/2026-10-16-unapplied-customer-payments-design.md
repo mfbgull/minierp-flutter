@@ -1,9 +1,9 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 19** · 2026-10-16 · Backend + API only
+**Revision 20** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–18. Fifteen defects were found — eleven by *executing*
-this document or checking it against the real API, and four more by auditing
+Supersedes revisions 1–19. Sixteen defects were found — eleven by *executing*
+this document or checking it against the real API, and five more by auditing
 whether sections still agree with each other:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -93,6 +93,16 @@ whether sections still agree with each other:
   money**, the same severity class as round-2 blocker 3. §5.4 now retires the
   source as step 4, atomic with the GL void, and §6's K states the
   `voided_at IS NULL` filter that makes the two agree. Test 33 pins it.
+- **rev 20** — **Blocker, same audit.** Revisions 4–19 specified voiding a
+  consumption by "inserting a compensating row", which cannot work. `amount`
+  carries `CHECK (amount > 0)`, so no row can offset the original, and adding a
+  row cannot reduce `Σ` — after voiding a 400 apply, `Σ` counts 400 + 400 = 800
+  and invariant L reads `500 = 500 − 800`. "Active" meanwhile had no column to
+  mean anything by, since the table carried no `voided_at`. Test 12 was
+  unimplementable and L was undefined. Both now use the pattern
+  `payment_allocations` already has: mark the row `voided_at` and restore the
+  base counters in one transaction. Rev 19's renumbering is what prompted
+  re-reading this; it was latent from rev 4.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -278,6 +288,8 @@ Records every draw against a source: an apply (APPLY) or a refund (REFUND).
 | `invoice_id` | INTEGER NULL | set only for `APPLY`. Lives here, **not** in `payment_allocations`, whose `invoice_id` is `NOT NULL` (E10) |
 | `payment_id` | INTEGER | the receipt this draw credits, for apply |
 | `amount` | DECIMAL(15,2) NOT NULL CHECK (`amount > 0`) | |
+| `created_at` | TIMESTAMP NOT NULL | |
+| `voided_at` | TIMESTAMP NULL | voids this draw. Voiding restores the base counters **and** sets this in one transaction — see the note below on why a compensating row cannot do it |
 
 ```sql
 CREATE TABLE credit_source_consumptions (
@@ -288,9 +300,18 @@ CREATE TABLE credit_source_consumptions (
   invoice_id INTEGER,          -- set only for APPLY; NULL for REFUND
   payment_id INTEGER,
   amount DECIMAL(15,2) NOT NULL CHECK (amount > 0),
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  voided_at TIMESTAMP          -- voids the draw; counters are restored, not offset
 );
 ```
+
+`voided_at` is load-bearing, not decoration. Revisions 4–19 specified voiding by
+"inserting a compensating row", which cannot work: `amount > 0` means no row can
+offset the original, and a second row cannot reduce `Σ` — after voiding a 400
+apply, `Σ` would count 400 + 400 = 800 and invariant L would read `500 = 500 −
+800`. "Active" had no column to mean anything by. The fix is the pattern
+`payment_allocations` already uses: mark the row voided and restore the base
+counters in the same transaction.
 
 Executed against SQLite 3.51.2: creates cleanly, `invoice_id` is nullable so a
 `REFUND` row inserts without one, and `amount > 0` plus the `kind` CHECK both
@@ -594,7 +615,7 @@ Un-apply is out of scope for this change.
 |---|---|
 | **F** | `abs(GL(1100)+GL(1110)) == abs(Σ current_balance − Σ credit_balance)` — **unchanged**. This feature writes neither column on receipt |
 | **K** | `Math.abs(GL_BALANCE('2110')) == Σ remaining_amount` over `UNAPPLIED_CASH` sources **where `voided_at IS NULL`**. The `Math.abs` is required, not cosmetic: `GL_BALANCE` computes `SUM(debit) − SUM(credit)`, so a `Cr 2110` receipt of 500 reads **−500**, not +500. This matches how the existing collector treats credit-normal accounts — see `Math.abs(GL_BALANCE('2000'))` at `accountingInvariants.ts:237` and `:250`. The `voided_at IS NULL` filter is what keeps a reversed receipt (§5.4 step 4) from reading as 500 of GL-backed credit after its GL leg is voided |
-| **L** | For every source, `remaining_amount == credited_amount − Σ active consumption amounts`. Computed from `credit_source_consumptions` in code, since the generated column alone cannot detect a missing base-counter update |
+| **L** | For every source, `remaining_amount == credited_amount − Σ consumption amounts **where `voided_at IS NULL`**`. Computed from `credit_source_consumptions` in code, since the generated column alone cannot detect a missing base-counter update. Voiding restores the base counters **and** sets `voided_at` in one transaction — a compensating row cannot do this job, because `amount > 0` forbids it |
 | **M** | For every source, `refunded_amount <= credited_amount` **and** `0 <= refundable_cash_amount <= remaining_amount` |
 | **N** | Per receipt: `Σ payment_allocations (voided_at IS NULL) <= payment.amount` |
 
@@ -745,7 +766,7 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 9 | Refund draining `Σ refundable_cash_amount` exactly | succeeds; `refundable_cash_amount` 0 |
 | 10 | Refund exceeding refundable cash | 409; M holds |
 | 11 | Return-credit source refunded | 409 — `refundable_cash_amount` is 0 |
-| 12 | Void an apply | base counters restored **and** compensating row inserted in one transaction; `remaining_amount` returns to pre-apply; L holds |
+| 12 | Void an apply | the consumption row is marked `voided_at` **and** the base counters are restored, in one transaction; `remaining_amount` returns to pre-apply; L holds because `Σ` now excludes the voided row |
 | 13 | Corrupt `consumed_amount` without a consumption row | L fails, proving L is not delegated to the generated column |
 | 14 | Apply replayed with the same key | returns the same `credit_applications` row; no second GL entry |
 | 15 | Apply, refund, reverse in a closed period | each returns the §7 status |
