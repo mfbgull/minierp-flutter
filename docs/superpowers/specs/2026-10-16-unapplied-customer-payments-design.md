@@ -1,21 +1,23 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 5** · 2026-10-16 · Backend + API only
+**Revision 6** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–4. Revision 4 fixed five defects found by self-review,
-two of them blockers. Revision 5 fixes one further blocker found by **executing**
-the schema rather than reading it: §3.1 declared
-`CHECK (refunded_amount <= refundable_cash_amount)` while §5.3 increments the
-first and decrements the second, so the two sections contradicted each other and
-the constraint made refunding impossible. Refunding the last 100 of a 500 source
-sets `refunded = 100, refundable = 0`; `100 <= 0` fails. That is the most
-ordinary refund in the feature, and revision 4's schema rejected it. The bound is
-now against `credited_amount`, and the CHECKs now live inside the
-`CREATE TABLE` — revision 4 listed them in a trailing block, which is dropped
-silently during implementation with no error to signal the loss.
+Supersedes revisions 1–5. Revision 5 fixed a blocker found by *executing* the
+schema: §3.1 declared `CHECK (refunded_amount <= refundable_cash_amount)` while
+§5.3 moves both in opposite directions, making the constraint unsatisfiable and
+refusing the most ordinary refund in the feature.
+
+Revision 6 fixes a blocker found by *running the migration arithmetic*: §8
+validated its backfill against `customers.credit_balance` and failed closed on
+disagreement. Measured, `credit_balance` disagrees for all five customers —
+customer 12 has 2400 returned less 2300 refunded and still reads 0 — so the
+column is not a historical record and the guard would have blocked the feature
+permanently. The backfill now validates on ledger self-consistency and its rows
+are explicitly inert.
 
 Every factual claim below was verified against `server/database/erp.db`, the
-current source tree, and by executing the proposed DDL against SQLite 3.51.2.
+current source tree, by executing the proposed DDL against SQLite 3.51.2, and by
+running the §8 backfill arithmetic against live data.
 
 ---
 
@@ -422,13 +424,37 @@ must void the original dated entry.
 5. Backfill `customer_credit_sources` for existing return credit:
    for each non-voided `RETURN` ledger row with `credit > 0`, insert a
    `RETURN_CREDIT` source with `credited_amount = credit`,
-   `consumed_amount` = credit already drawn by `CREDIT_OFFSET`
-   applications against that customer, `refundable_cash_amount = 0`.
+   `consumed_amount` = credit drawn by `CREDIT_OFFSET` applications against the
+   same customer, and `refundable_cash_amount = 0`.
 
-   This step needs care: `SUM(credit_balance) = 0` (E4) while 8550.20 of return
-   credit exists (E4). The migration derives consumed amounts from
-   `CREDIT_OFFSET` ledger rows, not from `credit_balance`. If the two disagree,
-   the migration must fail closed rather than guess.
+   **Do not validate this against `credit_balance`.** Revision 5 proposed
+   failing closed if the two disagreed. Measured, they disagree for all five
+   customers, so that guard would block the migration permanently:
+
+   | customer | RETURN credit | REFUND debit | CREDIT_OFFSET | credit_balance |
+   |---|---|---|---|---|
+   | 1 | 1450.20 | 1200 | 0 | 0 |
+   | 12 | 2400 | 2300 | 0 | 0 |
+   | 13 | 1200 | 400 | 0 | 0 |
+   | 14 | 1200 | 0 | 0 | 0 |
+   | 15 | 2300 | 550 | 1800 | 0 |
+
+   `credit_balance` is zero everywhere and tracks none of this history — not for
+   customer 12, where 2400 granted less 2300 refunded would leave 100. Customers
+   1, 12, 13 and 14 have no invoice offsets at all and still read 0, so this is
+   not consumption: the column never accumulated for these rows. It is not a
+   historical record and cannot arbitrate the backfill.
+
+   The backfilled rows are **provenance only** and are deliberately inert:
+   `refundable_cash_amount = 0` keeps them out of §5.3's refund draw, and §2's
+   `availableCredit` counts only `kind='UNAPPLIED_CASH'`, so they contribute
+   nothing to what a customer may spend or apply. They exist solely so that a
+   future refund of genuinely-cash-backed store credit has a row to draw from,
+   and so historical grants are not invisible.
+
+   Validate instead on ledger self-consistency: per customer,
+   `RETURN credit >= CREDIT_OFFSET credit` (so `consumed_amount` never exceeds
+   `credited_amount`), which holds for all five.
 
 ## 9. Backfill of historical `CREDIT_OFFSET` applications
 
@@ -479,6 +505,9 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 21 | Receive 300, refund 300 in full without applying | **succeeds**, leaving `remaining=0, refunded=300, refundable=0` |
 | 22 | Attempt to refund beyond `credited_amount` | rejected by `c_refund_le_credited` |
 | 23 | Migration executes the §3.1 `CREATE TABLE` verbatim | CHECKs present in `sqlite_master`; dropping them fails a test |
+| 24 | Run §8's backfill, then assert each customer's spendable credit | **unchanged** by the migration — backfilled `RETURN_CREDIT` rows are `refundable_cash_amount = 0` and `kind != 'UNAPPLIED_CASH'`, so §2's `availableCredit` ignores them. Customer 12 gains no visible 2400 |
+| 25 | Attempt to refund against a backfilled `RETURN_CREDIT` source | 409 — §5.3's `refundable_cash_amount >= :drawn` guard |
+| 26 | Migration validation | asserts per-customer `RETURN credit >= CREDIT_OFFSET credit`; must **not** read `credit_balance`, whose divergence is expected and benign |
 
 ---
 
