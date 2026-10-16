@@ -1,9 +1,9 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 24** · 2026-10-16 · Backend + API only
+**Revision 25** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–23. Twenty defects were found — eleven by *executing*
-this document or checking it against the real API, and nine more by auditing
+Supersedes revisions 1–24. Twenty-one defects were found — eleven by *executing*
+this document or checking it against the real API, and ten more by auditing
 whether sections still agree with each other:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -15,7 +15,7 @@ whether sections still agree with each other:
   returned, 2300 refunded, balance 0). The fail-closed guard would have blocked
   the migration permanently.
 - **rev 7** — reproducing the collector's own arithmetic showed invariant F
-  **already fails by exactly 1800.00**, independent of this feature. §12's tests
+  **already fails by exactly 1800.00**, independent of this feature. §11's tests
   must assert *no new* violations against a captured baseline, never absolute
   green.
 - **rev 8** — invariant K omitted `Math.abs`. `GL_BALANCE` computes
@@ -23,7 +23,7 @@ whether sections still agree with each other:
 - **rev 9** — §2 published `availableCredit = credit_balance + Σ unapplied
   cash`, the same shape as blocker 2. Nothing consumed it, but a combined
   "available credit" is a loaded name to hand an implementer.
-- **rev 10** — §12.1 invented `expectAllInvariantsHoldViolations()`, and
+- **rev 10** — §11.1 invented `expectAllInvariantsHoldViolations()`, and
   `GroupImbalance` has no `label` field, so the baseline compared `undefined:0`
   for every GL group and could not have failed.
 - **rev 11** — §8's account insert carried only `(code, name, type)`. Executed
@@ -59,10 +59,10 @@ whether sections still agree with each other:
   this service's `db` matters when the rebuild must see uncommitted rows. It also
   opens `conn.transaction()` internally, which nests via SAVEPOINT inside §5's
   transaction; noted so that nesting is not later "corrected".
-- **rev 17** — §12's tests contradicted §12.1. Tests 1 and 18 asserted "F still
+- **rev 17** — §11's tests contradicted §11.1. Tests 1 and 18 asserted "F still
   passes", but rev 7 established F **fails today** by 1800.00; and test 2
   reached for `expectAllInvariantsHold`, which rev 10 showed returns `void` and
-  cannot express "no new violation". All three now use the §12.1 baseline. Tests
+  cannot express "no new violation". All three now use the §11.1 baseline. Tests
   10 and 12 still assert that L and M hold absolutely, which is correct — those
   are new, feature-owned invariants, unlike pre-existing F.
 
@@ -137,6 +137,17 @@ it.
   reversing a receipt dated inside a closed period. §5.4 now guards explicitly
   as step 2, and the renumbering that followed is caught by §6's live
   cross-reference to step 5.
+- **rev 25** — `### 12.1` sat at line 857, 81 lines *before* its own parent
+  `## 12` at 938. It was a subsection of `## 11`, wearing the parent's next
+  number: an orphaned heading in a document whose entire purpose is to be
+  internally coherent, which would send a reader to the open-decisions list
+  expecting the baseline rules and find only product questions. Renumbered to
+  `### 11.1` with all six references updated. The consistency checker had been
+  validating step references (`§5.2 step 3`) all along and never validated
+  section numbering — it could not have caught this. Worth stating plainly:
+  the instrument built to check the document never looked at the document's
+  own skeleton, and I only found it by listing every header and reading the
+  line numbers.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -818,8 +829,8 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 
 | # | Test | Expectation |
 |---|---|---|
-| 1 | Receive 500 unapplied for a customer with zero balances | source created, `credit_balance` unchanged, F's violation set **unchanged** (§12.1) — not "F passes", which is false today |
-| 2 | Receive, then re-run the §12.1 baseline | no new violation label, and F's diff still exactly 1800.00 |
+| 1 | Receive 500 unapplied for a customer with zero balances | source created, `credit_balance` unchanged, F's violation set **unchanged** (§11.1) — not "F passes", which is false today |
+| 2 | Receive, then re-run the §11.1 baseline | no new violation label, and F's diff still exactly 1800.00 |
 | 3 | Apply 400 of a 500 source | Dr `2110` / Cr `1100`; `remaining_amount` 100; invoice balance down 400 |
 | 4 | Apply 1500 against a 500 receipt | **409**, receipt-ceiling assertion (§5.2) fires |
 | 5 | Apply 600 of a 500 source | **409**, per-source ceiling fires |
@@ -835,7 +846,7 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 15 | Apply, refund, reverse in a closed period | each returns the §7 status |
 | 16 | Apply 400, then attempt a second apply of 400 against the same 500 source | **409** — proves §5.2 step 5 moved `consumed_amount`, so `remaining_amount` fell to 100 |
 | 17 | Apply 400, then refund 400 | **409** — refundable cash fell with `consumed_amount`; the receipt holds no refundable cash once applied |
-| 18 | Apply 400 against a customer owing 499.80 | `current_balance` falls to 99.80; `GL(1100)` falls by 400; F's violation set unchanged and its diff still 1800.00 (§12.1) |
+| 18 | Apply 400 against a customer owing 499.80 | `current_balance` falls to 99.80; `GL(1100)` falls by 400; F's violation set unchanged and its diff still 1800.00 (§11.1) |
 | 19 | Apply spanning two sources in one call | both counters move; one `UNAPPLIED_APPLY` group; a single void by `credit_applications.id` clears every line |
 | 20 | Receive 500, apply 400, then refund the remaining 100 | **succeeds**, leaving `remaining=0, refunded=100, refundable=0`. This is the case revision 4's schema rejected outright (`100 <= 0`) |
 | 21 | Receive 300, refund 300 in full without applying | **succeeds**, leaving `remaining=0, refunded=300, refundable=0` |
@@ -854,7 +865,7 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 34 | **Refund writes a `payments` row.** Refund 100 of a 500 source | a `payments` row exists with `payment_kind='REFUND'`, `amount=-100`, the right `customer_id`; the `UNAPPLIED_REFUND` GL group's `reference_id` equals its id; voiding by that id reverses the payout. Without the row there is no id to key the GL on and no trace of the payout |
 | 35 | **Every GL group is voidable by id.** Apply, refund, and receipt | for each of `UNAPPLIED_APPLY`, `UNAPPLIED_REFUND`, `UNAPPLIED_RECEIPT`, `voidJournalLinesByReference` reverses the whole group using the id §4 assigns it. Guards the three `reference_id` assignments from drifting or being omitted |
 
-### 12.1 Assert no *new* violations, never absolute green
+### 11.1 Assert no *new* violations, never absolute green
 
 Reproduced the collector's own arithmetic against live data: `arImbalances()`
 returns a violation today, with `glBalance = 3499.80` against
