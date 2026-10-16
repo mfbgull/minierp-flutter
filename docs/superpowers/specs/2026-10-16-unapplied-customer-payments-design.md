@@ -1,8 +1,8 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 27** · 2026-10-16 · Backend + API only
+**Revision 28** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–26. Twenty-three defects were found — eleven by *executing*
+Supersedes revisions 1–27. Twenty-four defects were found — eleven by *executing*
 this document or checking it against the real API, and twelve more by auditing
 whether sections still agree with each other:
 
