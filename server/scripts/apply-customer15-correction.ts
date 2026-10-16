@@ -15,6 +15,11 @@ import db from '../src/config/database';
 import { AccountingService } from '../src/services/accountingService';
 import StockMovementModel from '../src/models/StockMovement';
 import ledger from '../src/utils/ledgerUtils';
+import { assertCorrectionAuthorized } from './lib/correctionSafety';
+
+// ── Safety gate: runs before any write. Without CORRECTION_AUTHORIZED, an
+// explicit DATABASE_PATH, and --apply, this script exits without touching data.
+assertCorrectionAuthorized('apply-customer15-correction');
 
 const {
   reverseLedgerEntry,
@@ -34,6 +39,74 @@ const TARGETS = [
   { invoiceId: 51, entryId: 209, ledgerRowId: 108 },
   { invoiceId: 59, entryId: 257, ledgerRowId: null },
 ];
+
+// ── Preconditions. These read only; they never repair. Each failure means the
+// database is not the state this correction was written against, so applying it
+// anyway would either double-reverse or void an unrelated document.
+interface Precond { label: string; ok: boolean; detail: string }
+const preconds: Precond[] = [];
+
+for (const t of TARGETS) {
+  const inv = db
+    .prepare('SELECT customer_id, credit_offset, balance_amount FROM invoices WHERE id = ?')
+    .get(t.invoiceId) as { customer_id: number; credit_offset: number; balance_amount: number } | undefined;
+  preconds.push({
+    label: `invoice ${t.invoiceId} belongs to customer ${CUSTOMER_ID}`,
+    ok: inv?.customer_id === CUSTOMER_ID,
+    detail: inv ? `customer_id=${inv.customer_id}` : 'invoice missing',
+  });
+
+  const active = db
+    .prepare(`SELECT COUNT(*) n FROM journal_lines
+              WHERE reference_type='CREDIT_OFFSET' AND reference_id=? AND voided=0`)
+    .get(t.invoiceId) as { n: number };
+  preconds.push({
+    label: `invoice ${t.invoiceId} has ACTIVE CREDIT_OFFSET lines (not already reversed)`,
+    ok: active.n > 0,
+    detail: `active lines=${active.n}`,
+  });
+
+  if (t.ledgerRowId) {
+    const led = db
+      .prepare('SELECT voided, reversed_by FROM customer_ledger WHERE id = ? AND customer_id = ?')
+      .get(t.ledgerRowId, CUSTOMER_ID) as { voided: number; reversed_by: number | null } | undefined;
+    preconds.push({
+      label: `ledger #${t.ledgerRowId} exists and is not already reversed`,
+      ok: !!led && !led.voided && led.reversed_by === null,
+      detail: led ? `voided=${led.voided} reversed_by=${led.reversed_by}` : 'row missing',
+    });
+  }
+}
+
+const inv59 = db.prepare('SELECT credit_offset FROM invoices WHERE id = 59').get() as
+  | { credit_offset: number }
+  | undefined;
+preconds.push({
+  label: 'invoice 59 carries the disputed credit_offset of 1800',
+  ok: inv59?.credit_offset === 1800,
+  detail: `credit_offset=${inv59?.credit_offset}`,
+});
+
+const bal = db.prepare('SELECT current_balance FROM customers WHERE id = ?').get(CUSTOMER_ID) as
+  | { current_balance: number }
+  | undefined;
+preconds.push({
+  label: 'customer 15 balance is the expected pre-correction 0',
+  ok: bal?.current_balance === 0,
+  detail: `current_balance=${bal?.current_balance}`,
+});
+
+console.log('=== preconditions ===');
+for (const p of preconds) console.log(`  ${p.ok ? 'OK  ' : 'FAIL'}  ${p.label}  (${p.detail})`);
+const failed = preconds.filter((p) => !p.ok);
+if (failed.length > 0) {
+  console.error(
+    `\nREFUSED: apply-customer15-correction — ${failed.length} precondition(s) failed.\n` +
+      `  The database is not in the state this correction was written against.\n` +
+      `  No data was modified.\n`,
+  );
+  process.exit(1);
+}
 
 const r2 = (v: unknown): string =>
   v === null || v === undefined ? '' : String(Math.round((+v as number) * 100) / 100);

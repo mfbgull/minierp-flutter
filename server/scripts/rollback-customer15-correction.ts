@@ -12,6 +12,11 @@
  */
 import fs from 'fs';
 import db from '../src/config/database';
+import { assertCorrectionAuthorized } from './lib/correctionSafety';
+
+// ── Safety gate: must stay above the snapshot read, which is the first write
+// (it truncates customer_ledger back to the recorded high-water mark).
+assertCorrectionAuthorized('rollback-customer15-correction');
 
 const CUSTOMER_ID = 15;
 const SNAPSHOT_PATH = process.env.ROLLBACK_SNAPSHOT ?? '/tmp/opencode/d4/rollback-snapshot.json';
