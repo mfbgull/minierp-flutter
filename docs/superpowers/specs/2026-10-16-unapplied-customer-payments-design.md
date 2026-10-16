@@ -1,10 +1,10 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 17** · 2026-10-16 · Backend + API only
+**Revision 18** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–16. Twelve defects were found — eleven by *executing* this
-document or checking it against the real API, and the twelfth by auditing
-whether the sections still agree with each other:
+Supersedes revisions 1–17. Fourteen defects were found — eleven by *executing*
+this document or checking it against the real API, and three more by auditing
+whether sections still agree with each other:
 
 - **rev 5** — executing the DDL showed §3.1's
   `CHECK (refunded_amount <= refundable_cash_amount)` is unsatisfiable against
@@ -71,6 +71,18 @@ whether the sections still agree with each other:
   edits were checked for *internal* structure but never for whether sections
   still agreed with each other after those edits. Revisions 4–16 each fixed one
   section; this one asks whether the fix left the neighbours true.
+- **rev 18** — Two gaps from the same audit. **Invariants K and N had no tests at
+  all.** N is the schema-free backstop for round-2 blocker 3 — a 500 receipt
+  settling a 1500 invoice — so the one property standing between this design and
+  phantom money was unverified; K is the only thing tying account `2110` to
+  tracked credit. Both now have tests (31, 32). Separately, §8 said "create the
+  three new tables (§3)" while §3 gave full DDL for only **one** of them; the
+  other two were prose column lists an implementer would have to transcribe.
+  All three now carry DDL, executed against the real `customers` DDL with real
+  customer rows: all create cleanly, the `operation` / `kind` / `amount` CHECKs
+  reject bad values, a `REFUND` consumption inserts with `invoice_id` NULL, and
+  §5.2 step 5's counter update yields exactly
+  `{remaining:100, consumed:400, refundable:100}` from a 500 source applied 400.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -256,6 +268,23 @@ Records every draw against a source: an apply (APPLY) or a refund (REFUND).
 | `invoice_id` | INTEGER NULL | set only for `APPLY`. Lives here, **not** in `payment_allocations`, whose `invoice_id` is `NOT NULL` (E10) |
 | `payment_id` | INTEGER | the receipt this draw credits, for apply |
 | `amount` | DECIMAL(15,2) NOT NULL CHECK (`amount > 0`) | |
+
+```sql
+CREATE TABLE credit_source_consumptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_id INTEGER NOT NULL REFERENCES customer_credit_sources(id),
+  application_id INTEGER NOT NULL REFERENCES credit_applications(id),
+  kind TEXT NOT NULL CHECK (kind IN ('APPLY','REFUND')),
+  invoice_id INTEGER,          -- set only for APPLY; NULL for REFUND
+  payment_id INTEGER,
+  amount DECIMAL(15,2) NOT NULL CHECK (amount > 0),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Executed against SQLite 3.51.2: creates cleanly, `invoice_id` is nullable so a
+`REFUND` row inserts without one, and `amount > 0` plus the `kind` CHECK both
+reject bad rows.
 | `created_at` | TIMESTAMP NOT NULL | |
 
 ### 3.3 `credit_applications`
@@ -271,6 +300,20 @@ Header row per apply or refund call. Its integer `id` is the journal
 | `operation` | TEXT NOT NULL CHECK (`APPLY`, `REFUND`) | |
 | `total_amount` | DECIMAL(15,2) NOT NULL | |
 | `created_at` | TIMESTAMP NOT NULL | |
+
+```sql
+CREATE TABLE credit_applications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  application_key TEXT NOT NULL,
+  customer_id INTEGER NOT NULL REFERENCES customers(id),
+  operation TEXT NOT NULL CHECK (operation IN ('APPLY','REFUND')),
+  total_amount DECIMAL(15,2) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Executed against SQLite 3.51.2: creates cleanly and the `operation` CHECK
+rejects anything outside `APPLY` / `REFUND`.
 
 Reversal keys on `(reference_type, reference_id)`, and `reference_id` is
 `INTEGER` (E9). The TEXT key therefore **cannot** be the journal reference; the
@@ -700,6 +743,8 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 28 | Run the migration against the **real** `chart_of_accounts` DDL and rows | account `2110` inserts with `normal_balance='credit'` and a `text_code`; `getAccountByTextCode('unapplied_customer_payments')` resolves it. An insert omitting `normal_balance` must be rejected — that was rev 10's blocker |
 | 29 | Post one `UNAPPLIED_RECEIPT` through `postEntry` after the migration | resolves both `cash` and `unapplied_customer_payments` by text code; journal group balances |
 | 30 | Allocation ceiling, exercised from **both** paths | `PaymentRecordingService.allocateExistingPayment` and `UnappliedCashService.apply` reject the same over-allocation with the same reason. Guards against the extracted helper drifting or being bypassed |
+| 31 | **Invariant K.** Receive, apply, refund, then read `GL(2110)` | `Math.abs(GL_BALANCE('2110')) == Σ remaining_amount` over live `UNAPPLIED_CASH` sources, at every step. Voided and reversed sources excluded. This is the only thing tying account `2110` to tracked credit — without it the account is an unverified bucket |
+| 32 | **Invariant N.** After a receipt is fully, partly, and over-applied | `Σ payment_allocations (voided_at IS NULL) <= payments.amount` holds for the receipt in every case, including the rejected over-application from test 4. N is the schema-free backstop for round-2 blocker 3, where a 500 receipt could settle a 1500 invoice |
 
 ### 12.1 Assert no *new* violations, never absolute green
 
