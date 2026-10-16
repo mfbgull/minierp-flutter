@@ -1,8 +1,8 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 11** · 2026-10-16 · Backend + API only
+**Revision 12** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–10. Seven defects were found by *executing* this document
+Supersedes revisions 1–11. Seven defects were found by *executing* this document
 or checking it against the real API, and each was invisible to reading it:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -43,18 +43,18 @@ my paraphrase was self-consistent. The rev 11 blocker survived precisely because
 the replica was mine. Future verification must load `sqlite_master.sql` and the
 live rows rather than re-typing a shape.
 
-Every factual claim below was verified against `server/database/erp.db`, the
-current source tree, by executing the proposed DDL against SQLite 3.51.2, by
-running the §8 backfill arithmetic against live data, by reproducing
-`arImbalances()` verbatim, by evaluating K's arithmetic in isolation, and by
-running migration 108's account insert against the **real** `chart_of_accounts`
-DDL and rows.
+Applying that correction re-ran migration 108 against the **real** `payments`
+DDL with all **53** live rows — not the 5-row paraphrase used in rev 10, which
+had also omitted `payment_no UNIQUE NOT NULL` and the XOR check. The ALTER holds
+against the real table: all 53 rows preserved, `payment_no` uniqueness intact,
+CHECK enforced on INSERT and UPDATE, and legacy `INSERT`s that omit
+`payment_kind` still succeed for both the customer and supplier shapes. The three
+new tables create and roll back cleanly.
 
-What is verified: `ALTER TABLE payments ADD COLUMN` accepts
-`NOT NULL DEFAULT 'RECEIPT' CHECK (...)` on a populated table, preserves every
-row, enforces the CHECK on INSERT and UPDATE, and still accepts legacy `INSERT`s
-that omit the column. The three new tables create and roll back cleanly. The
-account insert is now correct and confirmed against the real schema.
+Everything else was verified against `server/database/erp.db`, the current
+source tree, by executing the proposed DDL against SQLite 3.51.2, by running the
+§8 backfill arithmetic against live data, by reproducing `arImbalances()`
+verbatim, and by evaluating K's arithmetic in isolation.
 
 ---
 
@@ -77,6 +77,7 @@ All figures from `server/database/erp.db`, read-only, `user_version=107`,
 | E10 | `payment_allocations.invoice_id` | `NOT NULL` |
 | E11 | Accounts | `2100` = Tax Payable; `2110` free. The 11xx range holds only `1100` and `1110` — **there is no `1120`**; revisions 1–10 said otherwise and were wrong. `1110` is `type=asset` with `normal_balance=credit`, which is the documented mismatch |
 | E12 | `chart_of_accounts` shape | `code TEXT UNIQUE NOT NULL`, `normal_balance TEXT NOT NULL CHECK (normal_balance IN ('debit','credit'))`, `text_code TEXT` — all 31 rows populated, so a new account without a `text_code` is unresolvable by the text-code posting primitives |
+| E13 | `payments` shape | 53 rows. `payment_no VARCHAR(50) UNIQUE NOT NULL`, `payment_date DATE NOT NULL`, no triggers. Pre-existing `CHECK ((customer_id IS NULL) <> (supplier_id IS NULL))` requires **exactly one** of `customer_id` / `supplier_id`. §5.1 sets `customer_id` and leaves `supplier_id` null, satisfying it |
 
 ---
 
