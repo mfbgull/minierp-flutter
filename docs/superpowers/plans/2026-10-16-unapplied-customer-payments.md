@@ -1076,7 +1076,7 @@ describe('credit invariants K, L, M, N', () => {
     } finally { cleanup(); }
   });
 
-  it('N holds when allocations never exceed the invoice balance', () => {
+  it('N holds when no receipt is allocated beyond its own amount', () => {
     const { db, cleanup } = makeIsolatedCopy('inv-N');
     try {
       /* schema already migrated by setup.ts */;
@@ -1147,13 +1147,20 @@ export function collectCreditInvariants(db: Database.Database): CreditInvariantR
     SELECT COUNT(*) AS n FROM customer_credit_sources
     WHERE refunded_amount > credited_amount`).get() as { n: number };
 
-  // N: no allocation exceeds its invoice balance
+  // N (spec 6): PER RECEIPT, sum of live allocations <= the payment's amount.
+  // NOT "per invoice, allocations <= invoices.balance_amount". Those are
+  // different quantities: balance_amount is already net of allocations, so
+  // comparing a cumulative allocation against it reports every paid invoice as
+  // over-allocated. That wrong query returns 24 violations on live data; the
+  // spec's invariant returns 0. Do not reintroduce it.
   const overAllocated = db.prepare(`
     SELECT COUNT(*) AS n FROM (
-      SELECT pa.invoice_id, SUM(pa.amount) alloc, i.balance_amount bal
-      FROM payment_allocations pa JOIN invoices i ON i.id = pa.invoice_id
-      WHERE pa.voided_at IS NULL GROUP BY pa.invoice_id
-    ) WHERE alloc > bal`).get() as { n: number };
+      SELECT p.id FROM payments p
+      LEFT JOIN payment_allocations pa
+        ON pa.payment_id = p.id AND pa.voided_at IS NULL
+      GROUP BY p.id
+      HAVING COALESCE(SUM(pa.amount), 0) > p.amount
+    )`).get() as { n: number };
 
   return {
     gl2110,
