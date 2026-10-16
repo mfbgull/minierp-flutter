@@ -1,9 +1,9 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 26** · 2026-10-16 · Backend + API only
+**Revision 27** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–25. Twenty-two defects were found — eleven by *executing*
-this document or checking it against the real API, and eleven more by auditing
+Supersedes revisions 1–26. Twenty-three defects were found — eleven by *executing*
+this document or checking it against the real API, and twelve more by auditing
 whether sections still agree with each other:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -428,9 +428,21 @@ the receipt under a distinct type keeps each reversal scoped to one group and
 leaves `Payment.delete`'s PAYMENT void logic untouched.
 
 All four entries post through `AccountingService.postEntry`
-(`accountingService.ts:251`), which resolves accounts by **`text_code`** and
-asserts the period is open itself (`:315`). Account text codes, confirmed present
-for all 31 accounts (E12):
+(`accountingService.ts:251`), which asserts the period is open itself
+(`:315`, from `input.entry_date`). **`postEntry` does NOT resolve accounts by
+text code.** `JournalLineInput.account_id` is an INTEGER (`:76`), so the caller
+must resolve it first via
+`AccountingService.getAccountByTextCode(db, 'cash').id`
+(`accountingService.ts:120`) and throw if it is missing. Revisions 1–26 said
+`postEntry` resolved `text_code` itself; that is wrong, and an implementer
+following it would pass an account *string* where a numeric id is required.
+
+`PostEntryInput` is snake_case — `entry_date`, `description`, `reference_type`,
+`reference_id`, `created_by`, `lines` — and `reference_id` is
+`number | null`, not required. The returned `PostedEntry` exposes
+`journal_entry_id`, not `id`.
+
+Account text codes, confirmed present for all 31 accounts (E12):
 
 | Account | `text_code` | Used by |
 |---|---|---|
