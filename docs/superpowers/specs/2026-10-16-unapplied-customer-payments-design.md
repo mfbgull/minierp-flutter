@@ -1,9 +1,9 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 22** · 2026-10-16 · Backend + API only
+**Revision 23** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–21. Eighteen defects were found — eleven by *executing*
-this document or checking it against the real API, and seven more by auditing
+Supersedes revisions 1–22. Nineteen defects were found — eleven by *executing*
+this document or checking it against the real API, and eight more by auditing
 whether sections still agree with each other:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -119,7 +119,15 @@ whether sections still agree with each other:
   propagated the fix into the operation that posts it; revs 19 and 21 fixed the
   same omission in §5.4 and §5.3. §5.2 was the last holdout. All three
   assignments are now stated, and test 35 voids each group by the id §4 assigns
-  it.
+it.
+- **rev 23** — the same omission in the last remaining operation: §5.1 posted
+  `UNAPPLIED_RECEIPT` without a `reference_id`, while §4 keys it on `payments.id`
+  and §5.4 voids it by exactly that. All four GL-posting steps now state their
+  `reference_id`, and test 35 covers each group. The pattern is worth naming:
+  §4's table was corrected in rev 14, but §4 is a *description* of what the
+  operations do — correcting it told nobody what to write. Each operation only
+  learned its own `reference_id` when §4 was compared back against it, one
+  revision at a time.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -438,7 +446,11 @@ All four run inside one `db.transaction(...)` and open with
 3. Insert `customer_credit_sources` row: `kind='UNAPPLIED_CASH'`,
    `origin_payment_id`, `credited_amount` = amount, `refundable_cash_amount` =
    amount.
-4. Post `UNAPPLIED_RECEIPT` GL entry.
+4. Post `UNAPPLIED_RECEIPT` GL entry: Dr `1000` Cash / Cr `2110` Unapplied,
+   with `reference_type='UNAPPLIED_RECEIPT'` and `reference_id` = the
+   `payments.id` from step 2. §5.4 voids the group by that id, and the void
+   filters on `(reference_type, reference_id)`, so a NULL here would leave the
+   receipt unvoidable.
 5. **No `customer_ledger` row.** Customer money has not moved — it is still
    theirs, merely unallocated. Writing a ledger row would imply a balance change
    that did not happen and would break E1.
