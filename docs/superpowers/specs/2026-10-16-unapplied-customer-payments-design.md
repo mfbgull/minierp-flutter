@@ -1,8 +1,8 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 13** · 2026-10-16 · Backend + API only
+**Revision 14** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–12. Nine defects were found by *executing* this document
+Supersedes revisions 1–13. Ten defects were found by *executing* this document
 or checking it against the real API, and each was invisible to reading it:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -44,6 +44,12 @@ or checking it against the real API, and each was invisible to reading it:
   and it returns the parsed amount step 5 depends on. The spec now specifies
   extracting it to `paymentValidation.ts` with both callers delegating, so the
   two paths cannot drift.
+- **rev 14** — §4 said `postEntry`'s **returned** `PostedEntry` is what
+  `voidJournalLinesByReference` matches on, then contradicted itself in the very
+  next sentence. It is wrong: `reference_type` and `reference_id` are supplied by
+  the caller in `PostEntryInput` (`accountingService.ts:64-67`), and the void
+  matches exactly those. The returned entry is unrelated. §4 now carries an
+  explicit table of what each reference type keys on.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -288,11 +294,21 @@ for all 31 accounts (E12):
 | `1100` AR | `accounts_receivable` | `UNAPPLIED_APPLY` credit |
 | `1000` Cash | `cash` | `UNAPPLIED_REFUND` credit |
 
-`postEntry` returns the posted entry id; that id, not `credit_applications.id`,
-is what `voidJournalLinesByReference` later matches on for these groups. For
-`UNAPPLIED_RECEIPT` and `UNAPPLIED_REFUND` the group is keyed by the payment id;
-`UNAPPLIED_APPLY` posts once per call and is keyed by `credit_applications.id`
-as specified in §5.2 step 7.
+**What the reversal keys on.** `reference_type` and `reference_id` are supplied
+by the caller in `PostEntryInput` (`accountingService.ts:64-67`), and
+`voidJournalLinesByReference` matches exactly those
+(`WHERE reference_type = ? AND reference_id = ?`). The `PostedEntry` that
+`postEntry` returns is a different object and is **not** what a void matches on.
+
+| Reference type | `reference_id` passed to `postEntry` | Voided by |
+|---|---|---|
+| `UNAPPLIED_RECEIPT` | the `payments.id` of the receipt | `voidJournalLinesByReference(db, 'UNAPPLIED_RECEIPT', paymentId)` |
+| `UNAPPLIED_APPLY` | `credit_applications.id` for the call | `voidJournalLinesByReference(db, 'UNAPPLIED_APPLY', applicationId)` |
+| `UNAPPLIED_REFUND` | the `payments.id` of the refund receipt | `voidJournalLinesByReference(db, 'UNAPPLIED_REFUND', paymentId)` |
+
+Revision 11 stated here that `postEntry`'s returned id was what the void
+matched on, then contradicted itself in the next sentence. The value that
+matters is the one passed in.
 
 ---
 
