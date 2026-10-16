@@ -1,8 +1,8 @@
 # Unapplied Customer Payments — Technical Specification
 
-**Revision 12** · 2026-10-16 · Backend + API only
+**Revision 13** · 2026-10-16 · Backend + API only
 
-Supersedes revisions 1–11. Seven defects were found by *executing* this document
+Supersedes revisions 1–12. Nine defects were found by *executing* this document
 or checking it against the real API, and each was invisible to reading it:
 
 - **rev 5** — executing the DDL showed §3.1's
@@ -32,6 +32,18 @@ or checking it against the real API, and each was invisible to reading it:
   had claimed the migration ran clean — against a replica whose
   `chart_of_accounts` I had paraphrased without `normal_balance`. That claim was
   false and is withdrawn. Separately, E11 asserted `1120` exists; it does not.
+- **rev 12** — re-ran the migration against the **real** `payments` DDL with all
+  53 live rows, per the method rev 11 named. Rev 10's paraphrase had also omitted
+  `payment_no UNIQUE NOT NULL`, `payment_date DATE NOT NULL`, the void columns,
+  and `CHECK ((customer_id IS NULL) <> (supplier_id IS NULL))`. The ALTER holds
+  against the real table and legacy `INSERT`s still work — but that compatibility
+  claim had been asserted from a paraphrase and was not demonstrated until now.
+- **rev 13** — §5.2 step 3 told the implementer to reuse
+  `assertInvoiceAllocation` "unchanged". It is `private` on
+  `PaymentRecordingService` (`:147`), so `UnappliedCashService` cannot call it,
+  and it returns the parsed amount step 5 depends on. The spec now specifies
+  extracting it to `paymentValidation.ts` with both callers delegating, so the
+  two paths cannot drift.
 
 Sign errors cost two blockers here (§5.2's `current_balance`, §6's K). Both were
 arithmetic that reads correctly and inverts in code.
@@ -331,8 +343,31 @@ Applies held cash to one or more invoices. Reuses the original receipt's
    `paymentValidation.validateCustomerPayment` (per-invoice ceiling and ownership
    only) nor the schema (no trigger, E8) constrains this today, so it is asserted
    explicitly here and in a CHECK-backed invariant.
-3. For each allocation, run the existing `assertInvoiceAllocation` per-invoice
-   ceiling and ownership checks unchanged.
+3. For each allocation, run the per-invoice ceiling and ownership check —
+   **but it must first be made shareable.** `assertInvoiceAllocation` is
+   `private` on `PaymentRecordingService` (`PaymentRecordingService.ts:147`),
+   so `UnappliedCashService` cannot call it, and it returns the parsed amount
+   that step 5's counter arithmetic depends on. Do not duplicate the logic and
+   do not widen the existing method's visibility for one caller.
+
+   Extract it to an exported function in `services/paymentValidation.ts`, which
+   already owns `validateCustomerPayment`:
+
+   ```ts
+   export function assertInvoiceAllocation(
+     db: Database.Database,
+     customerId: number,
+     alloc: PaymentAllocation,
+   ): number   // returns the parsed, validated amount
+   ```
+
+   `PaymentRecordingService.allocateExistingPayment` calls the extracted
+   function and delegates, so the two paths cannot drift. Its existing rules
+   carry over unchanged: amount > 0, invoice exists, invoice belongs to this
+   customer, and `amount <= invoice.balance_amount + 0.01`.
+
+   `UnappliedCashService` takes `db` by constructor injection, matching
+   `PaymentRecordingService` (`constructor(private readonly db: Database.Database)`).
 4. Insert one `credit_applications` row (`operation='APPLY'`), then one
    `credit_source_consumptions` row per source drawn.
 5. **Move the source counters — mandatory, same transaction.** For each source
@@ -599,6 +634,7 @@ This is safe precisely because §2 keeps `credit_balance` store-credit-only.
 | 27 | Baseline the invariant suite before writing any feature test | record which invariants are **already** failing. F fails by exactly 1800.00 today, independent of this feature |
 | 28 | Run the migration against the **real** `chart_of_accounts` DDL and rows | account `2110` inserts with `normal_balance='credit'` and a `text_code`; `getAccountByTextCode('unapplied_customer_payments')` resolves it. An insert omitting `normal_balance` must be rejected — that was rev 10's blocker |
 | 29 | Post one `UNAPPLIED_RECEIPT` through `postEntry` after the migration | resolves both `cash` and `unapplied_customer_payments` by text code; journal group balances |
+| 30 | Allocation ceiling, exercised from **both** paths | `PaymentRecordingService.allocateExistingPayment` and `UnappliedCashService.apply` reject the same over-allocation with the same reason. Guards against the extracted helper drifting or being bypassed |
 
 ### 12.1 Assert no *new* violations, never absolute green
 
