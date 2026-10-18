@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Tristate;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -180,6 +181,7 @@ void main() {
     Size size = const Size(1440, 900),
     Locale locale = const Locale('en'),
     bool dark = false,
+    bool openDialog = true,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -217,7 +219,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    if (!page) {
+    if (!page && openDialog) {
       await tester.tap(find.text('Open advance'));
       await tester.pumpAndSettle();
     }
@@ -326,6 +328,69 @@ void main() {
 
   for (final locale in const [Locale('en'), Locale('ur')]) {
     testWidgets(
+      'Shift+Tab moves back from submit to Close (${locale.languageCode})',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await pump(tester, locale: locale);
+        for (var index = 0; index < 6; index++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+        }
+        final submit = find.byKey(const Key('cash_receive_submit'));
+        expect(
+          tester.getSemantics(submit).flagsCollection.isFocused,
+          Tristate.isTrue,
+        );
+
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        await tester.pump();
+
+        final close = find.ancestor(
+          of: find.text(
+            AppLocalizations.of(tester.element(submit))!.commonClose,
+          ),
+          matching: find.byType(TextButton),
+        );
+        expect(
+          tester.getSemantics(close.first).flagsCollection.isFocused,
+          Tristate.isTrue,
+        );
+        semantics.dispose();
+      },
+    );
+  }
+
+  testWidgets('keyboard opens and dismisses the date and method controls', (
+    tester,
+  ) async {
+    await pump(tester);
+    for (var index = 0; index < 3; index++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+    }
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsNothing);
+    expect(find.byKey(const Key('cash_receive_amount')), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.text('Bank'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.text('Bank'), findsNothing);
+    expect(find.byKey(const Key('cash_receive_amount')), findsOneWidget);
+  });
+
+  for (final locale in const [Locale('en'), Locale('ur')]) {
+    testWidgets(
       'Escape closes the receive dialog without submitting (${locale.languageCode})',
       (tester) async {
         await pump(tester, locale: locale);
@@ -334,6 +399,35 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('cash_receive_amount')), findsNothing);
         expect(writes, isEmpty);
+      },
+    );
+  }
+
+  for (final locale in const [Locale('en'), Locale('ur')]) {
+    testWidgets(
+      'Escape restores keyboard focus to the receive launcher (${locale.languageCode})',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await pump(tester, locale: locale, openDialog: false);
+        final launcher = find.widgetWithText(FilledButton, 'Open advance');
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        expect(
+          tester.getSemantics(launcher).flagsCollection.isFocused,
+          Tristate.isTrue,
+        );
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('cash_receive_amount')), findsOneWidget);
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+
+        expect(
+          tester.getSemantics(launcher).flagsCollection.isFocused,
+          Tristate.isTrue,
+        );
+        semantics.dispose();
       },
     );
   }
@@ -408,6 +502,26 @@ void main() {
       gate!.complete();
       await tester.pumpAndSettle();
       expect(find.text('Advance received'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Escape keeps the receive dialog open while a request is pending',
+    (tester) async {
+      gate = Completer<void>();
+      await pump(tester);
+      await tester.enterText(find.byKey(const Key('cash_receive_amount')), '5');
+      await tester.tap(find.byKey(const Key('cash_receive_submit')));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(writes, hasLength(1));
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byKey(const Key('cash_receive_amount')), findsOneWidget);
+      expect(writes, hasLength(1));
+      gate!.complete();
+      await tester.pumpAndSettle();
     },
   );
 

@@ -44,33 +44,70 @@ abstract final class AppTheme {
           borderRadius: AppBorderRadius.textField,
           borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          shape: const RoundedRectangleBorder(borderRadius: AppBorderRadius.smRadius),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
+        style:
+            FilledButton.styleFrom(
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppBorderRadius.smRadius,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ).copyWith(
+              side: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.focused)) {
+                  return BorderSide(color: colorScheme.onPrimary, width: 2);
+                }
+                return null;
+              }),
+            ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          shape: const RoundedRectangleBorder(borderRadius: AppBorderRadius.smRadius),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
+        style:
+            OutlinedButton.styleFrom(
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppBorderRadius.smRadius,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ).copyWith(
+              side: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.focused)) {
+                  return BorderSide(color: colorScheme.primary, width: 2);
+                }
+                return null;
+              }),
+            ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          shape: const RoundedRectangleBorder(borderRadius: AppBorderRadius.smRadius),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        ),
+        style:
+            TextButton.styleFrom(
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppBorderRadius.smRadius,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ).copyWith(
+              side: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.focused)) {
+                  return BorderSide(color: colorScheme.primary, width: 2);
+                }
+                return null;
+              }),
+            ),
       ),
       dialogTheme: DialogThemeData(
-        shape: const RoundedRectangleBorder(borderRadius: AppBorderRadius.dialog),
+        shape: const RoundedRectangleBorder(
+          borderRadius: AppBorderRadius.dialog,
+        ),
         surfaceTintColor: Colors.transparent,
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: const RoundedRectangleBorder(borderRadius: AppBorderRadius.smRadius),
+        shape: const RoundedRectangleBorder(
+          borderRadius: AppBorderRadius.smRadius,
+        ),
       ),
       dividerTheme: DividerThemeData(
         color: colorScheme.outlineVariant,
@@ -80,9 +117,7 @@ abstract final class AppTheme {
       // The M3 NavigationRail defaults to a 256px extended width; the
       // previous custom rail was 180px. Keep 180 so module grids keep
       // their viewport width (spec 3.2 — same width, M3 look).
-      navigationRailTheme: const NavigationRailThemeData(
-        minExtendedWidth: 180,
-      ),
+      navigationRailTheme: const NavigationRailThemeData(minExtendedWidth: 180),
       splashFactory: InkSparkle.splashFactory,
     );
   }

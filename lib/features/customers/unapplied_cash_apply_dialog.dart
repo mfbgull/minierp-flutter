@@ -419,7 +419,10 @@ class _UnappliedCashApplyDialogState
                         ),
                       )
                     else if (!_allowed)
-                      ErrorBanner(message: denied)
+                      Semantics(
+                        liveRegion: true,
+                        child: ErrorBanner(message: denied),
+                      )
                     else ...[
                       Text(
                         widget.customer.customerName,
@@ -447,12 +450,15 @@ class _UnappliedCashApplyDialogState
                       ),
                       const SizedBox(height: AppSpacing.space4),
                       if (pending != null)
-                        ErrorBanner(
-                          message: own
-                              ? (canRetry
-                                    ? l10n.cashPendingNotice
-                                    : l10n.cashRecoveryRequired)
-                              : l10n.cashOtherPending,
+                        Semantics(
+                          liveRegion: true,
+                          child: ErrorBanner(
+                            message: own
+                                ? (canRetry
+                                      ? l10n.cashPendingNotice
+                                      : l10n.cashRecoveryRequired)
+                                : l10n.cashOtherPending,
+                          ),
                         ),
                       if (_changed)
                         Semantics(
@@ -494,8 +500,11 @@ class _UnappliedCashApplyDialogState
                       else if (_readError != null)
                         Column(
                           children: [
-                            ErrorBanner(
-                              message: cashErrorMessage(l10n, _readError!),
+                            Semantics(
+                              liveRegion: true,
+                              child: ErrorBanner(
+                                message: cashErrorMessage(l10n, _readError!),
+                              ),
                             ),
                             TextButton(
                               onPressed: _busy ? null : _load,

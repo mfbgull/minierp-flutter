@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Tristate;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +19,7 @@ import 'package:minierp_app/features/customers/unapplied_cash_refund_dialog.dart
 import 'package:minierp_app/features/customers/unapplied_cash_reverse_dialog.dart';
 import 'package:minierp_app/l10n/app_localizations.dart';
 import 'package:minierp_app/features/customers/unapplied_cash_operation.dart';
+import 'package:minierp_app/widgets/movable_dialog.dart';
 import '../../test_helpers.dart';
 
 class CorrectionTestAuth extends AuthNotifier {
@@ -200,6 +202,7 @@ void main() {
     bool reverse = false,
     bool narrow = false,
     bool urdu = false,
+    bool openDialog = true,
   }) async {
     tester.view.physicalSize = narrow
         ? const Size(390, 844)
@@ -240,8 +243,10 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Open action'));
-    await tester.pumpAndSettle();
+    if (openDialog) {
+      await tester.tap(find.text('Open action'));
+      await tester.pumpAndSettle();
+    }
   }
 
   Future<void> draft(
@@ -282,6 +287,81 @@ void main() {
     }
   }
 
+  for (final reverse in [false, true]) {
+    for (final urdu in [false, true]) {
+      testWidgets(
+        'Escape restores keyboard focus to ${reverse ? 'reverse' : 'refund'} launcher (urdu=$urdu)',
+        (tester) async {
+          final semantics = tester.ensureSemantics();
+          await pump(tester, reverse: reverse, urdu: urdu, openDialog: false);
+          final launcher = find.widgetWithText(TextButton, 'Open action');
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+          expect(
+            tester.getSemantics(launcher).flagsCollection.isFocused,
+            Tristate.isTrue,
+          );
+
+          await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('cash_action_review')), findsOneWidget);
+          await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+          await tester.pumpAndSettle();
+
+          expect(
+            tester.getSemantics(launcher).flagsCollection.isFocused,
+            Tristate.isTrue,
+          );
+          semantics.dispose();
+        },
+      );
+    }
+  }
+
+  for (final reverse in [false, true]) {
+    testWidgets(
+      'Escape keeps ${reverse ? 'reverse' : 'refund'} open while its request is pending',
+      (tester) async {
+        gate = Completer<void>();
+        await pump(tester, reverse: reverse);
+        await draft(tester, reverse: reverse);
+        await tester.tap(find.byKey(const Key('cash_action_confirm')));
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(writes, hasLength(1));
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(find.byType(Dialog), findsOneWidget);
+        expect(writes, hasLength(1));
+        gate!.complete();
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
+  for (final reverse in [false, true]) {
+    for (final urdu in [false, true]) {
+      testWidgets(
+        'Tab traversal stays inside ${reverse ? 'reverse' : 'refund'} (urdu=$urdu)',
+        (tester) async {
+          await pump(tester, reverse: reverse, urdu: urdu);
+          for (var index = 0; index < 12; index++) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.pump();
+            final focusedContext =
+                tester.binding.focusManager.primaryFocus?.context;
+            expect(
+              focusedContext?.findAncestorWidgetOfExactType<MovableDialog>(),
+              isNotNull,
+              reason: 'Tab ${index + 1} should remain inside the dialog',
+            );
+          }
+        },
+      );
+    }
+  }
+
   testWidgets('partial refund reviews cash out before exact keyed POST', (
     tester,
   ) async {
@@ -312,6 +392,7 @@ void main() {
   testWidgets(
     'refund insufficient bank cash retains values and explains funds failure',
     (tester) async {
+      final semantics = tester.ensureSemantics();
       rejection = 'INSUFFICIENT_CASH';
       await pump(tester);
       await tester.tap(find.byKey(const Key('cash_action_method')));
@@ -324,13 +405,36 @@ void main() {
       expect(find.textContaining('cash or bank balance'), findsOneWidget);
       expect(
         tester
+            .getSemantics(find.textContaining('cash or bank balance'))
+            .getSemanticsData()
+            .flagsCollection
+            .isLiveRegion,
+        isTrue,
+      );
+      expect(
+        tester
             .widget<TextFormField>(find.byKey(const Key('cash_action_amount')))
             .controller!
             .text,
         '50.25',
       );
+      semantics.dispose();
     },
   );
+  testWidgets('reversal confirmation keeps a visible focus outline', (
+    tester,
+  ) async {
+    await pump(tester, reverse: true);
+    await draft(tester, reverse: true);
+    final button = tester.widget<FilledButton>(
+      find.byKey(const Key('cash_action_confirm')),
+    );
+
+    expect(
+      button.style?.side?.resolve({WidgetState.focused}),
+      BorderSide(color: AppTheme.light.colorScheme.onError, width: 2),
+    );
+  });
   testWidgets('refund date change reloads date eligible refundable capacity', (
     tester,
   ) async {

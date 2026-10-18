@@ -378,7 +378,10 @@ class _UnappliedCashActionDialogState
                         ),
                       )
                     else if (!_allowed)
-                      ErrorBanner(message: denied)
+                      Semantics(
+                        liveRegion: true,
+                        child: ErrorBanner(message: denied),
+                      )
                     else ...[
                       Text(
                         widget.customer.customerName,
@@ -630,6 +633,18 @@ class _UnappliedCashActionDialogState
                                 foregroundColor: Theme.of(
                                   context,
                                 ).colorScheme.onError,
+                              ).copyWith(
+                                side: WidgetStateProperty.resolveWith((states) {
+                                  if (states.contains(WidgetState.focused)) {
+                                    return BorderSide(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onError,
+                                      width: 2,
+                                    );
+                                  }
+                                  return null;
+                                }),
                               )
                             : null,
                         label: Text(
