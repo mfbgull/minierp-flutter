@@ -17,10 +17,14 @@ import '../../core/theme/status_colors.dart';
 import '../../core/utils/csv_export.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/unified_payment.dart' show UnifiedPayment;
-import '../../data/repositories/api_result.dart' show ApiResult;
-import '../../features/employees/employee_repository.dart' show employeeRepositoryProvider;
-import '../../data/repositories/invoice_repository.dart' show invoiceRepositoryProvider;
-import '../../data/repositories/owner_equity_repository.dart' show ownerEquityRepositoryProvider;
+import '../../data/repositories/api_result.dart'
+    show ApiResult, ApiFailure, ApiError;
+import '../../features/employees/employee_repository.dart'
+    show employeeRepositoryProvider;
+import '../../data/repositories/invoice_repository.dart'
+    show invoiceRepositoryProvider;
+import '../../data/repositories/owner_equity_repository.dart'
+    show ownerEquityRepositoryProvider;
 import '../../data/repositories/paged_request.dart' show PagedResponse;
 import '../../features/employees/salary_pay_dialog.dart'
     show showSalaryPayDialog;
@@ -82,18 +86,48 @@ const Map<String, String> _menuSource = {
   'owner_withdrawal': 'owner_withdrawal',
 };
 
-class PaymentsScreen extends ConsumerStatefulWidget {
+class PaymentsScreen extends StatelessWidget {
   const PaymentsScreen({super.key});
 
   @override
-  ConsumerState<PaymentsScreen> createState() => _PaymentsScreenState();
+  Widget build(BuildContext context) => _PaymentsBody(
+    key: ValueKey((
+      Localizations.localeOf(context),
+      Theme.of(context).brightness,
+    )),
+  );
 }
 
-class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
-    with PlutoGridScreen<UnifiedPayment, PaymentsScreen> {
+class _PaymentsBody extends ConsumerStatefulWidget {
+  const _PaymentsBody({super.key});
+
+  @override
+  ConsumerState<_PaymentsBody> createState() => _PaymentsScreenState();
+}
+
+class _PaymentsScreenState extends ConsumerState<_PaymentsBody>
+    with PlutoGridScreen<UnifiedPayment, _PaymentsBody> {
   Timer? _debounce;
   final TextEditingController _searchController = TextEditingController();
   bool _bulkBusy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.text = ref.read(unifiedPaymentsSearchProvider);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final selection = gridColumns.firstWhere(
+      (column) => column.field == kBulkSelectField,
+    );
+    selection.minWidth = 80;
+    if (selection.width < 80) {
+      selection.width = 80;
+    }
+  }
 
   Map<int, UnifiedPayment> get _paymentsById => {
     for (final p
@@ -196,6 +230,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
 
   /// Delete a single payment by routing to the correct source endpoint.
   Future<ApiResult<void>> _deletePayment(UnifiedPayment p) async {
+    if (!p.canDeleteGenerically ||
+        !(ref.read(authProvider).user?.hasPermission('payments', 'delete') ??
+            false)) {
+      return ApiFailure(
+        ApiError(message: AppLocalizations.of(context)!.cashBulkExcluded),
+      );
+    }
     switch (p.source) {
       case 'payment':
         return ref.read(invoiceRepositoryProvider).deletePayment(p.sourceId);
@@ -219,11 +260,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
   /// payments view. Routes each payment to its source-specific endpoint.
   /// Expenses are skipped (immutable, D20).
   Future<void> _bulkDelete(Set<int> ids) async {
+    if (_bulkBusy ||
+        !(ref.read(authProvider).user?.hasPermission('payments', 'delete') ??
+            false)) {
+      return;
+    }
     final l10n = AppLocalizations.of(context)!;
-    final confirmed = await _showTypedDeleteConfirm(
-      context,
-      count: ids.length,
-    );
+    final confirmed = await _showTypedDeleteConfirm(context, count: ids.length);
     if (!confirmed || !mounted) return;
 
     setState(() => _bulkBusy = true);
@@ -235,11 +278,13 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
         failures.add(BulkFailure(label: '#$encodedId', reason: 'Not found'));
         continue;
       }
-      if (payment.source == 'expense') {
+      if (!payment.canDeleteGenerically) {
         failures.add(
           BulkFailure(
-            label: payment.refNo.isNotEmpty ? payment.refNo : '#${payment.sourceId}',
-            reason: 'Expenses are immutable',
+            label: payment.refNo.isNotEmpty
+                ? payment.refNo
+                : '#${payment.sourceId}',
+            reason: l10n.cashBulkExcluded,
           ),
         );
         continue;
@@ -250,7 +295,9 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
           onSuccess: (_) => succeeded.add(encodedId),
           onFailure: (error) => failures.add(
             BulkFailure(
-              label: payment.refNo.isNotEmpty ? payment.refNo : '#${payment.sourceId}',
+              label: payment.refNo.isNotEmpty
+                  ? payment.refNo
+                  : '#${payment.sourceId}',
               reason: error.message,
             ),
           ),
@@ -258,7 +305,9 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
       } catch (e) {
         failures.add(
           BulkFailure(
-            label: payment.refNo.isNotEmpty ? payment.refNo : '#${payment.sourceId}',
+            label: payment.refNo.isNotEmpty
+                ? payment.refNo
+                : '#${payment.sourceId}',
             reason: e.toString(),
           ),
         );
@@ -301,7 +350,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
               Text('${l10n.bulkDeleteSelected} ($count)?'),
               const SizedBox(height: 4),
               Text(
-                'Expenses are immutable and will be skipped.',
+                l10n.cashBulkExcluded,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -310,9 +359,9 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
               TextField(
                 controller: controller,
                 autofocus: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   border: OutlineInputBorder(),
-                  hintText: 'Type DELETE to confirm',
+                  hintText: l10n.cashTypeDelete,
                 ),
                 onChanged: (v) {
                   final matches = v == 'DELETE';
@@ -504,7 +553,15 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
                   ),
                 if (user?.hasPermission('payments', 'delete') ?? false)
                   TextButton.icon(
-                    onPressed: () => _bulkDelete(sel),
+                    onPressed:
+                        !_bulkBusy &&
+                            sel.any(
+                              (id) =>
+                                  _paymentsById[id]?.canDeleteGenerically ??
+                                  false,
+                            )
+                        ? () => _bulkDelete(sel)
+                        : null,
                     icon: const Icon(Icons.delete_outline, size: 18),
                     style: TextButton.styleFrom(
                       foregroundColor: Theme.of(context).colorScheme.error,
@@ -528,8 +585,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
               // expense or salary). Unknown directions stay neutral.
               (row) {
                 final direction =
-                    (row.cells['data']?.value as UnifiedPayment?)
-                        ?.direction ??
+                    (row.cells['data']?.value as UnifiedPayment?)?.direction ??
                     'unknown';
                 return switch (direction) {
                   'in' => MoneyDirection.inflow,
@@ -565,17 +621,20 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
 
   @override
   List<PlutoColumn> buildGridColumns(AppLocalizations l10n) {
-    PlutoColumn textColumn(String field, String title, double width,
-            {bool sortable = false}) =>
-        PlutoColumn(
-          title: title,
-          field: field,
-          type: PlutoColumnType.text(),
-          width: width,
-          readOnly: true,
-          enableContextMenu: false,
-          enableSorting: sortable,
-        );
+    PlutoColumn textColumn(
+      String field,
+      String title,
+      double width, {
+      bool sortable = false,
+    }) => PlutoColumn(
+      title: title,
+      field: field,
+      type: PlutoColumnType.text(),
+      width: width,
+      readOnly: true,
+      enableContextMenu: false,
+      enableSorting: sortable,
+    );
 
     return [
       PlutoColumn(
@@ -608,12 +667,17 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
           final color = isUnknown
               ? StatusColors.of(context).warning
               : isIn
-                  ? StatusColors.of(context).success
-                  : StatusColors.of(context).error;
+              ? StatusColors.of(context).success
+              : StatusColors.of(context).error;
           return Align(
             alignment: Alignment.centerLeft,
             child: StatusBadge(
-              status: unifiedTypeLabel(l10n, type),
+              status: ctx.row.cells['data']?.value is UnifiedPayment
+                  ? unifiedPaymentLabel(
+                      l10n,
+                      ctx.row.cells['data']!.value as UnifiedPayment,
+                    )
+                  : unifiedTypeLabel(l10n, type),
               color: color,
             ),
           );
@@ -651,17 +715,19 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
         enableSorting: true,
         renderer: (ctx) {
           final payment = ctx.row.cells['data']?.value;
-          final direction = payment is UnifiedPayment ? payment.direction : 'unknown';
+          final direction = payment is UnifiedPayment
+              ? payment.direction
+              : 'unknown';
           final color = direction == 'in'
               ? StatusColors.of(context).success
               : direction == 'out'
-                  ? StatusColors.of(context).error
-                  : StatusColors.of(context).warning;
+              ? StatusColors.of(context).error
+              : StatusColors.of(context).warning;
           final prefix = direction == 'out'
               ? '- '
               : direction == 'in'
-                  ? '+ '
-                  : '';
+              ? '+ '
+              : '';
           return Align(
             alignment: Alignment.centerRight,
             child: Text(
@@ -681,7 +747,9 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen>
         enableSorting: false,
         renderer: (ctx) => Align(
           alignment: Alignment.centerLeft,
-          child: Text(unifiedMethodLabel(l10n, ctx.cell.value?.toString() ?? 'unknown')),
+          child: Text(
+            unifiedMethodLabel(l10n, ctx.cell.value?.toString() ?? 'unknown'),
+          ),
         ),
       ),
       textColumn('status', l10n.fieldsStatus, 110),
@@ -721,7 +789,8 @@ class _TypeFilterChips extends ConsumerWidget {
               label: Text(label),
               selected: selected == value,
               onSelected: (_) {
-                ref.read(unifiedPaymentsTypeFilterProvider.notifier).state = value;
+                ref.read(unifiedPaymentsTypeFilterProvider.notifier).state =
+                    value;
                 if (ref.read(unifiedPaymentsPageProvider) != 1) {
                   ref.read(unifiedPaymentsPageProvider.notifier).state = 1;
                 }

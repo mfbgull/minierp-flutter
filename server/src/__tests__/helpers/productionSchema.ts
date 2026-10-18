@@ -97,6 +97,66 @@ export interface FixtureOptions {
   reference?: boolean;
 }
 
+export function seedCustomers(db: Database.Database, count = 3): void {
+  const insert = db.prepare(
+    `INSERT INTO customers
+       (id, customer_code, customer_name, current_balance, credit_balance)
+     VALUES (?, ?, ?, 0, 0)`
+  );
+  db.transaction(() => {
+    for (let index = 1; index <= count; index += 1) {
+      insert.run(index, `SEED-${index}`, `Seed Customer ${index}`);
+    }
+  })();
+}
+
+export function seedHistoricalLedger(db: Database.Database): void {
+  const customer = db.prepare(
+    `INSERT INTO customers
+       (id, customer_code, customer_name, current_balance, credit_balance)
+     VALUES (?, ?, ?, 0, 0)`
+  );
+  const ledger = db.prepare(
+    `INSERT INTO customer_ledger
+       (customer_id, transaction_date, transaction_type, reference_no,
+        debit, credit, balance, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const grants: Array<[number, number[]]> = [
+    [1, [450.20, 1000]],
+    [12, [1000, 900, 500]],
+    [13, [700, 500]],
+    [14, [600, 600]],
+    [15, [600, 600, 550, 550]],
+  ];
+  const refunds = new Map<number, number>([[1, 1200], [12, 2300], [13, 400], [15, 550]]);
+  db.transaction(() => {
+    for (const [customerId, amounts] of grants) {
+      customer.run(customerId, `HIST-${customerId}`, `Historical Customer ${customerId}`);
+      let balance = 0;
+      for (const [index, amount] of amounts.entries()) {
+        balance = Math.round((balance - amount) * 100) / 100;
+        const date = `2026-09-0${index + 1}`;
+        ledger.run(customerId, date, 'RETURN', `RET-${customerId}-${index}`,
+          0, amount, balance, `${date} 10:00:00`);
+      }
+      const refund = refunds.get(customerId);
+      if (refund !== undefined) {
+        balance = Math.round((balance + refund) * 100) / 100;
+        ledger.run(customerId, '2026-09-12', 'REFUND', `PAY-SEED-${customerId}`,
+          refund, 0, balance, '2026-09-12 10:00:00');
+      }
+      if (customerId === 15) {
+        for (const [index, amount] of [1200, 600].entries()) {
+          balance = Math.round((balance - amount) * 100) / 100;
+          ledger.run(customerId, '2026-09-13', 'CREDIT_OFFSET', `OFF-15-${index}`,
+            0, amount, balance, `2026-09-13 1${index}:00:00`);
+        }
+      }
+    }
+  })();
+}
+
 /** An isolated, empty database with the production schema. Cheap; DDL replay. */
 export function createFixtureDb(options: FixtureOptions = {}): Database.Database {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'erp-fixture-'));

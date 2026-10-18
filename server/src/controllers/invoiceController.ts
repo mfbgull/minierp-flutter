@@ -20,6 +20,7 @@ import {
 } from '../utils/currency';
 import { isValidPaymentMethod } from '../services/cashService';
 import { handleBusinessError } from '../utils/businessRuleError';
+import { assertLegacyInvoiceAllocationsAllowed } from '../services/unappliedPaymentGuard';
 import {
   InvoiceCreationCreditError,
   InvoiceCreationIdempotencyError,
@@ -736,6 +737,7 @@ function deleteInvoice(req: AuthRequest, res: Response): Response | void {
       // journal lines and customer-ledger rows can never be orphaned.
       const freshInvoice = InvoiceModel.getById(invoiceId, db);
       if (!freshInvoice) throw new Error('Invoice not found');
+      assertLegacyInvoiceAllocationsAllowed(db, invoiceId);
 
       const invoiceItems = InvoiceModel.getItemsForStockReverse(invoiceId, db);
 

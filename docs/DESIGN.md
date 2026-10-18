@@ -492,6 +492,65 @@ payment changes nothing.
 
 ## Implementation Notes
 
+### Customer unapplied cash
+
+Payment history, the unified hub, details and exports distinguish ordinary
+receipts, advance receipts and customer refunds with text, not color alone.
+Customer refunds are cash outflows; advance/refund documents expose reprint and
+read-only details, never generic edit/delete or bulk deletion. Corrections belong
+in the cash workspace. Ordinary receipt actions retain their permission gates.
+Reprints fetch persisted payments and never invoke a payment POST. A4 and thermal
+documents retain the existing English PDF convention, using kind-specific titles
+and Paid To/Amount Paid for refunds. Advances/refunds omit the invoice-AR balance
+trail and allocations; they do not claim to settle an invoice. Detail footer
+actions wrap on constrained widths. Existing theme, focus and status tokens apply.
+Payment grids remount locally when locale/theme changes so column labels and
+rendered kinds stay current. The hub selection column has an 80px minimum for
+PlutoGrid's RTL checkbox/title layout; shared grid defaults are unchanged.
+
+Refund and reversal use a shared 560px correction-dialog shell with a fixed
+customer, scrollable body and persistent footer. Refund is explicitly cash out
+from the date-eligible FIFO pool, with amount/date/method and a separate review
+step before confirmation. Reversal identifies the original receipt, amount and
+date; only a reason is editable. It checks live payment/source state and never
+offers an editable reversal date. Used receipts have a disabled action with an
+explanation. Dependency errors identify source and invoice links without raw JSON.
+Review locks the proposed values; Edit returns to the draft without a write.
+Uncertain operations retain immutable retries, and an already-voided recovery is
+described as verified current state rather than a newly completed reversal.
+
+The Apply Cash dialog reuses the cash dialog's fixed customer, localized date,
+scrollable body and persistent footer. It is a settlement action, not a collection:
+there is no payment method or cash-entry field. The summary presents date-eligible
+capacity, selected total and remaining cash separately. Open invoices load online
+across every page, sorted oldest first; search only filters visibility, never drops
+entered allocations. Desktop selection uses Pluto-Grid with editable allocation
+cells; narrow screens use labeled amount cards. Auto Allocate is optional and only
+prepares a draft for explicit confirmation. Conflict refreshes preserve draft text
+and explain changed balances; uncertain outcomes lock the original request for Retry.
+
+- Customer Detail keeps its existing five tabs and adds Unapplied Cash. Header
+  actions wrap below the identity on constrained widths; Receive Advance stays
+  separate from Record Payment. The existing theme and radius tokens apply.
+- Cash held, invoice balance and store credit are separate labelled values,
+  never a combined net balance. Loading, unavailable permission and live-read
+  errors must not appear as zero cash. Current cash is not a historical balance;
+  the page date range filters application/refund activity only.
+- Receipt and activity lists reuse DetailTabGrid on desktop and labelled cards
+  below 640px. The list owns scrolling, with compact accessible pagination.
+  Summary cards wrap at the same breakpoint. Use theme typography and 8/12/16/24
+  spacing; status always has text as well as color.
+- Receive Advance uses MovableDialog, maximum width 560px, a scrollable form
+  and visible footer. The fixed customer, amount, date and method are the whole
+  form. Explain that invoices remain unpaid. Fields lock during submission and
+  while a previous request is uncertain; Retry uses that saved request unchanged.
+- Busy dialogs cannot dismiss; after an uncertain outcome Close retains the
+  pending request. A restored request for another customer/workflow is not sent
+  from this form. Unsupported/unknown replay guarantees require recovery, never
+  a replacement key. Success identifies advance amount and payment ID, not an
+  invoice-paid message. Material focus states, live status announcements and
+  English/Urdu RTL labels are required. No decorative motion is added.
+
 - This design system prioritizes data density and efficiency for business users
 - Dark mode is first-class - designed with same attention as light mode
 - All interactive elements must have visible focus states for accessibility

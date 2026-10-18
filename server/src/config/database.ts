@@ -2009,6 +2009,10 @@ export function applyPendingMigrations(): void {
   // so existing installs get the guard without a table rebuild.
   runLedgered('add-invoice-return-settled-ceiling.sql');
   runLedgered('add-journal-balance-commit-guard.sql');
+  runLedgered('108_unapplied_customer_payments.sql');
+  runLedgered('109_unapplied_operation_replay.sql');
+  runLedgered('110_unapplied_currency_precision.sql');
+  runLedgered('111_unapplied_receipt_replay.sql');
   // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
   // return time — a legacy COA predating GL foundation must fail the boot
   // with a clear error, never mis-post.

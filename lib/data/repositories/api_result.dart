@@ -75,17 +75,69 @@ class ApiFailure<T> extends ApiResult<T> {
 /// Structured failure: message (server `error` text or transport message),
 /// HTTP status when present, and whether it was a transport-level problem
 /// (timeout/connection) vs a server response.
+class ApiDependency {
+  const ApiDependency({
+    required this.sourceId,
+    required this.consumed,
+    required this.invoices,
+  });
+
+  final int sourceId;
+  final num consumed;
+  final List<int> invoices;
+}
+
 class ApiError {
   const ApiError({
     required this.message,
     this.statusCode,
     this.isNetwork = false,
     this.outcomeUnknown = false,
+    this.code,
+    this.blockedBy = const [],
   });
+
+  factory ApiError.fromResponse({
+    required String message,
+    int? statusCode,
+    Object? body,
+    bool isNetwork = false,
+    bool outcomeUnknown = false,
+  }) {
+    final error = body is Map ? body['error'] : null;
+    final code = error is Map && error['code'] is String
+        ? error['code'] as String
+        : null;
+    final blockers = error is Map ? error['blockedBy'] : null;
+    return ApiError(
+      message: message,
+      statusCode: statusCode,
+      code: code,
+      isNetwork: isNetwork,
+      outcomeUnknown: outcomeUnknown,
+      blockedBy: List.unmodifiable([
+        if (blockers is List)
+          for (final blocker in blockers)
+            if (blocker is Map &&
+                blocker['sourceId'] is int &&
+                blocker['consumed'] is num &&
+                blocker['invoices'] is List)
+              ApiDependency(
+                sourceId: blocker['sourceId'] as int,
+                consumed: blocker['consumed'] as num,
+                invoices: List.unmodifiable(
+                  (blocker['invoices'] as List).whereType<int>(),
+                ),
+              ),
+      ]),
+    );
+  }
 
   final String message;
   final int? statusCode;
   final bool isNetwork;
+  final String? code;
+  final List<ApiDependency> blockedBy;
 
   /// The request may already have been applied server-side, so a *write*
   /// must not be reported as a plain failure and must not be blindly
@@ -103,6 +155,6 @@ class ApiError {
 
   @override
   String toString() =>
-      'ApiError(${statusCode ?? 'no-status'}, network=$isNetwork, '
+      'ApiError(${statusCode ?? 'no-status'}, code=$code, network=$isNetwork, '
       'outcomeUnknown=$outcomeUnknown): $message';
 }

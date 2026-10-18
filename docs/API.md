@@ -400,6 +400,197 @@ Allocate an existing payment to invoices.
 
 ---
 
+## Unapplied Customer Cash
+
+These endpoints hold customer cash separately from return/store credit. They
+do not activate historical credit or change `credit_balance`. Existing
+`POST /payments` still requires allocations; use the dedicated receive endpoint
+for cash collected before invoice settlement.
+
+All four endpoints require authentication, the payment permission below, and
+an `Idempotency-Key` header containing 8..200 characters (a fresh UUID per
+operation is recommended). Reuse the same key and payload when retrying a lost
+response. Keys are independent per customer and operation; reverse keys are
+scoped to the receipt. Changed payloads with the same key return 409
+`IDEMPOTENCY_CONFLICT`. Receive retains a permanent receipt replay record;
+apply/refund retain permanent application replay records. Reverse uses the
+central idempotency retention policy. Completed central keys are pruned after
+30 days; this does not delete receive/apply/refund replay records. A receive
+retry after receipt reversal returns its original payment ID, never a new receipt.
+Browser preflights permit this header. Sensitive-operation rate limits apply.
+
+| Method | Path | Permission |
+|---|---|---|
+| POST | `/customers/:id/unapplied-cash` | `payments:create` |
+| POST | `/unapplied-cash/apply` | `payments:update` |
+| POST | `/unapplied-cash/refund` | `payments:create` |
+| POST | `/payments/:id/reverse` | `payments:delete` |
+
+### GET /unapplied-cash/capabilities
+
+Requires authentication, but no payment-read grant; this endpoint exposes only
+static compatibility metadata and uses `Cache-Control: no-store`.
+
+```json
+{"success":true,"data":{"receive":"durable-v1","apply":"permanent-application-v1","refund":"permanent-application-v1","reverse":"guarded-status-v1"}}
+```
+
+Clients must check this online before dispatching/resuming persisted requests;
+absent/unsupported guarantees require recovery, not blind resubmission. Receipt
+replay protection covers operations committed under `durable-v1`; no historical
+receipt keys are reconstructed or backfilled. Unexpired pre-upgrade central
+receive claims are promoted to durable records when legitimately replayed.
+
+### GET /customers/:id/unapplied-cash
+
+Requires `payments:read`. Optional `operation_date` is a real `YYYY-MM-DD` and
+defaults to the server's local current date. `page` defaults to 1; `limit` to 20
+(maximum 100). IDs and pagination must be positive safe integers; malformed
+queries return 400, missing customers 404, unauthorized access 401/403.
+
+```json
+{
+  "success": true,
+  "data": {
+    "customer_id": 1,
+    "operation_date": "2026-10-02",
+    "remaining_amount": 500,
+    "available_amount": 500,
+    "refundable_amount": 500,
+    "receipts": [{
+      "source_id": 1, "payment_id": 12, "payment_no": "PAY0012",
+      "payment_date": "2026-10-01", "payment_method": "Cash",
+      "original_amount": 500, "applied_amount": 0, "refunded_amount": 0,
+      "remaining_amount": 500, "voided_at": null, "can_reverse": true
+    }]
+  },
+  "pagination": {"currentPage": 1, "totalPages": 1, "totalItems": 1, "limit": 20}
+}
+```
+
+Totals cover all live UNAPPLIED_CASH sources for the customer, not just this
+page. Return/store credit and voided sources/receipts never contribute. Available
+and refundable amounts apply the service's current source and original-receipt
+capacity limits, excluding receipts after `operation_date`. They are **not**
+historical balances as of that date. Remaining cash includes future-dated live
+receipts. Rows include used and voided receipts, newest payment date/ID first.
+`can_reverse` is only an unused/dependency hint: POST still checks periods and
+chronological cash availability. Use fresh reads; POST remains authoritative.
+
+### GET /customers/:id/unapplied-cash/activity
+
+Requires `payments:read`, with the same pagination bounds. Optional inclusive
+`fromDate`/`toDate` must be real dates in ascending order. Returns
+`{success,data:[{application_id,operation,operation_date,total_amount,payment_id,
+lines:[{id,application_id,source_id,invoice_id,invoice_no,payment_id,amount,kind,
+voided_at}]}],pagination:{currentPage,totalPages,totalItems,limit}}`.
+Operation/kind are APPLY or REFUND. Results are newest operation date/ID first;
+invoice/payment IDs are nullable where not applicable. This history range does
+not affect the separate current-cash summary. Applications are not new cash
+receipts. Existing payment list/detail responses now include `payment_kind` and
+`voided_at`; unified payments include nullable `payment_kind`, positive absolute
+amounts and `out` direction for customer REFUND documents.
+
+Amounts are finite, positive JSON numbers, normalized to two currency decimal
+places, with a minimum normalized amount of 0.01. IDs are positive safe
+integers. `operation_date` must be a real `YYYY-MM-DD` date no later than the
+end of next calendar year. Unknown body fields are rejected. Payment methods
+are `Cash` (default), `Bank`, `Easypaisa`, `JazzCash`, and `Upaisa`.
+
+### POST /customers/:id/unapplied-cash
+
+```json
+{ "amount": 500, "operation_date": "2026-10-01", "payment_method": "Cash" }
+```
+
+Returns 201 on creation, or 200 when replayed:
+
+```json
+{ "success": true, "data": { "paymentId": 41, "applicationId": null, "amount": 500 } }
+```
+
+Creates one positive UNAPPLIED_RECEIPT payment and a cash source, posting cash
+against liability 2110 without changing customer AR. A customer with negative
+`current_balance` is rejected with 409 `CUSTOMER_ALREADY_IN_CREDIT`.
+
+### POST /unapplied-cash/apply
+
+```json
+{
+  "customer_id": 1,
+  "operation_date": "2026-10-02",
+  "allocations": [{ "invoice_id": 12, "amount": 400 }]
+}
+```
+
+Returns 200 with `{ "paymentId": null, "applicationId": 7, "amount": 400 }`
+inside `data`. Supply 1..1000 allocations. Duplicate invoice lines are combined
+before capacity checks. The server selects live cash sources oldest-first;
+clients cannot set source kinds, counters, or source IDs. Invoices must belong
+to this customer, remain payable, and not be dated after the application.
+Allocations use the original receipts, not a new cash payment. Settlement
+decreases invoice/customer AR and transfers liability 2110 to AR 1100.
+
+### POST /unapplied-cash/refund
+
+```json
+{ "customer_id": 1, "amount": 100, "operation_date": "2026-10-03", "payment_method": "Cash" }
+```
+
+Returns 200 with the refund's positive payment ID, application ID and positive
+refunded amount inside `data`. The persisted REFUND payment has a negative
+amount. Only cash still held can fund a refund; applied cash and RETURN_CREDIT
+sources cannot. The selected cash account must remain funded, including later
+dated spending. Customer AR is unchanged.
+
+### POST /payments/:id/reverse
+
+```json
+{ "reason": "Receipt entered twice" }
+```
+
+`reason` is optional; when supplied it must contain 1..500 characters after
+trimming and cannot be blank. An empty body is accepted. Returns 200:
+
+```json
+{ "success": true, "data": { "paymentId": 41, "voided": true } }
+```
+
+This endpoint reverses only unused UNAPPLIED_RECEIPT payments. It atomically
+voids the receipt journal/payment and retires its source, recording the acting
+user and supplied reason. It cannot leave later cash spending unfunded. Normal
+payment deletion continues through the existing payment API; this endpoint
+does not introduce an un-apply or refund-reversal workflow.
+
+### Errors and closed periods
+
+- 400: malformed JSON/body/IDs, invalid dates or amounts, missing/malformed
+  idempotency headers. Validation errors use `VALIDATION_ERROR`.
+- 401/403: existing authentication and permission middleware responses.
+- 404: missing customer, invoice, or unapplied receipt, with stable domain codes.
+- 409: insufficient cash/source/receipt/invoice capacity, changed replay payload,
+  cancelled/deleted invoices, already-voided receipts, or forbidden dependencies.
+- 409 `PERIOD_CLOSED`: receive/apply/refund check their operation dates; reverse
+  checks the original receipt date. An older receipt may be applied/refunded in
+  a later open period, but cannot be reversed from a closed original period.
+- 500 `INTERNAL_SERVER_ERROR`: generic response; no SQL, stacks or internal paths.
+
+Domain errors use `{ "success": false, "error": { "code": "...", "message": "..." } }`.
+Blocked reversal errors additionally expose `error.blockedBy`, for example:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "UNAPPLIED_ALREADY_APPLIED",
+    "message": "Receipt has applied or refunded dependencies",
+    "blockedBy": [{ "sourceId": 3, "consumed": 400, "invoices": [12] }]
+  }
+}
+```
+
+---
+
 ## Purchase Orders
 
 | Method | Path | Description |

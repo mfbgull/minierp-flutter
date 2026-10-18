@@ -35,8 +35,9 @@ class IdempotencyKeyCache {
   String keyFor(Map<String, dynamic> body) {
     final encoded = jsonEncode(body);
     if (_cached == null || _cachedBody != encoded) {
-      _cached = '$prefix-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
-          '-${_random.nextInt(1 << 32).toRadixString(36)}';
+      _cached =
+          '$prefix-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
+          '-${_random.nextInt(0x100000000).toRadixString(36)}';
       _cachedBody = encoded;
     }
     return _cached!;
@@ -70,5 +71,5 @@ class IdempotencyKeyCache {
 
   String _mint() =>
       '$prefix-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
-      '-${_random.nextInt(1 << 32).toRadixString(36)}';
+      '-${_random.nextInt(0x100000000).toRadixString(36)}';
 }

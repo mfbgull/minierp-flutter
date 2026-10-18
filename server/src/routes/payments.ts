@@ -6,6 +6,8 @@ import { requirePermission } from '../middleware/requirePermission';
 import { validateZodQuery, validateZodParams, validateZodBody, zodSchemas, zodBodySchemas } from '../middleware/validation';
 import { sensitiveOperationLimiter } from '../middleware/rateLimiter';
 import { z } from 'zod';
+import { reverseUnappliedCash } from '../controllers/unappliedCashController';
+import { cashIdParams, reverseCashBody } from '../middleware/unappliedCashValidation';
 
 router.use(authenticateToken);
 
@@ -26,5 +28,6 @@ router.put('/:id', requirePermission('payments', 'update'), sensitiveOperationLi
 router.delete('/:id', requirePermission('payments', 'delete'), sensitiveOperationLimiter, paymentsController.deletePayment);
 router.get('/:id/receipt', requirePermission('payments', 'read'), validateZodParams(zodSchemas.id), paymentsController.getPaymentReceipt);
 router.post('/:id/allocate', requirePermission('payments', 'update'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), paymentsController.allocatePaymentToInvoice);
+router.post('/:id/reverse', requirePermission('payments', 'delete'), sensitiveOperationLimiter, validateZodParams(cashIdParams), validateZodBody(reverseCashBody), reverseUnappliedCash);
 
 export default router;

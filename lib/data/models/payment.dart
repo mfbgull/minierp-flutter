@@ -21,6 +21,8 @@ class Payment {
     this.referenceNo,
     this.notes,
     this.createdAt,
+    this.paymentKind = 'RECEIPT',
+    this.voidedAt,
   });
 
   factory Payment.fromJson(Map<String, dynamic> json) => Payment(
@@ -38,6 +40,8 @@ class Payment {
     referenceNo: asString(json['reference_no']),
     notes: asString(json['notes']),
     createdAt: asString(json['created_at']),
+    paymentKind: asString(json['payment_kind']) ?? 'RECEIPT',
+    voidedAt: asString(json['voided_at']),
   );
 
   final int id;
@@ -54,6 +58,12 @@ class Payment {
   final String? referenceNo;
   final String? notes;
   final String? createdAt;
+  final String paymentKind;
+  final String? voidedAt;
+
+  bool get canModify => paymentKind == 'RECEIPT' && voidedAt == null;
+  bool get isCashOutflow =>
+      supplierId != null || paymentKind == 'REFUND' || amount < 0;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -67,6 +77,8 @@ class Payment {
     'payment_date': paymentDate,
     'amount': amount,
     'payment_method': paymentMethod,
+    'payment_kind': paymentKind,
+    'voided_at': voidedAt,
     if (referenceNo != null) 'reference_no': referenceNo,
     if (notes != null) 'notes': notes,
     if (createdAt != null) 'created_at': createdAt,

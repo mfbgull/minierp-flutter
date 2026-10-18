@@ -7,6 +7,7 @@ import {
   purchaseStock,
 } from './helpers/invoiceReturnSpec';
 import { InvoiceCreationService } from '../services/InvoiceCreationService';
+import { UnappliedCashService } from '../services/unappliedCashService';
 import type { InvoiceCreationInput } from '../services/invoiceCreationTypes';
 
 describe('InvoiceCreationService', () => {
@@ -134,5 +135,17 @@ describe('InvoiceCreationService', () => {
       expect(Number(row.balance)).toBeCloseTo(running, 2);
     }
     expect(ledgerUtils.recalcCustomerBalanceFromLedger(backdatedCustomerId)).toBeCloseTo(running, 2);
+  });
+
+  it('never treats held unapplied cash as return credit during invoice creation', async () => {
+    const cashCustomerId = await createCustomer('Held cash invoice customer', authCookie);
+    new UnappliedCashService(db).receive({ customerId: cashCustomerId, amount: 500, date: '2026-09-25', paymentMethod: 'Cash' });
+    const service = new InvoiceCreationService(db);
+    expect(() => service.create(input({ customerId: cashCustomerId, creditOffset: 50 }))).toThrow();
+    const created = service.create(input({ customerId: cashCustomerId }));
+    expect(created.balanceAmount).toBe(100);
+    expect(created.paidAmount).toBe(0);
+    expect(db.prepare('SELECT current_balance,credit_balance FROM customers WHERE id=?').get(cashCustomerId)).toEqual({ current_balance: 100, credit_balance: 0 });
+    expect(db.prepare("SELECT remaining_amount,consumed_amount FROM customer_credit_sources WHERE customer_id=? AND kind='UNAPPLIED_CASH'").get(cashCustomerId)).toEqual({ remaining_amount: 500, consumed_amount: 0 });
   });
 });

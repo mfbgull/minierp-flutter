@@ -1,0 +1,82 @@
+Current rebuild browser QA, 2026-10-18
+Browser command prefix: AGENT_BROWSER_SESSION=f7fix-2d3fabc8c040 agent-browser
+Surface: http://127.0.0.1:4517/#/customers/1, viewport 390x844, dark theme.
+Observed performance resource: http://127.0.0.1:4517/main.dart.js
+On-disk main.dart.js: 7337678 bytes, SHA256 7159ca43a0aae1e37dd8b04d4596e24a516e59f2ff2db7f7b808700c1a8ed0dc
+
+Each click below was followed by snapshot -i, press Escape, and snapshot -i.
+UR Receive: click @e6 (preceding snapshot: button "پیشگی رقم وصول کریں").
+Opened dialog with textbox "رقم 0.00", textbox "لین دین کی تاریخ", button "نقد", button "بند".
+Escape result: customer workspace, selected tab "غیر مختص نقد رقم", no dialog.
+UR Reverse: click @e21 (preceding snapshot: button "وصولی منسوخ کریں").
+Opened dialog with textbox "منسوخی کی وجہ", Retry and disabled review button.
+Escape result: customer workspace, no dialog. Screenshot /tmp/f7-qa-reverse-ur.png.
+UR Refund: click @e17 (preceding snapshot: button "نقد رقم واپس کریں").
+Opened dialog with textbox "رقم", textbox "لین دین کی تاریخ", button "طریقہ نقد", Retry and disabled review button.
+Escape result: customer workspace, no dialog.
+
+Change language: click @e3 (User menu), snapshot -i, click @e2 (زبان), snapshot -i, click @e1 (English).
+EN workspace snapshot includes button "Reverse receipt", ref=e22; no unexplained icon-only name.
+EN Apply: click @e18 (button "Apply Cash to Invoices").
+Opened dialog with textbox "Operation date", Retry, Close, disabled Apply Cash to Invoices.
+press Tab; eval activeElement => {"tag":"INPUT","role":null,"label":"Operation date"}.
+Escape result: customer workspace, no dialog.
+EN Reverse: click @e22 (button "Reverse receipt").
+Opened dialog with textbox "Reason for reversal", Retry, Close, disabled Review reversal.
+Escape result: customer workspace, no dialog.
+EN Receive: click @e6 (button "Receive Advance").
+Opened dialog with textbox "Amount 0.00", textbox "Operation date", button "Cash", button "Close".
+Escape result: customer workspace, no dialog.
+EN Refund: find role button click --name 'Refund Cash'.
+Opened dialog with textbox "Amount", textbox "Operation date", button "Method Cash", Retry, Close, disabled Review refund.
+Escape result: customer workspace, no dialog.
+An earlier stale-ref click targeted the Applications & refunds checkbox; that attempt was discarded and repeated with the named locator above.
+
+Change language: find role button click --name 'User menu Administrator'; find role menuitem click --name 'Language'; find role button click --name 'اردو'.
+UR Apply: find role button click --name 'نقد رقم انوائسز میں استعمال کریں'.
+Opened dialog with textbox "لین دین کی تاریخ", Retry, Close, disabled Apply button.
+Escape result: customer workspace, selected cash tab, localized Reverse button, no dialog.
+
+Real scroll capture correction:
+DOM scroll container was #flt-semantic-node-573 (role group, height 466, scrollHeight 1216).
+Initial DOM scrollTop=0 did not match the painted canvas, which showed end receipts.
+scroll down 350 --selector '#flt-semantic-node-573'
+scroll up 2500 --selector '#flt-semantic-node-573'
+screenshot audit/screenshots/unapplied-cash-ui/f7-ur-dark-phone-workspace.png
+Visually inspected: top summary cards (invoice balance 0, store credit 0, available unapplied cash 1000), workspace explanation/actions.
+scroll down 2500 --selector '#flt-semantic-node-573'
+screenshot audit/screenshots/unapplied-cash-ui/f7-ur-dark-phone-workspace-end.png
+Visually inspected: receipt card PAY-1026-000001, original/remaining Rs.500, localized method نقد, reversal action and pagination.
+Start: 61035 bytes, 390x844, SHA256 bc9eeca91d52af96e67adadf9b5d24d6aa0347c996468094a6177343229c7c22
+End: 60815 bytes, 390x844, SHA256 039d661ef9185c68f1f718775f99ce96d173376b81c83a652d3b58a943fadb68
+
+No financial submit or fixture mutation was performed. Apply/Refund/Reverse previews showed connection/retry errors, so dismissal passes describe idle/error dialogs only. This run does not certify busy-write Escape behavior, full focus traversal in Apply/Refund/Reverse, method/date picker interaction, or screen-reader announcement quality. English Receive dialog focus traversal and return were subsequently tested as recorded below.
+
+## Desktop compact Reverse accessible-name recheck
+
+Browser session `f7fix-2d3fabc8c040`; viewport 1280x900; cash workspace grid, idle state.
+
+English: switched language through user menu, then evaluated `JSON.stringify({w:innerWidth,h:innerHeight,reverseLabels:[...document.querySelectorAll("flt-semantics[role=button]")].map(e=>e.textContent.trim()).filter(t=>t==="Reverse receipt").length})`; result `{"w":1280,"h":900,"reverseLabels":2}`.
+
+Urdu: evaluated the equivalent exact localized button text query after switching to Urdu; result `{"w":1280,"h":900,"reverseLabels":2}` for `وصولی منسوخ کریں`. No actions were submitted; no fixture data was changed.
+
+## English Receive dialog focus loop
+
+Opened `Receive Advance` in the English workspace. The initial focus was the dialog semantic node. Repeated `Tab` inspection showed Amount, Operation date, Cash, Close, Receive Advance, then the dialog node and Amount again; all observed active semantic nodes remained within the modal. `Escape` dismissed the dialog and active focus returned to the `Receive Advance` launcher. No form submission occurred. Other dialog types and the method/date picker interaction are not covered by this pass. The original reverse-order claim was withdrawn after the independent repeat below.
+
+Independent QA repeat, English desktop 1280x900:
+Invocation: find role button click --name 'Receive Advance'; then eight press Tab actions.
+After each key, eval waited for two requestAnimationFrame callbacks and recorded activeElement textContent, aria-label, role, and !!activeElement.closest('[role=dialog]').
+Forward observations in order:
+1. INPUT aria-label='Amount\n0.00', insideDialog=true
+2. INPUT aria-label='Operation date', insideDialog=true
+3. button text='Operation date', insideDialog=true
+4. button text='Cash', insideDialog=true
+5. button text='Close', insideDialog=true
+6. button text='Receive Advance', insideDialog=true
+7. role=dialog, insideDialog=true
+8. INPUT aria-label='Amount\n0.00', insideDialog=true
+Then eight press Shift+Tab actions with the same observation yielded Operation date input, Operation date button, Cash, Close, Receive Advance, dialog, Amount, Operation date input. All remained insideDialog=true, but this was forward order. The key's reverse-direction fidelity is unresolved; no reverse-traversal PASS is claimed.
+Invocation: press Escape; wait --fn '!document.querySelector("[role=dialog]")'; eval activeElement.
+Observed: wait returned true; activeElement role='button', textContent='Receive Advance'.
+An initial context-tool subprocess probe used a different browser namespace and returned BODY for all focus observations; those results were discarded. The recorded repeat above used exec_command from the repository working directory and the existing named session.

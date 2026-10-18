@@ -9,12 +9,30 @@ import type Database from 'better-sqlite3';
 import { parseCurrency } from '../utils/currency';
 import type {
   CustomerPaymentInput,
+  PaymentAllocation,
   SupplierPaymentAllocation,
   SupplierPaymentInput,
 } from './paymentRecordingTypes';
 
 export const PAYMENT_METHODS_HINT =
   'use Cash, Bank, Easypaisa, JazzCash or Upaisa';
+
+export class InvoiceAllocationError extends Error {}
+
+export function assertInvoiceAllocation(db: Database.Database, customerId: number, alloc: PaymentAllocation): number {
+  const amount = parseCurrency(alloc.amount);
+  if (!(amount > 0)) throw new InvoiceAllocationError(`Allocation amount for invoice ${alloc.invoiceId} must be greater than 0`);
+  const invoice = db.prepare<[number], { id: number; customer_id: number; balance_amount: number }>(
+    'SELECT id, customer_id, balance_amount FROM invoices WHERE id = ?').get(alloc.invoiceId);
+  if (!invoice) throw new InvoiceAllocationError(`Invoice ${alloc.invoiceId} not found`);
+  if (Number(invoice.customer_id) !== Number(customerId)) {
+    throw new InvoiceAllocationError(`Invoice ${alloc.invoiceId} does not belong to this payment's customer`);
+  }
+  if (amount > parseCurrency(invoice.balance_amount) + 0.01) {
+    throw new InvoiceAllocationError(`Allocation (${amount.toFixed(2)}) exceeds invoice ${alloc.invoiceId} balance (${parseCurrency(invoice.balance_amount).toFixed(2)})`);
+  }
+  return amount;
+}
 
 export function assertPaymentShape(args: {
   paymentDate: string;

@@ -12,6 +12,6 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   globalTeardown: '<rootDir>/src/__tests__/teardown.ts',
-  setupFiles: [],
+  setupFiles: ['<rootDir>/src/__tests__/helpers/installLiveDbGuard.ts'],
   testTimeout: 10000,
 };

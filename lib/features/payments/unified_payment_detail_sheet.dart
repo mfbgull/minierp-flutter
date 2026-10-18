@@ -48,13 +48,13 @@ class _UnifiedPaymentDetailSheet extends StatelessWidget {
     final directionColor = payment.direction == 'in'
         ? statusColors.success
         : payment.direction == 'out'
-            ? statusColors.error
-            : statusColors.warning;
+        ? statusColors.error
+        : statusColors.warning;
     final signedAmount = payment.direction == 'out'
         ? '-${Formatters.currency(payment.amount)}'
         : payment.direction == 'in'
-            ? '+${Formatters.currency(payment.amount)}'
-            : Formatters.currency(payment.amount);
+        ? '+${Formatters.currency(payment.amount)}'
+        : Formatters.currency(payment.amount);
 
     return AlertDialog(
       title: Text(_title(l10n)),
@@ -65,7 +65,7 @@ class _UnifiedPaymentDetailSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _row(context, l10n.paymentsPaymentno, payment.refNo),
-            _row(context, l10n.fieldsType, unifiedTypeLabel(l10n, payment.type)),
+            _row(context, l10n.fieldsType, unifiedPaymentLabel(l10n, payment)),
             _row(context, l10n.paymentsParty, payment.party),
             _row(context, l10n.fieldsDate, Formatters.date(payment.date)),
             Padding(
@@ -73,8 +73,10 @@ class _UnifiedPaymentDetailSheet extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(l10n.fieldsAmount,
-                        style: Theme.of(context).textTheme.bodySmall),
+                    child: Text(
+                      l10n.fieldsAmount,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ),
                   Text(
                     signedAmount,
@@ -86,8 +88,11 @@ class _UnifiedPaymentDetailSheet extends StatelessWidget {
                 ],
               ),
             ),
-            _row(context, l10n.expensesPaymentmethod,
-                unifiedMethodLabel(l10n, payment.method)),
+            _row(
+              context,
+              l10n.expensesPaymentmethod,
+              unifiedMethodLabel(l10n, payment.method),
+            ),
             _row(context, l10n.fieldsStatus, payment.status),
             if (payment.description != null && payment.description!.isNotEmpty)
               _row(context, l10n.fieldsNotes, payment.description!),

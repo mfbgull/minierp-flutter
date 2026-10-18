@@ -44,7 +44,9 @@ PlutoColumn serialGridColumn() => PlutoColumn(
   renderer: (ctx) => Center(
     child: Text(
       '${ctx.rowIdx + 1}',
-      style: const TextStyle(color: Colors.black54, fontSize: 13),
+      style: ctx.stateManager.configuration.style.cellTextStyle.copyWith(
+        fontSize: 13,
+      ),
     ),
   ),
 );
@@ -73,8 +75,7 @@ const String kBulkSelectField = '_bulk';
 
 /// Reads the record id a row carries in its hidden `id` cell (the same
 /// cell the detail handlers read); null when the cell is missing.
-int? _bulkIdOf(PlutoRow row) =>
-    (row.cells['id']?.value as num?)?.toInt();
+int? _bulkIdOf(PlutoRow row) => (row.cells['id']?.value as num?)?.toInt();
 
 /// Drives checkbox bulk-selection on a grid: a `ValueNotifier<Set<int>>`
 /// of the selected record ids that the bulk action bar listens to. The
@@ -131,7 +132,8 @@ class GridBulkSelection {
   /// filter signature — if it matches the last one, selection survives
   /// (page change); if it differs, selection is cleared (filter change).
   void resetIfFilterChanged(String filterSignature) {
-    if (_lastFilterSignature != null && _lastFilterSignature != filterSignature) {
+    if (_lastFilterSignature != null &&
+        _lastFilterSignature != filterSignature) {
       clear();
     }
     _lastFilterSignature = filterSignature;
@@ -247,24 +249,29 @@ PlutoGridConfiguration plutoGridConfigurationFor(
       columnResizeIcon: const IconData(0x20),
       disabledIconColor: scheme.onSurface.withValues(alpha: 0.12),
       iconSize: compact ? 16 : 18,
-      rowHeight:
-          compact ? kCompactGridRowHeight : PlutoGridSettings.rowHeight,
-      columnHeight:
-          compact ? kCompactGridHeaderHeight : PlutoGridSettings.rowHeight,
-      columnFilterHeight:
-          compact ? kCompactGridHeaderHeight : PlutoGridSettings.rowHeight,
+      rowHeight: compact ? kCompactGridRowHeight : PlutoGridSettings.rowHeight,
+      columnHeight: compact
+          ? kCompactGridHeaderHeight
+          : PlutoGridSettings.rowHeight,
+      columnFilterHeight: compact
+          ? kCompactGridHeaderHeight
+          : PlutoGridSettings.rowHeight,
       defaultCellPadding: compact
           ? const EdgeInsets.symmetric(horizontal: 8)
           : PlutoGridSettings.cellPadding,
-      columnTextStyle: textTheme.titleSmall?.copyWith(
-        color: scheme.onSurface,
-        decoration: TextDecoration.none,
-        fontWeight: FontWeight.w600,
-      ) ?? const TextStyle(),
-      cellTextStyle: textTheme.bodyMedium?.copyWith(
-        color: scheme.onSurface,
-        fontSize: compact ? 13 : null,
-      ) ?? const TextStyle(),
+      columnTextStyle:
+          textTheme.titleSmall?.copyWith(
+            color: scheme.onSurface,
+            decoration: TextDecoration.none,
+            fontWeight: FontWeight.w600,
+          ) ??
+          const TextStyle(),
+      cellTextStyle:
+          textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurface,
+            fontSize: compact ? 13 : null,
+          ) ??
+          const TextStyle(),
       gridBorderRadius: AppBorderRadius.smRadius,
       gridPopupBorderRadius: AppBorderRadius.smRadius,
     ),
@@ -353,8 +360,10 @@ void autoFitPlutoColumns(PlutoGridStateManager stateManager) {
       );
     }
     final padding = column.cellPadding ?? style.defaultCellPadding;
-    ideals[column] =
-        (widest + padding.horizontal + 12).clamp(column.minWidth, kAutoFitMaxColumnWidth);
+    ideals[column] = (widest + padding.horizontal + 12).clamp(
+      column.minWidth,
+      kAutoFitMaxColumnWidth,
+    );
   }
 
   // Compute the viewport budget: maxWidth is the grid's available width;
@@ -523,10 +532,7 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
   /// Opens the row-actions menu anchored at [cellContext], running the
   /// selected [GridRowAction.onTap]. Actions are rebuilt fresh from
   /// [gridRowActionsFor] so the menu reflects the current row state.
-  Future<void> _openGridRowMenu(
-    BuildContext cellContext,
-    PlutoRow row,
-  ) async {
+  Future<void> _openGridRowMenu(BuildContext cellContext, PlutoRow row) async {
     final actions = gridRowActionsFor(row, cellContext);
     if (actions == null || actions.isEmpty) return;
     final box = cellContext.findRenderObject() as RenderBox?;
@@ -581,8 +587,7 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
         if (enableBulkSelection) bulkSelectColumn(bulkSelection),
         serialGridColumn(),
         ...buildGridColumns(AppLocalizations.of(context)!),
-        if (hasRowActions)
-          _buildActionsColumn(AppLocalizations.of(context)!),
+        if (hasRowActions) _buildActionsColumn(AppLocalizations.of(context)!),
       ];
       _columnsReady = true;
     }
@@ -714,14 +719,14 @@ mixin PlutoGridScreen<T, S extends ConsumerStatefulWidget> on ConsumerState<S> {
     // no such assert. Re-open the subscription on each call so
     // repeated builds never accumulate stale listeners.
     _tintToggleSubscription?.close();
-    _tintToggleSubscription = ref.listenManual(
-      moneyDirectionTintProvider,
-      (previous, next) {
-        if (previous != next && rowColorCallback != null) {
-          gridStateManager?.notifyListeners();
-        }
-      },
-    );
+    _tintToggleSubscription = ref.listenManual(moneyDirectionTintProvider, (
+      previous,
+      next,
+    ) {
+      if (previous != next && rowColorCallback != null) {
+        gridStateManager?.notifyListeners();
+      }
+    });
 
     // The grid fills the space. The error-panel path in gridScreenBody
     // returns before this.
