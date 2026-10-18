@@ -67,8 +67,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     }
     return _idemKey!;
   }
-  DateTime? _lastScanKeyAt;
-  DateTime? _scanStartedAt;
+  Duration? _lastScanKeyAt;
+  Duration? _scanStartedAt;
 
   @override
   void dispose() {
@@ -89,7 +89,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     if (event.logicalKey == LogicalKeyboardKey.enter) {
       final code = _scanBuffer.toString();
       final isFastScan = _scanStartedAt != null &&
-          DateTime.now().difference(_scanStartedAt!) <
+          event.timeStamp - _scanStartedAt! <
               const Duration(seconds: 1);
       _scanBuffer.clear();
       _lastScanKeyAt = null;
@@ -104,17 +104,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final char = event.character;
     if (char == null || char.isEmpty) return KeyEventResult.ignored;
 
-    final now = DateTime.now();
+    final eventTime = event.timeStamp;
     final gap = _lastScanKeyAt == null
         ? Duration.zero
-        : now.difference(_lastScanKeyAt!);
-    _lastScanKeyAt = now;
+        : eventTime - _lastScanKeyAt!;
+    _lastScanKeyAt = eventTime;
     // Gap > 100ms → a human is typing (or a new scan started) — reset.
     if (gap > const Duration(milliseconds: 100)) {
       _scanBuffer.clear();
-      _scanStartedAt = now;
+      _scanStartedAt = eventTime;
     } else {
-      _scanStartedAt ??= now;
+      _scanStartedAt ??= eventTime;
     }
     _scanBuffer.write(char);
     // Never swallow the key: manual search must keep working — the same

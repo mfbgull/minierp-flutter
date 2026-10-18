@@ -167,6 +167,25 @@ void main() {
       expect(find.text('Widget A'), findsWidgets);
     });
 
+    testWidgets('delayed event handling does not discard a scan prefix', (
+      tester,
+    ) async {
+      final items = [_testItem(id: 1, name: 'Widget A', code: 'WA001')];
+
+      await _pumpPos(tester, items: items);
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(_logicalKeyFor('W'), character: 'W');
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
+      await scanCode(tester, 'A001');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cart (1 items)'), findsOneWidget);
+      expect(find.text('Widget A'), findsWidgets);
+    });
+
     testWidgets('unknown barcode shows an item-not-found toast', (
       tester,
     ) async {
