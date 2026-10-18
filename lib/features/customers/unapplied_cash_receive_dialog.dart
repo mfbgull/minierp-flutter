@@ -246,7 +246,12 @@ class _UnappliedCashReceiveDialogState
                         ),
                       )
                     : !active
-                    ? ErrorBanner(message: l10n.cashNoCreatePermission)
+                    ? Semantics(
+                        liveRegion: true,
+                        child: ErrorBanner(
+                          message: l10n.cashNoCreatePermission,
+                        ),
+                      )
                     : _initializing
                     ? const Padding(
                         padding: EdgeInsets.all(AppSpacing.space6),

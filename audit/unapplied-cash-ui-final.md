@@ -2,14 +2,22 @@
 
 Status: code-level findings are fixed; fresh current-build workspace captures
 and targeted keyboard/accessibility checks are recorded. Desktop compact
-Reverse accessible-name evidence is now recorded for both locales. Independent
-final reviews completed with REQUEST_CHANGES: remaining accessibility evidence
-is listed below. The latest full Flutter rerun did not complete: it stopped at
-7:45 in `test/widget_test.dart` during sales bulk export (719 tests had passed
-at that point). An isolated rerun then failed to compile because the root
-filesystem was full (`No space left on device`). This is an environment
-blocker, not a passing final verification. Earlier full-suite and targeted
-results remain recorded below. The historical guard refusal below is
+Reverse accessible-name evidence is now recorded for both locales. A latest
+Receive-file rerun passed all 22 tests, including keyboard date-picker and
+payment-method-menu dismissal, and `flutter analyze --no-pub` passed. The POS
+barcode-scanner timing defect is fixed; after the fix, the POS file passed all
+12 tests and the full Flutter suite passed all 917 tests. QA and fidelity
+reviewers reassessed the newer widget-level busy-write and focus evidence.
+The follow-up adds explicit focused button outlines, live-region announcements
+for dynamic Apply states, and regression assertions for focus styling and
+pending/error announcements. The current full Flutter suite passed 919 tests,
+and the analyzer and diff check passed. Actual assistive-technology speech
+quality remains unverified. The earlier
+pre-fix full run had 915 passed and one POS scanner failure; its isolated case
+passed, and the added delay regression reproduced prefix loss before the timing
+fix. A previous full rerun stopped at 719 tests and an isolated compile attempt
+failed when disk space was exhausted; those are historical. Earlier full-suite
+and targeted results remain recorded below. The historical guard refusal below is
 superseded by the clean server rerun recorded later in this report.
 
 ## Canonical database guard baseline acknowledgement
@@ -128,23 +136,41 @@ unchanged. Earlier audit hashes remain historical evidence, not rewritten result
   widget regression test and retained the Urdu receipt-method regression.
 - `flutter analyze --no-pub` passed with no issues. The complete
   `unapplied_cash_payment_widgets_test.dart` file passed 15 tests; all eight
-  English/Urdu Escape widget tests passed. The latest full Flutter rerun
-  stopped at 7:45 in `test/widget_test.dart` during the sales bulk-export test;
-  it had reached 719 passing tests before termination. An isolated attempt to
-  compile that test then failed because the root filesystem was full. Do not
-  claim this rerun as full-suite verification.
+  English/Urdu Escape widget tests passed. New controlled-pending Escape tests
+  passed for Receive, Apply, Refund, and Reverse. Forward focus containment
+  passed for Apply, Refund, and Reverse across English/Urdu; Receive's forward
+  and Shift+Tab direction test passed in English. Before the scanner timing fix,
+  the full Flutter rerun completed with 915 passed and one failed: the scanned-
+  code cart assertion in `test/features/sales/pos_screen_test.dart`
+  (`Cart (1 items)` not found). The exact test passed alone, but a new delay
+  regression reproduced prefix loss before the fix. Logs:
+  `/tmp/f7-flutter-full-final.log`, `/tmp/f7-pos-isolated.log`, and
+  `/tmp/pos-delay-red.log`.
+  After changing scan timing to use monotonic `KeyEvent.timeStamp` rather than
+  callback-time `DateTime.now()`, the complete POS test file passed 12/12 and
+  the full Flutter suite passed 917/917. The POS file was rerun after removing
+  formatter-only churn and still passed 12/12; final analyzer and whitespace
+  checks passed. Logs: `/tmp/pos-screen-final.log`,
+  `/tmp/pos-flutter-full-fixed.log`, and `/tmp/pos-analyze-final.log`.
+  The earlier full rerun stopped at 719 tests, and its isolated compile attempt
+  failed because the root filesystem was full. Those are historical results.
 - Current-build browser evidence is in
   `audit/unapplied-cash-ui-current-manual-qa.md`; capture provenance, hashes,
   and dimensions are in
   `audit/screenshots/unapplied-cash-ui/f7-review-capture-manifest.md`. The
   current run manually confirmed Receive Escape in English and Urdu and Reverse
-  Escape in Urdu. Full keyboard traversal and Escape handling while a write is
-  busy remain open; do not infer them from idle dismissal tests.
+  Escape in Urdu. Widget regressions now cover busy-write Escape protection for
+  all four workflows, keyboard launcher restoration for all dialogs/locales,
+  bilingual Receive submit-to-Close Shift+Tab, and forward containment for
+  Apply/Refund/Reverse in both locales. Latest English Receive tests also cover
+  date-picker dismissal and payment-method menu dismissal.
 - The current desktop Reverse action has a localized accessible name in both
   locales, confirmed in browser semantics; the widget test asserts the
   localized compact-action tooltip. English Receive has independently
-  verified forward Tab containment and focus restoration. Shift+Tab direction,
-  busy-write Escape, traversal in the other dialogs, picker interaction, and
-  screen-reader announcement quality remain open in the manual QA artifact.
-  The final QA and clone-fidelity reviews returned REQUEST_CHANGES for these
-  remaining verification gaps; final acceptance is not established.
+  verified forward Tab containment and focus restoration. Follow-up tests assert
+  the shared filled-button focus outline and the custom
+  destructive confirmation outline. Apply pending and refund error regressions
+  assert live-region semantics. Read errors and permission notices now use live
+  regions too. Actual browser-rendered outline contrast and screen-reader speech
+  quality remain unverified; no full assistive-technology certification is
+  claimed. The QA reassessment describes the state before this follow-up.

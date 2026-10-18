@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Tristate;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -166,10 +167,23 @@ void main() {
       ),
     );
   });
+
+  test('filled buttons expose a distinct keyboard-focus outline', () {
+    final theme = AppTheme.light;
+    final focusedSide = theme.filledButtonTheme.style?.side?.resolve({
+      WidgetState.focused,
+    });
+
+    expect(
+      focusedSide,
+      BorderSide(color: theme.colorScheme.onPrimary, width: 2),
+    );
+  });
   Future<void> pump(
     WidgetTester tester, {
     bool narrow = false,
     bool urdu = false,
+    bool openDialog = true,
   }) async {
     tester.view.physicalSize = narrow
         ? const Size(390, 844)
@@ -202,8 +216,10 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Open apply'));
-    await tester.pumpAndSettle();
+    if (openDialog) {
+      await tester.tap(find.text('Open apply'));
+      await tester.pumpAndSettle();
+    }
   }
 
   Future<void> enter(WidgetTester tester, int id, String amount) async {
@@ -231,6 +247,73 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('cash_apply_submit')), findsNothing);
       expect(writes, isEmpty);
+    });
+  }
+
+  for (final urdu in [false, true]) {
+    testWidgets(
+      'Escape restores keyboard focus to apply launcher (urdu=$urdu)',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        await pump(tester, urdu: urdu, openDialog: false);
+        final launcher = find.widgetWithText(TextButton, 'Open apply');
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        expect(
+          tester.getSemantics(launcher).flagsCollection.isFocused,
+          Tristate.isTrue,
+        );
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('cash_apply_submit')), findsOneWidget);
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+
+        expect(
+          tester.getSemantics(launcher).flagsCollection.isFocused,
+          Tristate.isTrue,
+        );
+        semantics.dispose();
+      },
+    );
+  }
+
+  testWidgets('Escape keeps apply open while its request is pending', (
+    tester,
+  ) async {
+    gate = Completer<void>();
+    await pump(tester);
+    await enter(tester, 1, '50');
+    await tester.tap(find.byKey(const Key('cash_apply_submit')));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(writes, hasLength(1));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byKey(const Key('cash_apply_submit')), findsOneWidget);
+    expect(writes, hasLength(1));
+    gate!.complete();
+    await tester.pumpAndSettle();
+  });
+
+  for (final urdu in [false, true]) {
+    testWidgets('Tab traversal stays inside apply (urdu=$urdu)', (
+      tester,
+    ) async {
+      await pump(tester, urdu: urdu);
+      for (var index = 0; index < 16; index++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        final focusedContext =
+            tester.binding.focusManager.primaryFocus?.context;
+        expect(
+          focusedContext?.findAncestorWidgetOfExactType<Dialog>(),
+          isNotNull,
+          reason: 'Tab ${index + 1} should remain within the apply dialog',
+        );
+      }
     });
   }
 
@@ -340,11 +423,25 @@ void main() {
   testWidgets(
     'lost response close reopen retries immutable request despite reduced pool',
     (tester) async {
+      final semantics = tester.ensureSemantics();
       timeout = true;
       await pump(tester);
       await enter(tester, 1, '50');
       await submit(tester);
       expect(writes.length, 1);
+      final pendingNotice = find.text(
+        AppLocalizations.of(
+          tester.element(find.byKey(const Key('cash_apply_submit'))),
+        )!.cashPendingNotice,
+      );
+      expect(
+        tester
+            .getSemantics(pendingNotice)
+            .getSemanticsData()
+            .flagsCollection
+            .isLiveRegion,
+        isTrue,
+      );
       await tester.tap(find.text('Close'));
       await tester.pumpAndSettle();
       capacity = 0;
@@ -359,6 +456,7 @@ void main() {
         writes[1].headers['Idempotency-Key'],
       );
       expect(effects, 1);
+      semantics.dispose();
     },
   );
   testWidgets(

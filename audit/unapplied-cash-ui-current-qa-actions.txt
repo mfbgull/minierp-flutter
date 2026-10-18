@@ -80,3 +80,5 @@ Then eight press Shift+Tab actions with the same observation yielded Operation d
 Invocation: press Escape; wait --fn '!document.querySelector("[role=dialog]")'; eval activeElement.
 Observed: wait returned true; activeElement role='button', textContent='Receive Advance'.
 An initial context-tool subprocess probe used a different browser namespace and returned BODY for all focus observations; those results were discarded. The recorded repeat above used exec_command from the repository working directory and the existing named session.
+
+Later regression verification supersedes the missing-coverage claims above for mounted-widget behavior: audit/unapplied-cash-ui-current-qa-regressions.md records an independent 11-test PASS for four pending-write Escape guards, six English/Urdu Apply/Refund/Reverse forward focus containment cases, and English Receive submit-to-Close Shift+Tab direction using held Shift key events. The browser command's reverse-direction fidelity and complete reverse-loop coverage are still not claimed.
