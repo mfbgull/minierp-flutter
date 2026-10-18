@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import errorHandlerMiddleware from './middleware/errorHandler';
+import { jsonBodyErrorHandler } from './middleware/jsonBodyErrorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
 import logger from './utils/logger';
 import { requestLogger, errorLogger } from './middleware/requestLogger';
@@ -26,6 +27,7 @@ import invoiceRoutes from './routes/invoices';
 import invoiceReturnRoutes from './routes/invoiceReturns';
 import customerRoutes from './routes/customers';
 import paymentRoutes from './routes/payments';
+import unappliedCashRoutes from './routes/unappliedCash';
 import reportRoutes from './routes/reports';
 import posRoutes from './routes/pos';
 import expenseRoutes from './routes/expenses';
@@ -102,7 +104,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
 };
 
 app.use(cors(corsOptions));
@@ -112,6 +114,7 @@ app.use(cookieParser());
 
 // Body parsing middleware with limits
 app.use(express.json({ limit: '10mb' }));
+app.use(jsonBodyErrorHandler);
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Apply rate limiting to all API routes
@@ -228,6 +231,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/unapplied-cash', unappliedCashRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api', invoiceReturnRoutes);
 app.use('/api/pos', posRoutes);

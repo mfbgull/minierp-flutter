@@ -32,6 +32,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import '../../features/payments/unified_payment_labels.dart';
 
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
@@ -408,11 +409,15 @@ String buildOwnerCapitalCsv(
     (e) => [
       sanitizeCsvCell(e.capitalNo.isEmpty ? '—' : e.capitalNo),
       e.capitalDate.isEmpty ? '—' : Formatters.date(e.capitalDate),
-      sanitizeCsvCell((e.paymentMethod?.isEmpty ?? true) ? '—' : e.paymentMethod!),
+      sanitizeCsvCell(
+        (e.paymentMethod?.isEmpty ?? true) ? '—' : e.paymentMethod!,
+      ),
       sanitizeCsvCell((e.note?.isEmpty ?? true) ? '—' : e.note!),
       Formatters.currency(e.amount),
       sanitizeCsvCell(e.status),
-      sanitizeCsvCell((e.createdByName?.isEmpty ?? true) ? '—' : e.createdByName!),
+      sanitizeCsvCell(
+        (e.createdByName?.isEmpty ?? true) ? '—' : e.createdByName!,
+      ),
     ],
   );
 }
@@ -437,13 +442,19 @@ String buildOwnerWithdrawalsCsv(
     (r) => [
       sanitizeCsvCell(r.withdrawalNo.isEmpty ? '—' : r.withdrawalNo),
       r.withdrawalDate.isEmpty ? '—' : Formatters.date(r.withdrawalDate),
-      sanitizeCsvCell(r.kind == 'goods' ? l10n.equityKindgoods : l10n.equityKindcash),
+      sanitizeCsvCell(
+        r.kind == 'goods' ? l10n.equityKindgoods : l10n.equityKindcash,
+      ),
       Formatters.currency(r.amount),
       r.kind == 'goods' ? r.itemLineCount.toString() : '—',
-      sanitizeCsvCell((r.paymentMethod?.isEmpty ?? true) ? '—' : r.paymentMethod!),
+      sanitizeCsvCell(
+        (r.paymentMethod?.isEmpty ?? true) ? '—' : r.paymentMethod!,
+      ),
       sanitizeCsvCell((r.note?.isEmpty ?? true) ? '—' : r.note!),
       sanitizeCsvCell(r.status),
-      sanitizeCsvCell((r.createdByName?.isEmpty ?? true) ? '—' : r.createdByName!),
+      sanitizeCsvCell(
+        (r.createdByName?.isEmpty ?? true) ? '—' : r.createdByName!,
+      ),
     ],
   );
 }
@@ -500,39 +511,62 @@ String buildApAgingCsv(AppLocalizations l10n, ApAgingReport report) {
   );
 }
 
-String buildBalanceSheetCsv(
-  AppLocalizations l10n,
-  BalanceSheetReport report,
-) {
+String buildBalanceSheetCsv(AppLocalizations l10n, BalanceSheetReport report) {
   final buf = StringBuffer();
   buf.writeln('Balance Sheet,,${Formatters.date(report.asOfDate)}');
   buf.writeln();
   buf.writeln('Assets,,');
   buf.writeln('Inventory,,${Formatters.currency(report.assets.inventory)}');
-  buf.writeln('Accounts Receivable,,${Formatters.currency(report.assets.accountsReceivable)}');
+  buf.writeln(
+    'Accounts Receivable,,${Formatters.currency(report.assets.accountsReceivable)}',
+  );
   buf.writeln('Cash,,${Formatters.currency(report.assets.cash)}');
-  buf.writeln('${l10n.commonTotal},,${Formatters.currency(report.assets.total)}');
+  buf.writeln(
+    '${l10n.commonTotal},,${Formatters.currency(report.assets.total)}',
+  );
   buf.writeln();
   buf.writeln('Liabilities,,');
-  buf.writeln('Accounts Payable,,${Formatters.currency(report.liabilities.accountsPayable)}');
-  buf.writeln('${l10n.commonTotal},,${Formatters.currency(report.liabilities.total)}');
+  buf.writeln(
+    'Accounts Payable,,${Formatters.currency(report.liabilities.accountsPayable)}',
+  );
+  buf.writeln(
+    '${l10n.commonTotal},,${Formatters.currency(report.liabilities.total)}',
+  );
   buf.writeln();
   buf.writeln('Equity,,');
-  buf.writeln('Opening Retained Earnings,,${Formatters.currency(report.equity.openingRetainedEarnings)}');
+  buf.writeln(
+    'Opening Retained Earnings,,${Formatters.currency(report.equity.openingRetainedEarnings)}',
+  );
   if (report.equity.ownerCapital != null) {
-    buf.writeln('Owner Capital,,${Formatters.currency(report.equity.ownerCapital!)}');
+    buf.writeln(
+      'Owner Capital,,${Formatters.currency(report.equity.ownerCapital!)}',
+    );
   }
   if (report.equity.ownerDrawings != null) {
-    buf.writeln('Owner Drawings,,${Formatters.currency(report.equity.ownerDrawings!)}');
+    buf.writeln(
+      'Owner Drawings,,${Formatters.currency(report.equity.ownerDrawings!)}',
+    );
   }
-  buf.writeln('Net Income (YTD),,${Formatters.currency(report.equity.netIncomeYtd)}');
-  buf.writeln('Revenue (YTD),,${Formatters.currency(report.equity.revenueYtd)}');
+  buf.writeln(
+    'Net Income (YTD),,${Formatters.currency(report.equity.netIncomeYtd)}',
+  );
+  buf.writeln(
+    'Revenue (YTD),,${Formatters.currency(report.equity.revenueYtd)}',
+  );
   buf.writeln('COGS (YTD),,${Formatters.currency(report.equity.cogsYtd)}');
-  buf.writeln('Expenses (YTD),,${Formatters.currency(report.equity.expensesYtd)}');
-  buf.writeln('${l10n.commonTotal},,${Formatters.currency(report.equity.total)}');
+  buf.writeln(
+    'Expenses (YTD),,${Formatters.currency(report.equity.expensesYtd)}',
+  );
+  buf.writeln(
+    '${l10n.commonTotal},,${Formatters.currency(report.equity.total)}',
+  );
   buf.writeln();
-  buf.writeln('Total Assets,,${Formatters.currency(report.totals.totalAssets)}');
-  buf.writeln('Total Liabilities & Equity,,${Formatters.currency(report.totals.totalLiabAndEquity)}');
+  buf.writeln(
+    'Total Assets,,${Formatters.currency(report.totals.totalAssets)}',
+  );
+  buf.writeln(
+    'Total Liabilities & Equity,,${Formatters.currency(report.totals.totalLiabAndEquity)}',
+  );
   buf.writeln('Balanced,,${report.totals.balanced ? "Yes" : "No"}');
   return buf.toString();
 }
@@ -893,11 +927,13 @@ String buildSuppliersCsv(AppLocalizations l10n, List<Supplier> suppliers) {
       sanitizeCsvCell(s.supplierCode.isEmpty ? '—' : s.supplierCode),
       sanitizeCsvCell(s.supplierName.isEmpty ? '—' : s.supplierName),
       sanitizeCsvCell(s.contactPerson ?? '—'),
-      sanitizeCsvCell([
-        ?s.phone,
-        if (s.phone != null && s.email != null) ' / ',
-        ?s.email,
-      ].join()),
+      sanitizeCsvCell(
+        [
+          ?s.phone,
+          if (s.phone != null && s.email != null) ' / ',
+          ?s.email,
+        ].join(),
+      ),
       sanitizeCsvCell(s.paymentTerms ?? '—'),
       Formatters.currency(s.currentBalance ?? 0),
       sanitizeCsvCell(s.isActive ? l10n.statusActive : l10n.statusInactive),
@@ -962,10 +998,7 @@ String buildPhysicalCountsCsv(
 /// Builds the CSV text for the unified payments grid (Type | Ref No |
 /// Date | Party | Amount | Method | Status | Description — mirroring
 /// the grid's columns).
-String buildPaymentsCsv(
-  AppLocalizations l10n,
-  List<UnifiedPayment> payments,
-) {
+String buildPaymentsCsv(AppLocalizations l10n, List<UnifiedPayment> payments) {
   return _buildGridCsv(
     [
       l10n.fieldsType,
@@ -973,17 +1006,27 @@ String buildPaymentsCsv(
       l10n.fieldsDate,
       l10n.paymentsParty,
       l10n.fieldsAmount,
+      l10n.cashDirection,
       l10n.expensesPaymentmethod,
       l10n.fieldsStatus,
       l10n.fieldsNotes,
     ],
     payments,
     (p) => [
-      sanitizeCsvCell(p.type.isEmpty ? '—' : p.type),
+      unifiedPaymentLabel(l10n, p),
       sanitizeCsvCell(p.refNo.isEmpty ? '—' : p.refNo),
       p.date.isEmpty ? '—' : Formatters.date(p.date),
       sanitizeCsvCell(p.party.isEmpty ? '—' : p.party),
-      Formatters.currency(p.amount),
+      '${p.direction == 'out'
+          ? '-'
+          : p.direction == 'in'
+          ? '+'
+          : ''}${Formatters.currency(p.amount.abs())}',
+      p.direction == 'out'
+          ? l10n.paymentsTypeout
+          : p.direction == 'in'
+          ? l10n.paymentsTypein
+          : l10n.paymentsTypeUnknown,
       sanitizeCsvCell(p.method.isEmpty ? '—' : p.method),
       sanitizeCsvCell(p.status.isEmpty ? '—' : p.status),
       sanitizeCsvCell(p.description ?? '—'),
@@ -1104,11 +1147,11 @@ String buildInvoicesCsv(AppLocalizations l10n, List<Invoice> invoices) {
       sanitizeCsvCell(
         (i.customerName?.isEmpty ?? true) ? '—' : i.customerName!,
       ),
-       sanitizeCsvCell(invoiceStatusLabel(l10n, i.status)),
-       Formatters.currency(i.totalAmount),
-       Formatters.currency(i.paidAmount),
-       Formatters.currency(i.balanceAmount),
-       sanitizeCsvCell(
+      sanitizeCsvCell(invoiceStatusLabel(l10n, i.status)),
+      Formatters.currency(i.totalAmount),
+      Formatters.currency(i.paidAmount),
+      Formatters.currency(i.balanceAmount),
+      sanitizeCsvCell(
         (i.createdByUsername?.isEmpty ?? true) ? '—' : i.createdByUsername!,
       ),
     ],
@@ -1225,10 +1268,7 @@ String buildBomsCsv(AppLocalizations l10n, List<Bom> boms) {
 
 /// Builds the CSV text for the trial-balance grid (Account Code | Name
 /// | Type | Debit | Credit | Balance).
-String buildTrialBalanceCsv(
-  AppLocalizations l10n,
-  TrialBalanceReport report,
-) {
+String buildTrialBalanceCsv(AppLocalizations l10n, TrialBalanceReport report) {
   return _buildGridCsv(
     [
       l10n.reportsAccountcode,
@@ -1315,10 +1355,7 @@ String buildBatchTraceabilityCsv(
 }
 
 /// Expiry report CSV — mirrors [ExpiryReportScreen]'s grid columns.
-String buildExpiryReportCsv(
-  AppLocalizations l10n,
-  List<ExpiryReportRow> rows,
-) {
+String buildExpiryReportCsv(AppLocalizations l10n, List<ExpiryReportRow> rows) {
   return _buildGridCsv(
     [
       l10n.inventoryItemcode,
@@ -1353,35 +1390,33 @@ String buildExpiryReportCsv(
 }
 
 /// Exports [loans] as a CSV for personal-loan row-action bulk export.
-String buildPersonalLoansCsv(
-  AppLocalizations l10n,
-  List<PersonalLoan> loans,
-) => _buildGridCsv(
-  [
-    'Loan No',
-    l10n.equityPersonalLoanBorrower,
-    l10n.equityPersonalLoanAmount,
-    'Currency',
-    'Balance',
-    'Repaid',
-    l10n.equityPersonalLoanDateGiven,
-    l10n.equityPersonalLoanDueDate,
-    l10n.equityPersonalLoanPurpose,
-    l10n.fieldsStatus,
-    l10n.expensesCreatedby,
-  ],
-  loans,
-  (PersonalLoan loan) => [
-    loan.loanNo,
-    sanitizeCsvCell(loan.borrowerName),
-    loan.amount,
-    loan.currency,
-    loan.balance,
-    loan.repaidAmount,
-    loan.loanDate,
-    loan.dueDate ?? '',
-    sanitizeCsvCell(loan.purpose ?? ''),
-    loan.status,
-    sanitizeCsvCell(loan.createdByName ?? ''),
-  ],
-);
+String buildPersonalLoansCsv(AppLocalizations l10n, List<PersonalLoan> loans) =>
+    _buildGridCsv(
+      [
+        'Loan No',
+        l10n.equityPersonalLoanBorrower,
+        l10n.equityPersonalLoanAmount,
+        'Currency',
+        'Balance',
+        'Repaid',
+        l10n.equityPersonalLoanDateGiven,
+        l10n.equityPersonalLoanDueDate,
+        l10n.equityPersonalLoanPurpose,
+        l10n.fieldsStatus,
+        l10n.expensesCreatedby,
+      ],
+      loans,
+      (PersonalLoan loan) => [
+        loan.loanNo,
+        sanitizeCsvCell(loan.borrowerName),
+        loan.amount,
+        loan.currency,
+        loan.balance,
+        loan.repaidAmount,
+        loan.loanDate,
+        loan.dueDate ?? '',
+        sanitizeCsvCell(loan.purpose ?? ''),
+        loan.status,
+        sanitizeCsvCell(loan.createdByName ?? ''),
+      ],
+    );

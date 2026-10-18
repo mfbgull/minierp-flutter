@@ -17,6 +17,23 @@ import '../core/utils/pdf_fonts.dart';
 import '../data/models/invoice.dart' show CompanyInfo;
 import '../data/models/payment.dart' show Payment;
 import '../features/sales/models/sales_forms.dart' show defaultCompany;
+import '../l10n/app_localizations_en.dart';
+
+final _receiptL10n = AppLocalizationsEn();
+
+String paymentReceiptTitle(Payment payment) => switch (payment.paymentKind) {
+  'UNAPPLIED_RECEIPT' => _receiptL10n.cashAdvanceReceipt,
+  'REFUND' => _receiptL10n.cashRefundPayment,
+  _ => 'PAYMENT RECEIPT',
+};
+
+String paymentReceiptPartyLabel(Payment payment) => payment.isCashOutflow
+    ? _receiptL10n.cashPaidTo
+    : _receiptL10n.cashReceivedFrom;
+
+String paymentReceiptAmountLabel(Payment payment) => payment.isCashOutflow
+    ? _receiptL10n.cashAmountPaid
+    : _receiptL10n.cashAmountReceived;
 
 const PdfColor _accent = PdfColor.fromInt(0xFF059669);
 
@@ -110,7 +127,7 @@ pw.Widget _buildHeader(CompanyInfo company, Payment payment) {
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
           pw.Text(
-            'PAYMENT RECEIPT',
+            paymentReceiptTitle(payment),
             style: pw.TextStyle(
               fontSize: 18,
               fontWeight: pw.FontWeight.bold,
@@ -155,7 +172,7 @@ pw.Widget _buildDetails(Payment payment, String? entityName) {
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            _sectionLabel(isSupplier ? 'Paid To' : 'Received From'),
+            _sectionLabel(paymentReceiptPartyLabel(payment)),
             pw.SizedBox(height: 4),
             pw.Text(
               resolvedName,
@@ -185,7 +202,7 @@ pw.Widget _buildDetails(Payment payment, String? entityName) {
 
 pw.Widget _buildAmountBox(Payment payment, CurrencyFormatter? formatter) {
   final amount = formatPaymentReceiptAmount(
-    payment.amount,
+    payment.amount.abs(),
     formatter: formatter,
   );
   return pw.Container(
@@ -199,7 +216,7 @@ pw.Widget _buildAmountBox(Payment payment, CurrencyFormatter? formatter) {
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
         pw.Text(
-          payment.supplierId != null ? 'AMOUNT PAID' : 'AMOUNT RECEIVED',
+          paymentReceiptAmountLabel(payment),
           style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
         ),
         pw.Text(

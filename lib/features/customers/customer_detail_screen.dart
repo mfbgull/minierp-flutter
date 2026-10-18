@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/auth/auth_notifier.dart';
 import '../../data/models/customer.dart' show Customer;
 import '../../data/models/invoice.dart' show Invoice;
 import '../../data/models/ledger_entry.dart' show LedgerEntry;
@@ -18,8 +19,7 @@ import '../../data/repositories/api_result.dart' show ApiError;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/date_range_picker.dart' show DateRangeFilter;
 import '../../widgets/screen_error_panel.dart';
-import 'calculations/customer_calculations.dart'
-    show computeCustomerMetrics;
+import 'calculations/customer_calculations.dart' show computeCustomerMetrics;
 import 'customer_invoices_tab.dart';
 import 'customer_ledger_tab.dart';
 import 'customer_overview_tab.dart';
@@ -27,6 +27,8 @@ import 'customer_payment_modal.dart' show showCustomerPaymentModal;
 import 'customer_payments_tab.dart';
 import 'customer_providers.dart';
 import 'customer_statement_tab.dart';
+import 'customer_unapplied_cash_tab.dart';
+import 'unapplied_cash_receive_dialog.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class CustomerDetailScreen extends ConsumerStatefulWidget {
@@ -51,7 +53,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -86,6 +88,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
     Customer customer,
   ) {
     final scheme = Theme.of(context).colorScheme;
+    final canCreatePayment =
+        ref.watch(authProvider).user?.hasPermission('payments', 'create') ??
+        false;
     // Metrics inputs — shared with the Overview tab (default tab).
     final invoices = ref.watch(customerInvoicesProvider(widget.customerId));
     final ledger = ref.watch(customerLedgerProvider(widget.customerId));
@@ -111,77 +116,105 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
         // block carries the customer context.
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              IconButton(
-                tooltip: l10n.customersBacktocustomers,
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.pop(),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
+              Row(
+                children: [
+                  IconButton(
+                    tooltip: l10n.customersBacktocustomers,
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => context.pop(),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Flexible(
-                          child: Text(
-                            customer.customerName,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.headlineSmall,
-                          ),
-                        ),
-                        if (customer.contactPerson?.isNotEmpty ?? false) ...[
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              '(${customer.contactPerson})',
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: scheme.onSurfaceVariant),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                customer.customerName,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineSmall,
+                              ),
                             ),
-                          ),
-                        ],
+                            if (customer.contactPerson?.isNotEmpty ??
+                                false) ...[
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  '(${customer.contactPerson})',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          [
+                            customer.customerCode,
+                            if (customer.phone?.isNotEmpty ?? false)
+                              customer.phone!,
+                            if (customer.email?.isNotEmpty ?? false)
+                              customer.email!,
+                          ].join('  ·  '),
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      [
-                        customer.customerCode,
-                        if (customer.phone?.isNotEmpty ?? false)
-                          customer.phone!,
-                        if (customer.email?.isNotEmpty ?? false)
-                          customer.email!,
-                      ].join('  ·  '),
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (canCreatePayment)
+                    FilledButton.icon(
+                      onPressed: () => _openRecordPayment(customer),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: Text(l10n.customersRecordpayment),
+                    ),
+                  if (canCreatePayment)
+                    OutlinedButton.icon(
+                      onPressed: () => showUnappliedCashReceiveDialog(
+                        context,
+                        customer: customer,
+                      ),
+                      icon: const Icon(Icons.savings_outlined, size: 18),
+                      label: Text(l10n.cashReceiveAdvance),
+                    ),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 560),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DateRangeFilter(
+                        fromProvider: customerDetailFromDateProvider(
+                          _sessionId,
+                        ),
+                        toProvider: customerDetailToDateProvider(_sessionId),
+                        showAllDates: true,
+                        onChanged: () =>
+                            commitCustomerDetailRange(ref, _sessionId),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.icon(
-                onPressed: () => _openRecordPayment(customer),
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(l10n.customersRecordpayment),
-              ),
-              // Unified detail-page date range (spec D3): one pill drives
-              // every data tab; sits right of Record Payment and never
-              // wraps — the identity Expanded absorbs all narrowing. The
-              // pill's onChanged is the page's single commit rule
-              // (ranged → global, All dates → page-local only).
-              const SizedBox(width: 8),
-              DateRangeFilter(
-                fromProvider: customerDetailFromDateProvider(_sessionId),
-                toProvider: customerDetailToDateProvider(_sessionId),
-                showAllDates: true,
-                onChanged: () =>
-                    commitCustomerDetailRange(ref, _sessionId),
+                  ),
+                ],
               ),
             ],
           ),
@@ -200,48 +233,58 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                children: [
-                  _QuickStat(
-                    icon: Icons.account_balance_wallet_outlined,
-                    label: l10n.customersBalance,
-                    value: balanceIsCredit
-                        ? '${Formatters.currency(-metrics.currentBalance)} ${l10n.customersCreditAbbrev}'
-                        : Formatters.currency(metrics.currentBalance),
-                    color: metrics.currentBalance > 0
-                        ? scheme.error
-                        : balanceIsCredit
-                        ? scheme.primary
-                        : null,
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: constraints.maxWidth < 640
+                        ? 640
+                        : constraints.maxWidth,
+                    child: Row(
+                      children: [
+                        _QuickStat(
+                          icon: Icons.account_balance_wallet_outlined,
+                          label: l10n.customersBalance,
+                          value: balanceIsCredit
+                              ? '${Formatters.currency(-metrics.currentBalance)} ${l10n.customersCreditAbbrev}'
+                              : Formatters.currency(metrics.currentBalance),
+                          color: metrics.currentBalance > 0
+                              ? scheme.error
+                              : balanceIsCredit
+                              ? scheme.primary
+                              : null,
+                        ),
+                        _statDivider(scheme),
+                        _QuickStat(
+                          icon: Icons.credit_card_outlined,
+                          label: l10n.customersCreditlimit,
+                          value: Formatters.currency(customer.creditLimit ?? 0),
+                        ),
+                        _statDivider(scheme),
+                        _QuickStat(
+                          icon: Icons.trending_up,
+                          label: l10n.customersUtilization,
+                          value:
+                              '${metrics.creditUtilization.toStringAsFixed(2)}%',
+                          color: utilizationDanger
+                              ? scheme.error
+                              : utilizationWarn
+                              ? scheme.tertiary
+                              : null,
+                        ),
+                        _statDivider(scheme),
+                        _QuickStat(
+                          icon: Icons.warning_amber_outlined,
+                          label: l10n.customersOverdue,
+                          value: '${metrics.overdueInvoicesCount}',
+                          color: metrics.overdueInvoicesCount > 0
+                              ? scheme.error
+                              : null,
+                        ),
+                      ],
+                    ),
                   ),
-                  _statDivider(scheme),
-                  _QuickStat(
-                    icon: Icons.credit_card_outlined,
-                    label: l10n.customersCreditlimit,
-                    value: Formatters.currency(customer.creditLimit ?? 0),
-                  ),
-                  _statDivider(scheme),
-                  _QuickStat(
-                    icon: Icons.trending_up,
-                    label: l10n.customersUtilization,
-                    value:
-                        '${metrics.creditUtilization.toStringAsFixed(2)}%',
-                    color: utilizationDanger
-                        ? scheme.error
-                        : utilizationWarn
-                        ? scheme.tertiary
-                        : null,
-                  ),
-                  _statDivider(scheme),
-                  _QuickStat(
-                    icon: Icons.warning_amber_outlined,
-                    label: l10n.customersOverdue,
-                    value: '${metrics.overdueInvoicesCount}',
-                    color: metrics.overdueInvoicesCount > 0
-                        ? scheme.error
-                        : null,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -257,6 +300,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
             Tab(text: l10n.customersLedger),
             Tab(text: l10n.customersPayments),
             Tab(text: l10n.customersStatement),
+            Tab(text: l10n.cashTab),
           ],
         ),
         Expanded(
@@ -281,6 +325,10 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
               ),
               CustomerStatementTab(
                 customerId: widget.customerId,
+                sessionId: _sessionId,
+              ),
+              CustomerUnappliedCashTab(
+                customer: customer,
                 sessionId: _sessionId,
               ),
             ],
@@ -322,22 +370,24 @@ class _QuickStat extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: effectiveColor),
           const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(color: effectiveColor),
-              ),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: effectiveColor),
                 ),
-              ),
-            ],
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

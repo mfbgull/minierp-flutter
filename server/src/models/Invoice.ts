@@ -10,6 +10,7 @@ import InvoiceReturnModel from './InvoiceReturn';
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { roundQty } from '../utils/quantity';
 import { SqlParam } from '../utils/sqlTypes';
+import { assertLegacyInvoiceAllocationsAllowed } from '../services/unappliedPaymentGuard';
 
 /**
  * Reversal-rules guard rejection (rule 4/5: paid + returned documents
@@ -965,33 +966,39 @@ class InvoiceModel {
     discount_value?: number; 
     terms?: string; 
   }): void {
-    db.prepare(`
-      UPDATE invoices
-      SET
-        invoice_no = ?, customer_id = ?, invoice_date = ?, due_date = ?,
-        status = ?, payment_status = ?, return_status = ?,
-        total_amount = ?, paid_amount = ?, balance_amount = ?, notes = ?,
-        discount_scope = ?, discount_type = ?, discount_value = ?, terms = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(
-      data.invoice_no,
-      data.customer_id,
-      data.invoice_date,
-      data.due_date,
-      data.status,
-      data.payment_status || 'Unpaid',
-      data.return_status || 'None',
-      data.total_amount,
-      data.paid_amount,
-      data.balance_amount,
-      data.notes || null,
-      data.discount_scope || 'invoice',
-      data.discount_type || 'percentage',
-      data.discount_value || 0,
-      data.terms || null,
-      invoiceId
-    );
+    db.transaction(() => {
+      const existing = db.prepare<[number], { customer_id: number }>('SELECT customer_id FROM invoices WHERE id=?').get(invoiceId);
+      if (existing && data.customer_id !== undefined && Number(data.customer_id) !== existing.customer_id) {
+        assertLegacyInvoiceAllocationsAllowed(db, invoiceId);
+      }
+      db.prepare(`
+        UPDATE invoices
+        SET
+          invoice_no = ?, customer_id = ?, invoice_date = ?, due_date = ?,
+          status = ?, payment_status = ?, return_status = ?,
+          total_amount = ?, paid_amount = ?, balance_amount = ?, notes = ?,
+          discount_scope = ?, discount_type = ?, discount_value = ?, terms = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(
+        data.invoice_no,
+        data.customer_id,
+        data.invoice_date,
+        data.due_date,
+        data.status,
+        data.payment_status || 'Unpaid',
+        data.return_status || 'None',
+        data.total_amount,
+        data.paid_amount,
+        data.balance_amount,
+        data.notes || null,
+        data.discount_scope || 'invoice',
+        data.discount_type || 'percentage',
+        data.discount_value || 0,
+        data.terms || null,
+        invoiceId
+      );
+    }).immediate();
   }
 
   /**
@@ -1089,6 +1096,7 @@ class InvoiceModel {
     invoice: Invoice,
     userId: number
   ): void {
+    assertLegacyInvoiceAllocationsAllowed(db, invoice.id);
     // ---- Guards (rule 4/5: paid + returned documents lock) ----
     if (invoice.status === 'Cancelled') {
       throw new Error('Invoice is already cancelled');

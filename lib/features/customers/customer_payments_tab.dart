@@ -9,10 +9,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/theme/money_direction.dart';
+import '../../core/auth/auth_notifier.dart';
+import '../payments/unified_payment_labels.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/print_service.dart' show PrintService;
 import '../../data/models/payment.dart' show Payment;
-import '../../data/repositories/api_result.dart' show ApiError, ApiFailure, ApiSuccess;
+import '../../data/repositories/api_result.dart'
+    show ApiError, ApiFailure, ApiSuccess;
 import '../../data/repositories/invoice_repository.dart'
     show invoiceRepositoryProvider;
 import '../../l10n/app_localizations.dart';
@@ -61,22 +64,22 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
     // A range change re-keys the provider, so the old page index is
     // meaningless — reset to page 1 (spec §9: "paged tabs reset to page
     // 1").
-    ref.listen(
-      customerDetailFromDateProvider(widget.sessionId),
-      (previous, next) {
-        if (previous != next && _page != 1) {
-          setState(() => _page = 1);
-        }
-      },
-    );
-    ref.listen(
-      customerDetailToDateProvider(widget.sessionId),
-      (previous, next) {
-        if (previous != next && _page != 1) {
-          setState(() => _page = 1);
-        }
-      },
-    );
+    ref.listen(customerDetailFromDateProvider(widget.sessionId), (
+      previous,
+      next,
+    ) {
+      if (previous != next && _page != 1) {
+        setState(() => _page = 1);
+      }
+    });
+    ref.listen(customerDetailToDateProvider(widget.sessionId), (
+      previous,
+      next,
+    ) {
+      if (previous != next && _page != 1) {
+        setState(() => _page = 1);
+      }
+    });
 
     final payments = ref.watch(
       customerPaymentsPagedProvider(
@@ -112,46 +115,59 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
     );
 
     return switch (payments) {
-      AsyncData(:final value) => value.items.isEmpty
-          ? (range.from != null
-                ? const FilteredEmptyState()
-                : _empty(context, l10n.customersNopayments))
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: DetailTabGrid<Payment>(
-                    data: value.items,
-                    buildColumns: (l10n) => _columns(context, l10n),
-                    gridRowFor: _gridRowFor,
-                    hiddenFields: const ['data'],
-                    widthKey: 'customer_payments',
-                    rowColorCallback: moneyRowColorCallback(
-                      context,
-                      ref,
-                      // Money in — a customer payment brings cash into
-                      // the business.
-                      (_) => MoneyDirection.inflow,
+      AsyncData(:final value) =>
+        value.items.isEmpty
+            ? (range.from != null
+                  ? const FilteredEmptyState()
+                  : _empty(context, l10n.customersNopayments))
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: DetailTabGrid<Payment>(
+                      key: ValueKey((
+                        Localizations.localeOf(context),
+                        Theme.of(context).brightness,
+                      )),
+                      data: value.items,
+                      buildColumns: (l10n) => _columns(context, l10n),
+                      gridRowFor: _gridRowFor,
+                      hiddenFields: const ['data'],
+                      widthKey: 'customer_payments',
+                      rowColorCallback: moneyRowColorCallback(
+                        context,
+                        ref,
+                        // Money in — a customer payment brings cash into
+                        // the business.
+                        (row) {
+                          final payment = row.cells['data']?.value as Payment?;
+                          if (payment == null || payment.voidedAt != null) {
+                            return MoneyDirection.neutral;
+                          }
+                          return payment.isCashOutflow
+                              ? MoneyDirection.outflow
+                              : MoneyDirection.inflow;
+                        },
+                      ),
                     ),
                   ),
-                ),
-                ServerPaginationBar(
-                  page: value.currentPage,
-                  totalPages: value.totalPages,
-                  totalItems: value.totalItems,
-                  hasNext: value.hasNext,
-                  hasPrev: value.hasPrev,
-                  limit: _limit,
-                  itemLabel: l10n.paymentsPayments,
-                  onPageChanged: (p) => setState(() => _page = p),
-                  onLimitChanged: (limit) => setState(() {
-                    _limit = limit;
-                    _page = 1;
-                  }),
-                ),
-                const SizedBox(height: 12),
-              ],
-            ),
+                  ServerPaginationBar(
+                    page: value.currentPage,
+                    totalPages: value.totalPages,
+                    totalItems: value.totalItems,
+                    hasNext: value.hasNext,
+                    hasPrev: value.hasPrev,
+                    limit: _limit,
+                    itemLabel: l10n.paymentsPayments,
+                    onPageChanged: (p) => setState(() => _page = p),
+                    onLimitChanged: (limit) => setState(() {
+                      _limit = limit;
+                      _page = 1;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
       AsyncError(:final error) => DetailError(
         message: error is ApiError ? error.message : '$error',
         onRetry: () => ref.invalidate(
@@ -203,6 +219,7 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
         enableSetColumnsMenuItem: false,
       ),
       textCol('paymentNo', l10n.customersPaymentno, 130),
+      textCol('kind', l10n.fieldsType, 150),
       textCol('date', l10n.commonDate, 110),
       PlutoColumn(
         title: l10n.customersAmount,
@@ -237,16 +254,10 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
         renderer: (ctx) {
           final payment = ctx.cell.row.cells['data']?.value as Payment?;
           return Builder(
-            builder: (cellContext) => Listener(
-              behavior: HitTestBehavior.opaque,
-              onPointerDown: (_) => _openRowMenu(cellContext, payment),
-              child: Center(
-                child: Icon(
-                  Icons.more_vert,
-                  size: 18,
-                  color: Theme.of(cellContext).colorScheme.onSurfaceVariant,
-                ),
-              ),
+            builder: (cellContext) => IconButton(
+              tooltip: l10n.customersActions,
+              onPressed: () => _openRowMenu(cellContext, payment),
+              icon: const Icon(Icons.more_vert, size: 18),
             ),
           );
         },
@@ -258,6 +269,12 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
     cells: {
       'data': PlutoCell(value: payment),
       'paymentNo': PlutoCell(value: payment.paymentNo),
+      'kind': PlutoCell(
+        value: paymentKindLabel(
+          AppLocalizations.of(context)!,
+          payment.paymentKind,
+        ),
+      ),
       'date': PlutoCell(
         value: payment.paymentDate.isEmpty
             ? ''
@@ -271,10 +288,7 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
     },
   );
 
-  Future<void> _openRowMenu(
-    BuildContext cellContext,
-    Payment? payment,
-  ) async {
+  Future<void> _openRowMenu(BuildContext cellContext, Payment? payment) async {
     if (payment == null || !mounted) return;
     final l10n = AppLocalizations.of(cellContext)!;
     final box = cellContext.findRenderObject() as RenderBox?;
@@ -301,35 +315,41 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
             ],
           ),
         ),
-        PopupMenuItem(
-          value: _PaymentRowAction.edit,
-          child: Row(
-            children: [
-              const Icon(Icons.edit_outlined, size: 18),
-              const SizedBox(width: 8),
-              Text(l10n.commonEdit),
-            ],
+        if (payment.canModify &&
+            (ref.read(authProvider).user?.hasPermission('payments', 'update') ??
+                false))
+          PopupMenuItem(
+            value: _PaymentRowAction.edit,
+            child: Row(
+              children: [
+                const Icon(Icons.edit_outlined, size: 18),
+                const SizedBox(width: 8),
+                Text(l10n.commonEdit),
+              ],
+            ),
           ),
-        ),
-        PopupMenuItem(
-          value: _PaymentRowAction.delete,
-          child: Row(
-            children: [
-              Icon(
-                Icons.delete_outline,
-                size: 18,
-                color: Theme.of(cellContext).colorScheme.error,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                l10n.customersDeletepayment,
-                style: TextStyle(
+        if (payment.canModify &&
+            (ref.read(authProvider).user?.hasPermission('payments', 'delete') ??
+                false))
+          PopupMenuItem(
+            value: _PaymentRowAction.delete,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.delete_outline,
+                  size: 18,
                   color: Theme.of(cellContext).colorScheme.error,
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Text(
+                  l10n.customersDeletepayment,
+                  style: TextStyle(
+                    color: Theme.of(cellContext).colorScheme.error,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
       ],
     );
     if (action != null && mounted) {
@@ -350,7 +370,16 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
     final format = await service.pickFormat();
     if (format == null) return;
     try {
-      await service.printPaymentReceipt(payment, format: format);
+      final result = await ref
+          .read(invoiceRepositoryProvider)
+          .payment(payment.id);
+      if (!mounted) return;
+      switch (result) {
+        case ApiSuccess(:final data):
+          await service.printPaymentReceipt(data, format: format);
+        case ApiFailure(:final error):
+          showAppToast(context, error.message, isError: true);
+      }
     } catch (error) {
       if (mounted) {
         showAppToast(context, '${l10n.errorsFailed}: $error', isError: true);
@@ -359,6 +388,11 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
   }
 
   void _editPayment(Payment payment) {
+    if (!payment.canModify ||
+        !(ref.read(authProvider).user?.hasPermission('payments', 'update') ??
+            false)) {
+      return;
+    }
     showPaymentEditDialog(
       context,
       payment: payment,
@@ -370,12 +404,16 @@ class _CustomerPaymentsTabState extends ConsumerState<CustomerPaymentsTab> {
   }
 
   Future<void> _deletePayment(Payment payment) async {
+    if (!payment.canModify ||
+        !(ref.read(authProvider).user?.hasPermission('payments', 'delete') ??
+            false)) {
+      return;
+    }
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showConfirmDialog(
       context,
       title: l10n.customersDeletepayment,
-      message:
-          '${l10n.customersConfirmdeletepayment} "${payment.paymentNo}"?',
+      message: '${l10n.customersConfirmdeletepayment} "${payment.paymentNo}"?',
       confirmLabel: l10n.customersDeletepayment,
       destructive: true,
     );

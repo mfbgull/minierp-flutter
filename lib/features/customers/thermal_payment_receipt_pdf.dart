@@ -21,6 +21,11 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/invoice.dart' show CompanyInfo;
 import '../../data/models/payment.dart' show Payment;
 import '../sales/models/sales_forms.dart' show defaultCompany;
+import '../../widgets/payment_receipt_pdf.dart'
+    show
+        paymentReceiptTitle,
+        paymentReceiptPartyLabel,
+        paymentReceiptAmountLabel;
 
 /// Page width for 80mm thermal paper (~226.77pt).
 const double _kThermalWidth = 226.77;
@@ -60,10 +65,18 @@ Future<Uint8List> buildThermalPaymentReceiptPdf(
         _buildDivider(),
         _buildCustomerInfo(payment, entityName),
         _buildDivider(),
-        _buildBalanceTrail(payment, previousBalance, usedFormatter),
+        if (payment.paymentKind == 'RECEIPT')
+          _buildBalanceTrail(payment, previousBalance, usedFormatter)
+        else
+          _totalRowBold(
+            paymentReceiptAmountLabel(payment),
+            _fmtCurrency(payment.amount.abs(), usedFormatter),
+          ),
         _buildDivider(),
         _buildPaymentDetails(payment),
-        if (allocations != null && allocations.isNotEmpty) ...[
+        if (payment.paymentKind == 'RECEIPT' &&
+            allocations != null &&
+            allocations.isNotEmpty) ...[
           _buildDivider(),
           _buildAllocations(allocations, payment, usedFormatter),
         ],
@@ -117,7 +130,7 @@ pw.Widget _buildReceiptInfo(Payment payment) {
     children: [
       pw.Center(
         child: pw.Text(
-          'PAYMENT RECEIPT',
+          paymentReceiptTitle(payment),
           style: pw.TextStyle(
             fontSize: 12,
             fontWeight: pw.FontWeight.bold,
@@ -152,6 +165,7 @@ pw.Widget _buildCustomerInfo(Payment payment, String? entityName) {
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
+      _infoLine(paymentReceiptPartyLabel(payment)),
       pw.Text(
         resolvedName,
         style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
@@ -260,7 +274,9 @@ pw.Widget _buildFooter(CompanyInfo company, Payment payment) {
     crossAxisAlignment: pw.CrossAxisAlignment.center,
     children: [
       pw.Text(
-        isSupplier ? 'Payment recorded.' : 'Thank you for your payment!',
+        isSupplier || payment.isCashOutflow || payment.paymentKind != 'RECEIPT'
+            ? 'Payment recorded.'
+            : 'Thank you for your payment!',
         style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
         textAlign: pw.TextAlign.center,
       ),

@@ -9,6 +9,308 @@ class AppLocalizationsUr extends AppLocalizations {
   AppLocalizationsUr([String locale = 'ur']) : super(locale);
 
   @override
+  String get cashOrdinaryReceipt => 'وصولی';
+
+  @override
+  String get cashAdvanceReceipt => 'پیشگی وصولی';
+
+  @override
+  String get cashRefundPayment => 'گاہک کو نقد واپسی';
+
+  @override
+  String get cashDocumentReadOnly =>
+      'یہ نقد دستاویز یہاں صرف دیکھی جا سکتی ہے۔ معاون درستگی کے لیے غیر مختص نقد رقم استعمال کریں۔';
+
+  @override
+  String get cashBulkExcluded =>
+      'پیشگی وصولیاں، نقد واپسی اور ناقابل ترمیم دستاویزات یہاں حذف نہیں ہو سکتیں۔ ان کی معاون درستگی استعمال کریں۔';
+
+  @override
+  String get cashPaidTo => 'ادا کردہ بنام';
+
+  @override
+  String get cashAmountPaid => 'ادا کردہ رقم';
+
+  @override
+  String get cashAmountReceived => 'وصول کردہ رقم';
+
+  @override
+  String get cashReceivedFrom => 'وصول کردہ از';
+
+  @override
+  String get cashDirection => 'نقد رقم کی سمت';
+
+  @override
+  String get cashTypeDelete => 'تصدیق کے لیے DELETE لکھیں';
+
+  @override
+  String get cashTab => 'غیر مختص نقد رقم';
+
+  @override
+  String get cashRefund => 'نقد رقم واپس کریں';
+
+  @override
+  String get cashRefundHint =>
+      'گاہک کو اس تاریخ پر اہل پہلے آئی پہلے استعمال نقد رقم کے مجموعے سے رقم واپس دیں، کسی منتخب وصولی سے نہیں۔ یہ نقد ادائیگی ہے۔';
+
+  @override
+  String get cashRefundable => 'لین دین کی تاریخ پر قابل واپسی نقد رقم';
+
+  @override
+  String get cashReviewRefund => 'واپسی کا جائزہ لیں';
+
+  @override
+  String get cashConfirmRefund => 'نقد واپسی کی تصدیق کریں';
+
+  @override
+  String get cashRefundedSuccess => 'نقد رقم واپس کر دی گئی';
+
+  @override
+  String cashRefundedDetails(String amount, String paymentId) {
+    return '$amount ادا کیے گئے۔ ادائیگی کا شناختی نمبر: $paymentId۔';
+  }
+
+  @override
+  String get cashInsufficientFunds =>
+      'اس واپسی کے لیے نقد یا بینک کا بیلنس ناکافی ہے۔ دوبارہ کوشش سے پہلے طریقہ، تاریخ اور دستیاب رقم کا جائزہ لیں۔';
+
+  @override
+  String get cashInvalidRefund =>
+      'اس تاریخ کی قابل واپسی نقد رقم کے اندر، زیادہ سے زیادہ دو اعشاری جگہوں والی مثبت رقم درج کریں۔';
+
+  @override
+  String get cashReverse => 'وصولی منسوخ کریں';
+
+  @override
+  String get cashReverseHint =>
+      'صرف یہ غیر استعمال شدہ پیشگی وصولی منسوخ کریں۔ اصل وصولی کی تاریخ استعمال ہوگی اور تبدیل نہیں کی جا سکتی۔ متعلقہ استعمال یا واپسی منسوخی روکتے ہیں۔';
+
+  @override
+  String get cashReviewReverse => 'منسوخی کا جائزہ لیں';
+
+  @override
+  String get cashConfirmReverse => 'منسوخی کی تصدیق کریں';
+
+  @override
+  String get cashReverseReason => 'منسوخی کی وجہ';
+
+  @override
+  String get cashInvalidReason => '1 سے 500 حروف کے درمیان وجہ درج کریں۔';
+
+  @override
+  String get cashReverseUnavailable =>
+      'یہ وصولی منسوخ نہیں ہو سکتی کیونکہ یہ استعمال، واپس، منسوخ ہو چکی ہے یا فعال غیر استعمال شدہ پیشگی رقم نہیں ہے۔';
+
+  @override
+  String get cashNoReversePermission =>
+      'آپ کو وصولیاں منسوخ کرنے کی اجازت نہیں ہے۔';
+
+  @override
+  String get cashReversedSuccess => 'وصولی منسوخ ہو گئی';
+
+  @override
+  String get cashAlreadyReversed =>
+      'یہ وصولی پہلے ہی منسوخ ہے۔ موجودہ حالت کی تصدیق ہو گئی؛ اس کوشش نے اسے دوبارہ منسوخ نہیں کیا۔';
+
+  @override
+  String cashReversedDetails(String paymentNo) {
+    return 'وصولی $paymentNo منسوخ ہو گئی ہے۔ اصل ریکارڈ تاریخچے میں محفوظ ہے۔';
+  }
+
+  @override
+  String cashDependencySource(String sourceId, String amount) {
+    return 'ذریعہ #$sourceId؛ استعمال شدہ رقم $amount';
+  }
+
+  @override
+  String cashDependencyInvoice(String invoiceId) {
+    return 'انوائس #$invoiceId';
+  }
+
+  @override
+  String get cashEditReview => 'تفصیل تبدیل کریں';
+
+  @override
+  String get cashReceiveAdvance => 'پیشگی رقم وصول کریں';
+
+  @override
+  String get cashApply => 'نقد رقم انوائسز میں استعمال کریں';
+
+  @override
+  String get cashApplyHint =>
+      'گاہک کی پہلے سے موجود نقد رقم استعمال کریں۔ اس سے نئی ادائیگی وصول نہیں ہوتی۔';
+
+  @override
+  String get cashEligible => 'لین دین کی تاریخ پر دستیاب نقد رقم';
+
+  @override
+  String get cashSelected => 'منتخب کل رقم';
+
+  @override
+  String get cashAfterApply => 'استعمال کے بعد باقی نقد رقم';
+
+  @override
+  String get cashAutoAllocate => 'خودکار تقسیم';
+
+  @override
+  String get cashSearchInvoices => 'انوائسز تلاش کریں';
+
+  @override
+  String get cashAllocation => 'استعمال کی رقم';
+
+  @override
+  String get cashNoOpenInvoices => 'اس تاریخ پر کوئی اہل بقایا انوائس نہیں۔';
+
+  @override
+  String get cashNoUpdatePermission =>
+      'آپ کو نقد رقم استعمال کرنے کی اجازت نہیں ہے۔';
+
+  @override
+  String get cashNoInvoicePermission =>
+      'انوائسز منتخب کرنے کے لیے انہیں پڑھنے کی اجازت درکار ہے۔';
+
+  @override
+  String get cashInvalidAllocations =>
+      'انوائس کے بقایا اور دستیاب نقد رقم کے اندر مثبت رقم درج کریں۔ 1 سے 1,000 انوائسز منتخب کریں۔';
+
+  @override
+  String get cashChangedBalances =>
+      'بقایا بدل گیا ہے۔ تازہ رقم حاصل کر لی گئی ہے؛ دوبارہ تصدیق سے پہلے اپنی اصل تقسیم کا جائزہ لیں۔';
+
+  @override
+  String get cashAppliedSuccess => 'نقد رقم استعمال ہو گئی';
+
+  @override
+  String cashAppliedDetails(String amount, String applicationId) {
+    return '$amount استعمال ہوئے۔ استعمال کا شناختی نمبر: $applicationId۔ کوئی نئی ادائیگی وصول نہیں ہوئی۔';
+  }
+
+  @override
+  String get cashInvoiceBalance => 'انوائس کا بقایا';
+
+  @override
+  String get cashStoreCredit => 'اسٹور کریڈٹ';
+
+  @override
+  String get cashHeld => 'موجود غیر مختص نقد رقم';
+
+  @override
+  String get cashSummaryHint =>
+      'یہ رقم اسٹور کریڈٹ اور انوائس کے بقایا سے الگ ہے۔ تاریخ کی حد صرف استعمال اور واپسی کی تفصیل پر لاگو ہوتی ہے، موجودہ رقم پر نہیں۔';
+
+  @override
+  String get cashReceipts => 'وصولیاں';
+
+  @override
+  String get cashActivity => 'استعمال اور واپسی';
+
+  @override
+  String get cashNoReceipts => 'ابھی کوئی پیشگی وصولی نہیں';
+
+  @override
+  String get cashNoActivity => 'ابھی رقم استعمال یا واپس نہیں ہوئی';
+
+  @override
+  String get cashNoReadPermission =>
+      'آپ کو غیر مختص نقد رقم دیکھنے کی اجازت نہیں ہے۔';
+
+  @override
+  String get cashNoCreatePermission =>
+      'آپ کو پیشگی رقم وصول کرنے کی اجازت نہیں ہے۔';
+
+  @override
+  String get cashReceiveHint =>
+      'رقم ابھی وصول کریں اور بعد میں انوائس کے لیے استعمال کریں۔ پیشگی وصولی سے کسی انوائس کی ادائیگی نہیں ہوتی۔';
+
+  @override
+  String get cashAmount => 'رقم';
+
+  @override
+  String get cashInvalidAmount =>
+      'صفر سے زیادہ رقم درج کریں، اعشاریہ کے بعد زیادہ سے زیادہ دو ہندسے ہوں۔';
+
+  @override
+  String get cashOperationDate => 'لین دین کی تاریخ';
+
+  @override
+  String get cashReceived => 'پیشگی رقم وصول ہوگئی';
+
+  @override
+  String cashReceivedDetails(String amount, String paymentId) {
+    return '$amount وصول ہوئے۔ ادائیگی کا شناختی نمبر: $paymentId۔';
+  }
+
+  @override
+  String get cashPendingNotice =>
+      'ممکن ہے یہ درخواست پہلے ہی محفوظ ہو چکی ہو۔ اصل رقم، تاریخ، طریقہ اور دوبارہ کوشش کی کلید محفوظ ہیں۔ تصدیق کے لیے محفوظ طریقے سے دوبارہ کوشش کریں؛ نئی درخواست درج نہ کریں۔';
+
+  @override
+  String get cashRecoveryRequired =>
+      'نئی درخواست بھیجنے سے پہلے پچھلی درخواست کے نتیجے کی تصدیق ضروری ہے۔ زیرِ التوا درخواست محفوظ رکھیں؛ دوبارہ نئی درخواست درج نہ کریں۔';
+
+  @override
+  String get cashOtherPending =>
+      'کسی دوسرے گاہک یا نقد رقم کے عمل کی درخواست زیرِ التوا ہے۔ مزید رقم وصول کرنے سے پہلے اصل درخواست کا نتیجہ معلوم کریں۔';
+
+  @override
+  String get cashConnectionRequired =>
+      'رقم دیکھنے یا لین دین کی تصدیق کے لیے سرور سے رابطہ قائم کریں۔';
+
+  @override
+  String get cashAlreadyInCredit =>
+      'اس گاہک کے کھاتے میں پہلے سے کریڈٹ موجود ہے۔ پیشگی رقم وصول کرنے سے پہلے وہ کریڈٹ نمٹائیں۔';
+
+  @override
+  String get cashPeriodClosed =>
+      'منتخب تاریخ کا حسابی دور بند ہے۔ کھلے دور کی تاریخ منتخب کریں۔';
+
+  @override
+  String get cashReplayUnsupported =>
+      'یہ سرور ابھی محفوظ بحالی کی تصدیق نہیں کر سکتا۔ کوئی نئی درخواست نہیں بھیجی گئی۔';
+
+  @override
+  String get cashOperationFailed =>
+      'نقد رقم کا عمل مکمل نہیں ہو سکا۔ تفصیل دیکھ کر دوبارہ کوشش کریں۔';
+
+  @override
+  String get cashUnavailable => 'دستیاب نہیں';
+
+  @override
+  String get cashRemaining => 'باقی';
+
+  @override
+  String get cashApplied => 'استعمال شدہ';
+
+  @override
+  String get cashRefunded => 'واپس شدہ';
+
+  @override
+  String get cashOriginal => 'اصل رقم';
+
+  @override
+  String get cashStatusUnused => 'غیر استعمال شدہ';
+
+  @override
+  String get cashStatusPartial => 'جزوی استعمال شدہ';
+
+  @override
+  String get cashStatusUsed => 'استعمال شدہ';
+
+  @override
+  String get cashStatusReversed => 'منسوخ شدہ';
+
+  @override
+  String get cashApplyLabel => 'انوائس کے لیے استعمال';
+
+  @override
+  String get cashRefundLabel => 'نقد رقم کی واپسی';
+
+  @override
+  String cashPageLabel(int page, int pages) {
+    return 'صفحہ $page از $pages';
+  }
+
+  @override
   String get dashboardWelcome => 'خوش آمدید';
 
   @override

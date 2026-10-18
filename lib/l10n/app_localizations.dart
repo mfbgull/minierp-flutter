@@ -98,6 +98,528 @@ abstract class AppLocalizations {
     Locale('ur'),
   ];
 
+  /// No description provided for @cashOrdinaryReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt'**
+  String get cashOrdinaryReceipt;
+
+  /// No description provided for @cashAdvanceReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance receipt'**
+  String get cashAdvanceReceipt;
+
+  /// No description provided for @cashRefundPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer refund'**
+  String get cashRefundPayment;
+
+  /// No description provided for @cashDocumentReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'This cash document is read-only here. Use Unapplied Cash for supported corrections.'**
+  String get cashDocumentReadOnly;
+
+  /// No description provided for @cashBulkExcluded.
+  ///
+  /// In en, this message translates to:
+  /// **'Advances, refunds and immutable documents cannot be deleted here. Use their supported correction workflow.'**
+  String get cashBulkExcluded;
+
+  /// No description provided for @cashPaidTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid To'**
+  String get cashPaidTo;
+
+  /// No description provided for @cashAmountPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount Paid'**
+  String get cashAmountPaid;
+
+  /// No description provided for @cashAmountReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount Received'**
+  String get cashAmountReceived;
+
+  /// No description provided for @cashReceivedFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Received From'**
+  String get cashReceivedFrom;
+
+  /// No description provided for @cashDirection.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash direction'**
+  String get cashDirection;
+
+  /// No description provided for @cashTypeDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Type DELETE to confirm'**
+  String get cashTypeDelete;
+
+  /// No description provided for @cashTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Unapplied Cash'**
+  String get cashTab;
+
+  /// No description provided for @cashRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund Cash'**
+  String get cashRefund;
+
+  /// No description provided for @cashRefundHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay cash back to this customer from the date-eligible FIFO cash pool, not from a selected receipt. This is a cash outflow.'**
+  String get cashRefundHint;
+
+  /// No description provided for @cashRefundable.
+  ///
+  /// In en, this message translates to:
+  /// **'Refundable cash on operation date'**
+  String get cashRefundable;
+
+  /// No description provided for @cashReviewRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Review refund'**
+  String get cashReviewRefund;
+
+  /// No description provided for @cashConfirmRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm cash refund'**
+  String get cashConfirmRefund;
+
+  /// No description provided for @cashRefundedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash refunded'**
+  String get cashRefundedSuccess;
+
+  /// No description provided for @cashRefundedDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid out {amount}. Payment ID: {paymentId}.'**
+  String cashRefundedDetails(String amount, String paymentId);
+
+  /// No description provided for @cashInsufficientFunds.
+  ///
+  /// In en, this message translates to:
+  /// **'The cash or bank balance is insufficient for this refund. Review the method, date and available funds before trying again.'**
+  String get cashInsufficientFunds;
+
+  /// No description provided for @cashInvalidRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a positive amount with at most two decimal places, within refundable cash for this date.'**
+  String get cashInvalidRefund;
+
+  /// No description provided for @cashReverse.
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse receipt'**
+  String get cashReverse;
+
+  /// No description provided for @cashReverseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse only this unused advance. The original receipt date is used and cannot be changed. Related applications or refunds block reversal.'**
+  String get cashReverseHint;
+
+  /// No description provided for @cashReviewReverse.
+  ///
+  /// In en, this message translates to:
+  /// **'Review reversal'**
+  String get cashReviewReverse;
+
+  /// No description provided for @cashConfirmReverse.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm reversal'**
+  String get cashConfirmReverse;
+
+  /// No description provided for @cashReverseReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason for reversal'**
+  String get cashReverseReason;
+
+  /// No description provided for @cashInvalidReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a reason between 1 and 500 characters.'**
+  String get cashInvalidReason;
+
+  /// No description provided for @cashReverseUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This receipt cannot be reversed because it is used, refunded, voided or not a live unused advance.'**
+  String get cashReverseUnavailable;
+
+  /// No description provided for @cashNoReversePermission.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission to reverse receipts.'**
+  String get cashNoReversePermission;
+
+  /// No description provided for @cashReversedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt reversed'**
+  String get cashReversedSuccess;
+
+  /// No description provided for @cashAlreadyReversed.
+  ///
+  /// In en, this message translates to:
+  /// **'This receipt is already reversed. Current status was verified; this retry did not reverse it again.'**
+  String get cashAlreadyReversed;
+
+  /// No description provided for @cashReversedDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt {paymentNo} has been reversed. The original record remains in history.'**
+  String cashReversedDetails(String paymentNo);
+
+  /// No description provided for @cashDependencySource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source #{sourceId}; applied amount {amount}'**
+  String cashDependencySource(String sourceId, String amount);
+
+  /// No description provided for @cashDependencyInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice #{invoiceId}'**
+  String cashDependencyInvoice(String invoiceId);
+
+  /// No description provided for @cashEditReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit details'**
+  String get cashEditReview;
+
+  /// No description provided for @cashReceiveAdvance.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive Advance'**
+  String get cashReceiveAdvance;
+
+  /// No description provided for @cashApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply Cash to Invoices'**
+  String get cashApply;
+
+  /// No description provided for @cashApplyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use cash already held for this customer. This does not collect another payment.'**
+  String get cashApplyHint;
+
+  /// No description provided for @cashEligible.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash available on operation date'**
+  String get cashEligible;
+
+  /// No description provided for @cashSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected total'**
+  String get cashSelected;
+
+  /// No description provided for @cashAfterApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash remaining after application'**
+  String get cashAfterApply;
+
+  /// No description provided for @cashAutoAllocate.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Allocate'**
+  String get cashAutoAllocate;
+
+  /// No description provided for @cashSearchInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Search invoices'**
+  String get cashSearchInvoices;
+
+  /// No description provided for @cashAllocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply amount'**
+  String get cashAllocation;
+
+  /// No description provided for @cashNoOpenInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'No eligible open invoices on this date.'**
+  String get cashNoOpenInvoices;
+
+  /// No description provided for @cashNoUpdatePermission.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission to apply cash.'**
+  String get cashNoUpdatePermission;
+
+  /// No description provided for @cashNoInvoicePermission.
+  ///
+  /// In en, this message translates to:
+  /// **'You need permission to read invoices before selecting them.'**
+  String get cashNoInvoicePermission;
+
+  /// No description provided for @cashInvalidAllocations.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter positive amounts within invoice balances and available cash. Select 1 to 1,000 invoices.'**
+  String get cashInvalidAllocations;
+
+  /// No description provided for @cashChangedBalances.
+  ///
+  /// In en, this message translates to:
+  /// **'Balances changed. Current amounts have been refreshed; review your original allocations before confirming again.'**
+  String get cashChangedBalances;
+
+  /// No description provided for @cashAppliedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash applied'**
+  String get cashAppliedSuccess;
+
+  /// No description provided for @cashAppliedDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied {amount}. Application ID: {applicationId}. No new payment was collected.'**
+  String cashAppliedDetails(String amount, String applicationId);
+
+  /// No description provided for @cashInvoiceBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice balance'**
+  String get cashInvoiceBalance;
+
+  /// No description provided for @cashStoreCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Store credit'**
+  String get cashStoreCredit;
+
+  /// No description provided for @cashHeld.
+  ///
+  /// In en, this message translates to:
+  /// **'Unapplied cash held'**
+  String get cashHeld;
+
+  /// No description provided for @cashSummaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash held is separate from store credit and invoice balance. The date range filters activity only, not current cash.'**
+  String get cashSummaryHint;
+
+  /// No description provided for @cashReceipts.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipts'**
+  String get cashReceipts;
+
+  /// No description provided for @cashActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Applications & refunds'**
+  String get cashActivity;
+
+  /// No description provided for @cashNoReceipts.
+  ///
+  /// In en, this message translates to:
+  /// **'No advance receipts yet'**
+  String get cashNoReceipts;
+
+  /// No description provided for @cashNoActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'No applications or refunds yet'**
+  String get cashNoActivity;
+
+  /// No description provided for @cashNoReadPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission to view unapplied cash.'**
+  String get cashNoReadPermission;
+
+  /// No description provided for @cashNoCreatePermission.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission to receive an advance.'**
+  String get cashNoCreatePermission;
+
+  /// No description provided for @cashReceiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive cash now and apply it to invoices later. Receiving an advance does not mark any invoice paid.'**
+  String get cashReceiveHint;
+
+  /// No description provided for @cashAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get cashAmount;
+
+  /// No description provided for @cashInvalidAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a positive amount with at most two decimal places.'**
+  String get cashInvalidAmount;
+
+  /// No description provided for @cashOperationDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Operation date'**
+  String get cashOperationDate;
+
+  /// No description provided for @cashReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance received'**
+  String get cashReceived;
+
+  /// No description provided for @cashReceivedDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Received {amount}. Payment ID: {paymentId}.'**
+  String cashReceivedDetails(String amount, String paymentId);
+
+  /// No description provided for @cashPendingNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'This request may already have been saved. Its original amount, date, method and retry key are retained. Retry safely to confirm; do not enter it again.'**
+  String get cashPendingNotice;
+
+  /// No description provided for @cashRecoveryRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'The outcome needs verification before another request can be sent. Keep this pending request; do not enter it again.'**
+  String get cashRecoveryRequired;
+
+  /// No description provided for @cashOtherPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Another customer or cash workflow has a pending request. Recover that original operation before receiving more cash.'**
+  String get cashOtherPending;
+
+  /// No description provided for @cashConnectionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to the server to load cash or confirm this operation.'**
+  String get cashConnectionRequired;
+
+  /// No description provided for @cashAlreadyInCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'This customer is already in credit. Settle that credit before receiving an advance.'**
+  String get cashAlreadyInCredit;
+
+  /// No description provided for @cashPeriodClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'The operation date is in a closed accounting period. Choose an open date.'**
+  String get cashPeriodClosed;
+
+  /// No description provided for @cashReplayUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This server cannot confirm safe recovery yet. No new request has been sent.'**
+  String get cashReplayUnsupported;
+
+  /// No description provided for @cashOperationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The cash operation could not be completed. Check the details and try again.'**
+  String get cashOperationFailed;
+
+  /// No description provided for @cashUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get cashUnavailable;
+
+  /// No description provided for @cashRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get cashRemaining;
+
+  /// No description provided for @cashApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied'**
+  String get cashApplied;
+
+  /// No description provided for @cashRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get cashRefunded;
+
+  /// No description provided for @cashOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Original amount'**
+  String get cashOriginal;
+
+  /// No description provided for @cashStatusUnused.
+  ///
+  /// In en, this message translates to:
+  /// **'Unused'**
+  String get cashStatusUnused;
+
+  /// No description provided for @cashStatusPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partly used'**
+  String get cashStatusPartial;
+
+  /// No description provided for @cashStatusUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Used'**
+  String get cashStatusUsed;
+
+  /// No description provided for @cashStatusReversed.
+  ///
+  /// In en, this message translates to:
+  /// **'Reversed'**
+  String get cashStatusReversed;
+
+  /// No description provided for @cashApplyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied to invoices'**
+  String get cashApplyLabel;
+
+  /// No description provided for @cashRefundLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash refund'**
+  String get cashRefundLabel;
+
+  /// No description provided for @cashPageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page} of {pages}'**
+  String cashPageLabel(int page, int pages);
+
   /// No description provided for @dashboardWelcome.
   ///
   /// In en, this message translates to:

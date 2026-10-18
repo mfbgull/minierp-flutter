@@ -18,7 +18,8 @@ import AccountingService from './accountingService';
 import InvoiceModel from '../models/Invoice';
 import ledgerUtils from '../utils/ledgerUtils';
 import { parseCurrency, subtractCurrency } from '../utils/currency';
-import { validateCustomerPayment } from './paymentValidation';
+import { validateCustomerPayment, assertInvoiceAllocation } from './paymentValidation';
+import { assertLegacyPaymentAllowed } from './unappliedPaymentGuard';
 import { assertPaymentMethod, assertPeriodOpen, insertPaymentRow } from './paymentWriterCore';
 import { beginIdempotentWrite, claimIdempotencyKey } from '../utils/idempotency';
 import type {
@@ -88,6 +89,7 @@ export class PaymentRecordingService {
     if (input.allocations.length === 0) throw new Error('At least one allocation is required');
 
     this.db.transaction(() => {
+      assertLegacyPaymentAllowed(this.db, input.paymentId);
       // audit-3 task 08: allocation re-points money across invoices, so a
       // retry after a lost response would double-allocate. The claim
       // records the payment it settled against and replays instead.
@@ -109,7 +111,7 @@ export class PaymentRecordingService {
 
       let allocated = 0;
       for (const alloc of input.allocations) {
-        allocated += this.assertInvoiceAllocation(input.customerId, alloc);
+        allocated += assertInvoiceAllocation(this.db, input.customerId, alloc);
       }
       if (Math.abs(allocated - unallocated) > 0.01) {
         throw new Error(
@@ -142,25 +144,6 @@ export class PaymentRecordingService {
       ledgerUtils.calculateInvoiceBalance(invoiceId, this.db);
       ledgerUtils.updateInvoiceStatus(invoiceId, this.db);
     }
-  }
-
-  private assertInvoiceAllocation(customerId: number, alloc: PaymentAllocation): number {
-    const amount = parseCurrency(alloc.amount);
-    if (!(amount > 0)) {
-      throw new Error(`Allocation amount for invoice ${alloc.invoiceId} must be greater than 0`);
-    }
-    const invoice = this.db.prepare('SELECT id, customer_id, balance_amount FROM invoices WHERE id = ?')
-      .get(alloc.invoiceId) as { id: number; customer_id: number; balance_amount: number } | undefined;
-    if (!invoice) throw new Error(`Invoice ${alloc.invoiceId} not found`);
-    if (Number(invoice.customer_id) !== Number(customerId)) {
-      throw new Error(`Invoice ${alloc.invoiceId} does not belong to this payment's customer`);
-    }
-    if (amount > parseCurrency(invoice.balance_amount) + 0.01) {
-      throw new Error(
-        `Allocation (${amount.toFixed(2)}) exceeds invoice ${alloc.invoiceId} balance (${parseCurrency(invoice.balance_amount).toFixed(2)})`,
-      );
-    }
-    return amount;
   }
 
   private postAccounting(

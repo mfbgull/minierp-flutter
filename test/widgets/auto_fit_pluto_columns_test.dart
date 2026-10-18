@@ -6,34 +6,75 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:minierp_app/core/theme/app_theme.dart';
 import 'package:minierp_app/widgets/pluto_grid_screen.dart'
-    show autoFitPlutoColumns, kAutoFitMaxColumnWidth;
+    show
+        autoFitPlutoColumns,
+        kAutoFitMaxColumnWidth,
+        serialGridColumn,
+        withSerialCell,
+        plutoGridConfigurationFor;
 import 'package:pluto_grid/pluto_grid.dart';
 
 /// Convenience: two plain-text columns.
 List<PlutoColumn> _twoTextColumns() => [
-      PlutoColumn(
-        title: 'Name',
-        field: 'name',
-        type: PlutoColumnType.text(),
-        width: 100,
-      ),
-      PlutoColumn(
-        title: 'Value',
-        field: 'value',
-        type: PlutoColumnType.text(),
-        width: 100,
-      ),
-    ];
+  PlutoColumn(
+    title: 'Name',
+    field: 'name',
+    type: PlutoColumnType.text(),
+    width: 100,
+  ),
+  PlutoColumn(
+    title: 'Value',
+    field: 'value',
+    type: PlutoColumnType.text(),
+    width: 100,
+  ),
+];
 
 List<PlutoRow> _rows(List<Map<String, String>> data) => data
-    .map((d) => PlutoRow(cells: {
-          for (final e in d.entries) e.key: PlutoCell(value: e.value),
-        }))
+    .map(
+      (d) => PlutoRow(
+        cells: {for (final e in d.entries) e.key: PlutoCell(value: e.value)},
+      ),
+    )
     .toList();
 
 void main() {
   group('autoFitPlutoColumns', () {
+    testWidgets('serial number uses the dark grid foreground', (tester) async {
+      final theme = AppTheme.dark;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => PlutoGrid(
+                columns: [serialGridColumn(), ..._twoTextColumns()],
+                rows: [
+                  withSerialCell(
+                    PlutoRow(
+                      cells: {
+                        'name': PlutoCell(value: 'Receipt'),
+                        'value': PlutoCell(value: '20'),
+                      },
+                    ),
+                    0,
+                  ),
+                ],
+                configuration: plutoGridConfigurationFor(
+                  context,
+                  compact: true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final serial = tester.widget<Text>(find.text('1').first);
+      expect(serial.style?.color, theme.colorScheme.onSurface);
+    });
     testWidgets('widens columns when there is slack', (tester) async {
       tester.view.physicalSize = const Size(600, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -109,8 +150,9 @@ void main() {
       expect(total, lessThanOrEqualTo(300));
     });
 
-    testWidgets('proportionally scales growth when requests exceed slack',
-        (tester) async {
+    testWidgets('proportionally scales growth when requests exceed slack', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(400, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -244,7 +286,9 @@ void main() {
       expect(hidColumn.width, equals(100));
     });
 
-    testWidgets('falls back to unbounded when viewport is null', (tester) async {
+    testWidgets('falls back to unbounded when viewport is null', (
+      tester,
+    ) async {
       late PlutoGridStateManager sm;
       await tester.pumpWidget(
         MaterialApp(
@@ -269,8 +313,9 @@ void main() {
       expect(total, greaterThan(200));
     });
 
-    testWidgets('no-ops when column width is already within 1px of ideal',
-        (tester) async {
+    testWidgets('no-ops when column width is already within 1px of ideal', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(800, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -346,8 +391,9 @@ void main() {
       expect(sm.columns.first.width, greaterThanOrEqualTo(80));
     });
 
-    testWidgets('clamps column width to kAutoFitMaxColumnWidth',
-        (tester) async {
+    testWidgets('clamps column width to kAutoFitMaxColumnWidth', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(2000, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -378,14 +424,12 @@ void main() {
       autoFitPlutoColumns(sm);
       await tester.pump();
 
-      expect(
-        sm.columns.first.width,
-        lessThanOrEqualTo(kAutoFitMaxColumnWidth),
-      );
+      expect(sm.columns.first.width, lessThanOrEqualTo(kAutoFitMaxColumnWidth));
     });
 
-    testWidgets('growth is proportional when columns compete for slack',
-        (tester) async {
+    testWidgets('growth is proportional when columns compete for slack', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(250, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -434,8 +478,9 @@ void main() {
       expect(afterA + afterB, lessThanOrEqualTo(250));
     });
 
-    testWidgets('total never exceeds viewport across many calls',
-        (tester) async {
+    testWidgets('total never exceeds viewport across many calls', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(300, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);

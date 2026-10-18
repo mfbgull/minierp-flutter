@@ -52,7 +52,7 @@
  * A returns a two-field object rather than `Violation[]`, so the master
  * asserts its `groups`/`totalDiff` pair separately.
  */
-import db from '../../config/database';
+import defaultDb from '../../config/database';
 import { collectFlows, CASH_ACCOUNTS, CASH_GL_CODES } from '../../services/cashService';
 
 export interface Violation {
@@ -65,6 +65,60 @@ export interface Violation {
   reference?: string;
 }
 
+export function unappliedLiabilityImbalances(db = defaultDb): Violation[] {
+  const account = db.prepare<[], { id: number }>("SELECT id FROM chart_of_accounts WHERE code='2110'").get();
+  if (!account) throw new Error('Invariant K requires liability account 2110');
+  const gl = db.prepare<[number], { amount: number }>(
+    'SELECT COALESCE(SUM(credit-debit),0) amount FROM journal_lines WHERE account_id=? AND voided=0').get(account.id);
+  const source = db.prepare<[], { amount: number }>(`SELECT COALESCE(SUM(remaining_amount),0) amount
+    FROM customer_credit_sources WHERE kind='UNAPPLIED_CASH' AND voided_at IS NULL`).get();
+  if (!gl || !source) throw new Error('Invariant K could not read balances');
+  const actual = R2(Math.abs(gl.amount));
+  const expected = R2(source.amount);
+  return actual === expected ? [] : [{ label: 'GL unapplied liability vs live cash sources', diff: R2(actual - expected), actual, expected, account: '2110' }];
+}
+
+export function creditSourceConsumptionImbalances(db = defaultDb): Violation[] {
+  const rows = db.prepare<[], { id: number; credited_amount: number; consumed_amount: number; refunded_amount: number; remaining_amount: number; applied: number; refunded: number }>(`
+    SELECT source.id,source.credited_amount,source.consumed_amount,source.refunded_amount,source.remaining_amount,
+      COALESCE(SUM(CASE WHEN draw.kind='APPLY' THEN draw.amount ELSE 0 END),0) applied,
+      COALESCE(SUM(CASE WHEN draw.kind='REFUND' THEN draw.amount ELSE 0 END),0) refunded
+    FROM customer_credit_sources source LEFT JOIN credit_source_consumptions draw
+      ON draw.source_id=source.id AND draw.voided_at IS NULL
+    WHERE source.kind='UNAPPLIED_CASH' AND source.voided_at IS NULL
+    GROUP BY source.id ORDER BY source.id`).all();
+  return rows.flatMap(row => {
+    const expected = R2(row.credited_amount - row.applied - row.refunded);
+    const appliedDiff = R2(row.consumed_amount - row.applied);
+    const refundedDiff = R2(row.refunded_amount - row.refunded);
+    const remainingDiff = R2(row.remaining_amount - expected);
+    return appliedDiff || refundedDiff || remainingDiff
+      ? [{ label: `Credit source #${row.id} consumption drift`, diff: remainingDiff || appliedDiff || refundedDiff, expected, actual: R2(row.remaining_amount) }]
+      : [];
+  });
+}
+
+export function creditSourceBoundsImbalances(db = defaultDb): Violation[] {
+  return db.prepare<[], { id: number }>(`SELECT id FROM customer_credit_sources WHERE voided_at IS NULL AND (
+    ROUND(refunded_amount*100)>ROUND(credited_amount*100) OR refunded_amount<0 OR consumed_amount<0
+    OR ROUND(remaining_amount*100)<0 OR refundable_cash_amount<0
+    OR ROUND(refundable_cash_amount*100)>ROUND(remaining_amount*100)) ORDER BY id`).all()
+    .map(row => ({ label: `Credit source #${row.id} bounds violated`, diff: 1 }));
+}
+
+export function receiptAllocationImbalances(db = defaultDb): Violation[] {
+  return db.prepare<[], { id: number; amount: number; allocated: number }>(`SELECT receipt.id,receipt.amount,COALESCE(SUM(allocation.amount),0) allocated
+    FROM payments receipt LEFT JOIN payment_allocations allocation ON allocation.payment_id=receipt.id AND allocation.voided_at IS NULL
+    WHERE receipt.voided_at IS NULL AND receipt.amount>0 AND receipt.payment_kind IN ('RECEIPT','UNAPPLIED_RECEIPT')
+    GROUP BY receipt.id HAVING ROUND(allocated*100)>ROUND(receipt.amount*100) ORDER BY receipt.id`).all()
+    .map(row => ({ label: `Receipt #${row.id} allocations exceed collected cash`, diff: R2(row.allocated - row.amount), expected: row.amount, actual: row.allocated }));
+}
+
+export function historicalCreditSourceBaseline(db = defaultDb): { sourceId: number; consumed: number; refunded: number }[] {
+  return db.prepare<[], { sourceId: number; consumed: number; refunded: number }>(`SELECT id sourceId,consumed_amount consumed,refunded_amount refunded
+    FROM customer_credit_sources WHERE kind='RETURN_CREDIT' ORDER BY id`).all();
+}
+
 interface GroupImbalance {
   reference_type: string;
   reference_id: number;
@@ -72,7 +126,7 @@ interface GroupImbalance {
 }
 
 /** Invariant A: every reference group balances; the ledger balances. */
-export function glImbalances(): { groups: GroupImbalance[]; totalDiff: number } {
+export function glImbalances(db = defaultDb): { groups: GroupImbalance[]; totalDiff: number } {
   const groups = db.prepare(`
     SELECT reference_type, reference_id,
            ABS(SUM(debit) - SUM(credit)) AS diff
@@ -88,7 +142,7 @@ export function glImbalances(): { groups: GroupImbalance[]; totalDiff: number } 
 }
 
 /** Invariants B + C (customer side). */
-export function customerArImbalances(): Violation[] {
+export function customerArImbalances(db = defaultDb): Violation[] {
   const problems: Violation[] = [];
 
   const custDrift = db.prepare(`
@@ -129,7 +183,7 @@ export function customerArImbalances(): Violation[] {
 }
 
 /** Invariant D (supplier side). */
-export function supplierApImbalances(): Violation[] {
+export function supplierApImbalances(db = defaultDb): Violation[] {
   const drift = db.prepare(`
     SELECT s.id, s.supplier_name,
            s.current_balance - COALESCE(l.net, 0) AS diff
@@ -154,7 +208,7 @@ export function supplierApImbalances(): Violation[] {
  * directions and let real orphans report clean — do not "simplify" it back.
  * Needs SQLite 3.39+; better-sqlite3 bundles its own SQLite (3.51.2) instead of
  * the system one, so the floor comes from the dependency, not the host. */
-export function stockImbalances(): Violation[] {
+export function stockImbalances(db = defaultDb): Violation[] {
   return db.prepare(`
     SELECT COALESCE(b.item_id, sb.item_id) || '/' || COALESCE(b.warehouse_id, sb.warehouse_id) AS label,
            COALESCE(sb.quantity, 0) - COALESCE(b.total, 0) AS diff
@@ -171,11 +225,11 @@ export function stockImbalances(): Violation[] {
 // Invariants F–I: GL ↔ operational-balance reconciliation
 // ============================================================================
 
-const GL_ACCOUNT_ID = (code: string): number | undefined =>
+const GL_ACCOUNT_ID = (code: string, db = defaultDb): number | undefined =>
   (db.prepare('SELECT id FROM chart_of_accounts WHERE code = ?').get(code) as { id: number } | undefined)?.id;
 
-const GL_BALANCE = (code: string): number => {
-  const id = GL_ACCOUNT_ID(code);
+const GL_BALANCE = (code: string, db = defaultDb): number => {
+  const id = GL_ACCOUNT_ID(code, db);
   if (!id) return 0;
   const row = db.prepare(
     'SELECT COALESCE(SUM(debit) - SUM(credit), 0) AS balance FROM journal_lines WHERE account_id = ? AND voided = 0'
@@ -220,8 +274,8 @@ const R2 = (v: number): number => Math.round(v * 100) / 100;
  * asserts that a negative AR position must fail the invariant, which is an
  * accounting-policy decision and not a test-mechanics one — so it is left in
  * place until that convention is decided. Do not "simplify" this away. */
-export function arImbalances(): Violation[] {
-  const glBalance = R2(Math.abs(GL_BALANCE('1100') + GL_BALANCE('1110')));
+export function arImbalances(db = defaultDb): Violation[] {
+  const glBalance = R2(Math.abs(GL_BALANCE('1100', db) + GL_BALANCE('1110', db)));
   const row = db.prepare(
     'SELECT COALESCE(SUM(current_balance), 0) AS receivable, COALESCE(SUM(credit_balance), 0) AS storeCredit FROM customers'
   ).get() as { receivable: number; storeCredit: number };
@@ -233,8 +287,8 @@ export function arImbalances(): Violation[] {
 }
 
 /** Invariant G: GL AP (2000) == Σ supplier balances. */
-export function apImbalances(): Violation[] {
-  const glBalance = R2(Math.abs(GL_BALANCE('2000')));
+export function apImbalances(db = defaultDb): Violation[] {
+  const glBalance = R2(Math.abs(GL_BALANCE('2000', db)));
   const row = db.prepare(
     'SELECT COALESCE(SUM(current_balance), 0) AS total FROM suppliers'
   ).get() as { total: number };
@@ -246,8 +300,8 @@ export function apImbalances(): Violation[] {
 }
 
 /** Invariant H: GL Inventory (1200) == stock batch + legacy item values. */
-export function inventoryImbalances(): Violation[] {
-  const glBalance = R2(Math.abs(GL_BALANCE('1200')));
+export function inventoryImbalances(db = defaultDb): Violation[] {
+  const glBalance = R2(Math.abs(GL_BALANCE('1200', db)));
   const batchVal = db.prepare(
     'SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) AS v FROM stock_batches WHERE quantity_remaining > 0'
   ).get() as { v: number };
@@ -271,16 +325,16 @@ export function inventoryImbalances(): Violation[] {
  * could not fail. Explicit floor/upto bounds put every row in the main
  * queries so the seed is counted exactly once; 'unclassified' has no GL
  * account and is skipped. */
-export function cashImbalances(): Violation[] {
+export function cashImbalances(db = defaultDb): Violation[] {
   const flows = collectFlows(db, '9999-12-31', '1970-01-01');
   const violations: Violation[] = [];
   for (const { key, name } of CASH_ACCOUNTS) {
     const code = CASH_GL_CODES[key];
-    const acctId = code ? GL_ACCOUNT_ID(code) : undefined;
+    const acctId = code ? GL_ACCOUNT_ID(code, db) : undefined;
     if (!acctId) continue;
     const flow = flows.get(key);
     const opBalance = R2((flow?.inflow ?? 0) - (flow?.outflow ?? 0));
-    const glBalance = R2(GL_BALANCE(code));
+    const glBalance = R2(GL_BALANCE(code, db));
     if (Math.abs(glBalance - opBalance) > 0.005) {
       violations.push({ label: `GL Cash (${name}) vs operational`, diff: R2(glBalance - opBalance), account: code, expected: opBalance, actual: glBalance });
     }
@@ -302,7 +356,7 @@ export function cashImbalances(): Violation[] {
  * OPENING / TRANSFER / RECON rows legitimately reference a return header or a
  * sibling batch rather than a purchase or receipt.
  */
-export function orphanSourceBatches(): Violation[] {
+export function orphanSourceBatches(db = defaultDb): Violation[] {
   const orphans = db.prepare(`
     SELECT sb.id, sb.source_type, sb.source_id
     FROM stock_batches sb
@@ -328,17 +382,21 @@ export function orphanSourceBatches(): Violation[] {
 }
 
 /** Assert invariants A–E, F–I and J; `context` labels the call site. */
-export function expectAllInvariantsHold(context: string): void {
-  const gl = glImbalances();
+export function expectAllInvariantsHold(context: string, db = defaultDb): void {
+  const gl = glImbalances(db);
   expect(gl.groups).toEqual([]);
   expect(gl.totalDiff).toBeCloseTo(0, 2);
-  expect(customerArImbalances()).toEqual([]);
-  expect(supplierApImbalances()).toEqual([]);
-  expect(stockImbalances()).toEqual([]);
-  expect(arImbalances()).toEqual([]);
-  expect(apImbalances()).toEqual([]);
-  expect(inventoryImbalances()).toEqual([]);
-  expect(cashImbalances()).toEqual([]);
-  expect(orphanSourceBatches()).toEqual([]);
+  expect(customerArImbalances(db)).toEqual([]);
+  expect(supplierApImbalances(db)).toEqual([]);
+  expect(stockImbalances(db)).toEqual([]);
+  expect(arImbalances(db)).toEqual([]);
+  expect(apImbalances(db)).toEqual([]);
+  expect(inventoryImbalances(db)).toEqual([]);
+  expect(cashImbalances(db)).toEqual([]);
+  expect(orphanSourceBatches(db)).toEqual([]);
+  expect(unappliedLiabilityImbalances(db)).toEqual([]);
+  expect(creditSourceConsumptionImbalances(db)).toEqual([]);
+  expect(creditSourceBoundsImbalances(db)).toEqual([]);
+  expect(receiptAllocationImbalances(db)).toEqual([]);
   void context;
 }

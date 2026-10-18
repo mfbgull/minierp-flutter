@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
+import '../../core/auth/auth_notifier.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/payment.dart' show Payment;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -85,6 +86,11 @@ class _PaymentEditDialogState extends ConsumerState<PaymentEditDialog> {
   }
 
   Future<void> _submit() async {
+    if (!widget.payment.canModify ||
+        !(ref.read(authProvider).user?.hasPermission('payments', 'update') ??
+            false)) {
+      return;
+    }
     final l10n = AppLocalizations.of(context)!;
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
@@ -121,6 +127,19 @@ class _PaymentEditDialogState extends ConsumerState<PaymentEditDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    if (!widget.payment.canModify ||
+        !(ref.watch(authProvider).user?.hasPermission('payments', 'update') ??
+            false)) {
+      return AlertDialog(
+        content: Text(l10n.cashDocumentReadOnly),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.commonClose),
+          ),
+        ],
+      );
+    }
     final scheme = Theme.of(context).colorScheme;
 
     return Dialog(
@@ -155,7 +174,8 @@ class _PaymentEditDialogState extends ConsumerState<PaymentEditDialog> {
                       // PAY-04 (task 2.7): amount edits are rejected by the
                       // server — explain the void-and-reissue policy inline.
                       decoration: formInputDecoration().copyWith(
-                        helperText: 'Amount is fixed — void this payment and '
+                        helperText:
+                            'Amount is fixed — void this payment and '
                             'record a new one to change it',
                       ),
                     ),

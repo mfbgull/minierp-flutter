@@ -9,6 +9,10 @@ Flutter desktop client + Node/Express/SQLite backend in one repo.
 
 ---
 
+## Dummy historical data
+
+For non-production test/dummy records only, treat existing accounting gaps as known legacy noise. Do not repair or repeatedly re-audit them unless explicitly requested. They are not implementation blockers. However, do not weaken integrity checks or tests. Instead, isolate legacy gaps using clean fixtures, fresh test databases, or an explicit allowlist. Ensure all new transactions satisfy accounting invariants and add regression tests. If a gap can be reproduced by current logic, or if any record may be real, stop and investigate.
+
 ## Check before you finish
 
 There is no `package.json` at the repo root; each side has its own commands.

@@ -9,6 +9,7 @@ import { isValidPaymentMethod } from '../services/cashService';
 import { PaymentRecordingService } from '../services/PaymentRecordingService';
 import { SupplierPaymentService } from '../services/SupplierPaymentService';
 import type { SupplierPaymentAllocation } from '../services/paymentRecordingTypes';
+import { assertLegacyPaymentAllowed, assertLegacyInvoiceAllocationsAllowed } from '../services/unappliedPaymentGuard';
 
 interface PaymentFilters {
   search?: string;
@@ -77,6 +78,7 @@ export type UnifiedPaymentRow = {
   description: string | null;
   sort_created_at: string;
   direction: 'in' | 'out' | 'unknown';
+  payment_kind: string | null;
 };
 
 export type PaymentAllocation = {
@@ -94,6 +96,7 @@ export type PaymentDetailRow = {
   customer_name: string;
   supplier_id: number | null;
   voided_at: string | null;
+  payment_kind: string;
   invoice_id: number | null;
   invoice_no: string | null;
   payment_date: string;
@@ -140,7 +143,7 @@ export class PaymentModel {
     const payment = db.prepare(`
       SELECT p.id, p.payment_no, p.customer_id, c.customer_name, p.supplier_id, p.invoice_id, i.invoice_no,
              p.payment_date, p.amount, p.payment_method, p.reference_no, p.notes, p.created_at,
-             p.voided_at,
+             p.voided_at, p.payment_kind,
              GROUP_CONCAT(pa.invoice_id, ',') as allocated_invoices,
              GROUP_CONCAT(pa.amount, ',') as allocation_amounts,
              GROUP_CONCAT(pa.id, ',') as allocation_ids
@@ -174,6 +177,7 @@ export class PaymentModel {
       SELECT p.id, p.payment_no, p.customer_id, c.customer_name, p.supplier_id, s.supplier_name as supplier_name,
              p.invoice_id, i.invoice_no,
              p.payment_date, p.amount, p.payment_method, p.reference_no, p.notes, p.created_at,
+             p.voided_at, p.payment_kind,
              GROUP_CONCAT(pa.invoice_id, ',') as allocated_invoices,
              GROUP_CONCAT(pa.amount, ',') as allocation_amounts
       FROM payments p
@@ -286,7 +290,7 @@ export class PaymentModel {
              CASE WHEN p.supplier_id IS NOT NULL THEN 'supplier'
                   WHEN p.customer_id IS NOT NULL THEN 'customer' ELSE 'unknown' END party_type,
              'posted' status, p.notes description,
-             COALESCE(p.created_at, p.payment_date) sort_created_at
+             COALESCE(p.created_at, p.payment_date) sort_created_at, p.payment_kind
       FROM payments p
       LEFT JOIN customers c ON p.customer_id = c.id
       LEFT JOIN suppliers s ON p.supplier_id = s.id
@@ -296,14 +300,14 @@ export class PaymentModel {
              ${PaymentModel.unifiedMethodSql('e.payment_method')}, 'expense',
              COALESCE(e.vendor_name, e.expense_category) party, NULL party_id, NULL party_type,
              e.status, e.description,
-             COALESCE(e.created_at, e.expense_date)
+             COALESCE(e.created_at, e.expense_date), NULL
       FROM expenses e WHERE e.status NOT IN ('Draft', 'Cancelled')
       UNION ALL
       SELECT 'salary', sp.id, 'SAL-' || sp.id, sp.payment_date, ABS(sp.amount),
              ${PaymentModel.unifiedMethodSql('sp.payment_method')}, 'salary',
              TRIM(sp_emp.first_name || ' ' || sp_emp.last_name) party, sp.employee_id party_id, 'employee' party_type,
              sp.status, sp.notes,
-             COALESCE(sp.created_at, sp.payment_date)
+             COALESCE(sp.created_at, sp.payment_date), NULL
       FROM salary_payments sp LEFT JOIN employees sp_emp ON sp_emp.id = sp.employee_id
       WHERE sp.voided_at IS NULL
       UNION ALL
@@ -311,22 +315,22 @@ export class PaymentModel {
              ${PaymentModel.unifiedMethodSql('oc.payment_method')}, 'owner_capital',
              'Owner' party, NULL party_id, NULL party_type,
              oc.status, oc.note,
-             COALESCE(oc.created_at, oc.capital_date)
+             COALESCE(oc.created_at, oc.capital_date), NULL
       FROM owner_capital oc WHERE oc.status = 'posted'
       UNION ALL
       SELECT 'owner_withdrawal', ow.id, ow.withdrawal_no, ow.withdrawal_date, ABS(ow.amount),
              ${PaymentModel.unifiedMethodSql('ow.payment_method')}, 'owner_withdrawal',
              'Owner' party, NULL party_id, NULL party_type,
              ow.status, ow.note,
-             COALESCE(ow.created_at, ow.withdrawal_date)
+             COALESCE(ow.created_at, ow.withdrawal_date), NULL
       FROM owner_withdrawals ow WHERE ow.status = 'posted' AND ow.kind = 'cash'
     `;
 
-    const directionSql = `CASE type
+    const directionSql = `CASE WHEN type = 'customer' AND payment_kind = 'REFUND' THEN 'out' ELSE CASE type
         WHEN 'customer' THEN 'in' WHEN 'owner_capital' THEN 'in'
         WHEN 'supplier' THEN 'out' WHEN 'expense' THEN 'out'
         WHEN 'salary' THEN 'out' WHEN 'owner_withdrawal' THEN 'out'
-        ELSE 'unknown' END`;
+        ELSE 'unknown' END END`;
 
     const whereParts: string[] = [];
     const params: (string | number)[] = [];
@@ -448,6 +452,7 @@ export class PaymentModel {
   ): void {
     const existing = this.getById(db, id);
     if (!existing) throw new Error('Payment not found');
+    assertLegacyPaymentAllowed(db, id);
 
     // PAY-04 (financial-audit-p0-remediation 2.1): amount edits on an
     // allocated payment silently rescaled allocations past invoice balances
@@ -619,6 +624,7 @@ export class PaymentModel {
     AccountingService.assertPeriodNotClosed(db, existing.payment_date, `Payment ${existing.payment_no}`);
 
     db.transaction(() => {
+      assertLegacyPaymentAllowed(db, id);
       // GL consistency (ACC-09): the payment's journal lines (Dr Cash /
       // Cr AR, or supplier-side) must not survive as active orphans once
       // the payment is voided.
@@ -713,7 +719,10 @@ export class PaymentModel {
     // C6 (reversal-rules): allocation rows die with the payment reversal,
     // never with a row DELETE. Voided allocation rows are excluded from
     // balance math by voided_at IS NULL.
-    db.prepare('UPDATE payment_allocations SET voided_at = CURRENT_TIMESTAMP WHERE payment_id = ? AND voided_at IS NULL').run(paymentId);
+    db.transaction(() => {
+      assertLegacyPaymentAllowed(db, paymentId);
+      db.prepare('UPDATE payment_allocations SET voided_at = CURRENT_TIMESTAMP WHERE payment_id = ? AND voided_at IS NULL').run(paymentId);
+    }).immediate();
   }
 
   /**
@@ -722,7 +731,10 @@ export class PaymentModel {
   static deleteAllocationsByInvoiceId(db: Database.Database, invoiceId: number): void {
     // C6 (reversal-rules): void, never delete — allocation history must
     // survive every reversal for auditability.
-    db.prepare('UPDATE payment_allocations SET voided_at = CURRENT_TIMESTAMP WHERE invoice_id = ? AND voided_at IS NULL').run(invoiceId);
+    db.transaction(() => {
+      assertLegacyInvoiceAllocationsAllowed(db, invoiceId);
+      db.prepare('UPDATE payment_allocations SET voided_at = CURRENT_TIMESTAMP WHERE invoice_id = ? AND voided_at IS NULL').run(invoiceId);
+    }).immediate();
   }
 
   /**

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,6 +32,7 @@ class MovableDialog extends StatefulWidget {
     this.showHandle = true,
     this.snapThreshold = 40.0,
     this.enableKeyboardShortcuts = true,
+    this.enableEscapeKey = false,
     this.keyboardStep = 30.0,
   });
 
@@ -48,6 +51,8 @@ class MovableDialog extends StatefulWidget {
 
   /// Whether Ctrl+Arrow keys can move the dialog.
   final bool enableKeyboardShortcuts;
+
+  final bool enableEscapeKey;
 
   /// Pixels to move per Ctrl+Arrow press.
   final double keyboardStep;
@@ -68,16 +73,17 @@ class _MovableDialogState extends State<MovableDialog>
   void initState() {
     super.initState();
     _focusNode = FocusNode();
-    _snapController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 180),
-    )..addListener(() {
-        if (_snapAnimation != null) {
-          setState(() {
-            _offset = _snapAnimation!.value;
-          });
-        }
-      });
+    _snapController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 180),
+        )..addListener(() {
+          if (_snapAnimation != null) {
+            setState(() {
+              _offset = _snapAnimation!.value;
+            });
+          }
+        });
     _loadPosition();
   }
 
@@ -174,7 +180,10 @@ class _MovableDialogState extends State<MovableDialog>
     }
   }
 
-  void _onPanUpdate(DragUpdateDetails details, void Function(VoidCallback) setState) {
+  void _onPanUpdate(
+    DragUpdateDetails details,
+    void Function(VoidCallback) setState,
+  ) {
     setState(() {
       _offset += details.delta;
     });
@@ -182,12 +191,14 @@ class _MovableDialogState extends State<MovableDialog>
 
   /// Handle Ctrl+Arrow keyboard shortcuts to move the dialog.
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (!widget.enableKeyboardShortcuts) return KeyEventResult.ignored;
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
 
-    final isCtrl = HardwareKeyboard.instance.isControlPressed ||
+    if (!widget.enableKeyboardShortcuts) return KeyEventResult.ignored;
+
+    final isCtrl =
+        HardwareKeyboard.instance.isControlPressed ||
         HardwareKeyboard.instance.isMetaPressed;
     if (!isCtrl) return KeyEventResult.ignored;
 
@@ -221,67 +232,83 @@ class _MovableDialogState extends State<MovableDialog>
         return AnimatedBuilder(
           animation: _snapController,
           builder: (context, _) {
-            return Focus(
-              focusNode: _focusNode,
-              onKeyEvent: _handleKeyEvent,
-              canRequestFocus: false,
-              child: Transform.translate(
-                offset: _offset,
-                child: Dialog(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: widget.maxWidth,
-                    maxHeight: widget.maxHeight,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (widget.showHandle)
-                        GestureDetector(
-                          onPanUpdate: (details) {
-                            _onPanUpdate(details, setInnerState);
-                          },
-                          onPanEnd: (_) => _snapToEdge(),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            decoration: BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(
-                                  color: Theme.of(context)
-                                      .dividerColor
-                                      .withValues(alpha: 0.3),
-                                ),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  width: 32,
-                                  height: 4,
+            return CallbackShortcuts(
+              bindings: widget.enableEscapeKey
+                  ? {
+                      const SingleActivator(LogicalKeyboardKey.escape): () {
+                        unawaited(Navigator.of(context).maybePop());
+                      },
+                    }
+                  : const {},
+              child: Focus(
+                autofocus: widget.enableEscapeKey,
+                child: Focus(
+                  focusNode: _focusNode,
+                  onKeyEvent: _handleKeyEvent,
+                  canRequestFocus: false,
+                  child: Transform.translate(
+                    offset: _offset,
+                    child: Dialog(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: widget.maxWidth,
+                          maxHeight: widget.maxHeight,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (widget.showHandle)
+                              GestureDetector(
+                                onPanUpdate: (details) {
+                                  _onPanUpdate(details, setInnerState);
+                                },
+                                onPanEnd: (_) => _snapToEdge(),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 6,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant
-                                        .withValues(alpha: 0.4),
-                                    borderRadius: BorderRadius.circular(2),
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        color: Theme.of(
+                                          context,
+                                        ).dividerColor.withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: 32,
+                                        height: 4,
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant
+                                              .withValues(alpha: 0.4),
+                                          borderRadius: BorderRadius.circular(
+                                            2,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
+                              ),
+                            Flexible(child: widget.child),
+                          ],
                         ),
-                      Flexible(child: widget.child),
-                    ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-        },
-      );
-    },
-  );
+            );
+          },
+        );
+      },
+    );
   }
 }

@@ -9,6 +9,309 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get cashOrdinaryReceipt => 'Receipt';
+
+  @override
+  String get cashAdvanceReceipt => 'Advance receipt';
+
+  @override
+  String get cashRefundPayment => 'Customer refund';
+
+  @override
+  String get cashDocumentReadOnly =>
+      'This cash document is read-only here. Use Unapplied Cash for supported corrections.';
+
+  @override
+  String get cashBulkExcluded =>
+      'Advances, refunds and immutable documents cannot be deleted here. Use their supported correction workflow.';
+
+  @override
+  String get cashPaidTo => 'Paid To';
+
+  @override
+  String get cashAmountPaid => 'Amount Paid';
+
+  @override
+  String get cashAmountReceived => 'Amount Received';
+
+  @override
+  String get cashReceivedFrom => 'Received From';
+
+  @override
+  String get cashDirection => 'Cash direction';
+
+  @override
+  String get cashTypeDelete => 'Type DELETE to confirm';
+
+  @override
+  String get cashTab => 'Unapplied Cash';
+
+  @override
+  String get cashRefund => 'Refund Cash';
+
+  @override
+  String get cashRefundHint =>
+      'Pay cash back to this customer from the date-eligible FIFO cash pool, not from a selected receipt. This is a cash outflow.';
+
+  @override
+  String get cashRefundable => 'Refundable cash on operation date';
+
+  @override
+  String get cashReviewRefund => 'Review refund';
+
+  @override
+  String get cashConfirmRefund => 'Confirm cash refund';
+
+  @override
+  String get cashRefundedSuccess => 'Cash refunded';
+
+  @override
+  String cashRefundedDetails(String amount, String paymentId) {
+    return 'Paid out $amount. Payment ID: $paymentId.';
+  }
+
+  @override
+  String get cashInsufficientFunds =>
+      'The cash or bank balance is insufficient for this refund. Review the method, date and available funds before trying again.';
+
+  @override
+  String get cashInvalidRefund =>
+      'Enter a positive amount with at most two decimal places, within refundable cash for this date.';
+
+  @override
+  String get cashReverse => 'Reverse receipt';
+
+  @override
+  String get cashReverseHint =>
+      'Reverse only this unused advance. The original receipt date is used and cannot be changed. Related applications or refunds block reversal.';
+
+  @override
+  String get cashReviewReverse => 'Review reversal';
+
+  @override
+  String get cashConfirmReverse => 'Confirm reversal';
+
+  @override
+  String get cashReverseReason => 'Reason for reversal';
+
+  @override
+  String get cashInvalidReason =>
+      'Enter a reason between 1 and 500 characters.';
+
+  @override
+  String get cashReverseUnavailable =>
+      'This receipt cannot be reversed because it is used, refunded, voided or not a live unused advance.';
+
+  @override
+  String get cashNoReversePermission =>
+      'You do not have permission to reverse receipts.';
+
+  @override
+  String get cashReversedSuccess => 'Receipt reversed';
+
+  @override
+  String get cashAlreadyReversed =>
+      'This receipt is already reversed. Current status was verified; this retry did not reverse it again.';
+
+  @override
+  String cashReversedDetails(String paymentNo) {
+    return 'Receipt $paymentNo has been reversed. The original record remains in history.';
+  }
+
+  @override
+  String cashDependencySource(String sourceId, String amount) {
+    return 'Source #$sourceId; applied amount $amount';
+  }
+
+  @override
+  String cashDependencyInvoice(String invoiceId) {
+    return 'Invoice #$invoiceId';
+  }
+
+  @override
+  String get cashEditReview => 'Edit details';
+
+  @override
+  String get cashReceiveAdvance => 'Receive Advance';
+
+  @override
+  String get cashApply => 'Apply Cash to Invoices';
+
+  @override
+  String get cashApplyHint =>
+      'Use cash already held for this customer. This does not collect another payment.';
+
+  @override
+  String get cashEligible => 'Cash available on operation date';
+
+  @override
+  String get cashSelected => 'Selected total';
+
+  @override
+  String get cashAfterApply => 'Cash remaining after application';
+
+  @override
+  String get cashAutoAllocate => 'Auto Allocate';
+
+  @override
+  String get cashSearchInvoices => 'Search invoices';
+
+  @override
+  String get cashAllocation => 'Apply amount';
+
+  @override
+  String get cashNoOpenInvoices => 'No eligible open invoices on this date.';
+
+  @override
+  String get cashNoUpdatePermission =>
+      'You do not have permission to apply cash.';
+
+  @override
+  String get cashNoInvoicePermission =>
+      'You need permission to read invoices before selecting them.';
+
+  @override
+  String get cashInvalidAllocations =>
+      'Enter positive amounts within invoice balances and available cash. Select 1 to 1,000 invoices.';
+
+  @override
+  String get cashChangedBalances =>
+      'Balances changed. Current amounts have been refreshed; review your original allocations before confirming again.';
+
+  @override
+  String get cashAppliedSuccess => 'Cash applied';
+
+  @override
+  String cashAppliedDetails(String amount, String applicationId) {
+    return 'Applied $amount. Application ID: $applicationId. No new payment was collected.';
+  }
+
+  @override
+  String get cashInvoiceBalance => 'Invoice balance';
+
+  @override
+  String get cashStoreCredit => 'Store credit';
+
+  @override
+  String get cashHeld => 'Unapplied cash held';
+
+  @override
+  String get cashSummaryHint =>
+      'Cash held is separate from store credit and invoice balance. The date range filters activity only, not current cash.';
+
+  @override
+  String get cashReceipts => 'Receipts';
+
+  @override
+  String get cashActivity => 'Applications & refunds';
+
+  @override
+  String get cashNoReceipts => 'No advance receipts yet';
+
+  @override
+  String get cashNoActivity => 'No applications or refunds yet';
+
+  @override
+  String get cashNoReadPermission =>
+      'You do not have permission to view unapplied cash.';
+
+  @override
+  String get cashNoCreatePermission =>
+      'You do not have permission to receive an advance.';
+
+  @override
+  String get cashReceiveHint =>
+      'Receive cash now and apply it to invoices later. Receiving an advance does not mark any invoice paid.';
+
+  @override
+  String get cashAmount => 'Amount';
+
+  @override
+  String get cashInvalidAmount =>
+      'Enter a positive amount with at most two decimal places.';
+
+  @override
+  String get cashOperationDate => 'Operation date';
+
+  @override
+  String get cashReceived => 'Advance received';
+
+  @override
+  String cashReceivedDetails(String amount, String paymentId) {
+    return 'Received $amount. Payment ID: $paymentId.';
+  }
+
+  @override
+  String get cashPendingNotice =>
+      'This request may already have been saved. Its original amount, date, method and retry key are retained. Retry safely to confirm; do not enter it again.';
+
+  @override
+  String get cashRecoveryRequired =>
+      'The outcome needs verification before another request can be sent. Keep this pending request; do not enter it again.';
+
+  @override
+  String get cashOtherPending =>
+      'Another customer or cash workflow has a pending request. Recover that original operation before receiving more cash.';
+
+  @override
+  String get cashConnectionRequired =>
+      'Connect to the server to load cash or confirm this operation.';
+
+  @override
+  String get cashAlreadyInCredit =>
+      'This customer is already in credit. Settle that credit before receiving an advance.';
+
+  @override
+  String get cashPeriodClosed =>
+      'The operation date is in a closed accounting period. Choose an open date.';
+
+  @override
+  String get cashReplayUnsupported =>
+      'This server cannot confirm safe recovery yet. No new request has been sent.';
+
+  @override
+  String get cashOperationFailed =>
+      'The cash operation could not be completed. Check the details and try again.';
+
+  @override
+  String get cashUnavailable => 'Unavailable';
+
+  @override
+  String get cashRemaining => 'Remaining';
+
+  @override
+  String get cashApplied => 'Applied';
+
+  @override
+  String get cashRefunded => 'Refunded';
+
+  @override
+  String get cashOriginal => 'Original amount';
+
+  @override
+  String get cashStatusUnused => 'Unused';
+
+  @override
+  String get cashStatusPartial => 'Partly used';
+
+  @override
+  String get cashStatusUsed => 'Used';
+
+  @override
+  String get cashStatusReversed => 'Reversed';
+
+  @override
+  String get cashApplyLabel => 'Applied to invoices';
+
+  @override
+  String get cashRefundLabel => 'Cash refund';
+
+  @override
+  String cashPageLabel(int page, int pages) {
+    return 'Page $page of $pages';
+  }
+
+  @override
   String get dashboardWelcome => 'Welcome back';
 
   @override

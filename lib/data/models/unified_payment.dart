@@ -27,6 +27,7 @@ class UnifiedPayment {
     this.partyType,
     required this.status,
     this.description,
+    this.paymentKind,
   });
 
   factory UnifiedPayment.fromJson(Map<String, dynamic> json) => UnifiedPayment(
@@ -43,21 +44,29 @@ class UnifiedPayment {
     partyType: asString(json['party_type']),
     status: asString(json['status']) ?? '',
     description: asString(json['description']),
+    paymentKind: asString(json['payment_kind']),
   );
 
-  final String source; // payment | expense | salary | owner_capital | owner_withdrawal
+  final String
+  source; // payment | expense | salary | owner_capital | owner_withdrawal
   final int sourceId; // source-local database id
   final String refNo;
   final String date;
   final num amount;
   final String method;
-  final String type; // customer | supplier | expense | salary | owner_capital | owner_withdrawal | unknown
+  final String
+  type; // customer | supplier | expense | salary | owner_capital | owner_withdrawal | unknown
   final String direction; // in | out | unknown
   final String party;
   final int? partyId; // customer/supplier id (payment) or employee id (salary)
   final String? partyType; // customer | supplier | employee | unknown | null
   final String status;
   final String? description;
+  final String? paymentKind;
+
+  bool get canDeleteGenerically =>
+      source != 'expense' &&
+      (source != 'payment' || (paymentKind ?? 'RECEIPT') == 'RECEIPT');
 
   /// UI-only identity. A payment row and a salary row can share a numeric
   /// `sourceId`, so the grid key combines both. Never sent to the API.

@@ -36,14 +36,17 @@ import 'paged_request.dart';
 
 /// Thrown internally when the server responds `{success: false, error}`
 /// or the payload has an unexpected shape.
-class ApiResponseException implements Exception {
-  ApiResponseException(this.message, this.statusCode);
-
-  final String message;
-  final int? statusCode;
+class ApiResponseException extends ApiError implements Exception {
+  ApiResponseException(
+    String message,
+    int? statusCode, {
+    super.code,
+    super.blockedBy,
+  }) : super(message: message, statusCode: statusCode);
 
   @override
-  String toString() => 'ApiResponseException($statusCode): $message';
+  String toString() =>
+      'ApiResponseException($statusCode, code=$code): $message';
 }
 
 class RepositoryClient {
@@ -57,6 +60,7 @@ class RepositoryClient {
   }) : _cache = cache; // ignore: prefer_initializing_formals
 
   final Dio _dio;
+  String get baseUrl => _dio.options.baseUrl;
   final CacheManager? _cache;
 
   /// Default TTL for cached reads.
@@ -72,6 +76,32 @@ class RepositoryClient {
   /// (server unreachable) — screens render an "Offline" badge off this.
   final ValueNotifier<bool> servingCached = ValueNotifier<bool>(false);
 
+  Future<ApiResult<T>> getOnline<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    bool includeEnvelope = false,
+    required T Function(Object?) parse,
+  }) async {
+    try {
+      final result = await _guard(
+        () => _dio.get(path, queryParameters: queryParameters),
+      );
+      return result.map((response) {
+        if (servingCached.value) servingCached.value = false;
+        final data = _envelopeData(response);
+        return _tryParse(includeEnvelope ? response.data : data, parse);
+      });
+    } on ApiResponseException catch (error) {
+      return ApiFailure(error);
+    }
+  }
+
+  Future<void> invalidatePaths(Iterable<String> paths) async {
+    for (final path in paths) {
+      await _invalidateFor(path);
+    }
+  }
+
   /* ── Enveloped requests ──────────────────────────────────────── */
 
   Future<ApiResult<T>> get<T>(
@@ -79,7 +109,11 @@ class RepositoryClient {
     Map<String, dynamic>? queryParameters,
     required T Function(Object?) parse,
   }) => _parse(
-    _guardGet(path, queryParameters, () => _dio.get(path, queryParameters: queryParameters)),
+    _guardGet(
+      path,
+      queryParameters,
+      () => _dio.get(path, queryParameters: queryParameters),
+    ),
     parse,
   );
 
@@ -133,7 +167,7 @@ class RepositoryClient {
         _envelopeData(response); // throws on {success: false}
       });
     } on ApiResponseException catch (e) {
-      return ApiFailure(ApiError(message: e.message, statusCode: e.statusCode));
+      return ApiFailure(e);
     }
   }
 
@@ -160,7 +194,7 @@ class RepositoryClient {
         return _parseItems(data, parseItem);
       });
     } on ApiResponseException catch (e) {
-      return ApiFailure(ApiError(message: e.message, statusCode: e.statusCode));
+      return ApiFailure(e);
     }
   }
 
@@ -204,7 +238,7 @@ class RepositoryClient {
         );
       });
     } on ApiResponseException catch (e) {
-      return ApiFailure(ApiError(message: e.message, statusCode: e.statusCode));
+      return ApiFailure(e);
     }
   }
 
@@ -240,7 +274,7 @@ class RepositoryClient {
         return parse(raw);
       });
     } on ApiResponseException catch (e) {
-      return ApiFailure(ApiError(message: e.message, statusCode: e.statusCode));
+      return ApiFailure(e);
     }
   }
 
@@ -275,7 +309,7 @@ class RepositoryClient {
         );
       });
     } on ApiResponseException catch (e) {
-      return ApiFailure(ApiError(message: e.message, statusCode: e.statusCode));
+      return ApiFailure(e);
     }
   }
 
@@ -290,7 +324,11 @@ class RepositoryClient {
     Map<String, dynamic>? queryParameters,
     required T Function(Object?) parse,
   }) => _parseRaw(
-    _guardGet(path, queryParameters, () => _dio.get(path, queryParameters: queryParameters)),
+    _guardGet(
+      path,
+      queryParameters,
+      () => _dio.get(path, queryParameters: queryParameters),
+    ),
     parse,
   );
 
@@ -369,7 +407,7 @@ class RepositoryClient {
         return _parseItems(data, parseItem);
       });
     } on ApiResponseException catch (e) {
-      return ApiFailure(ApiError(message: e.message, statusCode: e.statusCode));
+      return ApiFailure(e);
     }
   }
 
@@ -411,7 +449,9 @@ class RepositoryClient {
           // Keep the cache small (spec: <10MB): skip oversized bodies.
           if (json.length <= _maxCacheBytes) {
             unawaited(
-              cache.put(key, json, ttl: ttlForPath[path] ?? cacheTtl).catchError((_) {}),
+              cache
+                  .put(key, json, ttl: ttlForPath[path] ?? cacheTtl)
+                  .catchError((_) {}),
             );
           }
         } on JsonUnsupportedObjectError {
@@ -453,11 +493,12 @@ class RepositoryClient {
   /// combos cache separately but a write can invalidate by path prefix.
   String? _cacheKey(String path, Map<String, dynamic>? queryParameters) {
     if (queryParameters == null || queryParameters.isEmpty) return path;
-    final pairs = queryParameters.entries
-        .where((e) => e.value != null)
-        .map((e) => '${e.key}=${e.value}')
-        .toList()
-      ..sort();
+    final pairs =
+        queryParameters.entries
+            .where((e) => e.value != null)
+            .map((e) => '${e.key}=${e.value}')
+            .toList()
+          ..sort();
     return pairs.isEmpty ? path : '$path?${pairs.join('&')}';
   }
 
@@ -492,7 +533,7 @@ class RepositoryClient {
         (response) => _tryParse(_envelopeData(response), parse),
       );
     } on ApiResponseException catch (e) {
-      return ApiFailure(ApiError(message: e.message, statusCode: e.statusCode));
+      return ApiFailure(e);
     }
   }
 
@@ -504,7 +545,7 @@ class RepositoryClient {
       final result = await guarded;
       return result.map((response) => _tryParse(response.data, parse));
     } on ApiResponseException catch (e) {
-      return ApiFailure(ApiError(message: e.message, statusCode: e.statusCode));
+      return ApiFailure(e);
     }
   }
 
@@ -515,8 +556,10 @@ class RepositoryClient {
   T _tryParse<T>(Object? json, T Function(Object?) parse) {
     try {
       return parse(json);
-    } on TypeError catch (e) {
-      throw ApiResponseException('Failed to parse server response: $e', null);
+    } on TypeError {
+      throw ApiResponseException('Failed to parse server response', null);
+    } on FormatException {
+      throw ApiResponseException('Invalid server response', null);
     }
   }
 
@@ -533,9 +576,16 @@ class RepositoryClient {
         throw ApiResponseException(error, response.statusCode);
       }
       if (error is Map<String, dynamic> && error['message'] is String) {
+        final structured = ApiError.fromResponse(
+          message: error['message'] as String,
+          statusCode: response.statusCode,
+          body: body,
+        );
         throw ApiResponseException(
           error['message'] as String,
           response.statusCode,
+          code: structured.code,
+          blockedBy: structured.blockedBy,
         );
       }
       throw ApiResponseException('Request failed', response.statusCode);
@@ -566,9 +616,10 @@ class RepositoryClient {
       DioExceptionType.transformTimeout => true,
       _ => false,
     };
-    return ApiError(
+    return ApiError.fromResponse(
       message: mapError(e),
       statusCode: e.response?.statusCode,
+      body: e.response?.data,
       isNetwork: isNetwork,
       outcomeUnknown: outcomeUnknown,
     );

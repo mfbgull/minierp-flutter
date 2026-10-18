@@ -1,6 +1,7 @@
 /// API endpoint constants — mirrors the REST contract in docs/API.md
 /// (~100 endpoints). Add each module's routes as it is ported.
 abstract final class ApiEndpoints {
+  static const unappliedCash = '/unapplied-cash';
   // Auth (§3)
   static const login = '/auth/login';
   static const refresh = '/auth/refresh';
