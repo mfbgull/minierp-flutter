@@ -3,6 +3,8 @@
 // ([openCustomerRowMenu]) and the destructive [deleteCustomer] action
 // with its Undo toast (SHORTCOMINGS-FIX 4.2).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -93,9 +95,9 @@ Future<void> openCustomerRowMenu({
 
   switch (action) {
     case CustomerRowAction.view:
-      context.push('/customers/${customer.id}');
+      unawaited(context.push('/customers/${customer.id}'));
     case CustomerRowAction.edit:
-      showCustomerFormDialog(context, customer: customer);
+      unawaited(showCustomerFormDialog(context, customer: customer));
     case CustomerRowAction.delete:
       await deleteCustomer(context: context, ref: ref, customer: customer);
   }

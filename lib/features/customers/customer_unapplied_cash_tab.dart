@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -507,7 +508,9 @@ class _CustomerUnappliedCashTabState
     setState(() => _openingInvoice = null);
     switch (result) {
       case ApiSuccess(:final data):
-        GoRouter.of(context).push('/sales/print-preview', extra: data);
+        unawaited(
+          GoRouter.of(context).push('/sales/print-preview', extra: data),
+        );
       case ApiFailure(:final error):
         showAppToast(context, error.message, isError: true);
     }
