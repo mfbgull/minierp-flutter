@@ -18,6 +18,15 @@ export const INVOICE_CREATE_SCOPE = 'invoice_create';
 export const MOBILE_INVOICE_CREATE_SCOPE = 'mobile_invoice_create';
 export const POS_SALE_SCOPE = 'pos_sale';
 
+export function observeInvoiceIdempotency(route: string, keyed: boolean): void {
+  logger.info({
+    message: 'invoice_idempotency_observation',
+    event: 'invoice_idempotency_observation',
+    route,
+    keyed,
+  });
+}
+
 /**
  * audit-3 task 08: one scope per money-moving write handler.
  *

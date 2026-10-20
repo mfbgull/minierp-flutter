@@ -13,10 +13,12 @@
  * directly against the tables.
  */
 import request from 'supertest';
+import { beforeAll, describe, expect, it } from '@jest/globals';
 import app from '../app';
 import db from '../config/database';
 import { IDEMPOTENCY_SCOPES } from '../utils/idempotency';
 import { createCustomer, createItem, createInvoice, purchaseStock } from './helpers/invoiceReturnSpec';
+import { SupplierPaymentService } from '../services/SupplierPaymentService';
 
 const TEST_PASSWORD = process.env.TEST_ADMIN_PASSWORD;
 if (!TEST_PASSWORD) {
@@ -463,6 +465,10 @@ describe('idempotency — Round 2 money handlers', () => {
         });
       expect(purchase.status).toBe(201);
       const purchaseId = Array.isArray(purchase.body) ? purchase.body[0].id : purchase.body.id;
+      new SupplierPaymentService(db).recordSupplierPayment({
+        supplierId, paymentDate: '2026-09-04', amount: 200, paymentMethod: 'Cash',
+        allocations: [{ kind: 'purchase', id: purchaseId, amount: 200 }],
+      });
 
       const returned = await request(app).post('/api/purchase-returns')
         .set('Cookie', authCookie)
