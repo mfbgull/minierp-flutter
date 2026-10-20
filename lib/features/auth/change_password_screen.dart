@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/utils/password_policy.dart';
 
 import '../../data/repositories/api_result.dart'
     show ApiError, ApiFailure, ApiSuccess;
@@ -130,8 +131,11 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                           if (value == null || value.isEmpty) {
                             return l10n.commonRequired;
                           }
-                          if (value.length < 6) {
+                          if (PasswordPolicy.isTooShort(value)) {
                             return l10n.changePasswordTooShort;
+                          }
+                          if (PasswordPolicy.isTooLong(value)) {
+                            return l10n.passwordTooLong;
                           }
                           if (value == _current.text) {
                             return l10n.changePasswordSameAsCurrent;
