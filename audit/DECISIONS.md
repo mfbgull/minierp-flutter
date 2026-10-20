@@ -1,5 +1,15 @@
 # MiniERP: Finalized Seven Decisions
 
+## D13 — Remaining audit implementation (2026-10-18)
+
+- ACCT-006: the user chose to keep current costing and show a clear warning for backdated sales. Full as-of stock allocation is not selected.
+- ACCT-008: the user chose to preserve keyless invoice API compatibility and complete migration telemetry, including the deprecated mobile submit endpoint. Mandatory retry keys remain deferred until external consumers can migrate.
+- ACCT-009: the user chose to implement accrual expenses, supplier bills, input tax and advances in this audit pass. Reuse existing accounting and advance-payment flows where present.
+- PAY-002: the user chose parent-only voiding. A salary-payment void reverses both linked records; a direct child-advance void remains blocked.
+- PRET-002: the user delegated the choice. A refund expected from a supplier remains an outstanding credit until an explicit refund receipt is recorded. Expected money must not increase cash.
+- CODE-003 security implementation: new passwords require at least 12 Unicode characters and at most 72 UTF-8 bytes (bcrypt's input limit), with no composition rule. Existing passwords are not rotated. Initial administrator creation requires an explicit password meeting the same policy in every environment; existing installations are not reseeded. The assigned system Admin role is authoritative; custom role names cannot confer the admin bypass, and the legacy role string is used only for unassigned legacy users.
+- The standing AGENTS.md restriction on historical dummy-data repairs remains in force; this implementation does not authorise live historical corrections.
+
 Decision record for implementation
 
 The following records the seven decisions agreed for the current MiniERP work. The implementation should follow these decisions and preserve existing accounting, inventory, and authorization integrity.
