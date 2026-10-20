@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { beforeAll, describe, expect, it } from '@jest/globals';
 import app from '../app';
 import { isValidPaymentMethod } from '../services/cashService';
 
@@ -35,12 +36,14 @@ describe('TASK 26 payment method options', () => {
     return (data as Array<{ value: string }>).map((o) => o.value);
   }
 
-  it('expense options exclude Other and every value is server-valid', async () => {
+  it('expense options contain the accrual method and valid cash methods', async () => {
     const options = await paymentMethodOptions('/api/expenses/payment-method-options');
     expect(options).not.toContain('Other');
     expect(options.length).toBeGreaterThan(0);
+    expect(options).toContain('Credit');
+    expect(isValidPaymentMethod('Credit')).toBe(false);
     for (const value of options) {
-      expect(isValidPaymentMethod(value)).toBe(true);
+      expect(value === 'Credit' || isValidPaymentMethod(value)).toBe(true);
     }
   });
 
