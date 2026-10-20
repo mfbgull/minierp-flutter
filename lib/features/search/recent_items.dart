@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/recoverable_failure.dart';
 
 /// A single recently-viewed entity, persisted locally (no backend).
 class RecentItem {
@@ -15,15 +16,15 @@ class RecentItem {
   });
 
   factory RecentItem.fromJson(Map<String, dynamic> json) => RecentItem(
-        entityType: (json['entityType'] as String?) ?? '',
-        entityId: json['entityId'],
-        title: (json['title'] as String?) ?? '',
-        subtitle: (json['subtitle'] as String?) ?? '',
-        path: (json['path'] as String?) ?? '',
-        timestamp: DateTime.fromMillisecondsSinceEpoch(
-          (json['timestamp'] as num?)?.toInt() ?? 0,
-        ),
-      );
+    entityType: (json['entityType'] as String?) ?? '',
+    entityId: json['entityId'],
+    title: (json['title'] as String?) ?? '',
+    subtitle: (json['subtitle'] as String?) ?? '',
+    path: (json['path'] as String?) ?? '',
+    timestamp: DateTime.fromMillisecondsSinceEpoch(
+      (json['timestamp'] as num?)?.toInt() ?? 0,
+    ),
+  );
 
   final String entityType;
   final dynamic entityId;
@@ -33,13 +34,13 @@ class RecentItem {
   final DateTime timestamp;
 
   Map<String, dynamic> toJson() => {
-        'entityType': entityType,
-        'entityId': entityId,
-        'title': title,
-        'subtitle': subtitle,
-        'path': path,
-        'timestamp': timestamp.millisecondsSinceEpoch,
-      };
+    'entityType': entityType,
+    'entityId': entityId,
+    'title': title,
+    'subtitle': subtitle,
+    'path': path,
+    'timestamp': timestamp.millisecondsSinceEpoch,
+  };
 
   String get key => '$entityType:$entityId';
 }
@@ -64,7 +65,8 @@ class RecentItems {
       final items = [for (final m in list) RecentItem.fromJson(m)];
       items.sort((a, b) => b.timestamp.compareTo(a.timestamp));
       return items;
-    } catch (_) {
+    } catch (error) {
+      reportRecoverableFailure('search.decode_recent_items', error);
       return const [];
     }
   }

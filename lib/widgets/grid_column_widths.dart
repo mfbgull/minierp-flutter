@@ -15,6 +15,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/utils/recoverable_failure.dart';
 
 class GridColumnWidths {
   GridColumnWidths._(this._stateManager, this._screenKey);
@@ -49,9 +50,7 @@ class GridColumnWidths {
     stateManager.resizingChangeNotifier.addListener(tracker._onResized);
     // Queue behind the caller's post-frame auto-fit so restoration lands
     // on the fitted layout instead of racing it.
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => tracker.restoreSaved(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => tracker.restoreSaved());
     return tracker;
   }
 
@@ -131,7 +130,8 @@ class GridColumnWidths {
     final raw = prefs.getString(_storageKey);
     if (raw == null) return const {};
     try {
-      final all = (jsonDecode(raw) as Map<String, dynamic>).cast<String, Object?>();
+      final all = (jsonDecode(raw) as Map<String, dynamic>)
+          .cast<String, Object?>();
       final screen = all[screenKey] as Map<String, dynamic>?;
       // Decode eagerly (not .cast) — JSON widths arrive as num and the
       // lazy view would throw outside this catch.
@@ -139,7 +139,8 @@ class GridColumnWidths {
             (field, value) => MapEntry(field, (value as num).toDouble()),
           ) ??
           const {};
-    } catch (_) {
+    } catch (error) {
+      reportRecoverableFailure('grid.restore_column_widths', error);
       // Corrupt blob — fall back to auto-fit everywhere; the next user
       // edit overwrites it wholesale.
       return const {};
@@ -160,7 +161,9 @@ class GridColumnWidths {
           // with String keys regardless of what jsonDecode produced.
           all = decoded.map((k, v) => MapEntry('$k', v));
         }
-      } catch (_) {}
+      } catch (error) {
+        reportRecoverableFailure('grid.decode_column_widths', error);
+      }
     }
     // Merge into the screen's map, dropping entries for fields the grid
     // no longer has (renamed/removed columns), then overlay this round's

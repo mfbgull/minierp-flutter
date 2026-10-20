@@ -21,6 +21,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/recoverable_failure.dart';
 
 import '../../core/utils/date_range_math.dart'
     show DatePreset, DateRange, WeekStart, presetRange;
@@ -92,10 +93,7 @@ class PreferencesCache {
       _defaultRangeKey,
       value == null
           ? null
-          : jsonEncode({
-              'from': isoDate(value.from),
-              'to': isoDate(value.to),
-            }),
+          : jsonEncode({'from': isoDate(value.from), 'to': isoDate(value.to)}),
     );
   }
 
@@ -124,7 +122,8 @@ class PreferencesCache {
         prefs.remove(_defaultRangeKey),
         prefs.remove(_presetsKey),
       ]);
-    } catch (_) {
+    } catch (error) {
+      reportRecoverableFailure('preferences.reset_cache', error);
       // Storage unavailable — the in-memory reset still applies.
     }
   }
@@ -135,14 +134,19 @@ class PreferencesCache {
     unawaited(_write(prefs, key, value));
   }
 
-  Future<void> _write(SharedPreferences prefs, String key, String? value) async {
+  Future<void> _write(
+    SharedPreferences prefs,
+    String key,
+    String? value,
+  ) async {
     try {
       if (value == null) {
         await prefs.remove(key);
       } else {
         await prefs.setString(key, value);
       }
-    } catch (_) {
+    } catch (error) {
+      reportRecoverableFailure('preferences.persist_cache', error);
       // Storage unavailable — in-memory value still applies this session.
     }
   }
@@ -164,7 +168,8 @@ class PreferencesCache {
       final to = DateTime.tryParse('${map['to']}');
       if (from == null || to == null) return null;
       return (from: from, to: to);
-    } catch (_) {
+    } catch (error) {
+      reportRecoverableFailure('preferences.decode_range', error);
       return null;
     }
   }
@@ -184,7 +189,8 @@ class PreferencesCache {
         }
       }
       return presets;
-    } catch (_) {
+    } catch (error) {
+      reportRecoverableFailure('preferences.decode_presets', error);
       return const [];
     }
   }
@@ -271,7 +277,8 @@ UserPreferences _adopt(ProviderContainer container, UserPreferences prefs) {
     ..setDefaultRange(prefs.defaultRange)
     ..setPresets(prefs.presets);
   container.read(weekStartProvider.notifier).state = prefs.weekStart;
-  container.read(activeDefaultRangeProvider.notifier).state = prefs.defaultRange;
+  container.read(activeDefaultRangeProvider.notifier).state =
+      prefs.defaultRange;
   container.read(userPresetsProvider.notifier).state = prefs.presets;
   return prefs;
 }
@@ -295,9 +302,9 @@ Future<ApiError?> saveWeekStart(WidgetRef ref, WeekStart value) async {
   final container = ProviderScope.containerOf(ref.context);
   ref.read(weekStartProvider.notifier).state = value;
   ref.read(preferencesCacheProvider).setWeekStart(value);
-  final result = await ref.read(preferencesRepositoryProvider).update(
-    weekStart: value,
-  );
+  final result = await ref
+      .read(preferencesRepositoryProvider)
+      .update(weekStart: value);
   switch (result) {
     case ApiSuccess(:final data):
       _adopt(container, data);
@@ -313,10 +320,9 @@ Future<ApiError?> saveDefaultRange(WidgetRef ref, DateRange? range) async {
   final container = ProviderScope.containerOf(ref.context);
   ref.read(activeDefaultRangeProvider.notifier).state = range;
   ref.read(preferencesCacheProvider).setDefaultRange(range);
-  final result = await ref.read(preferencesRepositoryProvider).update(
-    defaultRange: range,
-    clearDefaultRange: range == null,
-  );
+  final result = await ref
+      .read(preferencesRepositoryProvider)
+      .update(defaultRange: range, clearDefaultRange: range == null);
   switch (result) {
     case ApiSuccess(:final data):
       _adopt(container, data);
@@ -327,13 +333,16 @@ Future<ApiError?> saveDefaultRange(WidgetRef ref, DateRange? range) async {
 }
 
 /// Persists the user-defined presets list. Same write-through contract.
-Future<ApiError?> saveUserPresets(WidgetRef ref, List<UserPreset> presets) async {
+Future<ApiError?> saveUserPresets(
+  WidgetRef ref,
+  List<UserPreset> presets,
+) async {
   final container = ProviderScope.containerOf(ref.context);
   ref.read(userPresetsProvider.notifier).state = presets;
   ref.read(preferencesCacheProvider).setPresets(presets);
-  final result = await ref.read(preferencesRepositoryProvider).update(
-    presets: presets,
-  );
+  final result = await ref
+      .read(preferencesRepositoryProvider)
+      .update(presets: presets);
   switch (result) {
     case ApiSuccess(:final data):
       _adopt(container, data);
