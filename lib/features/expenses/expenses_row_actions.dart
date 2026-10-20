@@ -1,11 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../data/models/expense.dart' show Expense;
 import '../../l10n/app_localizations.dart';
 import 'expense_form_dialog.dart';
+import 'expense_payments_dialog.dart';
 
 /// The per-row ⋮ menu actions for an expense row.
-enum ExpenseRowAction { edit }
+enum ExpenseRowAction { edit, payments }
 
 /// Opens the row-actions menu (Edit) anchored at [context].
 Future<void> openExpenseRowMenu({
@@ -27,6 +30,11 @@ Future<void> openExpenseRowMenu({
       Offset.zero & overlay.context.size!,
     ),
     items: [
+      if (expense.paymentMethod == 'Credit' && expense.status == 'Recorded')
+        PopupMenuItem(
+          value: ExpenseRowAction.payments,
+          child: Text(l10n.expensePayments),
+        ),
       PopupMenuItem(
         value: ExpenseRowAction.edit,
         child: Row(
@@ -40,6 +48,13 @@ Future<void> openExpenseRowMenu({
     ],
   );
   if (action != null && context.mounted) {
-    showExpenseFormDialog(context, expense: expense);
+    if (action == ExpenseRowAction.payments) {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ExpensePaymentsDialog(expenseId: expense.id),
+      );
+    } else {
+      unawaited(showExpenseFormDialog(context, expense: expense));
+    }
   }
 }

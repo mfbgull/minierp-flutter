@@ -16,7 +16,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/endpoints.dart' show ApiEndpoints;
 import '../../core/utils/date_utils.dart' show isoDate;
-import '../models/expense.dart' show Expense, ExpenseCategory, ExpenseOption;
+import '../models/expense.dart'
+    show Expense, ExpenseCategory, ExpenseOption, ExpensePayment;
 import 'api_result.dart';
 import 'paged_request.dart' show PagedRequest, PagedResponse;
 import 'repository_client.dart';
@@ -58,6 +59,34 @@ class ExpenseRepository {
   ExpenseRepository(this._client);
 
   final RepositoryClient _client;
+
+  Future<ApiResult<Expense>> expense(int id) => _client.get(
+    '${ApiEndpoints.expenses}/$id',
+    parse: (Object? json) => Expense.fromJson(json! as Map<String, dynamic>),
+  );
+
+  Future<ApiResult<ExpensePayment>> pay(
+    int id,
+    Map<String, dynamic> body, {
+    required String idempotencyKey,
+  }) => _client.post(
+    '${ApiEndpoints.expenses}/$id/payments',
+    body: body,
+    headers: {'Idempotency-Key': idempotencyKey},
+    parse: (Object? json) =>
+        ExpensePayment.fromJson(json! as Map<String, dynamic>),
+  );
+
+  Future<ApiResult<ExpensePayment>> voidPayment(
+    int expenseId,
+    int paymentId, {
+    required String reason,
+  }) => _client.post(
+    '${ApiEndpoints.expenses}/$expenseId/payments/$paymentId/void',
+    body: {'reason': reason},
+    parse: (Object? json) =>
+        ExpensePayment.fromJson(json! as Map<String, dynamic>),
+  );
 
   Future<ApiResult<PagedResponse<Expense>>> expenses(PagedRequest request) =>
       _client.getPaged(
@@ -126,7 +155,8 @@ class ExpenseRepository {
       _client.put(
         '${ApiEndpoints.expenses}/$id',
         body: body,
-        parse: (Object? json) => Expense.fromJson(json! as Map<String, dynamic>),
+        parse: (Object? json) =>
+            Expense.fromJson(json! as Map<String, dynamic>),
       );
 
   Future<ApiResult<void>> delete(int id) =>
