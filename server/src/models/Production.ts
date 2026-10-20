@@ -8,6 +8,7 @@ import { assertInventoryDateNotRetroactive } from '../services/inventoryEffectiv
 import ItemModel from './Item';
 import AccountingService from '../services/accountingService';
 import { SqlParam } from '../utils/sqlTypes';
+import { BusinessRuleError } from '../utils/businessRuleError';
 
 interface Production {
   id: number;
@@ -138,18 +139,18 @@ function normalizeOutputLines(data: CreateProductionDTO): ProductionOutputLine[]
     : [{ item_id: Number(data.output_item_id), quantity: Number(data.output_quantity) }];
 
   if (lines.length === 0) {
-    throw new Error('At least one output item is required');
+    throw new BusinessRuleError(400, 'At least one output item is required');
   }
   const seen = new Set<number>();
   for (const line of lines) {
     if (!Number.isInteger(line.item_id) || line.item_id <= 0) {
-      throw new Error('Each output needs a valid item_id');
+      throw new BusinessRuleError(400, 'Each output needs a valid item_id');
     }
     if (!Number.isFinite(line.quantity) || line.quantity <= 0) {
-      throw new Error('Output quantity must be positive');
+      throw new BusinessRuleError(400, 'Output quantity must be positive');
     }
     if (seen.has(line.item_id)) {
-      throw new Error(`Output item ${line.item_id} is listed more than once`);
+      throw new BusinessRuleError(400, `Output item ${line.item_id} is listed more than once`);
     }
     seen.add(line.item_id);
   }
@@ -209,19 +210,19 @@ class ProductionModel {
     // negative-cost batch, a circular recipe, or a posting in a closed period.
     const overheadValue = overhead_cost ?? 0;
     if (typeof overheadValue !== 'number' || !Number.isFinite(overheadValue) || overheadValue < 0) {
-      throw new Error('Overhead cost must be a non-negative number');
+      throw new BusinessRuleError(400, 'Overhead cost must be a non-negative number');
     }
     if (input_items.some((line) => outputLines.some((o) => Number(line.item_id) === o.item_id))) {
-      throw new Error('An item cannot be produced from itself');
+      throw new BusinessRuleError(400, 'An item cannot be produced from itself');
     }
     AccountingService.assertPeriodNotClosed(db, production_date, 'Production');
 
     // Validate bom_id matches output_item_id
     if (bom_id) {
       const bom = db.prepare('SELECT finished_item_id FROM boms WHERE id = ?').get(bom_id) as { finished_item_id: number } | undefined;
-      if (!bom) throw new Error(`BOM ${bom_id} not found`);
+      if (!bom) throw new BusinessRuleError(404, `BOM ${bom_id} not found`);
       if (bom.finished_item_id !== output_item_id) {
-        throw new Error(`BOM ${bom_id} produces item ${bom.finished_item_id}, not item ${output_item_id}`);
+        throw new BusinessRuleError(400, `BOM ${bom_id} produces item ${bom.finished_item_id}, not item ${output_item_id}`);
       }
     }
 
@@ -282,7 +283,7 @@ class ProductionModel {
 
         if (availableStock < requiredQty) {
           const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(input.item_id) as { item_name: string };
-          throw new Error(`Insufficient stock for ${item.item_name} in warehouse. Available: ${availableStock}, Required: ${requiredQty}`);
+          throw new BusinessRuleError(400, `Insufficient stock for ${item.item_name} in warehouse. Available: ${availableStock}, Required: ${requiredQty}`);
         }
 
         // ACCT-006: a production dated before the material it consumes was

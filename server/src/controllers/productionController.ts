@@ -5,6 +5,7 @@ import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
 import db from '../config/database';
 import logger from '../utils/logger';
+import { handleBusinessError } from '../utils/businessRuleError';
 
 function recordProduction(req: AuthRequest, res: Response): void {
   try {
@@ -109,8 +110,7 @@ function recordProduction(req: AuthRequest, res: Response): void {
 
     res.status(201).json(production);
   } catch (error: unknown) {
-    logger.error('Record production error:', error);
-    res.status(500).json({ error: 'Failed to record production' });
+    handleBusinessError(res, error, 'Record production', 'Failed to record production');
   }
 }
 
