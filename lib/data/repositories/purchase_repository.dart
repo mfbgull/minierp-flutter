@@ -76,6 +76,7 @@ class PurchaseRepository {
     required int warehouseId,
     required num quantity,
     required num unitCost,
+    num inputTaxAmount = 0,
     required String purchaseDate,
     int? supplierId,
     String? invoiceNo,
@@ -89,6 +90,7 @@ class PurchaseRepository {
       'warehouse_id': warehouseId,
       'quantity': quantity,
       'unit_cost': unitCost,
+      'input_tax_amount': inputTaxAmount,
       'purchase_date': purchaseDate,
       'supplier_id': ?supplierId,
       if (invoiceNo != null && invoiceNo.trim().isNotEmpty)
@@ -118,7 +120,16 @@ class PurchaseRepository {
     int? supplierId,
     String? invoiceNo,
     String? remarks,
-    required List<({int itemId, num quantity, num unitCost, String? expiryDate})> items,
+    required List<
+      ({
+        int itemId,
+        num quantity,
+        num unitCost,
+        num inputTaxAmount,
+        String? expiryDate,
+      })
+    >
+    items,
     String? idempotencyKey,
   }) => _api.postRaw<List<Purchase>>(
     ApiEndpoints.purchases,
@@ -136,6 +147,7 @@ class PurchaseRepository {
             'item_id': line.itemId,
             'quantity': line.quantity,
             'unit_cost': line.unitCost,
+            'input_tax_amount': line.inputTaxAmount,
             'expiry_date': ?line.expiryDate,
           },
       ],
@@ -230,8 +242,12 @@ class PurchaseRepository {
     required num amount,
     String? paymentMethod,
     String? referenceNo,
+    String? idempotencyKey,
   }) => _api.postEnvelope<Map<String, dynamic>>(
     ApiEndpoints.supplierRefunds,
+    headers: idempotencyKey == null
+        ? null
+        : {'Idempotency-Key': idempotencyKey},
     body: {
       'refund_date': refundDate,
       'credit_note_id': creditNoteId,
@@ -245,10 +261,7 @@ class PurchaseRepository {
   /// Void a direct purchase (PUR-03) — enveloped `{success, message}` with
   /// no data. The server rejects (400) when stock was already sold/returned
   /// or payments are recorded against the purchase.
-  Future<ApiResult<void>> voidPurchase(
-    int id, {
-    required String reason,
-  }) =>
+  Future<ApiResult<void>> voidPurchase(int id, {required String reason}) =>
       _api.postEnvelope<void>(
         '${ApiEndpoints.purchases}/$id/void',
         body: {'reason': reason.trim()},

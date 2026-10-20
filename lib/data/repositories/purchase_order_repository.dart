@@ -66,8 +66,7 @@ class PurchaseOrderRepository {
   }) => _api.getRaw(
     '${ApiEndpoints.purchaseOrders}/summary/supplier/$supplierId',
     queryParameters: {'start_date': ?startDate, 'end_date': ?endDate},
-    parse: (Object? json) =>
-        POSummary.fromJson(json as Map<String, dynamic>),
+    parse: (Object? json) => POSummary.fromJson(json as Map<String, dynamic>),
   );
 
   /// PO detail — bare `{...po, items}` response.
@@ -156,12 +155,11 @@ class PurchaseOrderRepository {
 
   /// Goods-receipt history for a PO — **bare array** of `GoodsReceipt`
   /// (receipt_no, date, warehouse, per-receipt qty/value aggregates).
-  Future<ApiResult<List<GoodsReceipt>>> receipts(int poId) =>
-      _api.getRawList(
-        '${ApiEndpoints.purchaseOrders}/$poId/receipts',
-        parseItem: (Object? json) =>
-            GoodsReceipt.fromJson(json as Map<String, dynamic>),
-      );
+  Future<ApiResult<List<GoodsReceipt>>> receipts(int poId) => _api.getRawList(
+    '${ApiEndpoints.purchaseOrders}/$poId/receipts',
+    parseItem: (Object? json) =>
+        GoodsReceipt.fromJson(json as Map<String, dynamic>),
+  );
 
   /// Record a goods receipt — **bare 201** `GoodsReceipt`. The body is
   /// `{receipt_date, warehouse_id, remarks?, items: [{po_item_id,
@@ -170,10 +168,14 @@ class PurchaseOrderRepository {
   /// the PO status (Partially Received / Completed) itself.
   Future<ApiResult<GoodsReceipt>> createReceipt(
     int poId,
-    Map<String, dynamic> body,
-  ) => _api.postRaw(
+    Map<String, dynamic> body, {
+    String? idempotencyKey,
+  }) => _api.postRaw(
     '${ApiEndpoints.purchaseOrders}/$poId/receipts',
     body: body,
+    headers: idempotencyKey == null
+        ? null
+        : {'Idempotency-Key': idempotencyKey},
     parse: (Object? json) =>
         GoodsReceipt.fromJson(json as Map<String, dynamic>),
   );

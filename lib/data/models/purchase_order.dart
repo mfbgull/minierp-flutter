@@ -74,6 +74,7 @@ class PurchaseOrderItem {
     required this.unitOfMeasure,
     required this.quantity,
     this.unitPrice = 0,
+    this.inputTaxAmount = 0,
     this.amount,
     this.receivedQuantity,
     this.pendingQuantity,
@@ -89,6 +90,7 @@ class PurchaseOrderItem {
         unitOfMeasure: asString(json['unit_of_measure']) ?? '',
         quantity: asNum(json['quantity']) ?? 0,
         unitPrice: asNum(json['unit_price']) ?? 0,
+        inputTaxAmount: asNum(json['input_tax_amount']) ?? 0,
         amount: asNum(json['amount']),
         receivedQuantity: asNum(json['received_quantity']),
         pendingQuantity: asNum(json['pending_quantity']),
@@ -105,6 +107,7 @@ class PurchaseOrderItem {
   final String unitOfMeasure;
   final num quantity;
   final num unitPrice;
+  final num inputTaxAmount;
   final num? amount;
   final num? receivedQuantity;
   final num? pendingQuantity;
