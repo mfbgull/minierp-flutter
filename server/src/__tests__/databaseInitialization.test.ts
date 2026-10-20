@@ -17,6 +17,7 @@
  * cached, which would defeat jest.resetModules() between cases.
  */
 import fs from 'fs';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import os from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
@@ -90,6 +91,26 @@ afterEach(() => {
 });
 
 describe('database module initialization boundary', () => {
+  it.each([undefined, 'admin123'])('does not seed an administrator with a missing or weak configured password (%s)', async (password) => {
+    const previousPassword = process.env.DEFAULT_ADMIN_PASSWORD;
+    if (password === undefined) delete process.env.DEFAULT_ADMIN_PASSWORD;
+    else process.env.DEFAULT_ADMIN_PASSWORD = password;
+    const mod = await loadDatabaseModule();
+    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('Unsafe admin bootstrap refused');
+    });
+
+    try {
+      expect(() => mod.applyPendingMigrations()).toThrow();
+    } finally {
+      await mod.dbSeedReady;
+      exitSpy.mockRestore();
+      if (previousPassword === undefined) delete process.env.DEFAULT_ADMIN_PASSWORD;
+      else process.env.DEFAULT_ADMIN_PASSWORD = previousPassword;
+    }
+    expect(countTable('users')).toBe(0);
+  });
+
   it('does NOT apply migrations merely by importing the module', async () => {
     const mod = await loadDatabaseModule();
 
