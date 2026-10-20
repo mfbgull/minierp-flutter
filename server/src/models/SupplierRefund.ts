@@ -3,6 +3,8 @@ import SupplierLedgerModel from './SupplierLedger';
 import AccountingService from '../services/accountingService';
 import logger from '../utils/logger';
 import { generateDocNo } from '../utils/sequence';
+import { assertCashTimeline } from '../services/cashBalanceGuard';
+import { roundCurrency } from '../utils/currency';
 
 /**
  * SupplierRefundModel — cash receipt against a supplier credit note.
@@ -71,16 +73,34 @@ const REFUND_SELECT = `
 
 /** Amount of a credit note not yet paid out (excludes voided refunds). */
 export function creditNoteRefundable(creditNoteId: number, db: Database.Database): number {
-  const note = db.prepare(`SELECT amount, status FROM credit_notes WHERE id = ?`)
-    .get(creditNoteId) as { amount: number; status: string } | undefined;
+  const note = db.prepare<[number], { amount: number; status: string; source_type: string; source_id: number }>(`
+    SELECT cn.amount, cn.status, pr.source_type, pr.source_id
+    FROM credit_notes cn JOIN purchase_returns pr ON pr.id = cn.source_id
+    WHERE cn.id = ? AND cn.source_type = 'PURCHASE_RETURN'
+  `).get(creditNoteId);
   if (!note || note.status !== 'POSTED') return 0;
 
-  const refunded = db.prepare(`
-    SELECT COALESCE(SUM(amount), 0) AS paid FROM supplier_refunds
-    WHERE credit_note_id = ? AND status = 'POSTED'
-  `).get(creditNoteId) as { paid: number };
+  const paid = note.source_type === 'PURCHASE'
+    ? db.prepare<[number], { amount: number }>(`
+        SELECT COALESCE(SUM(a.amount), 0) AS amount
+        FROM purchase_allocations a JOIN payments p ON p.id = a.payment_id
+        WHERE a.purchase_id = ? AND a.voided_at IS NULL AND p.voided_at IS NULL
+      `).get(note.source_id)
+    : db.prepare<[number], { amount: number }>(`
+        SELECT COALESCE(SUM(a.amount), 0) AS amount
+        FROM po_allocations a JOIN payments p ON p.id = a.payment_id
+        WHERE a.po_id = ? AND a.voided_at IS NULL AND p.voided_at IS NULL
+      `).get(note.source_id);
+  const refunded = db.prepare<{ note: number; type: string; source: number }, { note_paid: number; source_paid: number }>(`
+    SELECT COALESCE(SUM(CASE WHEN sr.credit_note_id = @note THEN sr.amount ELSE 0 END), 0) AS note_paid,
+      COALESCE(SUM(sr.amount), 0) AS source_paid
+    FROM supplier_refunds sr JOIN purchase_returns pr ON pr.id = sr.return_id
+    WHERE sr.status = 'POSTED' AND pr.source_type = @type AND pr.source_id = @source
+  `).get({ note: creditNoteId, type: note.source_type, source: note.source_id });
 
-  return Number(note.amount) - Number(refunded.paid);
+  return roundCurrency(Math.max(0, Math.min(
+    note.amount - (refunded?.note_paid ?? 0), (paid?.amount ?? 0) - (refunded?.source_paid ?? 0),
+  )));
 }
 
 class SupplierRefundModel {
@@ -211,41 +231,46 @@ class SupplierRefundModel {
   }
 
   static void(id: number, userId: number, reason: string, db: Database.Database): SupplierRefundRow {
-    const refund = this.getById(id, db);
-    if (!refund) throw new Error('Supplier refund not found');
-    if (refund.status !== 'POSTED') throw new Error('Only POSTED refunds can be voided');
+    return db.transaction(() => {
+      const refund = this.getById(id, db);
+      if (!refund) throw new Error('Supplier refund not found');
+      if (refund.status !== 'POSTED') throw new Error('Only POSTED refunds can be voided');
+      AccountingService.assertPeriodNotClosed(db, refund.refund_date, `Supplier refund ${refund.refund_no}`);
 
-    db.prepare(`
-      UPDATE supplier_refunds
-      SET status = 'VOIDED', voided_at = datetime('now'), voided_by = ?, voided_reason = ?
-      WHERE id = ?
-    `).run(userId, reason || null, id);
+      AccountingService.voidJournalLinesByReference(db, 'SUPPLIER_REFUND', id, {
+        voidedBy: userId,
+        voidReason: reason || 'Supplier refund voided',
+      });
+      assertCashTimeline(db, { paymentMethod: refund.payment_method, fromDate: refund.refund_date });
 
-    // Reverse the ledger debit (credit side) + rebuild the balance chain.
-    SupplierLedgerModel.createEntry({
-      supplier_id: refund.supplier_id,
-      transaction_date: new Date().toISOString().split('T')[0],
-      transaction_type: 'SUPPLIER_REFUND_VOID',
-      reference_no: refund.refund_no,
-      debit: 0,
-      credit: refund.amount,
-      description: `Void supplier refund ${refund.refund_no}${reason ? ': ' + reason : ''}`,
-    }, db);
-    SupplierLedgerModel.rebuildBalances(refund.supplier_id, db);
+      db.prepare(`
+        UPDATE supplier_refunds
+        SET status = 'VOIDED', voided_at = datetime('now'), voided_by = ?, voided_reason = ?
+        WHERE id = ?
+      `).run(userId, reason || null, id);
 
-    // Reverse the GL entry by reference.
-    AccountingService.voidJournalLinesByReference(db, 'SUPPLIER_REFUND', id);
+      SupplierLedgerModel.createEntry({
+        supplier_id: refund.supplier_id,
+        transaction_date: new Date().toISOString().split('T')[0],
+        transaction_type: 'SUPPLIER_REFUND_VOID',
+        reference_no: refund.refund_no,
+        debit: 0,
+        credit: refund.amount,
+        description: `Void supplier refund ${refund.refund_no}${reason ? ': ' + reason : ''}`,
+      }, db);
+      SupplierLedgerModel.rebuildBalances(refund.supplier_id, db);
 
-    db.prepare(`
-      INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(
-      userId, 'VOID', 'SupplierRefund', id,
-      `Voided supplier refund ${refund.refund_no}${reason ? ': ' + reason : ''}`
-    );
+      db.prepare(`
+        INSERT INTO activity_log (user_id, action, entity_type, entity_id, description)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        userId, 'VOID', 'SupplierRefund', id,
+        `Voided supplier refund ${refund.refund_no}${reason ? ': ' + reason : ''}`
+      );
 
-    logger.info(`Supplier refund ${refund.refund_no} voided by user ${userId}`);
-    return this.getById(id, db) as SupplierRefundRow;
+      logger.info(`Supplier refund ${refund.refund_no} voided by user ${userId}`);
+      return this.getById(id, db) as SupplierRefundRow;
+    })();
   }
 }
 

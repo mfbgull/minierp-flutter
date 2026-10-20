@@ -7,7 +7,7 @@ import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, PURCHASE_RETURN_HEADER_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { isFeatureEnabled } from '../utils/featureFlags';
 import { roundQty } from '../utils/quantity';
-import { roundCurrency } from '../utils/currency';
+import { addCurrency, roundCurrency } from '../utils/currency';
 import { SqlParam } from '../utils/sqlTypes';
 
 /**
@@ -60,6 +60,7 @@ export interface PurchaseReturnItemRow {
   unit_cost: number;
   quantity: number;
   amount: number;
+  input_tax_amount: number;
 }
 
 export interface PurchaseReturnHeaderRow {
@@ -77,6 +78,7 @@ export interface PurchaseReturnHeaderRow {
   status: string;
   total_qty: number;
   total_amount: number;
+  input_tax_amount: number;
   credit_note_id: number | null;
   credit_no?: string | null;
   voided_at: string | null;
@@ -255,6 +257,7 @@ class PurchaseReturnModel {
         unit_cost: number;
         quantity: number;
         amount: number;
+        input_tax_amount: number;
       }> = [];
 
       let totalQty = 0;
@@ -294,7 +297,7 @@ class PurchaseReturnModel {
             WHERE p.id = ?
           `).get(sourceItemId) as {
             id: number; item_id: number; item_name: string;
-            quantity: number; unit_cost: number; returned_quantity: number;
+            quantity: number; unit_cost: number; returned_quantity: number; input_tax_amount: number;
           } | undefined;
           if (!purchase) throw new Error(`Purchase line ${sourceItemId} not found`);
           if (purchase.id !== data.source_id) {
@@ -312,6 +315,13 @@ class PurchaseReturnModel {
           }
 
           const amount = roundCurrency(agg.quantity * purchase.unit_cost);
+          const priorTax = db.prepare(`SELECT COALESCE(SUM(i.input_tax_amount), 0) AS amount
+            FROM purchase_return_items i JOIN purchase_returns r ON r.id = i.purchase_return_id
+            WHERE r.source_type = 'PURCHASE' AND r.source_id = ? AND r.status = 'POSTED' AND i.source_item_id = ?
+          `).get(purchase.id, purchase.id) as { amount: number };
+          const remainingTax = Math.max(0, roundCurrency(purchase.input_tax_amount - priorTax.amount));
+          const tax = roundQty(returnQty - returnable) === 0 ? remainingTax
+            : Math.min(remainingTax, roundCurrency(purchase.input_tax_amount * returnQty / purchase.quantity));
           lines.push({
             source_item_id: purchase.id,
             item_id: purchase.item_id,
@@ -319,6 +329,7 @@ class PurchaseReturnModel {
             unit_cost: purchase.unit_cost,
             quantity: agg.quantity,
             amount,
+            input_tax_amount: tax,
           });
           totalQty += agg.quantity;
           totalAmount += amount;
@@ -348,6 +359,16 @@ class PurchaseReturnModel {
           }
 
           const amount = roundCurrency(agg.quantity * poItem.unit_price);
+          const receivedTax = (db.prepare(`SELECT COALESCE(SUM(i.input_tax_amount), 0) AS amount
+            FROM goods_receipt_items i JOIN goods_receipts r ON r.id = i.receipt_id
+            WHERE i.po_item_id = ? AND r.voided_at IS NULL`).get(poItem.id) as { amount: number }).amount;
+          const priorTax = (db.prepare(`SELECT COALESCE(SUM(i.input_tax_amount), 0) AS amount
+            FROM purchase_return_items i JOIN purchase_returns r ON r.id = i.purchase_return_id
+            WHERE r.source_type = 'PURCHASE_ORDER' AND r.source_id = ? AND r.status = 'POSTED' AND i.source_item_id = ?
+          `).get(data.source_id, poItem.id) as { amount: number }).amount;
+          const remainingTax = Math.max(0, roundCurrency(receivedTax - priorTax));
+          const tax = roundQty(returnQty - netReceived) === 0 ? remainingTax
+            : Math.min(remainingTax, roundCurrency(remainingTax * returnQty / netReceived));
           lines.push({
             source_item_id: poItem.id,
             item_id: poItem.item_id,
@@ -355,13 +376,16 @@ class PurchaseReturnModel {
             unit_cost: poItem.unit_price,
             quantity: agg.quantity,
             amount,
+            input_tax_amount: tax,
           });
           totalQty += agg.quantity;
           totalAmount += amount;
         }
       }
 
-      totalAmount = roundCurrency(totalAmount);
+      const netTotalAmount = roundCurrency(totalAmount);
+      const totalInputTax = lines.reduce((sum, line) => addCurrency(sum, line.input_tax_amount), 0);
+      totalAmount = addCurrency(netTotalAmount, totalInputTax);
 
       // PRET-06 (task 4.5): returning goods worth more than is still owed
       // drives the supplier balance negative (a hidden receivable). Require
@@ -380,11 +404,6 @@ class PurchaseReturnModel {
         throw new Error(`Invalid disposition '${data.disposition}' — use 'credit_on_account' or 'refund_expected'`);
       }
 
-      // `refund_expected` promises money back to the supplier, so it may only
-      // promise what was actually collected. Without this, returning goods from
-      // a fully UNPAID purchase posted `Dr Cash / Cr AP` and manufactured a cash
-      // asset and an AP credit out of nothing (audit C-02, H-03).
-      let refundableAmount = totalAmount;
       if (data.disposition === 'refund_expected') {
         const collected = this.sourceCollected(data.source_type, data.source_id, db);
         if (collected <= 0.01) {
@@ -394,7 +413,6 @@ class PurchaseReturnModel {
             `Use 'credit_on_account' instead.`
           );
         }
-        refundableAmount = roundQty(Math.min(totalAmount, collected));
       }
 
       // Header
@@ -403,8 +421,8 @@ class PurchaseReturnModel {
         INSERT INTO purchase_returns (
           return_no, return_date, return_type, source_type, source_id,
           source_no, warehouse_id, reason, disposition, status, total_qty, total_amount,
-          created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'POSTED', ?, ?, ?)
+          created_by, input_tax_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'POSTED', ?, ?, ?, ?)
       `).run(
         returnNo,
         data.return_date,
@@ -417,15 +435,16 @@ class PurchaseReturnModel {
         data.disposition || null,
         totalQty,
         totalAmount,
-        userId
+        userId,
+        totalInputTax
       );
       const returnId = headerResult.lastInsertRowid as number;
 
       const insertLine = db.prepare(`
         INSERT INTO purchase_return_items (
           purchase_return_id, source_item_id, item_id, item_name,
-          unit_cost, quantity, amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          unit_cost, quantity, amount, input_tax_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       // Stock: verify availability, then record negative movements per line.
@@ -595,7 +614,8 @@ class PurchaseReturnModel {
           line.item_name,
           line.unit_cost,
           line.quantity,
-          line.amount
+          line.amount,
+          line.input_tax_amount
         );
 
         // Persist per-line batch consumption so void restores exactly
@@ -627,7 +647,8 @@ class PurchaseReturnModel {
         AccountingService.postPurchaseReturnEntry(db, {
           purchaseId: returnId,
           purchaseNo: returnNo,
-          returnAmount: totalAmount,
+          returnAmount: netTotalAmount,
+          inputTaxAmount: totalInputTax,
           returnDate: data.return_date,
           userId,
         });
@@ -639,24 +660,6 @@ class PurchaseReturnModel {
       );
 
       db.prepare('UPDATE purchase_returns SET credit_note_id = ? WHERE id = ?').run(creditNoteId, returnId);
-
-      // refund_expected: settle immediately — collect the credit note back in
-      // cash inside the same transaction (no orphan credit-note window). The
-      // amount is capped at what was collected, computed above; this branch
-      // only runs when that cap is greater than zero.
-      if (data.disposition === 'refund_expected') {
-        SupplierRefundModel.create(
-          {
-            refund_date: data.return_date,
-            credit_note_id: creditNoteId,
-            amount: refundableAmount,
-            payment_method: 'cash',
-            reference_no: returnNo,
-          },
-          userId,
-          db
-        );
-      }
 
       // Audit
       db.prepare(`
@@ -979,17 +982,15 @@ class PurchaseReturnModel {
   ): number {
     if (sourceType === 'PURCHASE') {
       const row = db.prepare(`
-        SELECT p.total_cost,
-          COALESCE((SELECT SUM(amount) FROM purchase_allocations WHERE purchase_id = p.id AND voided_at IS NULL), 0) AS paid
-        FROM purchases p WHERE p.id = ?
+        SELECT total_payable - returned_amount AS total_cost, paid_amount AS paid
+        FROM direct_purchase_payables WHERE id = ?
       `).get(sourceId) as { total_cost: number; paid: number } | undefined;
       if (!row) throw new Error('Purchase not found');
       return Number(row.total_cost) - Number(row.paid);
     }
     const row = db.prepare(`
-      SELECT po.total_amount,
-        COALESCE((SELECT SUM(amount) FROM po_allocations WHERE po_id = po.id AND voided_at IS NULL), 0) AS paid
-      FROM purchase_orders po WHERE po.id = ?
+      SELECT total_payable - returned_amount AS total_amount, paid_amount AS paid
+      FROM purchase_order_payables WHERE id = ?
     `).get(sourceId) as { total_amount: number; paid: number } | undefined;
     if (!row) throw new Error('Purchase Order not found');
     return Number(row.total_amount) - Number(row.paid);
