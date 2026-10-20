@@ -6,6 +6,7 @@ import {
 import { getForUser } from './UserPreferences';
 import { weekBounds } from '../utils/weekMath';
 import { AR_OUTSTANDING, ACTIVE_EXPENSE_STATUS } from '../utils/reportSql';
+import ReportsModel from './Reports';
 
 interface DashboardSummary {
   totalItems: number;
@@ -375,9 +376,12 @@ function getExpenseSummary(db: Database.Database, period: string = 'month', user
     SELECT
       COALESCE(SUM(amount), 0) as period_total,
       COUNT(*) as count
-    FROM expenses
+    FROM (
+      SELECT amount, expense_date FROM expenses WHERE ${ACTIVE_EXPENSE_STATUS()}
+      UNION ALL
+      SELECT net_amount, bill_date FROM supplier_bills WHERE voided_at IS NULL
+    )
     WHERE ${where}
-      AND ${ACTIVE_EXPENSE_STATUS()}
   `).get(...params) as ExpenseSummaryResult;
 }
 
@@ -596,39 +600,15 @@ function getKPI(
 
     // ── Additional cards (match the P&L / cash reports) ─────────────
     case 'expenses': {
-      // Same SQL as getExpenseSummary + the P&L report: GL-worthy
-      // (non-Draft, non-Cancelled) expenses within the range.
-      const result = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) as total FROM expenses
-        WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date BETWEEN ? AND ?
-      `).get(from, to) as { total: number };
-      return { metric, value: result.total, unit: 'currency', label: 'Expenses' };
+      const report = ReportsModel.getProfitLossReport(from, to, db);
+      return { metric, value: report.totalExpenses, unit: 'currency', label: 'Expenses' };
     }
 
     case 'net_profit': {
-      // Identical to getProfitLossReport: revenue − COGS − expenses.
-      const revenue = db.prepare(`
-        SELECT COALESCE(SUM(total_amount - COALESCE(returned_amount, 0)), 0) as total
-        FROM invoices
-        WHERE status != 'Cancelled' AND invoice_date BETWEEN ? AND ?
-      `).get(from, to) as { total: number };
-      const cogs = db.prepare(`
-        SELECT COALESCE(ABS(SUM(sm.quantity * sm.unit_cost)), 0) as total
-        FROM stock_movements sm
-        WHERE sm.movement_date BETWEEN ? AND ?
-          AND (
-            sm.movement_type = 'SALE'
-            OR (sm.movement_type = 'ADJUSTMENT'
-                AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE', 'INVOICE_CANCEL', 'SO_CANCEL'))
-          )
-      `).get(from, to) as { total: number };
-      const expenseRow = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) as total FROM expenses
-        WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date BETWEEN ? AND ?
-      `).get(from, to) as { total: number };
+      const report = ReportsModel.getProfitLossReport(from, to, db);
       return {
         metric,
-        value: revenue.total - cogs.total - expenseRow.total,
+        value: report.netProfit,
         unit: 'currency',
         label: 'Net Profit',
       };
