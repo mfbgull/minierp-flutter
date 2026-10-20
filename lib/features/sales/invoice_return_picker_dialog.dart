@@ -25,7 +25,7 @@ Future<void> showInvoiceReturnPicker(BuildContext context) async {
     builder: (dialogContext) => const InvoiceReturnPickerDialog(),
   );
   if (invoiceId == null || !context.mounted) return;
-  showInvoiceReturnDialog(context, invoiceId: invoiceId);
+  await showInvoiceReturnDialog(context, invoiceId: invoiceId);
 }
 
 class InvoiceReturnPickerDialog extends ConsumerWidget {

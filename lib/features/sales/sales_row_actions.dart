@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -156,9 +158,9 @@ Future<void> openSalesRowMenu({
     switch (action) {
       case InvoiceRowAction.view:
         // The read-only document view (same as the customer tab).
-        context.push('/sales/print-preview', extra: invoice);
+        unawaited(context.push('/sales/print-preview', extra: invoice));
       case InvoiceRowAction.edit:
-        context.push('/sales/form', extra: invoice);
+        unawaited(context.push('/sales/form', extra: invoice));
       case InvoiceRowAction.payment:
         await showInvoicePaymentDialog(context, invoice: invoice);
       case InvoiceRowAction.returnItem:
