@@ -81,7 +81,7 @@ function createPurchaseOrder(req: AuthRequest, res: Response): void {
     res.status(201).json(po);
   } catch (error: unknown) {
     logger.error('Create PO error:', error);
-    res.status(500).json({ error: errorMessage(error) || 'Failed to create purchase order' });
+    res.status(error instanceof BusinessRuleError ? error.status : 500).json({ error: errorMessage(error) || 'Failed to create purchase order' });
   }
 }
 
@@ -192,7 +192,7 @@ function deletePurchaseOrder(req: AuthRequest, res: Response): void {
 
 function addLineItem(req: AuthRequest, res: Response): void {
   try {
-    const { item_id, quantity, unit_price } = req.body;
+    const { item_id, quantity, unit_price, input_tax_amount } = req.body;
 
     if (!item_id || !quantity || !unit_price) {
       res.status(400).json({
@@ -213,20 +213,20 @@ function addLineItem(req: AuthRequest, res: Response): void {
 
     const item = PurchaseOrderModel.addItem(
       Number(req.params.id),
-      { item_id, quantity, unit_price },
+      { item_id, quantity, unit_price, input_tax_amount },
       db
     );
 
     res.status(201).json(item);
   } catch (error: unknown) {
     logger.error('Add PO item error:', error);
-    res.status(500).json({ error: errorMessage(error) || 'Failed to add line item' });
+    res.status(error instanceof BusinessRuleError ? error.status : 500).json({ error: errorMessage(error) || 'Failed to add line item' });
   }
 }
 
 function updateLineItem(req: Request, res: Response): void {
   try {
-    const { quantity, unit_price } = req.body;
+    const { quantity, unit_price, input_tax_amount } = req.body;
 
     if (!quantity || !unit_price) {
       res.status(400).json({
@@ -247,14 +247,14 @@ function updateLineItem(req: Request, res: Response): void {
 
     const item = PurchaseOrderModel.updateItem(
       Number(req.params.itemId),
-      { quantity, unit_price },
+      { quantity, unit_price, input_tax_amount },
       db
     );
 
     res.json(item);
   } catch (error: unknown) {
     logger.error('Update PO item error:', error);
-    res.status(500).json({ error: errorMessage(error) || 'Failed to update line item' });
+    res.status(error instanceof BusinessRuleError ? error.status : 500).json({ error: errorMessage(error) || 'Failed to update line item' });
   }
 }
 

@@ -42,6 +42,7 @@ interface PurchaseOrderItem {
   received_quantity: number;
   unit_price: number;
   amount: number;
+  input_tax_amount: number;
   expiry_date?: string | null;
   item_code?: string;
   item_name?: string;
@@ -77,6 +78,7 @@ interface CreatePurchaseOrderDTO {
     item_id: number;
     quantity: number;
     unit_price: number;
+    input_tax_amount?: number;
   }>;
 }
 
@@ -126,6 +128,13 @@ const PURCHASE_ORDER_SORT_COLUMN_MAP: Record<string, string> = {
 };
 
 class PurchaseOrderModel {
+  private static inputTax(value: number | undefined): number {
+    if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1e9)) {
+      throw new BusinessRuleError(400, 'Recoverable input tax must be a nonnegative amount');
+    }
+    return roundCurrency(value ?? 0);
+  }
+
   static create(data: CreatePurchaseOrderDTO, userId: number, db: Database.Database): PurchaseOrder {
     const { supplier_id, po_date, expected_delivery_date, status = 'Draft', notes, warehouse_id, items } = data;
 
@@ -144,7 +153,7 @@ class PurchaseOrderModel {
       // ACC-18 interim: rounded money — each line is round(qty × price),
       // the header total is the sum of rounded lines.
       const totalAmount = items.reduce(
-        (sum, item) => addCurrency(sum, multiplyCurrency(item.quantity, item.unit_price)),
+        (sum, item) => addCurrency(sum, addCurrency(multiplyCurrency(item.quantity, item.unit_price), this.inputTax(item.input_tax_amount))),
         0
       );
 
@@ -173,13 +182,13 @@ class PurchaseOrderModel {
       // Insert PO items
       const itemStmt = db.prepare(`
         INSERT INTO purchase_order_items (
-          po_id, item_id, quantity, unit_price, amount, expiry_date
-        ) VALUES (?, ?, ?, ?, ?, ?)
+          po_id, item_id, quantity, unit_price, amount, expiry_date, input_tax_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (const item of items) {
         const amount = multiplyCurrency(item.quantity, item.unit_price);
-        itemStmt.run(poId, item.item_id, item.quantity, item.unit_price, amount, (item as { expiry_date?: string | null }).expiry_date || null);
+        itemStmt.run(poId, item.item_id, item.quantity, item.unit_price, amount, (item as { expiry_date?: string | null }).expiry_date || null, this.inputTax(item.input_tax_amount));
       }
 
       // ACC-16: a PO is a commitment, not a liability. Posting Dr Inventory /
@@ -236,8 +245,9 @@ class PurchaseOrderModel {
         w.warehouse_code,
         u.username as created_by_username,
         COALESCE(pa.total_paid, 0) as paid_amount,
-        MAX(0, po.total_amount - COALESCE(pa.total_paid, 0)) as balance_amount
+        MAX(0, ROUND(v.total_payable - v.returned_amount - v.paid_amount, 2)) as balance_amount
       FROM purchase_orders po
+      JOIN purchase_order_payables v ON v.id = po.id
       JOIN suppliers s ON po.supplier_id = s.id
       LEFT JOIN warehouses w ON po.warehouse_id = w.id
       JOIN users u ON po.created_by = u.id
@@ -315,8 +325,9 @@ class PurchaseOrderModel {
           w.warehouse_code,
           u.username as created_by_username,
           COALESCE(pa.total_paid, 0) as paid_amount,
-          MAX(0, po.total_amount - COALESCE(pa.total_paid, 0)) as balance_amount
+          MAX(0, ROUND(v.total_payable - v.returned_amount - v.paid_amount, 2)) as balance_amount
         FROM purchase_orders po
+        JOIN purchase_order_payables v ON v.id = po.id
         JOIN suppliers s ON po.supplier_id = s.id
         LEFT JOIN warehouses w ON po.warehouse_id = w.id
         JOIN users u ON po.created_by = u.id
@@ -385,7 +396,7 @@ class PurchaseOrderModel {
     const transaction = db.transaction(() => {
       // Recalculate total from existing items (rounded once at the boundary)
       const totalRow = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) as total
+        SELECT COALESCE(SUM(amount + input_tax_amount), 0) as total
         FROM purchase_order_items
         WHERE po_id = ?
       `).get(id) as { total: number };
@@ -430,7 +441,7 @@ class PurchaseOrderModel {
     return transaction();
   }
 
-  static addItem(poId: number, itemData: { item_id: number; quantity: number; unit_price: number }, db: Database.Database): PurchaseOrderItem {
+  static addItem(poId: number, itemData: { item_id: number; quantity: number; unit_price: number; input_tax_amount?: number }, db: Database.Database): PurchaseOrderItem {
     const po = this.getById(poId, db);
 
     if (!po) {
@@ -445,15 +456,15 @@ class PurchaseOrderModel {
       const amount = multiplyCurrency(itemData.quantity, itemData.unit_price);
 
       const stmt = db.prepare(`
-        INSERT INTO purchase_order_items (po_id, item_id, quantity, unit_price, amount)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO purchase_order_items (po_id, item_id, quantity, unit_price, amount, input_tax_amount)
+        VALUES (?, ?, ?, ?, ?, ?)
       `);
 
-      const result = stmt.run(poId, itemData.item_id, itemData.quantity, itemData.unit_price, amount);
+      const result = stmt.run(poId, itemData.item_id, itemData.quantity, itemData.unit_price, amount, this.inputTax(itemData.input_tax_amount));
 
       // Update total
       const totalAmount = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) as total
+        SELECT COALESCE(SUM(amount + input_tax_amount), 0) as total
         FROM purchase_order_items
         WHERE po_id = ?
       `).get(poId) as { total: number };
@@ -475,7 +486,7 @@ class PurchaseOrderModel {
     return transaction();
   }
 
-  static updateItem(itemId: number, itemData: { quantity: number; unit_price: number }, db: Database.Database): PurchaseOrderItem {
+  static updateItem(itemId: number, itemData: { quantity: number; unit_price: number; input_tax_amount?: number }, db: Database.Database): PurchaseOrderItem {
     const item = db.prepare(`
       SELECT poi.*, po.status
       FROM purchase_order_items poi
@@ -496,13 +507,13 @@ class PurchaseOrderModel {
     const transaction = db.transaction(() => {
       db.prepare(`
         UPDATE purchase_order_items
-        SET quantity = ?, unit_price = ?, amount = ?
+        SET quantity = ?, unit_price = ?, amount = ?, input_tax_amount = COALESCE(?, input_tax_amount)
         WHERE id = ?
-      `).run(itemData.quantity, itemData.unit_price, amount, itemId);
+      `).run(itemData.quantity, itemData.unit_price, amount, itemData.input_tax_amount === undefined ? null : this.inputTax(itemData.input_tax_amount), itemId);
 
       // Update PO total
       const totalAmount = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) as total
+        SELECT COALESCE(SUM(amount + input_tax_amount), 0) as total
         FROM purchase_order_items
         WHERE po_id = ?
       `).get(item.po_id) as { total: number };
@@ -545,7 +556,7 @@ class PurchaseOrderModel {
 
       // Update PO total
       const totalAmount = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) as total
+        SELECT COALESCE(SUM(amount + input_tax_amount), 0) as total
         FROM purchase_order_items
         WHERE po_id = ?
       `).get(item.po_id) as { total: number };
@@ -836,7 +847,8 @@ class PurchaseOrderModel {
         w.warehouse_name,
         u.username as created_by_username,
         COALESCE(SUM(gri.received_quantity), 0) as total_quantity,
-        COALESCE(SUM(gri.received_quantity * poi.unit_price), 0) as total_amount
+        COALESCE(SUM(ROUND(gri.received_quantity * poi.unit_price, 2) + gri.input_tax_amount), 0) as total_amount,
+        COALESCE(SUM(gri.input_tax_amount), 0) as input_tax_amount
       FROM goods_receipts gr
       LEFT JOIN warehouses w ON gr.warehouse_id = w.id
       JOIN users u ON gr.created_by = u.id
@@ -955,19 +967,27 @@ class PurchaseOrderModel {
 
       // Insert receipt items and update PO items
       const receiptItemStmt = db.prepare(`
-        INSERT INTO goods_receipt_items (receipt_id, po_item_id, item_id, received_quantity)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO goods_receipt_items (receipt_id, po_item_id, item_id, received_quantity, input_tax_amount)
+        VALUES (?, ?, ?, ?, ?)
       `);
 
       let totalQuantity = 0;
       let totalAmount = 0;
+      let totalInputTax = 0;
 
       for (const receiptItem of items) {
         const poItem = db.prepare(`
           SELECT * FROM purchase_order_items WHERE id = ?
-        `).get(receiptItem.po_item_id) as { po_id: number; item_id: number; quantity: number; received_quantity: number; unit_price: number; expiry_date?: string | null };
+        `).get(receiptItem.po_item_id) as { po_id: number; item_id: number; quantity: number; received_quantity: number; unit_price: number; input_tax_amount: number; expiry_date?: string | null };
 
-        const receiptItemResult = receiptItemStmt.run(receiptId, receiptItem.po_item_id, poItem.item_id, receiptItem.received_quantity);
+        const previousTax = (db.prepare(`SELECT COALESCE(SUM(i.input_tax_amount), 0) AS amount
+          FROM goods_receipt_items i JOIN goods_receipts r ON r.id = i.receipt_id
+          WHERE i.po_item_id = ? AND r.voided_at IS NULL`).get(receiptItem.po_item_id) as { amount: number }).amount;
+        const remainingTax = Math.max(0, roundCurrency(poItem.input_tax_amount - previousTax));
+        const receiptTax = roundQty(poItem.quantity - poItem.received_quantity - receiptItem.received_quantity) === 0
+          ? remainingTax : Math.min(remainingTax, roundCurrency(poItem.input_tax_amount * receiptItem.received_quantity / poItem.quantity));
+        totalInputTax = addCurrency(totalInputTax, receiptTax);
+        const receiptItemResult = receiptItemStmt.run(receiptId, receiptItem.po_item_id, poItem.item_id, receiptItem.received_quantity, receiptTax);
         const receiptItemId = receiptItemResult.lastInsertRowid as number;
 
         // Update PO item received_quantity
@@ -1077,12 +1097,13 @@ class PurchaseOrderModel {
       // unfulfilled commitment. Partial receipts post partial value;
       // repeated receipts are additive, each under its own receipt id.
       const postedAmount = roundCurrency(totalAmount);
-      if (postedAmount > 0) {
+      if (postedAmount > 0 || totalInputTax > 0) {
         AccountingService.postGoodsReceiptEntry(db, {
           receiptId,
           receiptNo,
           poNo: po.po_no,
           amount: postedAmount,
+          inputTaxAmount: totalInputTax,
           receiptDate: receipt_date,
           userId,
         });
@@ -1102,7 +1123,7 @@ class PurchaseOrderModel {
             transaction_date: receipt_date,
             transaction_type: 'GOODS_RECEIPT',
             reference_no: receiptNo,
-            debit: postedAmount,
+            debit: addCurrency(postedAmount, totalInputTax),
             credit: 0,
             description: `Goods receipt ${receiptNo} against PO ${po.po_no}`,
           }, db);

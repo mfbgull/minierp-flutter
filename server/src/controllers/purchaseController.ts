@@ -35,7 +35,18 @@ function recordPurchase(req: AuthRequest, res: Response): void {
     const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.PURCHASE_RECORD, idemKey, hash);
     if (replayId !== null) {
       if (idemKey) res.set('X-Idempotent-Replay', 'true');
-      res.status(201).json(Purchase.getById(replayId, db));
+      if (Array.isArray(req.body?.items)) {
+        const members = db.prepare('SELECT purchase_id FROM purchase_submission_items WHERE root_purchase_id = ? ORDER BY line_index').all(replayId) as { purchase_id: number }[];
+        if (members.length === req.body.items.length) {
+          res.status(201).json(members.map(member => Purchase.getById(member.purchase_id, db)));
+        } else if (members.length === 0 && req.body.items.length === 1) {
+          res.status(201).json([Purchase.getById(replayId, db)]);
+        } else {
+          res.status(409).json({ error: 'The original purchase was recorded before multi-item retry tracking. Review the saved purchases before submitting again.' });
+        }
+      } else {
+        res.status(201).json(Purchase.getById(replayId, db));
+      }
       return;
     }
     // ACCT-005: a purchase may not be created without an
