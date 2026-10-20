@@ -297,6 +297,25 @@ class _MovableDialogState extends State<MovableDialog>
                                   ),
                                 ),
                               ),
+                            if (widget.title != null)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  16,
+                                  20,
+                                  8,
+                                ),
+                                child: Semantics(
+                                  header: true,
+                                  namesRoute: true,
+                                  child: Text(
+                                    widget.title!,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleLarge,
+                                  ),
+                                ),
+                              ),
                             Flexible(child: widget.child),
                           ],
                         ),
