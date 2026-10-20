@@ -47,7 +47,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _busy = false;
       if (error != null) {
         final l10n = AppLocalizations.of(context)!;
-        _error = error.isNetwork
+        _error = error.code == 'SESSION_STORAGE_UNAVAILABLE'
+            ? l10n.loginStorageUnavailable
+            : error.isNetwork
             ? l10n.loginServerUnreachable
             : error.statusCode == 401
             ? l10n.loginInvalidCredentials
