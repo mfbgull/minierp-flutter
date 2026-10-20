@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/repositories/supplier_accounting_repository.dart'
+    show supplierBillsProvider, supplierPrepaymentsProvider;
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/ledger_entry.dart' show LedgerEntry;
@@ -149,11 +151,13 @@ final supplierLedgerVersionProvider = StateProvider<int>((ref) => 0);
 final supplierLedgerRangedProvider = FutureProvider.autoDispose
     .family<List<LedgerEntry>, SupplierLedgerArgs>((ref, args) async {
       ref.watch(supplierLedgerVersionProvider);
-      final result = await ref.watch(supplierRepositoryProvider).ledger(
-        args.supplierId,
-        fromDate: args.fromDate,
-        toDate: args.toDate,
-      );
+      final result = await ref
+          .watch(supplierRepositoryProvider)
+          .ledger(
+            args.supplierId,
+            fromDate: args.fromDate,
+            toDate: args.toDate,
+          );
       return switch (result) {
         ApiSuccess(:final data) => data,
         ApiFailure(:final error) => throw error,
@@ -204,8 +208,7 @@ class SupplierPurchaseOrdersArgs {
       other.toDate == toDate;
 
   @override
-  int get hashCode =>
-      Object.hash(supplierId, page, limit, fromDate, toDate);
+  int get hashCode => Object.hash(supplierId, page, limit, fromDate, toDate);
 }
 
 /// Bumped by [invalidateSupplierQueries] so an open paged tab refetches
@@ -271,8 +274,7 @@ class SupplierPurchasesArgs {
       other.toDate == toDate;
 
   @override
-  int get hashCode =>
-      Object.hash(supplierId, page, limit, fromDate, toDate);
+  int get hashCode => Object.hash(supplierId, page, limit, fromDate, toDate);
 }
 
 /// One page of the supplier's direct purchases (`GET /purchases` +
@@ -398,8 +400,7 @@ class SupplierPaymentsArgs {
       other.toDate == toDate;
 
   @override
-  int get hashCode =>
-      Object.hash(supplierId, page, limit, fromDate, toDate);
+  int get hashCode => Object.hash(supplierId, page, limit, fromDate, toDate);
 }
 
 /// One page of the supplier's payments (`GET /payments?supplierId=<id>`
@@ -492,14 +493,18 @@ int _supplierDetailSessionSeq = 0;
 /// A fresh, stable session id for one supplier detail-page instance.
 int nextSupplierDetailSession() => ++_supplierDetailSessionSeq;
 
-final supplierDetailFromDateProvider =
-    StateProvider.family<DateTime?, int>((ref, sessionId) {
-      return ref.read(globalReportFromDateProvider);
-    });
-final supplierDetailToDateProvider =
-    StateProvider.family<DateTime?, int>((ref, sessionId) {
-      return ref.read(globalReportToDateProvider);
-    });
+final supplierDetailFromDateProvider = StateProvider.family<DateTime?, int>((
+  ref,
+  sessionId,
+) {
+  return ref.read(globalReportFromDateProvider);
+});
+final supplierDetailToDateProvider = StateProvider.family<DateTime?, int>((
+  ref,
+  sessionId,
+) {
+  return ref.read(globalReportToDateProvider);
+});
 
 /// The supplier detail page's active range as the endpoint-ready ISO
 /// strings, or (null, null) for "All dates" (spec §5.3: null = omit the
@@ -534,6 +539,8 @@ void commitSupplierDetailRange(WidgetRef ref, int sessionId) {
 /// Invalidates every supplier-scoped query after a mutation (record/edit/
 /// delete payment), so every detail tab refetches.
 void invalidateSupplierQueries(WidgetRef ref, int supplierId) {
+  ref.invalidate(supplierBillsProvider);
+  ref.invalidate(supplierPrepaymentsProvider);
   ref.invalidate(supplierDetailProvider(supplierId));
   ref.invalidate(supplierLedgerProvider(supplierId));
   ref.invalidate(supplierBalanceProvider(supplierId));

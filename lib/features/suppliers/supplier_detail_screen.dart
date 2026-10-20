@@ -23,6 +23,8 @@ import 'supplier_pos_tab.dart';
 import 'supplier_providers.dart';
 import 'supplier_purchases_tab.dart';
 import 'supplier_statement_tab.dart';
+import 'supplier_bills_tab.dart';
+import 'supplier_advances_tab.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 class SupplierDetailScreen extends ConsumerStatefulWidget {
@@ -47,7 +49,7 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 8, vsync: this);
   }
 
   @override
@@ -164,8 +166,7 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
                 fromProvider: supplierDetailFromDateProvider(_sessionId),
                 toProvider: supplierDetailToDateProvider(_sessionId),
                 showAllDates: true,
-                onChanged: () =>
-                    commitSupplierDetailRange(ref, _sessionId),
+                onChanged: () => commitSupplierDetailRange(ref, _sessionId),
               ),
             ],
           ),
@@ -216,6 +217,8 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
             Tab(text: l10n.suppliersLedger),
             Tab(text: l10n.suppliersPayments),
             Tab(text: l10n.suppliersStatement),
+            Tab(text: l10n.supplierBills),
+            Tab(text: l10n.supplierAdvances),
           ],
         ),
         Expanded(
@@ -246,6 +249,8 @@ class _SupplierDetailScreenState extends ConsumerState<SupplierDetailScreen>
                 supplierId: widget.supplierId,
                 sessionId: _sessionId,
               ),
+              SupplierBillsTab(supplierId: widget.supplierId),
+              SupplierAdvancesTab(supplierId: widget.supplierId),
             ],
           ),
         ),
