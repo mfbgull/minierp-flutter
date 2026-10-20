@@ -199,6 +199,20 @@ export function collectFlows(
   }
 
 
+  const expenseAndSalaryPreFloor = db.prepare(`
+    SELECT payment_method, SUM(amount) AS outflow FROM (
+      SELECT payment_method, amount FROM expenses
+      WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date < ? AND expense_date <= ?
+      UNION ALL
+      SELECT payment_method, amount FROM expense_payments
+      WHERE voided_at IS NULL AND payment_date < ? AND payment_date <= ?
+      UNION ALL
+      SELECT payment_method, amount FROM salary_payments
+      WHERE status != 'cancelled' AND voided_at IS NULL AND payment_date < ? AND payment_date <= ?
+    ) GROUP BY payment_method
+  `).all(floor, uptoDate, floor, uptoDate, floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
+  for (const row of expenseAndSalaryPreFloor) add(row.payment_method, 0, row.outflow);
+
   // Customer payments: positive amounts are money in; negative amounts
   // (refunds paid out to customers) are money out.
   const customerPayments = db.prepare(`
@@ -206,7 +220,7 @@ export function collectFlows(
            COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as inflow,
            COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as outflow
     FROM payments
-    WHERE voided_at IS NULL AND customer_id IS NOT NULL AND payment_date > ? AND payment_date <= ?
+    WHERE voided_at IS NULL AND customer_id IS NOT NULL AND payment_date >= ? AND payment_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number; outflow: number }>;
   for (const row of customerPayments) {
@@ -217,7 +231,7 @@ export function collectFlows(
   const supplierPayments = db.prepare(`
     SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
     FROM payments
-    WHERE voided_at IS NULL AND supplier_id IS NOT NULL AND amount > 0 AND payment_date > ? AND payment_date <= ?
+    WHERE voided_at IS NULL AND supplier_id IS NOT NULL AND amount > 0 AND payment_date >= ? AND payment_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
   for (const row of supplierPayments) {
@@ -228,7 +242,7 @@ export function collectFlows(
   const expenses = db.prepare(`
     SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
     FROM expenses
-    WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date > ? AND expense_date <= ?
+    WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date >= ? AND expense_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
   for (const row of expenses) {
@@ -236,10 +250,24 @@ export function collectFlows(
   }
 
   // Salary payments: money out (methods stored lowercase 'cash' | 'bank').
+  const supplierAdvances = db.prepare(`
+    SELECT payment_method, SUM(amount) AS outflow FROM supplier_prepayments
+    WHERE voided_at IS NULL AND prepay_date <= ? GROUP BY payment_method
+  `).all(uptoDate) as Array<{ payment_method: string; outflow: number }>;
+  for (const row of supplierAdvances) add(row.payment_method, 0, row.outflow);
+
+  const expensePayments = db.prepare(`
+    SELECT payment_method, COALESCE(SUM(amount), 0) AS outflow
+    FROM expense_payments
+    WHERE voided_at IS NULL AND payment_date >= ? AND payment_date <= ?
+    GROUP BY payment_method
+  `).all(floor, uptoDate) as Array<{ payment_method: string; outflow: number }>;
+  for (const row of expensePayments) add(row.payment_method, 0, row.outflow);
+
   const salaries = db.prepare(`
     SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
     FROM salary_payments
-    WHERE status != 'cancelled' AND voided_at IS NULL AND payment_date > ? AND payment_date <= ?
+    WHERE status != 'cancelled' AND voided_at IS NULL AND payment_date >= ? AND payment_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
   for (const row of salaries) {
@@ -252,7 +280,7 @@ export function collectFlows(
   const ownerCapital = db.prepare(`
     SELECT COALESCE(payment_method, 'Cash') AS payment_method, COALESCE(SUM(amount), 0) as inflow
     FROM owner_capital
-    WHERE status = 'posted' AND capital_date > ? AND capital_date <= ?
+    WHERE status = 'posted' AND capital_date >= ? AND capital_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number }>;
   for (const row of ownerCapital) {
@@ -262,7 +290,7 @@ export function collectFlows(
   const ownerCashOut = db.prepare(`
     SELECT COALESCE(payment_method, 'Cash') AS payment_method, COALESCE(SUM(amount), 0) as outflow
     FROM owner_withdrawals
-    WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date > ? AND withdrawal_date <= ?
+    WHERE status = 'posted' AND kind = 'cash' AND withdrawal_date >= ? AND withdrawal_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
   for (const row of ownerCashOut) {
@@ -276,7 +304,7 @@ export function collectFlows(
   const loans = db.prepare(`
     SELECT payment_method, COALESCE(SUM(amount), 0) as outflow
     FROM employee_loans
-    WHERE voided_at IS NULL AND disbursement_date > ? AND disbursement_date <= ?
+    WHERE voided_at IS NULL AND disbursement_date >= ? AND disbursement_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; outflow: number }>;
   for (const row of loans) {
@@ -286,7 +314,7 @@ export function collectFlows(
   const loanRepayments = db.prepare(`
     SELECT payment_method, COALESCE(SUM(amount), 0) as inflow
     FROM employee_loan_repayments
-    WHERE (repayment_type = 'direct' OR journal_entry_id IS NOT NULL) AND voided_at IS NULL AND payment_date > ? AND payment_date <= ?
+    WHERE (repayment_type = 'direct' OR journal_entry_id IS NOT NULL) AND voided_at IS NULL AND payment_date >= ? AND payment_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number }>;
   for (const row of loanRepayments) {
@@ -297,7 +325,7 @@ export function collectFlows(
   const supplierRefunds = db.prepare(`
     SELECT payment_method, COALESCE(SUM(amount), 0) as inflow
     FROM supplier_refunds
-    WHERE status = 'POSTED' AND refund_date > ? AND refund_date <= ?
+    WHERE status = 'POSTED' AND refund_date >= ? AND refund_date <= ?
     GROUP BY payment_method
   `).all(floor, uptoDate) as Array<{ payment_method: string | null; inflow: number }>;
   for (const row of supplierRefunds) {
@@ -400,6 +428,8 @@ export function syncOpeningBalancesToGl(db: Database.Database, userId?: number):
     SELECT MIN(d) as d FROM (
       SELECT MIN(payment_date) as d FROM payments
       UNION ALL SELECT MIN(expense_date) FROM expenses
+      UNION ALL SELECT MIN(payment_date) FROM expense_payments
+      UNION ALL SELECT MIN(prepay_date) FROM supplier_prepayments
       UNION ALL SELECT MIN(payment_date) FROM salary_payments
       UNION ALL SELECT MIN(capital_date) FROM owner_capital
       UNION ALL SELECT MIN(withdrawal_date) FROM owner_withdrawals
@@ -562,6 +592,23 @@ export function getCashAccountTransactions(
   }
 
   // Salary payments (money out).
+  for (const row of db.prepare(`
+    SELECT a.prepay_date AS date, a.payment_method AS method,
+      'ADV-' || a.id AS reference, a.notes AS description, a.amount
+    FROM supplier_prepayments a WHERE a.voided_at IS NULL AND a.prepay_date <= ?
+  `).all(uptoDate) as Array<{ date: string; method: string; reference: string; description: string | null; amount: number }>) {
+    push({ ...row, amount: -row.amount, type: 'supplier_advance' });
+  }
+
+  for (const row of db.prepare(`
+    SELECT p.payment_date AS date, p.payment_method AS method,
+           e.expense_no AS reference, e.description, p.amount
+    FROM expense_payments p JOIN expenses e ON e.id = p.expense_id
+    WHERE p.voided_at IS NULL AND p.payment_date <= ?
+  `).all(uptoDate) as Array<{ date: string; method: string; reference: string; description: string | null; amount: number }>) {
+    push({ ...row, amount: -row.amount, type: 'expense_payment' });
+  }
+
   for (const r of db.prepare(`
     SELECT payment_date as date, payment_method as method, reference_no as reference,
            notes as description, amount
