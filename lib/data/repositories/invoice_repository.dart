@@ -62,8 +62,7 @@ class InvoiceRepository {
   ) => _api.getPaged(
     ApiEndpoints.invoices,
     queryParameters: request.toQuery(),
-    parseItem: (Object? json) =>
-        Invoice.fromJson(json as Map<String, dynamic>),
+    parseItem: (Object? json) => Invoice.fromJson(json as Map<String, dynamic>),
   );
 
   /// Bare object with customer details + items (`GET /invoices/:id`).
@@ -128,13 +127,12 @@ class InvoiceRepository {
   /// owner_withdrawal) and searchable across ref_no/party/description.
   Future<ApiResult<PagedResponse<UnifiedPayment>>> unifiedPayments(
     PagedRequest request,
-  ) =>
-      _api.getPaged(
-        '${ApiEndpoints.payments}/unified',
-        queryParameters: request.toQuery(),
-        parseItem: (Object? json) =>
-            UnifiedPayment.fromJson(json as Map<String, dynamic>),
-      );
+  ) => _api.getPaged(
+    '${ApiEndpoints.payments}/unified',
+    queryParameters: request.toQuery(),
+    parseItem: (Object? json) =>
+        UnifiedPayment.fromJson(json as Map<String, dynamic>),
+  );
 
   /// All payments for one customer (`GET /payments?customerId=<id>` — the
   /// same enveloped list endpoint; the customer detail Payments tab
@@ -161,10 +159,14 @@ class InvoiceRepository {
   /// `po_allocations` array — see `createSupplierPayment` in the web
   /// SupplierPaymentModal). Enveloped; parses the returned Payment.
   Future<ApiResult<Payment>> createSupplierPayment(
-    Map<String, dynamic> body,
-  ) => _api.post(
+    Map<String, dynamic> body, {
+    String? idempotencyKey,
+  }) => _api.post(
     ApiEndpoints.payments,
     body: body,
+    headers: idempotencyKey == null
+        ? null
+        : {'Idempotency-Key': idempotencyKey},
     parse: (Object? json) => Payment.fromJson(json as Map<String, dynamic>),
   );
 
@@ -220,10 +222,8 @@ class InvoiceRepository {
 
   /// `POST /invoices/:id/restore` — reverts a soft delete (undo pattern,
   /// SHORTCOMINGS-FIX 4.2/4.4). Enveloped `{success, message, data}`.
-  Future<ApiResult<void>> restore(int id) => _api.post(
-    '${ApiEndpoints.invoices}/$id/restore',
-    parse: (_) {},
-  );
+  Future<ApiResult<void>> restore(int id) =>
+      _api.post('${ApiEndpoints.invoices}/$id/restore', parse: (_) {});
 
   /// Enveloped `{success, message, data}` response — `put`.
   Future<ApiResult<Invoice>> cancel(int id) => _api.put(
@@ -252,6 +252,7 @@ class InvoiceRepository {
     parseItem: (Object? json) =>
         SalesReturn.fromJson(json as Map<String, dynamic>),
   );
+
   /// The authoritative money position of an invoice (spec §3.2/§4.2) —
   /// `GET /invoices/:id/position`. The invoice detail embeds the same
   /// object as `data.position`, so most screens read it from there.
@@ -289,8 +290,12 @@ class InvoiceRepository {
     /// Explicit settlement allocations (Option A, spec §5.1 step 8).
     /// Omit → the return is recorded unsettled (Option B).
     List<Map<String, dynamic>>? settlements,
+    String? idempotencyKey,
   }) => _api.post(
     '${ApiEndpoints.invoices}/$id/return',
+    headers: idempotencyKey == null
+        ? null
+        : {'Idempotency-Key': idempotencyKey},
     body: {
       'items': items,
       'fee_type': ?feeType,
@@ -309,9 +314,13 @@ class InvoiceRepository {
   Future<ApiResult<SalesReturnResult>> settleReturn(
     int returnId, {
     required List<Map<String, dynamic>> settlements,
+    String? idempotencyKey,
   }) => _api.post(
     '${ApiEndpoints.invoiceReturns}/$returnId/settle',
-    body: {'settlements': settlements},
+    headers: idempotencyKey == null
+        ? null
+        : {'Idempotency-Key': idempotencyKey},
+    body: {'allocations': settlements},
     parse: (Object? json) =>
         SalesReturnResult.fromJson(json as Map<String, dynamic>),
   );
@@ -321,9 +330,7 @@ class InvoiceRepository {
   Future<ApiResult<void>> voidReturn(int returnId, {String? reason}) =>
       _api.post(
         '${ApiEndpoints.invoiceReturns}/$returnId/void',
-        body: {
-          if (reason != null && reason.isNotEmpty) 'reason': reason,
-        },
+        body: {if (reason != null && reason.isNotEmpty) 'reason': reason},
         parse: (_) {},
       );
 
@@ -332,9 +339,7 @@ class InvoiceRepository {
   Future<ApiResult<void>> voidSettlement(int settlementId, {String? reason}) =>
       _api.post(
         '${ApiEndpoints.returnSettlements}/$settlementId/void',
-        body: {
-          if (reason != null && reason.isNotEmpty) 'reason': reason,
-        },
+        body: {if (reason != null && reason.isNotEmpty) 'reason': reason},
         parse: (_) {},
       );
 }

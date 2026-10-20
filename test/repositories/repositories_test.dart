@@ -73,6 +73,30 @@ void main() {
   });
 
   group('RepositoryClient envelope machinery', () {
+    test('return settlement sends allocations and the retry key', () async {
+      handler = (options) {
+        expect(options.path, '/invoice-returns/7/settle');
+        expect(options.data, {
+          'allocations': [
+            {'type': 'cash', 'amount': 10},
+          ],
+        });
+        expect(options.headers['Idempotency-Key'], 'settle-retry-key');
+        return jsonBody({
+          'success': true,
+          'data': {'returnId': 7},
+        });
+      };
+      final result = await InvoiceRepository(api).settleReturn(
+        7,
+        settlements: [
+          {'type': 'cash', 'amount': 10},
+        ],
+        idempotencyKey: 'settle-retry-key',
+      );
+      expect(result, isA<ApiSuccess<Object?>>());
+    });
+
     test('get unwraps {success: true, data}', () async {
       handler = (o) => jsonBody({
         'success': true,
@@ -223,7 +247,8 @@ void main() {
           expect(
             failure.error.outcomeUnknown,
             true,
-            reason: 'a write that timed out after sending must not be '
+            reason:
+                'a write that timed out after sending must not be '
                 'reported as a definite failure',
           );
           expect(failure.error.isRetryableWrite, true);
@@ -251,7 +276,8 @@ void main() {
           expect(
             failure.error.outcomeUnknown,
             false,
-            reason: 'the request never reached the server, so nothing can '
+            reason:
+                'the request never reached the server, so nothing can '
                 'have been written',
           );
           expect(failure.error.isRetryableWrite, false);
@@ -259,10 +285,8 @@ void main() {
       }
 
       test('a server error response is not outcome-unknown', () async {
-        handler = (o) => jsonBody(
-          {'success': false, 'error': 'Bad request'},
-          status: 400,
-        );
+        handler = (o) =>
+            jsonBody({'success': false, 'error': 'Bad request'}, status: 400);
         final result = await api.get<Object>('/invoices', parse: parse);
         final failure = result as ApiFailure<Object>;
         expect(failure.error.outcomeUnknown, false);
@@ -640,7 +664,6 @@ void main() {
       final result = await repo.unitsOfMeasure();
       expect(result.requireData, ['Nos', 'Kg', 'Ltr']);
     });
-
   });
 
   group('ExpenseRepository', () {
@@ -1086,38 +1109,35 @@ void main() {
       'status': 'Submitted',
     };
 
-    test(
-      'list parses the paged envelope and forwards supplier_id',
-      () async {
-        // Regression: `GET /purchase-orders` is server-paginated
-        // ({success, data, pagination}); the old bare-array helper
-        // failed to parse it and the payment modal's PO list spun
-        // forever.
-        Map<String, dynamic>? seenQuery;
-        handler = (o) {
-          seenQuery = o.queryParameters;
-          return jsonBody({
-            'success': true,
-            'data': [poRow(1, 'PO-2026-001', 1000), poRow(2, 'PO-2026-002', 0)],
-            'pagination': {
-              'currentPage': 1,
-              'totalPages': 1,
-              'totalItems': 2,
-              'hasNext': false,
-              'hasPrev': false,
-            },
-          });
-        };
-        final result = await repo.list(supplierId: 7);
+    test('list parses the paged envelope and forwards supplier_id', () async {
+      // Regression: `GET /purchase-orders` is server-paginated
+      // ({success, data, pagination}); the old bare-array helper
+      // failed to parse it and the payment modal's PO list spun
+      // forever.
+      Map<String, dynamic>? seenQuery;
+      handler = (o) {
+        seenQuery = o.queryParameters;
+        return jsonBody({
+          'success': true,
+          'data': [poRow(1, 'PO-2026-001', 1000), poRow(2, 'PO-2026-002', 0)],
+          'pagination': {
+            'currentPage': 1,
+            'totalPages': 1,
+            'totalItems': 2,
+            'hasNext': false,
+            'hasPrev': false,
+          },
+        });
+      };
+      final result = await repo.list(supplierId: 7);
 
-        expect(result.requireData, hasLength(2));
-        expect(result.requireData.first.poNo, 'PO-2026-001');
-        expect(result.requireData.first.balanceAmount, 1000);
-        expect(seenQuery!['supplier_id'], 7);
-        expect(seenQuery!['page'], 1);
-        expect(seenQuery!['limit'], 1000);
-      },
-    );
+      expect(result.requireData, hasLength(2));
+      expect(result.requireData.first.poNo, 'PO-2026-001');
+      expect(result.requireData.first.balanceAmount, 1000);
+      expect(seenQuery!['supplier_id'], 7);
+      expect(seenQuery!['page'], 1);
+      expect(seenQuery!['limit'], 1000);
+    });
   });
 
   group('DashboardRepository', () {
@@ -1375,49 +1395,52 @@ void main() {
       repo = ProductionRepository(api);
     });
 
-    test('productionsPaged GETs /productions with the paged envelope', () async {
-      Map<String, dynamic>? seenQuery;
-      handler = (o) {
-        seenQuery = o.queryParameters;
-        return jsonBody({
-          'success': true,
-          'data': [
-            {
-              'id': 9,
-              'production_no': 'PROD-2026-005',
-              'output_item_id': 4,
-              'output_quantity': 10,
-              'warehouse_id': 2,
-              'production_date': '2026-08-10',
+    test(
+      'productionsPaged GETs /productions with the paged envelope',
+      () async {
+        Map<String, dynamic>? seenQuery;
+        handler = (o) {
+          seenQuery = o.queryParameters;
+          return jsonBody({
+            'success': true,
+            'data': [
+              {
+                'id': 9,
+                'production_no': 'PROD-2026-005',
+                'output_item_id': 4,
+                'output_quantity': 10,
+                'warehouse_id': 2,
+                'production_date': '2026-08-10',
+              },
+            ],
+            'pagination': {
+              'currentPage': 1,
+              'totalPages': 1,
+              'totalItems': 1,
+              'hasNext': false,
+              'hasPrev': false,
             },
-          ],
-          'pagination': {
-            'currentPage': 1,
-            'totalPages': 1,
-            'totalItems': 1,
-            'hasNext': false,
-            'hasPrev': false,
-          },
-        });
-      };
-      final result = await repo.productionsPaged(
-        const PagedRequest(
-          page: 1,
-          limit: 50,
-          search: 'widget',
-          sortBy: 'production_date',
-          sortOrder: 'DESC',
-        ),
-      );
-      expect(seenQuery!['page'], 1);
-      expect(seenQuery!['limit'], 50);
-      expect(seenQuery!['search'], 'widget');
-      expect(seenQuery!['sortBy'], 'production_date');
-      expect(seenQuery!['sortOrder'], 'DESC');
-      final page = result.requireData;
-      expect(page.items.single.productionNo, 'PROD-2026-005');
-      expect(page.totalItems, 1);
-    });
+          });
+        };
+        final result = await repo.productionsPaged(
+          const PagedRequest(
+            page: 1,
+            limit: 50,
+            search: 'widget',
+            sortBy: 'production_date',
+            sortOrder: 'DESC',
+          ),
+        );
+        expect(seenQuery!['page'], 1);
+        expect(seenQuery!['limit'], 50);
+        expect(seenQuery!['search'], 'widget');
+        expect(seenQuery!['sortBy'], 'production_date');
+        expect(seenQuery!['sortOrder'], 'DESC');
+        final page = result.requireData;
+        expect(page.items.single.productionNo, 'PROD-2026-005');
+        expect(page.totalItems, 1);
+      },
+    );
 
     test('production GETs /productions/:id with inputs', () async {
       String? seenPath;
@@ -1862,7 +1885,12 @@ void main() {
           return jsonBody({
             'success': true,
             'data': [employeeRow(1), employeeRow(2)],
-            'pagination': {'page': 2, 'limit': 10, 'total': 35, 'totalPages': 4},
+            'pagination': {
+              'page': 2,
+              'limit': 10,
+              'total': 35,
+              'totalPages': 4,
+            },
           });
         };
         final result = await repo.list(
@@ -1903,7 +1931,10 @@ void main() {
     });
 
     test('nextCode parses {code}', () async {
-      handler = (o) => jsonBody({'success': true, 'data': {'code': 'EMP-042'}});
+      handler = (o) => jsonBody({
+        'success': true,
+        'data': {'code': 'EMP-042'},
+      });
       final code = (await repo.nextCode()).requireData;
       expect(code, 'EMP-042');
     });
@@ -1920,32 +1951,35 @@ void main() {
       expect(employee.isActive, isTrue);
     });
 
-    test('create posts snake_case body and parses the created employee', () async {
-      Map<String, dynamic>? seenBody;
-      handler = (o) {
-        seenBody = o.data as Map<String, dynamic>;
-        return jsonBody({
-          'success': true,
-          'data': {
-            'id': 99,
-            'employee_code': 'EMP-099',
-            'first_name': seenBody!['first_name'],
-            'last_name': seenBody!['last_name'],
-            'salary': seenBody!['salary'],
-            'is_active': true,
-          },
-        }, status: 201);
-      };
-      final employee = (await repo.create({
-        'first_name': 'Sana',
-        'last_name': 'Ahmed',
-        'salary': 50000,
-      })).requireData;
-      expect(seenBody!['first_name'], 'Sana');
-      expect(seenBody!['salary'], 50000);
-      expect(employee.employeeCode, 'EMP-099');
-      expect(employee.isActive, isTrue);
-    });
+    test(
+      'create posts snake_case body and parses the created employee',
+      () async {
+        Map<String, dynamic>? seenBody;
+        handler = (o) {
+          seenBody = o.data as Map<String, dynamic>;
+          return jsonBody({
+            'success': true,
+            'data': {
+              'id': 99,
+              'employee_code': 'EMP-099',
+              'first_name': seenBody!['first_name'],
+              'last_name': seenBody!['last_name'],
+              'salary': seenBody!['salary'],
+              'is_active': true,
+            },
+          }, status: 201);
+        };
+        final employee = (await repo.create({
+          'first_name': 'Sana',
+          'last_name': 'Ahmed',
+          'salary': 50000,
+        })).requireData;
+        expect(seenBody!['first_name'], 'Sana');
+        expect(seenBody!['salary'], 50000);
+        expect(employee.employeeCode, 'EMP-099');
+        expect(employee.isActive, isTrue);
+      },
+    );
 
     test('update PUTs to /employees/:id', () async {
       String? seenPath;
@@ -2040,7 +2074,10 @@ void main() {
       FormData? seenForm;
       handler = (o) {
         seenForm = o.data as FormData;
-        return jsonBody({'success': true, 'data': {'id': 9}}, status: 201);
+        return jsonBody({
+          'success': true,
+          'data': {'id': 9},
+        }, status: 201);
       };
       final id = (await repo.addDocument(
         1,
@@ -2048,8 +2085,7 @@ void main() {
         documentType: 'ID',
         fileBytes: Uint8List.fromList([1, 2, 3]),
         fileName: 'passport.pdf',
-      ))
-          .requireData;
+      )).requireData;
       final form = seenForm!;
       final fields = {for (final e in form.fields) e.key: e.value};
       expect(fields['document_name'], 'Passport');
@@ -2058,12 +2094,14 @@ void main() {
       expect(id, 9);
     });
 
-    test('addDocument skips the file part when no bytes are given',
-        () async {
+    test('addDocument skips the file part when no bytes are given', () async {
       FormData? seenForm;
       handler = (o) {
         seenForm = o.data as FormData;
-        return jsonBody({'success': true, 'data': {'id': 9}}, status: 201);
+        return jsonBody({
+          'success': true,
+          'data': {'id': 9},
+        }, status: 201);
       };
       await repo.addDocument(1, documentName: 'Passport');
       final form = seenForm!;
@@ -2205,7 +2243,10 @@ void main() {
     });
 
     test('roles parses rows with permission_count', () async {
-      handler = (o) => jsonBody({'success': true, 'data': [roleRow(1)]});
+      handler = (o) => jsonBody({
+        'success': true,
+        'data': [roleRow(1)],
+      });
       final roles = (await repo.roles()).requireData;
       expect(roles.single.roleName, 'Manager');
       expect(roles.single.permissionCount, 8);
@@ -2294,12 +2335,10 @@ void main() {
           'data': {'id': 1, 'name': 'Acme'},
         });
       }
+
       final dio0 = Dio(BaseOptions(baseUrl: 'http://localhost:3011/api'));
       dio0.httpClientAdapter = FakeHttpAdapter(handler0);
-      final api = CachedRepositoryClient(
-        dio0,
-        cache: CacheManager(),
-      );
+      final api = CachedRepositoryClient(dio0, cache: CacheManager());
 
       // First call hits the server and snapshots the body.
       final first = await api.get<Map<String, dynamic>>(
@@ -2340,10 +2379,7 @@ void main() {
           jsonBody({'success': true, 'data': null});
       final dio0 = Dio(BaseOptions(baseUrl: 'http://localhost:3011/api'));
       dio0.httpClientAdapter = FakeHttpAdapter(handler0);
-      final api = CachedRepositoryClient(
-        dio0,
-        cache: CacheManager(),
-      );
+      final api = CachedRepositoryClient(dio0, cache: CacheManager());
       await api.get<Object>('/customers/1', parse: (o) => o!);
 
       // A write drops the snapshot → a subsequent read must re-hit the
@@ -2359,7 +2395,10 @@ void main() {
           reason: 'offline',
         ),
       );
-      final afterWrite = await api.get<Object>('/customers/1', parse: (o) => o!);
+      final afterWrite = await api.get<Object>(
+        '/customers/1',
+        parse: (o) => o!,
+      );
       expect(afterWrite, isA<ApiFailure<Object>>());
     });
   });

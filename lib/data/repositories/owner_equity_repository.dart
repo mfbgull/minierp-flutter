@@ -70,18 +70,17 @@ class OwnerEquityRepository {
             OwnerWithdrawalDetail.fromJson(json! as Map<String, dynamic>),
       );
 
-  Future<ApiResult<T>> _create<T>(
-    String path,
-    Map<String, dynamic> body,
-    T Function(Object?) parse,
-  ) => _client.post(path, body: body, parse: parse);
-
   Future<ApiResult<OwnerCapitalEntry>> createCapital(
-    Map<String, dynamic> body,
-  ) => _create(
+    Map<String, dynamic> body, {
+    String? idempotencyKey,
+  }) => _client.post(
     ApiEndpoints.ownerEquityCapital,
-    body,
-    (Object? json) => OwnerCapitalEntry.fromJson(json! as Map<String, dynamic>),
+    body: body,
+    headers: idempotencyKey == null
+        ? null
+        : {'Idempotency-Key': idempotencyKey},
+    parse: (Object? json) =>
+        OwnerCapitalEntry.fromJson(json! as Map<String, dynamic>),
   );
 
   Future<ApiResult<OwnerCapitalEntry>> updateCapital(
@@ -100,11 +99,16 @@ class OwnerEquityRepository {
       _client.delete('${ApiEndpoints.ownerEquityCapital}/$id');
 
   Future<ApiResult<OwnerWithdrawal>> createWithdrawal(
-    Map<String, dynamic> body,
-  ) => _create(
+    Map<String, dynamic> body, {
+    String? idempotencyKey,
+  }) => _client.post(
     ApiEndpoints.ownerEquityWithdrawals,
-    body,
-    (Object? json) => OwnerWithdrawal.fromJson(json! as Map<String, dynamic>),
+    body: body,
+    headers: idempotencyKey == null
+        ? null
+        : {'Idempotency-Key': idempotencyKey},
+    parse: (Object? json) =>
+        OwnerWithdrawal.fromJson(json! as Map<String, dynamic>),
   );
 
   Future<ApiResult<OwnerWithdrawal>> updateWithdrawal(
@@ -113,7 +117,8 @@ class OwnerEquityRepository {
   ) => _client.put(
     '${ApiEndpoints.ownerEquityWithdrawals}/$id',
     body: body,
-    parse: (Object? json) => OwnerWithdrawal.fromJson(json! as Map<String, dynamic>),
+    parse: (Object? json) =>
+        OwnerWithdrawal.fromJson(json! as Map<String, dynamic>),
   );
 
   Future<ApiResult<void>> voidWithdrawal(int id) =>
@@ -121,7 +126,8 @@ class OwnerEquityRepository {
 
   Future<ApiResult<EquitySummary>> summary() => _client.get(
     ApiEndpoints.ownerEquitySummary,
-    parse: (Object? json) => EquitySummary.fromJson(json! as Map<String, dynamic>),
+    parse: (Object? json) =>
+        EquitySummary.fromJson(json! as Map<String, dynamic>),
   );
 
   Future<ApiResult<List<ExpenseOption>>> paymentMethodOptions() =>
