@@ -11,11 +11,19 @@ import { expectAllInvariantsHold } from './helpers/accountingInvariants';
 import { pruneIdempotencyKeys } from '../utils/idempotency';
 
 let cookie: string;
+let noPermissionToken: string;
 let customerId: number;
 let sequence = 0;
 beforeAll(async () => {
   cookie = await getAuthCookie();
   expect(cookie).not.toBe('');
+  const role = db.prepare('INSERT INTO roles (role_name, is_active) VALUES (?, 1)').run('Cash API no permissions');
+  const user = db.prepare(`INSERT INTO users (username, email, full_name, password_hash, role, role_id, is_active)
+    VALUES ('cash-api-none', 'cash-api-none@example.test', 'No permissions', 'unused', 'user', ?, 1)`).run(role.lastInsertRowid);
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('Missing test JWT secret');
+  noPermissionToken = jwt.sign({ id: Number(user.lastInsertRowid), username: 'cash-api-none', role: 'user' }, secret,
+    { issuer: 'mini-erp', audience: 'mini-erp-client', expiresIn: '1h' });
 });
 beforeEach(async () => { customerId = await createCustomer(`Held cash API ${++sequence}`, cookie); });
 
@@ -205,7 +213,8 @@ test('unauthenticated and unprivileged callers cannot write cash', async () => {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error('Missing test JWT secret');
   const token = jwt.sign({ id: 99999999, username: 'no-permissions', role: 'user' }, secret, { issuer: 'mini-erp', audience: 'mini-erp-client', expiresIn: '1h' });
-  expect((await request(app).post(path).set('Authorization', `Bearer ${token}`).send(body)).status).toBe(403);
+  expect((await request(app).post(path).set('Authorization', `Bearer ${token}`).send(body)).status).toBe(401);
+  expect((await request(app).post(path).set('Authorization', `Bearer ${noPermissionToken}`).send(body)).status).toBe(403);
 });
 
 test('closed periods return PERIOD_CLOSED for every operation', async () => {
@@ -257,11 +266,8 @@ test.each([
   ['/api/unapplied-cash/refund', { customer_id: 1, operation_date: '2026-10-03', amount: 1, payment_method: 'Cash' }],
   ['/api/payments/99999999/reverse', {}],
 ])('authentication and permissions protect %s', async (path, body) => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error('Missing test JWT secret');
-  const token = jwt.sign({ id: 99999999, username: 'no-permissions', role: 'user' }, secret, { issuer: 'mini-erp', audience: 'mini-erp-client', expiresIn: '1h' });
   expect((await request(app).post(path).send(body)).status).toBe(401);
-  expect((await request(app).post(path).set('Authorization', `Bearer ${token}`).send(body)).status).toBe(403);
+  expect((await request(app).post(path).set('Authorization', `Bearer ${noPermissionToken}`).send(body)).status).toBe(403);
 });
 
 test('malformed JSON returns a safe 400', async () => {

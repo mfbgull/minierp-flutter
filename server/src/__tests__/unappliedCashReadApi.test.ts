@@ -6,9 +6,21 @@ import db from '../config/database';
 import { getAuthCookie, createCustomer } from './helpers/invoiceReturnSpec';
 
 let cookie: string;
+let noPermissionToken: string;
 let customerId: number;
 let sequence = 0;
-beforeAll(async () => { cookie = await getAuthCookie(); });
+beforeAll(async () => {
+  cookie = await getAuthCookie();
+  // A real active user whose assigned role holds no permissions: authority is
+  // resolved from the database, so this token authenticates but is forbidden.
+  const role = db.prepare('INSERT INTO roles (role_name, is_active) VALUES (?, 1)').run('Cash read no permissions');
+  const user = db.prepare(`INSERT INTO users (username, email, full_name, password_hash, role, role_id, is_active)
+    VALUES ('cash-read-none', 'cash-read-none@example.test', 'No permissions', 'unused', 'user', ?, 1)`).run(role.lastInsertRowid);
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('Missing test JWT secret');
+  noPermissionToken = jwt.sign({ id: Number(user.lastInsertRowid), username: 'cash-read-none', role: 'user' }, secret,
+    { issuer: 'mini-erp', audience: 'mini-erp-client', expiresIn: '1h' });
+});
 beforeEach(async () => { customerId = await createCustomer(`Cash reads ${++sequence}`, cookie); });
 
 function get(path: string) { return request(app).get(path).set('Cookie', cookie); }
@@ -82,6 +94,7 @@ test('empty and missing customers are distinct; cash reads and capability requir
   expect(capability.body.data).toEqual({ receive: 'durable-v1', apply: 'permanent-application-v1', refund: 'permanent-application-v1', reverse: 'guarded-status-v1' });
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error('Missing test secret');
-  const token = jwt.sign({ id: 99999999, username: 'no-permissions', role: 'user' }, secret, { issuer: 'mini-erp', audience: 'mini-erp-client' });
-  expect((await request(app).get(`/api/customers/${customerId}/unapplied-cash`).set('Authorization', `Bearer ${token}`)).status).toBe(403);
+  const missingToken = jwt.sign({ id: 99999999, username: 'missing', role: 'user' }, secret, { issuer: 'mini-erp', audience: 'mini-erp-client' });
+  expect((await request(app).get(`/api/customers/${customerId}/unapplied-cash`).set('Authorization', `Bearer ${missingToken}`)).status).toBe(401);
+  expect((await request(app).get(`/api/customers/${customerId}/unapplied-cash`).set('Authorization', `Bearer ${noPermissionToken}`)).status).toBe(403);
 });
