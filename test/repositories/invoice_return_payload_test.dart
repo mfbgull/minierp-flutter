@@ -120,7 +120,7 @@ void main() {
       ],
     );
     expect(capturedPath, '/invoice-returns/7/settle');
-    expect(capturedBody['settlements'], [
+    expect(capturedBody['allocations'], [
       {'type': 'credit', 'amount': 540},
     ]);
   });
