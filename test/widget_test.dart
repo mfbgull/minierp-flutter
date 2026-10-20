@@ -7109,8 +7109,8 @@ void main() {
     expect(find.text('Change Password'), findsWidgets);
 
     await tester.enterText(find.byType(TextFormField).at(0), 'admin123');
-    await tester.enterText(find.byType(TextFormField).at(1), 'newpass123');
-    await tester.enterText(find.byType(TextFormField).at(2), 'newpass123');
+    await tester.enterText(find.byType(TextFormField).at(1), 'new-valid-pass-2026');
+    await tester.enterText(find.byType(TextFormField).at(2), 'new-valid-pass-2026');
     await tester.tap(find.widgetWithText(FilledButton, 'Change Password'));
     await tester.pumpAndSettle();
 
@@ -7143,8 +7143,8 @@ void main() {
       await tester.tap(find.text('Change Password'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField).at(0), 'wrong');
-      await tester.enterText(find.byType(TextFormField).at(1), 'newpass123');
-      await tester.enterText(find.byType(TextFormField).at(2), 'newpass123');
+      await tester.enterText(find.byType(TextFormField).at(1), 'new-valid-pass-2026');
+      await tester.enterText(find.byType(TextFormField).at(2), 'new-valid-pass-2026');
       await tester.tap(find.widgetWithText(FilledButton, 'Change Password'));
       await tester.pumpAndSettle();
 
@@ -12967,7 +12967,12 @@ void main() {
     expect(adapter.lastPoPostBody?['supplier_id'], 1);
     expect(adapter.lastPoPostBody?['status'], 'Draft'); // schema default
     expect(adapter.lastPoPostBody?['items'], [
-      {'item_id': 1, 'quantity': 10, 'unit_price': 15.5},
+      {
+        'item_id': 1,
+        'quantity': 10,
+        'unit_price': 15.5,
+        'input_tax_amount': 0.0,
+      },
     ]);
     final now = DateTime.now();
     final today =
@@ -15865,7 +15870,7 @@ void main() {
     await tester.enterText(dialogFields.at(0), 'zain');
     await tester.enterText(dialogFields.at(1), 'Zain Malik');
     await tester.enterText(dialogFields.at(2), 'zain@example.com');
-    await tester.enterText(dialogFields.at(3), 'secret123');
+    await tester.enterText(dialogFields.at(3), 'secret123-valid');
     await tester.pumpAndSettle();
 
     // Pick the Manager role from the roles dropdown.
@@ -15880,7 +15885,7 @@ void main() {
     expect(adapter.lastUserPostBody?['email'], 'zain@example.com');
     expect(adapter.lastUserPostBody?['full_name'], 'Zain Malik');
     expect(adapter.lastUserPostBody?['role_id'], 3);
-    expect(adapter.lastUserPostBody?['password'], 'secret123');
+    expect(adapter.lastUserPostBody?['password'], 'secret123-valid');
     expect(find.text('User created successfully'), findsOneWidget);
   });
 
@@ -15898,7 +15903,7 @@ void main() {
     await tester.enterText(dialogFields.at(0), 'zain');
     await tester.enterText(dialogFields.at(1), 'Zain Malik');
     await tester.enterText(dialogFields.at(2), 'zain@example.com');
-    await tester.enterText(dialogFields.at(3), 'secret123');
+    await tester.enterText(dialogFields.at(3), 'secret123-valid');
     await tester.pumpAndSettle();
     await tester.tap(find.byType(SearchableSelect<Role>));
     await tester.pumpAndSettle();
