@@ -40,8 +40,8 @@ const money = (field: string, { allowZero = false } = {}) =>
  * clamped the total to zero while COGS was still posted.
  */
 export const invoiceLine = z.object({
-  item_id: z.union([z.number(), z.string()]).refine((v) => String(v).length > 0, { message: 'Required' }),
-  quantity: z.union([z.number(), z.string()]).refine((v) => Number(v) > 0, { message: 'Must be positive' }),
+  item_id: z.coerce.number().int().positive(),
+  quantity: z.coerce.number().finite().positive(),
   unit_price: money('unit_price'),
   tax_rate: z.number().min(0).max(100).optional(),
   discount_type: z.enum(['none', 'percentage', 'flat']).optional(),
@@ -165,6 +165,38 @@ export const zodBodySchemas = {
     amount: z.union([z.number(), z.string()]),
     expense_date: documentDate('expense_date'),
   }).passthrough(),
+  expensePayment: z.object({
+    amount: z.number().finite().positive(),
+    payment_date: documentDate('payment_date'),
+    payment_method: z.string().min(1).max(50),
+    reference_no: z.string().max(100).optional(),
+  }),
+  supplierBill: z.object({
+    supplier_id: z.number().int().positive(),
+    bill_no: z.string().trim().min(1).max(150),
+    bill_date: documentDate('bill_date'),
+    due_date: documentDate('due_date').optional(),
+    description: z.string().trim().min(1).max(2000),
+    net_amount: z.number().finite().positive().max(1e9),
+    input_tax_amount: z.number().finite().nonnegative().max(1e9).default(0),
+  }),
+  financialVoid: z.object({ reason: z.string().trim().min(1).max(500) }),
+  supplierPrepayment: z.object({
+    supplier_id: z.number().int().positive(),
+    prepay_date: documentDate('prepay_date'),
+    amount: z.number().finite().positive().max(1e9),
+    payment_method: z.string().min(1).max(50),
+    reference_no: z.string().max(100).optional(),
+    notes: z.string().max(2000).optional(),
+  }),
+  supplierPrepaymentApplication: z.object({
+    applied_at: documentDate('applied_at'),
+    allocations: z.array(z.object({
+      kind: z.enum(['purchase', 'purchase_order', 'supplier_bill']),
+      id: z.number().int().positive(),
+      amount: z.number().finite().positive().max(1e9),
+    })).min(1).max(100),
+  }),
 
   expenseCategoryCreate: z.object({
     category_name: z.string().min(1),
@@ -286,6 +318,8 @@ export const zodBodySchemas = {
   // Drafts POST/PUT may ship an empty body — optional like [object].
   mobileDraft: z.object({}).passthrough().optional(),
 
+  // Deprecated surface: keep the legacy single-field validation bodies the
+  // mobile controller returns. Typed validation belongs to invoiceCreate.
   mobileSubmit: z.object({
     customer_id: z.union([z.number(), z.string()]).refine(v => String(v).length > 0, { message: 'Required' }),
     invoice_date: z.string().min(1),
