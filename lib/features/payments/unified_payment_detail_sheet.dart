@@ -34,6 +34,8 @@ class _UnifiedPaymentDetailSheet extends StatelessWidget {
 
   String _title(AppLocalizations l10n) => switch (payment.source) {
     'expense' => l10n.paymentsExpenseDetail,
+    'expense_payment' => l10n.expensePayments,
+    'supplier_advance' => l10n.supplierAdvances,
     'salary' => l10n.paymentsSalaryPaymentDetail,
     'owner_capital' => l10n.paymentsOwnerCapitalDetail,
     'owner_withdrawal' => l10n.paymentsOwnerWithdrawalDetail,

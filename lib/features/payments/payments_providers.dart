@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../dashboard/dashboard_providers.dart' show dashboardSummaryProvider, dashboardCashPositionProvider;
+import '../../data/repositories/supplier_accounting_repository.dart' show supplierBillsProvider, supplierPrepaymentsProvider;
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/customer.dart' show Customer;
@@ -188,8 +190,13 @@ final unifiedPaymentsProvider =
 void invalidateCashMovementProviders(WidgetRef ref, String source) {
   ref.invalidate(unifiedPaymentsProvider);
   ref.invalidate(paymentsProvider);
+  ref.invalidate(dashboardSummaryProvider);
+  ref.invalidate(dashboardCashPositionProvider);
+  ref.invalidate(supplierBillsProvider);
+  ref.invalidate(supplierPrepaymentsProvider);
   switch (source) {
     case 'expense':
+    case 'expense_payment':
       ref.invalidate(expensesProvider);
     case 'salary':
       ref.invalidate(employeeSalaryHistoryProvider);
