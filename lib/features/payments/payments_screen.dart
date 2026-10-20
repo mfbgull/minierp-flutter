@@ -71,6 +71,8 @@ const Map<String, int> _sourceRank = {
   'salary': 3,
   'owner_capital': 4,
   'owner_withdrawal': 5,
+  'expense_payment': 6,
+  'supplier_advance': 7,
 };
 
 int _encodeId(String source, int sourceId) =>
@@ -777,6 +779,7 @@ class _TypeFilterChips extends ConsumerWidget {
       ('salary', l10n.paymentsTypeSalary),
       ('owner_capital', l10n.paymentsTypeOwnerCapital),
       ('owner_withdrawal', l10n.paymentsTypeOwnerWithdrawal),
+      ('supplier_advance', l10n.supplierAdvances),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
