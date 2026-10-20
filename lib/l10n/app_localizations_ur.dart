@@ -9,6 +9,100 @@ class AppLocalizationsUr extends AppLocalizations {
   AppLocalizationsUr([String locale = 'ur']) : super(locale);
 
   @override
+  String get supplierAdvances => 'سپلائر کو پیشگی ادائیگیاں';
+
+  @override
+  String get supplierAdvanceCreate => 'سپلائر کی پیشگی ادائیگی درج کریں';
+
+  @override
+  String get supplierAdvanceApply => 'پیشگی رقم استعمال کریں';
+
+  @override
+  String get supplierAdvanceAvailable => 'دستیاب پیشگی رقم';
+
+  @override
+  String get supplierAdvanceApplied => 'استعمال شدہ رقم';
+
+  @override
+  String get supplierAdvanceActive => 'فعال';
+
+  @override
+  String get supplierAdvanceCreateHint =>
+      'سپلائر کو پیشگی ادا کی گئی رقم درج کریں۔ خریداری، آرڈر یا بل کی ادائیگی کے وقت اسے الگ سے استعمال کریں۔';
+
+  @override
+  String get supplierAdvanceDocument => 'غیر ادا شدہ دستاویز';
+
+  @override
+  String get supplierAdvanceSearchHint =>
+      'دستاویز نمبر سے تلاش کریں؛ زیادہ سے زیادہ 50 مماثل غیر ادا شدہ دستاویزات دکھائی جاتی ہیں۔';
+
+  @override
+  String get supplierAdvanceVoid => 'پیشگی ادائیگی منسوخ کریں';
+
+  @override
+  String get supplierAdvanceVoidConfirm =>
+      'کیا اس پیشگی ادائیگی کو واپس کرنا ہے؟ پہلے اس کے تمام استعمال واپس کریں۔';
+
+  @override
+  String get supplierBillOpen => 'غیر ادا شدہ';
+
+  @override
+  String get supplierBillPaid => 'ادا شدہ';
+
+  @override
+  String get supplierBills => 'سپلائر بل';
+
+  @override
+  String get supplierBillCreate => 'سپلائر بل درج کریں';
+
+  @override
+  String get supplierBillNumber => 'سپلائر انوائس نمبر';
+
+  @override
+  String get supplierBillNetAmount => 'خالص اخراجات کی رقم';
+
+  @override
+  String get supplierBillInputTax => 'قابل وصول ان پٹ ٹیکس';
+
+  @override
+  String get supplierBillNonStockHint =>
+      'خدمات اور غیر اسٹاک خریداری کے لیے۔ اسٹاک خریداری درج کرنے کے لیے خریداری کا حصہ استعمال کریں۔';
+
+  @override
+  String get supplierBillVoid => 'سپلائر بل منسوخ کریں';
+
+  @override
+  String get supplierBillVoidConfirm =>
+      'کیا اس بل کو منسوخ کر کے بقایا، اخراجات اور ان پٹ ٹیکس واپس کرنا ہے؟ پہلے ادائیگیاں واپس کریں۔';
+
+  @override
+  String get expenseCreditMethod => 'ادھار (بعد میں ادائیگی)';
+
+  @override
+  String get expensePayments => 'اخراجات کی ادائیگیاں';
+
+  @override
+  String get expenseOutstanding => 'بقایا';
+
+  @override
+  String get expenseRecordPayment => 'ادائیگی درج کریں';
+
+  @override
+  String get expenseReversePayment => 'ادائیگی واپس کریں';
+
+  @override
+  String get expenseReversePaymentConfirm =>
+      'کیا اس ادائیگی کو واپس کر کے اخراجات کا بقایا بحال کرنا ہے؟';
+
+  @override
+  String get expensePaymentVoided => 'واپس شدہ';
+
+  @override
+  String get salesBackdatedCostingWarning =>
+      'پچھلی تاریخ کی فروخت: لاگت موجودہ اسٹاک سے لی جاتی ہے اور اس میں انوائس کی تاریخ کے بعد موصول ہونے والے بیچ بھی شامل ہو سکتے ہیں۔';
+
+  @override
   String get cashOrdinaryReceipt => 'وصولی';
 
   @override
@@ -3949,7 +4043,10 @@ class AppLocalizationsUr extends AppLocalizations {
   String get changePasswordTitle => 'پاس ورڈ تبدیل کریں';
 
   @override
-  String get changePasswordTooShort => 'پاس ورڈ کم از کم 6 حروف کا ہونا چاہیے';
+  String get changePasswordTooShort => 'پاس ورڈ کم از کم 12 حروف کا ہونا چاہیے';
+
+  @override
+  String get passwordTooLong => 'پاس ورڈ بہت طویل ہے۔ کم حروف استعمال کریں۔';
 
   @override
   String get changePasswordUpdating => 'اپ ڈیٹ ہو رہا ہے...';
@@ -5901,7 +5998,7 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get usermanagementValidationPasswordlength =>
-      'پاس ورڈ کم از کم 6 حروف کا ہونا چاہیے';
+      'پاس ورڈ کم از کم 12 حروف کا ہونا چاہیے';
 
   @override
   String get usermanagementValidationRolerequired => 'رول منتخب کریں';
@@ -6044,6 +6141,16 @@ class AppLocalizationsUr extends AppLocalizations {
 
   @override
   String get reportsTotaltax => 'کل ٹیکس';
+
+  @override
+  String get reportsOutputTax => 'آؤٹ پٹ ٹیکس';
+
+  @override
+  String get reportsNetTax => 'خالص ٹیکس';
+
+  @override
+  String get loginStorageUnavailable =>
+      'آپ کا سیشن محفوظ نہیں ہو سکا۔ محفوظ اسٹوریج چیک کر کے دوبارہ سائن اِن کریں۔';
 
   @override
   String get reportsBatchtraceability => 'بیچ ٹریس ابلٹی';
