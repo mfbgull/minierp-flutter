@@ -8,6 +8,7 @@ import '../../data/repositories/api_result.dart'
 import '../../data/repositories/auth_repository.dart'
     show AuthLoginResult, AuthRepository, authRepositoryProvider;
 import 'token_storage.dart' show TokenStorage, tokenStorageProvider;
+import '../utils/recoverable_failure.dart';
 
 /// Session state machine — PORTING.md §3.
 ///
@@ -52,8 +53,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<ApiError?> _applyLogin(AuthLoginResult login) async {
-    await _writeToken(login.token);
-    await _writeRefreshToken(login.refreshToken);
+    if (!await _writeToken(login.token) ||
+        !await _writeRefreshToken(login.refreshToken)) {
+      await _clearToken();
+      state = const AuthState(status: AuthStatus.unauthenticated);
+      return const ApiError(
+        code: 'SESSION_STORAGE_UNAVAILABLE',
+        message:
+            'Could not save your session. Check secure storage and sign in again.',
+      );
+    }
     state = AuthState(status: AuthStatus.authenticated, user: login.user);
     return null;
   }
@@ -74,7 +83,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Stores a fresh access token produced by the dio refresh interceptor
   /// (the user object is unchanged, so the session state stays put).
   Future<void> updateAccessToken(String token) async {
-    await _writeToken(token);
+    if (!await _writeToken(token)) await sessionExpired();
   }
 
   // Storage calls are wrapped so a storage failure (headless keyring,
@@ -82,27 +91,38 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<String?> _readToken() async {
     try {
       return await _storage.readToken();
-    } catch (_) {
+    } catch (error) {
+      reportRecoverableFailure('session.read_token', error);
       return null;
     }
   }
 
-  Future<void> _writeToken(String token) async {
+  Future<bool> _writeToken(String token) async {
     try {
       await _storage.writeToken(token);
-    } catch (_) {}
+      return true;
+    } catch (error) {
+      reportRecoverableFailure('session.write_token', error);
+      return false;
+    }
   }
 
-  Future<void> _writeRefreshToken(String token) async {
+  Future<bool> _writeRefreshToken(String token) async {
     try {
       await _storage.writeRefreshToken(token);
-    } catch (_) {}
+      return true;
+    } catch (error) {
+      reportRecoverableFailure('session.write_refresh_token', error);
+      return false;
+    }
   }
 
   Future<void> _clearToken() async {
     try {
       await _storage.clear();
-    } catch (_) {}
+    } catch (error) {
+      reportRecoverableFailure('session.clear_tokens', error);
+    }
   }
 }
 

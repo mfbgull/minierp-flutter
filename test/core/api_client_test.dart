@@ -21,12 +21,16 @@ import 'package:minierp_app/core/auth/token_storage.dart';
 class _MemoryStorage implements TokenStorage {
   String? token;
   String? refreshToken;
+  bool failTokenWrite = false;
 
   @override
   Future<String?> readToken() async => token;
 
   @override
-  Future<void> writeToken(String value) async => token = value;
+  Future<void> writeToken(String value) async {
+    if (failTokenWrite) throw StateError('private refreshed token');
+    token = value;
+  }
 
   @override
   Future<String?> readRefreshToken() async => refreshToken;
@@ -149,72 +153,67 @@ void main() {
       },
     );
 
-    test(
-      '401 retries transparently when the refresh token works',
-      () async {
-        storage.refreshToken = 'valid-refresh-token';
-        var invoiceHits = 0;
-        dio.httpClientAdapter = _Adapter((options) {
-          if (options.path == ApiEndpoints.refresh) {
-            return _json({
-              'success': true,
-              'data': {'token': 'fresh-access-token'},
-            });
-          }
-          if (options.path == '/invoices') {
-            invoiceHits++;
-            if (invoiceHits == 1) return _expiredToken401();
-            return _json({'success': true, 'data': []});
-          }
-          return _json({'success': true, 'data': null});
-        });
+    test('401 retries transparently when the refresh token works', () async {
+      storage.refreshToken = 'valid-refresh-token';
+      var invoiceHits = 0;
+      dio.httpClientAdapter = _Adapter((options) {
+        if (options.path == ApiEndpoints.refresh) {
+          return _json({
+            'success': true,
+            'data': {'token': 'fresh-access-token'},
+          });
+        }
+        if (options.path == '/invoices') {
+          invoiceHits++;
+          if (invoiceHits == 1) return _expiredToken401();
+          return _json({'success': true, 'data': []});
+        }
+        return _json({'success': true, 'data': null});
+      });
 
-        final response = await dio.get('/invoices');
-        expect(response.statusCode, 200);
-        expect(invoiceHits, 2); // original + one retry
-        expect(storage.token, 'fresh-access-token');
-        expect(unauthorizedFires, isEmpty);
-      },
-    );
+      final response = await dio.get('/invoices');
+      expect(response.statusCode, 200);
+      expect(invoiceHits, 2); // original + one retry
+      expect(storage.token, 'fresh-access-token');
+      expect(unauthorizedFires, isEmpty);
+    });
 
-    test(
-      'concurrent 401s share a single refresh round-trip',
-      () async {
-        storage.refreshToken = 'valid-refresh-token';
-        var refreshHits = 0;
-        var invoiceHits = 0;
-        dio.httpClientAdapter = _Adapter((options) async {
-          if (options.path == ApiEndpoints.refresh) {
-            refreshHits++;
-            return _json({
-              'success': true,
-              'data': {'token': 'fresh-access-token'},
-            });
-          }
-          if (options.path == '/invoices') {
-            invoiceHits++;
-            if (invoiceHits <= 2) return _expiredToken401();
-            return _json({'success': true, 'data': []});
-          }
-          return _json({'success': true, 'data': null});
-        });
+    test('concurrent 401s share a single refresh round-trip', () async {
+      storage.refreshToken = 'valid-refresh-token';
+      var refreshHits = 0;
+      var invoiceHits = 0;
+      dio.httpClientAdapter = _Adapter((options) async {
+        if (options.path == ApiEndpoints.refresh) {
+          refreshHits++;
+          return _json({
+            'success': true,
+            'data': {'token': 'fresh-access-token'},
+          });
+        }
+        if (options.path == '/invoices') {
+          invoiceHits++;
+          if (invoiceHits <= 2) return _expiredToken401();
+          return _json({'success': true, 'data': []});
+        }
+        return _json({'success': true, 'data': null});
+      });
 
-        final results = await Future.wait([
-          dio.get('/invoices'),
-          dio.get('/invoices'),
-        ]);
-        expect(results.every((r) => r.statusCode == 200), isTrue);
-        expect(refreshHits, 1);
-        expect(unauthorizedFires, isEmpty);
-      },
-    );
+      final results = await Future.wait([
+        dio.get('/invoices'),
+        dio.get('/invoices'),
+      ]);
+      expect(results.every((r) => r.statusCode == 200), isTrue);
+      expect(refreshHits, 1);
+      expect(unauthorizedFires, isEmpty);
+    });
 
     test('refresh failure falls back to clearing the session', () async {
       storage.refreshToken = 'expired-refresh-token';
       dio.httpClientAdapter = _Adapter((options) {
         if (options.path == ApiEndpoints.refresh) {
-          return _json({'error': 'Invalid or expired refresh token'},
-              status: 401);
+          return _json({
+            'error': 'Invalid or expired refresh token',
+          }, status: 401);
         }
         return _expiredToken401();
       });
@@ -224,5 +223,32 @@ void main() {
       expect(storage.token, isNull);
       expect(unauthorizedFires, hasLength(1));
     });
+
+    test(
+      'does not retry with an old token when a refreshed token cannot be saved',
+      () async {
+        storage.refreshToken = 'refresh-token';
+        storage.failTokenWrite = true;
+        var refreshHits = 0;
+        var invoiceHits = 0;
+        dio.httpClientAdapter = _Adapter((options) {
+          if (options.path == ApiEndpoints.refresh) {
+            refreshHits++;
+            return _json({
+              'success': true,
+              'data': {'token': 'private refreshed token'},
+            });
+          }
+          invoiceHits++;
+          return _expiredToken401();
+        });
+        await expectLater(dio.get('/invoices'), throwsA(isA<DioException>()));
+        await Future<void>.delayed(Duration.zero);
+        expect(refreshHits, 1);
+        expect(invoiceHits, 1);
+        expect(storage.token, isNull);
+        expect(unauthorizedFires, hasLength(1));
+      },
+    );
   });
 }
