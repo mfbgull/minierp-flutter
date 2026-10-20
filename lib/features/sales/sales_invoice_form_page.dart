@@ -18,14 +18,14 @@
 import 'dart:async';
 import 'dart:convert' show jsonEncode;
 import 'dart:math' show Random;
+import 'widgets/invoice_form_layout.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 
-import '../../widgets/pluto_grid_screen.dart'
-    show plutoGridConfigurationFor;
+import '../../widgets/pluto_grid_screen.dart' show plutoGridConfigurationFor;
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/print_service.dart' show PrintFormat, PrintService;
@@ -163,6 +163,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     }
     return _createIdemKey!;
   }
+
   bool _printing = false;
   String? _error;
 
@@ -213,7 +214,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     _status = invoice?.status ?? 'Unpaid';
     _invoiceDate =
         DateTime.tryParse(invoice?.invoiceDate ?? '') ?? DateTime.now();
-    _dueDate = DateTime.tryParse(invoice?.dueDate ?? '') ?? _invoiceDate.add(const Duration(days: 15));
+    _dueDate =
+        DateTime.tryParse(invoice?.dueDate ?? '') ??
+        _invoiceDate.add(const Duration(days: 15));
     _paymentDate = _invoiceDate;
     // Create mode defaults to per-item discount scope (spec §4.2); edit
     // mode honors the saved scope so invoice-level discounts round-trip
@@ -645,7 +648,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   /// from the lines, which knows nothing about credit, so it must subtract.
   num get _remainingBalance => _isEdit
       ? (_editBalance - _paymentSum)
-      : (calculateTotal(_filledLines, _scope, _invoiceDiscount) - _paymentSum - _creditOffset);
+      : (calculateTotal(_filledLines, _scope, _invoiceDiscount) -
+            _paymentSum -
+            _creditOffset);
 
   /// Balance the in-progress payment is validated against — the balance
   /// **before** this payment is applied. `_remainingBalance` already has
@@ -750,7 +755,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       showAppToast(
         context,
         l10n.paymentsErrorAmountExceedsBalance(
-          Formatters.currency(_balanceBeforePayment < 0 ? 0 : _balanceBeforePayment),
+          Formatters.currency(
+            _balanceBeforePayment < 0 ? 0 : _balanceBeforePayment,
+          ),
         ),
       );
       return false;
@@ -1065,9 +1072,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       if (item?.hasExpiry != true) continue;
       final result = await repo.getBatches(itemId: itemId);
       if (result case ApiFailure()) continue;
-      final batches = (result as ApiSuccess<List<StockBatch>>)
-          .data
-          .where((b) => !b.halted);
+      final batches = (result as ApiSuccess<List<StockBatch>>).data.where(
+        (b) => !b.halted,
+      );
       if (batches.isEmpty) continue;
       String? soonestExpiry;
       StockBatch? soonest;
@@ -1081,8 +1088,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         }
       }
       if (soonest == null || soonestExpiry == null) continue;
-      final days =
-          DateTime.parse(soonestExpiry).difference(DateTime.now()).inDays;
+      final days = DateTime.parse(
+        soonestExpiry,
+      ).difference(DateTime.now()).inDays;
       final name = item?.itemName ?? line.description;
       if (days < 0) {
         expired.add('$name · ${soonest.batchNo}');
@@ -1121,7 +1129,10 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     }
     // Near-expiry only — toast, no dialog.
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(near.join('\n')), duration: const Duration(seconds: 4)),
+      SnackBar(
+        content: Text(near.join('\n')),
+        duration: const Duration(seconds: 4),
+      ),
     );
     return true;
   }
@@ -1159,8 +1170,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     // credit-offset-vs-customer-credit check the inline guard skipped.
     // Edit mode is excluded — its payments are recorded separately via
     // [_recordPayments], and a zero payment sum must not block the PUT.
-    if (!_isEdit && _recordPayment && _paymentSum > 0 &&
-        !_validatePayment()) {
+    if (!_isEdit && _recordPayment && _paymentSum > 0 && !_validatePayment()) {
       return null;
     }
     if (!await _confirmExpiry()) return null;
@@ -1194,7 +1204,11 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
             final bodies = [
               for (final m in _paymentMethods)
                 if (m.amount > 0)
-                  _paymentBody(m, invoiceId: data.id, invoiceNo: data.invoiceNo),
+                  _paymentBody(
+                    m,
+                    invoiceId: data.id,
+                    invoiceNo: data.invoiceNo,
+                  ),
             ];
             await _postPaymentBodies(
               bodies,
@@ -1396,7 +1410,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     if (columns == null) {
       // Fills whatever height the layout gives it — Expanded on wide
       // screens, SizedBox(height: 320) in the stacked layout.
-    return Container(
+      return Container(
         alignment: Alignment.center,
         decoration: BoxDecoration(
           border: Border.all(
@@ -1510,22 +1524,24 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                 label: Text(l10n.actionsPrint),
               ),
             ),
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: TextButton.icon(
-                  onPressed: () async {
-                    await showInvoiceReturnDialog(
-                      context,
-                      invoiceId: widget.invoice!.id,
-                    );
-                    if (!mounted) return;
-                    _loadInvoiceDetail(widget.invoice!.id);
-                    _loadExistingPayments(widget.invoice!.id);
-                  },
-                  icon: const Icon(Icons.assignment_return_outlined, size: 18),
-                  label: Text(l10n.salesreturnsProcessreturn),
-                ),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                onPressed: () async {
+                  await showInvoiceReturnDialog(
+                    context,
+                    invoiceId: widget.invoice!.id,
+                  );
+                  if (!mounted) return;
+                  await Future.wait([
+                    _loadInvoiceDetail(widget.invoice!.id),
+                    _loadExistingPayments(widget.invoice!.id),
+                  ]);
+                },
+                icon: const Icon(Icons.assignment_return_outlined, size: 18),
+                label: Text(l10n.salesreturnsProcessreturn),
               ),
+            ),
           ],
         ],
       ),
@@ -1547,7 +1563,10 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                   customers,
                   wide: wide,
                 );
-                final heading = _itemsHeadingRow(l10n, wide: wide);
+                final heading = _itemsHeadingRow(
+                  l10n,
+                  wide: constraints.maxWidth >= 1100,
+                );
                 final grid = _buildGrid(l10n);
                 final totalsCard = _buildTotalsCard(
                   l10n,
@@ -1562,29 +1581,30 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                     ? null
                     : _buildErrorBanner(l10n);
                 final buttons = _buildButtonsRow(l10n);
-                if (wide && constraints.maxHeight >= 660) {
-                  return _buildWideLayout(
-                    l10n,
-                    header,
-                    heading,
-                    grid,
-                    totalsCard,
-                    notes,
-                    panel,
-                    errorBanner,
-                    buttons,
+                if (constraints.maxWidth >= 1100 &&
+                    constraints.maxHeight >= 800) {
+                  return InvoiceFormWideLayout(
+                    header: header,
+                    heading: heading,
+                    grid: grid,
+                    totals: totalsCard,
+                    notes: notes,
+                    panel: panel,
+                    errorBanner: errorBanner,
+                    buttons: buttons,
+                    gridMinHeight: _gridMinHeight,
                   );
                 }
-                return _buildNarrowLayout(
-                  l10n,
-                  header,
-                  heading,
-                  grid,
-                  totalsCard,
-                  notes,
-                  panel,
-                  errorBanner,
-                  buttons,
+                return InvoiceFormNarrowLayout(
+                  header: header,
+                  heading: heading,
+                  grid: grid,
+                  totals: totalsCard,
+                  notes: notes,
+                  panel: panel,
+                  errorBanner: errorBanner,
+                  buttons: buttons,
+                  gridMinHeight: _gridMinHeight,
                 );
               },
             ),
@@ -1949,7 +1969,25 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     final date = FormFieldShell(
       label: l10n.fieldsDate,
       required: true,
-      child: _dateField(l10n.fieldsDate, _invoiceDate, isDue: false),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _dateField(l10n.fieldsDate, _invoiceDate, isDue: false),
+          if (DateUtils.dateOnly(
+            _invoiceDate,
+          ).isBefore(DateUtils.dateOnly(DateTime.now())))
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  l10n.salesBackdatedCostingWarning,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
     final due = FormFieldShell(
       label: l10n.salesDuedate,
@@ -2041,119 +2079,6 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     );
   }
 
-  /// Fixed-height two-column layout (spec §3.1): grid left, payment +
-  /// error + buttons right, totals + notes under the grid.
-  Widget _buildWideLayout(
-    AppLocalizations l10n,
-    Widget header,
-    Widget heading,
-    Widget grid,
-    Widget totals,
-    Widget notes,
-    Widget panel,
-    Widget? errorBanner,
-    Widget buttons,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: header,
-        ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      heading,
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minHeight: _gridMinHeight,
-                          ),
-                          child: grid,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      totals,
-                      const SizedBox(height: 8),
-                      notes,
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 250,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: panel,
-                        ),
-                      ),
-                      if (errorBanner != null) ...[
-                        const SizedBox(height: 8),
-                        errorBanner,
-                      ],
-                      const SizedBox(height: 10),
-                      buttons,
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Stacked scrollable layout (spec §3.2) — used below the 720px width
-  /// breakpoint and on short windows.
-  Widget _buildNarrowLayout(
-    AppLocalizations l10n,
-    Widget header,
-    Widget heading,
-    Widget grid,
-    Widget totals,
-    Widget notes,
-    Widget panel,
-    Widget? errorBanner,
-    Widget buttons,
-  ) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          header,
-          const SizedBox(height: 10),
-          heading,
-          const SizedBox(height: 8),
-          SizedBox(height: _gridMinHeight, child: grid),
-          const SizedBox(height: 8),
-          totals,
-          const SizedBox(height: 8),
-          notes,
-          const SizedBox(height: 12),
-          panel,
-          if (errorBanner != null) ...[const SizedBox(height: 10), errorBanner],
-          const SizedBox(height: 12),
-          buttons,
-        ],
-      ),
-    );
-  }
 
   List<Item>? _cachedSearchPool;
 
@@ -2283,10 +2208,8 @@ class _PaymentEditFieldsState extends State<_PaymentEditFields> {
   );
 
   /// What the dialog's Save action pops.
-  (num, String) get value => (
-    num.tryParse(_amount.text) ?? 0,
-    _reference.text.trim(),
-  );
+  (num, String) get value =>
+      (num.tryParse(_amount.text) ?? 0, _reference.text.trim());
 
   @override
   void dispose() {
