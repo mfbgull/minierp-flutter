@@ -6,6 +6,8 @@
  * nothing (the H7 invariant).
  */
 import type Database from 'better-sqlite3';
+import AccountingService from './accountingService';
+import { BusinessRuleError } from '../utils/businessRuleError';
 import { parseCurrency } from '../utils/currency';
 import type {
   CustomerPaymentInput,
@@ -124,7 +126,28 @@ export function validateSupplierPayment(
     throw new Error(`Supplier ${input.supplierId} not found`);
   }
 
+  const targets = new Set<string>();
   for (const alloc of input.allocations) {
+    if (!Number.isSafeInteger(alloc.id) || alloc.id <= 0 || !Number.isFinite(alloc.amount) || !(parseCurrency(alloc.amount) > 0)) {
+      throw new BusinessRuleError(400, 'Invalid supplier payment allocation');
+    }
+    const target = `${alloc.kind}:${alloc.id}`;
+    if (targets.has(target)) throw new BusinessRuleError(400, 'Duplicate supplier payment allocation target');
+    targets.add(target);
+    if (alloc.kind === 'supplier_bill') {
+      const bill = db.prepare(`
+        SELECT b.supplier_id, b.total_amount, b.bill_date,
+          COALESCE((SELECT SUM(a.amount) FROM supplier_bill_allocations a
+            JOIN payments p ON p.id = a.payment_id
+            WHERE a.bill_id = b.id AND a.voided_at IS NULL AND p.voided_at IS NULL), 0) AS paid_amount
+        FROM supplier_bills b WHERE b.id = ? AND b.voided_at IS NULL
+      `).get(alloc.id) as { supplier_id: number; total_amount: number; bill_date: string; paid_amount: number } | undefined;
+      if (!bill || bill.supplier_id !== input.supplierId) throw new BusinessRuleError(400, 'Supplier bill not found for this supplier');
+      if (input.paymentDate < bill.bill_date) throw new BusinessRuleError(400, 'Payment cannot precede the supplier bill');
+      AccountingService.assertPeriodNotClosed(db, bill.bill_date, 'Supplier bill');
+      assertWithinBalance(`supplier bill ${alloc.id}`, alloc, bill.total_amount, bill.paid_amount);
+      continue;
+    }
     if (alloc.kind === 'purchase_order') {
       const po = readPurchaseOrder(db, alloc.id);
       if (!po) throw new Error(`Purchase order ${alloc.id} not found`);
@@ -142,8 +165,7 @@ export function validateSupplierPayment(
     assertWithinBalance(`purchase ${alloc.id}`, alloc, purchase.total_cost, purchase.paid_amount);
   }
 
-  // H7: there is no supplier-advance concept, so a supplier payment must be
-  // fully allocated. Checked before the first INSERT.
+  // H7: document settlements are fully allocated; advances use their own source.
   const allocatedTotal = input.allocations.reduce((sum, a) => sum + parseCurrency(a.amount), 0);
   const paymentTotal = parseCurrency(input.amount);
   if (Math.abs(allocatedTotal - paymentTotal) > 0.01) {
@@ -157,19 +179,19 @@ export function validateSupplierPayment(
 
 function readPurchaseOrder(db: Database.Database, poId: number): PurchaseOrderRow | undefined {
   return db.prepare(`
-    SELECT po.id, po.supplier_id, po.total_amount, COALESCE(SUM(pa.amount), 0) as paid_amount
+    SELECT po.id, po.supplier_id, v.total_payable - v.returned_amount AS total_amount, v.paid_amount
     FROM purchase_orders po
-    LEFT JOIN po_allocations pa ON pa.po_id = po.id AND pa.voided_at IS NULL
-    WHERE po.id = ? GROUP BY po.id
+    JOIN purchase_order_payables v ON v.id = po.id
+    WHERE po.id = ? AND LOWER(po.status) <> 'cancelled'
   `).get(poId) as PurchaseOrderRow | undefined;
 }
 
 function readPurchase(db: Database.Database, purchaseId: number): PurchaseRow | undefined {
   return db.prepare(`
-    SELECT p.id, p.supplier_id, p.total_cost, COALESCE(SUM(pa.amount), 0) as paid_amount
+    SELECT p.id, p.supplier_id, v.total_payable - v.returned_amount AS total_cost, v.paid_amount
     FROM purchases p
-    LEFT JOIN purchase_allocations pa ON pa.purchase_id = p.id AND pa.voided_at IS NULL
-    WHERE p.id = ? GROUP BY p.id
+    JOIN direct_purchase_payables v ON v.id = p.id
+    WHERE p.id = ? AND p.voided_at IS NULL
   `).get(purchaseId) as PurchaseRow | undefined;
 }
 
@@ -183,7 +205,7 @@ function assertWithinBalance(
   if (!(amount > 0)) throw new Error(`Allocation amount for ${label} must be greater than 0`);
   const remaining = Math.max(0, parseCurrency(total) - parseCurrency(paid));
   if (amount > remaining) {
-    throw new Error(
+    throw new BusinessRuleError(400,
       `Allocation amount (${amount.toFixed(2)}) for ${label} exceeds the remaining balance (${remaining.toFixed(2)})`,
     );
   }
