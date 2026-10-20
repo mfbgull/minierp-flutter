@@ -34,7 +34,8 @@ import '../../widgets/form_section_card.dart' show FormSectionCard;
 import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart'
     show allItemsProvider, warehousesProvider;
-import '../payments/payments_providers.dart' show paymentsProvider;
+import '../payments/payments_providers.dart'
+    show invalidateCashMovementProviders;
 import '../purchase_orders/purchase_order_providers.dart'
     show poSupplierOptionsProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
@@ -54,22 +55,28 @@ Future<void> showPurchaseFormDialog(BuildContext context) {
 /// Mutable form line — the item picker value plus qty/unit-cost fields
 /// (same shape as the PO form's `_PoLine`).
 class _PurchaseLine {
-  _PurchaseLine() : qtyController = TextEditingController(), costController = TextEditingController();
+  _PurchaseLine()
+    : qtyController = TextEditingController(),
+      costController = TextEditingController(),
+      taxController = TextEditingController(text: '0');
 
   int? itemId;
 
   final TextEditingController qtyController;
   final TextEditingController costController;
+  final TextEditingController taxController;
 
   /// Optional expiry date for expiry-tracked items (flows into the batch).
   DateTime? expiryDate;
 
   num get quantity => num.tryParse(qtyController.text.trim()) ?? 0;
   num get unitCost => num.tryParse(costController.text.trim()) ?? 0;
+  num get inputTax => num.tryParse(taxController.text.trim()) ?? 0;
 
   void dispose() {
     qtyController.dispose();
     costController.dispose();
+    taxController.dispose();
   }
 }
 
@@ -84,6 +91,7 @@ class _PurchaseFormDialog extends ConsumerStatefulWidget {
 class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
   final _formKey = GlobalKey<FormState>();
   final _idemKeys = IdempotencyKeyCache(prefix: 'pur');
+  final _paymentKeys = IdempotencyKeyCache(prefix: 'pur-pay');
 
   // Document.
   int? _supplierId;
@@ -136,7 +144,7 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
 
   num get _total => _filledLines.fold<num>(
     0,
-    (sum, line) => sum + line.quantity * line.unitCost,
+    (sum, line) => sum + line.quantity * line.unitCost + line.inputTax,
   );
   num get _paymentAmount => num.tryParse(_amountController.text.trim()) ?? 0;
 
@@ -190,6 +198,15 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
       setState(() => _error = l10n.paymentsErrorAmountGreaterThanZero);
       return;
     }
+    if (_recordPayment &&
+        (!_paymentAmount.isFinite || _paymentAmount > _total)) {
+      setState(
+        () => _error = l10n.paymentsErrorAmountExceedsBalance(
+          Formatters.currency(_total),
+        ),
+      );
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -201,8 +218,10 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
           itemId: line.itemId!,
           quantity: line.quantity,
           unitCost: line.unitCost,
-          expiryDate:
-              line.expiryDate != null ? isoDate(line.expiryDate!) : null,
+          inputTaxAmount: line.inputTax,
+          expiryDate: line.expiryDate != null
+              ? isoDate(line.expiryDate!)
+              : null,
         ),
     ];
     // audit-3 task 08: a purchase is the widest blast radius of a keyed
@@ -222,6 +241,7 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
             'item_id': l.itemId,
             'quantity': l.quantity,
             'unit_cost': l.unitCost,
+            'input_tax_amount': l.inputTaxAmount,
             'expiry_date': l.expiryDate,
           },
       ],
@@ -257,31 +277,31 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
           final allocations = <Map<String, dynamic>>[];
           for (final purchase in data) {
             if (remaining <= 0) break;
-            final amount =
-                remaining >= purchase.totalCost ? purchase.totalCost : remaining;
+            final amount = remaining >= purchase.totalPayable
+                ? purchase.totalPayable
+                : remaining;
             allocations.add({'purchase_id': purchase.id, 'amount': amount});
             remaining -= amount;
           }
-          if (remaining > 0 && allocations.isNotEmpty) {
-            allocations.last['amount'] =
-                (allocations.last['amount'] as num) + remaining;
-          }
-
+          final paymentBody = <String, dynamic>{
+            'supplier_id': _supplierId!,
+            'payment_date': isoDate(_paymentDate),
+            'amount': _paymentAmount,
+            'payment_method': _paymentMethod,
+            if (_referenceController.text.trim().isNotEmpty)
+              'reference_no': _referenceController.text.trim(),
+            if (_paymentNotesController.text.trim().isNotEmpty)
+              'notes': _paymentNotesController.text.trim(),
+            'purchase_allocations': allocations,
+          };
           final payResult = await ref
               .read(invoiceRepositoryProvider)
-              .createSupplierPayment({
-                'supplier_id': _supplierId!,
-                'payment_date': isoDate(_paymentDate),
-                'amount': _paymentAmount,
-                'payment_method': _paymentMethod,
-                if (_referenceController.text.trim().isNotEmpty)
-                  'reference_no': _referenceController.text.trim(),
-                if (_paymentNotesController.text.trim().isNotEmpty)
-                  'notes': _paymentNotesController.text.trim(),
-                'purchase_allocations': allocations,
-              });
+              .createSupplierPayment(
+                paymentBody,
+                idempotencyKey: _paymentKeys.keyFor(paymentBody),
+              );
           if (!mounted) return;
-          ref.invalidate(paymentsProvider);
+          invalidateCashMovementProviders(ref, 'payment');
           switch (payResult) {
             case ApiSuccess():
               Navigator.of(context).pop();
@@ -318,9 +338,9 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
           Expanded(
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ),
           Text(
@@ -398,8 +418,7 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
                   required: true,
                   child: _WarehouseSelect(
                     selected: _warehouseId,
-                    onChanged: (value) =>
-                        setState(() => _warehouseId = value),
+                    onChanged: (value) => setState(() => _warehouseId = value),
                   ),
                 ),
               ),
@@ -534,6 +553,24 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
             ),
           ],
         ),
+        const SizedBox(height: 6),
+        TextFormField(
+          key: ValueKey('purchase-input-tax-$index'),
+          controller: line.taxController,
+          enabled: !_busy,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: formInputDecoration().copyWith(
+            labelText: l10n.supplierBillInputTax,
+          ),
+          validator: (value) {
+            final amount = num.tryParse(value?.trim() ?? '');
+            return amount == null || !amount.isFinite || amount < 0
+                ? l10n.commonRequired
+                : null;
+          },
+          onChanged: (_) => _syncPaymentToTotal(),
+          onFieldSubmitted: submitOnEnter(_submit),
+        ),
         if (_lineShowsExpiry(index)) ...[
           const SizedBox(height: 6),
           Align(
@@ -570,11 +607,20 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
         children: [
           Row(
             children: [
-              Expanded(flex: 3, child: Text(l10n.fieldsItem, style: headerStyle)),
+              Expanded(
+                flex: 3,
+                child: Text(l10n.fieldsItem, style: headerStyle),
+              ),
               const SizedBox(width: 8),
-              SizedBox(width: 92, child: Text(l10n.fieldsQuantity, style: headerStyle)),
+              SizedBox(
+                width: 92,
+                child: Text(l10n.fieldsQuantity, style: headerStyle),
+              ),
               const SizedBox(width: 8),
-              SizedBox(width: 110, child: Text(l10n.purchasesUnitcost, style: headerStyle)),
+              SizedBox(
+                width: 110,
+                child: Text(l10n.purchasesUnitcost, style: headerStyle),
+              ),
               const SizedBox(width: 8),
               SizedBox(
                 width: 110,
@@ -668,9 +714,9 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
                 l10n.purchasesSupplierrequiredforpayment,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ),
           if (_recordPayment && hasSupplier) ...[
@@ -695,7 +741,9 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
                       labelBuilder: (m) => m,
                       decoration: formInputDecoration(),
                       onChanged: (value) {
-                        if (value != null) setState(() => _paymentMethod = value);
+                        if (value != null) {
+                          setState(() => _paymentMethod = value);
+                        }
                       },
                     ),
                   ),
@@ -779,104 +827,101 @@ class _PurchaseFormDialogState extends ConsumerState<_PurchaseFormDialog> {
       maxWidth: 620,
       maxHeight: 760,
       child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: AppBorderRadius.mdRadius,
-                      ),
-                      child: Icon(
-                        Icons.shopping_cart_outlined,
-                        size: 20,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: AppBorderRadius.mdRadius,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n.purchasesRecordpurchase,
-                            style: Theme.of(
-                              context,
-                            ).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            l10n.purchasesSubtitle,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                          ),
-                        ],
-                      ),
+                    child: Icon(
+                      Icons.shopping_cart_outlined,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
                     ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _documentSection(l10n, suppliers),
-                      const SizedBox(height: 12),
-                      _itemSection(l10n),
-                      const SizedBox(height: 12),
-                      _paymentSection(l10n),
-                      if (_error != null) ...[
-                        const SizedBox(height: 12),
-                        ErrorBanner(message: _error!),
-                      ],
-                    ],
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.purchasesRecordpurchase,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          l10n.purchasesSubtitle,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextButton(
-                      onPressed: _busy ? null : () => Navigator.of(context).pop(),
-                      child: Text(l10n.commonCancel),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: _busy ? null : _submit,
-                      icon: _busy
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save_outlined, size: 18),
-                      label: Text(l10n.commonSave),
-                    ),
+                    _documentSection(l10n, suppliers),
+                    const SizedBox(height: 12),
+                    _itemSection(l10n),
+                    const SizedBox(height: 12),
+                    _paymentSection(l10n),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      ErrorBanner(message: _error!),
+                    ],
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                    child: Text(l10n.commonCancel),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _busy ? null : _submit,
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_outlined, size: 18),
+                    label: Text(l10n.commonSave),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -927,7 +972,9 @@ class _ItemSelect extends ConsumerWidget {
       selected: selected,
       labelBuilder: (id) {
         final match = items.where((i) => i.id == id);
-        return match.isEmpty ? '$id' : '${match.first.itemCode} — ${match.first.itemName}';
+        return match.isEmpty
+            ? '$id'
+            : '${match.first.itemCode} — ${match.first.itemName}';
       },
       decoration: formInputDecoration(),
       validator: (v) => v == null ? l10n.commonRequired : null,

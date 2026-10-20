@@ -17,8 +17,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/detail_error.dart';
 import '../../widgets/detail_labels.dart';
 import '../../widgets/detail_rows.dart';
-import '../../widgets/payment_history_section.dart'
-    show PaymentHistorySection;
+import '../../widgets/payment_history_section.dart' show PaymentHistorySection;
 import '../suppliers/supplier_payment_modal.dart' show showSupplierPaymentModal;
 import 'purchase_providers.dart';
 import 'package:minierp_app/widgets/movable_dialog.dart';
@@ -47,17 +46,17 @@ class _PurchaseDetailDialog extends ConsumerWidget {
       maxWidth: 560,
       maxHeight: 620,
       child: switch (detail) {
-          AsyncData(:final value) => _DetailBody(detail: value),
-          AsyncError(:final error) => DetailError(
-            message: error is ApiError ? error.message : '$error',
-            onRetry: () => ref.invalidate(purchaseDetailProvider(purchaseId)),
-          ),
-          _ => const SizedBox(
-            width: 420,
-            height: 240,
-            child: Center(child: CircularProgressIndicator()),
-          ),
-        },
+        AsyncData(:final value) => _DetailBody(detail: value),
+        AsyncError(:final error) => DetailError(
+          message: error is ApiError ? error.message : '$error',
+          onRetry: () => ref.invalidate(purchaseDetailProvider(purchaseId)),
+        ),
+        _ => const SizedBox(
+          width: 420,
+          height: 240,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      },
     );
   }
 }
@@ -140,6 +139,14 @@ class _DetailBody extends ConsumerWidget {
                     DetailTile(
                       l10n.purchasesTotalcol,
                       Formatters.currency(detail.totalCost),
+                    ),
+                    DetailTile(
+                      l10n.supplierBillInputTax,
+                      Formatters.currency(detail.inputTaxAmount),
+                    ),
+                    DetailTile(
+                      l10n.salesGrandtotal,
+                      Formatters.currency(detail.totalPayable),
                       emphasize: true,
                     ),
                   ],

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
+import '../../core/utils/idempotency_key.dart';
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../data/models/purchase_return.dart' show PurchaseReturn;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -53,6 +54,7 @@ class _SupplierRefundDialog extends ConsumerStatefulWidget {
 }
 
 class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
+  final _idemKeys = IdempotencyKeyCache(prefix: 'supplier-refund');
   final _amountController = TextEditingController();
   final _referenceController = TextEditingController();
 
@@ -90,13 +92,22 @@ class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
       _error = null;
     });
 
-    final result = await ref.read(purchaseRepositoryProvider).createRefund(
-      refundDate: isoDate(_refundDate),
-      creditNoteId: widget.purchaseReturn.creditNoteId!,
-      amount: amount,
-      paymentMethod: _paymentMethod,
-      referenceNo: _referenceController.text.trim(),
-    );
+    final result = await ref
+        .read(purchaseRepositoryProvider)
+        .createRefund(
+          refundDate: isoDate(_refundDate),
+          creditNoteId: widget.purchaseReturn.creditNoteId!,
+          amount: amount,
+          paymentMethod: _paymentMethod,
+          referenceNo: _referenceController.text.trim(),
+          idempotencyKey: _idemKeys.keyFor({
+            'refund_date': isoDate(_refundDate),
+            'credit_note_id': widget.purchaseReturn.creditNoteId!,
+            'amount': amount,
+            'payment_method': _paymentMethod,
+            'reference_no': _referenceController.text.trim(),
+          }),
+        );
     if (!mounted) return;
 
     switch (result) {
@@ -123,7 +134,7 @@ class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
     return MovableDialog(
       dialogId: 'supplier_refund_form',
       maxWidth: 460,
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -172,7 +183,9 @@ class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
               child: TextField(
                 controller: _amountController,
                 enabled: !_busy,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 onSubmitted: (_) => _submit(),
                 decoration: formInputDecoration(
                   hintText: Formatters.number(widget.refundable),
@@ -183,7 +196,13 @@ class _SupplierRefundDialogState extends ConsumerState<_SupplierRefundDialog> {
             FormFieldShell(
               label: l10n.purchasesRefundmethod,
               child: SearchableSelect<String>(
-                items: const ['cash', 'bank', 'easypaisa', 'jazzcash', 'upaisa'],
+                items: const [
+                  'cash',
+                  'bank',
+                  'easypaisa',
+                  'jazzcash',
+                  'upaisa',
+                ],
                 selected: _paymentMethod,
                 isDense: true,
                 enabled: !_busy,
