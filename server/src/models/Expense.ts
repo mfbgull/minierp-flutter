@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
 import { getNextSequenceNumber } from '../utils/sequence';
 import { ACTIVE_EXPENSE_STATUS, GL_INACTIVE_EXPENSE_STATUSES } from '../utils/reportSql';
+import { BusinessRuleError } from '../utils/businessRuleError';
 
 interface ExpenseFilters {
   category?: string;
@@ -176,6 +177,10 @@ function update(db: Database.Database, id: number, data: UpdateExpenseDTO, opts?
     newMethod !== String(existing.payment_method ?? '');
 
   db.transaction(() => {
+    if (wasGlWorthy && (!willBeGlWorthy || moneyChanged) && existing.payment_method === 'Credit') {
+      const paid = db.prepare('SELECT COALESCE(SUM(amount), 0) AS amount FROM expense_payments WHERE expense_id = ? AND voided_at IS NULL').get(id) as { amount: number };
+      if (paid.amount > 0) throw new BusinessRuleError(409, 'Reverse expense payments before cancelling or changing the expense');
+    }
     // GL lifecycle: Draft/Cancelled have no financial effect; every other
     // status (Recorded) is GL-worthiness. Void active EXPENSE lines whenever
     // the row leaves (or never reaches) GL-worthiness, and (re)post on
@@ -210,12 +215,12 @@ function update(db: Database.Database, id: number, data: UpdateExpenseDTO, opts?
     );
 
     if (willBeGlWorthy && ((!wasGlWorthy && willBeGlWorthy) || (wasGlWorthy && moneyChanged))) {
-      const cashCode = AccountingService._cashOrBankAccountCode(newMethod || 'cash');
+      const cashCode = newMethod === 'Credit' ? '2115' : AccountingService._cashOrBankAccountCode(newMethod || 'cash');
       const fundsAccount = AccountingService.getAccountByCode(db, cashCode);
       if (!fundsAccount) {
         throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
       }
-      AccountingService.assertSufficientFunds(db, {
+      if (newMethod !== 'Credit') AccountingService.assertSufficientFunds(db, {
         accountId: fundsAccount.id,
         amount: newAmount,
         asOfDate: newDate,
@@ -342,8 +347,9 @@ function getStatusOptions() {
   ];
 }
 
-function getPaymentMethodOptions() {
+function getPaymentMethodOptions(context: 'cash' | 'expense' = 'cash') {
   return [
+    ...(context === 'expense' ? [{ value: 'Credit', label: 'Credit' }] : []),
     { value: 'Cash', label: 'Cash' },
     { value: 'Check', label: 'Check' },
     { value: 'Bank Transfer', label: 'Bank Transfer' },

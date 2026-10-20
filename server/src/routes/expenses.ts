@@ -18,6 +18,8 @@ router.get('/summary', requirePermission('expenses', 'read'), expenseController.
 router.get('/date-range', requirePermission('expenses', 'read'), expenseController.getExpensesByDateRange);
 router.get('/category/:category', requirePermission('expenses', 'read'), expenseController.getExpensesByCategory);
 router.get('/:id', requirePermission('expenses', 'read'), expenseController.getExpenseById);
+router.post('/:id/payments', requirePermission('expenses', 'update'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.expensePayment), expenseController.createExpensePayment);
+router.post('/:id/payments/:paymentId/void', requirePermission('expenses', 'update'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), expenseController.reverseExpensePayment);
 router.put('/:id', requirePermission('expenses', 'update'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), expenseController.updateExpense);
 router.post('/categories', requirePermission('expenses', 'create'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.expenseCategoryCreate), expenseController.createExpenseCategory);
 router.put('/categories/:id', requirePermission('expenses', 'update'), sensitiveOperationLimiter, validateZodBody(zodBodySchemas.object), expenseController.updateExpenseCategory);

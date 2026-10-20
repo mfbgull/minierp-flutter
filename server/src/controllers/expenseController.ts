@@ -7,6 +7,7 @@ import db from '../config/database';
 import logger from '../utils/logger';
 import { sanitizeSortParams, EXPENSE_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import ExpenseModel from '../models/Expense';
+import { listExpensePayments, payCreditExpense, voidExpensePayment } from '../models/ExpensePayment';
 import { isValidPaymentMethod } from '../services/cashService';
 import { handleBusinessError } from '../utils/businessRuleError';
 import { formatCurrency, getCurrencySymbol } from '../utils/displayCurrency';
@@ -35,7 +36,7 @@ function createExpense(req: AuthRequest, res: Response): void {
       res.status(400).json({ success: false, error: 'Amount must be a positive number' });
       return;
     }
-    if (payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
+    if (payment_method !== undefined && payment_method !== 'Credit' && !isValidPaymentMethod(payment_method)) {
       res.status(400).json({
         success: false,
         error: `Invalid payment_method "${payment_method}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`,
@@ -169,7 +170,9 @@ function getExpenseById(req: Request, res: Response): void {
     const id = parseInt(getRouteParam(req.params.id), 10);
     const expense = ExpenseModel.getById(db, id);
     if (!expense) { res.status(404).json({ success: false, error: 'Expense not found' }); return; }
-    res.json({ success: true, data: expense });
+    const payments = listExpensePayments(db, id);
+    const paidAmount = payments.filter(p => !p.voided_at).reduce((sum, p) => sum + p.amount, 0);
+    res.json({ success: true, data: { ...expense, payments, paid_amount: paidAmount } });
   } catch (error) {
     logger.error('Error fetching expense:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch expense' });
@@ -190,7 +193,7 @@ function updateExpense(req: AuthRequest, res: Response): void {
     const id = parseInt(getRouteParam(req.params.id), 10);
     const { expense_category, description, amount, expense_date, payment_method, reference_no, vendor_name, project } = req.body;
     const targetStatus = req.body.status as string | undefined;
-    if (payment_method !== undefined && !isValidPaymentMethod(payment_method)) {
+    if (payment_method !== undefined && payment_method !== 'Credit' && !isValidPaymentMethod(payment_method)) {
       res.status(400).json({
         success: false,
         error: `Invalid payment_method "${payment_method}" — use Cash, Bank, Easypaisa, JazzCash or Upaisa`,
@@ -407,8 +410,26 @@ function getExpenseStatusOptions(req: Request, res: Response): void {
   res.json({ success: true, data: ExpenseModel.getStatusOptions() });
 }
 
+function createExpensePayment(req: AuthRequest, res: Response): void {
+  try {
+    const payment = payCreditExpense(db, Number(req.params.id), req.body, req.user!.id, req.headers);
+    res.status(201).json({ success: true, data: payment });
+  } catch (error: unknown) {
+    handleBusinessError(res, error, 'Pay expense', 'Failed to pay expense', { success: true });
+  }
+}
+
+function reverseExpensePayment(req: AuthRequest, res: Response): void {
+  try {
+    const payment = voidExpensePayment(db, Number(req.params.id), Number(req.params.paymentId), req.user!.id, String(req.body.reason || 'Expense payment correction'));
+    res.json({ success: true, data: payment });
+  } catch (error: unknown) {
+    handleBusinessError(res, error, 'Void expense payment', 'Failed to void expense payment', { success: true });
+  }
+}
+
 function getExpensePaymentMethodOptions(req: Request, res: Response): void {
-  res.json({ success: true, data: ExpenseModel.getPaymentMethodOptions() });
+  res.json({ success: true, data: ExpenseModel.getPaymentMethodOptions('expense') });
 }
 
 export default {
@@ -416,4 +437,5 @@ export default {
   getExpensesByDateRange, getExpensesByCategory, getExpenseSummary,
   getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
   getExpenseStatusOptions, getExpensePaymentMethodOptions,
+  createExpensePayment, reverseExpensePayment,
 };
