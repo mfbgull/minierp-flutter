@@ -9,12 +9,14 @@
 // invoice's returned_amount/status refetch, and the new return appears
 // in the Returns tab.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/formatters.dart';
-import '../../data/models/invoice.dart'
-    show Invoice, InvoiceItem;
+import '../../core/utils/idempotency_key.dart';
+import '../../data/models/invoice.dart' show Invoice, InvoiceItem;
 import '../../data/models/sales_return.dart';
 import '../../data/models/stock_batch.dart' show StockBatch;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -27,6 +29,7 @@ import '../../widgets/form_helpers.dart';
 import '../../widgets/searchable_select.dart';
 import '../inventory/inventory_providers.dart' show warehousesProvider;
 import 'invoice_providers.dart';
+import 'widgets/invoice_return_views.dart';
 import 'package:minierp_app/widgets/movable_dialog.dart';
 import 'invoice_return_providers.dart' show invoiceReturnsProvider;
 
@@ -88,6 +91,7 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
   List<Invoice> _targetOptions = const [];
 
   bool _submitting = false;
+  final _idemKeys = IdempotencyKeyCache(prefix: 'sales-return');
   bool _loading = true;
   String? _loadError;
   String? _error;
@@ -148,7 +152,7 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
           // return actually creates a refund/credit entitlement (spec
           _settleNow = _postRefundDue > 0;
         });
-        _loadTargets();
+        unawaited(_loadTargets());
       case ApiFailure(:final error):
         setState(() {
           _loading = false;
@@ -156,7 +160,6 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
         });
     }
   }
-
 
   /// Open invoices of the same customer — pickers for `adjust`
   /// allocations. Fire-and-forget; the server auto-picks the oldest
@@ -176,6 +179,7 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
         break; // Informational — adjust falls back to auto-pick.
     }
   }
+
   /// Gross (tax-inclusive) returned value of the filled lines —
   /// `computeReturnedLine` on the server: proportional split of the
   /// line's net and tax, full-return snapped to ratio 1.
@@ -219,13 +223,15 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
     final totalSettled = p?.totalSettled ?? 0;
     final totalReturned = (p?.totalReturned ?? 0) + _grossReturnNow;
     final totalFees = (p?.totalFees ?? 0) + _feeAmount;
-    final currentInvoiceValue =
-        originalTotal - totalReturned < 0 ? 0.0 : originalTotal - totalReturned;
+    final currentInvoiceValue = originalTotal - totalReturned < 0
+        ? 0.0
+        : originalTotal - totalReturned;
     final netPosition = totalPaid - currentInvoiceValue - totalFees;
     final refundCreditDue = netPosition > 0 ? netPosition : 0.0;
     final balanceDue = netPosition < 0 ? -netPosition : 0.0;
-    final remainingRefundDue =
-        refundCreditDue - totalSettled < 0 ? 0.0 : refundCreditDue - totalSettled;
+    final remainingRefundDue = refundCreditDue - totalSettled < 0
+        ? 0.0
+        : refundCreditDue - totalSettled;
     return InvoicePosition(
       originalTotal: originalTotal,
       totalReturned: totalReturned,
@@ -276,9 +282,7 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
         _SettlementDraft(
           type: 'refund',
           amountController: TextEditingController(
-            text: remainder > 0.005
-                ? remainder.toStringAsFixed(2)
-                : '',
+            text: remainder > 0.005 ? remainder.toStringAsFixed(2) : '',
           ),
         ),
       );
@@ -339,6 +343,16 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
           reason: _reasonController.text,
           warehouseId: _warehouseId,
           settlements: settlements,
+          idempotencyKey: _idemKeys.keyFor({
+            'invoice_id': widget.invoiceId,
+            'items': items,
+            'fee_type': _feeType,
+            'fee_value': double.tryParse(_feeValueController.text.trim()),
+            'return_date': _returnDate,
+            'reason': _reasonController.text,
+            'warehouse_id': _warehouseId,
+            'settlements': settlements,
+          }),
         );
     if (!mounted) return;
     switch (result) {
@@ -352,7 +366,10 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
           '${Formatters.currency(data.netAmount)}',
         );
         if (data.returnNo != null) {
-          showAppToast(context, '${l10n.salesreturnsReturnno}: ${data.returnNo}');
+          showAppToast(
+            context,
+            '${l10n.salesreturnsReturnno}: ${data.returnNo}',
+          );
         }
         Navigator.of(context).pop();
       case ApiFailure(:final error):
@@ -373,26 +390,26 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
       maxWidth: 560,
       maxHeight: 640,
       child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.salesreturnsReturntitle,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                l10n.salesreturnsReturnsubtitle,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 12),
-              Flexible(child: _buildBody(l10n)),
-            ],
-          ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.salesreturnsReturntitle,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              l10n.salesreturnsReturnsubtitle,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            Flexible(child: _buildBody(l10n)),
+          ],
+        ),
       ),
     );
   }
@@ -467,7 +484,7 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
             ] else ...[
               for (var i = 0; i < _returnableItems.length; i++) ...[
                 if (i > 0) const Divider(height: 12),
-                _ReturnLineRow(
+                InvoiceReturnLineRow(
                   item: _returnableItems[i],
                   controller: _qtyControllers[i],
                   autofocus: i == 0,
@@ -498,7 +515,7 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
             ),
             if (_grossReturnNow > 0) ...[
               const SizedBox(height: 10),
-              _PositionPreview(
+              InvoiceReturnPositionPreview(
                 grossReturn: _grossReturnNow,
                 fee: _feeAmount,
                 net: _netAmount,
@@ -571,15 +588,19 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
                     : () async {
                         final picked = await showDatePicker(
                           context: context,
-                          initialDate: DateTime.tryParse(_returnDate) ??
-                              DateTime.now(),
-                          firstDate:
-                              DateTime.now().subtract(const Duration(days: 365)),
+                          initialDate:
+                              DateTime.tryParse(_returnDate) ?? DateTime.now(),
+                          firstDate: DateTime.now().subtract(
+                            const Duration(days: 365),
+                          ),
                           lastDate: DateTime.now(),
                         );
                         if (picked == null) return;
-                        setState(() =>
-                            _returnDate = picked.toIso8601String().substring(0, 10));
+                        setState(
+                          () => _returnDate = picked
+                              .toIso8601String()
+                              .substring(0, 10),
+                        );
                       },
                 child: InputDecorator(
                   decoration: formInputDecoration(),
@@ -625,15 +646,17 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
                     child: TextFormField(
                       controller: _feeValueController,
                       enabled: !_submitting && _feeType != 'none',
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       onChanged: (_) => _recalc(),
                       onFieldSubmitted: submitOnEnter(_submit),
-                      decoration: formInputDecoration(
-                        hintText: l10n.salesreturnsFeeValue,
-                      ).copyWith(
-                        suffixText: _feeType == 'percentage' ? '%' : null,
-                      ),
+                      decoration:
+                          formInputDecoration(
+                            hintText: l10n.salesreturnsFeeValue,
+                          ).copyWith(
+                            suffixText: _feeType == 'percentage' ? '%' : null,
+                          ),
                     ),
                   ),
                 ],
@@ -687,231 +710,6 @@ class _InvoiceReturnDialogState extends ConsumerState<InvoiceReturnDialog> {
   }
 }
 
-/// One returnable invoice line: item name/code + available qty on the
-/// left, return-quantity input on the right.
-class _ReturnLineRow extends StatelessWidget {
-  const _ReturnLineRow({
-    required this.item,
-    required this.controller,
-    required this.autofocus,
-    required this.enabled,
-    required this.onChanged,
-    required this.onSubmit,
-    this.batches,
-    this.expanded = false,
-    this.onToggleExpanded,
-  });
-
-  final InvoiceItem item;
-  final TextEditingController controller;
-
-  /// Batch-location breakdown for this line's item — shown via the
-  /// collapsible "batches" chip when non-empty (feature flag).
-  final List<StockBatch>? batches;
-  final bool expanded;
-  final VoidCallback? onToggleExpanded;
-
-  /// Focuses the first return-qty field on open — the quantities are the
-  /// dialog's primary input.
-  final bool autofocus;
-  final bool enabled;
-
-  /// Fired on every edit so the parent can recompute the refund/credit
-  /// split summary.
-  final VoidCallback onChanged;
-
-  /// Enter-to-submit: pressing Enter on a filled line processes the
-  /// return (same [submitOnEnter] contract as the other dialogs).
-  final VoidCallback onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final scheme = Theme.of(context).colorScheme;
-    final available = item.quantity - item.returnedQty;
-    final muted = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant);
-
-    final hasBatches = batches != null && batches!.isNotEmpty;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          item.itemName ?? '',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                      if (hasBatches) ...[
-                        const SizedBox(width: 4),
-                        InkWell(
-                          onTap: onToggleExpanded,
-                          borderRadius: BorderRadius.circular(10),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  expanded
-                                      ? Icons.expand_less
-                                      : Icons.expand_more,
-                                  size: 16,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                                Text(
-                                  'batches',
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.labelSmall?.copyWith(
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if ((item.itemCode ?? '').isNotEmpty)
-                    Text(item.itemCode!, style: muted),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${l10n.salesreturnsAvailableqty}: '
-                    '${Formatters.number(available)}',
-                    style: muted,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-        SizedBox(
-          width: 130,
-          child: FormFieldShell(
-            label: l10n.salesreturnsReturnquantity,
-            child: TextFormField(
-              controller: controller,
-              autofocus: autofocus,
-              enabled: enabled,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              onChanged: (_) => onChanged(),
-              onFieldSubmitted: submitOnEnter(onSubmit),
-              decoration: formInputDecoration(
-                hintText: Formatters.number(available),
-              ),
-              // Empty lines are optional; a filled line must be a valid,
-              // non-negative quantity within the available amount.
-              validator: (v) {
-                final text = (v ?? '').trim();
-                if (text.isEmpty) return null;
-                final qty = double.tryParse(text);
-                if (qty == null || qty <= 0) {
-                  return l10n.salesreturnsReturnqtyinvalid;
-                }
-                if (qty > available) {
-                  return l10n.salesreturnsReturnqtyexceeds;
-                }
-                return null;
-              },
-            ),
-          ),
-        ),
-          ],
-        ),
-        if (hasBatches && expanded) ...[
-          const SizedBox(height: 4),
-          Container(
-            margin: const EdgeInsets.only(left: 8),
-            padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final batch in batches!)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          batch.batchNo,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.labelMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        for (final loc in batch.locations!)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 12, top: 1),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  flex: 3,
-                                  child: Text(
-                                    loc.locationCode,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 2,
-                                  child: Text(
-                                    'Phys: ${Formatters.number(loc.quantityPhysical)}',
-                                    textAlign: TextAlign.end,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 2,
-                                  child: Text(
-                                    'Avail: ${Formatters.number(loc.quantityAvailable)}',
-                                    textAlign: TextAlign.end,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall?.copyWith(
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
 /// Restock-warehouse select for the return dialog — a required picker
 /// over `GET /inventory/warehouses` with a hint until the user chooses.
 class _WarehousePicker extends ConsumerWidget {
@@ -943,98 +741,6 @@ class _WarehousePicker extends ConsumerWidget {
       },
       decoration: formInputDecoration(),
       onChanged: onChanged,
-    );
-  }
-}
-
-/// Live position preview for the return dialog (spec §6.1 / §3.2):
-/// Returned Value, Restocking Fee, Net, and the POST-return Balance
-/// Due and Refund/Credit Due — both always shown, mirroring the
-/// server's `computePosition` exactly (D12).
-class _PositionPreview extends StatelessWidget {
-  const _PositionPreview({
-    required this.grossReturn,
-    required this.fee,
-    required this.net,
-    required this.position,
-  });
-
-  final double grossReturn;
-  final double fee;
-  final double net;
-  final InvoicePosition position;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final scheme = Theme.of(context).colorScheme;
-    final muted = Theme.of(context)
-        .textTheme
-        .bodySmall
-        ?.copyWith(color: scheme.onSurfaceVariant);
-    final bold =
-        Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(l10n.salesreturnsPositionReturned, style: muted),
-              Text(Formatters.currency(grossReturn), style: bold),
-            ],
-          ),
-          if (fee > 0.005)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(l10n.salesreturnsFee, style: muted),
-                Text(Formatters.currency(fee), style: bold),
-              ],
-            ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(l10n.salesreturnsPositionNet, style: muted),
-              Text(Formatters.currency(net), style: bold),
-            ],
-          ),
-          const Divider(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(l10n.salesreturnsPositionBalanceDue, style: muted),
-              Text(
-                Formatters.currency(position.balanceDue),
-                style: bold?.copyWith(
-                  color: position.balanceDue > 0.005 ? scheme.error : muted?.color,
-                ),
-              ),
-            ],
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(l10n.salesreturnsPositionRefundDue, style: muted),
-              Text(
-                Formatters.currency(position.refundCreditDue),
-                style: bold?.copyWith(
-                  color: position.refundCreditDue > 0.005
-                      ? scheme.tertiary
-                      : muted?.color,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1089,10 +795,11 @@ class _SettlementRow extends StatelessWidget {
           child: TextFormField(
             controller: draft.amountController,
             enabled: enabled,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             onChanged: (_) => onChanged(),
-            decoration: formInputDecoration(hintText: l10n.salesreturnsFeeValue),
+            decoration: formInputDecoration(
+              hintText: l10n.salesreturnsFeeValue,
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -1115,27 +822,26 @@ class _SettlementRow extends StatelessWidget {
                   },
                 )
               : draft.type == 'adjust'
-                  ? SearchableSelect<int>(
-                      items: [for (final inv in targetOptions) inv.id],
-                      selected: draft.targetInvoiceId,
-                      labelBuilder: (id) {
-                        final match =
-                            targetOptions.where((inv) => inv.id == id);
-                        return match.isEmpty
-                            ? '#$id'
-                            : '${match.first.invoiceNo} '
-                                '· ${Formatters.currency(match.first.balanceAmount)}';
-                      },
-                      enabled: enabled,
-                      decoration: formInputDecoration(
-                        hintText: l10n.salesreturnsSettleTarget,
-                      ),
-                      onChanged: (value) {
-                        draft.targetInvoiceId = value;
-                        onChanged();
-                      },
-                    )
-                  : const SizedBox.shrink(),
+              ? SearchableSelect<int>(
+                  items: [for (final inv in targetOptions) inv.id],
+                  selected: draft.targetInvoiceId,
+                  labelBuilder: (id) {
+                    final match = targetOptions.where((inv) => inv.id == id);
+                    return match.isEmpty
+                        ? '#$id'
+                        : '${match.first.invoiceNo} '
+                              '· ${Formatters.currency(match.first.balanceAmount)}';
+                  },
+                  enabled: enabled,
+                  decoration: formInputDecoration(
+                    hintText: l10n.salesreturnsSettleTarget,
+                  ),
+                  onChanged: (value) {
+                    draft.targetInvoiceId = value;
+                    onChanged();
+                  },
+                )
+              : const SizedBox.shrink(),
         ),
         IconButton(
           icon: const Icon(Icons.remove_circle_outline, size: 18),
