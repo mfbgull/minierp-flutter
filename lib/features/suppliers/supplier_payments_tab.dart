@@ -335,11 +335,11 @@ class _SupplierPaymentsTabState extends ConsumerState<SupplierPaymentsTab> {
     if (action != null && mounted) {
       switch (action) {
         case _PaymentRowAction.print:
-          _printReceipt(payment);
+          await _printReceipt(payment);
         case _PaymentRowAction.edit:
           _editPayment(payment);
         case _PaymentRowAction.delete:
-          _deletePayment(payment);
+          await _deletePayment(payment);
       }
     }
   }

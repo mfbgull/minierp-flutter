@@ -2,6 +2,8 @@
 // suppliers_screen.dart, spec 1.3). Contains the ⋮ popup menu
 // ([openSupplierRowMenu]) and the destructive [deleteSupplier] action.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -92,9 +94,9 @@ Future<void> openSupplierRowMenu({
 
   switch (action) {
     case SupplierRowAction.view:
-      context.push('/suppliers/${supplier.id}');
+      unawaited(context.push('/suppliers/${supplier.id}'));
     case SupplierRowAction.edit:
-      showSupplierFormDialog(context, supplier: supplier);
+      unawaited(showSupplierFormDialog(context, supplier: supplier));
     case SupplierRowAction.delete:
       await deleteSupplier(context: context, ref: ref, supplier: supplier);
   }
