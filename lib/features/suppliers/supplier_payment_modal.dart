@@ -33,6 +33,7 @@ import '../dashboard/cash_opening_balance_dialog.dart'
 import '../payments/payments_providers.dart' show paymentsProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'supplier_providers.dart';
+import 'widgets/supplier_allocation_rows.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:minierp_app/widgets/movable_dialog.dart';
 
@@ -556,8 +557,9 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
                                 // Allocated lines.
                                 if (_allocations.isNotEmpty) ...[
                                   for (final a in _allocations)
-                                    _AllocationRow(
-                                      allocation: a,
+                                    SupplierPoAllocationRow(
+                                      po: a.po,
+                                      controller: a.controller,
                                       onRemove: () =>
                                           _removeAllocation(a),
                                       onAmountChanged: (v) =>
@@ -608,7 +610,7 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
                                   )
                                 else
                                   for (final po in _availablePos)
-                                    _AvailablePoRow(
+                                    SupplierAvailablePoRow(
                                       po: po,
                                       onAdd: () => _addAllocation(po),
                                     ),
@@ -646,8 +648,9 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
                               else ...[
                                 if (_purchaseAllocations.isNotEmpty) ...[
                                   for (final a in _purchaseAllocations)
-                                    _PurchaseAllocationRow(
-                                      allocation: a,
+                                    SupplierPurchaseAllocationRow(
+                                      purchase: a.purchase,
+                                      controller: a.controller,
                                       onRemove: () =>
                                           _removePurchaseAllocation(a),
                                       onAmountChanged: (v) =>
@@ -700,7 +703,7 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
                                   )
                                 else
                                   for (final p in _availablePurchases)
-                                    _AvailablePurchaseRow(
+                                    SupplierAvailablePurchaseRow(
                                       purchase: p,
                                       onAdd: () => _addPurchaseAllocation(p),
                                     ),
@@ -795,227 +798,6 @@ class _SupplierPaymentModalState extends ConsumerState<SupplierPaymentModal> {
               fontWeight: FontWeight.w600,
               color: highlight ? scheme.error : null,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One allocated line: PO no + balance, editable amount, remove.
-class _AllocationRow extends StatelessWidget {
-  const _AllocationRow({
-    required this.allocation,
-    required this.onRemove,
-    required this.onAmountChanged,
-  });
-
-  final _Allocation allocation;
-  final VoidCallback onRemove;
-  final ValueChanged<String> onAmountChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final po = allocation.po;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  po.poNo,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  Formatters.currency(po.balanceAmount),
-                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: 130,
-            child: TextField(
-              controller: allocation.controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              onChanged: onAmountChanged,
-              decoration: InputDecoration(
-                isDense: true,
-                border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Remove',
-            onPressed: onRemove,
-            icon: Icon(
-              Icons.close,
-              size: 18,
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One available PO: no + balance + an Add button.
-class _AvailablePoRow extends StatelessWidget {
-  const _AvailablePoRow({required this.po, required this.onAdd});
-
-  final PurchaseOrder po;
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  po.poNo,
-                  style: const TextStyle(fontSize: 13),
-                ),
-                Text(
-                  '${Formatters.currency(po.balanceAmount)} '
-                  '${scheme.brightness == Brightness.dark ? '' : ''}',
-                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: onAdd,
-            child: const Text('+ Add'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One allocated line: purchase no + balance, editable amount, remove —
-/// mirrors [_AllocationRow] for direct purchases.
-class _PurchaseAllocationRow extends StatelessWidget {
-  const _PurchaseAllocationRow({
-    required this.allocation,
-    required this.onRemove,
-    required this.onAmountChanged,
-  });
-
-  final _PurchaseAllocation allocation;
-  final VoidCallback onRemove;
-  final ValueChanged<String> onAmountChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final purchase = allocation.purchase;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  purchase.purchaseNo,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  Formatters.currency(purchase.balanceAmount),
-                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: 130,
-            child: TextField(
-              controller: allocation.controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              onChanged: onAmountChanged,
-              decoration: InputDecoration(
-                isDense: true,
-                border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Remove',
-            onPressed: onRemove,
-            icon: Icon(
-              Icons.close,
-              size: 18,
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One available direct purchase: no + balance + an Add button.
-class _AvailablePurchaseRow extends StatelessWidget {
-  const _AvailablePurchaseRow({
-    required this.purchase,
-    required this.onAdd,
-  });
-
-  final Purchase purchase;
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  purchase.purchaseNo,
-                  style: const TextStyle(fontSize: 13),
-                ),
-                Text(
-                  Formatters.currency(purchase.balanceAmount),
-                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: onAdd,
-            child: const Text('+ Add'),
           ),
         ],
       ),
