@@ -9,6 +9,7 @@ import { isValidPaymentMethod } from './cashService';
 import { claimIdempotencyKey, findIdempotencyRecord } from '../utils/idempotency';
 import { assertLinesNotRetroactive } from './inventoryEffectiveDate';
 import { generateDocNo } from '../utils/sequence';
+import { BusinessRuleError } from '../utils/businessRuleError';
 import type {
   InvoiceCreationInput,
   InvoiceCreationItemResult,
@@ -95,13 +96,13 @@ export function resolveDueDate(
 }
 
 function validateInput(input: InvoiceCreationInput): void {
-  if (!input.customerId || input.customerId <= 0) throw new Error('Invalid customer_id');
-  if (!input.invoiceDate) throw new Error('invoice_date is required');
-  if (input.items.length === 0) throw new Error('At least one invoice item is required');
+  if (!Number.isSafeInteger(input.customerId) || input.customerId <= 0) throw new BusinessRuleError(400, 'Invalid customer_id');
+  if (!input.invoiceDate) throw new BusinessRuleError(400, 'invoice_date is required');
+  if (input.items.length === 0) throw new BusinessRuleError(400, 'At least one invoice item is required');
   for (const item of input.items) {
-    if (!item.item_id || item.item_id <= 0) throw new Error('Invalid item_id in invoice items');
-    if (!item.quantity || item.quantity <= 0) throw new Error('Invalid quantity in invoice items');
-    if (item.unit_price === undefined || item.unit_price < 0) throw new Error('Invalid unit_price in invoice items');
+    if (!Number.isSafeInteger(item.item_id) || item.item_id <= 0) throw new BusinessRuleError(400, 'Invalid item_id in invoice items');
+    if (!Number.isFinite(item.quantity) || item.quantity <= 0) throw new BusinessRuleError(400, 'Invalid quantity in invoice items');
+    if (!Number.isFinite(item.unit_price) || item.unit_price < 0) throw new BusinessRuleError(400, 'Invalid unit_price in invoice items');
   }
 }
 
@@ -129,7 +130,7 @@ export class InvoiceCreationService {
     let legsTotal = 0;
     for (const leg of legs) {
       const legAmount = parseCurrency(leg.amount);
-      if (legAmount < 0) throw new Error('Payment amounts must be non-negative');
+      if (legAmount < 0) throw new BusinessRuleError(400, 'Payment amounts must be non-negative');
       if (legAmount > 0 && !isValidPaymentMethod(leg.payment_method ?? 'Cash')) {
         throw new InvoiceCreationPaymentMethodError(leg.payment_method);
       }
@@ -140,7 +141,7 @@ export class InvoiceCreationService {
     }
 
     const creditOffset = parseCurrency(input.creditOffset);
-    if (creditOffset < 0) throw new Error('Credit offset must be non-negative');
+    if (creditOffset < 0) throw new BusinessRuleError(400, 'Credit offset must be non-negative');
     if (legsTotal + creditOffset > totalAmount + 0.01) {
       throw new InvoiceCreationOffsetError(legsTotal + creditOffset, totalAmount);
     }
@@ -168,6 +169,17 @@ export class InvoiceCreationService {
           if (existing.resource_id !== null) return this.resultFromExisting(existing.resource_id, true);
         }
       }
+
+      if (!this.db.prepare('SELECT id FROM customers WHERE id = ?').get(input.customerId)) {
+        throw new BusinessRuleError(404, `Customer ${input.customerId} not found`);
+      }
+      const itemIds = [...new Set(input.items.map(item => item.item_id))];
+      const foundItems = this.db.prepare<[string], { id: number }>(
+        'SELECT id FROM items WHERE id IN (SELECT value FROM json_each(?))',
+      ).all(JSON.stringify(itemIds));
+      const foundIds = new Set(foundItems.map(item => item.id));
+      const missingId = itemIds.find(id => !foundIds.has(id));
+      if (missingId !== undefined) throw new BusinessRuleError(404, `Item ${missingId} not found`);
 
       if (creditOffset > 0) {
         const customer = this.db.prepare(`

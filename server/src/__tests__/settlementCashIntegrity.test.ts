@@ -22,6 +22,7 @@
  * that leaves the books wrong is not a fix.
  */
 import fs from 'fs';
+import { beforeAll, describe, expect, it } from '@jest/globals';
 import path from 'path';
 import request from 'supertest';
 import app from '../app';
@@ -273,10 +274,14 @@ describe('C-02 / H-03 — a refund cannot exceed what was actually collected', (
       });
 
     expect(res.status).toBe(201);
-    // The cap is the 100 collected — never the 250 return value.
-    const collected = netCash() - cashBefore;
-    expect(collected).toBeLessThanOrEqual(100.01);
-    expect(collected).toBeGreaterThan(0);
+    expect(netCash()).toBeCloseTo(cashBefore, 2);
+    const note = db.prepare<[number], { id: number }>('SELECT id FROM credit_notes WHERE source_id = ?').get(idOf(res));
+    if (!note) throw new Error('Missing returned-purchase credit note');
+    const received = await request(app).post('/api/supplier-refunds').set('Cookie', authCookie).send({
+      credit_note_id: note.id, refund_date: '2026-09-05', amount: 100, payment_method: 'Cash',
+    });
+    expect(received.status).toBe(201);
+    expect(netCash() - cashBefore).toBeCloseTo(100, 2);
     assertTrialBalanceBalanced('C-02 partially paid refund');
   });
 
@@ -599,8 +604,8 @@ describe('SALES-008 — INVOICE_SETTLEMENT stays creation-only', () => {
   it('has exactly one production caller, and it is the invoice-creation path', () => {
     // Joined into one string so a failure diff names the offending call sites
     // directly. `@types/jest` here does not declare `expect(actual, message)`.
-    const sites = callSites().map((s) => `${s.file}:${s.line}`);
-    expect(sites.join(', ') || '(no production callers)').toBe('services/InvoiceCreationService.ts:277');
+    const sites = callSites().map((s) => s.file);
+    expect(sites).toEqual(['services/InvoiceCreationService.ts']);
   });
 
   it('still resolves the ceiling from total minus returned, not from balance', () => {
