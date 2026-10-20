@@ -68,32 +68,50 @@ class TaxSummaryReportScreen extends ConsumerWidget {
 
     final theme = Theme.of(context);
     return Center(
-      child: Card(
-        margin: const EdgeInsets.all(32),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.receipt_long,
-                size: 48,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                l10n.reportsTotaltax,
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                Formatters.currency(data.totalTax),
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+      child: SingleChildScrollView(
+        child: Card(
+          margin: const EdgeInsets.all(32),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.receipt_long,
+                  size: 48,
                   color: theme.colorScheme.primary,
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                Text(l10n.reportsOutputTax, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text(
+                  Formatters.currency(data.totalTax),
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  l10n.supplierBillInputTax,
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  Formatters.currency(data.inputTax),
+                  style: theme.textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 16),
+                Text(l10n.reportsNetTax, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text(
+                  Formatters.currency(data.netTax),
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

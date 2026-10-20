@@ -64,9 +64,11 @@ class UnifiedPayment {
   final String? description;
   final String? paymentKind;
 
-  bool get canDeleteGenerically =>
-      source != 'expense' &&
-      (source != 'payment' || (paymentKind ?? 'RECEIPT') == 'RECEIPT');
+  bool get canDeleteGenerically => switch (source) {
+    'payment' => (paymentKind ?? 'RECEIPT') == 'RECEIPT',
+    'salary' || 'owner_capital' || 'owner_withdrawal' => true,
+    _ => false,
+  };
 
   /// UI-only identity. A payment row and a salary row can share a numeric
   /// `sourceId`, so the grid key combines both. Never sent to the API.

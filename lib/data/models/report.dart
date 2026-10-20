@@ -186,6 +186,7 @@ class CashFlowMovement {
       );
 
   final String date;
+
   /// 'payment_received' | 'refund' | 'supplier_payment' | 'expense' | 'salary'
   final String type;
   final String reference;
@@ -757,8 +758,7 @@ class BalanceSheetEquity {
 
   factory BalanceSheetEquity.fromJson(Map<String, dynamic> json) =>
       BalanceSheetEquity(
-        openingRetainedEarnings:
-            asNum(json['opening_retained_earnings']) ?? 0,
+        openingRetainedEarnings: asNum(json['opening_retained_earnings']) ?? 0,
         // Owner-equity module children (3200/3300) — null on responses
         // from before the owner-equity migration.
         ownerCapital: asNum(json['owner_capital']),
@@ -855,15 +855,16 @@ class TrialBalanceAccount {
     required this.isZero,
   });
 
-  factory TrialBalanceAccount.fromJson(Map<String, dynamic> json) => TrialBalanceAccount(
-    accountCode: asString(json['account_code']) ?? '',
-    accountName: asString(json['account_name']) ?? '',
-    accountType: asString(json['account_type']) ?? '',
-    totalDebit: asNum(json['total_debit']) ?? 0,
-    totalCredit: asNum(json['total_credit']) ?? 0,
-    balance: asNum(json['balance']) ?? 0,
-    isZero: json['is_zero'] == true,
-  );
+  factory TrialBalanceAccount.fromJson(Map<String, dynamic> json) =>
+      TrialBalanceAccount(
+        accountCode: asString(json['account_code']) ?? '',
+        accountName: asString(json['account_name']) ?? '',
+        accountType: asString(json['account_type']) ?? '',
+        totalDebit: asNum(json['total_debit']) ?? 0,
+        totalCredit: asNum(json['total_credit']) ?? 0,
+        balance: asNum(json['balance']) ?? 0,
+        isZero: json['is_zero'] == true,
+      );
 
   final String accountCode;
   final String accountName;
@@ -884,17 +885,18 @@ class TrialBalanceReport {
     this.note,
   });
 
-  factory TrialBalanceReport.fromJson(Map<String, dynamic> json) => TrialBalanceReport(
-    asOfDate: asString(json['asOfDate']) ?? '',
-    accounts: [
-      for (final row in json['accounts'] as List? ?? const [])
-        TrialBalanceAccount.fromJson(row as Map<String, dynamic>),
-    ],
-    totalDebit: asNum(json['total_debit']) ?? 0,
-    totalCredit: asNum(json['total_credit']) ?? 0,
-    balanced: json['balanced'] == true,
-    note: asString(json['note']),
-  );
+  factory TrialBalanceReport.fromJson(Map<String, dynamic> json) =>
+      TrialBalanceReport(
+        asOfDate: asString(json['asOfDate']) ?? '',
+        accounts: [
+          for (final row in json['accounts'] as List? ?? const [])
+            TrialBalanceAccount.fromJson(row as Map<String, dynamic>),
+        ],
+        totalDebit: asNum(json['total_debit']) ?? 0,
+        totalCredit: asNum(json['total_credit']) ?? 0,
+        balanced: json['balanced'] == true,
+        note: asString(json['note']),
+      );
 
   final String asOfDate;
   final List<TrialBalanceAccount> accounts;
@@ -921,19 +923,20 @@ class GeneralLedgerRow {
     this.remarks,
   });
 
-  factory GeneralLedgerRow.fromJson(Map<String, dynamic> json) => GeneralLedgerRow(
-    id: asInt(json['id']) ?? 0,
-    customerId: asInt(json['customer_id']),
-    accountCode: asString(json['account_code']),
-    accountName: asString(json['account_name']),
-    transactionType: asString(json['transaction_type']) ?? '',
-    referenceNo: asString(json['reference_no']) ?? '',
-    debit: asNum(json['debit']) ?? 0,
-    credit: asNum(json['credit']) ?? 0,
-    balance: asNum(json['balance']) ?? 0,
-    transactionDate: asString(json['transaction_date']) ?? '',
-    remarks: asString(json['remarks']),
-  );
+  factory GeneralLedgerRow.fromJson(Map<String, dynamic> json) =>
+      GeneralLedgerRow(
+        id: asInt(json['id']) ?? 0,
+        customerId: asInt(json['customer_id']),
+        accountCode: asString(json['account_code']),
+        accountName: asString(json['account_name']),
+        transactionType: asString(json['transaction_type']) ?? '',
+        referenceNo: asString(json['reference_no']) ?? '',
+        debit: asNum(json['debit']) ?? 0,
+        credit: asNum(json['credit']) ?? 0,
+        balance: asNum(json['balance']) ?? 0,
+        transactionDate: asString(json['transaction_date']) ?? '',
+        remarks: asString(json['remarks']),
+      );
 
   final int id;
   final int? customerId;
@@ -961,15 +964,16 @@ class IncomeStatementReport {
     required this.grossProfit,
   });
 
-  factory IncomeStatementReport.fromJson(Map<String, dynamic> json) => IncomeStatementReport(
-    startDate: asString(json['startDate']) ?? '',
-    endDate: asString(json['endDate']) ?? '',
-    revenue: asNum(json['revenue']) ?? 0,
-    cogs: asNum(json['cogs']) ?? 0,
-    expenses: asNum(json['expenses']) ?? 0,
-    netIncome: asNum(json['netIncome']) ?? 0,
-    grossProfit: asNum(json['grossProfit']) ?? 0,
-  );
+  factory IncomeStatementReport.fromJson(Map<String, dynamic> json) =>
+      IncomeStatementReport(
+        startDate: asString(json['startDate']) ?? '',
+        endDate: asString(json['endDate']) ?? '',
+        revenue: asNum(json['revenue']) ?? 0,
+        cogs: asNum(json['cogs']) ?? 0,
+        expenses: asNum(json['expenses']) ?? 0,
+        netIncome: asNum(json['netIncome']) ?? 0,
+        grossProfit: asNum(json['grossProfit']) ?? 0,
+      );
 
   final String startDate;
   final String endDate;
@@ -985,13 +989,22 @@ class IncomeStatementReport {
 class TaxSummaryReport {
   const TaxSummaryReport({
     required this.totalTax,
+    this.inputTax = 0,
+    this.netTax = 0,
   });
 
-  factory TaxSummaryReport.fromJson(Map<String, dynamic> json) => TaxSummaryReport(
-    totalTax: asNum(json['total_tax']) ?? 0,
-  );
+  factory TaxSummaryReport.fromJson(Map<String, dynamic> json) =>
+      TaxSummaryReport(
+        totalTax: asNum(json['total_tax']) ?? 0,
+        inputTax: asNum(json['input_tax']) ?? 0,
+        netTax:
+            asNum(json['net_tax']) ??
+            (asNum(json['total_tax']) ?? 0) - (asNum(json['input_tax']) ?? 0),
+      );
 
   final num totalTax;
+  final num inputTax;
+  final num netTax;
 }
 
 // ── Batch Traceability (GET /reports/batch-traceability/:itemId) ─────
@@ -1004,12 +1017,13 @@ class BatchTraceabilityItem {
     required this.unitOfMeasure,
   });
 
-  factory BatchTraceabilityItem.fromJson(Map<String, dynamic> json) => BatchTraceabilityItem(
-    id: asInt(json['id']) ?? 0,
-    itemCode: asString(json['item_code']) ?? '',
-    itemName: asString(json['item_name']) ?? '',
-    unitOfMeasure: asString(json['unit_of_measure']) ?? '',
-  );
+  factory BatchTraceabilityItem.fromJson(Map<String, dynamic> json) =>
+      BatchTraceabilityItem(
+        id: asInt(json['id']) ?? 0,
+        itemCode: asString(json['item_code']) ?? '',
+        itemName: asString(json['item_name']) ?? '',
+        unitOfMeasure: asString(json['unit_of_measure']) ?? '',
+      );
 
   final int id;
   final String itemCode;
@@ -1033,20 +1047,21 @@ class BatchTraceabilityBatch {
     this.status,
   });
 
-  factory BatchTraceabilityBatch.fromJson(Map<String, dynamic> json) => BatchTraceabilityBatch(
-    id: asInt(json['id']) ?? 0,
-    batchNo: asString(json['batch_no']) ?? '',
-    warehouseName: asString(json['warehouse_name']) ?? '',
-    sourceType: asString(json['source_type']) ?? '',
-    sourceId: asInt(json['source_id']) ?? 0,
-    quantityOriginal: asNum(json['quantity_original']) ?? 0,
-    quantityRemaining: asNum(json['quantity_remaining']) ?? 0,
-    quantitySold: asNum(json['quantity_sold']) ?? 0,
-    unitCost: asNum(json['unit_cost']) ?? 0,
-    receivedDate: asString(json['received_date']) ?? '',
-    expiryDate: asString(json['expiry_date']),
-    status: asString(json['status']),
-  );
+  factory BatchTraceabilityBatch.fromJson(Map<String, dynamic> json) =>
+      BatchTraceabilityBatch(
+        id: asInt(json['id']) ?? 0,
+        batchNo: asString(json['batch_no']) ?? '',
+        warehouseName: asString(json['warehouse_name']) ?? '',
+        sourceType: asString(json['source_type']) ?? '',
+        sourceId: asInt(json['source_id']) ?? 0,
+        quantityOriginal: asNum(json['quantity_original']) ?? 0,
+        quantityRemaining: asNum(json['quantity_remaining']) ?? 0,
+        quantitySold: asNum(json['quantity_sold']) ?? 0,
+        unitCost: asNum(json['unit_cost']) ?? 0,
+        receivedDate: asString(json['received_date']) ?? '',
+        expiryDate: asString(json['expiry_date']),
+        status: asString(json['status']),
+      );
 
   final int id;
   final String batchNo;
@@ -1079,20 +1094,21 @@ class ExpiryReportRow {
     this.glAccount,
   });
 
-  factory ExpiryReportRow.fromJson(Map<String, dynamic> json) => ExpiryReportRow(
-    id: asNum(json['id'])?.toInt() ?? 0,
-    itemCode: asString(json['item_code']) ?? '',
-    itemName: asString(json['item_name']) ?? '',
-    batchNo: asString(json['batch_no']) ?? '',
-    warehouseName: asString(json['warehouse_name']) ?? '',
-    quantityRemaining: asNum(json['quantity_remaining']) ?? 0,
-    unitCost: asNum(json['unit_cost']) ?? 0,
-    receivedDate: asString(json['received_date']) ?? '',
-    expiryDate: asString(json['expiry_date']),
-    status: asString(json['status']) ?? 'normal',
-    halted: asBool(json['halted']),
-    glAccount: asString(json['gl_account']),
-  );
+  factory ExpiryReportRow.fromJson(Map<String, dynamic> json) =>
+      ExpiryReportRow(
+        id: asNum(json['id'])?.toInt() ?? 0,
+        itemCode: asString(json['item_code']) ?? '',
+        itemName: asString(json['item_name']) ?? '',
+        batchNo: asString(json['batch_no']) ?? '',
+        warehouseName: asString(json['warehouse_name']) ?? '',
+        quantityRemaining: asNum(json['quantity_remaining']) ?? 0,
+        unitCost: asNum(json['unit_cost']) ?? 0,
+        receivedDate: asString(json['received_date']) ?? '',
+        expiryDate: asString(json['expiry_date']),
+        status: asString(json['status']) ?? 'normal',
+        halted: asBool(json['halted']),
+        glAccount: asString(json['gl_account']),
+      );
 
   /// Numeric batch ID (stock_batches.id) — used for write-off endpoint.
   final int id;
@@ -1157,13 +1173,14 @@ class BatchTraceabilitySummary {
     required this.totalRemaining,
   });
 
-  factory BatchTraceabilitySummary.fromJson(Map<String, dynamic> json) => BatchTraceabilitySummary(
-    totalBatches: asInt(json['totalBatches']) ?? 0,
-    activeBatches: asInt(json['activeBatches']) ?? 0,
-    totalOriginal: asNum(json['totalOriginal']) ?? 0,
-    totalSold: asNum(json['totalSold']) ?? 0,
-    totalRemaining: asNum(json['totalRemaining']) ?? 0,
-  );
+  factory BatchTraceabilitySummary.fromJson(Map<String, dynamic> json) =>
+      BatchTraceabilitySummary(
+        totalBatches: asInt(json['totalBatches']) ?? 0,
+        activeBatches: asInt(json['activeBatches']) ?? 0,
+        totalOriginal: asNum(json['totalOriginal']) ?? 0,
+        totalSold: asNum(json['totalSold']) ?? 0,
+        totalRemaining: asNum(json['totalRemaining']) ?? 0,
+      );
 
   final int totalBatches;
   final int activeBatches;
@@ -1179,16 +1196,19 @@ class BatchTraceabilityReport {
     required this.summary,
   });
 
-  factory BatchTraceabilityReport.fromJson(Map<String, dynamic> json) => BatchTraceabilityReport(
-    item: BatchTraceabilityItem.fromJson(json['item'] as Map<String, dynamic>),
-    batches: [
-      for (final row in json['batches'] as List? ?? const [])
-        BatchTraceabilityBatch.fromJson(row as Map<String, dynamic>),
-    ],
-    summary: BatchTraceabilitySummary.fromJson(
-      json['summary'] as Map<String, dynamic>? ?? const {},
-    ),
-  );
+  factory BatchTraceabilityReport.fromJson(Map<String, dynamic> json) =>
+      BatchTraceabilityReport(
+        item: BatchTraceabilityItem.fromJson(
+          json['item'] as Map<String, dynamic>,
+        ),
+        batches: [
+          for (final row in json['batches'] as List? ?? const [])
+            BatchTraceabilityBatch.fromJson(row as Map<String, dynamic>),
+        ],
+        summary: BatchTraceabilitySummary.fromJson(
+          json['summary'] as Map<String, dynamic>? ?? const {},
+        ),
+      );
 
   final BatchTraceabilityItem item;
   final List<BatchTraceabilityBatch> batches;
@@ -1241,17 +1261,23 @@ class InventoryValuationReport {
       InventoryValuationReport(
         asOfDate: json['as_of_date'] as String? ?? '',
         sellable: ValuationBucket.fromJson(
-            json['sellable'] as Map<String, dynamic>? ?? {}),
+          json['sellable'] as Map<String, dynamic>? ?? {},
+        ),
         reserved: ValuationBucket.fromJson(
-            json['reserved'] as Map<String, dynamic>? ?? {}),
+          json['reserved'] as Map<String, dynamic>? ?? {},
+        ),
         expired: ValuationBucket.fromJson(
-            json['expired'] as Map<String, dynamic>? ?? {}),
+          json['expired'] as Map<String, dynamic>? ?? {},
+        ),
         damaged: ValuationBucket.fromJson(
-            json['damaged'] as Map<String, dynamic>? ?? {}),
+          json['damaged'] as Map<String, dynamic>? ?? {},
+        ),
         writtenOff: WrittenOffBucket.fromJson(
-            json['writtenOff'] as Map<String, dynamic>? ?? {}),
+          json['writtenOff'] as Map<String, dynamic>? ?? {},
+        ),
         totalPhysical: ValuationBucket.fromJson(
-            json['totalPhysical'] as Map<String, dynamic>? ?? {}),
+          json['totalPhysical'] as Map<String, dynamic>? ?? {},
+        ),
       );
   final String asOfDate;
   final ValuationBucket sellable;
