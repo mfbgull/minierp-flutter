@@ -6,6 +6,7 @@ import { log, logAuth, ActionType } from '../services/activityLogger';
 import logger from '../utils/logger';
 import UserModel from '../models/User';
 import { rolePermissionKeys, permissionsBeyondActor } from '../middleware/requirePermission';
+import { passwordPolicyError } from '../utils/passwordPolicy';
 
 /**
  * AUTHZ-002: administrator accounts are only manageable by administrators.
@@ -85,8 +86,9 @@ async function createUser(req: AuthRequest, res: Response): Promise<void> {
       return;
     }
 
-    if (password.length < 6) {
-      res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    const passwordError = passwordPolicyError(password);
+    if (passwordError) {
+      res.status(400).json({ error: passwordError });
       return;
     }
 
@@ -188,7 +190,8 @@ async function resetPassword(req: AuthRequest, res: Response): Promise<void> {
     const { newPassword } = req.body;
 
     if (!newPassword) { res.status(400).json({ error: 'New password is required' }); return; }
-    if (newPassword.length < 6) { res.status(400).json({ error: 'Password must be at least 6 characters long' }); return; }
+    const passwordError = passwordPolicyError(newPassword);
+    if (passwordError) { res.status(400).json({ error: passwordError }); return; }
 
     const existingUser = UserModel.getPublicById(userId, db);
     if (!existingUser) { res.status(404).json({ error: 'User not found' }); return; }
