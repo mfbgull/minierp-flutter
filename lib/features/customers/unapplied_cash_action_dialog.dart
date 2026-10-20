@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/theme/app_spacing.dart';
@@ -258,7 +259,7 @@ class _UnappliedCashActionDialogState
     if (result case ApiSuccess(:final data)) {
       final router = GoRouter.of(context);
       Navigator.of(context).pop();
-      router.push('/sales/print-preview', extra: data);
+      unawaited(router.push('/sales/print-preview', extra: data));
     } else if (result case ApiFailure(:final error)) {
       setState(() => _localError = error);
     }

@@ -431,9 +431,9 @@ class _CustomerInvoicesTabState extends ConsumerState<CustomerInvoicesTab> {
         case _InvoiceRowAction.view:
           _viewInvoice(invoice);
         case _InvoiceRowAction.delete:
-          _deleteInvoice(invoice);
+          await _deleteInvoice(invoice);
         case _InvoiceRowAction.cancel:
-          _cancelInvoice(invoice);
+          await _cancelInvoice(invoice);
       }
     }
   }
