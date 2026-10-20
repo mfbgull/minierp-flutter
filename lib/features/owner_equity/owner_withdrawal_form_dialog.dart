@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
+import '../../core/utils/idempotency_key.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/expense.dart' show ExpenseOption;
 import '../../data/models/item.dart' show Item;
@@ -76,6 +77,7 @@ class OwnerWithdrawalFormDialog extends ConsumerStatefulWidget {
 class _OwnerWithdrawalFormDialogState
     extends ConsumerState<OwnerWithdrawalFormDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _idemKeys = IdempotencyKeyCache(prefix: 'withdrawal');
 
   late final TextEditingController _amountController;
   late final TextEditingController _noteController;
@@ -185,8 +187,9 @@ class _OwnerWithdrawalFormDialogState
       return;
     }
     setState(() => _quoting = true);
-    final result =
-        await ref.read(ownerEquityRepositoryProvider).quoteWithdrawal(lines);
+    final result = await ref
+        .read(ownerEquityRepositoryProvider)
+        .quoteWithdrawal(lines);
     if (!mounted) return;
     switch (result) {
       case ApiSuccess(:final data):
@@ -253,9 +256,13 @@ class _OwnerWithdrawalFormDialogState
       _error = null;
     });
     final repo = ref.read(ownerEquityRepositoryProvider);
+    final body = _buildBody();
     final result = _isEdit
-        ? await repo.updateWithdrawal(widget.entry!.id, _buildBody())
-        : await repo.createWithdrawal(_buildBody());
+        ? await repo.updateWithdrawal(widget.entry!.id, body)
+        : await repo.createWithdrawal(
+            body,
+            idempotencyKey: _idemKeys.keyFor(body),
+          );
     if (!mounted) return;
 
     switch (result) {
@@ -351,211 +358,209 @@ class _OwnerWithdrawalFormDialogState
       maxWidth: 680,
       maxHeight: 760,
       child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _isEdit
-                            ? l10n.equityEditwithdrawal
-                            : l10n.equityNewwithdrawal,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isEdit
+                          ? l10n.equityEditwithdrawal
+                          : l10n.equityNewwithdrawal,
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    IconButton(
-                      tooltip: l10n.commonClose,
-                      icon: const Icon(Icons.close),
-                      onPressed: _submitting
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
+                  ),
+                  IconButton(
+                    tooltip: l10n.commonClose,
+                    icon: const Icon(Icons.close),
+                    onPressed: _submitting
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                  ),
+                ],
               ),
-              const Divider(height: 1),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SegmentedButton<bool>(
-                        segments: [
-                          ButtonSegment(
-                            value: false,
-                            icon: const Icon(Icons.payments_outlined),
-                            label: Text(l10n.equityKindcash),
-                          ),
-                          ButtonSegment(
-                            value: true,
-                            icon: const Icon(Icons.inventory_2_outlined),
-                            label: Text(l10n.equityKindgoods),
-                          ),
-                        ],
-                        selected: {_isGoodsKind},
-                        onSelectionChanged: _isEdit
-                            ? null // kind is fixed once created
-                            : (selection) {
-                                setState(() {
-                                  _isGoodsKind = selection.first;
-                                  _quote = null;
-                                  _error = null;
-                                });
-                                if (_isGoodsKind && _goodsLines.isEmpty) {
-                                  _addLine(warehouses.valueOrNull);
-                                }
-                              },
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: FormFieldShell(
-                              label: l10n.fieldsDate,
-                              required: true,
-                              child: SizedBox(
-                                height: 44,
-                                child: OutlinedButton.icon(
-                                  onPressed: _submitting ? null : _pickDate,
-                                  icon: const Icon(
-                                    Icons.calendar_today_outlined,
-                                    size: 16,
-                                  ),
-                                  label: Text(
-                                    Formatters.date(isoDate(_withdrawalDate)),
-                                  ),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SegmentedButton<bool>(
+                      segments: [
+                        ButtonSegment(
+                          value: false,
+                          icon: const Icon(Icons.payments_outlined),
+                          label: Text(l10n.equityKindcash),
+                        ),
+                        ButtonSegment(
+                          value: true,
+                          icon: const Icon(Icons.inventory_2_outlined),
+                          label: Text(l10n.equityKindgoods),
+                        ),
+                      ],
+                      selected: {_isGoodsKind},
+                      onSelectionChanged: _isEdit
+                          ? null // kind is fixed once created
+                          : (selection) {
+                              setState(() {
+                                _isGoodsKind = selection.first;
+                                _quote = null;
+                                _error = null;
+                              });
+                              if (_isGoodsKind && _goodsLines.isEmpty) {
+                                _addLine(warehouses.valueOrNull);
+                              }
+                            },
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: FormFieldShell(
+                            label: l10n.fieldsDate,
+                            required: true,
+                            child: SizedBox(
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                onPressed: _submitting ? null : _pickDate,
+                                icon: const Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  Formatters.date(isoDate(_withdrawalDate)),
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: FormFieldShell(
-                              label: l10n.expensesPaymentmethod,
-                              child: SearchableSelect<String?>(
-                                items: [null, ...paymentItems],
-                                selected: _paymentMethod,
-                                labelBuilder: (v) => v ?? l10n.commonNone,
-                                onChanged: _isGoodsKind
-                                    ? null // goods withdrawals move no cash
-                                    : (v) =>
-                                          setState(() => _paymentMethod = v),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      if (!_isGoodsKind)
-                        FormFieldShell(
-                          label: l10n.fieldsAmount,
-                          required: true,
-                          child: TextFormField(
-                            controller: _amountController,
-                            onFieldSubmitted: submitOnEnter(_submit),
-                            enabled: !_submitting,
-                            keyboardType:
-                                const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: _decoration(),
-                            validator: _validateAmount,
-                          ),
-                        )
-                      else ...[
-                        _goodsLinesHeader(l10n),
-                        for (var i = 0; i < _goodsLines.length; i++)
-                          _goodsLineRow(l10n, i, items, warehouses),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: _submitting
-                                  ? null
-                                  : () =>
-                                        _addLine(warehouses.valueOrNull),
-                              icon: const Icon(Icons.add, size: 18),
-                              label: Text(l10n.equityAdditem),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: FormFieldShell(
+                            label: l10n.expensesPaymentmethod,
+                            child: SearchableSelect<String?>(
+                              items: [null, ...paymentItems],
+                              selected: _paymentMethod,
+                              labelBuilder: (v) => v ?? l10n.commonNone,
+                              onChanged: _isGoodsKind
+                                  ? null // goods withdrawals move no cash
+                                  : (v) => setState(() => _paymentMethod = v),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        _quotePreview(l10n),
                       ],
-                      const SizedBox(height: 10),
+                    ),
+                    const SizedBox(height: 10),
+                    if (!_isGoodsKind)
                       FormFieldShell(
-                        label: l10n.fieldsNote,
+                        label: l10n.fieldsAmount,
+                        required: true,
                         child: TextFormField(
-                          controller: _noteController,
+                          controller: _amountController,
+                          onFieldSubmitted: submitOnEnter(_submit),
                           enabled: !_submitting,
-                          minLines: 2,
-                          maxLines: 4,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           decoration: _decoration(),
+                          validator: _validateAmount,
+                        ),
+                      )
+                    else ...[
+                      _goodsLinesHeader(l10n),
+                      for (var i = 0; i < _goodsLines.length; i++)
+                        _goodsLineRow(l10n, i, items, warehouses),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: _submitting
+                                ? null
+                                : () => _addLine(warehouses.valueOrNull),
+                            icon: const Icon(Icons.add, size: 18),
+                            label: Text(l10n.equityAdditem),
+                          ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (_error != null) ...[
-                      ErrorBanner(message: _error!),
                       const SizedBox(height: 8),
+                      _quotePreview(l10n),
                     ],
-                    Row(
-                      children: [
-                        if (_isEdit)
-                          TextButton.icon(
-                            onPressed: _submitting ? null : _delete,
-                            style: TextButton.styleFrom(
-                              foregroundColor:
-                                  Theme.of(context).colorScheme.error,
-                            ),
-                            icon: const Icon(Icons.delete_outline, size: 18),
-                            label: Text(l10n.commonDelete),
-                          ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: _submitting
-                              ? null
-                              : () => Navigator.of(context).pop(),
-                          child: Text(l10n.commonCancel),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: _submitting ? null : _submit,
-                          child: _submitting
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(l10n.commonSave),
-                        ),
-                      ],
+                    const SizedBox(height: 10),
+                    FormFieldShell(
+                      label: l10n.fieldsNote,
+                      child: TextFormField(
+                        controller: _noteController,
+                        enabled: !_submitting,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: _decoration(),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_error != null) ...[
+                    ErrorBanner(message: _error!),
+                    const SizedBox(height: 8),
+                  ],
+                  Row(
+                    children: [
+                      if (_isEdit)
+                        TextButton.icon(
+                          onPressed: _submitting ? null : _delete,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.error,
+                          ),
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: Text(l10n.commonDelete),
+                        ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: _submitting
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        child: Text(l10n.commonCancel),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: _submitting ? null : _submit,
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(l10n.commonSave),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -597,8 +602,9 @@ class _OwnerWithdrawalFormDialogState
     final line = _goodsLines[index];
     final itemList = items.valueOrNull ?? const <Item>[];
     final warehouseList = warehouses.valueOrNull ?? const <Warehouse>[];
-    final selectedName =
-        line.itemId != null ? (_itemById(itemList, line.itemId)?.itemName ?? line.name) : null;
+    final selectedName = line.itemId != null
+        ? (_itemById(itemList, line.itemId)?.itemName ?? line.name)
+        : null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -732,10 +738,9 @@ class _OwnerWithdrawalFormDialogState
           if (quote == null)
             Text(
               l10n.equityCostpreviewempty,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             )
           else ...[
             for (final line in quote.lines)
@@ -768,10 +773,9 @@ class _OwnerWithdrawalFormDialogState
             const SizedBox(height: 4),
             Text(
               l10n.equityCostatcostnote,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ],
         ],
