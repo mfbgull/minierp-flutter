@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import DashboardModel from '../models/Dashboard';
+import ReportsModel from '../models/Reports';
 
 /**
  * Unit tests for `DashboardModel.getKPI` — the per-card metric endpoint
@@ -65,7 +66,8 @@ beforeEach(() => {
       expense_no    TEXT,
       expense_date  TEXT,
       amount        REAL DEFAULT 0,
-      status        TEXT
+      status        TEXT,
+      expense_category TEXT
     );
     CREATE TABLE supplier_ledger (
       id               INTEGER PRIMARY KEY,
@@ -80,6 +82,40 @@ beforeEach(() => {
       customer_name TEXT,
       is_active     INTEGER DEFAULT 1
     );
+    -- GL tables required by the P&L-derived cards ('expenses', 'net_profit').
+    -- getProfitLossReport reads revenue/expense accounts from the chart and
+    -- period movement from journal_lines; COGS is hard-coded to account 5000.
+    CREATE TABLE chart_of_accounts (
+      id   INTEGER PRIMARY KEY,
+      code TEXT NOT NULL,
+      type TEXT NOT NULL
+    );
+    CREATE TABLE journal_lines (
+      id         INTEGER PRIMARY KEY,
+      account_id INTEGER NOT NULL,
+      debit      REAL DEFAULT 0,
+      credit     REAL DEFAULT 0,
+      voided     INTEGER DEFAULT 0,
+      line_date  TEXT NOT NULL
+    );
+    -- getProfitLossReport's category split and getExpenseSummary's UNION both
+    -- read active supplier bills (voided_at IS NULL).
+    CREATE TABLE supplier_bills (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      net_amount REAL NOT NULL DEFAULT 0,
+      voided_at  TEXT,
+      bill_date  TEXT NOT NULL
+    );
+  `);
+
+  // Deterministic chart: revenue, COGS (5000) and a non-COGS opex account.
+  db.exec(`
+    INSERT INTO chart_of_accounts (id, code, type) VALUES
+      (1, '1000', 'asset'),
+      (2, '1200', 'asset'),
+      (3, '4000', 'revenue'),
+      (4, '5000', 'expense'),
+      (5, '6000', 'expense');
   `);
 });
 
@@ -146,6 +182,34 @@ function seedPurchaseOrder(
     `INSERT INTO purchase_orders (po_no, po_date, status, total_amount)
      VALUES (?, ?, ?, ?)`,
   ).run(`PO-${Date.now()}-${Math.random()}`, date, status, amount);
+}
+
+/** Account ids seeded by the deterministic chart in beforeEach. */
+const GL = { cash: 1, inventory: 2, revenue: 3, cogs: 4, opex: 5 } as const;
+
+function seedGlLine(
+  accountId: number,
+  date: string,
+  debit: number,
+  credit: number,
+  voided = 0,
+): void {
+  db.prepare(
+    `INSERT INTO journal_lines (account_id, line_date, debit, credit, voided)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(accountId, date, debit, credit, voided);
+}
+
+/** One balanced two-line posting, so the fixture obeys double-entry. */
+function seedGlPosting(
+  date: string,
+  debitAccount: number,
+  creditAccount: number,
+  amount: number,
+  voided = 0,
+): void {
+  seedGlLine(debitAccount, date, amount, 0, voided);
+  seedGlLine(creditAccount, date, 0, amount, voided);
 }
 
 describe('dashboard /kpi core metrics (Phase 1)', () => {
@@ -234,11 +298,16 @@ describe('dashboard /kpi core metrics (Phase 1)', () => {
 });
 
 describe('dashboard /kpi additional cards (net profit, expenses, etc.)', () => {
-  function seedExpense(date: string, amount: number, status = 'Recorded'): void {
+  function seedExpense(
+    date: string,
+    amount: number,
+    status = 'Recorded',
+    category = 'Operating',
+  ): void {
     db.prepare(
-      `INSERT INTO expenses (expense_no, expense_date, amount, status)
-       VALUES (?, ?, ?, ?)`,
-    ).run(`EXP-${Date.now()}-${Math.random()}`, date, amount, status);
+      `INSERT INTO expenses (expense_no, expense_date, amount, status, expense_category)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(`EXP-${Date.now()}-${Math.random()}`, date, amount, status, category);
   }
 
   function seedSupplierLedger(
@@ -260,39 +329,69 @@ describe('dashboard /kpi additional cards (net profit, expenses, etc.)', () => {
   }
 
   test('expenses sums non-cancelled expenses within the range', () => {
-    seedExpense('2026-01-05', 300);
-    seedExpense('2026-01-20', 150);
-    seedExpense('2026-01-25', 400, 'Cancelled');
-    seedExpense('2026-02-10', 500);
+    // The GL is authoritative: Jan opex 300 + 150, Feb opex 500. The
+    // cancelled Jan expense is posted as a voided GL line, so it must be
+    // excluded. The operational rows only feed the P&L category split.
+    seedExpense('2026-01-05', 300, 'Recorded', 'Rent');
+    seedExpense('2026-01-20', 150, 'Recorded', 'Utilities');
+    seedExpense('2026-01-25', 400, 'Cancelled', 'Rent');
+    seedExpense('2026-02-10', 500, 'Recorded', 'Rent');
+    seedGlPosting('2026-01-05', GL.opex, GL.cash, 300);
+    seedGlPosting('2026-01-20', GL.opex, GL.cash, 150);
+    seedGlPosting('2026-01-25', GL.opex, GL.cash, 400, 1); // cancelled → voided
+    seedGlPosting('2026-02-10', GL.opex, GL.cash, 500);
 
     const jan = DashboardModel.getKPI(db, 'expenses', '2026-01-01', '2026-01-31');
     expect(jan.value).toBe(300 + 150); // 450
+    expect(jan.value).toBe(
+      ReportsModel.getProfitLossReport('2026-01-01', '2026-01-31', db).totalExpenses,
+    );
+
     const all = DashboardModel.getKPI(db, 'expenses');
     expect(all.value).toBe(300 + 150 + 500); // 950
+    expect(all.value).toBe(
+      ReportsModel.getProfitLossReport('2000-01-01', '2099-12-31', db).totalExpenses,
+    );
   });
 
   test('net_profit = revenue − COGS − expenses (matches P&L)', () => {
-    seedInvoice('2026-01-10', 1000);
-    seedInvoice('2026-01-12', 500);
-    seedMovement('2026-01-10', 'SALE', -2, 100); // COGS 200
-    seedMovement('2026-01-12', 'SALE', -1, 100); // COGS 100
-    seedExpense('2026-01-15', 300);
-    seedExpense('2026-01-20', 100);
+    // Revenue 1500 (credit 4000), COGS 300 (debit 5000), opex 400 (debit 6000).
+    seedGlPosting('2026-01-10', GL.cash, GL.revenue, 1500);
+    seedGlPosting('2026-01-10', GL.cogs, GL.inventory, 300);
+    seedGlPosting('2026-01-15', GL.opex, GL.cash, 400);
+    // Operational rows only supply the expense-category split.
+    seedExpense('2026-01-15', 300, 'Recorded', 'Rent');
+    seedExpense('2026-01-20', 100, 'Recorded', 'Utilities');
 
     const result = DashboardModel.getKPI(db, 'net_profit', '2026-01-01', '2026-01-31');
     // Revenue 1500 − COGS 300 − expenses 400 = 800.
     expect(result.value).toBe(800);
+    expect(result.value).toBe(
+      ReportsModel.getProfitLossReport('2026-01-01', '2026-01-31', db).netProfit,
+    );
   });
 
   test('net_profit is range-filtered like the P&L report', () => {
-    seedInvoice('2026-01-10', 1000);
-    seedExpense('2026-01-15', 200);
-    // February sales + expenses fall outside January.
-    seedInvoice('2026-02-10', 900);
-    seedExpense('2026-02-10', 500);
+    // January: 1000 revenue − 200 opex. February: 900 revenue − 500 opex.
+    seedGlPosting('2026-01-10', GL.cash, GL.revenue, 1000);
+    seedGlPosting('2026-01-15', GL.opex, GL.cash, 200);
+    seedGlPosting('2026-02-10', GL.cash, GL.revenue, 900);
+    seedGlPosting('2026-02-10', GL.opex, GL.cash, 500);
+    seedExpense('2026-01-15', 200, 'Recorded', 'Rent');
+    seedExpense('2026-02-10', 500, 'Recorded', 'Rent');
 
     const jan = DashboardModel.getKPI(db, 'net_profit', '2026-01-01', '2026-01-31');
     expect(jan.value).toBe(1000 - 200); // 800
+    expect(jan.value).toBe(
+      ReportsModel.getProfitLossReport('2026-01-01', '2026-01-31', db).netProfit,
+    );
+
+    // The same GL with no range proves the February postings were excluded.
+    const all = DashboardModel.getKPI(db, 'net_profit');
+    expect(all.value).toBe(1000 - 200 + 900 - 500); // 1200
+    expect(all.value).toBe(
+      ReportsModel.getProfitLossReport('2000-01-01', '2099-12-31', db).netProfit,
+    );
   });
 
   test('outstanding_payables = latest supplier ledger balance per supplier', () => {
