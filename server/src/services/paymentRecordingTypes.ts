@@ -48,7 +48,7 @@ export type CustomerPaymentInput = {
 };
 
 export type SupplierPaymentAllocation = {
-  readonly kind: 'purchase_order' | 'purchase';
+  readonly kind: 'purchase_order' | 'purchase' | 'supplier_bill';
   readonly id: number;
   readonly amount: number;
 };
@@ -63,6 +63,7 @@ export type SupplierPaymentInput = {
   readonly notes?: string | null;
   readonly userId?: number | null;
   readonly paymentNo?: string;
+  readonly supplierPrepaymentId?: number;
   /** audit-3 task 08 — claimed inside the supplier payment transaction. */
   readonly idempotency?: IdempotentClaim;
 };
