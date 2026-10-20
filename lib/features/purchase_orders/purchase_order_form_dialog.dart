@@ -16,6 +16,8 @@
 // against the existing PO immediately (the summary refreshes from the
 // detail provider after each payment).
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -45,6 +47,7 @@ import '../payments/payments_providers.dart' show paymentsProvider;
 import '../sales/payment_panel.dart' show kPaymentMethods;
 import 'purchase_order_pdf.dart' show buildA4PurchaseOrderPdf;
 import 'purchase_order_providers.dart';
+import 'widgets/purchase_order_line_row.dart';
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 import 'package:minierp_app/widgets/movable_dialog.dart';
 
@@ -63,7 +66,8 @@ Future<void> showPurchaseOrderFormDialog(
 class _PoLine {
   _PoLine({this.itemLineId, this.itemId = ''})
     : quantityController = TextEditingController(),
-      priceController = TextEditingController();
+      priceController = TextEditingController(),
+      taxController = TextEditingController(text: '0');
 
   /// The `purchase_order_items.id` when editing an existing line
   /// (null for lines being added).
@@ -74,6 +78,7 @@ class _PoLine {
 
   final TextEditingController quantityController;
   final TextEditingController priceController;
+  final TextEditingController taxController;
 
   /// Optional expiry date for expiry-tracked items (flows into the batch
   /// at goods receipt).
@@ -81,10 +86,12 @@ class _PoLine {
 
   num get quantity => double.tryParse(quantityController.text) ?? 0;
   num get unitPrice => double.tryParse(priceController.text) ?? 0;
+  num get inputTax => double.tryParse(taxController.text) ?? 0;
 
   void dispose() {
     quantityController.dispose();
     priceController.dispose();
+    taxController.dispose();
   }
 }
 
@@ -151,7 +158,8 @@ class _PurchaseOrderFormDialogState
         _lines.add(
           _PoLine(itemLineId: item.id, itemId: item.itemId.toString())
             ..quantityController.text = numText(item.quantity)
-            ..priceController.text = numText(item.unitPrice),
+            ..priceController.text = numText(item.unitPrice)
+            ..taxController.text = numText(item.inputTaxAmount),
         );
       }
     }
@@ -175,7 +183,7 @@ class _PurchaseOrderFormDialogState
 
   num get _total => _filledLines.fold<num>(
     0,
-    (sum, line) => sum + line.quantity * line.unitPrice,
+    (sum, line) => sum + line.quantity * line.unitPrice + line.inputTax,
   );
 
   num get _paymentAmount => num.tryParse(_amountController.text.trim()) ?? 0;
@@ -232,6 +240,7 @@ class _PurchaseOrderFormDialogState
     if (line.itemLineId == null) 'item_id': int.parse(line.itemId),
     'quantity': line.quantity,
     'unit_price': line.unitPrice,
+    'input_tax_amount': line.inputTax,
     if (line.expiryDate != null) 'expiry_date': isoDate(line.expiryDate!),
   };
 
@@ -267,9 +276,7 @@ class _PurchaseOrderFormDialogState
     setState(() => _recordingPayment = true);
     final result = await ref
         .read(invoiceRepositoryProvider)
-        .createSupplierPayment(
-          _paymentBody(poId: widget.detail!.id),
-        );
+        .createSupplierPayment(_paymentBody(poId: widget.detail!.id));
     if (!mounted) return;
     setState(() {
       _recordingPayment = false;
@@ -284,13 +291,15 @@ class _PurchaseOrderFormDialogState
         if (mounted) {
           // Nested success dialog — the form below keeps its unsaved
           // edits intact; Close returns to it.
-          showDialog<void>(
-            context: context,
-            builder: (_) => PaymentSuccessScreen(
-              title: l10n.paymentsRecordedsuccess,
-              subtitle: l10n.suppliersWhatnext,
-              paymentId: data.id,
-              entityName: widget.detail!.supplierName,
+          unawaited(
+            showDialog<void>(
+              context: context,
+              builder: (_) => PaymentSuccessScreen(
+                title: l10n.paymentsRecordedsuccess,
+                subtitle: l10n.suppliersWhatnext,
+                paymentId: data.id,
+                entityName: widget.detail!.supplierName,
+              ),
             ),
           );
         }
@@ -416,12 +425,14 @@ class _PurchaseOrderFormDialogState
           'item_id': selectedItemId,
           'quantity': line.quantity,
           'unit_price': line.unitPrice,
+          'input_tax_amount': line.inputTax,
         });
         if (added case ApiFailure(:final error)) {
           return _fail(error.message);
         }
       } else if (orig.quantity != line.quantity ||
-          orig.unitPrice != line.unitPrice) {
+          orig.unitPrice != line.unitPrice ||
+          orig.inputTaxAmount != line.inputTax) {
         final result = await repo.updateItem(
           detail.id,
           lineId,
@@ -517,9 +528,7 @@ class _PurchaseOrderFormDialogState
       };
       if (purchaseOrder == null) return;
 
-      final bytes = await buildA4PurchaseOrderPdf(
-        purchaseOrder: purchaseOrder,
-      );
+      final bytes = await buildA4PurchaseOrderPdf(purchaseOrder: purchaseOrder);
       if (!mounted) return;
       await printPdfBytes(bytes, '${purchaseOrder.poNo}.pdf', context);
     } catch (error) {
@@ -542,7 +551,9 @@ class _PurchaseOrderFormDialogState
     return SizedBox(
       height: 42,
       child: OutlinedButton.icon(
-        onPressed: _submitting || _recordingPayment ? null : () => _pickDate(expected: false),
+        onPressed: _submitting || _recordingPayment
+            ? null
+            : () => _pickDate(expected: false),
         icon: const Icon(Icons.calendar_today_outlined, size: 15),
         label: Text(Formatters.date(isoDate(value))),
       ),
@@ -557,9 +568,7 @@ class _PurchaseOrderFormDialogState
           child: SizedBox(
             height: 42,
             child: OutlinedButton.icon(
-              onPressed: _submitting
-                  ? null
-                  : () => _pickDate(expected: true),
+              onPressed: _submitting ? null : () => _pickDate(expected: true),
               icon: const Icon(Icons.calendar_today_outlined, size: 15),
               label: Text(
                 value == null
@@ -698,123 +707,31 @@ class _PurchaseOrderFormDialogState
     }
   }
 
-  Widget _lineRow(AppLocalizations l10n, int index) {
+  Widget _lineRow(int index) {
     final line = _lines[index];
     final items = ref.watch(poItemsProvider).valueOrNull ?? const <Item>[];
-    final scheme = Theme.of(context).colorScheme;
-    final amount = line.quantity * line.unitPrice;
-    final selectedItem = items
-        .where((i) => i.id.toString() == line.itemId)
-        .firstOrNull;
-    final showExpiry = selectedItem?.hasExpiry == true;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 3,
-          child: SearchableSelect<int>(
-            items: [for (final i in items) i.id],
-            selected: line.itemId.isEmpty ? null : int.tryParse(line.itemId),
-            labelBuilder: (id) {
-              final match = items.where((i) => i.id == id);
-              final item = match.isEmpty ? null : match.first;
-              return item == null
-                  ? '$id'
-                  : '${item.itemCode} — ${item.itemName}';
-            },
-            decoration: formInputDecoration(),
-            onChanged: (value) => setState(() {
-              line.itemId = value?.toString() ?? '';
-              _syncPaymentToTotal();
-            }),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 92,
-          child: TextFormField(
-            controller: line.quantityController,
-            enabled: !_submitting,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: _decoration(),
-            validator: (value) => (double.tryParse(value ?? '') ?? -1) > 0
-                ? null
-                : l10n.commonRequired,
-            onChanged: (_) => _syncPaymentToTotal(),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 110,
-          child: TextFormField(
-            controller: line.priceController,
-            enabled: !_submitting,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: _decoration(),
-            validator: (value) => (double.tryParse(value ?? '') ?? -1) > 0
-                ? null
-                : l10n.commonRequired,
-            onChanged: (_) => _syncPaymentToTotal(),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 110,
-          child: Container(
-            height: 42,
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              border: Border.all(color: scheme.outlineVariant),
-              borderRadius: AppBorderRadius.smRadius,
-              color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            ),
-            child: Text(
-              Formatters.currency(amount),
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ),
-        const SizedBox(width: 4),
-        SizedBox(
-          width: 34,
-          child: IconButton(
-            tooltip: l10n.commonRemove,
-            icon: const Icon(Icons.remove_circle_outline, size: 18),
-            onPressed: _submitting || _lines.length <= 1
-                ? null
-                : () => setState(() {
-                    _lines.removeAt(index).dispose();
-                    _syncPaymentToTotal();
-                  }),
-          ),
-        ),
-      ],
-      ),
-      if (showExpiry) ...[
-        const SizedBox(height: 6),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: SizedBox(
-            height: 38,
-            child: OutlinedButton.icon(
-              onPressed: _submitting ? null : () => _pickLineExpiryDate(index),
-              icon: const Icon(Icons.calendar_today_outlined, size: 15),
-              label: Text(
-                line.expiryDate != null
-                    ? Formatters.date(isoDate(line.expiryDate!))
-                    : l10n.expirySelectDateOptional,
-              ),
-            ),
-          ),
-        ),
-      ],
-    ]);
+    return PurchaseOrderLineRow(
+      index: index,
+      items: items,
+      selectedItemId: line.itemId,
+      quantityController: line.quantityController,
+      priceController: line.priceController,
+      taxController: line.taxController,
+      amount: line.quantity * line.unitPrice,
+      expiryDate: line.expiryDate,
+      submitting: _submitting,
+      canRemove: _lines.length > 1,
+      onItemChanged: (value) => setState(() {
+        line.itemId = value;
+        _syncPaymentToTotal();
+      }),
+      onValueChanged: _syncPaymentToTotal,
+      onRemove: () => setState(() {
+        _lines.removeAt(index).dispose();
+        _syncPaymentToTotal();
+      }),
+      onPickExpiry: () => _pickLineExpiryDate(index),
+    );
   }
 
   Widget _itemsSection(AppLocalizations l10n) {
@@ -837,9 +754,15 @@ class _PurchaseOrderFormDialogState
                   child: Text(l10n.fieldsItem, style: headerStyle),
                 ),
                 const SizedBox(width: 8),
-                SizedBox(width: 92, child: Text(l10n.fieldsQuantity, style: headerStyle)),
+                SizedBox(
+                  width: 92,
+                  child: Text(l10n.fieldsQuantity, style: headerStyle),
+                ),
                 const SizedBox(width: 8),
-                SizedBox(width: 110, child: Text(l10n.purchasesUnitcost, style: headerStyle)),
+                SizedBox(
+                  width: 110,
+                  child: Text(l10n.purchasesUnitcost, style: headerStyle),
+                ),
                 const SizedBox(width: 8),
                 SizedBox(
                   width: 110,
@@ -855,7 +778,7 @@ class _PurchaseOrderFormDialogState
             const SizedBox(height: 6),
           ],
           for (var i = 0; i < _lines.length; i++) ...[
-            _lineRow(l10n, i),
+            _lineRow(i),
             if (i < _lines.length - 1) const SizedBox(height: 8),
           ],
           const SizedBox(height: 8),
@@ -897,7 +820,12 @@ class _PurchaseOrderFormDialogState
     );
   }
 
-  Widget _summaryLine(String label, num value, {bool bold = false, Color? color}) {
+  Widget _summaryLine(
+    String label,
+    num value, {
+    bool bold = false,
+    Color? color,
+  }) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -906,9 +834,9 @@ class _PurchaseOrderFormDialogState
           Expanded(
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ),
           Text(
@@ -1017,7 +945,10 @@ class _PurchaseOrderFormDialogState
 
   /// Payment card — create mode offers pay-on-save; edit mode shows the
   /// paid/balance summary and records immediately.
-  Widget _paymentSection(AppLocalizations l10n, PurchaseOrderDetail? liveDetail) {
+  Widget _paymentSection(
+    AppLocalizations l10n,
+    PurchaseOrderDetail? liveDetail,
+  ) {
     final scheme = Theme.of(context).colorScheme;
     if (_isEdit) {
       final total = liveDetail?.totalAmount ?? widget.detail!.totalAmount;
@@ -1138,7 +1069,8 @@ class _PurchaseOrderFormDialogState
     final paymentId = _lastPaymentId;
     if (paymentId != null) {
       final suppliers =
-          ref.watch(poSupplierOptionsProvider).valueOrNull ?? const <Supplier>[];
+          ref.watch(poSupplierOptionsProvider).valueOrNull ??
+          const <Supplier>[];
       final matches = suppliers.where((s) => s.id == _supplierId);
       final supplier = matches.isEmpty ? null : matches.first;
       return PaymentSuccessScreen(
@@ -1154,7 +1086,9 @@ class _PurchaseOrderFormDialogState
     // detail while the refetch is in flight).
     PurchaseOrderDetail? liveDetail;
     if (_isEdit) {
-      liveDetail = ref.watch(purchaseOrderDetailProvider(widget.detail!.id))
+      liveDetail =
+          ref
+              .watch(purchaseOrderDetailProvider(widget.detail!.id))
               .valueOrNull ??
           widget.detail;
     }
@@ -1164,134 +1098,134 @@ class _PurchaseOrderFormDialogState
       maxWidth: 760,
       maxHeight: 780,
       child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                child: Row(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: AppBorderRadius.mdRadius,
+                    ),
+                    child: Icon(
+                      Icons.assignment_outlined,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isEdit
+                              ? l10n.purchaseordersEditpurchaseorder
+                              : l10n.purchaseordersNewpurchaseorder,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          l10n.purchaseordersSubtitle,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: AppBorderRadius.mdRadius,
+                    _documentSection(l10n),
+                    const SizedBox(height: 12),
+                    _itemsSection(l10n),
+                    const SizedBox(height: 12),
+                    _paymentSection(l10n, liveDetail),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
-                      child: Icon(
-                        Icons.assignment_outlined,
-                        size: 20,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _isEdit
-                                ? l10n.purchaseordersEditpurchaseorder
-                                : l10n.purchaseordersNewpurchaseorder,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            l10n.purchaseordersSubtitle,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    ],
                   ],
                 ),
               ),
-              const Divider(height: 1),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _documentSection(l10n),
-                      const SizedBox(height: 12),
-                      _itemsSection(l10n),
-                      const SizedBox(height: 12),
-                      _paymentSection(l10n, liveDetail),
-                      if (_error != null) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          _error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    if (_isEdit) ...[
-                      TextButton.icon(
-                        onPressed: _printing || _submitting
-                            ? null
-                            : _printPurchaseOrder,
-                        icon: _printing
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.print_outlined, size: 18),
-                        label: Text(l10n.purchaseordersPrinta4),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: _submitting ? null : _delete,
-                        icon: const Icon(Icons.delete_outline, size: 18),
-                        label: Text(l10n.commonDelete),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                      const Spacer(),
-                    ],
-                    TextButton(
-                      onPressed: _submitting
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (_isEdit) ...[
+                    TextButton.icon(
+                      onPressed: _printing || _submitting
                           ? null
-                          : () => Navigator.of(context).pop(),
-                      child: Text(l10n.commonCancel),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: _submitting ? null : _submit,
-                      child: _submitting
+                          : _printPurchaseOrder,
+                      icon: _printing
                           ? const SizedBox(
                               width: 16,
                               height: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(l10n.commonSave),
+                          : const Icon(Icons.print_outlined, size: 18),
+                      label: Text(l10n.purchaseordersPrinta4),
                     ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: _submitting ? null : _delete,
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: Text(l10n.commonDelete),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                    const Spacer(),
                   ],
-                ),
+                  TextButton(
+                    onPressed: _submitting
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: Text(l10n.commonCancel),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: _submitting ? null : _submit,
+                    child: _submitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(l10n.commonSave),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
+        ),
       ),
     );
   }
