@@ -238,9 +238,7 @@ Future<void> _pumpPage(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        invoiceCustomersProvider.overrideWith(
-          (ref) async => customersToShow,
-        ),
+        invoiceCustomersProvider.overrideWith((ref) async => customersToShow),
         invoiceItemsProvider.overrideWith(
           (ref) => itemsFuture ?? Future.value(items),
         ),
@@ -331,6 +329,63 @@ Invoice _editInvoice() => const Invoice(
 );
 
 void main() {
+  testWidgets('invoice layout boundaries retain filled grid on resize', (
+    tester,
+  ) async {
+    await _pumpPage(tester, invoice: _editInvoice());
+    final initialItem = gridRows(tester).single.cells['item']!.value;
+    final initialQuantity = gridRows(tester).single.cells['qty']!.value;
+    for (final size in const [
+      Size(719, 716),
+      Size(720, 716),
+      Size(720, 715),
+      Size(720, 716),
+      Size(1099, 856),
+      Size(1100, 855),
+      Size(1100, 856),
+      Size(1200, 2000),
+    ]) {
+      tester.view.physicalSize = size;
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(gridRows(tester), hasLength(1));
+      expect(gridRows(tester).single.cells['item']!.value, initialItem);
+      expect(gridRows(tester).single.cells['qty']!.value, initialQuantity);
+      final scrollableLayout = find.ancestor(
+        of: find.byType(PlutoGrid),
+        matching: find.byType(SingleChildScrollView),
+      );
+      expect(
+        scrollableLayout,
+        size.width < 1100 || size.height < 856
+            ? findsOneWidget
+            : findsNothing,
+      );
+    }
+  });
+
+  testWidgets('backdated invoice explains current stock costing', (
+    tester,
+  ) async {
+    await _pumpPage(tester, invoice: _editInvoice());
+    expect(
+      find.text(
+        'Backdated sale: costing uses current stock and may include batches received after the invoice date.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('today invoice has no backdated costing warning', (tester) async {
+    await _pumpPage(tester);
+    expect(
+      find.text(
+        'Backdated sale: costing uses current stock and may include batches received after the invoice date.',
+      ),
+      findsNothing,
+    );
+  });
+
   testWidgets('line-items grid survives customer selection', (tester) async {
     await _pumpPage(tester);
 
@@ -1481,10 +1536,7 @@ void main() {
 
       // The banner must NOT claim the write failed, and must stay put
       // rather than auto-dismissing into a false "it didn't save".
-      expect(
-        find.textContaining('may already have completed'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('may already have completed'), findsOneWidget);
       expect(find.text('Retry'), findsOneWidget);
 
       // Retry goes through the same idempotency key, so the server replays
@@ -1495,7 +1547,8 @@ void main() {
       expect(
         repo.createKeys[1],
         repo.createKeys[0],
-        reason: 'the retry must reuse the key or a duplicate invoice is created',
+        reason:
+            'the retry must reuse the key or a duplicate invoice is created',
       );
     });
 
@@ -1549,10 +1602,7 @@ void main() {
 
       await save(tester);
       expect(repo.createKeys, hasLength(1));
-      expect(
-        find.textContaining('may already have completed'),
-        findsNothing,
-      );
+      expect(find.textContaining('may already have completed'), findsNothing);
       expect(find.text('Retry'), findsNothing);
     });
   });
@@ -2184,11 +2234,22 @@ void main() {
       await fillInvoiceAndFindAmount(tester, payAmount: 50);
       await save(tester);
 
-      expect(repo.lastCreateBody, isNotNull, reason: 'the invoice itself saved');
-      expect(repo.postedPayments, isNotEmpty, reason: 'a payment was attempted');
+      expect(
+        repo.lastCreateBody,
+        isNotNull,
+        reason: 'the invoice itself saved',
+      );
+      expect(
+        repo.postedPayments,
+        isNotEmpty,
+        reason: 'a payment was attempted',
+      );
 
       // The server's reason must survive to the user...
-      expect(find.textContaining('exceeds the remaining balance'), findsOneWidget);
+      expect(
+        find.textContaining('exceeds the remaining balance'),
+        findsOneWidget,
+      );
       // ...and the bare success toast must NOT be the last word. showAppToast
       // calls hideCurrentSnackBar() first, so a later success toast would
       // silently replace the error — which is the reported bug.
@@ -2204,36 +2265,33 @@ void main() {
     /// Same shape as [_editInvoice] with an arbitrary paid/balance/credit
     /// split, so a test can model an invoice whose balance moved after the
     /// page opened, or one partly settled with store credit.
-    Invoice editInvoice({
-      num paid = 0,
-      num balance = 1000,
-      num credit = 0,
-    }) => Invoice(
-      id: 42,
-      invoiceNo: 'INV-EDIT-1',
-      customerId: 1,
-      invoiceDate: '2026-08-11',
-      totalAmount: 1000,
-      paidAmount: paid,
-      balanceAmount: balance,
-      creditOffset: credit,
-      status: paid > 0 ? 'Partially Paid' : 'Unpaid',
-      discountScope: 'invoice',
-      items: const [
-        InvoiceItem(
-          id: 1,
-          invoiceId: 42,
-          itemId: 1,
-          quantity: 10,
-          unitPrice: 100,
-          amount: 1000,
-          taxRate: 0,
-          discountType: 'none',
-          discountValue: 0,
-          returnedQty: 0,
-        ),
-      ],
-    );
+    Invoice editInvoice({num paid = 0, num balance = 1000, num credit = 0}) =>
+        Invoice(
+          id: 42,
+          invoiceNo: 'INV-EDIT-1',
+          customerId: 1,
+          invoiceDate: '2026-08-11',
+          totalAmount: 1000,
+          paidAmount: paid,
+          balanceAmount: balance,
+          creditOffset: credit,
+          status: paid > 0 ? 'Partially Paid' : 'Unpaid',
+          discountScope: 'invoice',
+          items: const [
+            InvoiceItem(
+              id: 1,
+              invoiceId: 42,
+              itemId: 1,
+              quantity: 10,
+              unitPrice: 100,
+              amount: 1000,
+              taxRate: 0,
+              discountType: 'none',
+              discountValue: 0,
+              returnedQty: 0,
+            ),
+          ],
+        );
 
     Finder amountField() => find.byWidgetPredicate(
       (w) => w is TextField && w.decoration?.labelText == 'Amount',
@@ -2275,7 +2333,9 @@ void main() {
       expect(find.text('Payment recorded'), findsOneWidget);
     });
 
-    testWidgets('a payment above the unpaid balance is refused', (tester) async {
+    testWidgets('a payment above the unpaid balance is refused', (
+      tester,
+    ) async {
       final repo = _FakeInvoiceRepository()..invoiceDetail = editInvoice();
       await _pumpPage(tester, repo: repo, invoice: editInvoice());
 
@@ -2385,7 +2445,8 @@ void main() {
       expect(
         repo.updatedPayments,
         isEmpty,
-        reason: '5,000 cannot fit in a 1,000 balance plus the 100 already '
+        reason:
+            '5,000 cannot fit in a 1,000 balance plus the 100 already '
             'recorded — headroom is 1,100',
       );
       expect(
@@ -2421,12 +2482,18 @@ void main() {
       await tester.enterText(amount, '0');
       await tester.pumpAndSettle();
       await tester.tap(
-        find.descendant(of: find.byType(AlertDialog), matching: find.text('Save')),
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Save'),
+        ),
       );
       await tester.pumpAndSettle();
 
       expect(repo.updatedPayments, isEmpty);
-      expect(find.text('Payment amount must be greater than zero'), findsOneWidget);
+      expect(
+        find.text('Payment amount must be greater than zero'),
+        findsOneWidget,
+      );
     });
   });
 }
