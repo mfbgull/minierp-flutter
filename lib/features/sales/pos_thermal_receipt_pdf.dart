@@ -7,6 +7,7 @@
 // RTL thermal text is out of scope (PORTING.md §12).
 
 import 'dart:typed_data';
+import '../../core/utils/recoverable_failure.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart' show Color;
@@ -249,7 +250,8 @@ Future<pw.MemoryImage?> _generateQrImage(String data) async {
     if (byteData == null) return null;
 
     return pw.MemoryImage(byteData.buffer.asUint8List());
-  } catch (_) {
+  } catch (error) {
+    reportRecoverableFailure('pos.render_receipt_qr', error);
     return null;
   }
 }
