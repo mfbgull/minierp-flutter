@@ -98,6 +98,180 @@ abstract class AppLocalizations {
     Locale('ur'),
   ];
 
+  /// No description provided for @supplierAdvances.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier advances'**
+  String get supplierAdvances;
+
+  /// No description provided for @supplierAdvanceCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Record supplier advance'**
+  String get supplierAdvanceCreate;
+
+  /// No description provided for @supplierAdvanceApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply advance'**
+  String get supplierAdvanceApply;
+
+  /// No description provided for @supplierAdvanceAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available advance'**
+  String get supplierAdvanceAvailable;
+
+  /// No description provided for @supplierAdvanceApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied amount'**
+  String get supplierAdvanceApplied;
+
+  /// No description provided for @supplierAdvanceActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get supplierAdvanceActive;
+
+  /// No description provided for @supplierAdvanceCreateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Record cash paid to a supplier before it is allocated to a purchase, PO or bill. Apply it separately when settling a document.'**
+  String get supplierAdvanceCreateHint;
+
+  /// No description provided for @supplierAdvanceDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpaid document'**
+  String get supplierAdvanceDocument;
+
+  /// No description provided for @supplierAdvanceSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by document number; up to 50 matching unpaid documents are shown.'**
+  String get supplierAdvanceSearchHint;
+
+  /// No description provided for @supplierAdvanceVoid.
+  ///
+  /// In en, this message translates to:
+  /// **'Void supplier advance'**
+  String get supplierAdvanceVoid;
+
+  /// No description provided for @supplierAdvanceVoidConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse this advance payment? Reverse all its applications first.'**
+  String get supplierAdvanceVoidConfirm;
+
+  /// No description provided for @supplierBillOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpaid'**
+  String get supplierBillOpen;
+
+  /// No description provided for @supplierBillPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get supplierBillPaid;
+
+  /// No description provided for @supplierBills.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier bills'**
+  String get supplierBills;
+
+  /// No description provided for @supplierBillCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Record supplier bill'**
+  String get supplierBillCreate;
+
+  /// No description provided for @supplierBillNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier invoice number'**
+  String get supplierBillNumber;
+
+  /// No description provided for @supplierBillNetAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Net expense amount'**
+  String get supplierBillNetAmount;
+
+  /// No description provided for @supplierBillInputTax.
+  ///
+  /// In en, this message translates to:
+  /// **'Recoverable input tax'**
+  String get supplierBillInputTax;
+
+  /// No description provided for @supplierBillNonStockHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For services and non-stock purchases. Record stock purchases through Purchases to create inventory.'**
+  String get supplierBillNonStockHint;
+
+  /// No description provided for @supplierBillVoid.
+  ///
+  /// In en, this message translates to:
+  /// **'Void supplier bill'**
+  String get supplierBillVoid;
+
+  /// No description provided for @supplierBillVoidConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Void this bill and reverse its payable, expense and input tax? Reverse any payments first.'**
+  String get supplierBillVoidConfirm;
+
+  /// No description provided for @expenseCreditMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit (pay later)'**
+  String get expenseCreditMethod;
+
+  /// No description provided for @expensePayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense payments'**
+  String get expensePayments;
+
+  /// No description provided for @expenseOutstanding.
+  ///
+  /// In en, this message translates to:
+  /// **'Outstanding'**
+  String get expenseOutstanding;
+
+  /// No description provided for @expenseRecordPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Record payment'**
+  String get expenseRecordPayment;
+
+  /// No description provided for @expenseReversePayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse payment'**
+  String get expenseReversePayment;
+
+  /// No description provided for @expenseReversePaymentConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse this payment and restore the expense payable?'**
+  String get expenseReversePaymentConfirm;
+
+  /// No description provided for @expensePaymentVoided.
+  ///
+  /// In en, this message translates to:
+  /// **'Reversed'**
+  String get expensePaymentVoided;
+
+  /// No description provided for @salesBackdatedCostingWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Backdated sale: costing uses current stock and may include batches received after the invoice date.'**
+  String get salesBackdatedCostingWarning;
+
   /// No description provided for @cashOrdinaryReceipt.
   ///
   /// In en, this message translates to:
@@ -7715,8 +7889,14 @@ abstract class AppLocalizations {
   /// No description provided for @changePasswordTooShort.
   ///
   /// In en, this message translates to:
-  /// **'Password must be at least 6 characters'**
+  /// **'Password must be at least 12 characters'**
   String get changePasswordTooShort;
+
+  /// No description provided for @passwordTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Password is too long. Use fewer characters.'**
+  String get passwordTooLong;
 
   /// No description provided for @changePasswordUpdating.
   ///
@@ -11489,7 +11669,7 @@ abstract class AppLocalizations {
   /// No description provided for @usermanagementValidationPasswordlength.
   ///
   /// In en, this message translates to:
-  /// **'Password must be at least 6 characters'**
+  /// **'Password must be at least 12 characters'**
   String get usermanagementValidationPasswordlength;
 
   /// No description provided for @usermanagementValidationRolerequired.
@@ -11773,6 +11953,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Total Tax'**
   String get reportsTotaltax;
+
+  /// No description provided for @reportsOutputTax.
+  ///
+  /// In en, this message translates to:
+  /// **'Output tax'**
+  String get reportsOutputTax;
+
+  /// No description provided for @reportsNetTax.
+  ///
+  /// In en, this message translates to:
+  /// **'Net tax'**
+  String get reportsNetTax;
+
+  /// No description provided for @loginStorageUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save your session. Check secure storage and sign in again.'**
+  String get loginStorageUnavailable;
 
   /// No description provided for @reportsBatchtraceability.
   ///
