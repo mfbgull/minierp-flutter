@@ -221,7 +221,7 @@ class _InvoicePrintPreviewPageState
                         invoiceId: _detail!.id,
                       );
                       if (!mounted) return;
-                      _load();
+                      await _load();
                     },
               icon: const Icon(Icons.assignment_return_outlined, size: 18),
               label: Text(l10n.salesreturnsProcessreturn),
