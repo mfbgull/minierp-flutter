@@ -6,6 +6,7 @@ import { logAuth, ActionType } from '../services/activityLogger';
 import db from '../config/database';
 import UserModel from '../models/User';
 import logger from '../utils/logger';
+import { passwordPolicyError } from '../utils/passwordPolicy';
 import { sendSuccess, sendBadRequest, sendUnauthorized, sendNotFound, sendInternalError } from '../utils/apiResponse';
 
 async function login(req: Request, res: Response): Promise<void> {
@@ -108,7 +109,8 @@ async function changePassword(req: AuthRequest, res: Response): Promise<void> {
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) { sendBadRequest(res, 'Current and new password required'); return; }
-    if (newPassword.length < 6) { sendBadRequest(res, 'New password must be at least 6 characters'); return; }
+    const passwordError = passwordPolicyError(newPassword);
+    if (passwordError) { sendBadRequest(res, passwordError); return; }
 
     const user = UserModel.getPasswordHash(req.user!.id, db);
     if (!user) { sendNotFound(res, 'User'); return; }

@@ -97,7 +97,7 @@ describe('Auth Controller', () => {
       .post('/api/auth/change-password')
       .set('Cookie', [authCookie, csrfCookie])
       .set('x-csrf-token', csrfToken)
-      .send({ currentPassword: 'wrong-password', newPassword: 'newpass123' });
+      .send({ currentPassword: 'wrong-password', newPassword: 'new-valid-pass-2026' });
     expect(res.status).toBe(401);
   });
 });
