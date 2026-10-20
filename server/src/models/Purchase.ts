@@ -8,6 +8,8 @@ import AccountingService from '../services/accountingService';
 import ledgerUtils from '../utils/ledgerUtils';
 import { requireSupplierForPurchase } from '../utils/purchaseValidation';
 import { roundQty } from '../utils/quantity';
+import { roundCurrency } from '../utils/currency';
+import { BusinessRuleError } from '../utils/businessRuleError';
 import { SqlParam } from '../utils/sqlTypes';
 import { assertInboundDateNotRetroactive } from '../services/inventoryEffectiveDate';
 
@@ -19,6 +21,7 @@ interface Purchase {
   quantity: number;
   unit_cost: number;
   total_cost: number;
+  input_tax_amount: number;
   supplier_id?: number;
   supplier_name?: string;
   purchase_date: string;
@@ -87,6 +90,7 @@ interface CreatePurchaseDTO {
   warehouse_id: number;
   quantity: number;
   unit_cost: number;
+  input_tax_amount?: number;
   supplier_id?: number;
   supplier_name?: string;
   purchase_date: string;
@@ -101,6 +105,7 @@ interface CreatePurchaseLineDTO {
   item_id: number;
   quantity: number;
   unit_cost: number;
+  input_tax_amount?: number;
   expiry_date?: string;
 }
 
@@ -132,6 +137,9 @@ class PurchaseModel {
   }
 
   private static validateCreateDTO(data: CreatePurchaseDTO, db: Database.Database): void {
+    if (data.input_tax_amount !== undefined && (typeof data.input_tax_amount !== 'number' || !Number.isFinite(data.input_tax_amount) || data.input_tax_amount < 0 || data.input_tax_amount > 1e9)) {
+      throw new BusinessRuleError(400, 'Recoverable input tax must be a non-negative finite amount');
+    }
     if (!data.item_id || data.item_id <= 0) throw new Error('Invalid item_id');
     if (!data.warehouse_id || data.warehouse_id <= 0) throw new Error('Invalid warehouse_id');
     if (!data.quantity || data.quantity <= 0) throw new Error('Quantity must be positive');
@@ -196,11 +204,13 @@ class PurchaseModel {
     const purchaseStmt = db.prepare(`
       INSERT INTO purchases (
         purchase_no, item_id, warehouse_id, quantity, unit_cost, total_cost,
-        supplier_id, supplier_name, purchase_date, invoice_no, remarks, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        supplier_id, supplier_name, purchase_date, invoice_no, remarks, created_by, input_tax_amount
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const totalCost = roundQty(quantity * unit_cost);
+    const inputTax = roundCurrency(data.input_tax_amount ?? 0);
+    const totalPayable = roundCurrency(totalCost + inputTax);
 
     const result = purchaseStmt.run(
       purchaseNo,
@@ -214,7 +224,8 @@ class PurchaseModel {
       purchase_date,
       invoice_no || null,
       remarks || null,
-      userId
+      userId,
+      inputTax
     );
 
     const purchaseId = result.lastInsertRowid as number;
@@ -301,7 +312,7 @@ class PurchaseModel {
         transaction_date: purchase_date,
         transaction_type: 'PURCHASE',
         reference_no: purchaseNo,
-        debit: totalCost,
+        debit: totalPayable,
         credit: 0,
         description: `Purchase ${purchaseNo}`,
       }, db);
@@ -318,6 +329,7 @@ class PurchaseModel {
       purchaseId,
       purchaseNo,
       totalCost,
+      inputTaxAmount: inputTax,
       purchaseDate: purchase_date,
       paymentMethod: resolvedSupplierId ? 'credit' : 'cash',
       userId,
@@ -358,6 +370,7 @@ class PurchaseModel {
    * single better-sqlite3 transaction.
    */
   static recordPurchaseMulti(data: CreatePurchaseBatchDTO, userId: number, db: Database.Database): Purchase[] {
+    if (Object.prototype.hasOwnProperty.call(data, 'input_tax_amount')) throw new BusinessRuleError(400, 'Provide recoverable input tax on each purchase item');
     if (!data.warehouse_id || data.warehouse_id <= 0) throw new Error('Invalid warehouse_id');
     if (!data.purchase_date) throw new Error('purchase_date is required');
     if (!Array.isArray(data.items) || data.items.length === 0) throw new Error('At least one purchase item is required');
@@ -372,13 +385,14 @@ class PurchaseModel {
 
     const { id, name } = this.resolveSupplier(data.supplier_id, undefined, db);
 
-    const transaction = db.transaction(() =>
-      data.items.map((line) => this.writePurchaseRow(
+    const transaction = db.transaction(() => {
+      const rows = data.items.map((line) => this.writePurchaseRow(
         {
           item_id: line.item_id,
           warehouse_id: data.warehouse_id,
           quantity: line.quantity,
           unit_cost: line.unit_cost,
+          input_tax_amount: line.input_tax_amount,
           purchase_date: data.purchase_date,
           expiry_date: line.expiry_date,
           supplier_id: data.supplier_id,
@@ -389,8 +403,11 @@ class PurchaseModel {
         name,
         userId,
         db
-      ))
-    );
+      ));
+      const insert = db.prepare('INSERT INTO purchase_submission_items (root_purchase_id, purchase_id, line_index) VALUES (?, ?, ?)');
+      rows.forEach((row, index) => insert.run(rows[0].id, row.id, index));
+      return rows;
+    });
 
     return transaction();
   }
@@ -430,8 +447,10 @@ class PurchaseModel {
         w.warehouse_name,
         u.username as created_by_username,
         COALESCE(pa.paid_amount, 0) as paid_amount,
-        MAX(0, p.total_cost - COALESCE(pa.paid_amount, 0)) as balance_amount
+        ROUND(p.total_cost + p.input_tax_amount, 2) AS total_payable,
+        MAX(0, ROUND(v.total_payable - v.returned_amount - v.paid_amount, 2)) as balance_amount
       FROM purchases p
+      JOIN direct_purchase_payables v ON v.id = p.id
       JOIN items i ON p.item_id = i.id
       JOIN warehouses w ON p.warehouse_id = w.id
       JOIN users u ON p.created_by = u.id
@@ -528,8 +547,10 @@ class PurchaseModel {
         w.warehouse_name,
         u.username as created_by_username,
         COALESCE(pa.paid_amount, 0) as paid_amount,
-        MAX(0, p.total_cost - COALESCE(pa.paid_amount, 0)) as balance_amount
+        ROUND(p.total_cost + p.input_tax_amount, 2) AS total_payable,
+        MAX(0, ROUND(v.total_payable - v.returned_amount - v.paid_amount, 2)) as balance_amount
       FROM purchases p
+      JOIN direct_purchase_payables v ON v.id = p.id
       JOIN items i ON p.item_id = i.id
       JOIN warehouses w ON p.warehouse_id = w.id
       JOIN users u ON p.created_by = u.id
