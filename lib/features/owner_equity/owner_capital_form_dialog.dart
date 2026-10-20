@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
+import '../../core/utils/idempotency_key.dart';
 import '../../data/models/expense.dart' show ExpenseOption;
 import '../../data/models/owner_equity.dart' show OwnerCapitalEntry;
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
@@ -51,6 +52,7 @@ class OwnerCapitalFormDialog extends ConsumerStatefulWidget {
 class _OwnerCapitalFormDialogState
     extends ConsumerState<OwnerCapitalFormDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _idemKeys = IdempotencyKeyCache(prefix: 'capital');
 
   late final TextEditingController _amountController;
   late final TextEditingController _noteController;
@@ -120,9 +122,13 @@ class _OwnerCapitalFormDialogState
       _error = null;
     });
     final repo = ref.read(ownerEquityRepositoryProvider);
+    final body = _buildBody();
     final result = _isEdit
-        ? await repo.updateCapital(widget.entry!.id, _buildBody())
-        : await repo.createCapital(_buildBody());
+        ? await repo.updateCapital(widget.entry!.id, body)
+        : await repo.createCapital(
+            body,
+            idempotencyKey: _idemKeys.keyFor(body),
+          );
     if (!mounted) return;
 
     switch (result) {
@@ -207,7 +213,9 @@ class _OwnerCapitalFormDialogState
                   children: [
                     Expanded(
                       child: Text(
-                        _isEdit ? l10n.equityEditcapital : l10n.equityNewcapital,
+                        _isEdit
+                            ? l10n.equityEditcapital
+                            : l10n.equityNewcapital,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
@@ -263,8 +271,8 @@ class _OwnerCapitalFormDialogState
                                 enabled: !_submitting,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                                      decimal: true,
+                                    ),
                                 decoration: _decoration(),
                                 validator: _validateAmount,
                               ),
@@ -313,8 +321,9 @@ class _OwnerCapitalFormDialogState
                           TextButton.icon(
                             onPressed: _submitting ? null : _delete,
                             style: TextButton.styleFrom(
-                              foregroundColor:
-                                  Theme.of(context).colorScheme.error,
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.error,
                             ),
                             icon: const Icon(Icons.delete_outline, size: 18),
                             label: Text(l10n.commonDelete),

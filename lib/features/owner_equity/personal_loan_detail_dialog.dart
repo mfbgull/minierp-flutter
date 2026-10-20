@@ -316,7 +316,7 @@ class _PersonalLoanDetailDialogState
       loan: _detail!.loan,
     );
     if (result == true && mounted) {
-      _loadDetail();
+      await _loadDetail();
     }
   }
 
@@ -374,7 +374,7 @@ class _PersonalLoanDetailDialogState
 
     switch (result) {
       case ApiSuccess():
-        _loadDetail();
+        await _loadDetail();
       case ApiFailure(:final error):
         showAppToast(context, error.message, isError: true);
     }
