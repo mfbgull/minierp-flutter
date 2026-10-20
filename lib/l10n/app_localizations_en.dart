@@ -9,6 +9,100 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get supplierAdvances => 'Supplier advances';
+
+  @override
+  String get supplierAdvanceCreate => 'Record supplier advance';
+
+  @override
+  String get supplierAdvanceApply => 'Apply advance';
+
+  @override
+  String get supplierAdvanceAvailable => 'Available advance';
+
+  @override
+  String get supplierAdvanceApplied => 'Applied amount';
+
+  @override
+  String get supplierAdvanceActive => 'Active';
+
+  @override
+  String get supplierAdvanceCreateHint =>
+      'Record cash paid to a supplier before it is allocated to a purchase, PO or bill. Apply it separately when settling a document.';
+
+  @override
+  String get supplierAdvanceDocument => 'Unpaid document';
+
+  @override
+  String get supplierAdvanceSearchHint =>
+      'Search by document number; up to 50 matching unpaid documents are shown.';
+
+  @override
+  String get supplierAdvanceVoid => 'Void supplier advance';
+
+  @override
+  String get supplierAdvanceVoidConfirm =>
+      'Reverse this advance payment? Reverse all its applications first.';
+
+  @override
+  String get supplierBillOpen => 'Unpaid';
+
+  @override
+  String get supplierBillPaid => 'Paid';
+
+  @override
+  String get supplierBills => 'Supplier bills';
+
+  @override
+  String get supplierBillCreate => 'Record supplier bill';
+
+  @override
+  String get supplierBillNumber => 'Supplier invoice number';
+
+  @override
+  String get supplierBillNetAmount => 'Net expense amount';
+
+  @override
+  String get supplierBillInputTax => 'Recoverable input tax';
+
+  @override
+  String get supplierBillNonStockHint =>
+      'For services and non-stock purchases. Record stock purchases through Purchases to create inventory.';
+
+  @override
+  String get supplierBillVoid => 'Void supplier bill';
+
+  @override
+  String get supplierBillVoidConfirm =>
+      'Void this bill and reverse its payable, expense and input tax? Reverse any payments first.';
+
+  @override
+  String get expenseCreditMethod => 'Credit (pay later)';
+
+  @override
+  String get expensePayments => 'Expense payments';
+
+  @override
+  String get expenseOutstanding => 'Outstanding';
+
+  @override
+  String get expenseRecordPayment => 'Record payment';
+
+  @override
+  String get expenseReversePayment => 'Reverse payment';
+
+  @override
+  String get expenseReversePaymentConfirm =>
+      'Reverse this payment and restore the expense payable?';
+
+  @override
+  String get expensePaymentVoided => 'Reversed';
+
+  @override
+  String get salesBackdatedCostingWarning =>
+      'Backdated sale: costing uses current stock and may include batches received after the invoice date.';
+
+  @override
   String get cashOrdinaryReceipt => 'Receipt';
 
   @override
@@ -3949,7 +4043,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changePasswordTitle => 'Change Password';
 
   @override
-  String get changePasswordTooShort => 'Password must be at least 6 characters';
+  String get changePasswordTooShort =>
+      'Password must be at least 12 characters';
+
+  @override
+  String get passwordTooLong => 'Password is too long. Use fewer characters.';
 
   @override
   String get changePasswordUpdating => 'Updating...';
@@ -5906,7 +6004,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get usermanagementValidationPasswordlength =>
-      'Password must be at least 6 characters';
+      'Password must be at least 12 characters';
 
   @override
   String get usermanagementValidationRolerequired => 'Select a role';
@@ -6050,6 +6148,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reportsTotaltax => 'Total Tax';
+
+  @override
+  String get reportsOutputTax => 'Output tax';
+
+  @override
+  String get reportsNetTax => 'Net tax';
+
+  @override
+  String get loginStorageUnavailable =>
+      'Could not save your session. Check secure storage and sign in again.';
 
   @override
   String get reportsBatchtraceability => 'Batch Traceability';
