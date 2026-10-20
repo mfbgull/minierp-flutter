@@ -17,7 +17,7 @@
 //
 // All grid-style builders share the same shape — a localized header row
 // followed by one row per record — so every builder routes through the
-// parameterized [_buildGridCsv] helper, passing its headers and a
+// parameterized [buildGridCsv] helper, passing its headers and a
 // per-record row mapping (the ledger/returns/production/BOM builders
 // keep any precomputed values — e.g. running balances — captured by
 // their row mapper).
@@ -34,7 +34,6 @@ import 'dart:io';
 import 'dart:typed_data';
 import '../../features/payments/unified_payment_labels.dart';
 
-import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -50,9 +49,7 @@ import '../../features/owner_equity/personal_loan_models.dart'
     show PersonalLoan;
 import '../../data/models/physical_count.dart' show PhysicalCount;
 import '../../data/models/production.dart' show Production;
-import '../../data/models/purchase_order.dart' show PurchaseOrder;
 import '../../data/models/purchase_return.dart' show PurchaseReturn;
-import '../../data/models/quotation.dart' show Quotation;
 import '../../data/models/report.dart'
     show
         ApAgingReport,
@@ -68,7 +65,6 @@ import '../../data/models/report.dart'
         ProfitLossReport,
         TopDebtorRow,
         TrialBalanceReport;
-import '../../data/models/sales_order.dart' show SalesOrder;
 import '../../data/models/sales_return.dart' show SalesReturn;
 import '../../data/models/stock_balance.dart' show StockBalance;
 import '../../data/models/stock_movement.dart' show StockMovement;
@@ -81,42 +77,16 @@ import '../../features/forecasts/forecast_models.dart' show ForecastDemand;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
 import 'formatters.dart';
+import 'csv_encoding.dart';
+
+export 'csv_encoding.dart' show sanitizeCsvCell;
+export 'csv_order_builders.dart'
+    show buildSalesOrdersCsv, buildPurchaseOrdersCsv, buildQuotationsCsv;
 import 'cash_movement_labels.dart';
 import 'expense_status.dart';
 import 'invoice_status.dart';
 import 'movement_type_label.dart';
-import 'po_status.dart';
 import 'purchase_return_type.dart';
-import 'quotation_status.dart';
-import 'so_status.dart';
-
-/// Strips leading spreadsheet-formula characters (`=`, `+`, `-`, `@`)
-/// from a user-controlled cell value (CSV/formula-injection hardening).
-/// The rest of the value is preserved verbatim — e.g. `=1+1` → `1+1`,
-/// `+HYPERLINK(...)` → `HYPERLINK(...)`. Values not starting with a
-/// formula character are returned unchanged.
-///
-/// Tradeoff (deliberate): a user text that *legitimately* starts with a
-/// hyphen, e.g. an item name like `-bolts`, also loses its leading `-`.
-/// Stripping — rather than quoting/prefixing — is what the product asked
-/// for, and hyphens at the start of doc numbers/names are not a real
-/// pattern in this domain; the alternative (prefixing a `'`) would be
-/// the choice if that ever becomes a concern.
-String sanitizeCsvCell(String value) {
-  var start = 0;
-  while (start < value.length) {
-    final c = value.codeUnitAt(start);
-    if (c == 0x3D /* = */ ||
-        c == 0x2B /* + */ ||
-        c == 0x2D /* - */ ||
-        c == 0x40 /* @ */ ) {
-      start++;
-    } else {
-      break;
-    }
-  }
-  return start == 0 ? value : value.substring(start);
-}
 
 /// The running balance after each movement — keyed by movement id. The
 /// API returns newest-first, so walk the reversed (oldest-first) list.
@@ -138,7 +108,7 @@ String buildStockLedgerCsv(
   List<StockMovement> movements,
 ) {
   final balances = stockLedgerBalances(movements);
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.commonDate,
       l10n.inventoryStockledgerType,
@@ -173,7 +143,7 @@ String buildInvoiceReturnsCsv(
   AppLocalizations l10n,
   List<SalesReturn> returns,
 ) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.salesreturnsReturnno,
       l10n.salesreturnsReturndate,
@@ -210,7 +180,7 @@ String buildPurchaseReturnsCsv(
   AppLocalizations l10n,
   List<PurchaseReturn> returns,
 ) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.purchasesReturnno,
       l10n.purchasesReturndate,
@@ -238,89 +208,6 @@ String buildPurchaseReturnsCsv(
 String csvSuggestedName(String stem) =>
     '$stem-${DateTime.now().toIso8601String().split('T').first}.csv';
 
-/// Builds the CSV text for the sales-orders grid (SO # | Date | Customer
-/// | Status | Total | Delivery — mirroring the grid's columns; the
-/// Status column uses the same localized label as the grid's badge).
-String buildSalesOrdersCsv(AppLocalizations l10n, List<SalesOrder> orders) {
-  return _buildGridCsv(
-    [
-      l10n.salesordersSono,
-      l10n.salesordersDate,
-      l10n.salesordersCustomer,
-      l10n.salesordersStatus,
-      l10n.commonTotal,
-      l10n.salesordersDelivery,
-    ],
-    orders,
-    (o) => [
-      sanitizeCsvCell(o.soNo.isEmpty ? '—' : o.soNo),
-      o.soDate.isEmpty ? '—' : Formatters.date(o.soDate),
-      sanitizeCsvCell(o.customerName.isEmpty ? '—' : o.customerName),
-      sanitizeCsvCell(soStatusLabel(l10n, o.status)),
-      Formatters.currency(o.totalAmount),
-      (o.deliveryDate?.isEmpty ?? true)
-          ? '—'
-          : Formatters.date(o.deliveryDate!),
-    ],
-  );
-}
-
-/// Builds the CSV text for the purchase-orders grid (PO No | Date |
-/// Supplier | Status | Total | Expected Delivery — mirroring the grid's
-/// columns; the Status column uses the same localized label as the
-/// grid's badge).
-String buildPurchaseOrdersCsv(
-  AppLocalizations l10n,
-  List<PurchaseOrder> orders,
-) {
-  return _buildGridCsv(
-    [
-      l10n.purchaseordersPono,
-      l10n.commonDate,
-      l10n.purchasesSuppliercol,
-      l10n.commonStatus,
-      l10n.commonTotal,
-      l10n.purchaseordersExpecteddelivery,
-    ],
-    orders,
-    (o) => [
-      sanitizeCsvCell(o.poNo.isEmpty ? '—' : o.poNo),
-      o.poDate.isEmpty ? '—' : Formatters.date(o.poDate),
-      sanitizeCsvCell(o.supplierName.isEmpty ? '—' : o.supplierName),
-      sanitizeCsvCell(poStatusLabel(l10n, o.status)),
-      Formatters.currency(o.totalAmount),
-      (o.expectedDeliveryDate?.isEmpty ?? true)
-          ? '—'
-          : Formatters.date(o.expectedDeliveryDate!),
-    ],
-  );
-}
-
-/// Builds the CSV text for the quotations grid (Quotation # | Date |
-/// Customer | Status | Total | Expiry — mirroring the grid's columns;
-/// the Status column uses the same localized label as the grid's badge).
-String buildQuotationsCsv(AppLocalizations l10n, List<Quotation> quotations) {
-  return _buildGridCsv(
-    [
-      l10n.quotationsQuotation,
-      l10n.quotationsDate,
-      l10n.quotationsCustomer,
-      l10n.quotationsStatus,
-      l10n.commonTotal,
-      l10n.quotationsExpiry,
-    ],
-    quotations,
-    (q) => [
-      sanitizeCsvCell(q.quotationNo.isEmpty ? '—' : q.quotationNo),
-      q.quotationDate.isEmpty ? '—' : Formatters.date(q.quotationDate),
-      sanitizeCsvCell(q.customerName.isEmpty ? '—' : q.customerName),
-      sanitizeCsvCell(quotationStatusLabel(l10n, q.status)),
-      Formatters.currency(q.totalAmount),
-      (q.expiryDate?.isEmpty ?? true) ? '—' : Formatters.date(q.expiryDate!),
-    ],
-  );
-}
-
 /// Builds the CSV text for the sales-invoices grid (Invoice No | Date |
 /// Customer | Status | Total | Paid | Due | Created By — mirroring the
 /// grid's columns; the Status column uses the same localized label as
@@ -331,7 +218,7 @@ String buildQuotationsCsv(AppLocalizations l10n, List<Quotation> quotations) {
 /// | Level, mirroring the activity grid's columns (description and the
 /// free-text fields go through the CSV-injection sanitizer).
 String buildActivityLogCsv(AppLocalizations l10n, List<ActivityLog> logs) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.activitylogTimestamp,
       l10n.activitylogUser,
@@ -356,7 +243,7 @@ String buildActivityLogCsv(AppLocalizations l10n, List<ActivityLog> logs) {
 /// columns; the Status column uses the same localized label as the
 /// grid's badge).
 String buildExpensesCsv(AppLocalizations l10n, List<Expense> expenses) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.expensesExpenseno,
       l10n.fieldsDate,
@@ -395,7 +282,7 @@ String buildOwnerCapitalCsv(
   AppLocalizations l10n,
   List<OwnerCapitalEntry> entries,
 ) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.equityCapitalno,
       l10n.fieldsDate,
@@ -426,7 +313,7 @@ String buildOwnerWithdrawalsCsv(
   AppLocalizations l10n,
   List<OwnerWithdrawal> rows,
 ) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.equityWithdrawalno,
       l10n.fieldsDate,
@@ -460,7 +347,7 @@ String buildOwnerWithdrawalsCsv(
 }
 
 String buildArAgingCsv(AppLocalizations l10n, ArAgingReport report) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.fieldsCustomer,
       l10n.fieldsCustomerCode,
@@ -486,7 +373,7 @@ String buildArAgingCsv(AppLocalizations l10n, ArAgingReport report) {
 }
 
 String buildApAgingCsv(AppLocalizations l10n, ApAgingReport report) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.fieldsSupplier,
       'Supplier Code',
@@ -575,7 +462,7 @@ String buildBalanceSheetCsv(AppLocalizations l10n, BalanceSheetReport report) {
 /// mirroring the web page's export (DSO days, period, total sales,
 /// total AR, avg invoice value).
 String buildDsoCsv(AppLocalizations l10n, DSOMetric metric) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [l10n.fieldsMetric, l10n.fieldsValue],
     [
       (l10n.reportsDsodays, Formatters.number(metric.dso)),
@@ -599,7 +486,7 @@ String buildDsoCsv(AppLocalizations l10n, DSOMetric metric) {
 /// Builds the CSV text for the cash flow report — a Metric | Value
 /// table (total inflow, total outflow, net cash flow).
 String buildCashFlowCsv(AppLocalizations l10n, CashFlowReport report) {
-  final summary = _buildGridCsv(
+  final summary = buildGridCsv(
     [l10n.fieldsMetric, l10n.fieldsValue],
     [
       (l10n.reportsTotalinflow, Formatters.currency(report.totalInflow)),
@@ -609,7 +496,7 @@ String buildCashFlowCsv(AppLocalizations l10n, CashFlowReport report) {
     (row) => [sanitizeCsvCell(row.$1), row.$2],
   );
   if (report.movements.isEmpty) return summary;
-  final movements = _buildGridCsv(
+  final movements = buildGridCsv(
     [
       l10n.commonDate,
       l10n.fieldsType,
@@ -669,7 +556,7 @@ String buildCashReconciliationCsv(
       '',
     ],
   ];
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.fieldsAccount,
       l10n.cashreconOpening,
@@ -688,7 +575,7 @@ String buildCashReconciliationCsv(
 /// Builds the CSV text for the profit & loss report — a Metric | Value
 /// table (revenue, COGS, gross profit, expenses, net profit, margins).
 String buildProfitLossCsv(AppLocalizations l10n, ProfitLossReport report) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [l10n.fieldsMetric, l10n.fieldsValue],
     [
       (l10n.reportsTotalrevenue, Formatters.currency(report.totalRevenue)),
@@ -713,7 +600,7 @@ String buildProfitLossCsv(AppLocalizations l10n, ProfitLossReport report) {
 /// Outstanding | Invoiced | Invoice Count — mirroring the grid's
 /// columns).
 String buildTopDebtorsCsv(AppLocalizations l10n, List<TopDebtorRow> rows) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.fieldsCustomer,
       l10n.fieldsCustomerCode,
@@ -739,7 +626,7 @@ String buildCustomerStatementsCsv(
   AppLocalizations l10n,
   List<CustomerStatementRow> rows,
 ) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.fieldsCustomer,
       l10n.fieldsCustomerCode,
@@ -766,7 +653,7 @@ String buildCustomerStatementsCsv(
 /// used by the customers bulk-export action (SHORTCOMINGS-FIX 4.4) and
 /// the full-list export.
 String buildCustomersCsv(AppLocalizations l10n, List<Customer> customers) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.customersCustomercode,
       l10n.customersCustomername,
@@ -802,7 +689,7 @@ String buildCustomersCsv(AppLocalizations l10n, List<Customer> customers) {
 /// Price | Status — mirroring the grid columns), used by the items bulk
 /// export action (spec D10).
 String buildItemsCsv(AppLocalizations l10n, List<Item> items) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.inventoryItemcode,
       l10n.inventoryItemname,
@@ -835,7 +722,7 @@ String buildItemsCsv(AppLocalizations l10n, List<Item> items) {
 /// Department | Designation | Employment Type | Phone | Email | Salary |
 /// Status — mirroring the grid's columns).
 String buildEmployeesCsv(AppLocalizations l10n, List<Employee> employees) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       'Code',
       l10n.employeesFullname,
@@ -865,7 +752,7 @@ String buildEmployeesCsv(AppLocalizations l10n, List<Employee> employees) {
 /// Builds the CSV text for the users grid (Username | Full Name | Email |
 /// Role | Status — mirroring the grid's columns).
 String buildUsersCsv(AppLocalizations l10n, List<User> users) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.usermanagementUsername,
       l10n.usermanagementFullname,
@@ -888,7 +775,7 @@ String buildUsersCsv(AppLocalizations l10n, List<User> users) {
 /// Permission Count | System Role | Status — mirroring the grid's
 /// columns).
 String buildRolesCsv(AppLocalizations l10n, List<Role> roles) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.usermanagementRolename,
       l10n.usermanagementDescription,
@@ -912,7 +799,7 @@ String buildRolesCsv(AppLocalizations l10n, List<Role> roles) {
 /// the grid's columns), used by the suppliers bulk export action
 /// (spec D10).
 String buildSuppliersCsv(AppLocalizations l10n, List<Supplier> suppliers) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.suppliersSuppliercode,
       l10n.suppliersSuppliername,
@@ -944,7 +831,7 @@ String buildSuppliersCsv(AppLocalizations l10n, List<Supplier> suppliers) {
 /// Builds the CSV text for the warehouses grid (Code | Name | Location |
 /// Total Items | Unique Items | Status — mirroring the grid's columns).
 String buildWarehousesCsv(AppLocalizations l10n, List<Warehouse> warehouses) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       'Code',
       'Name',
@@ -972,7 +859,7 @@ String buildPhysicalCountsCsv(
   AppLocalizations l10n,
   List<PhysicalCount> counts,
 ) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       'Count No',
       l10n.commonDate,
@@ -999,7 +886,7 @@ String buildPhysicalCountsCsv(
 /// Date | Party | Amount | Method | Status | Description — mirroring
 /// the grid's columns).
 String buildPaymentsCsv(AppLocalizations l10n, List<UnifiedPayment> payments) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.fieldsType,
       l10n.paymentsPaymentno,
@@ -1041,7 +928,7 @@ String buildStockMovementsCsv(
   AppLocalizations l10n,
   List<StockMovement> movements,
 ) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       'No',
       l10n.commonDate,
@@ -1073,7 +960,7 @@ String buildStockByWarehouseCsv(
   AppLocalizations l10n,
   List<StockBalance> balances,
 ) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.inventoryItemcode,
       l10n.inventoryItemname,
@@ -1099,7 +986,7 @@ String buildDemandForecastCsv(
   AppLocalizations l10n,
   List<ForecastDemand> forecasts,
 ) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.inventoryItemcode,
       l10n.inventoryItemname,
@@ -1129,7 +1016,7 @@ String buildDemandForecastCsv(
 }
 
 String buildInvoicesCsv(AppLocalizations l10n, List<Invoice> invoices) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.salesInvoiceno,
       l10n.fieldsDate,
@@ -1157,16 +1044,6 @@ String buildInvoicesCsv(AppLocalizations l10n, List<Invoice> invoices) {
     ],
   );
 }
-
-/// Parameterized grid-style CSV builder shared by every export: emits
-/// [headers] followed by one row per [items] entry, mapped by [rowFor].
-/// The per-record mapping keeps each builder's type-specific cell
-/// logic; the header-row + encode tail is shared here.
-String _buildGridCsv<T>(
-  List<String> headers,
-  List<T> items,
-  List<dynamic> Function(T) rowFor,
-) => Csv().encode([headers, for (final item in items) rowFor(item)]);
 
 /// Prompts for a save location via the platform file picker and writes
 /// [csv] to the chosen path. Shows a success toast on completion and an
@@ -1207,7 +1084,7 @@ String buildProductionsCsv(
   AppLocalizations l10n,
   List<Production> productions,
 ) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.productionNo,
       l10n.commonDate,
@@ -1241,7 +1118,7 @@ String buildProductionsCsv(
 /// | Status — mirroring the grid's columns; the Status column uses
 /// the same localized label as the grid's badge).
 String buildBomsCsv(AppLocalizations l10n, List<Bom> boms) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.bomNo,
       l10n.bomName,
@@ -1269,7 +1146,7 @@ String buildBomsCsv(AppLocalizations l10n, List<Bom> boms) {
 /// Builds the CSV text for the trial-balance grid (Account Code | Name
 /// | Type | Debit | Credit | Balance).
 String buildTrialBalanceCsv(AppLocalizations l10n, TrialBalanceReport report) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.reportsAccountcode,
       l10n.reportsAccountname,
@@ -1296,7 +1173,7 @@ String buildGeneralLedgerCsv(
   AppLocalizations l10n,
   List<GeneralLedgerRow> rows,
 ) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.reportsDate,
       l10n.reportsTransactiontype,
@@ -1325,7 +1202,7 @@ String buildBatchTraceabilityCsv(
   AppLocalizations l10n,
   BatchTraceabilityReport report,
 ) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       'Batch No',
       l10n.fieldsWarehouse,
@@ -1356,7 +1233,7 @@ String buildBatchTraceabilityCsv(
 
 /// Expiry report CSV — mirrors [ExpiryReportScreen]'s grid columns.
 String buildExpiryReportCsv(AppLocalizations l10n, List<ExpiryReportRow> rows) {
-  return _buildGridCsv(
+  return buildGridCsv(
     [
       l10n.inventoryItemcode,
       l10n.inventoryItemname,
@@ -1391,7 +1268,7 @@ String buildExpiryReportCsv(AppLocalizations l10n, List<ExpiryReportRow> rows) {
 
 /// Exports [loans] as a CSV for personal-loan row-action bulk export.
 String buildPersonalLoansCsv(AppLocalizations l10n, List<PersonalLoan> loans) =>
-    _buildGridCsv(
+    buildGridCsv(
       [
         'Loan No',
         l10n.equityPersonalLoanBorrower,
