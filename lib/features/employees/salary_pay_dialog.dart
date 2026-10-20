@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
 import '../../core/utils/formatters.dart';
+import '../../core/utils/idempotency_key.dart';
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
@@ -23,7 +24,6 @@ import 'employee_providers.dart';
 import 'employee_repository.dart' show employeeRepositoryProvider;
 import 'loan_models.dart' show EmployeeLoan;
 import 'loan_providers.dart';
-import 'loan_repository.dart' show loanRepositoryProvider;
 import 'package:minierp_app/core/theme/app_border_radius.dart';
 
 /// Opens the salary pay modal for one employee.
@@ -57,6 +57,7 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
   String _paymentType = 'full';
   late final TextEditingController _loanDeductionController;
   bool _submitting = false;
+  final _idemKeys = IdempotencyKeyCache(prefix: 'salary');
   String? _error;
 
   @override
@@ -97,7 +98,7 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
   String? _validateAmount(String? value) {
     final l10n = AppLocalizations.of(context)!;
     final amount = num.tryParse(value?.trim() ?? '');
-    if (amount == null || amount <= 0) {
+    if (amount == null || !amount.isFinite || amount <= 0) {
       return l10n.employeesInvalidamount;
     }
     return null;
@@ -111,6 +112,13 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
       'payment_date': isoDate(_paymentDate),
       'payment_method': _paymentMethod ?? 'bank',
       'payment_type': _paymentType,
+      if (_loanDeduction > 0) ...{
+        'loan_deduction': _loanDeduction,
+        'loan_id': ref
+            .read(employeeActiveLoansProvider(widget.employee.id))
+            .firstOrNull
+            ?.id,
+      },
       if (reference.isNotEmpty) 'reference_no': reference,
       if (notes.isNotEmpty) 'notes': notes,
     };
@@ -127,18 +135,18 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
       _submitting = true;
       _error = null;
     });
+    final body = _buildBody();
     final result = await ref
         .read(employeeRepositoryProvider)
-        .paySalary(widget.employee.id, _buildBody());
+        .paySalary(
+          widget.employee.id,
+          body,
+          idempotencyKey: _idemKeys.keyFor(body),
+        );
     if (!mounted) return;
 
     switch (result) {
       case ApiSuccess():
-        // If loan deduction > 0, create a loan repayment record.
-        if (_loanDeduction > 0) {
-          await _recordLoanDeduction();
-        }
-        if (!mounted) return;
         ref.invalidate(employeesProvider);
         ref.invalidate(employeeDetailProvider(widget.employee.id));
         ref.invalidate(employeeSalaryHistoryProvider(widget.employee.id));
@@ -151,30 +159,6 @@ class _SalaryPayDialogState extends ConsumerState<SalaryPayDialog> {
           _error = error.message;
         });
     }
-  }
-
-  /// Records a loan repayment for each active loan with the deduction amount.
-  Future<void> _recordLoanDeduction() async {
-    final deduction = _loanDeduction;
-    if (deduction <= 0) return;
-
-    final activeLoans = ref.read(
-      employeeActiveLoansProvider(widget.employee.id),
-    );
-    if (activeLoans.isEmpty) return;
-
-    // Apply deduction to the first active loan (sorted by due date)
-    final loan = activeLoans.first;
-    final repayAmount = deduction <= loan.balance ? deduction : loan.balance;
-
-    await ref
-        .read(loanRepositoryProvider)
-        .repayLoan(widget.employee.id, loan.id, {
-          'amount': repayAmount,
-          'payment_date': isoDate(_paymentDate),
-          'payment_method': _paymentMethod?.toLowerCase() ?? 'bank',
-          'notes': 'Loan deduction from salary payment',
-        });
   }
 
   @override
@@ -577,6 +561,17 @@ class _LoanDeductionSection extends StatelessWidget {
                 child: TextFormField(
                   controller: controller,
                   enabled: enabled,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    final amount = num.tryParse(value.trim());
+                    if (amount == null ||
+                        !amount.isFinite ||
+                        amount < 0 ||
+                        amount > loan.balance) {
+                      return l10n.employeesInvalidamount;
+                    }
+                    return null;
+                  },
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),

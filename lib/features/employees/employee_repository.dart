@@ -65,8 +65,7 @@ class EmployeeFilters {
     'page': page,
     'limit': limit,
     if (search != null && search!.isNotEmpty) 'search': search,
-    if (department != null && department!.isNotEmpty)
-      'department': department,
+    if (department != null && department!.isNotEmpty) 'department': department,
     if (status != null && status!.isNotEmpty) 'status': status,
     if (sortBy != null && sortBy!.isNotEmpty) 'sortBy': sortBy,
     if (sortOrder != null) 'sortOrder': sortOrder,
@@ -138,13 +137,11 @@ class EmployeeRepository {
 
   /// `POST /employees` — body keys per the controller's createEmployee
   /// DTO; the employee_code is server-generated (fetch [nextCode] first).
-  Future<ApiResult<Employee>> create(Map<String, dynamic> body) =>
-      _client.post(
-        ApiEndpoints.employees,
-        body: body,
-        parse: (Object? json) =>
-            Employee.fromJson(json! as Map<String, dynamic>),
-      );
+  Future<ApiResult<Employee>> create(Map<String, dynamic> body) => _client.post(
+    ApiEndpoints.employees,
+    body: body,
+    parse: (Object? json) => Employee.fromJson(json! as Map<String, dynamic>),
+  );
 
   Future<ApiResult<Employee>> update(int id, Map<String, dynamic> body) =>
       _client.put(
@@ -155,18 +152,21 @@ class EmployeeRepository {
       );
 
   /// `DELETE /employees/:id` — 204, no body.
-  Future<ApiResult<void>> delete(int id) => _client.deleteRaw(
-    '${ApiEndpoints.employees}/$id',
-  );
+  Future<ApiResult<void>> delete(int id) =>
+      _client.deleteRaw('${ApiEndpoints.employees}/$id');
 
   /// `POST /employees/:id/salary/pay` — body keys per paySalary; returns
   /// the created salary_payment id (and the GL journal id when posted).
   Future<ApiResult<Map<String, dynamic>>> paySalary(
     int id,
-    Map<String, dynamic> body,
-  ) => _client.post(
+    Map<String, dynamic> body, {
+    String? idempotencyKey,
+  }) => _client.post(
     '${ApiEndpoints.employees}/$id/salary/pay',
     body: body,
+    headers: idempotencyKey == null
+        ? null
+        : {'Idempotency-Key': idempotencyKey},
     parse: (Object? json) => json! as Map<String, dynamic>,
   );
 
@@ -190,9 +190,7 @@ class EmployeeRepository {
 
   /// `DELETE /employees/:id/salary/:paymentId` — voids GL entry + deletes record.
   Future<ApiResult<void>> deleteSalaryPayment(int id, int paymentId) =>
-      _client.deleteRaw(
-        '${ApiEndpoints.employees}/$id/salary/$paymentId',
-      );
+      _client.deleteRaw('${ApiEndpoints.employees}/$id/salary/$paymentId');
 
   /// `GET /employees/:id/documents` — newest-first by created_at.
   Future<ApiResult<List<EmployeeDocument>>> documents(int id) =>
@@ -234,17 +232,13 @@ class EmployeeRepository {
         'file': MultipartFile.fromBytes(
           fileBytes,
           filename: fileName,
-          contentType: DioMediaType.parse(
-            _mediaTypeFor(fileName),
-          ),
+          contentType: DioMediaType.parse(_mediaTypeFor(fileName)),
         )
       else if (fileName != null && filePath != null)
         'file': MultipartFile.fromFile(
           filePath,
           filename: fileName,
-          contentType: DioMediaType.parse(
-            _mediaTypeFor(fileName),
-          ),
+          contentType: DioMediaType.parse(_mediaTypeFor(fileName)),
         ),
     });
     return _client.postMultipart(
@@ -275,10 +269,10 @@ String _mediaTypeFor(String fileName) {
     'gif' => 'image/gif',
     'doc' => 'application/msword',
     'docx' =>
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'xls' => 'application/vnd.ms-excel',
     'xlsx' =>
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'txt' => 'text/plain',
     _ => 'application/octet-stream',
   };

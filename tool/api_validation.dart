@@ -155,11 +155,11 @@ Future<void> main() async {
     }
   } on DioException catch (e) {
     report.fail('login / server reachable', e.toString());
-    _finish(report);
+    await _finish(report);
     return;
   }
   if (token.isEmpty) {
-    _finish(report);
+    await _finish(report);
     return;
   }
 
@@ -503,7 +503,7 @@ Future<void> main() async {
     report.fail('generateInvoiceNo', invoiceNo);
   }
 
-  _finish(report);
+  await _finish(report);
 }
 
 Future<void> _finish(_Report report) async {
