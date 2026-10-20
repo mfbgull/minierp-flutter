@@ -10,6 +10,7 @@ import { PaymentRecordingService } from '../services/PaymentRecordingService';
 import { SupplierPaymentService } from '../services/SupplierPaymentService';
 import type { SupplierPaymentAllocation } from '../services/paymentRecordingTypes';
 import { assertLegacyPaymentAllowed, assertLegacyInvoiceAllocationsAllowed } from '../services/unappliedPaymentGuard';
+import { BusinessRuleError } from '../utils/businessRuleError';
 
 interface PaymentFilters {
   search?: string;
@@ -301,7 +302,18 @@ export class PaymentModel {
              COALESCE(e.vendor_name, e.expense_category) party, NULL party_id, NULL party_type,
              e.status, e.description,
              COALESCE(e.created_at, e.expense_date), NULL
-      FROM expenses e WHERE e.status NOT IN ('Draft', 'Cancelled')
+      FROM expenses e WHERE e.status NOT IN ('Draft', 'Cancelled') AND LOWER(COALESCE(e.payment_method, '')) <> 'credit'
+      UNION ALL
+      SELECT 'expense_payment', ep.id, e.expense_no || '/PAY-' || ep.id, ep.payment_date, ep.amount,
+             ${PaymentModel.unifiedMethodSql('ep.payment_method')}, 'expense',
+             COALESCE(NULLIF(e.vendor_name, ''), e.expense_category), NULL, NULL,
+             'posted', e.description, ep.created_at, NULL
+      FROM expense_payments ep JOIN expenses e ON e.id = ep.expense_id WHERE ep.voided_at IS NULL
+      UNION ALL
+      SELECT 'supplier_advance', a.id, 'ADV-' || a.id, a.prepay_date, a.amount,
+             ${PaymentModel.unifiedMethodSql('a.payment_method')}, 'supplier_advance',
+             s.supplier_name, a.supplier_id, 'supplier', 'posted', a.notes, a.created_at, NULL
+      FROM supplier_prepayments a JOIN suppliers s ON s.id = a.supplier_id WHERE a.voided_at IS NULL
       UNION ALL
       SELECT 'salary', sp.id, 'SAL-' || sp.id, sp.payment_date, ABS(sp.amount),
              ${PaymentModel.unifiedMethodSql('sp.payment_method')}, 'salary',
@@ -328,7 +340,7 @@ export class PaymentModel {
 
     const directionSql = `CASE WHEN type = 'customer' AND payment_kind = 'REFUND' THEN 'out' ELSE CASE type
         WHEN 'customer' THEN 'in' WHEN 'owner_capital' THEN 'in'
-        WHEN 'supplier' THEN 'out' WHEN 'expense' THEN 'out'
+        WHEN 'supplier' THEN 'out' WHEN 'supplier_advance' THEN 'out' WHEN 'expense' THEN 'out'
         WHEN 'salary' THEN 'out' WHEN 'owner_withdrawal' THEN 'out'
         ELSE 'unknown' END END`;
 
@@ -473,6 +485,21 @@ export class PaymentModel {
     const dateChanged = !!data.payment_date && data.payment_date !== existing.payment_date;
     const methodChanged = data.payment_method !== undefined &&
       data.payment_method.toLowerCase() !== String(existing.payment_method).toLowerCase();
+
+    if ((dateChanged || methodChanged) && db.prepare('SELECT id FROM supplier_prepayment_applications WHERE payment_id = ?').get(id)) {
+      throw new BusinessRuleError(409, 'Reverse and reapply supplier advances to change their application date or funding');
+    }
+    if (dateChanged || methodChanged) {
+      const bills = db.prepare(`SELECT b.bill_date FROM supplier_bill_allocations a
+        JOIN supplier_bills b ON b.id = a.bill_id
+        WHERE a.payment_id = ? AND a.voided_at IS NULL`).all(id) as Array<{ bill_date: string }>;
+      for (const bill of bills) {
+        if ((data.payment_date ?? existing.payment_date) < bill.bill_date) {
+          throw new BusinessRuleError(400, 'Payment cannot precede the supplier bill');
+        }
+        AccountingService.assertPeriodNotClosed(db, bill.bill_date, 'Supplier bill');
+      }
+    }
 
     // The payment already posted in its CURRENT period and, when the date
     // moves, will post in the TARGET period — both must be open before any
@@ -648,6 +675,7 @@ export class PaymentModel {
       db.prepare(
          'UPDATE po_allocations SET voided_at = CURRENT_TIMESTAMP WHERE payment_id = ? AND voided_at IS NULL'
       ).run(id);
+      db.prepare('UPDATE supplier_bill_allocations SET voided_at = CURRENT_TIMESTAMP WHERE payment_id = ? AND voided_at IS NULL').run(id);
       db.prepare(
         'UPDATE payments SET voided_at = CURRENT_TIMESTAMP, voided_by = ?, void_reason = ? WHERE id = ? AND voided_at IS NULL'
       ).run(attribution?.voidedBy ?? null, attribution?.voidReason ?? null, id);
