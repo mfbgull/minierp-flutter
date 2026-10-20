@@ -3,37 +3,11 @@ import AccountingService from '../services/accountingService';
 import { CASH_ACCOUNTS, getCashAccountTotals, collectFlows, normalizeCashMethod } from '../services/cashService';
 import { netRevenueSum, NET_REVENUE_STATUS, AR_OUTSTANDING, ACTIVE_EXPENSE_STATUS, cogsForPeriod } from '../utils/reportSql';
 import { SqlParam } from '../utils/sqlTypes';
+import { computeARAging } from './arAging';
+import { roundCurrency } from '../utils/currency';
 
 function getARAgingReport(asOfDate: string, db: Database.Database) {
-  const agingData = db.prepare(`
-    SELECT c.customer_name, c.customer_code, SUM(i.balance_amount) as total_outstanding,
-      SUM(CASE WHEN i.due_date IS NULL OR julianday(?) - julianday(i.due_date) <= 0 THEN i.balance_amount ELSE 0 END) as current_amount,
-      SUM(CASE WHEN julianday(?) - julianday(i.due_date) > 0 AND julianday(?) - julianday(i.due_date) <= 30 THEN i.balance_amount ELSE 0 END) as days_1_30,
-      SUM(CASE WHEN julianday(?) - julianday(i.due_date) > 30 AND julianday(?) - julianday(i.due_date) <= 60 THEN i.balance_amount ELSE 0 END) as days_31_60,
-      SUM(CASE WHEN julianday(?) - julianday(i.due_date) > 60 AND julianday(?) - julianday(i.due_date) <= 90 THEN i.balance_amount ELSE 0 END) as days_61_90,
-      SUM(CASE WHEN julianday(?) - julianday(i.due_date) > 90 THEN i.balance_amount ELSE 0 END) as days_over_90
-    FROM invoices i JOIN customers c ON i.customer_id = c.id
-    WHERE ${AR_OUTSTANDING('i')}
-    GROUP BY i.customer_id, c.customer_name, c.customer_code ORDER BY total_outstanding DESC
-  `).all(asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate);
-
-  // A NULL due_date yields NULL from julianday(), so every comparison is NULL
-  // and the row falls through to ELSE 0 — the balance appeared in the total and
-  // in no bucket, so the aging did not foot. Such a row is "not yet due" and
-  // belongs in current_amount. The rule is applied in BOTH queries above (the
-  // per-customer buckets and the grand summary) because both foot against a
-  // total that counts the undated row (audit ACCT-004).
-  const summary = db.prepare(`
-    SELECT SUM(balance_amount) as totalReceivables,
-      SUM(CASE WHEN due_date IS NULL OR julianday(?) - julianday(due_date) <= 0 THEN balance_amount ELSE 0 END) as current_amount,
-      SUM(CASE WHEN julianday(?) - julianday(due_date) > 0 AND julianday(?) - julianday(due_date) <= 30 THEN balance_amount ELSE 0 END) as total_1_30,
-      SUM(CASE WHEN julianday(?) - julianday(due_date) > 30 AND julianday(?) - julianday(due_date) <= 60 THEN balance_amount ELSE 0 END) as total_31_60,
-      SUM(CASE WHEN julianday(?) - julianday(due_date) > 60 AND julianday(?) - julianday(due_date) <= 90 THEN balance_amount ELSE 0 END) as total_61_90,
-      SUM(CASE WHEN julianday(?) - julianday(due_date) > 90 THEN balance_amount ELSE 0 END) as total_over_90
-    FROM invoices WHERE ${AR_OUTSTANDING()}
-  `).get(asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate, asOfDate);
-
-  return { asOfDate, agingBuckets: agingData, summary };
+  return computeARAging(asOfDate, db);
 }
 
 // Moved from reportsController
@@ -463,7 +437,13 @@ function getProfitLossReport(startDate: string, endDate: string, db: Database.Da
   // only a description), so the breakdown stays operational while the
   // authoritative total comes from the journal. glAuthority.test.ts fails
   // if the two ever diverge.
-  const expenses = db.prepare(`SELECT expense_category, SUM(amount) as total FROM expenses WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date BETWEEN ? AND ? GROUP BY expense_category ORDER BY total DESC`).all(startDate, endDate) as Array<{ expense_category: string; total: number }>;
+  const expenses = db.prepare(`SELECT expense_category, SUM(amount) AS total FROM (
+    SELECT expense_category, amount FROM expenses
+    WHERE ${ACTIVE_EXPENSE_STATUS()} AND expense_date BETWEEN ? AND ?
+    UNION ALL
+    SELECT 'Supplier bills', net_amount FROM supplier_bills
+    WHERE voided_at IS NULL AND bill_date BETWEEN ? AND ?
+  ) GROUP BY expense_category ORDER BY total DESC`).all(startDate, endDate, startDate, endDate) as Array<{ expense_category: string; total: number }>;
 
   const totalExpenses = round2(opexMovement.total_debit - opexMovement.total_credit);
   const grossProfit = revenue.total - cogs.total;
@@ -1012,7 +992,7 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
            COALESCE(NULLIF(e.vendor_name, ''), e.expense_category) as party,
            e.payment_method as method, e.description as description, e.amount
     FROM expenses e
-    WHERE ${ACTIVE_EXPENSE_STATUS('e')} AND e.expense_date BETWEEN ? AND ?
+    WHERE ${ACTIVE_EXPENSE_STATUS('e')} AND COALESCE(e.payment_method, '') <> 'Credit' AND e.expense_date BETWEEN ? AND ?
     ORDER BY e.expense_date DESC
   `).all(startDate, endDate) as Array<{ date: string; reference: string; party: string | null; method: string | null; description: string | null; amount: number }>;
   for (const r of expenseRows) {
@@ -1020,6 +1000,24 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
   }
 
   // Salary payments: money out.
+  const supplierAdvances = db.prepare(`
+    SELECT a.prepay_date AS date, 'ADV-' || a.id AS reference,
+      s.supplier_name AS party, a.payment_method AS method, a.notes AS description, a.amount
+    FROM supplier_prepayments a JOIN suppliers s ON s.id = a.supplier_id
+    WHERE a.voided_at IS NULL AND a.prepay_date BETWEEN ? AND ?
+  `).all(startDate, endDate) as Array<{ date: string; reference: string; party: string | null; method: string | null; description: string | null; amount: number }>;
+  for (const source of supplierAdvances) push({ ...source, type: 'supplier_advance', amount: -source.amount });
+
+  const expensePayments = db.prepare(`
+    SELECT p.payment_date AS date, e.expense_no AS reference,
+           COALESCE(NULLIF(e.vendor_name, ''), e.expense_category) AS party,
+           p.payment_method AS method, e.description, p.amount
+    FROM expense_payments p JOIN expenses e ON e.id = p.expense_id
+    WHERE p.voided_at IS NULL AND p.payment_date BETWEEN ? AND ?
+    ORDER BY p.payment_date DESC
+  `).all(startDate, endDate) as Array<{ date: string; reference: string; party: string | null; method: string | null; description: string | null; amount: number }>;
+  for (const payment of expensePayments) push({ ...payment, type: 'expense_payment', amount: -payment.amount });
+
   const salaryRows = db.prepare(`
     SELECT sp.payment_date as date, COALESCE(NULLIF(sp.reference_no, ''), sp.id) as reference,
            TRIM(COALESCE(e.first_name, '') || ' ' || COALESCE(e.last_name, '')) as party,
@@ -1100,14 +1098,11 @@ function getCashMovements(startDate: string, endDate: string, db: Database.Datab
 }
 
 function getTaxSummary(startDate: string, endDate: string, db: Database.Database) {
-  // report-query-integrity: sum the stored per-line tax_amount instead of
-  // re-deriving tax from `amount`, which is tax-INCLUSIVE on
-  // quotation-sourced lines (re-deriving taxed the tax).
-  return db.prepare(`
-    SELECT COALESCE(SUM(ii.tax_amount), 0) as total_tax
-    FROM invoice_items ii JOIN invoices i ON ii.invoice_id = i.id
-    WHERE i.invoice_date BETWEEN ? AND ? AND ${NET_REVENUE_STATUS('i')}
-  `).get(startDate, endDate) as { total_tax: number };
+  const output = AccountingService.getPeriodMovement(db, { accountCodes: ['2100'], startDate, endDate });
+  const input = AccountingService.getPeriodMovement(db, { accountCodes: ['1320'], startDate, endDate });
+  const totalTax = roundCurrency(output.total_credit - output.total_debit);
+  const inputTax = roundCurrency(input.total_debit - input.total_credit);
+  return { total_tax: totalTax, input_tax: inputTax, net_tax: roundCurrency(totalTax - inputTax) };
 }
 
 function getDailySales(startDate: string, endDate: string, db: Database.Database) {
