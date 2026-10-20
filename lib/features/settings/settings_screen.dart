@@ -839,7 +839,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ApiFailure(:final error) =>
         error.message.isEmpty ? l10n.settingsBackupFailed : error.message,
     });
-    if (result is ApiSuccess<String>) _loadBackups();
+    if (result is ApiSuccess<String>) await _loadBackups();
   }
 
   Future<void> _downloadBackup(BackupFile file) async {
@@ -901,7 +901,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ApiFailure(:final error) =>
         error.message.isEmpty ? l10n.settingsBackupDeleteFailed : error.message,
     });
-    if (result is ApiSuccess<void>) _loadBackups();
+    if (result is ApiSuccess<void>) await _loadBackups();
   }
 
   void _showSnack(String message) {

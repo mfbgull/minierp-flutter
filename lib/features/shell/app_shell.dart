@@ -281,7 +281,7 @@ class _UserMenu extends ConsumerWidget {
       ),
     );
     if (selected != null) {
-      ref.read(localeProvider.notifier).setLocale(selected);
+      await ref.read(localeProvider.notifier).setLocale(selected);
     }
   }
 
