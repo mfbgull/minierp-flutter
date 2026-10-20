@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../auth/session_events.dart';
 import '../auth/token_storage.dart';
 import 'endpoints.dart' show ApiEndpoints;
+import '../utils/recoverable_failure.dart';
 
 /// Shared HTTP client for the MiniERP backend — PORTING.md §0/§2.
 ///
@@ -54,7 +55,9 @@ class ApiClient {
           String? token;
           try {
             token = await tokenStorage.readToken();
-          } catch (_) {}
+          } catch (error) {
+            reportRecoverableFailure('api.read_token', error);
+          }
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -76,7 +79,8 @@ class ApiClient {
                 final retried = await dio.fetch(error.requestOptions);
                 handler.resolve(retried);
                 return;
-              } catch (_) {
+              } catch (error) {
+                reportRecoverableFailure('api.retry_after_refresh', error);
                 // Fall through: the retry also failed → expire the session.
               }
             }
@@ -89,7 +93,9 @@ class ApiClient {
               error.requestOptions.path != ApiEndpoints.refresh) {
             try {
               await tokenStorage.clear();
-            } catch (_) {}
+            } catch (error) {
+              reportRecoverableFailure('api.clear_tokens', error);
+            }
             // PORTING.md §2: 401 → clear session → login screen. The app
             // listens on [SessionEvents.unauthorized] and expires the
             // session (avoids a dioProvider → authProvider cycle).
@@ -116,7 +122,9 @@ class ApiClient {
     String? refreshToken;
     try {
       refreshToken = await tokenStorage.readRefreshToken();
-    } catch (_) {}
+    } catch (error) {
+      reportRecoverableFailure('api.read_refresh_token', error);
+    }
     if (refreshToken == null || refreshToken.isEmpty) return false;
     try {
       final response = await dio.post(
@@ -132,12 +140,16 @@ class ApiClient {
         if (token != null && token.isNotEmpty) {
           try {
             await tokenStorage.writeToken(token);
-          } catch (_) {}
+          } catch (error) {
+            reportRecoverableFailure('api.save_refreshed_token', error);
+            return false;
+          }
           return true;
         }
       }
       return false;
-    } catch (_) {
+    } catch (error) {
+      reportRecoverableFailure('api.refresh_session', error);
       return false;
     }
   }
