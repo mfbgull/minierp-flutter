@@ -226,7 +226,10 @@ function paySalary(req: Request, res: Response): void {
       return;
     }
 
-    const { amount, payment_date, payment_method, reference_no, notes, payment_type } = req.body;
+    const { amount, payment_date, payment_method, reference_no, notes, payment_type, loan_deduction, loan_id } = req.body;
+    if (loan_deduction !== undefined && (typeof loan_deduction !== 'number' || !Number.isFinite(loan_deduction) || loan_deduction < 0)) {
+      throw new BusinessRuleError(400, 'Loan deduction must be a non-negative finite amount');
+    }
     if (typeof amount !== 'number' || !Number.isFinite(amount) || roundCurrency(amount) <= 0) {
       res.status(422).json({ success: false, error: 'Valid amount is required' });
       return;
@@ -360,6 +363,33 @@ function paySalary(req: Request, res: Response): void {
           db.prepare('UPDATE salary_payments SET journal_entry_id = ? WHERE id = ?')
             .run(advanceEntry.journal_entry_id, advanceCreated);
         }
+      }
+
+      const deduction = roundCurrency(loan_deduction ?? 0);
+      if (deduction > 0) {
+        if (!Number.isSafeInteger(loan_id) || loan_id <= 0) {
+          throw new BusinessRuleError(400, 'Loan deduction requires a valid loan');
+        }
+        const loan = EmployeeLoanModel.getById(loan_id, db);
+        if (!loan || loan.employee_id !== employeeId || loan.voided_at || !['active', 'overdue'].includes(loan.status)) {
+          throw new BusinessRuleError(400, 'Loan deduction requires an active loan for this employee');
+        }
+        if (payment_date < loan.disbursement_date || deduction > loan.balance || deduction > salaryAmount) {
+          throw new BusinessRuleError(400, 'Loan deduction exceeds the loan or salary balance, or precedes disbursement');
+        }
+        const repaymentId = EmployeeLoanModel.addRepayment({
+          loan_id: loan.id, employee_id: employeeId, amount: deduction,
+          payment_date, payment_method: method, repayment_type: 'salary_deduction',
+          salary_payment_id: paymentId, created_by: authReq.user?.id,
+          notes: 'Loan deduction from salary payment',
+        }, db);
+        EmployeeLoanModel.deductBalance(loan.id, deduction, db);
+        const repaymentEntry = AccountingService.postLoanRepayment(db, {
+          repaymentId, loanId: loan.id, employeeName: `${employee.first_name} ${employee.last_name}`,
+          employeeCode: employee.employee_code, amount: deduction, paymentDate: payment_date,
+          paymentMethod: method, userId: authReq.user?.id,
+        });
+        if (repaymentEntry) EmployeeLoanModel.updateRepaymentJournal(repaymentId, repaymentEntry.journal_entry_id, db);
       }
 
       logCRUD(ActionType.EMPLOYEE_UPDATE, 'Employee', employeeId,
