@@ -31,6 +31,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart' show dioProvider;
 import '../../core/cache/cache_manager.dart' show CacheManager;
 import '../../core/utils/error_mapper.dart' show mapError;
+import '../../core/utils/recoverable_failure.dart';
 import 'api_result.dart';
 import 'paged_request.dart';
 
@@ -482,7 +483,8 @@ class RepositoryClient {
             // Corrupt entry — fall through to the real failure.
           }
         }
-      } catch (_) {
+      } catch (error) {
+        reportRecoverableFailure('cache.read_offline_response', error);
         // Storage plugin unavailable — treat as a cache miss.
       }
     }
@@ -513,7 +515,8 @@ class RepositoryClient {
       if (slash > 0) {
         await cache.invalidate(path.substring(0, slash));
       }
-    } catch (_) {
+    } catch (error) {
+      reportRecoverableFailure('cache.invalidate_response', error);
       // Storage plugin unavailable — nothing to invalidate.
     }
     if (servingCached.value) servingCached.value = false;
