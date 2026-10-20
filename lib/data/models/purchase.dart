@@ -28,6 +28,7 @@ class Purchase {
     required this.quantity,
     this.unitCost = 0,
     this.totalCost = 0,
+    this.inputTaxAmount = 0,
     this.paidAmount = 0,
     this.balanceAmount = 0,
     this.supplierId,
@@ -53,6 +54,7 @@ class Purchase {
     quantity: asNum(json['quantity']) ?? 0,
     unitCost: asNum(json['unit_cost']) ?? 0,
     totalCost: asNum(json['total_cost']) ?? 0,
+    inputTaxAmount: asNum(json['input_tax_amount']) ?? 0,
     paidAmount: asNum(json['paid_amount']) ?? 0,
     balanceAmount: asNum(json['balance_amount']) ?? 0,
     supplierId: asInt(json['supplier_id']),
@@ -77,6 +79,8 @@ class Purchase {
   final num quantity;
   final num unitCost;
   final num totalCost;
+  final num inputTaxAmount;
+  num get totalPayable => totalCost + inputTaxAmount;
   final num paidAmount;
   final num balanceAmount;
   final int? supplierId;
