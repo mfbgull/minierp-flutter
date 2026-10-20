@@ -13,6 +13,7 @@
 // providers so the detail dialog beneath it refetches.
 
 import 'package:flutter/material.dart';
+import '../../core/utils/idempotency_key.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_utils.dart' show isoDate;
@@ -74,6 +75,7 @@ class ReceiveGoodsDialog extends ConsumerStatefulWidget {
 
 class _ReceiveGoodsDialogState extends ConsumerState<ReceiveGoodsDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _idemKeys = IdempotencyKeyCache(prefix: 'po-receipt');
   final List<_ReceiveLine> _lines = [];
 
   int? _warehouseId;
@@ -142,20 +144,25 @@ class _ReceiveGoodsDialogState extends ConsumerState<ReceiveGoodsDialog> {
     });
 
     final remarks = _remarksController?.text.trim() ?? '';
+    final body = {
+      'receipt_date': isoDate(_receiptDate),
+      'warehouse_id': _warehouseId,
+      if (remarks.isNotEmpty) 'remarks': remarks,
+      'items': [
+        for (final line in _filledLines)
+          {
+            'po_item_id': line.item.id,
+            'received_quantity': line.receivedQuantity,
+          },
+      ],
+    };
     final result = await ref
         .read(purchaseOrderRepositoryProvider)
-        .createReceipt(widget.detail.id, {
-          'receipt_date': isoDate(_receiptDate),
-          'warehouse_id': _warehouseId,
-          if (remarks.isNotEmpty) 'remarks': remarks,
-          'items': [
-            for (final line in _filledLines)
-              {
-                'po_item_id': line.item.id,
-                'received_quantity': line.receivedQuantity,
-              },
-          ],
-        });
+        .createReceipt(
+          widget.detail.id,
+          body,
+          idempotencyKey: _idemKeys.keyFor(body),
+        );
     if (!mounted) return;
 
     switch (result) {
@@ -188,137 +195,137 @@ class _ReceiveGoodsDialogState extends ConsumerState<ReceiveGoodsDialog> {
       maxWidth: 620,
       maxHeight: 680,
       child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Text(
-                  l10n.purchaseordersReceivegoods,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text(
+                l10n.purchaseordersReceivegoods,
+                style: Theme.of(context).textTheme.titleLarge,
               ),
-              const Divider(height: 1),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: FormFieldShell(
-                              label: l10n.fieldsWarehouse,
-                              required: true,
-                              child: SearchableSelect<int>(
-                                items: warehouseIds,
-                                selected: _warehouseId,
-                                labelBuilder: (id) {
-                                  final match = warehouses.where(
-                                    (w) => w.id == id,
-                                  );
-                                  final warehouse = match.isEmpty
-                                      ? null
-                                      : match.first;
-                                  return warehouse == null
-                                      ? '$id'
-                                      : '${warehouse.warehouseCode} — '
-                                            '${warehouse.warehouseName ?? ''}';
-                                },
-                                onChanged: (value) =>
-                                    setState(() => _warehouseId = value),
-                              ),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: FormFieldShell(
+                            label: l10n.fieldsWarehouse,
+                            required: true,
+                            child: SearchableSelect<int>(
+                              items: warehouseIds,
+                              selected: _warehouseId,
+                              labelBuilder: (id) {
+                                final match = warehouses.where(
+                                  (w) => w.id == id,
+                                );
+                                final warehouse = match.isEmpty
+                                    ? null
+                                    : match.first;
+                                return warehouse == null
+                                    ? '$id'
+                                    : '${warehouse.warehouseCode} — '
+                                          '${warehouse.warehouseName ?? ''}';
+                              },
+                              onChanged: (value) =>
+                                  setState(() => _warehouseId = value),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: FormFieldShell(
-                              label: l10n.purchaseordersReceiptdate,
-                              required: true,
-                              child: SizedBox(
-                                height: 44,
-                                child: OutlinedButton.icon(
-                                  onPressed: _saving ? null : _pickDate,
-                                  icon: const Icon(
-                                    Icons.calendar_today_outlined,
-                                    size: 16,
-                                  ),
-                                  label: Text(
-                                    Formatters.date(isoDate(_receiptDate)),
-                                  ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FormFieldShell(
+                            label: l10n.purchaseordersReceiptdate,
+                            required: true,
+                            child: SizedBox(
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                onPressed: _saving ? null : _pickDate,
+                                icon: const Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  Formatters.date(isoDate(_receiptDate)),
                                 ),
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      FormFieldShell(
-                        label: l10n.fieldsNotes,
-                        child: TextFormField(
-                          controller: _remarksController,
-                          enabled: !_saving,
-                          minLines: 2,
-                          maxLines: 3,
-                          decoration: _decoration(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        l10n.purchasesItemscard,
-                        style: Theme.of(context).textTheme.labelLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      for (var i = 0; i < _lines.length; i++) ...[
-                        _lineRow(l10n, i),
-                        if (i < _lines.length - 1) const SizedBox(height: 8),
-                      ],
-                      if (_error != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    FormFieldShell(
+                      label: l10n.fieldsNotes,
+                      child: TextFormField(
+                        controller: _remarksController,
+                        enabled: !_saving,
+                        minLines: 2,
+                        maxLines: 3,
+                        decoration: _decoration(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n.purchasesItemscard,
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    for (var i = 0; i < _lines.length; i++) ...[
+                      _lineRow(l10n, i),
+                      if (i < _lines.length - 1) const SizedBox(height: 8),
                     ],
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: _saving
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      child: Text(l10n.commonCancel),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: _saving ? null : _save,
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.inventory_2_outlined, size: 18),
-                      label: Text(l10n.purchaseordersReceivegoods),
-                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _saving
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: Text(l10n.commonCancel),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.inventory_2_outlined, size: 18),
+                    label: Text(l10n.purchaseordersReceivegoods),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
