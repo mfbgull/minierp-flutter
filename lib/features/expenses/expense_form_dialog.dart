@@ -262,260 +262,260 @@ class _ExpenseFormDialogState extends ConsumerState<ExpenseFormDialog> {
       maxWidth: 560,
       maxHeight: 680,
       child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _isEdit ? l10n.expensesEdit : l10n.expensesNewexpense,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isEdit ? l10n.expensesEdit : l10n.expensesNewexpense,
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    IconButton(
-                      tooltip: l10n.commonClose,
-                      icon: const Icon(Icons.close),
-                      onPressed: _submitting
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: FormFieldShell(
-                              label: l10n.fieldsCategory,
-                              required: true,
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: SearchableSelect<String>(
-                                      items: categoryItems,
-                                      selected: _category,
-                                      labelBuilder: (v) => v,
-                                      onChanged: (v) =>
-                                          setState(() => _category = v),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  // Quick-add: opens the category dialog,
-                                  // then selects the created category.
-                                  IconButton(
-                                    tooltip: l10n.expensesAddcategory,
-                                    onPressed: _submitting
-                                        ? null
-                                        : _addCategory,
-                                    icon: const Icon(
-                                      Icons.add_circle_outline,
-                                      size: 20,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: FormFieldShell(
-                              label: l10n.expensesExpensedate,
-                              required: true,
-                              child: SizedBox(
-                                height: 44,
-                                child: OutlinedButton.icon(
-                                  onPressed: _submitting ? null : _pickDate,
-                                  icon: const Icon(
-                                    Icons.calendar_today_outlined,
-                                    size: 16,
-                                  ),
-                                  label: Text(
-                                    Formatters.date(isoDate(_expenseDate)),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      FormFieldShell(
-                        label: l10n.fieldsAmount,
-                        required: true,
-                        child: TextFormField(
-                          controller: _amountController,
-                          onFieldSubmitted: submitOnEnter(_submit),
-                          enabled: !_submitting,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: _decoration(),
-                          validator: _validateAmount,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: FormFieldShell(
-                              label: l10n.expensesPaymentmethod,
-                              child: SearchableSelect<String?>(
-                                items: [null, ...paymentItems],
-                                selected: _paymentMethod,
-                                labelBuilder: (v) => v ?? l10n.commonNone,
-                                onChanged: (v) =>
-                                    setState(() => _paymentMethod = v),
-                              ),
-                            ),
-                          ),
-                          // EXP-03 (task 5.5): the server defaults new
-                          // expenses to Draft and ignores client status —
-                          // only show transitions when editing.
-                          if (_isEdit) ...[
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FormFieldShell(
-                                label: l10n.fieldsStatus,
-                                required: true,
-                                child: SearchableSelect<String>(
-                                  items: statusItems,
-                                  selected: _status,
-                                  labelBuilder: (v) => v,
-                                  onChanged: (v) => setState(() => _status = v),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: FormFieldShell(
-                              label: l10n.expensesVendor,
-                              child: TextFormField(
-                                controller: _vendorController,
-                                onFieldSubmitted: submitOnEnter(_submit),
-                                enabled: !_submitting,
-                                decoration: _decoration(),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: FormFieldShell(
-                              label: l10n.expensesReferenceno,
-                              child: TextFormField(
-                                controller: _referenceNoController,
-                                onFieldSubmitted: submitOnEnter(_submit),
-                                enabled: !_submitting,
-                                decoration: _decoration(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      FormFieldShell(
-                        label: l10n.expensesProject,
-                        child: TextFormField(
-                          controller: _projectController,
-                          onFieldSubmitted: submitOnEnter(_submit),
-                          enabled: !_submitting,
-                          decoration: _decoration(),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      FormFieldShell(
-                        label: l10n.expensesDescription,
-                        child: TextFormField(
-                          controller: _descriptionController,
-                          enabled: !_submitting,
-                          minLines: 2,
-                          maxLines: 4,
-                          decoration: _decoration(),
-                        ),
-                      ),
-                    ],
                   ),
-                ),
+                  IconButton(
+                    tooltip: l10n.commonClose,
+                    icon: const Icon(Icons.close),
+                    onPressed: _submitting
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                  ),
+                ],
               ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (_error != null) ...[
-                      ErrorBanner(
-                        message: _error!,
-                        actionLabel: _error!.contains('Insufficient funds')
-                            ? l10n.dashboardOpeningbalance
-                            : null,
-                        onAction: _error!.contains('Insufficient funds')
-                            ? () => showCashOpeningBalanceDialog(context, ref)
-                            : null,
-                      ),
-                      const SizedBox(height: 8),
-                    ],
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_isEdit)
-                          TextButton.icon(
-                            onPressed: _submitting ? null : _delete,
-                            style: TextButton.styleFrom(
-                              foregroundColor: Theme.of(
-                                context,
-                              ).colorScheme.error,
-                            ),
-                            icon: const Icon(Icons.delete_outline, size: 18),
-                            label: Text(l10n.commonDelete),
-                          ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: _submitting
-                              ? null
-                              : () => Navigator.of(context).pop(),
-                          child: Text(l10n.commonCancel),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: _submitting ? null : _submit,
-                          child: _submitting
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                        Expanded(
+                          flex: 3,
+                          child: FormFieldShell(
+                            label: l10n.fieldsCategory,
+                            required: true,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: SearchableSelect<String>(
+                                    items: categoryItems,
+                                    selected: _category,
+                                    labelBuilder: (v) => v,
+                                    onChanged: (v) =>
+                                        setState(() => _category = v),
                                   ),
-                                )
-                              : Text(l10n.commonSave),
+                                ),
+                                const SizedBox(width: 4),
+                                // Quick-add: opens the category dialog,
+                                // then selects the created category.
+                                IconButton(
+                                  tooltip: l10n.expensesAddcategory,
+                                  onPressed: _submitting ? null : _addCategory,
+                                  icon: const Icon(
+                                    Icons.add_circle_outline,
+                                    size: 20,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: FormFieldShell(
+                            label: l10n.expensesExpensedate,
+                            required: true,
+                            child: SizedBox(
+                              height: 44,
+                              child: OutlinedButton.icon(
+                                onPressed: _submitting ? null : _pickDate,
+                                icon: const Icon(
+                                  Icons.calendar_today_outlined,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  Formatters.date(isoDate(_expenseDate)),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 10),
+                    FormFieldShell(
+                      label: l10n.fieldsAmount,
+                      required: true,
+                      child: TextFormField(
+                        controller: _amountController,
+                        onFieldSubmitted: submitOnEnter(_submit),
+                        enabled: !_submitting,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: _decoration(),
+                        validator: _validateAmount,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: FormFieldShell(
+                            label: l10n.expensesPaymentmethod,
+                            child: SearchableSelect<String?>(
+                              items: [null, ...paymentItems],
+                              selected: _paymentMethod,
+                              labelBuilder: (v) => v == 'Credit'
+                                  ? l10n.expenseCreditMethod
+                                  : v ?? l10n.commonNone,
+                              onChanged: (v) =>
+                                  setState(() => _paymentMethod = v),
+                            ),
+                          ),
+                        ),
+                        // EXP-03 (task 5.5): the server defaults new
+                        // expenses to Draft and ignores client status —
+                        // only show transitions when editing.
+                        if (_isEdit) ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FormFieldShell(
+                              label: l10n.fieldsStatus,
+                              required: true,
+                              child: SearchableSelect<String>(
+                                items: statusItems,
+                                selected: _status,
+                                labelBuilder: (v) => v,
+                                onChanged: (v) => setState(() => _status = v),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: FormFieldShell(
+                            label: l10n.expensesVendor,
+                            child: TextFormField(
+                              controller: _vendorController,
+                              onFieldSubmitted: submitOnEnter(_submit),
+                              enabled: !_submitting,
+                              decoration: _decoration(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FormFieldShell(
+                            label: l10n.expensesReferenceno,
+                            child: TextFormField(
+                              controller: _referenceNoController,
+                              onFieldSubmitted: submitOnEnter(_submit),
+                              enabled: !_submitting,
+                              decoration: _decoration(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    FormFieldShell(
+                      label: l10n.expensesProject,
+                      child: TextFormField(
+                        controller: _projectController,
+                        onFieldSubmitted: submitOnEnter(_submit),
+                        enabled: !_submitting,
+                        decoration: _decoration(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    FormFieldShell(
+                      label: l10n.expensesDescription,
+                      child: TextFormField(
+                        controller: _descriptionController,
+                        enabled: !_submitting,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: _decoration(),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_error != null) ...[
+                    ErrorBanner(
+                      message: _error!,
+                      actionLabel: _error!.contains('Insufficient funds')
+                          ? l10n.dashboardOpeningbalance
+                          : null,
+                      onAction: _error!.contains('Insufficient funds')
+                          ? () => showCashOpeningBalanceDialog(context, ref)
+                          : null,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Row(
+                    children: [
+                      if (_isEdit)
+                        TextButton.icon(
+                          onPressed: _submitting ? null : _delete,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.error,
+                          ),
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: Text(l10n.commonDelete),
+                        ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: _submitting
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        child: Text(l10n.commonCancel),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: _submitting ? null : _submit,
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(l10n.commonSave),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

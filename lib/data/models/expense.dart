@@ -23,6 +23,8 @@ class Expense {
     this.createdAt,
     this.updatedAt,
     this.createdByName,
+    this.paidAmount = 0,
+    this.payments = const [],
   });
 
   factory Expense.fromJson(Map<String, dynamic> json) => Expense(
@@ -40,6 +42,12 @@ class Expense {
     createdAt: asString(json['created_at']),
     updatedAt: asString(json['updated_at']),
     createdByName: asString(json['created_by_name']),
+    paidAmount: asNum(json['paid_amount']) ?? 0,
+    payments: [
+      for (final payment
+          in json['payments'] is List ? json['payments'] as List : const [])
+        if (payment is Map<String, dynamic>) ExpensePayment.fromJson(payment),
+    ],
   );
 
   final int id;
@@ -62,6 +70,9 @@ class Expense {
   final String? createdAt;
   final String? updatedAt;
   final String? createdByName;
+  final num paidAmount;
+  final List<ExpensePayment> payments;
+  num get outstandingAmount => amount - paidAmount;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -79,6 +90,30 @@ class Expense {
     if (updatedAt != null) 'updated_at': updatedAt,
     if (createdByName != null) 'created_by_name': createdByName,
   };
+}
+
+class ExpensePayment {
+  const ExpensePayment({
+    required this.id,
+    required this.amount,
+    required this.paymentDate,
+    required this.paymentMethod,
+    this.voidedAt,
+  });
+
+  factory ExpensePayment.fromJson(Map<String, dynamic> json) => ExpensePayment(
+    id: asInt(json['id']) ?? 0,
+    amount: asNum(json['amount']) ?? 0,
+    paymentDate: asString(json['payment_date']) ?? '',
+    paymentMethod: asString(json['payment_method']) ?? '',
+    voidedAt: asString(json['voided_at']),
+  );
+
+  final int id;
+  final num amount;
+  final String paymentDate;
+  final String paymentMethod;
+  final String? voidedAt;
 }
 
 /// One row of `GET /expenses/categories` — the predefined categories
