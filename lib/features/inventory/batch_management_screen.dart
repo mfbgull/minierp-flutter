@@ -139,7 +139,7 @@ class _BatchManagementScreenState
     switch (result) {
       case ApiSuccess():
         showAppToast(context, l10n.commonSaved);
-        _load();
+        await _load();
       case ApiFailure(:final error):
         showAppToast(context, error.message, isError: true);
     }
@@ -183,7 +183,7 @@ class _BatchManagementScreenState
     switch (result) {
       case ApiSuccess():
         showAppToast(context, l10n.statusHalted);
-        _load();
+        await _load();
       case ApiFailure(:final error):
         showAppToast(context, error.message, isError: true);
     }
@@ -198,7 +198,7 @@ class _BatchManagementScreenState
     switch (result) {
       case ApiSuccess():
         showAppToast(context, l10n.statusNormal);
-        _load();
+        await _load();
       case ApiFailure(:final error):
         showAppToast(context, error.message, isError: true);
     }
