@@ -17,6 +17,7 @@ String unifiedPaymentLabel(AppLocalizations l10n, UnifiedPayment payment) =>
 String unifiedTypeLabel(AppLocalizations l10n, String type) => switch (type) {
   'customer' => l10n.paymentsTypeCustomer,
   'supplier' => l10n.paymentsTypeSupplier,
+  'supplier_advance' => l10n.supplierAdvances,
   'expense' => l10n.paymentsTypeExpense,
   'salary' => l10n.paymentsTypeSalary,
   'owner_capital' => l10n.paymentsTypeOwnerCapital,
