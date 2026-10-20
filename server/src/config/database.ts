@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
+import { passwordPolicyError } from '../utils/passwordPolicy';
 import logger from '../utils/logger';
 import { getNextSequenceNumber } from '../utils/sequence';
 import { backfillPurchaseReturns } from '../utils/purchaseReturnBackfill';
@@ -363,17 +364,16 @@ function createDefaultUser(): void {
   const existingUser = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
 
   if (!existingUser) {
-    let defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD;
-    if (!defaultPassword && process.env.NODE_ENV !== 'production') {
-      // Development: no env var set, fall back to well-known dev credential
-      logger.warn('⚠ WARNING: DEFAULT_ADMIN_PASSWORD not set. Using default development fallback (admin123). DO NOT USE IN PRODUCTION.');
-      // dev-only, gated by the NODE_ENV check above; production throws instead (docs/README.md, PORTING.md) — mimosa-ignore
-      defaultPassword = 'admin123';
-    }
+    const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD;
     if (!defaultPassword) {
       // Nothing to seed — release any awaiter so it doesn't hang forever.
       seedAdminUserResolve?.();
       throw new Error('FATAL: DEFAULT_ADMIN_PASSWORD environment variable must be set');
+    }
+    const passwordError = passwordPolicyError(defaultPassword);
+    if (passwordError) {
+      seedAdminUserResolve?.();
+      throw new Error(`FATAL: DEFAULT_ADMIN_PASSWORD: ${passwordError}`);
     }
     seedInFlight = true;
     // Fire-and-forget: the boot sequence below is synchronous; [dbSeedReady]
@@ -2013,6 +2013,11 @@ export function applyPendingMigrations(): void {
   runLedgered('109_unapplied_operation_replay.sql');
   runLedgered('110_unapplied_currency_precision.sql');
   runLedgered('111_unapplied_receipt_replay.sql');
+  runLedgered('112_expense_payables.sql');
+  runLedgered('113_supplier_bills.sql');
+  runLedgered('114_supplier_prepayments.sql');
+  runLedgered('115_purchase_input_tax.sql');
+  runLedgered('116_purchase_order_input_tax.sql');
   // Boot-time guard (spec §4.1): the restocking-fee posting resolves 4150 at
   // return time — a legacy COA predating GL foundation must fail the boot
   // with a clear error, never mis-post.
