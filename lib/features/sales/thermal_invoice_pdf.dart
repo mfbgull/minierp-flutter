@@ -13,6 +13,7 @@
 // an arabic-shaping font and is out of scope.
 
 import 'dart:typed_data';
+import '../../core/utils/recoverable_failure.dart';
 
 import 'package:flutter/painting.dart' show Color;
 import 'package:pdf/pdf.dart';
@@ -296,7 +297,8 @@ Future<pw.MemoryImage?> _generateQrImage(String data) async {
     if (byteData == null) return null;
 
     return pw.MemoryImage(byteData.buffer.asUint8List());
-  } catch (_) {
+  } catch (error) {
+    reportRecoverableFailure('invoice.render_receipt_qr', error);
     return null;
   }
 }

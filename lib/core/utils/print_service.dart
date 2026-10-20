@@ -20,6 +20,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/models/invoice.dart'
     show CompanyInfo, Invoice, InvoicePaymentRecord;
 import 'formatters.dart';
+import 'recoverable_failure.dart';
 import '../../data/models/payment.dart' show Payment;
 import '../../features/customers/thermal_payment_receipt_pdf.dart'
     show buildThermalPaymentReceiptPdf, PaymentAllocation;
@@ -65,7 +66,8 @@ abstract class PrintFormatMemory {
         if (format.name == raw) return format;
       }
       return null;
-    } catch (_) {
+    } catch (error) {
+      reportRecoverableFailure('print.read_preference', error);
       return null;
     }
   }
@@ -74,7 +76,8 @@ abstract class PrintFormatMemory {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_key, format.name);
-    } catch (_) {
+    } catch (error) {
+      reportRecoverableFailure('print.save_preference', error);
       // Storage unavailable — in-session behavior is unaffected.
     }
   }
@@ -84,7 +87,9 @@ abstract class PrintFormatMemory {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_key);
-    } catch (_) {}
+    } catch (error) {
+      reportRecoverableFailure('print.clear_preference', error);
+    }
   }
 }
 
