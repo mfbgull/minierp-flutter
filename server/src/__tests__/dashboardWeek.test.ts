@@ -31,6 +31,12 @@ beforeEach(() => {
       status       TEXT,
       amount       REAL DEFAULT 0
     );
+    CREATE TABLE supplier_bills (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      net_amount REAL NOT NULL DEFAULT 0,
+      voided_at  TEXT,
+      bill_date  TEXT NOT NULL
+    );
   `);
 });
 
@@ -70,6 +76,12 @@ function seedExpense(date: string, amount: number): void {
   ).run(`EXP-${Date.now()}-${Math.floor(Math.random() * 1e6)}`, date, amount);
 }
 
+function seedSupplierBill(date: string, amount: number, voidedAt: string | null = null): void {
+  db.prepare(
+    `INSERT INTO supplier_bills (net_amount, voided_at, bill_date) VALUES (?, ?, ?)`,
+  ).run(amount, voidedAt, date);
+}
+
 describe('week-aware period=week dashboard summaries', () => {
   for (const weekStart of ['monday', 'saturday', 'sunday'] as WeekStart[]) {
     it(`sales summary bounds the ${weekStart}-first calendar week`, () => {
@@ -92,9 +104,14 @@ describe('week-aware period=week dashboard summaries', () => {
 
     seedExpense(from, 50);
     seedExpense(addDaysISO(from, -1), 70);
+    seedSupplierBill(from, 80);
+    seedSupplierBill(addDaysISO(from, 1), 90, '2026-01-01 00:00:00');
+    seedSupplierBill(addDaysISO(from, -1), 60);
 
     const result = DashboardModel.getExpenseSummary(db, 'week', 1);
-    expect(result).toEqual({ period_total: 50, count: 1 });
+    // In-week: expense 50 + non-voided bill 80. The voided in-week bill and
+    // the pre-week bill are excluded.
+    expect(result).toEqual({ period_total: 130, count: 2 });
   });
 
   it('falls back to the rolling 7-day window when no user id is given', () => {
