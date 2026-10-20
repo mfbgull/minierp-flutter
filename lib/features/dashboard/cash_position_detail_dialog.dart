@@ -157,7 +157,9 @@ class _CashPositionDetailDialog extends StatelessWidget {
     final label = switch (t.type) {
       'payment_received' => l10n.cashposPaymentreceived,
       'supplier_payment' => l10n.cashposSupplierpayment,
+      'supplier_advance' => l10n.supplierAdvances,
       'expense' => l10n.cashposExpense,
+      'expense_payment' => l10n.expensePayments,
       'salary' => l10n.cashposSalary,
       'refund' => l10n.cashposRefund,
       'purchase' => l10n.cashposPurchase,
