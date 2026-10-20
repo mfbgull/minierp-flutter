@@ -38,9 +38,9 @@
  *      → orphanSourceBatches
  *
  * G needs no second subledger term the way F did: `suppliers` has no
- * `credit_balance` column and supplier prepayments are DESIGN-ONLY
- * (docs/supplier-prepayments-design.md), so `current_balance` is the whole
- * supplier position. Note the GL/subledger signs are OPPOSITE for AP — 2000 is
+ * `credit_balance` column. Supplier advances stay in asset account 1330 until
+ * application; only their AP settlement enters the supplier ledger. Note the
+ * GL/subledger signs are OPPOSITE for AP — 2000 is
  * credit-normal while the ledger runs debit-positive — so the `Math.abs()` in
  * `apImbalances` is load-bearing here, unlike F's where it is inert.
  *
@@ -53,6 +53,7 @@
  * asserts its `groups`/`totalDiff` pair separately.
  */
 import defaultDb from '../../config/database';
+import { expect } from '@jest/globals';
 import { collectFlows, CASH_ACCOUNTS, CASH_GL_CODES } from '../../services/cashService';
 
 export interface Violation {
@@ -381,7 +382,44 @@ export function orphanSourceBatches(db = defaultDb): Violation[] {
   }));
 }
 
-/** Assert invariants A–E, F–I and J; `context` labels the call site. */
+export function supplierAdvanceImbalances(db = defaultDb): Violation[] {
+  const row = db.prepare(`
+    SELECT COALESCE(SUM(a.amount - COALESCE((
+      SELECT SUM(x.amount) FROM supplier_prepayment_applications x
+      JOIN payments p ON p.id = x.payment_id
+      WHERE x.prepayment_id = a.id AND p.voided_at IS NULL
+    ), 0)), 0) AS amount FROM supplier_prepayments a WHERE a.voided_at IS NULL
+  `).get() as { amount: number };
+  const actual = R2(GL_BALANCE('1330', db));
+  const expected = R2(row.amount);
+  return Math.abs(actual - expected) > 0.005 ? [{ label: 'Supplier advances vs GL', diff: R2(actual - expected), account: '1330', expected, actual }] : [];
+}
+
+export function expensePayableImbalances(db = defaultDb): Violation[] {
+  const row = db.prepare(`
+    SELECT COALESCE(SUM(e.amount - COALESCE((SELECT SUM(p.amount) FROM expense_payments p
+      WHERE p.expense_id = e.id AND p.voided_at IS NULL), 0)), 0) AS amount
+    FROM expenses e WHERE e.status = 'Recorded' AND e.payment_method = 'Credit'
+  `).get() as { amount: number };
+  const actual = R2(-GL_BALANCE('2115', db));
+  const expected = R2(row.amount);
+  return Math.abs(actual - expected) > 0.005 ? [{ label: 'Expense payables vs GL', diff: R2(actual - expected), account: '2115', expected, actual }] : [];
+}
+
+export function inputTaxImbalances(db = defaultDb): Violation[] {
+  const row = db.prepare(`SELECT
+    (SELECT COALESCE(SUM(input_tax_amount), 0) FROM supplier_bills WHERE voided_at IS NULL)
+    + (SELECT COALESCE(SUM(input_tax_amount), 0) FROM purchases WHERE voided_at IS NULL)
+    + (SELECT COALESCE(SUM(i.input_tax_amount), 0) FROM goods_receipt_items i
+      JOIN goods_receipts r ON r.id = i.receipt_id WHERE r.voided_at IS NULL)
+    - (SELECT COALESCE(SUM(input_tax_amount), 0) FROM purchase_returns WHERE status = 'POSTED') AS amount
+  `).get() as { amount: number };
+  const actual = R2(GL_BALANCE('1320', db));
+  const expected = R2(row.amount);
+  return Math.abs(actual - expected) > 0.005 ? [{ label: 'Recoverable input tax vs GL', diff: R2(actual - expected), account: '1320', expected, actual }] : [];
+}
+
+/** Assert invariants A–J and the advance, input-tax and expense-payable controls. */
 export function expectAllInvariantsHold(context: string, db = defaultDb): void {
   const gl = glImbalances(db);
   expect(gl.groups).toEqual([]);
@@ -393,6 +431,9 @@ export function expectAllInvariantsHold(context: string, db = defaultDb): void {
   expect(apImbalances(db)).toEqual([]);
   expect(inventoryImbalances(db)).toEqual([]);
   expect(cashImbalances(db)).toEqual([]);
+  expect(supplierAdvanceImbalances(db)).toEqual([]);
+  expect(expensePayableImbalances(db)).toEqual([]);
+  expect(inputTaxImbalances(db)).toEqual([]);
   expect(orphanSourceBatches(db)).toEqual([]);
   expect(unappliedLiabilityImbalances(db)).toEqual([]);
   expect(creditSourceConsumptionImbalances(db)).toEqual([]);

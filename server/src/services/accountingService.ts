@@ -680,27 +680,34 @@ export class AccountingService {
       receiptNo: string;
       poNo: string;
       amount: number;
+      inputTaxAmount?: number;
       receiptDate: string;
       userId?: number;
     }
   ): PostedEntry | null {
-    if (!args.amount || args.amount <= 0) return null;
+    const netAmount = roundCurrency(args.amount);
+    const inputTax = roundCurrency(args.inputTaxAmount ?? 0);
+    if (!Number.isFinite(netAmount) || netAmount < 0 || !Number.isFinite(inputTax) || inputTax < 0) throw new Error('Invalid receipt or recoverable-tax amount');
+    if (netAmount === 0 && inputTax === 0) return null;
 
     const inventory = AccountingService.getAccountByCode(db, '1200');
     const ap = AccountingService.getAccountByCode(db, '2000');
     if (!inventory || !ap) {
       throw new Error('Chart of accounts is missing required accounts: 1200 (Inventory Asset) or 2000 (AP)');
     }
+    const taxAccount = inputTax > 0 ? AccountingService.getAccountByCode(db, '1320') : undefined;
+    if (inputTax > 0 && !taxAccount) throw new Error('Recoverable input tax account is missing');
 
     return AccountingService.postEntry(db, {
       entry_date: args.receiptDate,
-      description: `Goods receipt ${args.receiptNo} (PO ${args.poNo}) — ${args.amount.toFixed(2)}`,
+      description: `Goods receipt ${args.receiptNo} (PO ${args.poNo}) — ${(netAmount + inputTax).toFixed(2)}`,
       reference_type: 'GOODS_RECEIPT',
       reference_id: args.receiptId,
       created_by: args.userId,
       lines: [
-        { account_id: inventory.id, debit: args.amount, description: `Inventory received via ${args.receiptNo}` },
-        { account_id: ap.id, credit: args.amount, description: `AP created for ${args.receiptNo}` },
+        ...(netAmount > 0 ? [{ account_id: inventory.id, debit: netAmount, description: `Inventory received via ${args.receiptNo}` }] : []),
+        ...(taxAccount ? [{ account_id: taxAccount.id, debit: inputTax, description: `Recoverable input tax ${args.receiptNo}` }] : []),
+        { account_id: ap.id, credit: roundCurrency(netAmount + inputTax), description: `AP created for ${args.receiptNo}` },
       ],
     });
   }
@@ -716,18 +723,24 @@ export class AccountingService {
       purchaseId: number;
       purchaseNo: string;
       totalCost: number;
+      inputTaxAmount?: number;
       purchaseDate: string;
       paymentMethod?: string | null;
       userId?: number;
     }
   ): PostedEntry | null {
-    if (!args.totalCost || args.totalCost <= 0) return null;
+    const netAmount = roundCurrency(args.totalCost);
+    const inputTax = roundCurrency(args.inputTaxAmount ?? 0);
+    if (!Number.isFinite(netAmount) || netAmount < 0 || !Number.isFinite(inputTax) || inputTax < 0) throw new Error('Invalid purchase or recoverable-tax amount');
+    if (netAmount === 0 && inputTax === 0) return null;
 
     const inventory = AccountingService.getAccountByCode(db, '1200');
     if (!inventory) {
       throw new Error('Chart of accounts is missing required account: 1200 (Inventory Asset)');
     }
     const creditAccount = AccountingService.purchaseCreditAccount(db, args.paymentMethod);
+    const taxAccount = inputTax > 0 ? AccountingService.getAccountByCode(db, '1320') : null;
+    if (inputTax > 0 && !taxAccount) throw new Error('Chart of accounts is missing required account: 1320 (Recoverable Input Tax)');
     const isCredit = !args.paymentMethod || args.paymentMethod.toLowerCase() === 'credit';
     const creditDescription = isCredit
       ? `Obligation for ${args.purchaseNo}`
@@ -740,8 +753,9 @@ export class AccountingService {
       reference_id: args.purchaseId,
       created_by: args.userId,
       lines: [
-        { account_id: inventory.id, debit: args.totalCost, description: `Inventory received via ${args.purchaseNo}` },
-        { account_id: creditAccount.id, credit: args.totalCost, description: creditDescription },
+        ...(netAmount > 0 ? [{ account_id: inventory.id, debit: netAmount, description: `Inventory received via ${args.purchaseNo}` }] : []),
+        ...(taxAccount ? [{ account_id: taxAccount.id, debit: inputTax, description: `Recoverable tax on ${args.purchaseNo}` }] : []),
+        { account_id: creditAccount.id, credit: roundCurrency(netAmount + inputTax), description: creditDescription },
       ],
     });
   }
@@ -807,7 +821,7 @@ export class AccountingService {
     if (!opex) {
       throw new Error('Chart of accounts is missing required account: 6000 (Operating Expenses)');
     }
-    const cashCode = AccountingService._cashOrBankAccountCode(args.paymentMethod);
+    const cashCode = args.paymentMethod === 'Credit' ? '2115' : AccountingService._cashOrBankAccountCode(args.paymentMethod);
     const cash = AccountingService.getAccountByCode(db, cashCode);
     if (!cash) {
       throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
@@ -821,7 +835,7 @@ export class AccountingService {
       created_by: args.userId,
       lines: [
         { account_id: opex.id, debit: args.amount, description: `Expense incurred via ${args.expenseNo}` },
-        { account_id: cash.id, credit: args.amount, description: `Cash paid for ${args.expenseNo}` },
+        { account_id: cash.id, credit: args.amount, description: `${args.paymentMethod === 'Credit' ? 'Payable' : 'Cash paid'} for ${args.expenseNo}` },
       ],
     });
   }
@@ -1325,15 +1339,20 @@ export class AccountingService {
       purchaseId: number;
       purchaseNo: string;
       returnAmount: number;
+      inputTaxAmount?: number;
       returnDate: string;
       userId?: number;
     }
   ): PostedEntry | null {
-    if (!args.returnAmount || args.returnAmount <= 0) return null;
+    const netAmount = roundCurrency(args.returnAmount);
+    const inputTax = roundCurrency(args.inputTaxAmount ?? 0);
+    if (!Number.isFinite(netAmount) || netAmount < 0 || !Number.isFinite(inputTax) || inputTax < 0) throw new Error('Invalid purchase return or recoverable-tax amount');
+    if (netAmount === 0 && inputTax === 0) return null;
 
     const inventory = AccountingService.getAccountByCode(db, '1200');
     const ap = AccountingService.getAccountByCode(db, '2000');
-    if (!inventory || !ap) {
+    const taxAccount = inputTax > 0 ? AccountingService.getAccountByCode(db, '1320') : null;
+    if (!inventory || !ap || (inputTax > 0 && !taxAccount)) {
       throw new Error(
         'Chart of accounts is missing required accounts: 1200 (Inventory Asset) or 2000 (AP)'
       );
@@ -1346,8 +1365,9 @@ export class AccountingService {
       reference_id: args.purchaseId,
       created_by: args.userId,
       lines: [
-        { account_id: ap.id, debit: args.returnAmount, description: `AP reduced for return of ${args.purchaseNo}` },
-        { account_id: inventory.id, credit: args.returnAmount, description: `Inventory removed for return of ${args.purchaseNo}` },
+        { account_id: ap.id, debit: roundCurrency(netAmount + inputTax), description: `AP reduced for return of ${args.purchaseNo}` },
+        ...(netAmount > 0 ? [{ account_id: inventory.id, credit: netAmount, description: `Inventory removed for return of ${args.purchaseNo}` }] : []),
+        ...(taxAccount ? [{ account_id: taxAccount.id, credit: inputTax, description: `Recoverable tax returned for ${args.purchaseNo}` }] : []),
       ],
     });
   }
