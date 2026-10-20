@@ -2,7 +2,7 @@
 //
 // Field set mirrors the server's createUser/updateUser DTOs: username,
 // email, full_name and role are required; create mode additionally
-// requires password (min 6 chars, the server's rule). The role dropdown
+// requires a password under the shared password policy. The role dropdown
 // loads from `GET /roles` and always includes the current value so an
 // edit form never loses a role the loaded list doesn't contain. The
 // server rejects changing your own role away from Admin — that error
@@ -10,6 +10,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/utils/password_policy.dart';
 
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../l10n/app_localizations.dart';
@@ -97,8 +98,11 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
         return l10n.usermanagementValidationPasswordlength;
       }
     }
-    if (value != null && value.isNotEmpty && value.length < 6) {
+    if (value != null && value.isNotEmpty && PasswordPolicy.isTooShort(value)) {
       return l10n.usermanagementValidationPasswordlength;
+    }
+    if (value != null && PasswordPolicy.isTooLong(value)) {
+      return l10n.passwordTooLong;
     }
     return null;
   }
@@ -137,7 +141,9 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
         Navigator.of(context).pop();
         showAppToast(
           context,
-          _isEdit ? l10n.usermanagementUserupdated : l10n.usermanagementUsercreated,
+          _isEdit
+              ? l10n.usermanagementUserupdated
+              : l10n.usermanagementUsercreated,
         );
       case ApiFailure(:final error):
         setState(() {
@@ -152,9 +158,7 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
     final l10n = AppLocalizations.of(context)!;
     final roles = ref.watch(rolesProvider);
 
-    final roleItems = <Role>[
-      ...?roles.valueOrNull,
-    ];
+    final roleItems = <Role>[...?roles.valueOrNull];
     // Keep the stored role when the loaded list lags or omits it.
     final currentRole = roleItems.where((r) => r.id == _roleId).firstOrNull;
     final effectiveRoleItems = (currentRole == null && _roleId != null)
@@ -313,7 +317,9 @@ class _UserFormDialogState extends ConsumerState<UserFormDialog> {
                         child: Text(
                           _error!,
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onErrorContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onErrorContainer,
                           ),
                         ),
                       ),
