@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { AuthUser } from '../types';
 
 interface UserRecord {
   id: number;
@@ -46,17 +47,34 @@ interface UpdateUserDTO {
 }
 
 class UserModel {
+  static getActiveAuthUser(id: number, db: Database.Database): AuthUser | undefined {
+    return db.prepare<number, AuthUser>(`
+      SELECT u.id, u.username, u.email,
+        CASE WHEN u.role_id IS NULL THEN u.role
+          WHEN r.role_name = 'Admin' AND r.is_system_role = 1 THEN 'admin'
+          ELSE 'user' END AS role
+      FROM users u LEFT JOIN roles r ON r.id = u.role_id
+      WHERE u.id = ? AND u.is_active = 1
+        AND (u.role_id IS NULL OR r.is_active = 1)
+    `).get(id);
+  }
+
   static findByUsername(username: string, db: Database.Database): Omit<UserRecord, 'password_hash'> & { password_hash?: string } | undefined {
     return db.prepare(`
-      SELECT id, username, email, password_hash, full_name, role, is_active
-      FROM users WHERE username = ? AND is_active = 1
+      SELECT u.id, u.username, u.email, u.password_hash, u.full_name, u.is_active,
+        CASE WHEN u.role_id IS NULL THEN u.role
+          WHEN r.role_name = 'Admin' AND r.is_system_role = 1 THEN 'admin' ELSE 'user' END AS role
+      FROM users u LEFT JOIN roles r ON r.id = u.role_id
+      WHERE u.username = ? AND u.is_active = 1 AND (u.role_id IS NULL OR r.is_active = 1)
     `).get(username) as UserRecord | undefined;
   }
 
   static getById(id: number, db: Database.Database): Omit<UserRecord, 'password_hash'> | undefined {
     return db.prepare(`
-      SELECT id, username, email, full_name, role, is_active, created_at
-      FROM users WHERE id = ?
+      SELECT u.id, u.username, u.email, u.full_name, u.is_active, u.created_at,
+        CASE WHEN u.role_id IS NULL THEN u.role
+          WHEN r.role_name = 'Admin' AND r.is_system_role = 1 THEN 'admin' ELSE 'user' END AS role
+      FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ?
     `).get(id) as Omit<UserRecord, 'password_hash'> | undefined;
   }
 
@@ -85,7 +103,12 @@ class UserModel {
   }
 
   static getAll(filters: UserFilters, db: Database.Database): UserPublic[] {
-    let query = `SELECT id, username, email, full_name, role, is_active, created_at, updated_at FROM users WHERE 1=1`;
+    let query = `SELECT * FROM (
+      SELECT u.id, u.username, u.email, u.full_name, u.is_active, u.created_at, u.updated_at,
+        CASE WHEN u.role_id IS NULL THEN u.role
+          WHEN r.role_name = 'Admin' AND r.is_system_role = 1 THEN 'admin' ELSE 'user' END AS role
+      FROM users u LEFT JOIN roles r ON r.id = u.role_id
+    ) WHERE 1=1`;
     const params: (string | number)[] = [];
 
     if (filters.role) { query += ' AND role = ?'; params.push(filters.role); }
@@ -102,8 +125,10 @@ class UserModel {
 
   static getPublicById(id: number, db: Database.Database): UserPublic | undefined {
     return db.prepare(`
-      SELECT id, username, email, full_name, role, is_active, created_at, updated_at
-      FROM users WHERE id = ?
+      SELECT u.id, u.username, u.email, u.full_name, u.is_active, u.created_at, u.updated_at,
+        CASE WHEN u.role_id IS NULL THEN u.role
+          WHEN r.role_name = 'Admin' AND r.is_system_role = 1 THEN 'admin' ELSE 'user' END AS role
+      FROM users u LEFT JOIN roles r ON r.id = u.role_id WHERE u.id = ?
     `).get(id) as UserPublic | undefined;
   }
 
@@ -156,7 +181,12 @@ class UserModel {
   }
 
   static getAdminCount(db: Database.Database): number {
-    const result = db.prepare('SELECT COUNT(*) as count FROM users WHERE role = ? AND is_active = 1').get('admin') as { count: number };
+    const result = db.prepare<[], { count: number }>(`
+      SELECT COUNT(*) AS count FROM users u LEFT JOIN roles r ON r.id = u.role_id
+      WHERE u.is_active = 1 AND ((u.role_id IS NULL AND u.role = 'admin')
+        OR (r.role_name = 'Admin' AND r.is_system_role = 1 AND r.is_active = 1))
+    `).get();
+    if (!result) throw new Error('Could not count administrators');
     return result.count;
   }
 

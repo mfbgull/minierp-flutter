@@ -4,6 +4,8 @@ import { AuthUser, AuthRequest } from '../types';
 import logger from '../utils/logger';
 
 import { errorName } from '../utils/errorMessage';
+import db from '../config/database';
+import UserModel from '../models/User';
 
 if (!process.env.JWT_SECRET) {
   throw new Error('FATAL: JWT_SECRET environment variable must be set. Generate one with: openssl rand -base64 64');
@@ -27,12 +29,19 @@ export function authenticateToken(
   }
 
   try {
-    const user = jwt.verify(token, JWT_SECRET, {
+    const payload = jwt.verify(token, JWT_SECRET, {
       algorithms: ['HS256'],
       issuer: 'mini-erp',
       audience: 'mini-erp-client'
-    }) as AuthUser;
-
+    });
+    const user = typeof payload !== 'string' && payload.type !== 'refresh'
+      && Number.isSafeInteger(payload.id) && payload.id > 0
+      ? UserModel.getActiveAuthUser(payload.id, db)
+      : undefined;
+    if (!user) {
+      res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+      return;
+    }
     req.user = user;
     next();
   } catch (err: unknown) {
@@ -98,16 +107,18 @@ export function generateRefreshToken(user: AuthUser): string {
   );
 }
 
-/// Verifies a refresh token. Returns the embedded user, or `null` for
-/// missing/expired/wrong-type tokens.
+/// Verifies a refresh token and reloads current account authority.
 export function verifyRefreshToken(token: string): AuthUser | null {
   try {
     const payload = jwt.verify(token, JWT_SECRET, {
       algorithms: ['HS256'],
       issuer: 'mini-erp',
       audience: 'mini-erp-client',
-    }) as AuthUser & { type?: string };
-    return payload.type === 'refresh' ? payload : null;
+    });
+    return typeof payload !== 'string' && payload.type === 'refresh'
+      && Number.isSafeInteger(payload.id) && payload.id > 0
+      ? UserModel.getActiveAuthUser(payload.id, db) ?? null
+      : null;
   } catch {
     return null;
   }
