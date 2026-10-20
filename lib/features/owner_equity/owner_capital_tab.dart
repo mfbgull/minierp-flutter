@@ -136,7 +136,7 @@ class _OwnerCapitalTabState extends ConsumerState<OwnerCapitalTab>
     }
   }
 
-  void _bulkVoid(Set<int> ids) async {
+  Future<void> _bulkVoid(Set<int> ids) async {
     final l10n = AppLocalizations.of(context)!;
     final entries =
         ref.read(ownerCapitalProvider).valueOrNull?.items ??
