@@ -128,7 +128,7 @@ class _BatchReconciliationScreenState
     switch (result) {
       case ApiSuccess():
         showAppToast(context, l10n.commonSaved);
-        _load();
+        await _load();
       case ApiFailure(:final error):
         showAppToast(context, error.message, isError: true);
     }
