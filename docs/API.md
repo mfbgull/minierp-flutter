@@ -609,6 +609,13 @@ Blocked reversal errors additionally expose `error.blockedBy`, for example:
 | GET | /purchase-orders/:id/receipts | Get goods receipts |
 | POST | /purchase-orders/:id/receipts | Create goods receipt |
 
+PO line create/add/update bodies accept `input_tax_amount` (nonnegative currency,
+default zero) for the full ordered line. `unit_price` and line `amount` stay net
+of recoverable tax; the PO `total_amount` includes tax. Submission records a
+commitment. Each goods receipt recognizes inventory at net cost, recoverable tax
+on the received quantity, and gross supplier AP. The final receipt assigns the
+tax rounding remainder. Voiding a receipt reverses that receipt's tax and AP.
+
 ---
 
 ## Direct Purchases
@@ -624,18 +631,24 @@ Blocked reversal errors additionally expose `error.blockedBy`, for example:
 | GET | /purchases/summary/daterange | Purchase summary by date range |
 | GET | /purchases/top-suppliers | Top suppliers report |
 
-`POST /purchases` accepts an optional `supplier_id` — when provided the
+`POST /purchases` requires an identified, active `supplier_id`. The
 server resolves the supplier name, links the purchase, and posts the AP
 supplier-ledger entry (debit) so the purchase can be paid via
 `POST /payments` with `purchase_allocations`. `invoice_no` / `remarks`
 are also accepted.
 
-Without a `supplier_id` the purchase is treated as an **immediate
-(counter / walk-in) purchase**: the GL credits the `1000 Cash` account
-instead of `2000 Accounts Payable`, and no supplier-ledger row is
-written. An AP liability is never created without a supplier to owe it
-to — payments are supplier-keyed, so a credit AP entry would be an
-untraceable, unsetttable orphan.
+Each line accepts `input_tax_amount` (nonnegative currency, default zero).
+`total_cost` and batch cost remain net; `total_payable` includes tax.
+`balance_amount` subtracts posted returns and active payment allocations.
+Purchase returns include proportional tax in their payable credit and credit
+note; inventory reversal remains net. Tax is stored per return line so final
+returns exhaust the original tax exactly.
+
+Multi-line bodies use `items: [{item_id, quantity, unit_cost,
+input_tax_amount?, expiry_date?}]` and return an array. An unchanged request
+with the same `Idempotency-Key` replays all original line IDs without posting
+again. Pre-migration multi-line requests without a saved membership map return
+409 for manual review; one-line legacy retries retain their array shape.
 
 ```json
 {
@@ -756,6 +769,57 @@ server rejects (400) returns that are not `POSTED`.
 | POST | /expenses/categories | Yes | Create category |
 | PUT | /expenses/categories/:id | Yes | Update category |
 | DELETE | /expenses/categories/:id | Yes | Delete category |
+
+`payment_method: "Credit"` records an accrued expense when it reaches Recorded
+status (Dr expense / Cr expense payable); Draft has no financial effect.
+`GET /expenses/:id` includes `payments` and `paid_amount`. Settle with
+`POST /expenses/:id/payments` using `{amount, payment_date, payment_method}`;
+reverse with `POST /expenses/:id/payments/:paymentId/void` using `{reason}`.
+Both require expenses:update; payment creation supports `Idempotency-Key`.
+Reverse payments before cancelling or financially editing a credit expense.
+
+## Supplier bills and advances
+
+These routes return `{success: true, data}`. Lists require `supplier_id`, accept
+`page` and `limit` (maximum 100), and include a pagination block. All writes
+enforce accounting periods and run atomically with GL/subledger changes.
+
+| Method | Path | Permission / purpose |
+|---|---|---|
+| GET | /supplier-bills, /supplier-bills/:id | purchases:read |
+| POST | /supplier-bills | purchases:create and expenses:approve; recognize a non-stock bill |
+| POST | /supplier-bills/:id/payments | payments:create; settle the bill |
+| POST | /supplier-bills/:id/void | purchases:delete; reverse an unpaid bill |
+| GET | /supplier-prepayments, /supplier-prepayments/:id | payments:read |
+| GET | /supplier-prepayments/:id/targets?search= | payments:read; up to 50 matching unpaid documents for the same supplier |
+| POST | /supplier-prepayments | payments:create; pay a supplier advance |
+| POST | /supplier-prepayments/:id/apply | payments:create; apply an advance without new cash |
+| POST | /supplier-prepayments/:id/void | payments:delete; reverse an unapplied advance |
+
+Bill creation accepts `{supplier_id, bill_no, bill_date, due_date?, description,
+net_amount, input_tax_amount?}`. It posts net expense and recoverable input tax
+against gross AP. Active bill numbers are unique per supplier; after void, a
+corrected bill can reuse the number while the original record remains visible.
+Bill payments accept `{amount, payment_date, payment_method, reference_no?}`.
+Reverse all payments before voiding; void bodies require `{reason}`.
+
+Advances accept `{supplier_id, prepay_date, amount, payment_method,
+reference_no?, notes?}` and post an asset against cash. Applications accept
+`{applied_at, allocations: [{kind, id, amount}]}`, where kind is `purchase`,
+`purchase_order` or `supplier_bill`. They settle AP against the advance asset.
+Availability and document balances are validated together; duplicate targets,
+cross-supplier targets and excess amounts are rejected. Standard payment voiding
+restores advance availability. Advance-funded payments cannot be changed to cash
+through the generic payment editor. Reverse applications before voiding an advance.
+
+Bill/advance creation and settlement/application accept `Idempotency-Key`;
+unchanged retries replay the saved result. Advances are separate from document
+settlements, which still require full allocation of the payment amount.
+
+`GET /reports/tax-summary?startDate=...&endDate=...` returns `total_tax` (net
+output-tax movement), `input_tax` (net recoverable-tax movement) and `net_tax`
+(output less input). These use posted GL movements, including returns and voids;
+the report does not determine tax rates or filing eligibility.
 
 ---
 
