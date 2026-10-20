@@ -35,6 +35,7 @@ import {
   INVOICE_CREATE_SCOPE,
   normalizeIdempotencyKey,
   logKeylessIdempotentWrite,
+  observeInvoiceIdempotency,
   hashRequestPayload,
   claimIdempotencyKey,
   startIdempotentRequest,
@@ -216,6 +217,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
     } catch (keyError) {
       return res.status(400).json({ error: (keyError as Error).message });
     }
+    observeInvoiceIdempotency('POST /api/invoices', idemKey !== null);
     if (idemKey === null) {
       logKeylessIdempotentWrite(INVOICE_CREATE_SCOPE, {
         userId: req.user.id,

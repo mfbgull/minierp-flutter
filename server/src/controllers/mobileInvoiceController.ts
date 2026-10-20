@@ -3,6 +3,7 @@ import { AuthRequest, SellableStockUnavailableError } from '../types';
 import db from '../config/database';
 import { getRouteParam } from '../utils/queryUtils';
 import logger from '../utils/logger';
+import { handleBusinessError } from '../utils/businessRuleError';
 import MobileInvoiceModel from '../models/MobileInvoice';
 import { getQueryParam } from '../utils/queryUtils';
 import {
@@ -18,6 +19,8 @@ import {
   normalizeIdempotencyKey,
   hashRequestPayload,
   findIdempotencyRecord,
+  observeInvoiceIdempotency,
+  logKeylessIdempotentWrite,
 } from '../utils/idempotency';
 import {
   InvoiceCreationCreditError,
@@ -160,6 +163,14 @@ export async function submitInvoice(req: AuthRequest, res: Response) {
     } catch (keyError) {
       return res.status(400).json({ success: false, error: (keyError as Error).message });
     }
+    observeInvoiceIdempotency('POST /api/mobile-invoices/submit', idemKey !== null);
+    if (idemKey === null) {
+      logKeylessIdempotentWrite(MOBILE_INVOICE_CREATE_SCOPE, {
+        userId: req.user?.id,
+        route: 'POST /api/mobile-invoices/submit',
+        userAgent: req.headers['user-agent'],
+      });
+    }
     const idemHash = idemKey ? hashRequestPayload(req.body) : '';
     if (idemKey) {
       const existing = findIdempotencyRecord(db, MOBILE_INVOICE_CREATE_SCOPE, idemKey);
@@ -222,8 +233,7 @@ export async function submitInvoice(req: AuthRequest, res: Response) {
       res.status(409).json({ success: false, error: error.message });
       return;
     }
-    logger.error('Submit invoice error:', error);
-    res.status(500).json({ success: false, error: 'Failed to create invoice' });
+    handleBusinessError(res, error, 'Submit invoice', 'Failed to create invoice', { success: true });
   }
 }
 
