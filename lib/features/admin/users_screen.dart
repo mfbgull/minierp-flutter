@@ -14,6 +14,7 @@ import 'package:pluto_grid/pluto_grid.dart';
 
 import '../../core/auth/auth_notifier.dart' show authProvider;
 import '../../core/utils/csv_export.dart';
+import '../../core/utils/password_policy.dart';
 import '../../data/repositories/api_result.dart' show ApiFailure, ApiSuccess;
 import '../../l10n/app_localizations.dart';
 import '../../widgets/app_toast.dart';
@@ -99,7 +100,9 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
     final activating = !user.isActive;
     final confirmed = await showConfirmDialog(
       context,
-      title: activating ? l10n.usermanagementActivate : l10n.usermanagementDeactivate,
+      title: activating
+          ? l10n.usermanagementActivate
+          : l10n.usermanagementDeactivate,
       message: activating
           ? '${l10n.usermanagementActivate} "${user.username}"?'
           : '${l10n.usermanagementDeactivate} "${user.username}"?',
@@ -119,7 +122,9 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
         ref.invalidate(usersProvider);
         showAppToast(
           context,
-          activating ? l10n.usermanagementActivated : l10n.usermanagementDeactivated,
+          activating
+              ? l10n.usermanagementActivated
+              : l10n.usermanagementDeactivated,
         );
       case ApiFailure(:final error):
         showAppToast(context, error.message, isError: true);
@@ -136,8 +141,6 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
       cancelLabel: l10n.commonCancel,
     );
     if (!confirmed || !mounted) return;
-    // The reset dialog posts with the server's default flow — the user
-    // must supply the new password (at least 6 chars).
     final newPassword = await _promptNewPassword(l10n);
     if (newPassword == null || !mounted) return;
     final result = await ref
@@ -153,18 +156,29 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
   }
 
   Future<String?> _promptNewPassword(AppLocalizations l10n) {
-    final controller = TextEditingController();
+    var password = '';
+    final formKey = GlobalKey<FormState>();
     return showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(l10n.usermanagementResetpassword),
-        content: TextField(
-          controller: controller,
-          obscureText: true,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: l10n.usermanagementNewpassword,
-            border: const OutlineInputBorder(),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            onChanged: (value) => password = value,
+            obscureText: true,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: l10n.usermanagementNewpassword,
+              border: const OutlineInputBorder(),
+            ),
+            validator: (value) {
+              if (value == null || PasswordPolicy.isTooShort(value)) {
+                return l10n.usermanagementValidationPasswordlength;
+              }
+              if (PasswordPolicy.isTooLong(value)) return l10n.passwordTooLong;
+              return null;
+            },
           ),
         ),
         actions: [
@@ -173,8 +187,11 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
             child: Text(l10n.commonCancel),
           ),
           FilledButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(controller.text.trim()),
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(dialogContext).pop(password);
+              }
+            },
             child: Text(l10n.commonConfirm),
           ),
         ],
@@ -193,9 +210,7 @@ class _UsersScreenState extends ConsumerState<UsersScreen>
       destructive: true,
     );
     if (!confirmed || !mounted) return;
-    final result = await ref
-        .read(adminRepositoryProvider)
-        .deleteUser(user.id);
+    final result = await ref.read(adminRepositoryProvider).deleteUser(user.id);
     if (!mounted) return;
     switch (result) {
       case ApiSuccess():
