@@ -3,6 +3,7 @@
  * Covers: create (ledger + GL), refundable cap, void reversal.
  */
 import Database from 'better-sqlite3';
+import { afterAll, describe, expect, test } from '@jest/globals';
 import SupplierRefundModel, { creditNoteRefundable } from '../models/SupplierRefund';
 import PurchaseReturnModel from '../models/PurchaseReturn';
 import AccountingService from '../services/accountingService';
@@ -37,8 +38,8 @@ function setupDb(): Database.Database {
 let seedCounter = 0;
 
 /** Seed a fully-paid purchase + the return against it (disposition stamped). */
-function seedReturn(db: Database.Database, opts: { cash?: number; disposition?: string } = {}): {
-  returnId: number; creditNoteId: number; total: number;
+function seedReturn(db: Database.Database, opts: { cash?: number; disposition?: string; paidAmount?: number; returnQty?: number } = {}): {
+  returnId: number; creditNoteId: number; total: number; purchaseId: number;
 } {
   seedCounter += 1;
   const qty = 10;
@@ -69,11 +70,11 @@ function seedReturn(db: Database.Database, opts: { cash?: number; disposition?: 
   const payResult = db.prepare(`
     INSERT INTO payments (payment_no, supplier_id, payment_date, amount, payment_method)
     VALUES (?, 1, '2026-07-01', ?, 'Cash')
-  `).run(`PAY-SR-${seedCounter}`, total);
+  `).run(`PAY-SR-${seedCounter}`, opts.paidAmount ?? total);
   db.prepare(`
     INSERT INTO purchase_allocations (payment_id, purchase_id, amount)
     VALUES (?, ?, ?)
-  `).run(payResult.lastInsertRowid as number, purchaseId, total);
+  `).run(payResult.lastInsertRowid as number, purchaseId, opts.paidAmount ?? total);
 
   if (opts.cash !== undefined && opts.cash > 0) {
     // Seed opening cash (Dr cash against opening equity) for GL context.
@@ -98,7 +99,7 @@ function seedReturn(db: Database.Database, opts: { cash?: number; disposition?: 
       source_id: purchaseId,
       warehouse_id: 1,
       disposition: opts.disposition ?? 'refund_expected',
-      items: [{ source_item_id: purchaseId, quantity: qty }],
+      items: [{ source_item_id: purchaseId, quantity: opts.returnQty ?? qty }],
     },
     1,
     db
@@ -107,10 +108,70 @@ function seedReturn(db: Database.Database, opts: { cash?: number; disposition?: 
   const note = db.prepare(`SELECT id FROM credit_notes WHERE source_id = ?`)
     .get(created.id) as { id: number };
 
-  return { returnId: created.id, creditNoteId: note.id, total };
+  return { returnId: created.id, creditNoteId: note.id, total: (opts.returnQty ?? qty) * unitCost, purchaseId };
 }
 
 describe('SupplierRefundModel', () => {
+  test('PRET-002: expected money leaves a refundable credit without recording cash', () => {
+    const db = setupDb();
+    const { creditNoteId, total } = seedReturn(db);
+
+    expect(db.prepare('SELECT * FROM supplier_refunds').all()).toEqual([]);
+    expect(creditNoteRefundable(creditNoteId, db)).toBe(total);
+    const cash = db.prepare<[], { amount: number }>(`SELECT COALESCE(SUM(j.debit-j.credit),0) AS amount
+      FROM journal_lines j JOIN chart_of_accounts a ON a.id=j.account_id
+      WHERE a.code='1000' AND j.voided=0`).get();
+    expect(cash?.amount).toBe(0);
+  });
+
+  test('PRET-002: actual refunds cannot exceed payments or reuse them on another return', () => {
+    const db = setupDb();
+    const first = seedReturn(db, { disposition: 'credit_on_account', paidAmount: 40, returnQty: 5 });
+
+    expect(creditNoteRefundable(first.creditNoteId, db)).toBe(40);
+    expect(() => SupplierRefundModel.create({
+      refund_date: '2026-07-03', credit_note_id: first.creditNoteId, amount: 41,
+    }, 1, db)).toThrow(/exceeds the refundable/);
+    SupplierRefundModel.create({ refund_date: '2026-07-03', credit_note_id: first.creditNoteId, amount: 40 }, 1, db);
+    const second = PurchaseReturnModel.create({
+      return_date: '2026-07-04', source_type: 'PURCHASE', source_id: first.purchaseId,
+      warehouse_id: 1, disposition: 'credit_on_account',
+      items: [{ source_item_id: first.purchaseId, quantity: 5 }],
+    }, 1, db);
+    const note = db.prepare<[number], { id: number }>('SELECT id FROM credit_notes WHERE source_id = ?').get(second.id);
+    if (!note) throw new Error('Missing second credit note');
+    expect(creditNoteRefundable(note.id, db)).toBe(0);
+    expect(() => SupplierRefundModel.create({
+      refund_date: '2026-07-04', credit_note_id: note.id, amount: 1,
+    }, 1, db)).toThrow(/exceeds the refundable/);
+  });
+
+  test('ACCT-013: a void that would overdraw later cash spending rolls back every effect', () => {
+    const db = setupDb();
+    const { creditNoteId, total } = seedReturn(db, { disposition: 'credit_on_account' });
+    const refund = SupplierRefundModel.create(
+      { refund_date: '2026-07-03', credit_note_id: creditNoteId, amount: total }, 1, db
+    );
+    const cash = AccountingService.getAccountByCode(db, '1000');
+    const expense = AccountingService.getAccountByCode(db, '6000');
+    if (!cash || !expense) throw new Error('Missing fixture accounts');
+    AccountingService.postEntry(db, {
+      entry_date: '2026-07-04', description: 'Later spending of supplier refund',
+      lines: [{ account_id: expense.id, debit: total }, { account_id: cash.id, credit: total }],
+    });
+    const ledgerBefore = db.prepare('SELECT * FROM supplier_ledger ORDER BY id').all();
+    const journalBefore = db.prepare('SELECT * FROM journal_lines ORDER BY id').all();
+    const activityBefore = db.prepare('SELECT * FROM activity_log ORDER BY id').all();
+
+    expect(() => SupplierRefundModel.void(refund.id, 1, 'wrong receipt', db))
+      .toThrow(/Reverse the later spending first/);
+
+    expect(SupplierRefundModel.getById(refund.id, db)?.status).toBe('POSTED');
+    expect(db.prepare('SELECT * FROM supplier_ledger ORDER BY id').all()).toEqual(ledgerBefore);
+    expect(db.prepare('SELECT * FROM journal_lines ORDER BY id').all()).toEqual(journalBefore);
+    expect(db.prepare('SELECT * FROM activity_log ORDER BY id').all()).toEqual(activityBefore);
+  });
+
   test('create collects a credit-note refund: ledger debit, GL posting, refundable drops', () => {
     const db = setupDb();
     const { creditNoteId, total } = seedReturn(db, { cash: 1000, disposition: 'credit_on_account' });
@@ -164,11 +225,15 @@ describe('SupplierRefundModel', () => {
     ).toThrow(/exceeds the refundable/);
   });
 
-  test('refund_expected return auto-issues the cash refund collection in the same transaction', () => {
+  test('refund_expected leaves the credit outstanding until cash is explicitly received', () => {
     const db = setupDb();
     const { creditNoteId, total } = seedReturn(db, { cash: 1000 });
 
-    // The return itself collected the refund — refundable already 0.
+    expect(creditNoteRefundable(creditNoteId, db)).toBe(total);
+    expect(db.prepare('SELECT * FROM supplier_refunds').all()).toEqual([]);
+    SupplierRefundModel.create({
+      refund_date: '2026-07-03', credit_note_id: creditNoteId, amount: total,
+    }, 1, db);
     expect(creditNoteRefundable(creditNoteId, db)).toBe(0);
 
     const refunds = db.prepare(
@@ -184,12 +249,15 @@ describe('SupplierRefundModel', () => {
     expect(Math.abs(balance.balance)).toBeLessThan(0.01);
   });
 
-  test('refund_expected return collects the refund even with zero opening cash', () => {
+  test('an explicit supplier refund receipt works with zero opening cash', () => {
     const db = setupDb();
 
     // The refund is money IN from the supplier — no funds guard applies,
     // so zero opening cash must not block the return or the collection.
     const { creditNoteId, total } = seedReturn(db, { cash: 0 });
+    SupplierRefundModel.create({
+      refund_date: '2026-07-03', credit_note_id: creditNoteId, amount: total,
+    }, 1, db);
 
     const returns = db.prepare(`SELECT COUNT(*) AS n FROM purchase_returns`).get() as { n: number };
     const notes = db.prepare(`SELECT COUNT(*) AS n FROM credit_notes`).get() as { n: number };
@@ -201,11 +269,13 @@ describe('SupplierRefundModel', () => {
     expect(total).toBeGreaterThan(0);
   });
 
-  test('PRET-001: voiding a refund_expected return also voids the auto-issued refund', () => {
+  test('PRET-001: voiding a return also voids its explicitly recorded supplier refund', () => {
     const db = setupDb();
     const { returnId, creditNoteId } = seedReturn(db, { cash: 1000 });
 
-    // The refund_expected return auto-issued its cash collection.
+    SupplierRefundModel.create({
+      refund_date: '2026-07-03', credit_note_id: creditNoteId, amount: 100,
+    }, 1, db);
     const refund = db.prepare(
       `SELECT id FROM supplier_refunds WHERE credit_note_id = ? AND status = 'POSTED'`
     ).get(creditNoteId) as { id: number };
