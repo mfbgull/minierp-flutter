@@ -79,6 +79,79 @@ function getItem(req: Request, res: Response): void {
   }
 }
 
+type NumericFieldResult =
+  | { ok: true; value: number | undefined }
+  | { ok: false; error: string };
+
+type WarehouseFieldResult =
+  | { ok: true; id: number | undefined }
+  | { ok: false; error: string };
+
+function parseOptionalNonNegative(raw: unknown, field: string): NumericFieldResult {
+  if ((typeof raw !== 'number' && typeof raw !== 'string') || raw === '') {
+    return { ok: false, error: `${field} must be a non-negative number` };
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) {
+    return { ok: false, error: `${field} must be a non-negative number` };
+  }
+  return { ok: true, value };
+}
+
+function resolveOpeningWarehouse(raw: unknown): WarehouseFieldResult {
+  if (raw === undefined || raw === null || raw === '') {
+    return { ok: true, id: WarehouseModel.getDefaultWarehouse(db)?.id };
+  }
+  if (typeof raw !== 'number' && typeof raw !== 'string') {
+    return { ok: false, error: 'warehouse_id must be a positive integer' };
+  }
+  const warehouseId = Number(raw);
+  const warehouse = Number.isInteger(warehouseId) && warehouseId > 0
+    ? WarehouseModel.getById(db, warehouseId)
+    : undefined;
+  if (!warehouse || warehouse.is_active === 0) {
+    return { ok: false, error: 'warehouse_id must reference an active warehouse' };
+  }
+  return { ok: true, id: warehouseId };
+}
+
+type OpeningStockPlan =
+  | { ok: true; openingQty: number; standardCost: number | undefined; openingWarehouseId: number | undefined }
+  | { ok: false; error: string };
+
+function planOpeningStock(
+  body: Record<string, unknown>,
+  hasCurrentStock: boolean,
+  hasStandardCost: boolean
+): OpeningStockPlan {
+  const currentStock = hasCurrentStock
+    ? parseOptionalNonNegative(body.current_stock, 'current_stock')
+    : { ok: true as const, value: undefined };
+  if (!currentStock.ok) return { ok: false, error: currentStock.error };
+  const openingQty = currentStock.value ?? 0;
+
+  const standardCostField = hasStandardCost
+    ? parseOptionalNonNegative(body.standard_cost, 'standard_cost')
+    : { ok: true as const, value: undefined };
+  if (!standardCostField.ok) return { ok: false, error: standardCostField.error };
+  const standardCost = standardCostField.value;
+
+  if (openingQty > 0 && (standardCost === undefined || standardCost <= 0)) {
+    return { ok: false, error: 'standard_cost must be greater than 0 when current_stock is greater than 0' };
+  }
+
+  if (openingQty === 0) {
+    return { ok: true, openingQty, standardCost, openingWarehouseId: undefined };
+  }
+
+  const warehouse = resolveOpeningWarehouse(body.warehouse_id);
+  if (!warehouse.ok) return { ok: false, error: warehouse.error };
+  if (warehouse.id === undefined) {
+    return { ok: false, error: 'An active warehouse is required when current_stock is greater than 0' };
+  }
+  return { ok: true, openingQty, standardCost, openingWarehouseId: warehouse.id };
+}
+
 function createItem(req: AuthRequest, res: Response): void {
   try {
     const { item_code, item_name } = req.body;
@@ -95,71 +168,13 @@ function createItem(req: AuthRequest, res: Response): void {
     }
 
     const hasCurrentStock = Object.prototype.hasOwnProperty.call(req.body, 'current_stock');
-    const rawCurrentStock = req.body.current_stock;
-    let openingQty = 0;
-    if (hasCurrentStock) {
-      if (
-        (typeof rawCurrentStock !== 'number' && typeof rawCurrentStock !== 'string') ||
-        rawCurrentStock === ''
-      ) {
-        res.status(400).json({ error: 'current_stock must be a non-negative number' });
-        return;
-      }
-      openingQty = Number(rawCurrentStock);
-      if (!Number.isFinite(openingQty) || openingQty < 0) {
-        res.status(400).json({ error: 'current_stock must be a non-negative number' });
-        return;
-      }
-    }
-
     const hasStandardCost = Object.prototype.hasOwnProperty.call(req.body, 'standard_cost');
-    const rawStandardCost = req.body.standard_cost;
-    let standardCost: number | undefined;
-    if (hasStandardCost) {
-      if (
-        (typeof rawStandardCost !== 'number' && typeof rawStandardCost !== 'string') ||
-        rawStandardCost === ''
-      ) {
-        res.status(400).json({ error: 'standard_cost must be a non-negative number' });
-        return;
-      }
-      standardCost = Number(rawStandardCost);
-      if (!Number.isFinite(standardCost) || standardCost < 0) {
-        res.status(400).json({ error: 'standard_cost must be a non-negative number' });
-        return;
-      }
-    }
-
-    if (openingQty > 0 && (standardCost === undefined || standardCost <= 0)) {
-      res.status(400).json({ error: 'standard_cost must be greater than 0 when current_stock is greater than 0' });
+    const plan = planOpeningStock(req.body, hasCurrentStock, hasStandardCost);
+    if (!plan.ok) {
+      res.status(400).json({ error: plan.error });
       return;
     }
-
-    let openingWarehouseId: number | undefined;
-    if (openingQty > 0) {
-      const rawWarehouseId = req.body.warehouse_id;
-      if (rawWarehouseId !== undefined && rawWarehouseId !== null && rawWarehouseId !== '') {
-        if (typeof rawWarehouseId !== 'number' && typeof rawWarehouseId !== 'string') {
-          res.status(400).json({ error: 'warehouse_id must be a positive integer' });
-          return;
-        }
-        const warehouseId = Number(rawWarehouseId);
-        const warehouse = Number.isInteger(warehouseId) && warehouseId > 0
-          ? WarehouseModel.getById(db, warehouseId)
-          : undefined;
-        if (!warehouse || warehouse.is_active === 0) {
-          res.status(400).json({ error: 'warehouse_id must reference an active warehouse' });
-          return;
-        }
-        openingWarehouseId = warehouseId;
-      } else {
-        openingWarehouseId = WarehouseModel.getDefaultWarehouse(db)?.id;
-      }
-      if (openingWarehouseId === undefined) {
-        res.status(400).json({ error: 'An active warehouse is required when current_stock is greater than 0' });
-        return;
-      }
-    }
+    const { openingQty, standardCost, openingWarehouseId } = plan;
 
     const itemData = {
       ...req.body,

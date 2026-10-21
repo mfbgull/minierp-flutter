@@ -50,6 +50,90 @@ interface Token {
 
 // ── Tokenizer ────────────────────────────────────────────────
 
+const PUNCTUATION_TYPES: Record<string, TokenType> = {
+  '+': 'op',
+  '-': 'op',
+  '*': 'op',
+  '/': 'op',
+  '%': 'op',
+  '(': 'lparen',
+  ')': 'rparen',
+  ',': 'comma',
+};
+
+/**
+ * Reject the characters that are never valid in an expression: string
+ * literals, SQL comments and the statement separator.
+ */
+function assertTokenAllowed(ch: string, input: string, i: number): void {
+  // String literal — always rejected (token-named error)
+  if (ch === "'" || ch === '"') {
+    throw new ExpressionValidationError(
+      ch, i,
+      `String literals are not allowed in expressions. Only numbers, report fields, arithmetic (+ - * / %), parentheses, and ROUND/ABS/COALESCE/IFNULL/MIN/MAX/CAST may be used.`
+    );
+  }
+
+  // SQL comments — always rejected
+  if (ch === '-' && input[i + 1] === '-') {
+    throw new ExpressionValidationError('--', i, 'SQL comments are not allowed in expressions.');
+  }
+  if (ch === '/' && input[i + 1] === '*') {
+    throw new ExpressionValidationError('/*', i, 'SQL comments are not allowed in expressions.');
+  }
+
+  // Semicolon — statement separator, always rejected
+  if (ch === ';') {
+    throw new ExpressionValidationError(';', i, 'Semicolons are not allowed in expressions.');
+  }
+}
+
+/**
+ * Scan a numeric literal starting at `i`. Returns null when the character
+ * at `i` does not start a number.
+ */
+function scanNumber(input: string, i: number): { token: Token; next: number } | null {
+  const ch = input[i];
+  if (!(/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(input[i + 1] || '')))) return null;
+
+  let j = i;
+  while (j < input.length && /[0-9.]/.test(input[j])) j += 1;
+  const value = input.slice(i, j);
+  if ((value.match(/\./g) || []).length > 1) {
+    throw new ExpressionValidationError(value, i, `Invalid numeric literal "${value}".`);
+  }
+  return { token: { type: 'number', value, position: i }, next: j };
+}
+
+/**
+ * Scan an identifier or a function call starting at `i`. Returns null when
+ * the character at `i` does not start an identifier.
+ */
+function scanIdentifier(input: string, i: number): { token: Token; next: number } | null {
+  const ch = input[i];
+  if (!/[A-Za-z_]/.test(ch)) return null;
+
+  let j = i;
+  while (j < input.length && /[A-Za-z0-9_]/.test(input[j])) j += 1;
+
+  // Skip whitespace to see whether a '(' follows (function call).
+  let k = j;
+  while (k < input.length && /\s/.test(input[k])) k += 1;
+
+  if (input[k] === '(') {
+    const name = input.slice(i, j).toUpperCase();
+    if (!ALLOWED_FUNCTIONS.has(name)) {
+      throw new ExpressionValidationError(
+        input.slice(i, j), i,
+        `Function "${input.slice(i, j)}" is not allowed. Allowed functions: ${[...ALLOWED_FUNCTIONS].join(', ')}.`
+      );
+    }
+    return { token: { type: 'func', value: name, position: i }, next: j };
+  }
+
+  return { token: { type: 'ident', value: input.slice(i, j), position: i }, next: j };
+}
+
 function tokenize(input: string): Token[] {
   const tokens: Token[] = [];
   let i = 0;
@@ -63,85 +147,28 @@ function tokenize(input: string): Token[] {
       continue;
     }
 
-    // String literal — always rejected (token-named error)
-    if (ch === "'" || ch === '"') {
-      throw new ExpressionValidationError(
-        ch, i,
-        `String literals are not allowed in expressions. Only numbers, report fields, arithmetic (+ - * / %), parentheses, and ROUND/ABS/COALESCE/IFNULL/MIN/MAX/CAST may be used.`
-      );
-    }
-
-    // SQL comments — always rejected
-    if (ch === '-' && input[i + 1] === '-') {
-      throw new ExpressionValidationError('--', i, 'SQL comments are not allowed in expressions.');
-    }
-    if (ch === '/' && input[i + 1] === '*') {
-      throw new ExpressionValidationError('/*', i, 'SQL comments are not allowed in expressions.');
-    }
-
-    // Semicolon — statement separator, always rejected
-    if (ch === ';') {
-      throw new ExpressionValidationError(';', i, 'Semicolons are not allowed in expressions.');
-    }
+    assertTokenAllowed(ch, input, i);
 
     // Numbers
-    if (/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(input[i + 1] || ''))) {
-      let j = i;
-      while (j < input.length && /[0-9.]/.test(input[j])) j += 1;
-      const value = input.slice(i, j);
-      if ((value.match(/\./g) || []).length > 1) {
-        throw new ExpressionValidationError(value, i, `Invalid numeric literal "${value}".`);
-      }
-      tokens.push({ type: 'number', value, position: i });
-      i = j;
+    const number = scanNumber(input, i);
+    if (number) {
+      tokens.push(number.token);
+      i = number.next;
       continue;
     }
 
     // Identifiers / function names
-    if (/[A-Za-z_]/.test(ch)) {
-      let j = i;
-      while (j < input.length && /[A-Za-z0-9_]/.test(input[j])) j += 1;
-
-      // Skip whitespace to see whether a '(' follows (function call).
-      let k = j;
-      while (k < input.length && /\s/.test(input[k])) k += 1;
-
-      if (input[k] === '(') {
-        const name = input.slice(i, j).toUpperCase();
-        if (!ALLOWED_FUNCTIONS.has(name)) {
-          throw new ExpressionValidationError(
-            input.slice(i, j), i,
-            `Function "${input.slice(i, j)}" is not allowed. Allowed functions: ${[...ALLOWED_FUNCTIONS].join(', ')}.`
-          );
-        }
-        tokens.push({ type: 'func', value: name, position: i });
-        i = j;
-        continue;
-      }
-
-      tokens.push({ type: 'ident', value: input.slice(i, j), position: i });
-      i = j;
+    const identifier = scanIdentifier(input, i);
+    if (identifier) {
+      tokens.push(identifier.token);
+      i = identifier.next;
       continue;
     }
 
     // Operators & punctuation
-    if ('+-*/%'.includes(ch)) {
-      tokens.push({ type: 'op', value: ch, position: i });
-      i += 1;
-      continue;
-    }
-    if (ch === '(') {
-      tokens.push({ type: 'lparen', value: ch, position: i });
-      i += 1;
-      continue;
-    }
-    if (ch === ')') {
-      tokens.push({ type: 'rparen', value: ch, position: i });
-      i += 1;
-      continue;
-    }
-    if (ch === ',') {
-      tokens.push({ type: 'comma', value: ch, position: i });
+    const punctuation = PUNCTUATION_TYPES[ch];
+    if (punctuation) {
+      tokens.push({ type: punctuation, value: ch, position: i });
       i += 1;
       continue;
     }
@@ -227,41 +254,9 @@ class Parser {
         this.expectRparen();
         return;
 
-      case 'func': {
-        const afterName = this.next();
-        if (!afterName || afterName.type !== 'lparen') {
-          throw new ExpressionValidationError(
-            tok.value, tok.position,
-            `"${tok.value}" must be followed by "(...)".`
-          );
-        }
-        // CAST(expr AS TYPE) has a type keyword as its final argument.
-        if (tok.value === 'CAST') {
-          this.parseExpression();
-          const asTok = this.next();
-          if (!asTok || !/^(as)$/i.test(asTok.value) || asTok.type !== 'ident') {
-            throw new ExpressionValidationError(
-              asTok?.value || '', asTok?.position ?? tok.position,
-              'CAST requires the form CAST(expression AS type).'
-            );
-          }
-          const typeTok = this.next();
-          if (!typeTok || typeTok.type !== 'ident' || !/^(INTEGER|INT|REAL|FLOAT|TEXT|NUMERIC|DECIMAL)$/i.test(typeTok.value)) {
-            throw new ExpressionValidationError(
-              typeTok?.value || '', typeTok?.position ?? tok.position,
-              'CAST target type must be one of INTEGER, REAL, TEXT, NUMERIC, DECIMAL.'
-            );
-          }
-        } else {
-          this.parseExpression();
-          while (this.peek()?.type === 'comma') {
-            this.next();
-            this.parseExpression();
-          }
-        }
-        this.expectRparen();
+      case 'func':
+        this.parseFunctionCall(tok);
         return;
-      }
 
       case 'ident': {
         if (!this.validFields.has(tok.value)) {
@@ -279,6 +274,51 @@ class Parser {
           `Unexpected token "${tok.value}" in expression.`
         );
     }
+  }
+
+  /**
+   * Parse a function call's arguments. CAST(expr AS TYPE) has a type keyword
+   * as its final argument; every other allowed function takes a
+   * comma-separated expression list.
+   */
+  private parseFunctionCall(tok: Token): void {
+    const afterName = this.next();
+    if (!afterName || afterName.type !== 'lparen') {
+      throw new ExpressionValidationError(
+        tok.value, tok.position,
+        `"${tok.value}" must be followed by "(...)".`
+      );
+    }
+    // CAST(expr AS TYPE) has a type keyword as its final argument.
+    if (tok.value === 'CAST') {
+      this.parseCastArguments(tok);
+      return;
+    }
+    this.parseExpression();
+    while (this.peek()?.type === 'comma') {
+      this.next();
+      this.parseExpression();
+    }
+    this.expectRparen();
+  }
+
+  private parseCastArguments(tok: Token): void {
+    this.parseExpression();
+    const asTok = this.next();
+    if (!asTok || !/^(as)$/i.test(asTok.value) || asTok.type !== 'ident') {
+      throw new ExpressionValidationError(
+        asTok?.value || '', asTok?.position ?? tok.position,
+        'CAST requires the form CAST(expression AS type).'
+      );
+    }
+    const typeTok = this.next();
+    if (!typeTok || typeTok.type !== 'ident' || !/^(INTEGER|INT|REAL|FLOAT|TEXT|NUMERIC|DECIMAL)$/i.test(typeTok.value)) {
+      throw new ExpressionValidationError(
+        typeTok?.value || '', typeTok?.position ?? tok.position,
+        'CAST target type must be one of INTEGER, REAL, TEXT, NUMERIC, DECIMAL.'
+      );
+    }
+    this.expectRparen();
   }
 
   private expectRparen(): void {

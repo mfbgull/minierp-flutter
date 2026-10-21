@@ -6,7 +6,7 @@ import InvoiceModel from './Invoice';
 import { InvoiceCreationService } from '../services/InvoiceCreationService';
 import { SqlParam } from '../utils/sqlTypes';
 
-export interface SalesOrder {
+interface SalesOrder {
   id: number;
   so_no: string;
   customer_id: number;

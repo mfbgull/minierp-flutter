@@ -270,22 +270,9 @@ export class InvoiceReturnModel {
     ).all(returnId) as InvoiceReturnItemRow[];
   }
 
-  static getSettlements(db: Database.Database, returnId: number): ReturnSettlementRow[] {
-    return db.prepare(
-      'SELECT * FROM return_settlements WHERE return_id = ? ORDER BY id'
-    ).all(returnId) as ReturnSettlementRow[];
-  }
-
   // ───────────────────────────────────────────────────────────────
   // Void support (spec §5.3)
   // ───────────────────────────────────────────────────────────────
-
-  /** Active (non-voided) returns for an invoice, oldest first. */
-  static getActiveByInvoiceId(db: Database.Database, invoiceId: number): InvoiceReturnHeader[] {
-    return db.prepare(
-      'SELECT * FROM invoice_returns WHERE invoice_id = ? AND voided_at IS NULL ORDER BY id'
-    ).all(invoiceId) as InvoiceReturnHeader[];
-  }
 
   /** Settlement rows still in effect for a return (voided excluded). */
   static getActiveSettlements(db: Database.Database, returnId: number): ReturnSettlementRow[] {

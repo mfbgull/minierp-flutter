@@ -109,6 +109,348 @@ interface RecordMovementDTO {
   skipAdjustmentFinancialPosting?: boolean;
 }
 
+type ConsumptionEntry = { batchId: number | null; consumed: number; unitCost: number };
+
+type LocationBatchRow = {
+  id: number;
+  unit_cost: number;
+  received_date: string;
+  expiry_date: string | null;
+  qty_avail: number;
+};
+
+type LegacyBatchRow = { id: number; quantity_remaining: number; unit_cost: number };
+
+/**
+ * Sellable quantity for the item in the warehouse.
+ *
+ * `stock_balances` is the source of truth. `quantity_available` exists only
+ * after the batch-location migration, so it is read only when the feature is
+ * on — legacy databases (flag off, column absent) keep the old behaviour.
+ *
+ * With the flag on, legacy stock that predates batch costing has no
+ * `batch_stock_by_location` rows, so `quantity_available` is 0 while
+ * `quantity` still holds the real on-hand amount. Such stock must stay
+ * consumable (the no-coverage fallback below prices it at standard cost with
+ * batchId null), so fall back to `quantity` when the item has no per-location
+ * coverage in this warehouse.
+ */
+function resolveAvailableQuantity(
+  db: Database.Database,
+  itemId: number,
+  warehouseId: number,
+  requiredQty: number,
+  featureOn: boolean
+): number {
+  const balanceRow = db.prepare(`
+    SELECT quantity${featureOn ? ', quantity_available' : ''} FROM stock_balances
+    WHERE item_id = ? AND warehouse_id = ?
+  `).get(itemId, warehouseId) as { quantity: number; quantity_available?: number } | undefined;
+
+  let availableQty = featureOn
+    ? (balanceRow ? roundQty(parseFloat(String(balanceRow.quantity_available ?? 0))) : 0)
+    : (balanceRow ? roundQty(parseFloat(String(balanceRow.quantity))) : 0);
+
+  if (featureOn && qtyLessThan(availableQty, requiredQty)) {
+    const coverage = db.prepare(`
+      SELECT COALESCE(SUM(bsl.quantity_available), 0) as covered
+      FROM batch_stock_by_location bsl
+      JOIN locations l ON bsl.location_id = l.id
+      JOIN stock_batches sb ON sb.id = bsl.batch_id
+      WHERE l.warehouse_id = ? AND sb.item_id = ?
+    `).get(warehouseId, itemId) as { covered: number };
+    if (roundQty(coverage.covered) < requiredQty) {
+      availableQty = balanceRow ? roundQty(parseFloat(String(balanceRow.quantity))) : 0;
+    }
+  }
+
+  return availableQty;
+}
+
+/**
+ * Batches eligible for consumption, aggregated across the locations of this
+ * warehouse. `useFEFO` adds the expiry filter; both paths skip halted batches
+ * and non-ACTIVE locations.
+ */
+function selectLocationBatches(
+  db: Database.Database,
+  itemId: number,
+  warehouseId: number,
+  asOf: string,
+  useFEFO: boolean
+): LocationBatchRow[] {
+  const locationFilter = useFEFO
+    ? `AND sb.halted = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'
+       AND (sb.expiry_date IS NULL OR sb.expiry_date >= @asOf)`
+    : `AND sb.halted = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'`;
+
+  return db.prepare(`
+    SELECT sb.id, sb.unit_cost, sb.received_date, sb.expiry_date,
+           SUM(bsl.quantity_available) as qty_avail
+    FROM stock_batches sb
+    JOIN batch_stock_by_location bsl ON sb.id = bsl.batch_id
+    JOIN locations l ON bsl.location_id = l.id
+    WHERE sb.item_id = ? AND l.warehouse_id = ?
+      AND bsl.quantity_available > 0
+      AND sb.received_date <= @asOf
+      ${locationFilter}
+    GROUP BY sb.id
+    ORDER BY
+      CASE WHEN sb.expiry_date IS NULL THEN 1 ELSE 0 END,
+      sb.expiry_date ASC,
+      sb.received_date ASC,
+      sb.id ASC
+  `).all(itemId, warehouseId, { asOf }) as LocationBatchRow[];
+}
+
+/**
+ * Stock exists in this warehouse but every batch/location is blocked or
+ * expired. That is "no sellable stock", not legacy unbatched stock.
+ */
+function assertNoBlockedStockOnly(
+  db: Database.Database,
+  itemId: number,
+  warehouseId: number,
+  quantity: number
+): void {
+  const allBatchStock = db.prepare(`
+    SELECT SUM(bsl.quantity_available) as total, COUNT(*) as rows_count
+    FROM batch_stock_by_location bsl
+    JOIN locations l ON bsl.location_id = l.id
+    WHERE l.warehouse_id = ?
+      AND EXISTS (
+        SELECT 1 FROM stock_batches sb
+        WHERE sb.id = bsl.batch_id AND sb.item_id = ?
+      )
+  `).get(warehouseId, itemId) as { total: number; rows_count: number } | undefined;
+  const totalBlocked = allBatchStock?.total ?? 0;
+  const coverageRows = allBatchStock?.rows_count ?? 0;
+  if (totalBlocked <= 0 && coverageRows <= 0) return;
+
+  const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
+  throw new SellableStockUnavailableError(
+    item?.item_name || `item ${itemId}`,
+    quantity,
+    0
+  );
+}
+
+/**
+ * Consume from the oldest eligible batch first. The location rows of a batch
+ * are drawn down first, then the master batch row is decremented by the
+ * batch's total take.
+ */
+function consumeBatchesByLocation(
+  db: Database.Database,
+  itemId: number,
+  warehouseId: number,
+  batchRows: LocationBatchRow[],
+  roundedQty: number
+): ConsumptionEntry[] {
+  let remaining = roundedQty;
+  const consumption: ConsumptionEntry[] = [];
+
+  for (const batch of batchRows) {
+    if (remaining <= 0) break;
+    const batchAvail = roundQty(batch.qty_avail);
+    const consumeFromThis = roundQty(Math.min(remaining, batchAvail));
+
+    // Location rows for this batch in this warehouse. The batch-level
+    // expiry/halted filter already ran in the outer batchRows query;
+    // here only location sellability applies (ACTIVE status).
+    // (The previous version referenced `sb.expiry_date` out of scope
+    // — a latent "no such column" failure on every FEFO consumption.)
+    const locRows = db.prepare(`
+      SELECT bsl.id, bsl.quantity_available, l.created_at
+      FROM batch_stock_by_location bsl
+      JOIN locations l ON bsl.location_id = l.id
+      WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+        AND bsl.quantity_available > 0
+        AND (bsl.status_override IS NULL OR bsl.status_override = 'ACTIVE')
+      ORDER BY l.created_at ASC, bsl.id ASC
+    `).all(batch.id, warehouseId) as Array<{ id: number; quantity_available: number; created_at: string }>;
+
+    let batchRemaining = consumeFromThis;
+    for (const loc of locRows) {
+      if (batchRemaining <= 0) break;
+      const locAvail = roundQty(loc.quantity_available);
+      const take = roundQty(Math.min(batchRemaining, locAvail));
+      db.prepare(`
+        UPDATE batch_stock_by_location
+        SET quantity_physical = quantity_physical - ?, quantity_reserved = quantity_reserved
+        WHERE id = ?
+      `).run(take, loc.id);
+      batchRemaining -= take;
+    }
+
+    // Also decrement master batch for backward compatibility
+    db.prepare(`
+      UPDATE stock_batches
+      SET quantity_remaining = quantity_remaining - ?
+      WHERE id = ?
+    `).run(consumeFromThis, batch.id);
+
+    consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost });
+    remaining -= consumeFromThis;
+  }
+
+  if (qtyPositive(remaining)) {
+    const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
+    throw new SellableStockUnavailableError(
+      item?.item_name || `item ${itemId}`,
+      roundedQty,
+      roundQty(roundedQty - remaining)
+    );
+  }
+
+  return consumption;
+}
+
+/**
+ * Batches for the legacy (feature-flag-off) path. FEFO additionally reports
+ * the total tracked quantity so the caller can tell "all batches exhausted"
+ * from "no batches at all".
+ */
+function selectLegacyBatches(
+  db: Database.Database,
+  itemId: number,
+  warehouseId: number,
+  asOf: string,
+  useFEFO: boolean,
+  availableQty: number
+): { batches: LegacyBatchRow[]; totalBatchTrackedQty: number } {
+  if (!useFEFO) {
+    const batches = db.prepare(`
+      SELECT id, quantity_remaining, unit_cost
+      FROM stock_batches
+      WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+        AND received_date <= @asOf
+      ORDER BY received_date ASC, id ASC
+    `).all(itemId, warehouseId, { asOf }) as LegacyBatchRow[];
+    return { batches, totalBatchTrackedQty: 0 };
+  }
+
+  const batches = db.prepare(`
+    SELECT id, quantity_remaining, unit_cost
+    FROM stock_batches
+    WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+      AND (halted = 0 OR halted IS NULL)
+      AND received_date <= @asOf
+      AND (expiry_date IS NULL OR expiry_date >= @asOf)
+    ORDER BY
+      CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END,
+      expiry_date ASC,
+      received_date ASC,
+      id ASC
+  `).all(itemId, warehouseId, { asOf }) as LegacyBatchRow[];
+
+  if (batches.length > 0) return { batches, totalBatchTrackedQty: 0 };
+
+  if (availableQty <= 0) return { batches, totalBatchTrackedQty: 0 };
+
+  const allBatches = db.prepare(`
+    SELECT SUM(quantity_remaining) as total
+    FROM stock_batches
+    WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+  `).get(itemId, warehouseId) as { total: number } | undefined;
+
+  return { batches, totalBatchTrackedQty: allBatches?.total ?? 0 };
+}
+
+function consumeLegacyBatches(
+  db: Database.Database,
+  itemId: number,
+  batches: LegacyBatchRow[],
+  roundedQty: number
+): ConsumptionEntry[] {
+  let remaining = roundedQty;
+  const consumption: ConsumptionEntry[] = [];
+
+  for (const batch of batches) {
+    if (remaining <= 0) break;
+    const batchRemaining = roundQty(batch.quantity_remaining);
+    const consumeFromThis = roundQty(Math.min(remaining, batchRemaining));
+
+    db.prepare(`
+      UPDATE stock_batches
+      SET quantity_remaining = quantity_remaining - ?
+      WHERE id = ?
+    `).run(consumeFromThis, batch.id);
+
+    consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost });
+    remaining -= consumeFromThis;
+  }
+
+  if (qtyPositive(remaining)) {
+    const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
+    throw new SellableStockUnavailableError(
+      item?.item_name || `item ${itemId}`,
+      roundedQty,
+      roundQty(roundedQty - remaining)
+    );
+  }
+
+  return consumption;
+}
+
+/**
+ * The legacy (feature-flag-off) consumption path: select batches, consume
+ * them, and fall back to standard cost when the item has no batch rows.
+ */
+function consumeLegacyStock(
+  db: Database.Database,
+  itemId: number,
+  warehouseId: number,
+  quantity: number,
+  roundedQty: number,
+  asOf: string,
+  useFEFO: boolean,
+  availableQty: number,
+  itemRow: { has_expiry: number; standard_cost: number; item_name: string } | undefined
+): ConsumptionEntry[] {
+  const { batches, totalBatchTrackedQty } = selectLegacyBatches(
+    db, itemId, warehouseId, asOf, useFEFO, availableQty
+  );
+
+  if (batches.length === 0) {
+    if (useFEFO && totalBatchTrackedQty > 0) {
+      throw new SellableStockUnavailableError(
+        itemRow?.item_name || `item ${itemId}`,
+        quantity,
+        0
+      );
+    }
+
+    // Same distinction as the feature-flagged path. If this item HAS
+    // batches in this warehouse and all of them are exhausted, that is "no
+    // sellable stock", not legacy unbatched stock. Falling through would
+    // fabricate the quantity at standard cost out of a balance no batch
+    // backs, creating stock that does not exist.
+    if (!useFEFO) {
+      const tracked = db.prepare(`
+        SELECT COUNT(*) AS batches FROM stock_batches
+        WHERE item_id = ? AND warehouse_id = ?
+      `).get(itemId, warehouseId) as { batches: number };
+      if (Number(tracked.batches) > 0) {
+        throw new SellableStockUnavailableError(
+          itemRow?.item_name || `item ${itemId}`,
+          quantity,
+          0
+        );
+      }
+    }
+
+    const fallbackCost = itemRow?.standard_cost ?? 0;
+    logger.warn(
+      `[BatchCosting] No batch rows for ${itemRow?.item_name || 'item'} in warehouse. ` +
+      `Using standard_cost (${fallbackCost}) for the entire ${quantity} units (legacy stock).`
+    );
+    return [{ batchId: null, consumed: quantity, unitCost: fallbackCost }];
+  }
+
+  return consumeLegacyBatches(db, itemId, batches, roundedQty);
+}
+
 class StockMovementModel {
   /**
    * Next sequence number for batch numbers (shared with PhysicalCount via
@@ -623,15 +965,6 @@ class StockMovementModel {
     return { rows, total: countRow.total, pageNum, limitNum };
   }
 
-  static getOriginalWarehouseForItem(db: Database.Database, itemId: number, invoiceNo: string): number | undefined {
-    const result = db.prepare(`
-      SELECT warehouse_id FROM stock_movements
-      WHERE item_id = ? AND reference_docno = ? AND movement_type = 'SALE'
-      LIMIT 1
-    `).get(itemId, invoiceNo) as { warehouse_id: number } | undefined;
-    return result ? result.warehouse_id : undefined;
-  }
-
   /**
    * Consume a quantity of an item from the oldest available stock batches (FIFO).
    * Deducts quantity_remaining from each batch until the required quantity is met.
@@ -829,36 +1162,7 @@ class StockMovementModel {
 
     const featureOn = isFeatureEnabled(db, 'feature_batch_locations');
 
-    // Authoritative check: stock_balances is the source of truth.
-    // quantity_available exists only after the batch-location migration;
-    // select it only when the feature is on so legacy databases (flag
-    // off, column absent) keep the old behavior.
-    const balanceRow = db.prepare(`
-      SELECT quantity${featureOn ? ', quantity_available' : ''} FROM stock_balances
-      WHERE item_id = ? AND warehouse_id = ?
-    `).get(itemId, warehouseId) as { quantity: number; quantity_available?: number } | undefined;
-    // With the flag on, legacy stock that predates batch costing has no
-    // batch_stock_by_location rows, so quantity_available is 0 while
-    // quantity still holds the real on-hand amount. Such stock must stay
-    // consumable (the no-coverage fallback below prices it at standard
-    // cost with batchId null), so fall back to quantity when the item
-    // has no per-location coverage in this warehouse.
-    let availableQty = featureOn
-      ? (balanceRow ? roundQty(parseFloat(String(balanceRow.quantity_available ?? 0))) : 0)
-      : (balanceRow ? roundQty(parseFloat(String(balanceRow.quantity))) : 0);
-    if (featureOn && qtyLessThan(availableQty, roundedQty)) {
-      const coverage = db.prepare(`
-        SELECT COALESCE(SUM(bsl.quantity_available), 0) as covered
-        FROM batch_stock_by_location bsl
-        JOIN locations l ON bsl.location_id = l.id
-        JOIN stock_batches sb ON sb.id = bsl.batch_id
-        WHERE l.warehouse_id = ? AND sb.item_id = ?
-      `).get(warehouseId, itemId) as { covered: number };
-      if (roundQty(coverage.covered) < roundedQty) {
-        // No (or insufficient) per-location coverage: legacy stock.
-        availableQty = balanceRow ? roundQty(parseFloat(String(balanceRow.quantity))) : 0;
-      }
-    }
+    const availableQty = resolveAvailableQuantity(db, itemId, warehouseId, roundedQty, featureOn);
 
     if (qtyLessThan(availableQty, roundedQty)) {
       const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
@@ -874,60 +1178,11 @@ class StockMovementModel {
     const useFEFO = itemRow?.has_expiry === 1;
 
     if (featureOn) {
-      // New path: read from batch_stock_by_location, filtered by warehouse via locations.
-      // Aggregate quantity_available per batch across locations in this warehouse,
-      // respecting per-location status_override (skip non-ACTIVE locations).
-      const locationFilter = useFEFO
-        ? `AND sb.halted = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'
-           AND (sb.expiry_date IS NULL OR sb.expiry_date >= @asOf)`
-        : `AND sb.halted = 0 AND COALESCE(bsl.status_override, 'ACTIVE') = 'ACTIVE'`;
-
-      const batchRows = db.prepare(`
-        SELECT sb.id, sb.unit_cost, sb.received_date, sb.expiry_date,
-               SUM(bsl.quantity_available) as qty_avail
-        FROM stock_batches sb
-        JOIN batch_stock_by_location bsl ON sb.id = bsl.batch_id
-        JOIN locations l ON bsl.location_id = l.id
-        WHERE sb.item_id = ? AND l.warehouse_id = ?
-          AND bsl.quantity_available > 0
-          AND sb.received_date <= @asOf
-          ${locationFilter}
-        GROUP BY sb.id
-        ORDER BY
-          CASE WHEN sb.expiry_date IS NULL THEN 1 ELSE 0 END,
-          sb.expiry_date ASC,
-          sb.received_date ASC,
-          sb.id ASC
-      `).all(itemId, warehouseId, { asOf }) as Array<{
-        id: number;
-        unit_cost: number;
-        received_date: string;
-        expiry_date: string | null;
-        qty_avail: number;
-      }>;
+      const batchRows = selectLocationBatches(db, itemId, warehouseId, asOf, useFEFO);
 
       // Check if stock exists but all batches/locations are blocked/expired.
       if (batchRows.length === 0 && availableQty > 0) {
-        const allBatchStock = db.prepare(`
-          SELECT SUM(bsl.quantity_available) as total, COUNT(*) as rows_count
-          FROM batch_stock_by_location bsl
-          JOIN locations l ON bsl.location_id = l.id
-          WHERE l.warehouse_id = ?
-            AND EXISTS (
-              SELECT 1 FROM stock_batches sb
-              WHERE sb.id = bsl.batch_id AND sb.item_id = ?
-            )
-        `).get(warehouseId, itemId) as { total: number; rows_count: number } | undefined;
-        const totalBlocked = allBatchStock?.total ?? 0;
-        const coverageRows = allBatchStock?.rows_count ?? 0;
-        if (totalBlocked > 0 || coverageRows > 0) {
-          const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
-          throw new SellableStockUnavailableError(
-            item?.item_name || `item ${itemId}`,
-            quantity,
-            0
-          );
-        }
+        assertNoBlockedStockOnly(db, itemId, warehouseId, quantity);
       }
 
       // Legacy case: positive warehouse stock but no batch_stock_by_location rows.
@@ -940,174 +1195,13 @@ class StockMovementModel {
         return [{ batchId: null, consumed: quantity, unitCost: fallbackCost }];
       }
 
-      // Consume from oldest batches first, respecting per-batch available.
-      let remaining = roundedQty;
-      const consumption: Array<{ batchId: number | null; consumed: number; unitCost: number }> = [];
-
-      for (const batch of batchRows) {
-        if (remaining <= 0) break;
-        const batchAvail = roundQty(batch.qty_avail);
-        const consumeFromThis = roundQty(Math.min(remaining, batchAvail));
-
-        // Location rows for this batch in this warehouse. The batch-level
-        // expiry/halted filter already ran in the outer batchRows query;
-        // here only location sellability applies (ACTIVE status).
-        // (The previous version referenced `sb.expiry_date` out of scope
-        // — a latent "no such column" failure on every FEFO consumption.)
-        const locRows = db.prepare(`
-          SELECT bsl.id, bsl.quantity_available, l.created_at
-          FROM batch_stock_by_location bsl
-          JOIN locations l ON bsl.location_id = l.id
-          WHERE bsl.batch_id = ? AND l.warehouse_id = ?
-            AND bsl.quantity_available > 0
-            AND (bsl.status_override IS NULL OR bsl.status_override = 'ACTIVE')
-          ORDER BY l.created_at ASC, bsl.id ASC
-        `).all(batch.id, warehouseId) as Array<{ id: number; quantity_available: number; created_at: string }>;
-
-        let batchRemaining = consumeFromThis;
-        for (const loc of locRows) {
-          if (batchRemaining <= 0) break;
-          const locAvail = roundQty(loc.quantity_available);
-          const take = roundQty(Math.min(batchRemaining, locAvail));
-          db.prepare(`
-            UPDATE batch_stock_by_location
-            SET quantity_physical = quantity_physical - ?, quantity_reserved = quantity_reserved
-            WHERE id = ?
-          `).run(take, loc.id);
-          batchRemaining -= take;
-        }
-
-        // Also decrement master batch for backward compatibility
-        db.prepare(`
-          UPDATE stock_batches
-          SET quantity_remaining = quantity_remaining - ?
-          WHERE id = ?
-        `).run(consumeFromThis, batch.id);
-
-        consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost });
-        remaining -= consumeFromThis;
-      }
-
-      if (qtyPositive(remaining)) {
-        const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
-        throw new SellableStockUnavailableError(
-          item?.item_name || `item ${itemId}`,
-          roundedQty,
-          roundQty(roundedQty - remaining)
-        );
-      }
-
-      return consumption;
+      return consumeBatchesByLocation(db, itemId, warehouseId, batchRows, roundedQty);
     }
 
     // Legacy path (feature flag off): original behavior unchanged.
-    let batches: Array<{ id: number; quantity_remaining: number; unit_cost: number }>;
-    let totalBatchTrackedQty = 0;
-
-    if (useFEFO) {
-      batches = db.prepare(`
-        SELECT id, quantity_remaining, unit_cost
-        FROM stock_batches
-        WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
-          AND (halted = 0 OR halted IS NULL)
-          AND received_date <= @asOf
-          AND (expiry_date IS NULL OR expiry_date >= @asOf)
-        ORDER BY
-          CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END,
-          expiry_date ASC,
-          received_date ASC,
-          id ASC
-      `).all(itemId, warehouseId, { asOf }) as Array<{
-        id: number;
-        quantity_remaining: number;
-        unit_cost: number;
-      }>;
-
-      if (batches.length === 0 && availableQty > 0) {
-        const allBatches = db.prepare(`
-          SELECT SUM(quantity_remaining) as total
-          FROM stock_batches
-          WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
-        `).get(itemId, warehouseId) as { total: number } | undefined;
-        totalBatchTrackedQty = allBatches?.total ?? 0;
-      }
-    } else {
-      batches = db.prepare(`
-        SELECT id, quantity_remaining, unit_cost
-        FROM stock_batches
-        WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
-          AND received_date <= @asOf
-        ORDER BY received_date ASC, id ASC
-      `).all(itemId, warehouseId, { asOf }) as Array<{
-        id: number;
-        quantity_remaining: number;
-        unit_cost: number;
-      }>;
-    }
-
-    if (batches.length === 0) {
-      if (useFEFO && totalBatchTrackedQty > 0) {
-        throw new SellableStockUnavailableError(
-          itemRow?.item_name || `item ${itemId}`,
-          quantity,
-          0
-        );
-      }
-
-      // Same distinction as the feature-flagged path above. If this item HAS
-      // batches in this warehouse and all of them are exhausted, that is "no
-      // sellable stock", not legacy unbatched stock. Falling through would
-      // fabricate the quantity at standard cost out of a balance no batch
-      // backs, creating stock that does not exist.
-      if (!useFEFO) {
-        const tracked = db.prepare(`
-          SELECT COUNT(*) AS batches FROM stock_batches
-          WHERE item_id = ? AND warehouse_id = ?
-        `).get(itemId, warehouseId) as { batches: number };
-        if (Number(tracked.batches) > 0) {
-          throw new SellableStockUnavailableError(
-            itemRow?.item_name || `item ${itemId}`,
-            quantity,
-            0
-          );
-        }
-      }
-
-      const fallbackCost = itemRow?.standard_cost ?? 0;
-      logger.warn(
-        `[BatchCosting] No batch rows for ${itemRow?.item_name || 'item'} in warehouse. ` +
-        `Using standard_cost (${fallbackCost}) for the entire ${quantity} units (legacy stock).`
-      );
-      return [{ batchId: null, consumed: quantity, unitCost: fallbackCost }];
-    }
-
-    let remaining = roundedQty;
-    const consumption: Array<{ batchId: number | null; consumed: number; unitCost: number }> = [];
-
-    for (const batch of batches) {
-      if (remaining <= 0) break;
-      const batchRemaining = roundQty(batch.quantity_remaining);
-      const consumeFromThis = roundQty(Math.min(remaining, batchRemaining));
-
-      db.prepare(`
-        UPDATE stock_batches
-        SET quantity_remaining = quantity_remaining - ?
-        WHERE id = ?
-      `).run(consumeFromThis, batch.id);
-
-      consumption.push({ batchId: batch.id, consumed: consumeFromThis, unitCost: batch.unit_cost });
-      remaining -= consumeFromThis;
-    }
-
-    if (qtyPositive(remaining)) {
-      const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(itemId) as { item_name: string } | undefined;
-      throw new SellableStockUnavailableError(
-        item?.item_name || `item ${itemId}`,
-        roundedQty,
-        roundQty(roundedQty - remaining)
-      );
-    }
-    return consumption;
+    return consumeLegacyStock(
+      db, itemId, warehouseId, quantity, roundedQty, asOf, useFEFO, availableQty, itemRow
+    );
   }
 
     /**

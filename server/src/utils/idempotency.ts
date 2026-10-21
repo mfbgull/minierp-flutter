@@ -230,6 +230,38 @@ export type IdempotencyStart =
   | { kind: 'replay'; resourceId: number }
   | { kind: 'error'; status: 400 | 409; message: string };
 
+/**
+ * The subset of an Express response this module needs, so the helper can
+ * live here without pulling Express into a util.
+ */
+export type IdempotencyResponse = {
+  status(code: number): IdempotencyResponse;
+  set(name: string, value: string): void;
+  json(body: unknown): void;
+};
+
+/**
+ * Answer a replayed (or rejected) idempotent write. Returns false when the
+ * request may proceed with its write, so the caller does not repeat the
+ * error and replay branches.
+ */
+export function respondToIdempotencyReplay(
+  res: IdempotencyResponse,
+  outcome: IdempotencyStart,
+  options: { status?: number; buildBody: (resourceId: number) => unknown }
+): boolean {
+  if (outcome.kind === 'error') {
+    res.status(outcome.status).json({ error: outcome.message });
+    return true;
+  }
+  if (outcome.kind === 'replay') {
+    res.set('X-Idempotent-Replay', 'true');
+    res.status(options.status ?? 200).json(options.buildBody(outcome.resourceId));
+    return true;
+  }
+  return false;
+}
+
 export function startIdempotentRequest(
   db: Database.Database,
   headers: Record<string, unknown> | undefined,

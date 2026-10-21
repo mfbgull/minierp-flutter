@@ -48,7 +48,7 @@ export class InvoiceCancellationGuardError extends Error {
   }
 }
 
-export interface Invoice {
+interface Invoice {
   id: number;
   invoice_no: string;
   customer_id: number;
@@ -99,7 +99,7 @@ export interface InvoiceItem {
   is_expired_at_sale?: boolean;
 }
 
-export interface CreateInvoiceDTO {
+interface CreateInvoiceDTO {
   invoice_no?: string;
   customer_id: number;
   customer_name?: string;
@@ -136,21 +136,6 @@ export interface CreateInvoiceItemDTO {
   discount_value?: number;
   /** Loose amount-driven lines: entered bill amount as the gross base. */
   amount?: number;
-}
-
-export interface UpdateInvoiceDTO {
-  customer_id?: number;
-  customer_name?: string;
-  invoice_date?: string;
-  due_date?: string;
-  status?: 'Draft' | 'Sent' | 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled' | 'Returned' | 'Partially Returned';
-  notes?: string;
-  terms?: string;
-  warehouse_id?: number;
-  items?: CreateInvoiceItemDTO[];
-  discount_scope?: string;
-  discount_type?: string;
-  discount_value?: number;
 }
 
 export interface InvoiceFilters {
@@ -206,6 +191,55 @@ const INVOICE_RETURN_SORT_COLUMN_MAP: Record<string, string> = {
   unit_cost: 'sm.unit_cost',
   created_at: 'sm.created_at',
 };
+
+function assertInvoiceItemsValid(items: CreateInvoiceItemDTO[]): void {
+  for (const item of items) {
+    if (!item.item_id || item.item_id <= 0) throw new Error('Invalid item_id in invoice items');
+    if (!item.quantity || item.quantity <= 0) throw new Error('Invalid quantity in invoice items');
+    if (item.unit_price === undefined || item.unit_price < 0) throw new Error('Invalid unit_price in invoice items');
+  }
+}
+
+/**
+ * Positional parameters for the invoices INSERT, in column order.
+ */
+function buildInvoiceInsertParams(
+  data: CreateInvoiceDTO,
+  userId: number,
+  totalAmount: number,
+  paidAmount: number,
+  balanceAmount: number,
+  creditOffset: number
+): SqlParam[] {
+  const paymentStatus =
+    (data.status === 'Paid' || (data.paid_amount ?? 0) >= (data.total_amount ?? 0)) ? 'Paid'
+      : data.status === 'Partially Paid' ? 'Partially Paid'
+      : 'Unpaid';
+
+  return [
+    data.invoice_no || null,
+    data.customer_id,
+    data.customer_name || null,
+    data.so_id || null,
+    data.source_type || null,
+    data.quotation_id || null,
+    data.invoice_date,
+    data.due_date || null,
+    data.status || 'Unpaid',
+    paymentStatus,
+    'None',
+    totalAmount,
+    paidAmount,
+    balanceAmount,
+    data.notes || null,
+    data.discount_scope || 'invoice',
+    data.discount_type || 'percentage',
+    data.discount_value || 0,
+    data.terms || null,
+    userId,
+    creditOffset,
+  ];
+}
 
 class InvoiceModel {
   /**
@@ -428,68 +462,6 @@ class InvoiceModel {
    /**
    * Get sales cycle chain for an invoice (quotation -> SO -> invoice)
    */
-  static getSalesCycleChain(invoiceId: number, db: Database.Database): {
-    quotation: Record<string, unknown> | undefined;
-    salesOrder: Record<string, unknown> | undefined;
-    invoice: Invoice | undefined;
-  } {
-    const invoice = this.getById(invoiceId, db);
-
-    // Annotated explicitly: `let x = undefined` has no inferred type for
-    // TS to evolve here, so the assignments below collapse to `never`.
-    let salesOrder: Record<string, unknown> | undefined = undefined;
-    let quotation: Record<string, unknown> | undefined = undefined;
-
-    if (invoice?.so_id) {
-      salesOrder = db.prepare(`
-        SELECT
-          so.*,
-          w.warehouse_code,
-          w.warehouse_name,
-          u.username as created_by_username,
-          q.quotation_no
-        FROM sales_orders so
-        LEFT JOIN warehouses w ON so.warehouse_id = w.id
-        LEFT JOIN users u ON so.created_by = u.id
-        LEFT JOIN quotations q ON so.source_id = q.id AND so.source_type = 'QUOTATION'
-        WHERE so.id = ?
-      `).get(invoice.so_id) as Record<string, unknown> | undefined;
-
-      // Get quotation if SO has source
-      if (salesOrder?.source_type === 'QUOTATION' && salesOrder.source_id) {
-        quotation = db.prepare(`
-          SELECT
-            q.*,
-            w.warehouse_code,
-            w.warehouse_name,
-            u.username as created_by_username
-          FROM quotations q
-          LEFT JOIN warehouses w ON q.warehouse_id = w.id
-          LEFT JOIN users u ON q.created_by = u.id
-          WHERE q.id = ?
-        `).get(salesOrder.source_id) as Record<string, unknown> | undefined;
-      }
-    } else if (invoice?.quotation_id) {
-      // Direct quotation link (if invoice was created directly from quotation)
-      quotation = db.prepare(`
-        SELECT
-          q.*,
-          w.warehouse_code,
-          w.warehouse_name,
-          u.username as created_by_username
-        FROM quotations q
-        LEFT JOIN warehouses w ON q.warehouse_id = w.id
-        LEFT JOIN users u ON q.created_by = u.id
-        WHERE q.id = ?
-      `).get(invoice.quotation_id) as Record<string, unknown> | undefined;
-    }
-
-    return {
-      quotation,
-      salesOrder,
-      invoice
-    };
-  }
 
   /**
    * Generate the next payment number atomically using a transaction.
@@ -588,7 +560,6 @@ class InvoiceModel {
 
     return defaultWarehouse ? defaultWarehouse.id : 1;
   }
-
 
   /**
    * Reverse stock movements for a list of invoice items that were previously sold.
@@ -768,11 +739,7 @@ class InvoiceModel {
     if (!data.items || data.items.length === 0) {
       throw new Error('At least one invoice item is required');
     }
-    for (const item of data.items) {
-      if (!item.item_id || item.item_id <= 0) throw new Error('Invalid item_id in invoice items');
-      if (!item.quantity || item.quantity <= 0) throw new Error('Invalid quantity in invoice items');
-      if (item.unit_price === undefined || item.unit_price < 0) throw new Error('Invalid unit_price in invoice items');
-    }
+    assertInvoiceItemsValid(data.items);
 
     // CRITICAL-1 fix: when the caller supplies paid_amount/balance_amount
     // overrides (e.g., an initial payment was recorded as part of the
@@ -794,31 +761,9 @@ class InvoiceModel {
         discount_scope, discount_type, discount_value, terms, created_by, credit_offset
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      data.invoice_no || null,
-      data.customer_id,
-      data.customer_name || null,
-      data.so_id || null,
-      data.source_type || null,
-      data.quotation_id || null,
-      data.invoice_date,
-      data.due_date || null,
-      data.status || 'Unpaid',
-      (data.status === 'Paid' || (data.paid_amount ?? 0) >= (data.total_amount ?? 0)) ? 'Paid'
-        : data.status === 'Partially Paid' ? 'Partially Paid'
-        : 'Unpaid',
-      'None',
-      totalAmount,
-      paidAmount,
-      balanceAmount,
-      data.notes || null,
-      data.discount_scope || 'invoice',
-      data.discount_type || 'percentage',
-      data.discount_value || 0,
-      data.terms || null,
-      userId,
-      creditOffset
-    );
+    `).run(...buildInvoiceInsertParams(
+      data, userId, totalAmount, paidAmount, balanceAmount, creditOffset
+    ));
     return result.lastInsertRowid as number;
   }
 
@@ -935,21 +880,10 @@ class InvoiceModel {
   /**
    * Get total paid for an invoice
    */
-  static getTotalPaid(db: Database.Database, invoiceId: number): number {
-    const result = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total_paid
-      FROM payment_allocations
-      WHERE invoice_id = ? AND voided_at IS NULL
-    `).get(invoiceId) as { total_paid: number };
-    return result.total_paid;
-  }
 
   /**
    * Get invoice by ID for balance calculation
    */
-  static getInvoiceForBalance(db: Database.Database, invoiceId: number): { total_amount: number; status: string } | undefined {
-    return db.prepare(`SELECT total_amount, status FROM invoices WHERE id = ?`).get(invoiceId) as { total_amount: number; status: string } | undefined;
-  }
 
   /**
    * Update invoice record
@@ -1164,9 +1098,6 @@ class InvoiceModel {
   /**
    * Delete invoice
    */
-  static deleteInvoice(db: Database.Database, invoiceId: number): void {
-    db.prepare(`DELETE FROM invoices WHERE id = ?`).run(invoiceId);
-  }
 
   /**
    * Get invoices by quotation ID (via SO or direct)
@@ -1212,58 +1143,16 @@ class InvoiceModel {
   /**
    * Update invoice source tracking (used when converting SO to invoice)
    */
-  static updateSourceTracking(
-    invoiceId: number,
-    soId: number,
-    quotationId: number | null,
-    db: Database.Database
-  ): void {
-    db.prepare(`
-      UPDATE invoices
-      SET source_type = 'SALES_ORDER',
-          so_id = ?,
-          quotation_id = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(soId, quotationId, invoiceId);
-  }
 
   /**
    * Get invoice statistics by customer
    */
-  static getStatsByCustomer(customerId: number, db: Database.Database): {
-    total_invoices: number;
-    total_amount: number;
-    paid_amount: number;
-    outstanding_amount: number;
-    avg_invoice_value: number;
-  } {
-    return db.prepare(`
-      SELECT
-        COUNT(*) as total_invoices,
-        COALESCE(SUM(total_amount), 0) as total_amount,
-        COALESCE(SUM(paid_amount), 0) as paid_amount,
-        COALESCE(SUM(balance_amount), 0) as outstanding_amount,
-        COALESCE(AVG(total_amount), 0) as avg_invoice_value
-      FROM invoices
-      WHERE customer_id = ?
-    `).get(customerId) as {
-      total_invoices: number;
-      total_amount: number;
-      paid_amount: number;
-      outstanding_amount: number;
-      avg_invoice_value: number;
-    };
-  }
 
   /**
    * Get invoices by status filter — delegates to the paged query so the
    * status-CSV path and the paged list share one definition. Kept for
    * backward compatibility (returns the full unfiltered-by-page set).
    */
-  static getByStatus(statusList: string[], db: Database.Database): Invoice[] {
-    return this.getAll({ statuses: statusList }, db).rows;
-  }
 
   static getWithCustomer(id: number, db: Database.Database) {
     return db.prepare(`
@@ -1308,10 +1197,6 @@ class InvoiceModel {
 
   static getItemsForStockReverse(invoiceId: number, db: Database.Database) {
     return db.prepare(`SELECT item_id, quantity, unit_price FROM invoice_items WHERE invoice_id = ?`).all(invoiceId) as Array<{ item_id: number; quantity: number; unit_price: number }>;
-  }
-
-  static deleteItems(db: Database.Database, invoiceId: number): void {
-    db.prepare(`DELETE FROM invoice_items WHERE invoice_id = ?`).run(invoiceId);
   }
 
   static getBySalesOrderId(soId: number, db: Database.Database): Invoice[] {

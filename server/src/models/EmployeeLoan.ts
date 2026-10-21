@@ -49,16 +49,6 @@ export interface LoanRepayment {
   created_at: string;
 }
 
-export interface RepayLoanDTO {
-  amount: number;
-  payment_date: string;
-  payment_method?: string;
-  reference_no?: string;
-  notes?: string;
-  salary_payment_id?: number;
-  created_by?: number;
-}
-
 export interface LoanSummary {
   total_loans: number;
   active_loans: number;
@@ -117,13 +107,6 @@ export class EmployeeLoanModel {
     ).all(employeeId) as EmployeeLoan[];
   }
 
-  static getActiveByEmployee(employeeId: number, db: Database.Database): EmployeeLoan[] {
-    return db.prepare(
-      `SELECT * FROM employee_loans WHERE employee_id = ? AND status IN ('active', 'overdue') AND voided_at IS NULL
-       ORDER BY due_date ASC`
-    ).all(employeeId) as EmployeeLoan[];
-  }
-
   static getRepayments(loanId: number, db: Database.Database): LoanRepayment[] {
     return db.prepare(
       'SELECT * FROM employee_loan_repayments WHERE loan_id = ? AND voided_at IS NULL ORDER BY payment_date ASC'
@@ -167,11 +150,6 @@ export class EmployeeLoanModel {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(amount, amount, loanId);
-  }
-
-  static setStatus(loanId: number, status: string, db: Database.Database): void {
-    db.prepare('UPDATE employee_loans SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .run(status, loanId);
   }
 
   // ── Repayment ────────────────────────────────────────────────
@@ -239,17 +217,6 @@ export class EmployeeLoanModel {
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(amount, loanId);
-  }
-
-  static restoreFromWriteOff(loanId: number, db: Database.Database): void {
-    db.prepare(`
-      UPDATE employee_loans
-      SET balance = written_off_amount,
-          written_off_amount = 0,
-          status = 'active',
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(loanId);
   }
 
   static deleteRepayment(repaymentId: number, db: Database.Database, voidedBy: number | null, voidReason: string): void {

@@ -7,7 +7,6 @@ import { PaymentRecordingService } from './PaymentRecordingService';
 import { addCurrency, computeInvoiceGrandTotal, parseCurrency, subtractCurrency } from '../utils/currency';
 import { isValidPaymentMethod } from './cashService';
 import { claimIdempotencyKey, findIdempotencyRecord } from '../utils/idempotency';
-import { assertLinesNotRetroactive } from './inventoryEffectiveDate';
 import { generateDocNo } from '../utils/sequence';
 import { BusinessRuleError } from '../utils/businessRuleError';
 import type {
@@ -225,80 +224,18 @@ export class InvoiceCreationService {
         claimIdempotencyKey(this.db, input.idempotency.scope, input.idempotency.key, input.idempotency.hash, invoiceId);
       }
 
-      const itemResults: InvoiceCreationItemResult[] = [];
-      const consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }> = [];
-      let cogsAmount = 0;
+      const lineWarehouses = this.resolveLineWarehouses(input.items, input.warehouseId);
 
-      // ACCT-006: the warehouse each line will draw from is resolved first so
-      // the retroactivity guard can be applied per line BEFORE anything is
-      // consumed. Rejecting here rolls back the whole transaction, so a
-      // refusal leaves no partial stock, ledger or GL write behind.
-      const lineWarehouses: Array<{ itemId: number; warehouseId: number }> = [];
-      for (const item of input.items) {
-        const warehouseId = item.warehouse_id || input.warehouseId || InvoiceModel.findWarehouseForItem(this.db, item.item_id, item.quantity);
-        lineWarehouses.push({ itemId: item.item_id, warehouseId });
-      }
+      const { itemResults, consumptions, cogsAmount } = this.consumeInvoiceItems(
+        invoiceId, invoiceNo, input, lineWarehouses
+      );
 
-      for (let li = 0; li < input.items.length; li++) {
-        const item = input.items[li];
-        const warehouseId = lineWarehouses[li].warehouseId;
-        InvoiceModel.createInvoiceItem(this.db, invoiceId, {
-          item_id: item.item_id,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          tax_rate: item.tax_rate,
-          discount_type: item.discount_type,
-          discount_value: item.discount_value,
-          amount: item.amount,
-        });
-        const consumption = InvoiceModel.consumeFromOldestBatches(item.item_id, warehouseId, item.quantity, this.db, input.invoiceDate);
-        const batchIds: Array<number | null> = [];
-        for (const entry of consumption) {
-          StockMovementModel.recordMovement({
-            item_id: item.item_id,
-            warehouse_id: warehouseId,
-            movement_type: 'SALE',
-            quantity: -entry.consumed,
-            unit_cost: entry.unitCost,
-            reference_doctype: input.source === 'POS' ? 'POS' : 'INVOICE',
-            reference_docno: invoiceNo,
-            remarks: input.source === 'POS' ? `POS Sale: ${invoiceNo}` : `Sold via Invoice ${invoiceNo}`,
-            movement_date: input.invoiceDate,
-            batch_id: entry.batchId ?? undefined,
-          }, input.userId, this.db);
-          batchIds.push(entry.batchId);
-          cogsAmount += entry.consumed * entry.unitCost;
-        }
-        consumptions.push({ itemId: item.item_id, consumption });
-        itemResults.push({ itemId: item.item_id, quantity: item.quantity, unitPrice: item.unit_price, amount: parseCurrency(item.quantity * item.unit_price), warehouseId, batchIds });
-      }
       InvoiceModel.denormalizeExpiryInfo(invoiceId, consumptions, this.db);
       InvoiceModel.createLedgerEntry(this.db, input.customerId, 'INVOICE', invoiceNo, input.invoiceDate, totalAmount, 0, `Invoice ${invoiceNo}`);
       AccountingService.postInvoiceEntry(this.db, { invoiceId, invoiceNo, totalAmount, invoiceDate: input.invoiceDate, userId: input.userId, taxAmount: InvoiceModel.getInvoiceTaxTotal(this.db, invoiceId) });
       if (cogsAmount > 0) AccountingService.postCOGSEntry(this.db, { invoiceId, invoiceNo, cogsAmount: parseCurrency(cogsAmount), invoiceDate: input.invoiceDate, userId: input.userId });
 
-      let paymentId: number | null = null;
-      let paymentNo: string | null = null;
-      // One entry per leg, each through the single existing recording path
-      // so the method whitelist, period guard, allocation, status refresh
-      // and GL posting stay in one place.
-      for (const leg of legs) {
-        const legAmount = parseCurrency(leg.amount);
-        if (legAmount <= 0) continue;
-        const recorded = new PaymentRecordingService(this.db).recordCustomerPayment({
-          mode: 'INVOICE_SETTLEMENT',
-          customerId: input.customerId,
-          paymentDate: leg.payment_date || input.invoiceDate,
-          amount: legAmount,
-          paymentMethod: leg.payment_method || 'Cash',
-          referenceNo: leg.reference_no,
-          notes: leg.notes,
-          userId: input.userId,
-          allocations: [{ invoiceId, amount: legAmount }],
-        });
-        paymentId = paymentId ?? recorded.paymentId;
-        paymentNo = paymentNo ?? recorded.paymentNo;
-      }
+      const { paymentId, paymentNo } = this.recordPaymentLegs(legs, invoiceId, input);
       if (creditOffset > 0) {
         AccountingService.postCreditOffsetEntry(this.db, { invoiceId, invoiceNo, amount: creditOffset, invoiceDate: input.invoiceDate, customerId: input.customerId, userId: input.userId });
         const customer = this.db.prepare('SELECT COALESCE(credit_balance, 0) AS credit_balance FROM customers WHERE id = ?').get(input.customerId) as { credit_balance: number };
@@ -316,6 +253,112 @@ export class InvoiceCreationService {
     });
 
     return transaction();
+  }
+
+  /**
+   * ACCT-006: the warehouse each line will draw from is resolved first so
+   * the retroactivity guard can be applied per line BEFORE anything is
+   * consumed. Rejecting here rolls back the whole transaction, so a
+   * refusal leaves no partial stock, ledger or GL write behind.
+   */
+  private resolveLineWarehouses(
+    items: InvoiceCreationInput['items'],
+    defaultWarehouseId: number | undefined
+  ): Array<{ itemId: number; warehouseId: number }> {
+    const lineWarehouses: Array<{ itemId: number; warehouseId: number }> = [];
+    for (const item of items) {
+      const warehouseId = item.warehouse_id || defaultWarehouseId || InvoiceModel.findWarehouseForItem(this.db, item.item_id, item.quantity);
+      lineWarehouses.push({ itemId: item.item_id, warehouseId });
+    }
+    return lineWarehouses;
+  }
+
+  /**
+   * Insert the invoice lines, consume FIFO batches for each, and record one
+   * stock movement per consumed batch. Returns the COGS total the caller
+   * posts to the GL.
+   */
+  private consumeInvoiceItems(
+    invoiceId: number,
+    invoiceNo: string,
+    input: InvoiceCreationInput,
+    lineWarehouses: Array<{ itemId: number; warehouseId: number }>
+  ): {
+    itemResults: InvoiceCreationItemResult[];
+    consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }>;
+    cogsAmount: number;
+  } {
+    const itemResults: InvoiceCreationItemResult[] = [];
+    const consumptions: Array<{ itemId: number; consumption: Array<{ batchId: number | null; consumed: number }> }> = [];
+    let cogsAmount = 0;
+
+    for (let li = 0; li < input.items.length; li++) {
+      const item = input.items[li];
+      const warehouseId = lineWarehouses[li].warehouseId;
+      InvoiceModel.createInvoiceItem(this.db, invoiceId, {
+        item_id: item.item_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        tax_rate: item.tax_rate,
+        discount_type: item.discount_type,
+        discount_value: item.discount_value,
+        amount: item.amount,
+      });
+      const consumption = InvoiceModel.consumeFromOldestBatches(item.item_id, warehouseId, item.quantity, this.db, input.invoiceDate);
+      const batchIds: Array<number | null> = [];
+      for (const entry of consumption) {
+        StockMovementModel.recordMovement({
+          item_id: item.item_id,
+          warehouse_id: warehouseId,
+          movement_type: 'SALE',
+          quantity: -entry.consumed,
+          unit_cost: entry.unitCost,
+          reference_doctype: input.source === 'POS' ? 'POS' : 'INVOICE',
+          reference_docno: invoiceNo,
+          remarks: input.source === 'POS' ? `POS Sale: ${invoiceNo}` : `Sold via Invoice ${invoiceNo}`,
+          movement_date: input.invoiceDate,
+          batch_id: entry.batchId ?? undefined,
+        }, input.userId, this.db);
+        batchIds.push(entry.batchId);
+        cogsAmount += entry.consumed * entry.unitCost;
+      }
+      consumptions.push({ itemId: item.item_id, consumption });
+      itemResults.push({ itemId: item.item_id, quantity: item.quantity, unitPrice: item.unit_price, amount: parseCurrency(item.quantity * item.unit_price), warehouseId, batchIds });
+    }
+
+    return { itemResults, consumptions, cogsAmount };
+  }
+
+  /**
+   * Record the payment legs. One entry per leg, each through the single
+   * existing recording path so the method whitelist, period guard,
+   * allocation, status refresh and GL posting stay in one place.
+   */
+  private recordPaymentLegs(
+    legs: readonly InvoiceCreationPayment[],
+    invoiceId: number,
+    input: InvoiceCreationInput
+  ): { paymentId: number | null; paymentNo: string | null } {
+    let paymentId: number | null = null;
+    let paymentNo: string | null = null;
+    for (const leg of legs) {
+      const legAmount = parseCurrency(leg.amount);
+      if (legAmount <= 0) continue;
+      const recorded = new PaymentRecordingService(this.db).recordCustomerPayment({
+        mode: 'INVOICE_SETTLEMENT',
+        customerId: input.customerId,
+        paymentDate: leg.payment_date || input.invoiceDate,
+        amount: legAmount,
+        paymentMethod: leg.payment_method || 'Cash',
+        referenceNo: leg.reference_no,
+        notes: leg.notes,
+        userId: input.userId,
+        allocations: [{ invoiceId, amount: legAmount }],
+      });
+      paymentId = paymentId ?? recorded.paymentId;
+      paymentNo = paymentNo ?? recorded.paymentNo;
+    }
+    return { paymentId, paymentNo };
   }
 
   private resultFromExisting(invoiceId: number, replayed: boolean): InvoiceCreationResult {

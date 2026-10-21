@@ -115,36 +115,6 @@ class SupplierLedgerModel {
     `).all(supplier_id) as SupplierLedgerEntry[];
   }
 
-  static getAllTransactions(db: Database.Database): SupplierLedgerEntry[] {
-    return db.prepare(`
-      SELECT
-        sl.*,
-        s.supplier_name
-      FROM supplier_ledger sl
-      JOIN suppliers s ON sl.supplier_id = s.id
-      ORDER BY sl.transaction_date DESC, sl.created_at DESC
-    `).all() as SupplierLedgerEntry[];
-  }
-
-  static getSupplierBalances(db: Database.Database): Array<{ supplier_id: number; supplier_name: string; balance: number }> {
-    return db.prepare(`
-      SELECT
-        s.id as supplier_id,
-        s.supplier_name,
-        COALESCE(sl.balance, 0) as balance
-      FROM suppliers s
-      LEFT JOIN supplier_ledger sl
-        ON s.id = sl.supplier_id
-        AND sl.id = (
-          SELECT id FROM supplier_ledger
-          WHERE supplier_id = s.id AND voided = 0 AND reversed_by IS NULL
-          ORDER BY transaction_date DESC, id DESC
-          LIMIT 1
-        )
-      WHERE s.is_active = 1
-      ORDER BY balance DESC
-    `).all() as Array<{ supplier_id: number; supplier_name: string; balance: number }>;
-  }
 }
 
 export default SupplierLedgerModel;

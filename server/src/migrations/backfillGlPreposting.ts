@@ -128,7 +128,8 @@ export function runBackfillGlPreposting(db: Database.Database): void {
   const reviewList: string[] = [];
   let postedCount = 0;
 
-  const run = (): void => {
+  const backfill1DirectPurchases = (): number => {
+    let posted = 0;
     // ── 1. Direct purchases ──────────────────────────────────────────
     // PUR-015: voided_at IS NULL, mirroring the receipts leg below. Without it,
     // voiding a purchase and then running this backfill re-posts
@@ -148,9 +149,14 @@ export function runBackfillGlPreposting(db: Database.Database): void {
       if (post(p.purchase_date, p.purchase_no, 'PURCHASE', p.id, [
         { code: '1200', debit: round2(p.total_cost), label: `Inventory received via ${p.purchase_no} (backfill)` },
         { code: '2000', credit: round2(p.total_cost), label: `AP created for ${p.purchase_no} (backfill)` },
-      ])) postedCount += 1;
+      ])) posted += 1;
     }
 
+    return posted;
+  };
+
+  const backfill23Payments = (): number => {
+    let posted = 0;
     // ── 2+3. Payments (supplier out / customer in-or-refund) ─────────
     const payments = db.prepare(`
       SELECT id, payment_no, amount, payment_date, payment_method,
@@ -168,7 +174,7 @@ export function runBackfillGlPreposting(db: Database.Database): void {
         if (post(pay.payment_date, pay.payment_no, 'PAYMENT', pay.id, [
           { code: '2000', debit: amount, label: `AP settled by ${pay.payment_no} (backfill)` },
           { code, credit: amount, label: `Cash paid via ${pay.payment_no} (backfill)` },
-        ])) postedCount += 1;
+        ])) posted += 1;
         continue;
       }
 
@@ -178,16 +184,21 @@ export function runBackfillGlPreposting(db: Database.Database): void {
         if (post(pay.payment_date, pay.payment_no, 'PAYMENT', pay.id, [
           { code, debit: amount, label: `Cash received via ${pay.payment_no} (backfill)` },
           { code: '1100', credit: amount, label: `AR reduced by ${pay.payment_no} (backfill)` },
-        ])) postedCount += 1;
+        ])) posted += 1;
       } else {
         // Refund paid out to the customer.
         if (post(pay.payment_date, pay.payment_no, 'PAYMENT', pay.id, [
           { code: '1100', debit: amount, label: `AR adjusted for refund ${pay.payment_no} (backfill)` },
           { code, credit: amount, label: `Cash refunded via ${pay.payment_no} (backfill)` },
-        ])) postedCount += 1;
+        ])) posted += 1;
       }
     }
 
+    return posted;
+  };
+
+  const backfill4ExpensesDraft = (): number => {
+    let posted = 0;
     // ── 4. Expenses (draft/cancelled never drained the till) ─────────
     const expenses = db.prepare(`
       SELECT id, expense_no, amount, expense_date, payment_method FROM expenses
@@ -199,9 +210,14 @@ export function runBackfillGlPreposting(db: Database.Database): void {
       if (post(e.expense_date, e.expense_no, 'EXPENSE', e.id, [
         { code: '6000', debit: round2(e.amount), label: `Expense incurred via ${e.expense_no} (backfill)` },
         { code, credit: round2(e.amount), label: `Cash paid for ${e.expense_no} (backfill)` },
-      ])) postedCount += 1;
+      ])) posted += 1;
     }
 
+    return posted;
+  };
+
+  const backfill5SalaryPayments = (): number => {
+    let posted = 0;
     // ── 5. Salary payments ────────────────────────────────────────────
     const salaries = db.prepare(`
       SELECT id, amount, payment_date, payment_method FROM salary_payments
@@ -213,9 +229,14 @@ export function runBackfillGlPreposting(db: Database.Database): void {
       if (post(s.payment_date, `salary payment #${s.id}`, 'SALARY_PAYMENT', s.id, [
         { code: '6100', debit: round2(s.amount), label: `Salary paid (backfill)` },
         { code, credit: round2(s.amount), label: `Cash paid for salary (backfill)` },
-      ])) postedCount += 1;
+      ])) posted += 1;
     }
 
+    return posted;
+  };
+
+  const backfill6OpeningCapital = (): number => {
+    let posted = 0;
     // ── 6. Opening capital from operational opening_balances ─────────
     // OPENING_BALANCE is the live-synced seed (dashboardController);
     // a non-voided row under either reference means the opening capital
@@ -244,10 +265,15 @@ export function runBackfillGlPreposting(db: Database.Database): void {
       }
       if (lines.length > 0) {
         const today = (db.prepare(`SELECT date('now', 'localtime') as d`).get() as { d: string }).d;
-        if (post(today, 'opening capital from opening_balances', 'BACKFILL_OPENING', 0, lines)) postedCount += 1;
+        if (post(today, 'opening capital from opening_balances', 'BACKFILL_OPENING', 0, lines)) posted += 1;
       }
     }
 
+    return posted;
+  };
+
+  const backfill7GoodsReceipts = (): number => {
+    let posted = 0;
     // ── 7. Goods receipts (PO) ───────────────────────────────────────
     // Receipts created before receipt-time GL posting added stock and a
     // batch cost layer but no Dr 1200 / Cr 2000, so GL inventory and AP
@@ -279,7 +305,7 @@ export function runBackfillGlPreposting(db: Database.Database): void {
       if (post(r.receipt_date, `Goods receipt ${r.receipt_no} (PO ${r.po_no})`, 'GOODS_RECEIPT', r.id, [
         { code: '1200', debit: amt, label: `Inventory received via ${r.receipt_no} (backfill)` },
         { code: '2000', credit: amt, label: `AP created for ${r.receipt_no} (backfill)` },
-      ])) postedCount += 1;
+      ])) posted += 1;
 
       // PUR-015: the GL leg alone leaves GL 2000 permanently above the AP
       // subledger — measured apImbalances() {expected: 200, actual: 330}. The
@@ -312,6 +338,15 @@ export function runBackfillGlPreposting(db: Database.Database): void {
       }
     }
 
+    return posted;
+  };
+  const run = (): void => {
+    postedCount += backfill1DirectPurchases();
+    postedCount += backfill23Payments();
+    postedCount += backfill4ExpensesDraft();
+    postedCount += backfill5SalaryPayments();
+    postedCount += backfill6OpeningCapital();
+    postedCount += backfill7GoodsReceipts();
     // ── Sanity: the whole table must still foot ───────────────────────
     const totals = db.prepare(`
       SELECT COALESCE(SUM(debit), 0) as d, COALESCE(SUM(credit), 0) as c

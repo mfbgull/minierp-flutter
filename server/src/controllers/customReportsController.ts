@@ -39,6 +39,19 @@ type ReportConfigUnderValidation = Partial<{
   filters: Array<{ field?: string }>;
 }>;
 
+/**
+ * A field reference is valid when it names an entity field or a computed
+ * column defined alongside the report.
+ */
+function isKnownReportField(
+  field: string,
+  validFields: Set<string>,
+  computedColumns: ReportConfigUnderValidation['computedColumns']
+): boolean {
+  if (validFields.has(field)) return true;
+  return Array.isArray(computedColumns) && computedColumns.some((cc) => cc.name === field);
+}
+
 function validateReportConfig(config: ReportConfigUnderValidation): ValidationError[] {
   const errors: ValidationError[] = [];
 
@@ -64,13 +77,8 @@ function validateReportConfig(config: ReportConfigUnderValidation): ValidationEr
       const col = config.columns[i];
       if (!col.field || typeof col.field !== 'string') {
         errors.push({ field: `columns[${i}].field`, message: 'Column field name is required' });
-      } else if (!validFields.has(col.field)) {
-        // Check if it's a computed column reference
-        const isComputed = Array.isArray(config.computedColumns) &&
-          config.computedColumns.some((cc) => cc.name === col.field);
-        if (!isComputed) {
-          errors.push({ field: `columns[${i}].field`, message: `Field "${col.field}" not found on entity "${config.entity}"` });
-        }
+      } else if (!isKnownReportField(col.field, validFields, config.computedColumns)) {
+        errors.push({ field: `columns[${i}].field`, message: `Field "${col.field}" not found on entity "${config.entity}"` });
       }
     }
   }
@@ -81,12 +89,8 @@ function validateReportConfig(config: ReportConfigUnderValidation): ValidationEr
       const s = config.sort[i];
       if (!s.field || typeof s.field !== 'string') {
         errors.push({ field: `sort[${i}].field`, message: 'Sort field name is required' });
-      } else if (!validFields.has(s.field)) {
-        const isComputed = Array.isArray(config.computedColumns) &&
-          config.computedColumns.some((cc) => cc.name === s.field);
-        if (!isComputed) {
-          errors.push({ field: `sort[${i}].field`, message: `Sort field "${s.field}" not found on entity "${config.entity}"` });
-        }
+      } else if (!isKnownReportField(s.field, validFields, config.computedColumns)) {
+        errors.push({ field: `sort[${i}].field`, message: `Sort field "${s.field}" not found on entity "${config.entity}"` });
       }
       if (s.direction && !['asc', 'desc'].includes(s.direction.toLowerCase())) {
         errors.push({ field: `sort[${i}].direction`, message: 'Sort direction must be "asc" or "desc"' });

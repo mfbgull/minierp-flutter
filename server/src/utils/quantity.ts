@@ -118,9 +118,6 @@ export function qtyLessThan(a: number, b: number, precision: number = DEFAULT_QT
  * @param precision - Number of decimal places (default: 3)
  * @returns true if a <= b at this precision
  */
-export function qtyLessThanOrEqual(a: number, b: number, precision: number = DEFAULT_QTY_PRECISION): boolean {
-  return roundQty(a, precision) <= roundQty(b, precision);
-}
 
 /**
  * Check if quantity is positive (greater than zero) at precision.

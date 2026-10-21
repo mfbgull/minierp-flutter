@@ -6,8 +6,8 @@ import {
   getForUser,
   updateForUser,
   UserPreferences,
-  WeekStart,
 } from '../models/UserPreferences';
+import type { WeekStart } from '../utils/weekMath';
 
 const WEEK_STARTS: ReadonlyArray<WeekStart> = ['monday', 'saturday', 'sunday'];
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;

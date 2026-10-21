@@ -537,6 +537,97 @@ function buildWhereClause(
   return nonEmpty.join(' AND ');
 }
 
+type FilterValue = SqlParam | SqlParam[] | undefined;
+type FilterBuilder = (col: string, value: FilterValue, ctx: BuildContext) => string;
+
+function buildEquality(
+  col: string,
+  value: FilterValue,
+  ctx: BuildContext,
+  negate: boolean
+): string {
+  if (value === null || value === undefined) return `${col} IS ${negate ? 'NOT ' : ''}NULL`;
+  const rd = checkRelativeDate(value);
+  if (rd) return `${col} ${negate ? '!=' : '='} ${rd.sqlExpr}`;
+  ctx.paramValues.push(scalarParam(value));
+  return `${col} ${negate ? '!=' : '='} ?`;
+}
+
+function buildComparison(
+  col: string,
+  sqlOperator: string,
+  value: FilterValue,
+  ctx: BuildContext
+): string {
+  const rd = checkRelativeDate(value);
+  if (rd) return `${col} ${sqlOperator} ${rd.sqlExpr}`;
+  ctx.paramValues.push(scalarParam(value));
+  return `${col} ${sqlOperator} ?`;
+}
+
+function buildLike(
+  col: string,
+  value: FilterValue,
+  ctx: BuildContext,
+  pattern: 'contains' | 'starts_with' | 'ends_with'
+): string {
+  const escaped = escapeLikeWildcards(String(value));
+  const wildcard =
+    pattern === 'contains' ? `%${escaped}%`
+    : pattern === 'starts_with' ? `${escaped}%`
+    : `%${escaped}`;
+  ctx.paramValues.push(wildcard);
+  return `${col} LIKE ? ESCAPE '\\'`;
+}
+
+function buildInList(col: string, value: FilterValue, ctx: BuildContext): string {
+  if (!Array.isArray(value) || value.length === 0) return '1=0';
+  if (checkRelativeDate(value[0])) {
+    const items = value.map((v) => {
+      const r = checkRelativeDate(v);
+      return r ? r.sqlExpr : '?';
+    });
+    ctx.paramValues.push(...value.filter((v) => !checkRelativeDate(v)));
+    return `${col} IN (${items.join(', ')})`;
+  }
+  ctx.paramValues.push(...value);
+  return `${col} IN (${value.map(() => '?').join(', ')})`;
+}
+
+function buildNotIn(col: string, value: FilterValue, ctx: BuildContext): string {
+  if (!Array.isArray(value) || value.length === 0) return '';
+  ctx.paramValues.push(...value);
+  return `${col} NOT IN (${value.map(() => '?').join(', ')})`;
+}
+
+function buildBetween(col: string, value: FilterValue, ctx: BuildContext): string {
+  if (!Array.isArray(value) || value.length < 2) return '1=1';
+  const relativeStart = checkRelativeDate(value[0]);
+  const relativeEnd = checkRelativeDate(value[1]);
+  if (!relativeStart) ctx.paramValues.push(value[0]);
+  if (!relativeEnd) ctx.paramValues.push(value[1]);
+  const start = relativeStart ? relativeStart.sqlExpr : '?';
+  const end = relativeEnd ? relativeEnd.sqlExpr : '?';
+  return `${col} BETWEEN ${start} AND ${end}`;
+}
+
+const FILTER_BUILDERS: Record<FilterOperator, FilterBuilder> = {
+  equals: (col, value, ctx) => buildEquality(col, value, ctx, false),
+  not_equals: (col, value, ctx) => buildEquality(col, value, ctx, true),
+  greater_than: (col, value, ctx) => buildComparison(col, '>', value, ctx),
+  less_than: (col, value, ctx) => buildComparison(col, '<', value, ctx),
+  greater_or_equal: (col, value, ctx) => buildComparison(col, '>=', value, ctx),
+  less_or_equal: (col, value, ctx) => buildComparison(col, '<=', value, ctx),
+  contains: (col, value, ctx) => buildLike(col, value, ctx, 'contains'),
+  starts_with: (col, value, ctx) => buildLike(col, value, ctx, 'starts_with'),
+  ends_with: (col, value, ctx) => buildLike(col, value, ctx, 'ends_with'),
+  in_list: buildInList,
+  not_in: buildNotIn,
+  between: buildBetween,
+  is_null: (col) => `${col} IS NULL`,
+  is_not_null: (col) => `${col} IS NOT NULL`,
+};
+
 /**
  * Build a single filter expression.
  *
@@ -571,99 +662,10 @@ function buildFilterExpression(
     ? quoteIdentifier(filter.field)
     : `${ctx.primaryTableAlias}.${quoteIdentifier(filter.field)}`;
 
-  const value = filter.value;
-
-  switch (filter.operator) {
-    case 'equals': {
-      if (value === null || value === undefined) return `${col} IS NULL`;
-      const rd = checkRelativeDate(value);
-      if (rd) return `${col} = ${rd.sqlExpr}`;
-      ctx.paramValues.push(scalarParam(value));
-      return `${col} = ?`;
-    }
-    case 'not_equals': {
-      if (value === null || value === undefined) return `${col} IS NOT NULL`;
-      const rd = checkRelativeDate(value);
-      if (rd) return `${col} != ${rd.sqlExpr}`;
-      ctx.paramValues.push(scalarParam(value));
-      return `${col} != ?`;
-    }
-    case 'greater_than': {
-      const rd = checkRelativeDate(value);
-      if (rd) return `${col} > ${rd.sqlExpr}`;
-      ctx.paramValues.push(scalarParam(value));
-      return `${col} > ?`;
-    }
-    case 'less_than': {
-      const rd = checkRelativeDate(value);
-      if (rd) return `${col} < ${rd.sqlExpr}`;
-      ctx.paramValues.push(scalarParam(value));
-      return `${col} < ?`;
-    }
-    case 'greater_or_equal': {
-      const rd = checkRelativeDate(value);
-      if (rd) return `${col} >= ${rd.sqlExpr}`;
-      ctx.paramValues.push(scalarParam(value));
-      return `${col} >= ?`;
-    }
-    case 'less_or_equal': {
-      const rd = checkRelativeDate(value);
-      if (rd) return `${col} <= ${rd.sqlExpr}`;
-      ctx.paramValues.push(scalarParam(value));
-      return `${col} <= ?`;
-    }
-    case 'contains': {
-      ctx.paramValues.push(`%${escapeLikeWildcards(String(value))}%`);
-      return `${col} LIKE ? ESCAPE '\\'`;
-    }
-    case 'starts_with': {
-      ctx.paramValues.push(`${escapeLikeWildcards(String(value))}%`);
-      return `${col} LIKE ? ESCAPE '\\'`;
-    }
-    case 'ends_with': {
-      ctx.paramValues.push(`%${escapeLikeWildcards(String(value))}`);
-      return `${col} LIKE ? ESCAPE '\\'`;
-    }
-    case 'in_list': {
-      if (!Array.isArray(value) || value.length === 0) return '1=0';
-      const rd = checkRelativeDate(value[0]);
-      if (rd) {
-        // For date lists with relative dates, inline each
-        const items = value.map((v) => {
-          const r = checkRelativeDate(v);
-          return r ? r.sqlExpr : '?';
-        });
-        const nonParam = value.filter((v) => !checkRelativeDate(v));
-        ctx.paramValues.push(...nonParam);
-        return `${col} IN (${items.join(', ')})`;
-      }
-      const placeholders = value.map(() => '?').join(', ');
-      ctx.paramValues.push(...value);
-      return `${col} IN (${placeholders})`;
-    }
-    case 'not_in': {
-      if (!Array.isArray(value) || value.length === 0) return '';
-      const placeholders = value.map(() => '?').join(', ');
-      ctx.paramValues.push(...value);
-      return `${col} NOT IN (${placeholders})`;
-    }
-    case 'between': {
-      if (!Array.isArray(value) || value.length < 2) return '1=1';
-      const rd1 = checkRelativeDate(value[0]);
-      const rd2 = checkRelativeDate(value[1]);
-      const expr1 = rd1 ? rd1.sqlExpr : '?';
-      const expr2 = rd2 ? rd2.sqlExpr : '?';
-      if (!rd1) ctx.paramValues.push(value[0]);
-      if (!rd2) ctx.paramValues.push(value[1]);
-      return `${col} BETWEEN ${expr1} AND ${expr2}`;
-    }
-    case 'is_null':
-      return `${col} IS NULL`;
-    case 'is_not_null':
-      return `${col} IS NOT NULL`;
-    default:
-      return '';
-  }
+  // `filter.operator` comes from a persisted report definition, so an
+  // unrecognised value is possible at runtime even though the type forbids it.
+  const build = FILTER_BUILDERS[filter.operator as FilterOperator];
+  return typeof build === 'function' ? build(col, filter.value, ctx) : '';
 }
 
 // ── GROUP BY Builder ────────────────────────────────────────

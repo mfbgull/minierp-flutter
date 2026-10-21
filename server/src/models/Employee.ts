@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { SqlParam } from '../utils/sqlTypes';
 
 export interface Employee {
   id: number;
@@ -160,6 +161,82 @@ export type SalaryHistoryRow = {
   last_payment_date: string;
 };
 
+/**
+ * The employees UPDATE columns, in the order the statement binds them.
+ */
+const EMPLOYEE_UPDATE_FIELDS = [
+  'first_name', 'last_name', 'email', 'phone', 'mobile', 'cnic_no',
+  'address', 'city', 'state', 'postal_code', 'country', 'date_of_birth',
+  'gender', 'department', 'designation', 'employment_type',
+  'date_of_joining', 'date_of_leaving', 'salary',
+  'bank_name', 'bank_account_no', 'bank_iban',
+  'emergency_contact_name', 'emergency_contact_phone',
+  'profile_photo', 'notes',
+] as const;
+
+/**
+ * Positional parameters for the employees UPDATE, in column order.
+ */
+function buildEmployeeUpdateParams(data: UpdateEmployeeDTO, id: number): SqlParam[] {
+  const params: SqlParam[] = EMPLOYEE_UPDATE_FIELDS.map((field) => data[field] ?? null);
+  params.push(data.is_active !== undefined ? (data.is_active ? 1 : 0) : null, id);
+  return params;
+}
+
+/**
+ * The employees INSERT columns that fall back to a default, in the order the
+ * statement binds them.
+ */
+const EMPLOYEE_CREATE_COLUMNS = [
+  'email', 'phone', 'mobile', 'cnic_no', 'address', 'city', 'state', 'postal_code',
+  'country', 'date_of_birth', 'gender', 'department', 'designation',
+  'employment_type', 'date_of_joining', 'date_of_leaving', 'salary',
+  'bank_name', 'bank_account_no', 'bank_iban', 'emergency_contact_name',
+  'emergency_contact_phone', 'profile_photo', 'notes',
+] as const;
+
+const EMPLOYEE_CREATE_DEFAULTS: Record<(typeof EMPLOYEE_CREATE_COLUMNS)[number], SqlParam> = {
+  email: null,
+  phone: null,
+  mobile: null,
+  cnic_no: null,
+  address: null,
+  city: null,
+  state: null,
+  postal_code: null,
+  country: 'Pakistan',
+  date_of_birth: null,
+  gender: null,
+  department: null,
+  designation: null,
+  employment_type: 'Full-time',
+  date_of_joining: null,
+  date_of_leaving: null,
+  salary: 0,
+  bank_name: null,
+  bank_account_no: null,
+  bank_iban: null,
+  emergency_contact_name: null,
+  emergency_contact_phone: null,
+  profile_photo: null,
+  notes: null,
+};
+
+/**
+ * Positional parameters for the employees INSERT, in column order.
+ */
+function buildEmployeeCreateParams(data: CreateEmployeeDTO): SqlParam[] {
+  const params: SqlParam[] = [data.employee_code, data.first_name, data.last_name];
+  for (const column of EMPLOYEE_CREATE_COLUMNS) {
+    params.push(data[column] || EMPLOYEE_CREATE_DEFAULTS[column]);
+  }
+  params.push(
+    data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
+    data.created_by || null
+  );
+  return params;
+}
+
 class EmployeeModel {
   static getAll(
     db: Database.Database,
@@ -226,37 +303,7 @@ class EmployeeModel {
         bank_iban, emergency_contact_name, emergency_contact_phone,
         profile_photo, notes, is_active, created_by
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      data.employee_code,
-      data.first_name,
-      data.last_name,
-      data.email || null,
-      data.phone || null,
-      data.mobile || null,
-      data.cnic_no || null,
-      data.address || null,
-      data.city || null,
-      data.state || null,
-      data.postal_code || null,
-      data.country || 'Pakistan',
-      data.date_of_birth || null,
-      data.gender || null,
-      data.department || null,
-      data.designation || null,
-      data.employment_type || 'Full-time',
-      data.date_of_joining || null,
-      data.date_of_leaving || null,
-      data.salary || 0,
-      data.bank_name || null,
-      data.bank_account_no || null,
-      data.bank_iban || null,
-      data.emergency_contact_name || null,
-      data.emergency_contact_phone || null,
-      data.profile_photo || null,
-      data.notes || null,
-      data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
-      data.created_by || null
-    );
+    `).run(...buildEmployeeCreateParams(data));
     return result.lastInsertRowid as number;
   }
 
@@ -292,36 +339,7 @@ class EmployeeModel {
         is_active = COALESCE(?, is_active),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(
-      data.first_name ?? null,
-      data.last_name ?? null,
-      data.email ?? null,
-      data.phone ?? null,
-      data.mobile ?? null,
-      data.cnic_no ?? null,
-      data.address ?? null,
-      data.city ?? null,
-      data.state ?? null,
-      data.postal_code ?? null,
-      data.country ?? null,
-      data.date_of_birth ?? null,
-      data.gender ?? null,
-      data.department ?? null,
-      data.designation ?? null,
-      data.employment_type ?? null,
-      data.date_of_joining ?? null,
-      data.date_of_leaving ?? null,
-      data.salary ?? null,
-      data.bank_name ?? null,
-      data.bank_account_no ?? null,
-      data.bank_iban ?? null,
-      data.emergency_contact_name ?? null,
-      data.emergency_contact_phone ?? null,
-      data.profile_photo ?? null,
-      data.notes ?? null,
-      data.is_active !== undefined ? (data.is_active ? 1 : 0) : null,
-      id
-    );
+    `).run(...buildEmployeeUpdateParams(data, id));
   }
 
   static delete(id: number, db: Database.Database): Database.RunResult {

@@ -28,9 +28,6 @@ class WarehouseModel {
   /**
    * Get all active warehouses
    */
-  static getAllActive(db: Database.Database): Warehouse[] {
-    return db.prepare('SELECT * FROM warehouses WHERE is_active = 1').all() as Warehouse[];
-  }
 
   static getAll(db: Database.Database): Warehouse[] {
     return db.prepare('SELECT * FROM warehouses ORDER BY warehouse_code').all() as Warehouse[];

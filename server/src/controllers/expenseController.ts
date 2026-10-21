@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type Database from 'better-sqlite3';
 import { getQueryParam, getRouteParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
@@ -188,6 +189,97 @@ const EXPENSE_TRANSITIONS: Record<string, string[]> = {
   Cancelled: [],
 };
 
+interface ExpenseUpdateFields {
+  expense_category?: string;
+  description?: string;
+  amount?: number | string;
+  expense_date?: string;
+  payment_method?: string;
+  reference_no?: string;
+  vendor_name?: string;
+  project?: string;
+}
+
+interface ExpenseUpdatePayload {
+  expense_category?: string;
+  description?: string;
+  amount?: number;
+  expense_date?: string;
+  payment_method?: string;
+  reference_no?: string;
+  vendor_name?: string;
+  project?: string;
+  status?: string;
+}
+
+/**
+ * Validate a requested expense status transition. Returns the HTTP status and
+ * message to send, or null when the transition is allowed.
+ */
+function validateExpenseStatusTransition(
+  db: Database.Database,
+  currentStatus: string,
+  targetStatus: string | undefined,
+  userId: number,
+  role: string | undefined
+): { status: number; error: string } | null {
+  if (targetStatus === undefined || targetStatus === currentStatus) return null;
+
+  if (!(EXPENSE_STATUSES as readonly string[]).includes(targetStatus)) {
+    return {
+      status: 400,
+      error: `Invalid status '${targetStatus}' — use one of: ${EXPENSE_STATUSES.join(', ')}`,
+    };
+  }
+  if (!EXPENSE_TRANSITIONS[currentStatus]?.includes(targetStatus)) {
+    return {
+      status: 400,
+      error: `Cannot move an expense from ${currentStatus} to ${targetStatus} — allowed: ${EXPENSE_TRANSITIONS[currentStatus]?.join(', ') || '(none; terminal state)'}`,
+    };
+  }
+  // Recording is the control point that posts cash: moving into Recorded
+  // requires expenses:approve (Admin bypasses in the middleware itself).
+  if (targetStatus === 'Recorded' && role !== 'admin') {
+    const perm = db.prepare(`
+      SELECT 1 FROM role_permissions rp
+      JOIN permissions p ON p.id = rp.permission_id
+      JOIN users u ON u.role_id = rp.role_id
+      WHERE u.id = ? AND p.permission_name = 'expenses:approve'
+      LIMIT 1
+    `).get(userId);
+    if (!perm) {
+      return {
+        status: 403,
+        error: 'The expenses:approve permission is required to record expenses',
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * Recorded/Cancelled documents reject field edits; only the documented
+ * reversal (→ Cancelled from a prior state) may still carry them.
+ */
+function buildExpenseUpdatePayload(
+  fields: ExpenseUpdateFields,
+  isLocked: boolean,
+  targetStatus: string | undefined
+): ExpenseUpdatePayload {
+  const lockedField = isLocked && targetStatus !== 'Cancelled';
+  return {
+    expense_category: lockedField ? undefined : fields.expense_category,
+    description: lockedField ? undefined : fields.description,
+    amount: lockedField ? undefined : (fields.amount !== undefined ? parseFloat(String(fields.amount)) : undefined),
+    expense_date: lockedField ? undefined : fields.expense_date,
+    payment_method: lockedField ? undefined : fields.payment_method,
+    reference_no: lockedField ? undefined : fields.reference_no,
+    vendor_name: lockedField ? undefined : fields.vendor_name,
+    project: lockedField ? undefined : fields.project,
+    status: targetStatus,
+  };
+}
+
 function updateExpense(req: AuthRequest, res: Response): void {
   try {
     const id = parseInt(getRouteParam(req.params.id), 10);
@@ -209,33 +301,12 @@ function updateExpense(req: AuthRequest, res: Response): void {
     const currentStatus = String(existing.status);
 
     // Status transition validation.
-    if (targetStatus !== undefined && targetStatus !== currentStatus) {
-      if (!(EXPENSE_STATUSES as readonly string[]).includes(targetStatus)) {
-        res.status(400).json({ success: false, error: `Invalid status '${targetStatus}' — use one of: ${EXPENSE_STATUSES.join(', ')}` });
-        return;
-      }
-      if (!EXPENSE_TRANSITIONS[currentStatus]?.includes(targetStatus)) {
-        res.status(400).json({
-          success: false,
-          error: `Cannot move an expense from ${currentStatus} to ${targetStatus} — allowed: ${EXPENSE_TRANSITIONS[currentStatus]?.join(', ') || '(none; terminal state)'}`,
-        });
-        return;
-      }
-      // Recording is the control point that posts cash: moving into Recorded
-      // requires expenses:approve (Admin bypasses in the middleware itself).
-      if (targetStatus === 'Recorded' && req.user!.role !== 'admin') {
-        const perm = db.prepare(`
-          SELECT 1 FROM role_permissions rp
-          JOIN permissions p ON p.id = rp.permission_id
-          JOIN users u ON u.role_id = rp.role_id
-          WHERE u.id = ? AND p.permission_name = 'expenses:approve'
-          LIMIT 1
-        `).get(req.user!.id);
-        if (!perm) {
-          res.status(403).json({ success: false, error: 'The expenses:approve permission is required to record expenses' });
-          return;
-        }
-      }
+    const statusError = validateExpenseStatusTransition(
+      db, currentStatus, targetStatus, req.user!.id, req.user!.role
+    );
+    if (statusError) {
+      res.status(statusError.status).json({ success: false, error: statusError.error });
+      return;
     }
 
     // Immutability: Recorded/Cancelled documents reject field edits. Only the
@@ -262,17 +333,20 @@ function updateExpense(req: AuthRequest, res: Response): void {
       }
     }
 
-    ExpenseModel.update(db, id, {
-      expense_category: isLocked && targetStatus !== 'Cancelled' ? undefined : expense_category,
-      description: isLocked && targetStatus !== 'Cancelled' ? undefined : description,
-      amount: !isLocked || targetStatus === 'Cancelled' ? (amount !== undefined ? parseFloat(amount) : undefined) : undefined,
-      expense_date: isLocked && targetStatus !== 'Cancelled' ? undefined : expense_date,
-      payment_method: isLocked && targetStatus !== 'Cancelled' ? undefined : payment_method,
-      reference_no: isLocked && targetStatus !== 'Cancelled' ? undefined : reference_no,
-      vendor_name: isLocked && targetStatus !== 'Cancelled' ? undefined : vendor_name,
-      project: isLocked && targetStatus !== 'Cancelled' ? undefined : project,
-      status: targetStatus,
-    }, { userId: req.user!.id });
+    ExpenseModel.update(db, id, buildExpenseUpdatePayload(
+      {
+        expense_category,
+        description,
+        amount,
+        expense_date,
+        payment_method,
+        reference_no,
+        vendor_name,
+        project,
+      },
+      isLocked,
+      targetStatus
+    ), { userId: req.user!.id });
 
     logCRUD(ActionType.EXPENSE_UPDATE, 'Expense', id, `Updated expense: ${existing.expense_no}${targetStatus ? ` → ${targetStatus}` : ''}`, req.user!.id, { expense_no: existing.expense_no, changes: Object.keys(req.body).filter(k => req.body[k] !== undefined), from_status: currentStatus, to_status: targetStatus });
     req.activityLogged = true;

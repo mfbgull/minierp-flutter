@@ -4,7 +4,7 @@ import { sanitizeSortParams, QUOTATION_SORT_COLUMNS } from '../utils/sqlSanitize
 import { SalesOrderWithWarehouse, InvoiceWithUsername } from '../types';
 import { SqlParam } from '../utils/sqlTypes';
 
-export interface Quotation {
+interface Quotation {
   id: number;
   quotation_no: string;
   customer_id: number;

@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import type Database from 'better-sqlite3';
 import db from '../config/database';
 import { AuthRequest, CreateInvoiceDTO, Invoice, InvoiceItemDTO, PaymentDTO, InvoiceStatus, SellableStockUnavailableError } from '../types';
 import StockMovementModel from '../models/StockMovement';
@@ -29,17 +30,7 @@ import {
   InvoiceCreationService,
   InvoiceCreationTotalMismatchError,
 } from '../services/InvoiceCreationService';
-import {
-  IDEMPOTENCY_KEY_HEADER,
-  IDEMPOTENCY_SCOPES,
-  INVOICE_CREATE_SCOPE,
-  normalizeIdempotencyKey,
-  logKeylessIdempotentWrite,
-  observeInvoiceIdempotency,
-  hashRequestPayload,
-  claimIdempotencyKey,
-  startIdempotentRequest,
-} from '../utils/idempotency';
+import { IDEMPOTENCY_KEY_HEADER, IDEMPOTENCY_SCOPES, INVOICE_CREATE_SCOPE, claimIdempotencyKey, hashRequestPayload, logKeylessIdempotentWrite, normalizeIdempotencyKey, observeInvoiceIdempotency, respondToIdempotencyReplay, startIdempotentRequest } from '../utils/idempotency';
 
 /**
  * ACC-18 interim: thrown when a client-supplied invoice total disagrees
@@ -284,6 +275,178 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
   }
 }
 
+/**
+ * The Flutter form re-sends the invoice's existing credit_offset on every
+ * edit, so an unchanged value must stay acceptable. A changed one cannot be
+ * honoured here — it would need a partial reversal of the posted offset entry
+ * — and silently ignoring it would leave the user believing credit was applied
+ * when it was not.
+ */
+function assertCreditOffsetUnchanged(
+    creditOffset: number | string | undefined,
+    appliedCreditOnInvoice: number
+): void {
+    if (creditOffset === undefined || creditOffset === null) return;
+    const requestedCredit = parseCurrency(creditOffset);
+    if (Math.abs(requestedCredit - appliedCreditOnInvoice) > 0.005) {
+        throw new CreditOffsetChangeNotSupportedError(appliedCreditOnInvoice, requestedCredit);
+    }
+}
+
+/**
+ * Auto-compute the invoice status only when the user did NOT explicitly set
+ * one. Draft, Sent, Cancelled, and other manual statuses must be preserved
+ * on update.
+ */
+function resolveUpdatedInvoiceStatus(
+    requestedStatus: InvoiceStatus | undefined,
+    newBalanceAmount: number,
+    totalAmountNum: number,
+    returnedAmt: number
+): InvoiceStatus {
+    const fullyReturned = returnedAmt >= totalAmountNum && totalAmountNum > 0;
+    if (requestedStatus && requestedStatus !== 'Unpaid') {
+        // User explicitly set a non-default status — respect it.
+        return requestedStatus;
+    }
+    if (fullyReturned) return 'Returned';
+    if (newBalanceAmount <= 0 && totalAmountNum > 0) return 'Paid';
+    if (newBalanceAmount > 0 && newBalanceAmount < totalAmountNum) return 'Partially Paid';
+    return requestedStatus || 'Unpaid';
+}
+
+/**
+ * PAY-01: drop payments the client removed from this invoice. Every
+ * deleted_payments id MUST be joined to THIS invoice via an existing
+ * payment_allocations row. Anything else is a crafted cross-invoice
+ * deletion → 400, delete nothing.
+ */
+function applyDeletedInvoicePayments(
+    db: Database.Database,
+    req: AuthRequest,
+    invoiceId: number,
+    originalInvoice: { customer_id: number },
+    deletedPayments: number[] | undefined,
+    userId: number
+): void {
+    if (!deletedPayments || !Array.isArray(deletedPayments) || deletedPayments.length === 0) return;
+
+    for (const deletedPaymentId of deletedPayments) {
+        const allocations = PaymentModel.getAllocationsByPaymentId(db, deletedPaymentId);
+        const ownsPayment = allocations.some(alloc => alloc.invoice_id === invoiceId);
+        if (!ownsPayment) {
+            throw new Error(
+                `Payment ${deletedPaymentId} is not allocated to invoice ${invoiceId}; ` +
+                `refusing to delete`
+            );
+        }
+    }
+
+    for (const deletedPaymentId of deletedPayments) {
+        const paymentInfo = PaymentModel.getById(db, deletedPaymentId);
+        if (paymentInfo) {
+            InvoiceModel.deleteLedgerEntryByReference(db, paymentInfo.payment_no, originalInvoice.customer_id);
+
+            log({
+                userId,
+                action: ActionType.PAYMENT_DELETE,
+                entityType: 'Payment',
+                entityId: deletedPaymentId,
+                description: `Payment ${paymentInfo.payment_no} (${Number(paymentInfo.amount).toFixed(2)}) removed from invoice ${invoiceId} during invoice update`,
+                metadata: {
+                    payment_id: deletedPaymentId,
+                    payment_no: paymentInfo.payment_no,
+                    amount: Number(paymentInfo.amount),
+                    invoice_id: invoiceId,
+                    actor: userId,
+                },
+            });
+            req.activityLogged = true;
+        }
+
+        const allocations = PaymentModel.getAllocationsByPaymentId(db, deletedPaymentId);
+
+        PaymentModel.delete(db, deletedPaymentId, {
+            voidedBy: userId,
+            voidReason: `Payment removed from invoice ${invoiceId} during update`,
+        });
+
+        // Recalculate balance for each affected invoice using
+        // the common helper (which accounts for returned_amount)
+        for (const alloc of allocations) {
+            calculateInvoiceBalance(alloc.invoice_id);
+            updateInvoiceStatus(alloc.invoice_id);
+        }
+    }
+}
+
+/**
+ * Replace the invoice's items: insert the new rows, consume FIFO batches for
+ * each, and record one stock movement per consumed batch. Returns the COGS
+ * total the caller posts to the GL.
+ */
+function consumeInvoiceItemsAndPostCogs(
+    db: Database.Database,
+    invoiceId: number,
+    items: InvoiceItemDTO[],
+    invoiceDate: string,
+    resolvedInvoiceNo: string,
+    userId: number
+): number {
+    let updatedCogsTotal = 0;
+    for (const item of items) {
+        // Intentionally bypasses InvoiceCreationService (post-create amendment, not invoice creation).
+        InvoiceModel.createInvoiceItem(db, invoiceId, {
+            item_id: item.item_id,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            tax_rate: item.tax_rate,
+            discount_type: item.discount_type,
+            discount_value: item.discount_value,
+            amount: item.amount
+        });
+
+        // FIX #3: Stock validation with warning
+        const warehouseId = InvoiceModel.findWarehouseForItem(
+            db,
+            item.item_id,
+            item.quantity,
+            item.warehouse_id
+        );
+
+        // FIFO batch consumption for new/updated items
+        const consumption = InvoiceModel.consumeFromOldestBatches(
+            item.item_id,
+            warehouseId,
+            item.quantity,
+            db
+        );
+
+        // Create one stock movement per consumed batch with actual COGS
+        for (const entry of consumption) {
+            const batchLabel = entry.batchId ? `(batch ${entry.batchId})` : '(legacy stock)';
+            StockMovementModel.recordMovement(
+                {
+                    item_id: item.item_id,
+                    warehouse_id: warehouseId,
+                    movement_type: 'SALE',
+                    quantity: -entry.consumed,
+                    unit_cost: entry.unitCost,
+                    reference_doctype: 'INVOICE',
+                    reference_docno: resolvedInvoiceNo,
+                    remarks: `Sold via Invoice ${resolvedInvoiceNo} (updated) ${batchLabel}`,
+                    movement_date: invoiceDate,
+                    batch_id: entry.batchId ?? undefined,
+                },
+                userId,
+                db
+            );
+            updatedCogsTotal += entry.consumed * entry.unitCost;
+        }
+    }
+    return updatedCogsTotal;
+}
+
 function updateInvoice(req: AuthRequest, res: Response): Response | void {
   try {
     const { id } = req.params;
@@ -351,12 +514,7 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // the posted offset entry — and silently ignoring it would leave the
         // user believing credit was applied when it was not.
         const appliedCreditOnInvoice = parseCurrency(originalInvoice.credit_offset || 0);
-        if (credit_offset !== undefined && credit_offset !== null) {
-            const requestedCredit = parseCurrency(credit_offset);
-            if (Math.abs(requestedCredit - appliedCreditOnInvoice) > 0.005) {
-                throw new CreditOffsetChangeNotSupportedError(appliedCreditOnInvoice, requestedCredit);
-            }
-        }
+        assertCreditOffsetUnchanged(credit_offset, appliedCreditOnInvoice);
 
         // ACC-18 interim: server-authoritative totals on update too.
         const computedTotal = computeInvoiceGrandTotal(items, {
@@ -397,59 +555,7 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // Fallback to original invoice_no if not provided in request
         const resolvedInvoiceNo = invoice_no || originalInvoice.invoice_no;
 
-        // === Handle deleted payments (PAY-01) ===
-        // Every deleted_payments id MUST be joined to THIS invoice via an
-        // existing payment_allocations row. Anything else is a crafted
-        // cross-invoice deletion → 400, delete nothing.
-        if (deleted_payments && Array.isArray(deleted_payments) && deleted_payments.length > 0) {
-            for (const deletedPaymentId of deleted_payments) {
-                const allocations = PaymentModel.getAllocationsByPaymentId(db, deletedPaymentId);
-                const ownsPayment = allocations.some(alloc => alloc.invoice_id === invoiceId);
-                if (!ownsPayment) {
-                    throw new Error(
-                        `Payment ${deletedPaymentId} is not allocated to invoice ${invoiceId}; ` +
-                        `refusing to delete`
-                    );
-                }
-            }
-
-            for (const deletedPaymentId of deleted_payments) {
-                const paymentInfo = PaymentModel.getById(db, deletedPaymentId);
-                if (paymentInfo) {
-                    InvoiceModel.deleteLedgerEntryByReference(db, paymentInfo.payment_no, originalInvoice.customer_id);
-
-                    log({
-                        userId,
-                        action: ActionType.PAYMENT_DELETE,
-                        entityType: 'Payment',
-                        entityId: deletedPaymentId,
-                        description: `Payment ${paymentInfo.payment_no} (${Number(paymentInfo.amount).toFixed(2)}) removed from invoice ${invoiceId} during invoice update`,
-                        metadata: {
-                            payment_id: deletedPaymentId,
-                            payment_no: paymentInfo.payment_no,
-                            amount: Number(paymentInfo.amount),
-                            invoice_id: invoiceId,
-                            actor: userId,
-                        },
-                    });
-                    req.activityLogged = true;
-                }
-
-                const allocations = PaymentModel.getAllocationsByPaymentId(db, deletedPaymentId);
-
-                PaymentModel.delete(db, deletedPaymentId, {
-                    voidedBy: userId,
-                    voidReason: `Payment removed from invoice ${invoiceId} during update`,
-                });
-
-                    // Recalculate balance for each affected invoice using
-                    // the common helper (which accounts for returned_amount)
-                    for (const alloc of allocations) {
-                        calculateInvoiceBalance(alloc.invoice_id);
-                        updateInvoiceStatus(alloc.invoice_id);
-                    }
-            }
-        }
+        applyDeletedInvoicePayments(db, req, invoiceId, originalInvoice, deleted_payments, userId);
 
         // Rebuild running balances after deleting payment ledger entries
         ledgerUtils.rebuildLedgerBalances(parsedCustomerId);
@@ -510,23 +616,7 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         const returnedAmt = parseCurrency(originalInvoice?.returned_amount || 0);
         const newBalanceAmount = Math.max(0, subtractCurrency(subtractCurrency(totalAmountNum, totalPaid), returnedAmt));
 
-        // Determine status: auto-compute only when the user did NOT
-        // explicitly set a status. Draft, Sent, Cancelled, and other
-        // manual statuses must be preserved on update.
-        let newStatus: InvoiceStatus;
-        const fullyReturned = returnedAmt >= totalAmountNum && totalAmountNum > 0;
-        if (status && status !== 'Unpaid') {
-            // User explicitly set a non-default status — respect it.
-            newStatus = status;
-        } else if (fullyReturned) {
-            newStatus = 'Returned';
-        } else if (newBalanceAmount <= 0 && totalAmountNum > 0) {
-            newStatus = 'Paid';
-        } else if (newBalanceAmount > 0 && newBalanceAmount < totalAmountNum) {
-            newStatus = 'Partially Paid';
-        } else {
-            newStatus = status || 'Unpaid';
-        }
+        const newStatus = resolveUpdatedInvoiceStatus(status, newBalanceAmount, totalAmountNum, returnedAmt);
 
         // Update invoice record
         InvoiceModel.updateInvoice(db, invoiceId, {
@@ -553,57 +643,9 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         InvoiceModel.deleteInvoiceItems(db, invoiceId);
 
         // Insert new invoice items and create new stock movements
-        let updatedCogsTotal = 0;
-        for (const item of items) {
-            // Intentionally bypasses InvoiceCreationService (post-create amendment, not invoice creation).
-            InvoiceModel.createInvoiceItem(db, invoiceId, {
-                item_id: item.item_id,
-                quantity: item.quantity,
-                unit_price: item.unit_price,
-                tax_rate: item.tax_rate,
-                discount_type: item.discount_type,
-                discount_value: item.discount_value,
-                amount: item.amount
-            });
-
-            // FIX #3: Stock validation with warning
-            const warehouseId = InvoiceModel.findWarehouseForItem(
-                db,
-                item.item_id,
-                item.quantity,
-                item.warehouse_id
-            );
-
-            // FIFO batch consumption for new/updated items
-            const consumption = InvoiceModel.consumeFromOldestBatches(
-                item.item_id,
-                warehouseId,
-                item.quantity,
-                db
-            );
-
-            // Create one stock movement per consumed batch with actual COGS
-            for (const entry of consumption) {
-                const batchLabel = entry.batchId ? `(batch ${entry.batchId})` : '(legacy stock)';
-                StockMovementModel.recordMovement(
-                    {
-                        item_id: item.item_id,
-                        warehouse_id: warehouseId,
-                        movement_type: 'SALE',
-                        quantity: -entry.consumed,
-                        unit_cost: entry.unitCost,
-                        reference_doctype: 'INVOICE',
-                        reference_docno: resolvedInvoiceNo,
-                        remarks: `Sold via Invoice ${resolvedInvoiceNo} (updated) ${batchLabel}`,
-                        movement_date: invoice_date,
-                        batch_id: entry.batchId ?? undefined,
-                    },
-                    userId,
-                    db
-                );
-                updatedCogsTotal += entry.consumed * entry.unitCost;
-            }
-        }
+        const updatedCogsTotal = consumeInvoiceItemsAndPostCogs(
+            db, invoiceId, items, invoice_date, resolvedInvoiceNo, userId
+        );
 
         // GL consistency (ACC-08): void the invoice's INVOICE + COGS lines
         // (attributed) and re-post them at the new amounts. The old lines
@@ -1058,13 +1100,9 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
     // credit, so a retry must replay rather than return the goods twice.
     const idemHash = hashRequestPayload(req.body);
     const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.INVOICE_RETURN, idemHash);
-    if (start.kind === 'error') {
-      return res.status(start.status).json({ error: start.message });
-    }
-    if (start.kind === 'replay') {
-      res.set('X-Idempotent-Replay', 'true');
-      return res.json({ success: true, message: 'Return processed successfully', idempotentReplay: true, data: { returnId: start.resourceId } });
-    }
+    if (respondToIdempotencyReplay(res, start, {
+      buildBody: (resourceId) => ({ success: true, message: 'Return processed successfully', idempotentReplay: true, data: { returnId: resourceId } }),
+    })) return;
 
     const result = InvoiceReturnService.processReturn({
       invoiceId,
@@ -1087,7 +1125,7 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
       userId,
     });
 
-    if (start.key) {
+    if (start.kind === 'proceed' && start.key) {
       claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.INVOICE_RETURN, start.key, idemHash, result.returnId);
     }
 

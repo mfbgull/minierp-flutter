@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type Database from 'better-sqlite3';
 import { getQueryParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
@@ -113,6 +114,185 @@ function getPayment(req: Request, res: Response): void {
   }
 }
 
+/**
+ * Validate a customer payment's invoice allocations: each allocation must
+ * name an existing invoice that belongs to this customer, carry a positive
+ * amount that does not exceed the invoice's remaining balance, and the
+ * allocations must add up to the payment amount.
+ */
+function validateCustomerInvoiceAllocations(
+  db: Database.Database,
+  invoiceAllocations: Array<{ invoice_id: number | string; amount: number | string }>,
+  parsedCustomerId: number,
+  parsedAmount: number
+): { status: number; error: string } | null {
+  for (const alloc of invoiceAllocations) {
+    const parsedInvoiceId = parseInt(String(alloc.invoice_id), 10);
+    if (isNaN(parsedInvoiceId)) {
+      return { status: 400, error: `Invalid invoice ID: ${alloc.invoice_id}` };
+    }
+
+    const invoice = InvoiceModel.getById(parsedInvoiceId, db);
+    if (!invoice) {
+      return { status: 404, error: `Invoice ${parsedInvoiceId} not found` };
+    }
+
+    if (Number(invoice.customer_id) !== Number(parsedCustomerId)) {
+      return { status: 400, error: `Invoice ${parsedInvoiceId} does not belong to customer ${parsedCustomerId}` };
+    }
+
+    if (parseCurrency(alloc.amount) <= 0) {
+      return { status: 400, error: `Allocation amount for invoice ${alloc.invoice_id} must be greater than 0` };
+    }
+
+    if (parseCurrency(alloc.amount) > parseCurrency(invoice.balance_amount)) {
+      return {
+        status: 400,
+        error: `Allocation amount (${parseCurrency(alloc.amount).toFixed(2)}) for invoice ${alloc.invoice_id} exceeds the remaining balance (${parseCurrency(invoice.balance_amount).toFixed(2)})`,
+      };
+    }
+  }
+
+  const totalAllocated = invoiceAllocations.reduce(
+    (sum: number, alloc: { amount: number | string }) => sum + parseCurrency(alloc.amount),
+    0
+  );
+  if (Math.abs(totalAllocated - parsedAmount) > 0.01) {
+    return {
+      status: 400,
+      error: `Payment amount (${parsedAmount.toFixed(2)}) does not match total allocated amount (${totalAllocated.toFixed(2)})`,
+    };
+  }
+
+  return null;
+}
+
+interface CustomerPaymentParams {
+  customerId: number;
+  paymentDate: string;
+  amount: number;
+  paymentMethod: string;
+  referenceNo: string | undefined;
+  notes: string | undefined;
+  invoiceAllocations: Array<{ invoice_id: string; amount: number }> | undefined;
+  idemKey: string | null;
+  currency: string;
+}
+
+interface SupplierPaymentParams {
+  supplierId: number;
+  paymentDate: string;
+  amount: number;
+  paymentMethod: string;
+  referenceNo: string | undefined;
+  notes: string | undefined;
+  poAllocations: Array<{ po_id: string; amount: number }> | undefined;
+  purchaseAllocations: Array<{ purchase_id: string; amount: number }> | undefined;
+  idemKey: string | null;
+  currency: string;
+}
+
+function createCustomerPayment(
+  req: AuthRequest,
+  res: Response,
+  p: CustomerPaymentParams
+): void {
+  const { customerId, paymentDate, amount, paymentMethod, referenceNo, notes, invoiceAllocations, idemKey, currency } = p;
+
+  if (!invoiceAllocations || !Array.isArray(invoiceAllocations) || invoiceAllocations.length === 0) {
+    res.status(400).json({ success: false, error: 'At least one invoice allocation is required for customer payments' });
+    return;
+  }
+
+  if (!CustomerModel.getById(customerId, db)) {
+    res.status(404).json({ success: false, error: 'Customer not found' });
+    return;
+  }
+
+  const allocationError = validateCustomerInvoiceAllocations(db, invoiceAllocations, customerId, amount);
+  if (allocationError) {
+    res.status(allocationError.status).json({ success: false, error: allocationError.error });
+    return;
+  }
+
+  const hash = hashRequestPayload(req.body);
+  const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.PAYMENT_CUSTOMER, idemKey, hash);
+  if (replayId !== null) {
+    if (idemKey) res.set('X-Idempotent-Replay', 'true');
+    res.status(201).json({ success: true, data: PaymentModel.getById(db, replayId) });
+    return;
+  }
+
+  const paymentId = db.transaction(() => {
+    const id = PaymentModel.create(db, {
+      customer_id: customerId, payment_date: paymentDate, amount, payment_method: paymentMethod, reference_no: referenceNo, notes, invoice_allocations: invoiceAllocations,
+      userId: req.user!.id,
+    });
+    if (idemKey) {
+      claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PAYMENT_CUSTOMER, idemKey, hash, id);
+    }
+    return id;
+  })();
+
+  const customer = CustomerModel.getById(customerId, db);
+  logCRUD(ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created payment - ${formatCurrency(amount, currency)} from ${customer?.customer_name || 'Unknown'}`, req.user!.id, { customer_id: customerId, amount, payment_method: paymentMethod, invoice_allocations: invoiceAllocations.length });
+  req.activityLogged = true;
+
+  res.status(201).json({ success: true, data: PaymentModel.getById(db, paymentId) });
+}
+
+function createSupplierPayment(
+  req: AuthRequest,
+  res: Response,
+  p: SupplierPaymentParams
+): void {
+  const { supplierId, paymentDate, amount, paymentMethod, referenceNo, notes, poAllocations, purchaseAllocations, idemKey, currency } = p;
+
+  const hasPoAllocs = poAllocations && Array.isArray(poAllocations) && poAllocations.length > 0;
+  const hasPurchaseAllocs = purchaseAllocations && Array.isArray(purchaseAllocations) && purchaseAllocations.length > 0;
+  if (!hasPoAllocs && !hasPurchaseAllocs) {
+    res.status(400).json({ success: false, error: 'At least one PO or purchase allocation is required for supplier payments' });
+    return;
+  }
+
+  if (!SupplierModel.getById(supplierId, db)) {
+    res.status(404).json({ success: false, error: 'Supplier not found' });
+    return;
+  }
+
+  const hash = hashRequestPayload(req.body);
+  const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.PAYMENT_SUPPLIER, idemKey, hash);
+  if (replayId !== null) {
+    if (idemKey) res.set('X-Idempotent-Replay', 'true');
+    res.status(201).json({ success: true, data: PaymentModel.getById(db, replayId) });
+    return;
+  }
+
+  const paymentId = db.transaction(() => {
+    const id = PaymentModel.createSupplierPayment(db, {
+      supplier_id: supplierId,
+      payment_date: paymentDate,
+      amount,
+      payment_method: paymentMethod,
+      reference_no: referenceNo,
+      notes,
+      po_allocations: hasPoAllocs ? poAllocations : [],
+      purchase_allocations: hasPurchaseAllocs ? purchaseAllocations : [],
+      userId: req.user!.id,
+    });
+    if (idemKey) {
+      claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PAYMENT_SUPPLIER, idemKey, hash, id);
+    }
+    return id;
+  })();
+
+  const supplier = SupplierModel.getById(supplierId, db);
+  logCRUD(ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created supplier payment - ${formatCurrency(amount, currency)} to ${supplier?.supplier_name || 'Unknown'}`, req.user!.id, { supplier_id: supplierId, amount, payment_method: paymentMethod, allocation_count: (poAllocations || []).length + (purchaseAllocations || []).length });
+  req.activityLogged = true;
+
+  res.status(201).json({ success: true, data: PaymentModel.getById(db, paymentId) });
+}
+
 function createPayment(req: AuthRequest, res: Response): void {
   try {
     const { customer_id, supplier_id, payment_date, amount, payment_method, reference_no, notes, invoice_allocations, po_allocations, purchase_allocations } = req.body;
@@ -136,130 +316,33 @@ function createPayment(req: AuthRequest, res: Response): void {
     const currency = getCurrencySymbol(db);
 
     if (customer_id) {
-      const parsedCustomerId = parseInt(customer_id, 10);
-      if (!invoice_allocations || !Array.isArray(invoice_allocations) || invoice_allocations.length === 0) {
-        res.status(400).json({ success: false, error: 'At least one invoice allocation is required for customer payments' });
-        return;
-      }
-
-      if (!CustomerModel.getById(parsedCustomerId, db)) {
-        res.status(404).json({ success: false, error: 'Customer not found' });
-        return;
-      }
-
-      for (const alloc of invoice_allocations) {
-        const parsedInvoiceId = parseInt(alloc.invoice_id, 10);
-        if (isNaN(parsedInvoiceId)) {
-          res.status(400).json({ success: false, error: `Invalid invoice ID: ${alloc.invoice_id}` });
-          return;
-        }
-
-        const invoice = InvoiceModel.getById(parsedInvoiceId, db);
-        if (!invoice) {
-          res.status(404).json({ success: false, error: `Invoice ${parsedInvoiceId} not found` });
-          return;
-        }
-
-        if (Number(invoice.customer_id) !== Number(parsedCustomerId)) {
-          res.status(400).json({ success: false, error: `Invoice ${parsedInvoiceId} does not belong to customer ${parsedCustomerId}` });
-          return;
-        }
-
-        if (parseCurrency(alloc.amount) <= 0) {
-          res.status(400).json({ success: false, error: `Allocation amount for invoice ${alloc.invoice_id} must be greater than 0` });
-          return;
-        }
-
-        if (parseCurrency(alloc.amount) > parseCurrency(invoice.balance_amount)) {
-          res.status(400).json({
-            success: false,
-            error: `Allocation amount (${parseCurrency(alloc.amount).toFixed(2)}) for invoice ${alloc.invoice_id} exceeds the remaining balance (${parseCurrency(invoice.balance_amount).toFixed(2)})`
-          });
-          return;
-        }
-      }
-
-      const totalAllocated = invoice_allocations.reduce(
-        (sum: number, alloc: { amount: number | string }) => sum + parseCurrency(alloc.amount),
-        0
-      );
-      if (Math.abs(totalAllocated - parsedAmount) > 0.01) {
-        res.status(400).json({ success: false, error: `Payment amount (${parsedAmount.toFixed(2)}) does not match total allocated amount (${totalAllocated.toFixed(2)})` });
-        return;
-      }
-
-      const hash = hashRequestPayload(req.body);
-      const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.PAYMENT_CUSTOMER, idemKey, hash);
-      if (replayId !== null) {
-        if (idemKey) res.set('X-Idempotent-Replay', 'true');
-        res.status(201).json({ success: true, data: PaymentModel.getById(db, replayId) });
-        return;
-      }
-
-      const paymentId = db.transaction(() => {
-        const id = PaymentModel.create(db, {
-          customer_id: parsedCustomerId, payment_date, amount: parsedAmount, payment_method, reference_no, notes, invoice_allocations,
-          userId: req.user!.id,
-        });
-        if (idemKey) {
-          claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PAYMENT_CUSTOMER, idemKey, hash, id);
-        }
-        return id;
-      })();
-
-      const customer = CustomerModel.getById(parsedCustomerId, db);
-      logCRUD(ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created payment - ${formatCurrency(parsedAmount, currency)} from ${customer?.customer_name || 'Unknown'}`, req.user!.id, { customer_id: parsedCustomerId, amount: parsedAmount, payment_method, invoice_allocations: invoice_allocations.length });
-      req.activityLogged = true;
-
-      res.status(201).json({ success: true, data: PaymentModel.getById(db, paymentId) });
+      createCustomerPayment(req, res, {
+        customerId: parseInt(customer_id, 10),
+        paymentDate: payment_date,
+        amount: parsedAmount,
+        paymentMethod: payment_method,
+        referenceNo: reference_no,
+        notes,
+        invoiceAllocations: invoice_allocations,
+        idemKey,
+        currency,
+      });
       return;
     }
 
     if (supplier_id) {
-      const parsedSupplierId = parseInt(supplier_id, 10);
-      const hasPoAllocs = po_allocations && Array.isArray(po_allocations) && po_allocations.length > 0;
-      const hasPurchaseAllocs = purchase_allocations && Array.isArray(purchase_allocations) && purchase_allocations.length > 0;
-      if (!hasPoAllocs && !hasPurchaseAllocs) {
-        res.status(400).json({ success: false, error: 'At least one PO or purchase allocation is required for supplier payments' });
-        return;
-      }
-
-      if (!SupplierModel.getById(parsedSupplierId, db)) {
-        res.status(404).json({ success: false, error: 'Supplier not found' });
-        return;
-      }
-
-      const hash = hashRequestPayload(req.body);
-      const { replayId } = beginIdempotentWrite(db, IDEMPOTENCY_SCOPES.PAYMENT_SUPPLIER, idemKey, hash);
-      if (replayId !== null) {
-        if (idemKey) res.set('X-Idempotent-Replay', 'true');
-        res.status(201).json({ success: true, data: PaymentModel.getById(db, replayId) });
-        return;
-      }
-
-      const paymentId = db.transaction(() => {
-        const id = PaymentModel.createSupplierPayment(db, {
-          supplier_id: parsedSupplierId,
-          payment_date,
-          amount: parsedAmount,
-          payment_method,
-          reference_no,
-          notes,
-          po_allocations: hasPoAllocs ? po_allocations : [],
-          purchase_allocations: hasPurchaseAllocs ? purchase_allocations : [],
-          userId: req.user!.id,
-        });
-        if (idemKey) {
-          claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PAYMENT_SUPPLIER, idemKey, hash, id);
-        }
-        return id;
-      })();
-
-      const supplier = SupplierModel.getById(parsedSupplierId, db);
-      logCRUD(ActionType.PAYMENT_CREATE, 'Payment', paymentId, `Created supplier payment - ${formatCurrency(parsedAmount, currency)} to ${supplier?.supplier_name || 'Unknown'}`, req.user!.id, { supplier_id: parsedSupplierId, amount: parsedAmount, payment_method, allocation_count: (po_allocations || []).length + (purchase_allocations || []).length });
-      req.activityLogged = true;
-
-      res.status(201).json({ success: true, data: PaymentModel.getById(db, paymentId) });
+      createSupplierPayment(req, res, {
+        supplierId: parseInt(supplier_id, 10),
+        paymentDate: payment_date,
+        amount: parsedAmount,
+        paymentMethod: payment_method,
+        referenceNo: reference_no,
+        notes,
+        poAllocations: po_allocations,
+        purchaseAllocations: purchase_allocations,
+        idemKey,
+        currency,
+      });
       return;
     }
   } catch (error) {

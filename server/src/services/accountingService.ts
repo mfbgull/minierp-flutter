@@ -91,14 +91,6 @@ export interface AccountBalance {
   text_code: string | null;
 }
 
-export type AccountingPeriod = {
-  id: number;
-  period_name: string;
-  start_date: string;
-  end_date: string;
-  status: 'open' | 'closed';
-};
-
 export class AccountingService {
 
   // ------------------------------------------------------------------
@@ -362,7 +354,6 @@ export class AccountingService {
         `Open a period in accounting_periods before posting.`
       );
     }
-
 
     // Insert header first, then lines. The header's AUTOINCREMENT id is
     // the grouping key, so lines can never point at a nonexistent or
@@ -1502,7 +1493,6 @@ export class AccountingService {
     return result.changes;
   }
 
-
   /**
    * Void the LEGACY invoice-keyed INVOICE_RETURN lines that genuinely
    * belong to `invoiceId`.
@@ -1548,23 +1538,6 @@ export class AccountingService {
       invoiceId
     );
     return result.changes;
-  }
-
-
-  static listPeriods(db: Database.Database): AccountingPeriod[] {
-    return db.prepare(`
-      SELECT id, period_name, start_date, end_date, status
-      FROM accounting_periods
-      ORDER BY start_date DESC
-    `).all() as AccountingPeriod[];
-  }
-
-  static closePeriod(db: Database.Database, periodId: number, closedBy?: number): void {
-    db.prepare(`
-      UPDATE accounting_periods
-      SET status = 'closed', closed_at = CURRENT_TIMESTAMP, closed_by = ?
-      WHERE id = ? AND status = 'open'
-    `).run(closedBy || null, periodId);
   }
 
   static openPeriod(db: Database.Database, periodName: string, startDate: string, endDate: string): number {
@@ -1758,14 +1731,6 @@ export class AccountingService {
    * Useful when callers want a raw "debit total" without the
    * signed-balance convention applied.
    */
-  static getAccountRawTotals(
-    db: Database.Database,
-    accountId: number,
-    asOfDate: string
-  ): { debit: number; credit: number } {
-    const bal = AccountingService.getAccountBalance(db, accountId, asOfDate);
-    return { debit: bal.total_debit, credit: bal.total_credit };
-  }
 }
 
 export default AccountingService;

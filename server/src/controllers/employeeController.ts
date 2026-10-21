@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type Database from 'better-sqlite3';
 import { AuthRequest } from '../types';
 import { logCRUD, ActionType } from '../services/activityLogger';
 import db from '../config/database';
@@ -214,6 +215,142 @@ function getNextEmployeeCode(req: Request, res: Response): void {
   }
 }
 
+type SalaryEmployeeRef = {
+  first_name: string;
+  last_name: string;
+  employee_code: string;
+};
+
+/**
+ * Post the salary payment's GL entry and stamp the journal id back onto the
+ * salary payment row.
+ */
+function postSalaryPaymentGl(
+  db: Database.Database,
+  employee: SalaryEmployeeRef,
+  paymentId: number,
+  salaryAmount: number,
+  paymentDate: string,
+  method: string,
+  userId: number | undefined
+): number | null {
+  let journalEntryId: number | null = null;
+  try {
+    const result = AccountingService.postSalaryEntry(db, {
+      salaryPaymentId: paymentId,
+      employeeName: `${employee.first_name} ${employee.last_name}`,
+      employeeCode: employee.employee_code,
+      amount: salaryAmount,
+      paymentDate,
+      paymentMethod: method,
+      userId,
+    });
+    if (result) journalEntryId = result.journal_entry_id;
+  } catch (glError: unknown) {
+    throw new Error(`GL posting failed: ${errorMessage(glError)}`, { cause: glError });
+  }
+
+  if (journalEntryId) {
+    db.prepare(`UPDATE salary_payments SET journal_entry_id = ? WHERE id = ?`)
+      .run(journalEntryId, paymentId);
+  }
+  return journalEntryId;
+}
+
+/**
+ * D3: a salary overpayment must be posted once. The excess above the
+ * payable salary becomes an employee advance, carried in the next pay period.
+ */
+function createSalaryAdvance(
+  db: Database.Database,
+  employee: SalaryEmployeeRef,
+  employeeId: number,
+  excess: number,
+  parentPaymentId: number,
+  payPeriod: string,
+  paymentDate: string,
+  method: string,
+  userId: number | undefined
+): number | null {
+  if (excess <= 0) return null;
+
+  const [year, month] = payPeriod.split('-').map(Number);
+  const nextDate = new Date(year, month, 1);
+  const nextPayPeriod = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+  const advanceCreated = EmployeeModel.addSalaryPayment({
+    employee_id: employeeId,
+    amount: excess,
+    payment_date: paymentDate,
+    payment_method: method,
+    reference_no: `ADV-${payPeriod}`,
+    notes: `Auto-advance from overpayment in ${payPeriod}`,
+    paid_by: userId,
+    payment_type: 'advance',
+    parent_payment_id: parentPaymentId,
+    pay_period: nextPayPeriod,
+  }, db);
+  const advanceEntry = AccountingService.postSalaryEntry(db, {
+    salaryPaymentId: advanceCreated,
+    employeeName: `${employee.first_name} ${employee.last_name}`,
+    employeeCode: employee.employee_code,
+    amount: excess,
+    paymentDate,
+    paymentMethod: method,
+    userId,
+    postingKind: 'advance',
+  });
+  if (advanceEntry) {
+    db.prepare('UPDATE salary_payments SET journal_entry_id = ? WHERE id = ?')
+      .run(advanceEntry.journal_entry_id, advanceCreated);
+  }
+  return advanceCreated;
+}
+
+/**
+ * D4: a salary payment may repay an employee loan, but only an active loan
+ * of this employee, never more than the loan balance or the salary paid,
+ * and never before the loan was disbursed.
+ */
+function applySalaryLoanDeduction(
+  db: Database.Database,
+  employee: SalaryEmployeeRef,
+  employeeId: number,
+  salaryPaymentId: number,
+  salaryAmount: number,
+  loanDeduction: number | null | undefined,
+  loanId: number | null | undefined,
+  paymentDate: string,
+  method: string,
+  userId: number | undefined
+): void {
+  const deduction = roundCurrency(loanDeduction ?? 0);
+  if (deduction <= 0) return;
+
+  if (!Number.isSafeInteger(loanId) || (loanId as number) <= 0) {
+    throw new BusinessRuleError(400, 'Loan deduction requires a valid loan');
+  }
+  const loan = EmployeeLoanModel.getById(loanId as number, db);
+  if (!loan || loan.employee_id !== employeeId || loan.voided_at || !['active', 'overdue'].includes(loan.status)) {
+    throw new BusinessRuleError(400, 'Loan deduction requires an active loan for this employee');
+  }
+  if (paymentDate < loan.disbursement_date || deduction > loan.balance || deduction > salaryAmount) {
+    throw new BusinessRuleError(400, 'Loan deduction exceeds the loan or salary balance, or precedes disbursement');
+  }
+  const repaymentId = EmployeeLoanModel.addRepayment({
+    loan_id: loan.id, employee_id: employeeId, amount: deduction,
+    payment_date: paymentDate, payment_method: method, repayment_type: 'salary_deduction',
+    salary_payment_id: salaryPaymentId, created_by: userId,
+    notes: 'Loan deduction from salary payment',
+  }, db);
+  EmployeeLoanModel.deductBalance(loan.id, deduction, db);
+  const repaymentEntry = AccountingService.postLoanRepayment(db, {
+    repaymentId, loanId: loan.id, employeeName: `${employee.first_name} ${employee.last_name}`,
+    employeeCode: employee.employee_code, amount: deduction, paymentDate,
+    paymentMethod: method, userId,
+  });
+  if (repaymentEntry) EmployeeLoanModel.updateRepaymentJournal(repaymentId, repaymentEntry.journal_entry_id, db);
+}
+
 function paySalary(req: Request, res: Response): void {
   try {
     const { id } = req.params;
@@ -311,86 +448,18 @@ function paySalary(req: Request, res: Response): void {
         claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.EMPLOYEE_SALARY_PAY, start.key, hash, paymentId);
       }
 
-      let journalEntryId: number | null = null;
-      try {
-        const result = AccountingService.postSalaryEntry(db, {
-          salaryPaymentId: paymentId,
-          employeeName: `${employee.first_name} ${employee.last_name}`,
-          employeeCode: employee.employee_code,
-          amount: salaryAmount,
-          paymentDate: payment_date,
-          paymentMethod: method,
-          userId: authReq.user?.id,
-        });
-        if (result) journalEntryId = result.journal_entry_id;
-      } catch (glError: unknown) {
-        throw new Error(`GL posting failed: ${errorMessage(glError)}`, { cause: glError });
-      }
+      const journalEntryId = postSalaryPaymentGl(
+        db, employee, paymentId, salaryAmount, payment_date, method, authReq.user?.id
+      );
 
-      if (journalEntryId) {
-        db.prepare(`UPDATE salary_payments SET journal_entry_id = ? WHERE id = ?`)
-          .run(journalEntryId, paymentId);
-      }
+      const advanceCreated = createSalaryAdvance(
+        db, employee, employeeId, excess, paymentId, payPeriod, payment_date, method, authReq.user?.id
+      );
 
-      let advanceCreated: number | null = null;
-      if (excess > 0) {
-        const [year, month] = payPeriod.split('-').map(Number);
-        const nextDate = new Date(year, month, 1);
-        const nextPayPeriod = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
-        advanceCreated = EmployeeModel.addSalaryPayment({
-          employee_id: employeeId,
-          amount: excess,
-          payment_date,
-          payment_method: method,
-          reference_no: `ADV-${payPeriod}`,
-          notes: `Auto-advance from overpayment in ${payPeriod}`,
-          paid_by: authReq.user?.id,
-          payment_type: 'advance',
-          parent_payment_id: paymentId,
-          pay_period: nextPayPeriod,
-        }, db);
-        const advanceEntry = AccountingService.postSalaryEntry(db, {
-          salaryPaymentId: advanceCreated,
-          employeeName: `${employee.first_name} ${employee.last_name}`,
-          employeeCode: employee.employee_code,
-          amount: excess,
-          paymentDate: payment_date,
-          paymentMethod: method,
-          userId: authReq.user?.id,
-          postingKind: 'advance',
-        });
-        if (advanceEntry) {
-          db.prepare('UPDATE salary_payments SET journal_entry_id = ? WHERE id = ?')
-            .run(advanceEntry.journal_entry_id, advanceCreated);
-        }
-      }
-
-      const deduction = roundCurrency(loan_deduction ?? 0);
-      if (deduction > 0) {
-        if (!Number.isSafeInteger(loan_id) || loan_id <= 0) {
-          throw new BusinessRuleError(400, 'Loan deduction requires a valid loan');
-        }
-        const loan = EmployeeLoanModel.getById(loan_id, db);
-        if (!loan || loan.employee_id !== employeeId || loan.voided_at || !['active', 'overdue'].includes(loan.status)) {
-          throw new BusinessRuleError(400, 'Loan deduction requires an active loan for this employee');
-        }
-        if (payment_date < loan.disbursement_date || deduction > loan.balance || deduction > salaryAmount) {
-          throw new BusinessRuleError(400, 'Loan deduction exceeds the loan or salary balance, or precedes disbursement');
-        }
-        const repaymentId = EmployeeLoanModel.addRepayment({
-          loan_id: loan.id, employee_id: employeeId, amount: deduction,
-          payment_date, payment_method: method, repayment_type: 'salary_deduction',
-          salary_payment_id: paymentId, created_by: authReq.user?.id,
-          notes: 'Loan deduction from salary payment',
-        }, db);
-        EmployeeLoanModel.deductBalance(loan.id, deduction, db);
-        const repaymentEntry = AccountingService.postLoanRepayment(db, {
-          repaymentId, loanId: loan.id, employeeName: `${employee.first_name} ${employee.last_name}`,
-          employeeCode: employee.employee_code, amount: deduction, paymentDate: payment_date,
-          paymentMethod: method, userId: authReq.user?.id,
-        });
-        if (repaymentEntry) EmployeeLoanModel.updateRepaymentJournal(repaymentId, repaymentEntry.journal_entry_id, db);
-      }
+      applySalaryLoanDeduction(
+        db, employee, employeeId, paymentId, salaryAmount,
+        loan_deduction, loan_id, payment_date, method, authReq.user?.id
+      );
 
       logCRUD(ActionType.EMPLOYEE_UPDATE, 'Employee', employeeId,
         `Salary paid: ${employee.first_name} ${employee.last_name} (amount: ${amount})`, authReq.user?.id);

@@ -47,7 +47,3 @@ export interface ActionDef {
   condition?: (row: Record<string, unknown>) => boolean;
 }
 
-/** Raw row from an entity search query (before transformation). */
-export interface EntityRow extends Record<string, unknown> {
-  id: number;
-}

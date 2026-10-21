@@ -106,7 +106,3 @@ export function cogsForPeriod(db: Database.Database, startDate: string, endDate:
   return cogsAggregate(db, `sm.movement_date BETWEEN ? AND ? AND ${cogsCondition()}`, [startDate, endDate]);
 }
 
-/** Cumulative COGS up to and including asOfDate (balance-sheet YTD). */
-export function cogsUpTo(db: Database.Database, asOfDate: string): number {
-  return cogsAggregate(db, `sm.movement_date <= ? AND ${cogsCondition()}`, [asOfDate]);
-}
