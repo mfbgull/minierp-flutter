@@ -1,0 +1,3590 @@
+{
+ "exports": [],
+ "types": [],
+ "enums": [
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "PO_CREATE",
+   "kind": "enum_member",
+   "line": 32,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "PO_UPDATE",
+   "kind": "enum_member",
+   "line": 33,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "PO_APPROVE",
+   "kind": "enum_member",
+   "line": 34,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "PO_CANCEL",
+   "kind": "enum_member",
+   "line": 35,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "PO_DELETE",
+   "kind": "enum_member",
+   "line": 36,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "GRN_CREATE",
+   "kind": "enum_member",
+   "line": 37,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "GRN_UPDATE",
+   "kind": "enum_member",
+   "line": 38,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_CREATE",
+   "kind": "enum_member",
+   "line": 51,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_UPDATE",
+   "kind": "enum_member",
+   "line": 52,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_CONFIRM",
+   "kind": "enum_member",
+   "line": 53,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_DELIVER",
+   "kind": "enum_member",
+   "line": 54,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_INVOICE",
+   "kind": "enum_member",
+   "line": 55,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_CANCEL",
+   "kind": "enum_member",
+   "line": 56,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - referenced by name (named-ref)",
+   "external": [
+    {
+     "file": "server/src/models/Dashboard.ts",
+     "line": 148,
+     "text": "AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE', 'INVOICE_CANCEL', 'SO_CANCEL'))",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Dashboard.ts",
+     "line": 510,
+     "text": "AND sm.reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE', 'INVOICE_CANCEL', 'SO_CANCEL'))",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/utils/reportSql.ts",
+     "line": 91,
+     "text": "AND ${p}reference_doctype IN ('RETURN', 'INVOICE_DELETE', 'INVOICE_UPDATE', 'INVOICE_CANCEL', 'SO_CANCEL'))",
+     "rel": "named-ref"
+    }
+   ],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_DELETE",
+   "kind": "enum_member",
+   "line": 57,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "INVOICE_POST",
+   "kind": "enum_member",
+   "line": 62,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "INVOICE_RETURN",
+   "kind": "enum_member",
+   "line": 65,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via named-ref + member-access",
+   "external": [
+    {
+     "file": "server/scripts/historical-data-integrity.ts",
+     "line": 182,
+     "text": "AND jl.reference_type IN ('INVOICE_RETURN', 'RETURN_FEE')",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/scripts/historical-data-integrity.ts",
+     "line": 249,
+     "text": "WHERE jl.reference_type IN ('INVOICE_RETURN', 'RETURN_FEE')",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/scripts/historical-data-integrity.ts",
+     "line": 299,
+     "text": "document: 'INVOICE_RETURN',",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/scripts/verify-reversal-rules.ts",
+     "line": 172,
+     "text": "assert(activeLines('INVOICE_RETURN', inv1Id) === 0, 'INVOICE_RETURN GL voided');",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/glReturnTaxBalance.test.ts",
+     "line": 27,
+     "text": "WHERE reference_type = 'INVOICE_RETURN' AND reference_id = ? AND voided = 0",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/glReturnTaxBalance.test.ts",
+     "line": 142,
+     "text": "WHERE account_id = ? AND reference_type = 'INVOICE_RETURN'",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/historicalDataIntegrityScanner.test.ts",
+     "line": 128,
+     "text": "insertJournalLine.run(1, 'INVOICE_RETURN', 1, 100, 0, 1, 'Invoice INV-A cancelled');",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/historicalDataIntegrityScanner.test.ts",
+     "line": 129,
+     "text": "insertJournalLine.run(2, 'INVOICE_RETURN', 1, 0, 100, 1, 'Invoice INV-A cancelled');",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/historicalDataIntegrityScanner.test.ts",
+     "line": 131,
+     "text": "insertJournalLine.run(3, 'INVOICE_RETURN', 2, 50, 0, 1, 'Invoice INV-A cancelled');",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/historicalDataIntegrityScanner.test.ts",
+     "line": 132,
+     "text": "insertJournalLine.run(4, 'INVOICE_RETURN', 2, 0, 50, 1, 'Invoice INV-A cancelled');",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/historicalDataIntegrityScanner.test.ts",
+     "line": 216,
+     "text": "document: 'INVOICE_RETURN',",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/historicalDataIntegrityScanner.test.ts",
+     "line": 232,
+     "text": "document: 'INVOICE_RETURN',",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/idempotencyRound2.test.ts",
+     "line": 201,
+     "text": "const key = keyFor(IDEMPOTENCY_SCOPES.INVOICE_RETURN);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/idempotencyRound2.test.ts",
+     "line": 221,
+     "text": "const key = keyFor(IDEMPOTENCY_SCOPES.INVOICE_RETURN);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 6,
+     "text": "* RETURN document — journal_lines(reference_type = 'INVOICE_RETURN',",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 9,
+     "text": "* Cancelling invoice N used to void INVOICE_RETURN lines by the bare",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 187,
+     "text": "const goodsBefore = glTotalsFor('INVOICE_RETURN', returnId);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 189,
+     "text": "const goodsLinesBefore = activeLines('INVOICE_RETURN', returnId);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 196,
+     "text": "expect(accountTotals('INVOICE_RETURN', returnId, '1100').credit).toBeCloseTo(100, 2); // AR",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 197,
+     "text": "expect(accountTotals('INVOICE_RETURN', returnId, '4100').debit).toBeCloseTo(100, 2);  // Sales Returns",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 198,
+     "text": "expect(accountTotals('INVOICE_RETURN', returnId, '1200').debit).toBeCloseTo(100, 2);  // Inventory restored",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 199,
+     "text": "expect(accountTotals('INVOICE_RETURN', returnId, '5000').credit).toBeCloseTo(100, 2); // COGS reversed",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 219,
+     "text": "expect(glTotalsFor('INVOICE_RETURN', returnId)).toEqual(goodsBefore);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 221,
+     "text": "expect(activeLines('INVOICE_RETURN', returnId)).toEqual(goodsLinesBefore);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 223,
+     "text": "expect(accountTotals('INVOICE_RETURN', returnId, '1100').credit).toBeCloseTo(100, 2);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 224,
+     "text": "expect(accountTotals('INVOICE_RETURN', returnId, '4100').debit).toBeCloseTo(100, 2);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 225,
+     "text": "expect(accountTotals('INVOICE_RETURN', returnId, '1200').debit).toBeCloseTo(100, 2);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 226,
+     "text": "expect(accountTotals('INVOICE_RETURN', returnId, '5000').credit).toBeCloseTo(100, 2);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 231,
+     "text": "WHERE reference_type IN ('INVOICE_RETURN', 'RETURN_FEE')",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 353,
+     "text": "// /api/invoices/:id voided INVOICE_RETURN by the bare invoice id.",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 390,
+     "text": "const goodsBefore = glTotalsFor('INVOICE_RETURN', returnId);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 391,
+     "text": "const goodsLinesBefore = activeLines('INVOICE_RETURN', returnId);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 393,
+     "text": "expect(accountTotals('INVOICE_RETURN', returnId, '1100').credit).toBeCloseTo(100, 2);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 394,
+     "text": "expect(accountTotals('INVOICE_RETURN', returnId, '4100').debit).toBeCloseTo(100, 2);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 406,
+     "text": "expect(glTotalsFor('INVOICE_RETURN', returnId)).toEqual(goodsBefore);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 407,
+     "text": "expect(activeLines('INVOICE_RETURN', returnId)).toEqual(goodsLinesBefore);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 408,
+     "text": "expect(accountTotals('INVOICE_RETURN', returnId, '1100').credit).toBeCloseTo(100, 2);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 409,
+     "text": "expect(accountTotals('INVOICE_RETURN', returnId, '4100').debit).toBeCloseTo(100, 2);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReturnCollision.test.ts",
+     "line": 412,
+     "text": "WHERE reference_type IN ('INVOICE_RETURN', 'RETURN_FEE')",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceCancelReversal.test.ts",
+     "line": 147,
+     "text": "expect(activeLines('INVOICE_RETURN', invoiceId)).toBe(0);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceReturnAcceptance.test.ts",
+     "line": 132,
+     "text": "assertGlBalanced('INVOICE_RETURN', ret.returnId!);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceReturnAcceptance.test.ts",
+     "line": 420,
+     "text": "AND je.reference_type = 'INVOICE_RETURN' AND je.reference_id = ?",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceReturnEdgeCases.test.ts",
+     "line": 288,
+     "text": "AND reference_type = 'INVOICE_RETURN'",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceReturnEdgeCases.test.ts",
+     "line": 299,
+     "text": "AND reference_type = 'INVOICE_RETURN'",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceReturnEdgeCases.test.ts",
+     "line": 309,
+     "text": "AND reference_type = 'INVOICE_RETURN'",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceReturnVoidsAndPrint.test.ts",
+     "line": 76,
+     "text": "expect(glTotalsFor('INVOICE_RETURN', returnId)).toEqual({ debit: 0, credit: 0 });",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceReturnVoidsAndPrint.test.ts",
+     "line": 272,
+     "text": "assertGlBalanced('INVOICE_RETURN', r1.returnId!);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceReturnVoidsAndPrint.test.ts",
+     "line": 274,
+     "text": "assertGlBalanced('INVOICE_RETURN', r2.returnId!);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceReturnVoidsAndPrint.test.ts",
+     "line": 318,
+     "text": "// The fee is NOT embedded in the INVOICE_RETURN group (separate entries)",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceReturnVoidsAndPrint.test.ts",
+     "line": 321,
+     "text": "WHERE account_id = ? AND reference_type = 'INVOICE_RETURN'",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/reverseStockRestock.test.ts",
+     "line": 75,
+     "text": "AND jl.reference_type = 'INVOICE_RETURN'",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/reverseStockRestock.test.ts",
+     "line": 87,
+     "text": "AND jl.reference_type = 'INVOICE_RETURN'",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/taxPostingConsistency.test.ts",
+     "line": 61,
+     "text": "WHERE account_id = ? AND reference_type = 'INVOICE_RETURN'",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/taxPostingConsistency.test.ts",
+     "line": 235,
+     "text": "assertGlBalanced('INVOICE_RETURN', returnId);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/taxPostingConsistency.test.ts",
+     "line": 255,
+     "text": "assertGlBalanced('INVOICE_RETURN', returnId);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 857,
+     "text": "*   2. Un-void the invoice's INVOICE + INVOICE_RETURN journal lines",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 931,
+     "text": "AccountingService.restoreJournalLinesByReference(db, 'INVOICE_RETURN', invoiceId, {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 1022,
+     "text": "// INVOICE_RETURN), append-only CANCELLATION ledger credit,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 1102,
+     "text": "const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.INVOICE_RETURN, idemHash);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 1129,
+     "text": "claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.INVOICE_RETURN, start.key, idemHash, result.returnId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Invoice.ts",
+     "line": 979,
+     "text": "* of invoices.id. Voiding INVOICE_RETURN by the bare invoice id",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Invoice.ts",
+     "line": 999,
+     "text": "db, 'INVOICE_RETURN', ret.id,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Invoice.ts",
+     "line": 1020,
+     "text": "*   3. GL void by reference: INVOICE + INVOICE_RETURN journal_lines",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/accountingService.ts",
+     "line": 1183,
+     "text": "reference_type: args.referenceType ?? 'INVOICE_RETURN',",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/accountingService.ts",
+     "line": 1266,
+     "text": "reference_type: 'INVOICE_RETURN',",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/accountingService.ts",
+     "line": 1497,
+     "text": "* Void the LEGACY invoice-keyed INVOICE_RETURN lines that genuinely",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/accountingService.ts",
+     "line": 1504,
+     "text": "* postings key INVOICE_RETURN lines to an invoice id, so this pass is",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/accountingService.ts",
+     "line": 1526,
+     "text": "WHERE reference_type = 'INVOICE_RETURN'",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 530,
+     "text": "'INVOICE_RETURN',",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 693,
+     "text": "//    shares the INVOICE_RETURN group by construction, so it is",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 695,
+     "text": "AccountingService.voidJournalLinesByReference(db, 'INVOICE_RETURN', returnId, {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 1483,
+     "text": "//    INVOICE_RETURN group, which carries the Dr 1200 / Cr 5000 COGS",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/utils/idempotency.ts",
+     "line": 49,
+     "text": "INVOICE_RETURN: 'invoices.return',",
+     "rel": "named-ref"
+    }
+   ],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "WO_START",
+   "kind": "enum_member",
+   "line": 82,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "WO_COMPLETE",
+   "kind": "enum_member",
+   "line": 83,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "WO_CANCEL",
+   "kind": "enum_member",
+   "line": 84,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "MATERIAL_CONSUME",
+   "kind": "enum_member",
+   "line": 86,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "DATA_IMPORT",
+   "kind": "enum_member",
+   "line": 106,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "DATA_EXPORT",
+   "kind": "enum_member",
+   "line": 107,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "POS_SALE",
+   "kind": "enum_member",
+   "line": 111,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "POS_RETURN",
+   "kind": "enum_member",
+   "line": 112,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "REPORT_GENERATE",
+   "kind": "enum_member",
+   "line": 115,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "REPORT_EXPORT",
+   "kind": "enum_member",
+   "line": 116,
+   "parent": "ActionType",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "DEBUG",
+   "kind": "enum_member",
+   "line": 121,
+   "parent": "LogLevel",
+   "owner": [],
+   "verdict": "CONFIRMED-DEAD",
+   "why": "zero references anywhere in the TS/JS tree outside the declaration",
+   "external": [],
+   "internalCount": 0
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "ERROR",
+   "kind": "enum_member",
+   "line": 124,
+   "parent": "LogLevel",
+   "owner": [],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - referenced by name (named-ref)",
+   "external": [
+    {
+     "file": "server/scripts/backup-db.js",
+     "line": 30,
+     "text": "console.error(`[db:backup] ERROR: ${message}`);",
+     "rel": "named-ref"
+    }
+   ],
+   "internalCount": 0
+  }
+ ],
+ "class_members": [
+  {
+   "path": "server/src/models/EmployeeLoan.ts",
+   "sym": "getById",
+   "kind": "class_member",
+   "line": 100,
+   "parent": "default",
+   "owner": [
+    "EmployeeLoanModel"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via member-access + named-ref + qualified-call",
+   "external": [
+    {
+     "file": "server/scripts/verify-reversal-rules.ts",
+     "line": 167,
+     "text": "InvoiceModel.cancelInvoiceInternal(db, InvoiceModel.getById(inv1Id, db)!, 1);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/scripts/verify-reversal-rules.ts",
+     "line": 192,
+     "text": "const inv2Row = InvoiceModel.getById(inv2Id, db)!;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/cashInflowReversal.test.ts",
+     "line": 76,
+     "text": "expect(SupplierRefundModel.getById(refund.id, db)?.status).toBe('POSTED');",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/glSoftDelete.test.ts",
+     "line": 69,
+     "text": "// Hidden from list + getById",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/invoiceReturnMigration.test.ts",
+     "line": 148,
+     "text": "expect(InvoiceReturnModel.getById(db, header.id)!.settled_amount).toBeCloseTo(1080, 2);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/invoiceReturnMigration.test.ts",
+     "line": 149,
+     "text": "expect(InvoiceReturnModel.getById(db, header.id)!.status).toBe('Settled');",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 59,
+     "text": "describe('getById', () => {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 61,
+     "text": "const item = ItemModel.getById(createdItemId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 68,
+     "text": "const item = ItemModel.getById(999999, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 75,
+     "text": "const item = ItemModel.getById(createdItemId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 157,
+     "text": "const updated = ItemModel.getById(createdItemId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 180,
+     "text": "const deleted = ItemModel.getById(createdItemId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 228,
+     "text": "describe('getById', () => {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 230,
+     "text": "const wh = WarehouseModel.getById(db, createdWarehouseId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 236,
+     "text": "const wh = WarehouseModel.getById(db, 999999);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 243,
+     "text": "const wh = WarehouseModel.getById(db, createdWarehouseId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 267,
+     "text": "warehouse_code: WarehouseModel.getById(db, createdWarehouseId)!.warehouse_code,",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 272,
+     "text": "const updated = WarehouseModel.getById(db, createdWarehouseId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 281,
+     "text": "const deleted = WarehouseModel.getById(db, createdWarehouseId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 377,
+     "text": "describe('getById', () => {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 381,
+     "text": "const movement = StockMovementModel.getById(rows[0].id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 388,
+     "text": "const movement = StockMovementModel.getById(999999, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/models.test.ts",
+     "line": 777,
+     "text": "const row = PurchaseModel.getById(purchaseId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/ownerEquity.test.ts",
+     "line": 158,
+     "text": "expect(OwnerCapitalModel.getById(db, id)?.status).toBe('voided');",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/ownerEquity.test.ts",
+     "line": 231,
+     "text": "expect(OwnerCapitalModel.getById(db, id)?.note).toBe('after');",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/ownerEquity.test.ts",
+     "line": 407,
+     "text": "expect(OwnerWithdrawalModel.getById(db, created.id)?.status).toBe('voided');",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/supplierRefund.test.ts",
+     "line": 169,
+     "text": "expect(SupplierRefundModel.getById(refund.id, db)?.status).toBe('POSTED');",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/unappliedCashGl.test.ts",
+     "line": 354,
+     "text": "const stale = Invoice.getById(invoiceId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/unappliedCashGl.test.ts",
+     "line": 366,
+     "text": "const existing = Invoice.getById(invoiceId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/accountingController.ts",
+     "line": 217,
+     "text": "const period = PeriodModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/accountingController.ts",
+     "line": 327,
+     "text": "const existing = PeriodModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/accountingController.ts",
+     "line": 336,
+     "text": "const updated = PeriodModel.getById(db, id)!;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/authController.ts",
+     "line": 90,
+     "text": "const user = UserModel.getById(req.user!.id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/bomController.ts",
+     "line": 46,
+     "text": "const bom = BOMModel.getById(Number(id), db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/bomController.ts",
+     "line": 130,
+     "text": "const bom = BOMModel.getById(Number(id), db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/customersController.ts",
+     "line": 54,
+     "text": "const customer = CustomerModel.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/customersController.ts",
+     "line": 95,
+     "text": "const createdCustomer = CustomerModel.getById(customerId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/customersController.ts",
+     "line": 112,
+     "text": "const existingCustomer = CustomerModel.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/customersController.ts",
+     "line": 119,
+     "text": "const updatedCustomer = CustomerModel.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/customersController.ts",
+     "line": 136,
+     "text": "const existingCustomer = CustomerModel.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/customersController.ts",
+     "line": 169,
+     "text": "const existingCustomer = CustomerModel.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/customersController.ts",
+     "line": 176,
+     "text": "const restoredCustomer = CustomerModel.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/customersController.ts",
+     "line": 202,
+     "text": "const customer = CustomerModel.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/customersController.ts",
+     "line": 233,
+     "text": "const customer = CustomerModel.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 69,
+     "text": "const employee = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 129,
+     "text": "const employee = EmployeeModel.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 146,
+     "text": "const existing = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 168,
+     "text": "const updated = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 181,
+     "text": "const existing = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 332,
+     "text": "const loan = EmployeeLoanModel.getById(loanId as number, db);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 360,
+     "text": "const employee = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 487,
+     "text": "const employee = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 507,
+     "text": "const employee = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 528,
+     "text": "const employee = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 616,
+     "text": "const employee = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 635,
+     "text": "const employee = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 682,
+     "text": "const employee = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 721,
+     "text": "const employee = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 757,
+     "text": "const employee = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 814,
+     "text": "return EmployeeLoanModel.getById(loanId, db);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 829,
+     "text": "const loan = EmployeeLoanModel.getById(parsedLoanId, db);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 854,
+     "text": "const loan = EmployeeLoanModel.getById(parsedLoanId, db);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 888,
+     "text": "const employee = EmployeeModel.getById(employeeId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 951,
+     "text": "const updatedLoan = EmployeeLoanModel.getById(parsedLoanId, db);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 974,
+     "text": "const loan = EmployeeLoanModel.getById(parsedLoanId, db);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 984,
+     "text": "const employee = EmployeeModel.getById(loan.employee_id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 1038,
+     "text": "const loan = EmployeeLoanModel.getById(parsedLoanId, db);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 1106,
+     "text": "const updatedLoan = EmployeeLoanModel.getById(parsedLoanId, db);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/expenseController.ts",
+     "line": 75,
+     "text": "res.status(201).json({ success: true, message: 'Expense created successfully', data: ExpenseModel.getById(db, replayId) });",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/expenseController.ts",
+     "line": 172,
+     "text": "const expense = ExpenseModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/expenseController.ts",
+     "line": 296,
+     "text": "const existing = ExpenseModel.getById(db, id) as Record<string, unknown> | undefined;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/expenseController.ts",
+     "line": 354,
+     "text": "res.json({ success: true, message: 'Expense updated successfully', data: ExpenseModel.getById(db, id) });",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 63,
+     "text": "const item = ItemModel.getById(Number(req.params.id), db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 110,
+     "text": "? WarehouseModel.getById(db, warehouseId)",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 215,
+     "text": "const newItem = ItemModel.getById(itemId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 226,
+     "text": "const existingItem = ItemModel.getById(itemId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 241,
+     "text": "const updatedItem = ItemModel.getById(itemId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 252,
+     "text": "const item = ItemModel.getById(itemId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 331,
+     "text": "const warehouse = WarehouseModel.getById(db, Number(req.params.id));",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 387,
+     "text": "const newWarehouse = WarehouseModel.getById(db, warehouseId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 398,
+     "text": "const existing = WarehouseModel.getById(db, warehouseId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 430,
+     "text": "const updated = WarehouseModel.getById(db, warehouseId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 441,
+     "text": "const item = ItemModel.getById(itemId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 449,
+     "text": "const restoredItem = ItemModel.getById(itemId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 466,
+     "text": "const existing = WarehouseModel.getById(db, warehouseId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 587,
+     "text": "const movement = StockMovementModel.getById(Number(req.params.id), db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 637,
+     "text": "const item = ItemModel.getById(item_id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 638,
+     "text": "const warehouse = WarehouseModel.getById(db, warehouse_id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 654,
+     "text": "const firstMovement = StockMovementModel.getById(primaryResult.id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 844,
+     "text": "const count = PhysicalCountModel.getById(Number(req.params.id), db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 872,
+     "text": "const warehouse = WarehouseModel.getById(db, warehouse_id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 886,
+     "text": "const newCount = PhysicalCountModel.getById(countId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 922,
+     "text": "const count = PhysicalCountModel.getById(countId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 938,
+     "text": "const count = PhysicalCountModel.getById(countId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 977,
+     "text": "const count = PhysicalCountModel.getById(countId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/inventoryController.ts",
+     "line": 1394,
+     "text": "const reservation = StockReservationModel.getById(reservationId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 346,
+     "text": "const paymentInfo = PaymentModel.getById(db, deletedPaymentId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 499,
+     "text": "const invoiceExists = InvoiceModel.getById(invoiceId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 506,
+     "text": "const originalInvoice = InvoiceModel.getById(invoiceId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 760,
+     "text": "const invoice = InvoiceModel.getById(invoiceId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 782,
+     "text": "const freshInvoice = InvoiceModel.getById(invoiceId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 818,
+     "text": "(PaymentModel.getById(db, alloc.payment_id))?.payment_no || '', freshInvoice.customer_id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 871,
+     "text": "// getById filters deleted rows — a raw lookup is required here.",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 984,
+     "text": "const restored = InvoiceModel.getById(invoiceId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 1007,
+     "text": "const invoice = InvoiceModel.getById(invoiceId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/ownerEquityController.ts",
+     "line": 206,
+     "text": "const existing = OwnerCapitalModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/ownerEquityController.ts",
+     "line": 237,
+     "text": "const existing = OwnerCapitalModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/ownerEquityController.ts",
+     "line": 432,
+     "text": "const withdrawal = OwnerWithdrawalModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/ownerEquityController.ts",
+     "line": 458,
+     "text": "const existing = OwnerWithdrawalModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/ownerEquityController.ts",
+     "line": 515,
+     "text": "const existing = OwnerWithdrawalModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 108,
+     "text": "const payment = PaymentModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 135,
+     "text": "const invoice = InvoiceModel.getById(parsedInvoiceId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 207,
+     "text": "if (!CustomerModel.getById(customerId, db)) {",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 222,
+     "text": "res.status(201).json({ success: true, data: PaymentModel.getById(db, replayId) });",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 237,
+     "text": "const customer = CustomerModel.getById(customerId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 241,
+     "text": "res.status(201).json({ success: true, data: PaymentModel.getById(db, paymentId) });",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 258,
+     "text": "if (!SupplierModel.getById(supplierId, db)) {",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 267,
+     "text": "res.status(201).json({ success: true, data: PaymentModel.getById(db, replayId) });",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 289,
+     "text": "const supplier = SupplierModel.getById(supplierId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 293,
+     "text": "res.status(201).json({ success: true, data: PaymentModel.getById(db, paymentId) });",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 362,
+     "text": "const existing = PaymentModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 391,
+     "text": "const existing = PaymentModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 421,
+     "text": "const payment = PaymentModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 572,
+     "text": "const payment = PaymentModel.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 608,
+     "text": "data: PaymentModel.getById(db, replayId),",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/paymentsController.ts",
+     "line": 629,
+     "text": "res.json({ success: true, message: 'Allocation recorded', data: PaymentModel.getById(db, id) });",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/posController.ts",
+     "line": 84,
+     "text": "const warehouse = WarehouseModel.getById(db, Number(reqBody.warehouse_id));",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/posController.ts",
+     "line": 230,
+     "text": "const warehouse = WarehouseModel.getById(db, body.warehouse_id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/productionController.ts",
+     "line": 163,
+     "text": "const production = ProductionModel.getById(Number(req.params.id), db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/productionController.ts",
+     "line": 192,
+     "text": "const production = ProductionModel.getById(productionId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/purchaseController.ts",
+     "line": 91,
+     "text": "res.status(201).json(members.map(member => Purchase.getById(member.purchase_id, db)));",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/purchaseController.ts",
+     "line": 93,
+     "text": "res.status(201).json([Purchase.getById(replayId, db)]);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/purchaseController.ts",
+     "line": 98,
+     "text": "res.status(201).json(Purchase.getById(replayId, db));",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/purchaseController.ts",
+     "line": 236,
+     "text": "const purchase = Purchase.getById(Number(req.params.id), db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/purchaseController.ts",
+     "line": 319,
+     "text": "const purchase = Purchase.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/purchaseOrderController.ts",
+     "line": 135,
+     "text": "const po = PurchaseOrderModel.getById(Number(req.params.id), db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/purchaseReturnController.ts",
+     "line": 57,
+     "text": "const purchaseReturn = PurchaseReturnModel.getById(Number(req.params.id), db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/salesController.ts",
+     "line": 120,
+     "text": "const quotation = QuotationModel.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/salesController.ts",
+     "line": 164,
+     "text": "const quotation = QuotationModel.getById(Number(id), db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/salesController.ts",
+     "line": 306,
+     "text": "const salesOrder = SalesOrderModel.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/salesController.ts",
+     "line": 367,
+     "text": "const salesOrder = SalesOrderModel.getById(Number(id), db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/supplierRefundController.ts",
+     "line": 40,
+     "text": "const refund = SupplierRefundModel.getById(Number(req.params.id), db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/suppliersController.ts",
+     "line": 56,
+     "text": "const supplier = SupplierModel.getById(supplierId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/suppliersController.ts",
+     "line": 248,
+     "text": "const existingSupplier = SupplierModel.getById(supplierId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/suppliersController.ts",
+     "line": 272,
+     "text": "const supplier = SupplierModel.getById(supplierId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/suppliersController.ts",
+     "line": 312,
+     "text": "const supplier = SupplierModel.getById(supplierId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/suppliersController.ts",
+     "line": 344,
+     "text": "const supplier = SupplierModel.getById(supplierId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/unappliedCashController.ts",
+     "line": 79,
+     "text": "const receipt = PaymentModel.getById(db, replayId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/BOM.ts",
+     "line": 140,
+     "text": "return this.getById(bomId, db) as BOMWithItems;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/BOM.ts",
+     "line": 212,
+     "text": "static getById(id: number, db: Database.Database): BOMWithItems | null {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/BOM.ts",
+     "line": 285,
+     "text": "const existingBOM = BOMModel.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/BOM.ts",
+     "line": 325,
+     "text": "return this.getById(id, db) as BOMWithItems;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/BOM.ts",
+     "line": 367,
+     "text": "return this.getById(id, db) as BOMWithItems;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Customer.ts",
+     "line": 142,
+     "text": "static getById(id: string | string[] | number, db: Database.Database): Customer | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Employee.ts",
+     "line": 292,
+     "text": "static getById(id: number, db: Database.Database): Employee | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Expense.ts",
+     "line": 144,
+     "text": "function getById(db: Database.Database, id: number) {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Expense.ts",
+     "line": 154,
+     "text": "const existing = getById(db, id) as Record<string, unknown> | undefined;",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Expense.ts",
+     "line": 370,
+     "text": "getById,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Invoice.ts",
+     "line": 310,
+     "text": "static getById(id: number, db: Database.Database): Invoice | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/InvoiceReturn.ts",
+     "line": 253,
+     "text": "static getById(db: Database.Database, id: number): InvoiceReturnHeader | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Item.ts",
+     "line": 182,
+     "text": "static getById(id: number, db: Database.Database): Item | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/OwnerCapital.ts",
+     "line": 140,
+     "text": "function getById(db: Database.Database, id: number): OwnerCapitalRow | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/OwnerCapital.ts",
+     "line": 160,
+     "text": "const existing = getById(db, id);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/OwnerCapital.ts",
+     "line": 215,
+     "text": "const existing = getById(db, id);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/OwnerCapital.ts",
+     "line": 267,
+     "text": "getById,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/OwnerWithdrawal.ts",
+     "line": 388,
+     "text": "function getById(db: Database.Database, id: number): OwnerWithdrawalRow | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/OwnerWithdrawal.ts",
+     "line": 437,
+     "text": "const existing = getById(db, id);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/OwnerWithdrawal.ts",
+     "line": 577,
+     "text": "const existing = getById(db, id);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/OwnerWithdrawal.ts",
+     "line": 604,
+     "text": "getById,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Payment.ts",
+     "line": 246,
+     "text": "static getById(db: Database.Database, id: number): PaymentDetailRow | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Payment.ts",
+     "line": 568,
+     "text": "const existing = this.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Payment.ts",
+     "line": 637,
+     "text": "const finalPayment = this.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Payment.ts",
+     "line": 679,
+     "text": "const existing = this.getById(db, id);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Period.ts",
+     "line": 43,
+     "text": "function getById(db: Database.Database, id: number): Period | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Period.ts",
+     "line": 101,
+     "text": "return getById(db, Number(result.lastInsertRowid))!;",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Period.ts",
+     "line": 123,
+     "text": "getById,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/PhysicalCount.ts",
+     "line": 163,
+     "text": "static getById(id: number, db: Database.Database): PhysicalCount | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/PhysicalCount.ts",
+     "line": 267,
+     "text": "const count = this.getById(countId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PhysicalCount.ts",
+     "line": 299,
+     "text": "const count = this.getById(countId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PhysicalCount.ts",
+     "line": 452,
+     "text": "const count = this.getById(countId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PhysicalCount.ts",
+     "line": 498,
+     "text": "const count = this.getById(data.countId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PhysicalCount.ts",
+     "line": 774,
+     "text": "const count = this.getById(countId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Production.ts",
+     "line": 558,
+     "text": "return this.getById(productionId, db) as Production;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Production.ts",
+     "line": 658,
+     "text": "static getById(id: number, db: Database.Database): Production | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Production.ts",
+     "line": 730,
+     "text": "const production = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Purchase.ts",
+     "line": 356,
+     "text": "return this.getById(purchaseId, db) as Purchase;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Purchase.ts",
+     "line": 539,
+     "text": "static getById(id: number, db: Database.Database): Purchase | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Purchase.ts",
+     "line": 639,
+     "text": "const purchase = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PurchaseOrder.ts",
+     "line": 211,
+     "text": "return this.getById(poId, db) as PurchaseOrder;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PurchaseOrder.ts",
+     "line": 317,
+     "text": "static getById(id: number, db: Database.Database): PurchaseOrder | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/PurchaseOrder.ts",
+     "line": 377,
+     "text": "const po = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PurchaseOrder.ts",
+     "line": 438,
+     "text": "return this.getById(id, db) as PurchaseOrder;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PurchaseOrder.ts",
+     "line": 445,
+     "text": "const po = this.getById(poId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PurchaseOrder.ts",
+     "line": 577,
+     "text": "const po = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PurchaseOrder.ts",
+     "line": 627,
+     "text": "return this.getById(id, db) as PurchaseOrder;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PurchaseOrder.ts",
+     "line": 634,
+     "text": "const po = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PurchaseOrder.ts",
+     "line": 891,
+     "text": "const po = this.getById(po_id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PurchaseReturn.ts",
+     "line": 497,
+     "text": "static getById(id: number, db: Database.Database): PurchaseReturnHeaderRow | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/PurchaseReturn.ts",
+     "line": 742,
+     "text": "return this.getById(returnId, db) as PurchaseReturnHeaderRow;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PurchaseReturn.ts",
+     "line": 753,
+     "text": "const header = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PurchaseReturn.ts",
+     "line": 926,
+     "text": "return this.getById(id, db) as PurchaseReturnHeaderRow;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Quotation.ts",
+     "line": 226,
+     "text": "return this.getById(quotationId, db) as Quotation;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Quotation.ts",
+     "line": 235,
+     "text": "static getById(id: number, db: Database.Database): Quotation | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Quotation.ts",
+     "line": 373,
+     "text": "const quotation = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Quotation.ts",
+     "line": 510,
+     "text": "return this.getById(id, db) as Quotation;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Quotation.ts",
+     "line": 520,
+     "text": "const quotation = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Quotation.ts",
+     "line": 552,
+     "text": "const quotation = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Quotation.ts",
+     "line": 681,
+     "text": "const quotation = this.getById(quotationId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/Role.ts",
+     "line": 51,
+     "text": "function getById(db: Database.Database, id: number): Role | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Role.ts",
+     "line": 77,
+     "text": "return getById(db, roleId)!;",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Role.ts",
+     "line": 81,
+     "text": "const existing = getById(db, id);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Role.ts",
+     "line": 104,
+     "text": "return getById(db, id)!;",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Role.ts",
+     "line": 108,
+     "text": "const existing = getById(db, id);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Role.ts",
+     "line": 132,
+     "text": "const existing = getById(db, roleId);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Role.ts",
+     "line": 156,
+     "text": "getById,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/SalesOrder.ts",
+     "line": 223,
+     "text": "return this.getById(salesOrderId, db) as SalesOrder;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/SalesOrder.ts",
+     "line": 232,
+     "text": "static getById(id: number, db: Database.Database): SalesOrder | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/SalesOrder.ts",
+     "line": 383,
+     "text": "const salesOrder = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/SalesOrder.ts",
+     "line": 509,
+     "text": "return this.getById(id, db) as SalesOrder;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/SalesOrder.ts",
+     "line": 519,
+     "text": "const salesOrder = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/SalesOrder.ts",
+     "line": 552,
+     "text": "const salesOrder = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/SalesOrder.ts",
+     "line": 575,
+     "text": "const fullInvoice = InvoiceModel.getById(linkedInvoice.id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/SalesOrder.ts",
+     "line": 625,
+     "text": "const salesOrder = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/SalesOrder.ts",
+     "line": 683,
+     "text": "const salesOrder = this.getById(salesOrderId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/StockMovement.ts",
+     "line": 681,
+     "text": "static getById(id: number, db: Database.Database): StockMovement | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/StockReservation.ts",
+     "line": 81,
+     "text": "return this.getById(id, db)!;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/StockReservation.ts",
+     "line": 105,
+     "text": "return this.getById(existing.id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/StockReservation.ts",
+     "line": 129,
+     "text": "return this.getById(existing.id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/StockReservation.ts",
+     "line": 155,
+     "text": "static getById(id: number, db: Database.Database): StockReservation | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Supplier.ts",
+     "line": 123,
+     "text": "static getById(id: number, db: Database.Database): Supplier | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/SupplierLedger.ts",
+     "line": 54,
+     "text": "return this.getById(result.lastInsertRowid as number, db) as SupplierLedgerEntry;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/SupplierLedger.ts",
+     "line": 57,
+     "text": "static getById(id: number, db: Database.Database): SupplierLedgerEntry | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/SupplierRefund.ts",
+     "line": 133,
+     "text": "static getById(id: number, db: Database.Database): SupplierRefundRow | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/SupplierRefund.ts",
+     "line": 230,
+     "text": "return this.getById(refundId, db) as SupplierRefundRow;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/SupplierRefund.ts",
+     "line": 235,
+     "text": "const refund = this.getById(id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/SupplierRefund.ts",
+     "line": 272,
+     "text": "return this.getById(id, db) as SupplierRefundRow;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/UnappliedCash.ts",
+     "line": 65,
+     "text": "if (!CustomerModel.getById(customerId, db)) throw new UnappliedCashError('CUSTOMER_NOT_FOUND', 'Customer not found', 404);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/User.ts",
+     "line": 72,
+     "text": "static getById(id: number, db: Database.Database): Omit<UserRecord, 'password_hash'> | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Warehouse.ts",
+     "line": 36,
+     "text": "static getById(db: Database.Database, id: number): Warehouse | undefined {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 285,
+     "text": "const invoice = InvoiceModel.getById(input.invoiceId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 304,
+     "text": "const fresh = InvoiceModel.getById(input.invoiceId, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 525,
+     "text": "const finalHeader = InvoiceReturnModel.getById(db, header.id) as InvoiceReturnHeader;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 580,
+     "text": "const ret = InvoiceReturnModel.getById(db, returnId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 584,
+     "text": "const invoice = InvoiceModel.getById(ret.invoice_id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 612,
+     "text": "const finalHeader = InvoiceReturnModel.getById(db, returnId) as InvoiceReturnHeader;",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 662,
+     "text": "const ret = InvoiceReturnModel.getById(db, returnId);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 669,
+     "text": "const invoice = InvoiceModel.getById(ret.invoice_id, db);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 763,
+     "text": "const ret = InvoiceReturnModel.getById(db, row.return_id);",
+     "rel": "member-access"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/models/EmployeeLoan.ts",
+   "sym": "getByEmployee",
+   "kind": "class_member",
+   "line": 104,
+   "parent": "default",
+   "owner": [
+    "EmployeeLoanModel"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 730,
+     "text": "const loans = EmployeeLoanModel.getByEmployee(employeeId, db);",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/models/EmployeeLoan.ts",
+   "sym": "getRepayments",
+   "kind": "class_member",
+   "line": 110,
+   "parent": "default",
+   "owner": [
+    "EmployeeLoanModel"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 835,
+     "text": "const repayments = EmployeeLoanModel.getRepayments(parsedLoanId, db);",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/models/EmployeeLoan.ts",
+   "sym": "getRepaymentById",
+   "kind": "class_member",
+   "line": 116,
+   "parent": "default",
+   "owner": [
+    "EmployeeLoanModel"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 1080,
+     "text": "const repayment = EmployeeLoanModel.getRepaymentById(parsedRepaymentId, db);",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/models/EmployeeLoan.ts",
+   "sym": "getSummary",
+   "kind": "class_member",
+   "line": 120,
+   "parent": "default",
+   "owner": [
+    "EmployeeLoanModel"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via member-access + named-ref + qualified-call",
+   "external": [
+    {
+     "file": "server/src/__tests__/dashboardBoot.test.ts",
+     "line": 61,
+     "text": "// Summary is the real DashboardModel.getSummary payload.",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/expenseStatusConsistency.test.ts",
+     "line": 99,
+     "text": "const summary = ExpenseModel.getSummary(db, RANGE.from, RANGE.to);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/__tests__/expenseStatusConsistency.test.ts",
+     "line": 170,
+     "text": "const summary = ExpenseModel.getSummary(db, RANGE.from, RANGE.to);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/dashboardController.ts",
+     "line": 21,
+     "text": "function getSummary(req: AuthRequest, res: Response): void {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/dashboardController.ts",
+     "line": 25,
+     "text": "const data = DashboardModel.getSummary(db, fromDate || undefined, toDate || undefined);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/dashboardController.ts",
+     "line": 264,
+     "text": "summary: DashboardModel.getSummary(db, fromDate, toDate),",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/dashboardController.ts",
+     "line": 369,
+     "text": "getSummary,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 731,
+     "text": "const summary = EmployeeLoanModel.getSummary(employeeId, db);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/expenseController.ts",
+     "line": 403,
+     "text": "const summary = ExpenseModel.getSummary(db, fromDateParam as string, toDateParam as string);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/ownerEquityController.ts",
+     "line": 538,
+     "text": "function getSummary(_req: Request, res: Response): void {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/ownerEquityController.ts",
+     "line": 565,
+     "text": "getSummary,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Dashboard.ts",
+     "line": 91,
+     "text": "function getSummary(db: Database.Database, fromDate?: string, toDate?: string): DashboardSummary {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Dashboard.ts",
+     "line": 455,
+     "text": "// getSummary — same defaults (all-time when no range), same SQL — so a",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Dashboard.ts",
+     "line": 458,
+     "text": "// unfiltered, matching getSummary's behavior.",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Dashboard.ts",
+     "line": 463,
+     "text": "// items carrying stock with no batch rows (identical to getSummary).",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Dashboard.ts",
+     "line": 479,
+     "text": "// ── Phase 1 core cards (match getSummary exactly) ────────────────",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Dashboard.ts",
+     "line": 685,
+     "text": "getSummary,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Expense.ts",
+     "line": 278,
+     "text": "function getSummary(db: Database.Database, from_date?: string, to_date?: string) {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Expense.ts",
+     "line": 374,
+     "text": "getSummary,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/routes/dashboard.ts",
+     "line": 19,
+     "text": "router.get('/summary', requirePermission('dashboard', 'read'), dashboardController.getSummary);",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/routes/ownerEquity.ts",
+     "line": 13,
+     "text": "router.get('/summary', requirePermission('owner_equity', 'read'), ownerEquityController.getSummary);",
+     "rel": "member-access"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/models/EmployeeLoan.ts",
+   "sym": "hasRepayments",
+   "kind": "class_member",
+   "line": 133,
+   "parent": "default",
+   "owner": [
+    "EmployeeLoanModel"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 739,
+     "text": "repayment_count: EmployeeLoanModel.hasRepayments(l.id, db) ? 1 : 0,",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 1047,
+     "text": "if (EmployeeLoanModel.hasRepayments(parsedLoanId, db)) {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/models/EmployeeLoan.ts",
+   "sym": "updateJournalEntry",
+   "kind": "class_member",
+   "line": 140,
+   "parent": "default",
+   "owner": [
+    "EmployeeLoanModel"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 811,
+     "text": "EmployeeLoanModel.updateJournalEntry(loanId, journalEntryId, db);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 1010,
+     "text": "EmployeeLoanModel.updateJournalEntry(parsedLoanId, journalEntryId, db);",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/models/EmployeeLoan.ts",
+   "sym": "updateRepaymentJournal",
+   "kind": "class_member",
+   "line": 192,
+   "parent": "default",
+   "owner": [
+    "EmployeeLoanModel"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 351,
+     "text": "if (repaymentEntry) EmployeeLoanModel.updateRepaymentJournal(repaymentId, repaymentEntry.journal_entry_id, db);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 948,
+     "text": "EmployeeLoanModel.updateRepaymentJournal(repaymentId, journalEntryId, db);",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/models/EmployeeLoan.ts",
+   "sym": "writeOff",
+   "kind": "class_member",
+   "line": 199,
+   "parent": "default",
+   "owner": [
+    "EmployeeLoanModel"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via named-ref + qualified-call",
+   "external": [
+    {
+     "file": "server/src/__tests__/auditRegression3.test.ts",
+     "line": 201,
+     "text": "const writeOff = await post(`/api/employees/${employeeId}/loans/${loanId}/write-off`, {});",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/auditRegression3.test.ts",
+     "line": 202,
+     "text": "expect(writeOff.status).toBe(200);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/auditRegression3Recovered.test.ts",
+     "line": 197,
+     "text": "const writeOff = await post(`/api/employees/${employeeId}/loans/${loanId}/write-off`, {});",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/auditRegression3Recovered.test.ts",
+     "line": 198,
+     "text": "expect(writeOff.status).toBe(200);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/auditRegression5.test.ts",
+     "line": 20,
+     "text": "/** Seed an expired batch at the EXPIRED warehouse (same approach as writeOff.test.ts). */",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/auditRegression5.test.ts",
+     "line": 38,
+     "text": "const writeOff = (batchId: number) =>",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/auditRegression5.test.ts",
+     "line": 57,
+     "text": "expect((await writeOff(batchId)).status).toBe(200);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/auditRegression5.test.ts",
+     "line": 65,
+     "text": "expect((await writeOff(batchId)).status).toBe(200);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/auditRegression5.test.ts",
+     "line": 73,
+     "text": "expect((await writeOff(batchId)).status).toBe(200);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/auditRegression5.test.ts",
+     "line": 92,
+     "text": "const res = await writeOff(batchId);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/auditRegression9.test.ts",
+     "line": 324,
+     "text": "const writeOff = (batchIds: number[]) =>",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/auditRegression9.test.ts",
+     "line": 344,
+     "text": "const res = await writeOff([batchId]);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/auditRegression9.test.ts",
+     "line": 381,
+     "text": "const res = await writeOff([mirrorBatchId]);",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 989,
+     "text": "EmployeeLoanModel.writeOff(parsedLoanId, db);",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/models/EmployeeLoan.ts",
+   "sym": "getGlobalActiveLoans",
+   "kind": "class_member",
+   "line": 251,
+   "parent": "default",
+   "owner": [
+    "EmployeeLoanModel"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/controllers/dashboardController.ts",
+     "line": 351,
+     "text": "const loans = EmployeeLoanModel.getGlobalActiveLoans(db);",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/models/EmployeeLoan.ts",
+   "sym": "getGlobalLoanSummary",
+   "kind": "class_member",
+   "line": 269,
+   "parent": "default",
+   "owner": [
+    "EmployeeLoanModel"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/controllers/dashboardController.ts",
+     "line": 352,
+     "text": "const summary = EmployeeLoanModel.getGlobalLoanSummary(db);",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "getAllAccountBalances",
+   "kind": "class_member",
+   "line": 172,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/__tests__/expenseStatusConsistency.test.ts",
+     "line": 179,
+     "text": "const balances = AccountingService.getAllAccountBalances(db, RANGE.to);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/accountingController.ts",
+     "line": 104,
+     "text": "const balances = AccountingService.getAllAccountBalances(db, asOfDate);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/Reports.ts",
+     "line": 459,
+     "text": "// Every section reads AccountingService.getAllAccountBalances — the same",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/Reports.ts",
+     "line": 470,
+     "text": "const balances = AccountingService.getAllAccountBalances(db, asOfDate);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/Reports.ts",
+     "line": 589,
+     "text": "// AccountingService.getAllAccountBalances, i.e. journal_lines only",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/Reports.ts",
+     "line": 599,
+     "text": "const balances = AccountingService.getAllAccountBalances(db, asOfDate);",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "getPeriodMovement",
+   "kind": "class_member",
+   "line": 186,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/models/Reports.ts",
+     "line": 422,
+     "text": "const revenueMovement = AccountingService.getPeriodMovement(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/Reports.ts",
+     "line": 425,
+     "text": "const cogsMovement = AccountingService.getPeriodMovement(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/Reports.ts",
+     "line": 429,
+     "text": "const opexMovement = AccountingService.getPeriodMovement(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/Reports.ts",
+     "line": 1101,
+     "text": "const output = AccountingService.getPeriodMovement(db, { accountCodes: ['2100'], startDate, endDate });",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/Reports.ts",
+     "line": 1102,
+     "text": "const input = AccountingService.getPeriodMovement(db, { accountCodes: ['1320'], startDate, endDate });",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postInvoiceEntry",
+   "kind": "class_member",
+   "line": 519,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via named-ref + qualified-call",
+   "external": [
+    {
+     "file": "server/scripts/verify-reversal-rules.ts",
+     "line": 117,
+     "text": "* postInvoiceEntry + postCOGSEntry. This is the exact posting pipeline",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/scripts/verify-reversal-rules.ts",
+     "line": 148,
+     "text": "AccountingService.postInvoiceEntry(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/__tests__/settlementCashIntegrity.test.ts",
+     "line": 13,
+     "text": "* SALES-005  `postInvoiceEntry` returns null for a non-positive total, so",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 527,
+     "text": "// SALES-005: void-then-repost below has no floor. `postInvoiceEntry`",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 663,
+     "text": "AccountingService.postInvoiceEntry(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/migrations/backfillInvoiceTaxGl.ts",
+     "line": 5,
+     "text": "* postInvoiceEntry used to receive a tax amount recomputed from GROSS",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/InvoiceCreationService.ts",
+     "line": 235,
+     "text": "AccountingService.postInvoiceEntry(this.db, { invoiceId, invoiceNo, totalAmount, invoiceDate: input.invoiceDate, userId: input.userId, taxAmount: InvoiceModel.getInvoiceTaxTotal(this.db, invoiceId) });",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postPaymentEntry",
+   "kind": "class_member",
+   "line": 579,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via member-access + qualified-call + named-ref",
+   "external": [
+    {
+     "file": "server/src/__tests__/paymentEditReposting.test.ts",
+     "line": 495,
+     "text": "// Cash). postPaymentEntry ignores amounts ≤ 0, so an edit that voids and",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 596,
+     "text": "AccountingService.postPaymentEntry(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/Payment.ts",
+     "line": 147,
+     "text": "AccountingService.postPaymentEntry(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/Payment.ts",
+     "line": 558,
+     "text": "* reposted through the SAME refund primitive — postPaymentEntry ignores",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/PaymentRecordingService.ts",
+     "line": 197,
+     "text": "AccountingService.postPaymentEntry(this.db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postCreditOffsetEntry",
+   "kind": "class_member",
+   "line": 620,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/services/InvoiceCreationService.ts",
+     "line": 240,
+     "text": "AccountingService.postCreditOffsetEntry(this.db, { invoiceId, invoiceNo, amount: creditOffset, invoiceDate: input.invoiceDate, customerId: input.customerId, userId: input.userId });",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/services/PaymentRecordingService.ts",
+     "line": 161,
+     "text": "AccountingService.postCreditOffsetEntry(this.db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postGoodsReceiptEntry",
+   "kind": "class_member",
+   "line": 667,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/models/PurchaseOrder.ts",
+     "line": 1101,
+     "text": "AccountingService.postGoodsReceiptEntry(db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postPurchaseEntry",
+   "kind": "class_member",
+   "line": 711,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/models/Purchase.ts",
+     "line": 328,
+     "text": "AccountingService.postPurchaseEntry(db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postSupplierPaymentEntry",
+   "kind": "class_member",
+   "line": 758,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/models/Payment.ts",
+     "line": 160,
+     "text": "AccountingService.postSupplierPaymentEntry(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/services/SupplierPaymentService.ts",
+     "line": 125,
+     "text": "AccountingService.postSupplierPaymentEntry(this.db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postExpenseEntry",
+   "kind": "class_member",
+   "line": 798,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/models/Expense.ts",
+     "line": 229,
+     "text": "AccountingService.postExpenseEntry(db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postOwnerCapitalEntry",
+   "kind": "class_member",
+   "line": 905,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/models/OwnerCapital.ts",
+     "line": 72,
+     "text": "AccountingService.postOwnerCapitalEntry(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/OwnerCapital.ts",
+     "line": 188,
+     "text": "AccountingService.postOwnerCapitalEntry(db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postOwnerWithdrawalCashEntry",
+   "kind": "class_member",
+   "line": 942,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/models/OwnerWithdrawal.ts",
+     "line": 235,
+     "text": "AccountingService.postOwnerWithdrawalCashEntry(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/OwnerWithdrawal.ts",
+     "line": 476,
+     "text": "AccountingService.postOwnerWithdrawalCashEntry(db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postOwnerWithdrawalGoodsEntry",
+   "kind": "class_member",
+   "line": 983,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/models/OwnerWithdrawal.ts",
+     "line": 287,
+     "text": "AccountingService.postOwnerWithdrawalGoodsEntry(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/OwnerWithdrawal.ts",
+     "line": 556,
+     "text": "AccountingService.postOwnerWithdrawalGoodsEntry(db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "assertNoActivePosting",
+   "kind": "class_member",
+   "line": 1085,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/__tests__/ownerEquity.test.ts",
+     "line": 185,
+     "text": "AccountingService.assertNoActivePosting(db, 'OWNER_CAPITAL', id)",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/OwnerCapital.ts",
+     "line": 70,
+     "text": "AccountingService.assertNoActivePosting(db, 'OWNER_CAPITAL', newId);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/OwnerWithdrawal.ts",
+     "line": 225,
+     "text": "AccountingService.assertNoActivePosting(db, 'OWNER_WITHDRAWAL', newId);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/OwnerWithdrawal.ts",
+     "line": 286,
+     "text": "AccountingService.assertNoActivePosting(db, 'OWNER_WITHDRAWAL', newId);",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postCOGSEntry",
+   "kind": "class_member",
+   "line": 1107,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via named-ref + qualified-call",
+   "external": [
+    {
+     "file": "server/scripts/verify-reversal-rules.ts",
+     "line": 117,
+     "text": "* postInvoiceEntry + postCOGSEntry. This is the exact posting pipeline",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/scripts/verify-reversal-rules.ts",
+     "line": 152,
+     "text": "AccountingService.postCOGSEntry(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 673,
+     "text": "AccountingService.postCOGSEntry(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/services/InvoiceCreationService.ts",
+     "line": 236,
+     "text": "if (cogsAmount > 0) AccountingService.postCOGSEntry(this.db, { invoiceId, invoiceNo, cogsAmount: parseCurrency(cogsAmount), invoiceDate: input.invoiceDate, userId: input.userId });",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 2
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postCOGSReversalEntry",
+   "kind": "class_member",
+   "line": 1153,
+   "parent": "default",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via named-ref + qualified-call",
+   "external": [
+    {
+     "file": "server/src/__tests__/invoiceReturnAcceptance.test.ts",
+     "line": 378,
+     "text": "// here (postCOGSReversalEntry, at true FIFO cost) and must not post it again",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Invoice.ts",
+     "line": 705,
+     "text": "// ReturnEntry and postCOGSReversalEntry already post the inventory",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Invoice.ts",
+     "line": 977,
+     "text": "* postInvoiceReturnEntry / postCOGSReversalEntry) — and",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 429,
+     "text": "AccountingService.postCOGSReversalEntry(db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 2
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postInvoiceReturnEntry",
+   "kind": "class_member",
+   "line": 1211,
+   "parent": "default",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via named-ref + qualified-call",
+   "external": [
+    {
+     "file": "server/src/__tests__/glReturnTaxBalance.test.ts",
+     "line": 5,
+     "text": "*   postInvoiceReturnEntry — the goods reversal:",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/glReturnTaxBalance.test.ts",
+     "line": 42,
+     "text": "return AccountingService.postInvoiceReturnEntry(database, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/Invoice.ts",
+     "line": 977,
+     "text": "* postInvoiceReturnEntry / postCOGSReversalEntry) — and",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 411,
+     "text": "AccountingService.postInvoiceReturnEntry(db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 3
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postReturnFeeEntry",
+   "kind": "class_member",
+   "line": 1285,
+   "parent": "default",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via named-ref + qualified-call",
+   "external": [
+    {
+     "file": "server/src/__tests__/glReturnTaxBalance.test.ts",
+     "line": 10,
+     "text": "*   postReturnFeeEntry — the restocking fee, as its OWN group:",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/glReturnTaxBalance.test.ts",
+     "line": 52,
+     "text": "return AccountingService.postReturnFeeEntry(database, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/services/invoiceReturnService.ts",
+     "line": 419,
+     "text": "AccountingService.postReturnFeeEntry(db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 2
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postPurchaseReturnEntry",
+   "kind": "class_member",
+   "line": 1327,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via named-ref + member-access + qualified-call",
+   "external": [
+    {
+     "file": "server/src/__tests__/accountingInvariants.test.ts",
+     "line": 952,
+     "text": "// postPurchaseReturnEntry (which credits 1200 again) in the same",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/accountingInvariants.test.ts",
+     "line": 959,
+     "text": "// voidReturn reverses postPurchaseReturnEntry and records its own movement:",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/__tests__/purchaseReturn.test.ts",
+     "line": 268,
+     "text": "// known-issues.md item 4. postPurchaseReturnEntry is the authoritative",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/models/PurchaseReturn.ts",
+     "line": 29,
+     "text": "* GL posting reuses AccountingService.postPurchaseReturnEntry (Dr AP / Cr",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/PurchaseReturn.ts",
+     "line": 651,
+     "text": "// items.current_stock. It posts NO GL leg: postPurchaseReturnEntry",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/PurchaseReturn.ts",
+     "line": 713,
+     "text": "AccountingService.postPurchaseReturnEntry(db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postRefundEntry",
+   "kind": "class_member",
+   "line": 1380,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via named-ref + qualified-call",
+   "external": [
+    {
+     "file": "server/src/__tests__/paymentEditReposting.test.ts",
+     "line": 494,
+     "text": "// PAYMENT/refundPaymentId but posted by postRefundEntry (Dr AR / Cr",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Payment.ts",
+     "line": 134,
+     "text": "AccountingService.postRefundEntry(db, {",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/models/Payment.ts",
+     "line": 557,
+     "text": "* Refund payments (negative amount, posted by postRefundEntry) are",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/services/PaymentRecordingService.ts",
+     "line": 180,
+     "text": "AccountingService.postRefundEntry(this.db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "restoreJournalLinesByReference",
+   "kind": "class_member",
+   "line": 1469,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/scripts/rollback-customer15-correction.ts",
+     "line": 7,
+     "text": "* AccountingService.restoreJournalLinesByReference clears voided/voided_by/",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 930,
+     "text": "AccountingService.restoreJournalLinesByReference(db, 'INVOICE', invoiceId);",
+     "rel": "qualified-call"
+    },
+    {
+     "file": "server/src/controllers/invoiceController.ts",
+     "line": 931,
+     "text": "AccountingService.restoreJournalLinesByReference(db, 'INVOICE_RETURN', invoiceId, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "voidOwnInvoiceReturnLines",
+   "kind": "class_member",
+   "line": 1511,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/models/Invoice.ts",
+     "line": 1003,
+     "text": "return voided + AccountingService.voidOwnInvoiceReturnLines(",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "openPeriod",
+   "kind": "class_member",
+   "line": 1543,
+   "parent": "AccountingService",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via named-ref + member-access",
+   "external": [
+    {
+     "file": "server/src/controllers/accountingController.ts",
+     "line": 232,
+     "text": "function openPeriod(req: AuthRequest, res: Response): void {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/accountingController.ts",
+     "line": 280,
+     "text": "const created = PeriodModel.openPeriod(db, {",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/accountingController.ts",
+     "line": 370,
+     "text": "openPeriod,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Period.ts",
+     "line": 91,
+     "text": "function openPeriod(",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Period.ts",
+     "line": 127,
+     "text": "openPeriod,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/routes/accounting.ts",
+     "line": 68,
+     "text": "accountingController.openPeriod",
+     "rel": "member-access"
+    }
+   ],
+   "internalCount": 7
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "openPeriod",
+   "kind": "class_member",
+   "line": 1543,
+   "parent": "default",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via named-ref + member-access",
+   "external": [
+    {
+     "file": "server/src/controllers/accountingController.ts",
+     "line": 232,
+     "text": "function openPeriod(req: AuthRequest, res: Response): void {",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/controllers/accountingController.ts",
+     "line": 280,
+     "text": "const created = PeriodModel.openPeriod(db, {",
+     "rel": "member-access"
+    },
+    {
+     "file": "server/src/controllers/accountingController.ts",
+     "line": 370,
+     "text": "openPeriod,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Period.ts",
+     "line": 91,
+     "text": "function openPeriod(",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/models/Period.ts",
+     "line": 127,
+     "text": "openPeriod,",
+     "rel": "named-ref"
+    },
+    {
+     "file": "server/src/routes/accounting.ts",
+     "line": 68,
+     "text": "accountingController.openPeriod",
+     "rel": "member-access"
+    }
+   ],
+   "internalCount": 7
+  },
+  {
+   "path": "server/src/services/accountingService.ts",
+   "sym": "postLoanWriteOff",
+   "kind": "class_member",
+   "line": 1691,
+   "parent": "default",
+   "owner": [
+    "AccountingService"
+   ],
+   "verdict": "FALSE-POSITIVE",
+   "why": "live - consumed via qualified-call",
+   "external": [
+    {
+     "file": "server/src/controllers/employeeController.ts",
+     "line": 995,
+     "text": "const result = AccountingService.postLoanWriteOff(db, {",
+     "rel": "qualified-call"
+    }
+   ],
+   "internalCount": 1
+  }
+ ]
+}

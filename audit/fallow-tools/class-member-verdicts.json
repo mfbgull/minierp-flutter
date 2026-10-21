@@ -1,0 +1,1052 @@
+[
+ {
+  "path": "server/src/models/EmployeeLoan.ts",
+  "line": 100,
+  "member": "getById",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "EmployeeLoanModel"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 332,
+    "text": "const loan = EmployeeLoanModel.getById(loanId as number, db);"
+   },
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 814,
+    "text": "return EmployeeLoanModel.getById(loanId, db);"
+   },
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 829,
+    "text": "const loan = EmployeeLoanModel.getById(parsedLoanId, db);"
+   },
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 854,
+    "text": "const loan = EmployeeLoanModel.getById(parsedLoanId, db);"
+   },
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 951,
+    "text": "const updatedLoan = EmployeeLoanModel.getById(parsedLoanId, db);"
+   },
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 974,
+    "text": "const loan = EmployeeLoanModel.getById(parsedLoanId, db);"
+   },
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 1038,
+    "text": "const loan = EmployeeLoanModel.getById(parsedLoanId, db);"
+   },
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 1106,
+    "text": "const updatedLoan = EmployeeLoanModel.getById(parsedLoanId, db);"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/employeeController.ts:332",
+   "server/src/controllers/employeeController.ts:814",
+   "server/src/controllers/employeeController.ts:829"
+  ]
+ },
+ {
+  "path": "server/src/models/EmployeeLoan.ts",
+  "line": 104,
+  "member": "getByEmployee",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "EmployeeLoanModel"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 730,
+    "text": "const loans = EmployeeLoanModel.getByEmployee(employeeId, db);"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/employeeController.ts:730"
+  ]
+ },
+ {
+  "path": "server/src/models/EmployeeLoan.ts",
+  "line": 110,
+  "member": "getRepayments",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "EmployeeLoanModel"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 835,
+    "text": "const repayments = EmployeeLoanModel.getRepayments(parsedLoanId, db);"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/employeeController.ts:835"
+  ]
+ },
+ {
+  "path": "server/src/models/EmployeeLoan.ts",
+  "line": 116,
+  "member": "getRepaymentById",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "EmployeeLoanModel"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 1080,
+    "text": "const repayment = EmployeeLoanModel.getRepaymentById(parsedRepaymentId, db);"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/employeeController.ts:1080"
+  ]
+ },
+ {
+  "path": "server/src/models/EmployeeLoan.ts",
+  "line": 120,
+  "member": "getSummary",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "EmployeeLoanModel"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 731,
+    "text": "const summary = EmployeeLoanModel.getSummary(employeeId, db);"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/employeeController.ts:731"
+  ]
+ },
+ {
+  "path": "server/src/models/EmployeeLoan.ts",
+  "line": 133,
+  "member": "hasRepayments",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "EmployeeLoanModel"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 739,
+    "text": "repayment_count: EmployeeLoanModel.hasRepayments(l.id, db) ? 1 : 0,"
+   },
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 1047,
+    "text": "if (EmployeeLoanModel.hasRepayments(parsedLoanId, db)) {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/employeeController.ts:739",
+   "server/src/controllers/employeeController.ts:1047"
+  ]
+ },
+ {
+  "path": "server/src/models/EmployeeLoan.ts",
+  "line": 140,
+  "member": "updateJournalEntry",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "EmployeeLoanModel"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 811,
+    "text": "EmployeeLoanModel.updateJournalEntry(loanId, journalEntryId, db);"
+   },
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 1010,
+    "text": "EmployeeLoanModel.updateJournalEntry(parsedLoanId, journalEntryId, db);"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/employeeController.ts:811",
+   "server/src/controllers/employeeController.ts:1010"
+  ]
+ },
+ {
+  "path": "server/src/models/EmployeeLoan.ts",
+  "line": 192,
+  "member": "updateRepaymentJournal",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "EmployeeLoanModel"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 351,
+    "text": "if (repaymentEntry) EmployeeLoanModel.updateRepaymentJournal(repaymentId, repaymentEntry.journal_entry_id, db);"
+   },
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 948,
+    "text": "EmployeeLoanModel.updateRepaymentJournal(repaymentId, journalEntryId, db);"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/employeeController.ts:351",
+   "server/src/controllers/employeeController.ts:948"
+  ]
+ },
+ {
+  "path": "server/src/models/EmployeeLoan.ts",
+  "line": 199,
+  "member": "writeOff",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "EmployeeLoanModel"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 989,
+    "text": "EmployeeLoanModel.writeOff(parsedLoanId, db);"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/employeeController.ts:989"
+  ]
+ },
+ {
+  "path": "server/src/models/EmployeeLoan.ts",
+  "line": 251,
+  "member": "getGlobalActiveLoans",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "EmployeeLoanModel"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/dashboardController.ts",
+    "line": 351,
+    "text": "const loans = EmployeeLoanModel.getGlobalActiveLoans(db);"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/dashboardController.ts:351"
+  ]
+ },
+ {
+  "path": "server/src/models/EmployeeLoan.ts",
+  "line": 269,
+  "member": "getGlobalLoanSummary",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "EmployeeLoanModel"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/dashboardController.ts",
+    "line": 352,
+    "text": "const summary = EmployeeLoanModel.getGlobalLoanSummary(db);"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/dashboardController.ts:352"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 172,
+  "member": "getAllAccountBalances",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/__tests__/expenseStatusConsistency.test.ts",
+    "line": 179,
+    "text": "const balances = AccountingService.getAllAccountBalances(db, RANGE.to);"
+   },
+   {
+    "file": "server/src/controllers/accountingController.ts",
+    "line": 104,
+    "text": "const balances = AccountingService.getAllAccountBalances(db, asOfDate);"
+   },
+   {
+    "file": "server/src/models/Reports.ts",
+    "line": 459,
+    "text": "// Every section reads AccountingService.getAllAccountBalances — the same"
+   },
+   {
+    "file": "server/src/models/Reports.ts",
+    "line": 470,
+    "text": "const balances = AccountingService.getAllAccountBalances(db, asOfDate);"
+   },
+   {
+    "file": "server/src/models/Reports.ts",
+    "line": 589,
+    "text": "// AccountingService.getAllAccountBalances, i.e. journal_lines only"
+   },
+   {
+    "file": "server/src/models/Reports.ts",
+    "line": 599,
+    "text": "const balances = AccountingService.getAllAccountBalances(db, asOfDate);"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/__tests__/expenseStatusConsistency.test.ts:179",
+   "server/src/controllers/accountingController.ts:104",
+   "server/src/models/Reports.ts:459"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 186,
+  "member": "getPeriodMovement",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/models/Reports.ts",
+    "line": 422,
+    "text": "const revenueMovement = AccountingService.getPeriodMovement(db, {"
+   },
+   {
+    "file": "server/src/models/Reports.ts",
+    "line": 425,
+    "text": "const cogsMovement = AccountingService.getPeriodMovement(db, {"
+   },
+   {
+    "file": "server/src/models/Reports.ts",
+    "line": 429,
+    "text": "const opexMovement = AccountingService.getPeriodMovement(db, {"
+   },
+   {
+    "file": "server/src/models/Reports.ts",
+    "line": 1101,
+    "text": "const output = AccountingService.getPeriodMovement(db, { accountCodes: ['2100'], startDate, endDate });"
+   },
+   {
+    "file": "server/src/models/Reports.ts",
+    "line": 1102,
+    "text": "const input = AccountingService.getPeriodMovement(db, { accountCodes: ['1320'], startDate, endDate });"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/models/Reports.ts:422",
+   "server/src/models/Reports.ts:425",
+   "server/src/models/Reports.ts:429"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 519,
+  "member": "postInvoiceEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/scripts/verify-reversal-rules.ts",
+    "line": 148,
+    "text": "AccountingService.postInvoiceEntry(db, {"
+   },
+   {
+    "file": "server/src/controllers/invoiceController.ts",
+    "line": 663,
+    "text": "AccountingService.postInvoiceEntry(db, {"
+   },
+   {
+    "file": "server/src/services/InvoiceCreationService.ts",
+    "line": 235,
+    "text": "AccountingService.postInvoiceEntry(this.db, { invoiceId, invoiceNo, totalAmount, invoiceDate: input.invoiceDate, userId: input.userId, taxAmount: InvoiceModel.getInvoiceTaxTotal(this.db, invoiceId) });"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/scripts/verify-reversal-rules.ts:148",
+   "server/src/controllers/invoiceController.ts:663",
+   "server/src/services/InvoiceCreationService.ts:235"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 579,
+  "member": "postPaymentEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/invoiceController.ts",
+    "line": 596,
+    "text": "AccountingService.postPaymentEntry(db, {"
+   },
+   {
+    "file": "server/src/models/Payment.ts",
+    "line": 147,
+    "text": "AccountingService.postPaymentEntry(db, {"
+   },
+   {
+    "file": "server/src/services/PaymentRecordingService.ts",
+    "line": 197,
+    "text": "AccountingService.postPaymentEntry(this.db, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/invoiceController.ts:596",
+   "server/src/models/Payment.ts:147",
+   "server/src/services/PaymentRecordingService.ts:197"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 620,
+  "member": "postCreditOffsetEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/services/InvoiceCreationService.ts",
+    "line": 240,
+    "text": "AccountingService.postCreditOffsetEntry(this.db, { invoiceId, invoiceNo, amount: creditOffset, invoiceDate: input.invoiceDate, customerId: input.customerId, userId: input.userId });"
+   },
+   {
+    "file": "server/src/services/PaymentRecordingService.ts",
+    "line": 161,
+    "text": "AccountingService.postCreditOffsetEntry(this.db, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/services/InvoiceCreationService.ts:240",
+   "server/src/services/PaymentRecordingService.ts:161"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 667,
+  "member": "postGoodsReceiptEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/models/PurchaseOrder.ts",
+    "line": 1101,
+    "text": "AccountingService.postGoodsReceiptEntry(db, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/models/PurchaseOrder.ts:1101"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 711,
+  "member": "postPurchaseEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/models/Purchase.ts",
+    "line": 328,
+    "text": "AccountingService.postPurchaseEntry(db, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/models/Purchase.ts:328"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 758,
+  "member": "postSupplierPaymentEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/models/Payment.ts",
+    "line": 160,
+    "text": "AccountingService.postSupplierPaymentEntry(db, {"
+   },
+   {
+    "file": "server/src/services/SupplierPaymentService.ts",
+    "line": 125,
+    "text": "AccountingService.postSupplierPaymentEntry(this.db, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/models/Payment.ts:160",
+   "server/src/services/SupplierPaymentService.ts:125"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 798,
+  "member": "postExpenseEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/models/Expense.ts",
+    "line": 229,
+    "text": "AccountingService.postExpenseEntry(db, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/models/Expense.ts:229"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 905,
+  "member": "postOwnerCapitalEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/models/OwnerCapital.ts",
+    "line": 72,
+    "text": "AccountingService.postOwnerCapitalEntry(db, {"
+   },
+   {
+    "file": "server/src/models/OwnerCapital.ts",
+    "line": 188,
+    "text": "AccountingService.postOwnerCapitalEntry(db, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/models/OwnerCapital.ts:72",
+   "server/src/models/OwnerCapital.ts:188"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 942,
+  "member": "postOwnerWithdrawalCashEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/models/OwnerWithdrawal.ts",
+    "line": 235,
+    "text": "AccountingService.postOwnerWithdrawalCashEntry(db, {"
+   },
+   {
+    "file": "server/src/models/OwnerWithdrawal.ts",
+    "line": 476,
+    "text": "AccountingService.postOwnerWithdrawalCashEntry(db, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/models/OwnerWithdrawal.ts:235",
+   "server/src/models/OwnerWithdrawal.ts:476"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 983,
+  "member": "postOwnerWithdrawalGoodsEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/models/OwnerWithdrawal.ts",
+    "line": 287,
+    "text": "AccountingService.postOwnerWithdrawalGoodsEntry(db, {"
+   },
+   {
+    "file": "server/src/models/OwnerWithdrawal.ts",
+    "line": 556,
+    "text": "AccountingService.postOwnerWithdrawalGoodsEntry(db, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/models/OwnerWithdrawal.ts:287",
+   "server/src/models/OwnerWithdrawal.ts:556"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 1085,
+  "member": "assertNoActivePosting",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/__tests__/ownerEquity.test.ts",
+    "line": 185,
+    "text": "AccountingService.assertNoActivePosting(db, 'OWNER_CAPITAL', id)"
+   },
+   {
+    "file": "server/src/models/OwnerCapital.ts",
+    "line": 70,
+    "text": "AccountingService.assertNoActivePosting(db, 'OWNER_CAPITAL', newId);"
+   },
+   {
+    "file": "server/src/models/OwnerWithdrawal.ts",
+    "line": 225,
+    "text": "AccountingService.assertNoActivePosting(db, 'OWNER_WITHDRAWAL', newId);"
+   },
+   {
+    "file": "server/src/models/OwnerWithdrawal.ts",
+    "line": 286,
+    "text": "AccountingService.assertNoActivePosting(db, 'OWNER_WITHDRAWAL', newId);"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/__tests__/ownerEquity.test.ts:185",
+   "server/src/models/OwnerCapital.ts:70",
+   "server/src/models/OwnerWithdrawal.ts:225"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 1107,
+  "member": "postCOGSEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/scripts/verify-reversal-rules.ts",
+    "line": 152,
+    "text": "AccountingService.postCOGSEntry(db, {"
+   },
+   {
+    "file": "server/src/controllers/invoiceController.ts",
+    "line": 673,
+    "text": "AccountingService.postCOGSEntry(db, {"
+   },
+   {
+    "file": "server/src/services/InvoiceCreationService.ts",
+    "line": 236,
+    "text": "if (cogsAmount > 0) AccountingService.postCOGSEntry(this.db, { invoiceId, invoiceNo, cogsAmount: parseCurrency(cogsAmount), invoiceDate: input.invoiceDate, userId: input.userId });"
+   }
+  ],
+  "looseInternal": [
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 1146,
+    "text": "* Post COGS reversal for returned items. Reverses what postCOGSEntry",
+    "loose": true
+   }
+  ],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/scripts/verify-reversal-rules.ts:152",
+   "server/src/controllers/invoiceController.ts:673",
+   "server/src/services/InvoiceCreationService.ts:236"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 1153,
+  "member": "postCOGSReversalEntry",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/services/invoiceReturnService.ts",
+    "line": 429,
+    "text": "AccountingService.postCOGSReversalEntry(db, {"
+   }
+  ],
+  "looseInternal": [
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 1502,
+    "text": "* postCOGSReversalEntry), and invoice_returns.id is an AUTOINCREMENT",
+    "loose": true
+   }
+  ],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/services/invoiceReturnService.ts:429"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 1211,
+  "member": "postInvoiceReturnEntry",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/__tests__/glReturnTaxBalance.test.ts",
+    "line": 42,
+    "text": "return AccountingService.postInvoiceReturnEntry(database, {"
+   },
+   {
+    "file": "server/src/services/invoiceReturnService.ts",
+    "line": 411,
+    "text": "AccountingService.postInvoiceReturnEntry(db, {"
+   }
+  ],
+  "looseInternal": [
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 1372,
+    "text": "* This is paired with postInvoiceReturnEntry which already did:",
+    "loose": true
+   },
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 1501,
+    "text": "* (reference_id = invoice_returns.id — see postInvoiceReturnEntry and",
+    "loose": true
+   }
+  ],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/__tests__/glReturnTaxBalance.test.ts:42",
+   "server/src/services/invoiceReturnService.ts:411"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 1285,
+  "member": "postReturnFeeEntry",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/__tests__/glReturnTaxBalance.test.ts",
+    "line": 52,
+    "text": "return AccountingService.postReturnFeeEntry(database, {"
+   },
+   {
+    "file": "server/src/services/invoiceReturnService.ts",
+    "line": 419,
+    "text": "AccountingService.postReturnFeeEntry(db, {"
+   }
+  ],
+  "looseInternal": [
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 1201,
+    "text": "* its own group via postReturnFeeEntry (spec D20) so a fee can be",
+    "loose": true
+   }
+  ],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/__tests__/glReturnTaxBalance.test.ts:52",
+   "server/src/services/invoiceReturnService.ts:419"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 1327,
+  "member": "postPurchaseReturnEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/models/PurchaseReturn.ts",
+    "line": 29,
+    "text": "* GL posting reuses AccountingService.postPurchaseReturnEntry (Dr AP / Cr"
+   },
+   {
+    "file": "server/src/models/PurchaseReturn.ts",
+    "line": 713,
+    "text": "AccountingService.postPurchaseReturnEntry(db, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/models/PurchaseReturn.ts:29",
+   "server/src/models/PurchaseReturn.ts:713"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 1380,
+  "member": "postRefundEntry",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/models/Payment.ts",
+    "line": 134,
+    "text": "AccountingService.postRefundEntry(db, {"
+   },
+   {
+    "file": "server/src/services/PaymentRecordingService.ts",
+    "line": 180,
+    "text": "AccountingService.postRefundEntry(this.db, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/models/Payment.ts:134",
+   "server/src/services/PaymentRecordingService.ts:180"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 1469,
+  "member": "restoreJournalLinesByReference",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/scripts/rollback-customer15-correction.ts",
+    "line": 7,
+    "text": "* AccountingService.restoreJournalLinesByReference clears voided/voided_by/"
+   },
+   {
+    "file": "server/src/controllers/invoiceController.ts",
+    "line": 930,
+    "text": "AccountingService.restoreJournalLinesByReference(db, 'INVOICE', invoiceId);"
+   },
+   {
+    "file": "server/src/controllers/invoiceController.ts",
+    "line": 931,
+    "text": "AccountingService.restoreJournalLinesByReference(db, 'INVOICE_RETURN', invoiceId, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/scripts/rollback-customer15-correction.ts:7",
+   "server/src/controllers/invoiceController.ts:930",
+   "server/src/controllers/invoiceController.ts:931"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 1511,
+  "member": "voidOwnInvoiceReturnLines",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/models/Invoice.ts",
+    "line": 1003,
+    "text": "return voided + AccountingService.voidOwnInvoiceReturnLines("
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/models/Invoice.ts:1003"
+  ]
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 1543,
+  "member": "openPeriod",
+  "reportedParent": "AccountingService",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [],
+  "looseInternal": [
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 314,
+    "text": "let openPeriod = db.prepare(`",
+    "loose": true
+   },
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 320,
+    "text": "if (!openPeriod) {",
+    "loose": true
+   },
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 330,
+    "text": "openPeriod = db.prepare(`",
+    "loose": true
+   },
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 336,
+    "text": "if (openPeriod) {",
+    "loose": true
+   },
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 344,
+    "text": "entityId: openPeriod.id,",
+    "loose": true
+   },
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 351,
+    "text": "if (!openPeriod) {",
+    "loose": true
+   }
+  ],
+  "verdict": "REDUNDANT-EXPORT",
+  "evidence": []
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 1543,
+  "member": "openPeriod",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [],
+  "looseInternal": [
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 314,
+    "text": "let openPeriod = db.prepare(`",
+    "loose": true
+   },
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 320,
+    "text": "if (!openPeriod) {",
+    "loose": true
+   },
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 330,
+    "text": "openPeriod = db.prepare(`",
+    "loose": true
+   },
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 336,
+    "text": "if (openPeriod) {",
+    "loose": true
+   },
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 344,
+    "text": "entityId: openPeriod.id,",
+    "loose": true
+   },
+   {
+    "file": "server/src/services/accountingService.ts",
+    "line": 351,
+    "text": "if (!openPeriod) {",
+    "loose": true
+   }
+  ],
+  "verdict": "REDUNDANT-EXPORT",
+  "evidence": []
+ },
+ {
+  "path": "server/src/services/accountingService.ts",
+  "line": 1691,
+  "member": "postLoanWriteOff",
+  "reportedParent": "default",
+  "resolvedOwner": [
+   "AccountingService"
+  ],
+  "qualifiedExternal": [
+   {
+    "file": "server/src/controllers/employeeController.ts",
+    "line": 995,
+    "text": "const result = AccountingService.postLoanWriteOff(db, {"
+   }
+  ],
+  "looseInternal": [],
+  "verdict": "FALSE-POSITIVE",
+  "evidence": [
+   "server/src/controllers/employeeController.ts:995"
+  ]
+ }
+]
