@@ -1,0 +1,49 @@
+{
+  "ignoreExportsUsedInFile": true,
+  "ignorePatterns": [
+    "audit/fallow-tools/**"
+  ],
+  "ignoreUnresolvedImports": [
+    "./flutter_bootstrap.js"
+  ],
+  "ignoreExports": [
+    {
+      "file": "server/src/services/entityRegistry.ts",
+      "exports": ["default"]
+    },
+    {
+      "file": "server/src/services/reportQueryEngine.ts",
+      "exports": ["default"]
+    }
+  ],
+  "entry": [
+    "scripts/openspec-archive-guard.js",
+    "scripts/openspec-archive-guard.test.js",
+    "scripts/unapplied-cash-fixture.test.cjs",
+    "docs/test-migration-order.ts",
+    "docs/superpowers/verification/*.cjs",
+    "server/scripts/*.ts",
+    "server/scripts/*.js",
+    "server/scripts/*.cjs",
+    "server/scripts/dev/*.ts",
+    "server/scripts/fixtures/*.cjs",
+    "server/scripts/lib/*.ts",
+    "server/src/scripts/*.ts"
+  ],
+  "rules": {
+    "unused-enum-members": "warn",
+    "unused-class-members": "warn"
+  },
+  "duplicates": {
+    "minOccurrences": 3
+  },
+  "health": {
+    "coverage": "server/coverage/coverage-final.json"
+  },
+  "audit": {
+    "gate": "new-only",
+    "deadCodeBaseline": "audit/fallow-baselines/dead-code.json",
+    "healthBaseline": "audit/fallow-baselines/health.json",
+    "dupesBaseline": "audit/fallow-baselines/dupes.json"
+  }
+}

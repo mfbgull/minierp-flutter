@@ -45,6 +45,7 @@ openspec/
 .pub/
 /build/
 /coverage/
+/server/coverage/
 
 # Symbolication related
 app.*.symbols
@@ -99,3 +100,6 @@ server/dbg-*.ts
 /*.db-shm
 /*.db-wal
 
+
+# fallow analysis snapshot (regenerable; not part of the repo).
+audit/fallow-tools/snapshot.json

@@ -34,6 +34,30 @@ jobs:
   # advisory-counting job was removed at the flip (see
   # server/STRICT_NULL_CHECKS.md).
 
+  fallow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The audit compares the tree against a base ref, so it must be local.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+      # Fails only on findings NEW relative to the base ref, measured against
+      # the committed baselines in audit/fallow-baselines/ — the legacy
+      # backlog is baselined, not hidden. The version is pinned because the
+      # baselines are only comparable against the analyzer that produced them.
+      - name: Dead-code / complexity / duplication gate
+        env:
+          FALLOW_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}
+        run: npx --yes fallow@3.34.1 audit --base "$FALLOW_BASE"
+
   flutter:
     runs-on: ubuntu-latest
     steps:

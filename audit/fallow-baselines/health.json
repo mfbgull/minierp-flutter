@@ -1,0 +1,863 @@
+{
+  "kind": "health",
+  "finding_counts": {
+    "docs/superpowers/verification/unapplied-cash-stage-d.cjs": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "docs/superpowers/verification/unapplied-customer-payments.cjs": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/openspec-archive-guard.js": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 2
+      }
+    },
+    "server/scripts/apply-customer15-correction.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/scripts/backfill-ledger-dates.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/scripts/backup-db.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "server/scripts/dedupe-po.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/scripts/dev/audit-trace.ts": {
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "server/scripts/fixtures/unapplied-cash-ui.cjs": {
+      "crap_critical": {
+        "count": 2
+      }
+    },
+    "server/scripts/lib/correctionSafety.ts": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "server/scripts/recompute-item-amounts.js": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/scripts/reconcile-customer-credits.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/scripts/repair-stock.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/scripts/rollback-customer15-correction.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/scripts/verify-reversal-rules.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "server/server.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/__tests__/accountingInvariants.test.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/__tests__/auditRegression9.test.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/__tests__/cashTruth.test.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/__tests__/glPostingMatrix.test.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/__tests__/purchaseReturn.test.ts": {
+      "crap_high": {
+        "count": 2
+      }
+    },
+    "server/src/__tests__/purchaseVoid.test.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/__tests__/reverseStockRestock.test.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/__tests__/search.test.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/config/database.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/accountingController.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/src/controllers/bomController.ts": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/customReportsController.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/src/controllers/dashboardController.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/employeeController.ts": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 8
+      }
+    },
+    "server/src/controllers/expenseController.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/inventoryController.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 6
+      }
+    },
+    "server/src/controllers/invoiceController.ts": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "complexity_high": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 4
+      }
+    },
+    "server/src/controllers/invoiceReturnController.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/mobileInvoiceController.ts": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 2
+      }
+    },
+    "server/src/controllers/ownerEquityController.ts": {
+      "complexity_high": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 3
+      }
+    },
+    "server/src/controllers/ownerPersonalLoansController.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 6
+      }
+    },
+    "server/src/controllers/paymentsController.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "server/src/controllers/posController.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/preferencesController.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/productionController.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/purchaseController.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/purchaseOrderController.ts": {
+      "complexity_high": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/purchaseReturnController.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/reportsController.ts": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/supplierBillController.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/supplierPrepaymentController.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/supplierRefundController.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/suppliersController.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/controllers/userController.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/src/middleware/activityLog.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/middleware/auth.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/migrations/backfillGlPreposting.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/migrations/backfillGlUnification.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/models/ActivityLog.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/src/models/Customer.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/models/Dashboard.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "server/src/models/Expense.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/models/ExpensePayment.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/models/Invoice.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/src/models/Item.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/models/MobileInvoice.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/models/OwnerCapital.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/src/models/OwnerWithdrawal.ts": {
+      "complexity_high": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/models/Payment.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 4
+      }
+    },
+    "server/src/models/PhysicalCount.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/models/Production.ts": {
+      "complexity_high": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "server/src/models/Purchase.ts": {
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/src/models/PurchaseOrder.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/src/models/PurchaseReturn.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/src/models/Quotation.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      }
+    },
+    "server/src/models/Reports.ts": {
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/models/Role.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/models/SalesOrder.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 3
+      }
+    },
+    "server/src/models/StockMovement.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 4
+      },
+      "crap_moderate": {
+        "count": 5
+      }
+    },
+    "server/src/models/StockReservation.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/models/Supplier.ts": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "server/src/models/SupplierBill.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/models/SupplierPrepayment.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/models/SupplierRefund.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/src/models/UserPreferences.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/routes/stockBatches.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/scripts/backfill-batches.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/scripts/fix-duplicate-purchase.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/scripts/reconcile-stock-cash.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/services/InvoiceCreationService.ts": {
+      "complexity_high": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/services/PaymentRecordingService.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/services/SupplierPaymentService.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/services/accountingService.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 3
+      }
+    },
+    "server/src/services/activityLogger.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/services/backupService.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/services/cashService.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/services/expressionValidator.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/services/forecastService.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "server/src/services/invoiceReturnService.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/src/services/paymentValidation.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/services/reportQueryEngine.ts": {
+      "complexity_high": {
+        "count": 2
+      },
+      "complexity_moderate": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 4
+      }
+    },
+    "server/src/services/returnMath.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "server/src/services/searchService.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/services/unappliedCashService.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "server/src/utils/ledgerUtils.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "server/src/utils/purchaseReturnBackfill.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    }
+  },
+  "runtime_coverage_findings": [],
+  "target_keys": [
+    "server/src/services/unappliedCashService.ts:high impact",
+    "server/src/models/StockMovement.ts:complexity",
+    "server/src/controllers/mobileInvoiceController.ts:complexity",
+    "server/src/models/Invoice.ts:complexity",
+    "server/src/controllers/productionController.ts:complexity",
+    "server/src/services/paymentValidation.ts:complexity",
+    "server/src/models/Purchase.ts:hidden coupling",
+    "server/src/models/PurchaseReturn.ts:complexity",
+    "server/src/models/PurchaseOrder.ts:hidden coupling",
+    "server/src/__tests__/helpers/liveDbGuard.ts:high impact",
+    "server/src/controllers/preferencesController.ts:complexity",
+    "server/src/services/invoiceReturnService.ts:complexity",
+    "server/src/models/Production.ts:complexity",
+    "server/src/controllers/customReportsController.ts:complexity",
+    "server/src/models/PhysicalCount.ts:complexity",
+    "server/src/models/SalesOrder.ts:complexity",
+    "server/src/__tests__/purchaseVoid.test.ts:hidden coupling",
+    "server/src/__tests__/purchaseReturn.test.ts:hidden coupling"
+  ]
+}

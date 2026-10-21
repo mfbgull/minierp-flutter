@@ -1,0 +1,230 @@
+{
+ "exports": [],
+ "types": [],
+ "enums": [
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "PO_CREATE",
+   "line": 32,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "PO_UPDATE",
+   "line": 33,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "PO_APPROVE",
+   "line": 34,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "PO_CANCEL",
+   "line": 35,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "PO_DELETE",
+   "line": 36,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "GRN_CREATE",
+   "line": 37,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "GRN_UPDATE",
+   "line": 38,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_CREATE",
+   "line": 51,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_UPDATE",
+   "line": 52,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_CONFIRM",
+   "line": 53,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_DELIVER",
+   "line": 54,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_INVOICE",
+   "line": 55,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_CANCEL",
+   "line": 56,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "SO_DELETE",
+   "line": 57,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "INVOICE_POST",
+   "line": 62,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "INVOICE_RETURN",
+   "line": 65,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "WO_START",
+   "line": 82,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "WO_COMPLETE",
+   "line": 83,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "WO_CANCEL",
+   "line": 84,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "MATERIAL_CONSUME",
+   "line": 86,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "DATA_IMPORT",
+   "line": 106,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "DATA_EXPORT",
+   "line": 107,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "POS_SALE",
+   "line": 111,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "POS_RETURN",
+   "line": 112,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "REPORT_GENERATE",
+   "line": 115,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "REPORT_EXPORT",
+   "line": 116,
+   "parent": "ActionType",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "DEBUG",
+   "line": 121,
+   "parent": "LogLevel",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  },
+  {
+   "path": "server/src/services/activityLogger.ts",
+   "sym": "ERROR",
+   "line": 124,
+   "parent": "LogLevel",
+   "v": "REDUNDANT-EXPORT",
+   "why": "referenced 1x inside its own module only"
+  }
+ ]
+}
