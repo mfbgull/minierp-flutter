@@ -20,11 +20,6 @@ export function errorMessage(error: unknown): string {
   return String(error);
 }
 
-/** Stack for a caught value, when it has one. */
-export function errorStack(error: unknown): string | undefined {
-  return error instanceof Error ? error.stack : undefined;
-}
-
 /**
  * The error's NAME, e.g. `TokenExpiredError`.
  *
@@ -53,9 +48,4 @@ export function errorCode(error: unknown): string | undefined {
     if (typeof code === 'string') return code;
   }
   return undefined;
-}
-
-/** Narrow a caught value to an Error, for the rare site that needs a type. */
-export function asError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(errorMessage(error));
 }

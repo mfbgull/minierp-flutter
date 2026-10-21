@@ -8,12 +8,7 @@ import { AuthRequest } from '../types';
 import { InvoiceReturnService, ReturnError, type SettlementInput } from '../services/invoiceReturnService';
 import { handleBusinessError } from '../utils/businessRuleError';
 import db from '../config/database';
-import {
-  IDEMPOTENCY_SCOPES,
-  claimIdempotencyKey,
-  hashRequestPayload,
-  startIdempotentRequest,
-} from '../utils/idempotency';
+import { IDEMPOTENCY_SCOPES, claimIdempotencyKey, hashRequestPayload, respondToIdempotencyReplay, startIdempotentRequest } from '../utils/idempotency';
 
 function settleReturn(req: AuthRequest, res: Response): Response | void {
   try {
@@ -27,16 +22,12 @@ function settleReturn(req: AuthRequest, res: Response): Response | void {
     // return being settled, which is the operation's resource identity.
     const hash = hashRequestPayload(req.body);
     const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.INVOICE_RETURN_SETTLE, hash);
-    if (start.kind === 'error') {
-      return res.status(start.status).json({ error: start.message });
-    }
-    if (start.kind === 'replay') {
-      res.set('X-Idempotent-Replay', 'true');
-      return res.json({ success: true, message: 'Return settled successfully', idempotentReplay: true, data: { returnId: start.resourceId } });
-    }
+    if (respondToIdempotencyReplay(res, start, {
+      buildBody: (resourceId) => ({ success: true, message: 'Return settled successfully', idempotentReplay: true, data: { returnId: resourceId } }),
+    })) return;
 
     const result = InvoiceReturnService.settleReturn(returnId, allocations, req.user!.id);
-    if (start.key) {
+    if (start.kind === 'proceed' && start.key) {
       claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.INVOICE_RETURN_SETTLE, start.key, hash, returnId);
     }
     return res.json({ success: true, message: 'Return settled successfully', data: result });

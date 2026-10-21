@@ -18,6 +18,56 @@ import { requireSupplierForPurchase } from '../utils/purchaseValidation';
 import { handleBusinessError } from '../utils/businessRuleError';
 import { errorMessage } from '../utils/errorMessage';
 
+type MultiItemPurchaseLine = {
+  item_id?: number | string;
+  quantity?: number | string;
+  unit_cost?: number | string;
+};
+
+type SingleItemPurchaseBody = {
+  item_id?: unknown;
+  warehouse_id?: unknown;
+  quantity?: unknown;
+  unit_cost?: unknown;
+  purchase_date?: unknown;
+};
+
+/**
+ * Validate the line items of a multi-item purchase payload. Returns the
+ * error message to send, or null when every line is acceptable.
+ */
+function validateMultiItemPurchaseLines(items: MultiItemPurchaseLine[]): string | null {
+  for (const line of items) {
+    if (!line?.item_id || !line.quantity || line.unit_cost === undefined) {
+      return 'Each purchase item needs item_id, quantity, and unit cost';
+    }
+    if (Number(line.quantity) <= 0) {
+      return 'Quantity must be positive';
+    }
+    if (Number(line.unit_cost) < 0) {
+      return 'Unit cost cannot be negative';
+    }
+  }
+  return null;
+}
+
+/**
+ * Validate the legacy flat single-item purchase payload. Returns the error
+ * message to send, or null when it is acceptable.
+ */
+function validateSingleItemPurchase(body: SingleItemPurchaseBody): string | null {
+  if (!body.item_id || !body.warehouse_id || !body.quantity || !body.unit_cost || !body.purchase_date) {
+    return 'Item, warehouse, quantity, unit cost, and purchase date are required';
+  }
+  if (Number(body.quantity) <= 0) {
+    return 'Quantity must be positive';
+  }
+  if (Number(body.unit_cost) < 0) {
+    return 'Unit cost cannot be negative';
+  }
+  return null;
+}
+
 function recordPurchase(req: AuthRequest, res: Response): void {
   try {
     // audit-3 task 08: a purchase is the widest blast radius of any keyed
@@ -80,21 +130,10 @@ function recordPurchase(req: AuthRequest, res: Response): void {
         res.status(400).json({ error: 'Warehouse and purchase date are required' });
         return;
       }
-      for (const line of items) {
-        if (!line?.item_id || !line.quantity || line.unit_cost === undefined) {
-          res.status(400).json({
-            error: 'Each purchase item needs item_id, quantity, and unit cost'
-          });
-          return;
-        }
-        if (Number(line.quantity) <= 0) {
-          res.status(400).json({ error: 'Quantity must be positive' });
-          return;
-        }
-        if (Number(line.unit_cost) < 0) {
-          res.status(400).json({ error: 'Unit cost cannot be negative' });
-          return;
-        }
+      const lineError = validateMultiItemPurchaseLines(items);
+      if (lineError) {
+        res.status(400).json({ error: lineError });
+        return;
       }
 
       const created = db.transaction(() => {
@@ -116,20 +155,9 @@ function recordPurchase(req: AuthRequest, res: Response): void {
       purchase_date,
     } = req.body;
 
-    if (!item_id || !warehouse_id || !quantity || !unit_cost || !purchase_date) {
-      res.status(400).json({
-        error: 'Item, warehouse, quantity, unit cost, and purchase date are required'
-      });
-      return;
-    }
-
-    if (quantity <= 0) {
-      res.status(400).json({ error: 'Quantity must be positive' });
-      return;
-    }
-
-    if (unit_cost < 0) {
-      res.status(400).json({ error: 'Unit cost cannot be negative' });
+    const singleError = validateSingleItemPurchase({ item_id, warehouse_id, quantity, unit_cost, purchase_date });
+    if (singleError) {
+      res.status(400).json({ error: singleError });
       return;
     }
 

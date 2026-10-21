@@ -184,6 +184,56 @@ function calculateInvoiceBalance(invoiceId: number, conn: typeof db = db): numbe
   return newBalance;
 }
 
+function deriveReturnStatus(returned: number, total: number): string {
+  if (returned >= total && total > 0) return 'Fully Returned';
+  if (returned > 0 && total > 0) return 'Partially Returned';
+  return 'None';
+}
+
+/**
+ * Derive payment_status. Overdue applies only when the invoice is not in a
+ * terminal state and the due date has fully elapsed — an invoice due today
+ * stays payable through end of today.
+ */
+function derivePaymentStatus(
+  paid: number,
+  balance: number,
+  total: number,
+  returnStatus: string,
+  dueDate: string | null,
+  today: string
+): string {
+  let paymentStatus: string;
+  if (paid >= total && total > 0 && returnStatus === 'None') {
+    paymentStatus = paid > total ? 'Overpaid' : 'Paid';
+  } else if (paid > 0 && balance > 0 && returnStatus === 'None') {
+    paymentStatus = 'Partially Paid';
+  } else if (balance <= 0 && total > 0) {
+    paymentStatus = 'Paid';
+  } else {
+    paymentStatus = 'Unpaid';
+  }
+
+  const isTerminal = paymentStatus === 'Paid' || returnStatus === 'Fully Returned' || returnStatus === 'Partially Returned';
+  if (!isTerminal && dueDate && dueDate.slice(0, 10) < today) {
+    paymentStatus = 'Overdue';
+  }
+  return paymentStatus;
+}
+
+/**
+ * Derive the combined legacy status for backward compatibility.
+ */
+function deriveCombinedStatus(paymentStatus: string, returnStatus: string): string {
+  if (returnStatus === 'Fully Returned') return 'Returned';
+  if (returnStatus === 'Partially Returned') return 'Partially Returned';
+  if (paymentStatus === 'Paid') return 'Paid';
+  if (paymentStatus === 'Overpaid') return 'Paid';
+  if (paymentStatus === 'Partially Paid') return 'Partially Paid';
+  if (paymentStatus === 'Overdue') return 'Overdue';
+  return 'Unpaid';
+}
+
 function updateInvoiceStatus(invoiceId: number, conn: typeof db = db): string {
   const invoice = conn.prepare('SELECT balance_amount, total_amount, paid_amount, due_date, returned_amount, status FROM invoices WHERE id = ?')
     .get(invoiceId) as { balance_amount: number; total_amount: number; paid_amount: number; due_date: string | null; returned_amount?: number; status?: string } | undefined;
@@ -207,51 +257,12 @@ function updateInvoiceStatus(invoiceId: number, conn: typeof db = db): string {
     returnStatus = 'None';
     combinedStatus = 'Cancelled';
   } else {
-    // Derive return_status
-    if (returned >= total && total > 0) {
-      returnStatus = 'Fully Returned';
-    } else if (returned > 0 && total > 0) {
-      returnStatus = 'Partially Returned';
-    } else {
-      returnStatus = 'None';
-    }
+    returnStatus = deriveReturnStatus(returned, total);
 
-    // Derive payment_status
-    if (paid >= total && total > 0 && returnStatus === 'None') {
-      paymentStatus = paid > total ? 'Overpaid' : 'Paid';
-    } else if (paid > 0 && balance > 0 && returnStatus === 'None') {
-      paymentStatus = 'Partially Paid';
-    } else if (balance <= 0 && total > 0) {
-      paymentStatus = 'Paid';
-    } else {
-      paymentStatus = 'Unpaid';
-    }
-
-    // Overdue: not in a terminal state and the due date has fully
-    // elapsed — an invoice due today stays payable through end of today.
-    const isTerminal = paymentStatus === 'Paid' || returnStatus === 'Fully Returned' || returnStatus === 'Partially Returned';
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    if (!isTerminal && invoice.due_date && invoice.due_date.slice(0, 10) < today) {
-      paymentStatus = 'Overdue';
-    }
-
-    // Derive combined legacy status for backward compatibility
-    if (returnStatus === 'Fully Returned') {
-      combinedStatus = 'Returned';
-    } else if (returnStatus === 'Partially Returned') {
-      combinedStatus = 'Partially Returned';
-    } else if (paymentStatus === 'Paid') {
-      combinedStatus = 'Paid';
-    } else if (paymentStatus === 'Overpaid') {
-      combinedStatus = 'Paid';
-    } else if (paymentStatus === 'Partially Paid') {
-      combinedStatus = 'Partially Paid';
-    } else if (paymentStatus === 'Overdue') {
-      combinedStatus = 'Overdue';
-    } else {
-      combinedStatus = 'Unpaid';
-    }
+    paymentStatus = derivePaymentStatus(paid, balance, total, returnStatus, invoice.due_date, today);
+    combinedStatus = deriveCombinedStatus(paymentStatus, returnStatus);
   }
 
   conn.prepare('UPDATE invoices SET status = ?, payment_status = ?, return_status = ? WHERE id = ?')

@@ -82,7 +82,8 @@ export type UnifiedPaymentRow = {
   payment_kind: string | null;
 };
 
-export type PaymentAllocation = {
+/** A persisted allocation row (see services/paymentRecordingTypes.ts for the command shape). */
+export type PaymentAllocationRow = {
   id: number;
   payment_id: number;
   invoice_id: number;
@@ -109,8 +110,128 @@ export type PaymentDetailRow = {
   allocated_invoices: string | null;
   allocation_amounts: string | null;
   allocation_ids: string | null;
-  allocations?: PaymentAllocation[];
+  allocations?: PaymentAllocationRow[];
 };
+
+/**
+ * H8: void-and-reissue the GL so the journal carries the payment's FINAL date
+ * and cash/bank account. `voidJournalLinesByReference` returns how many
+ * lines it retired — repost only when the payment actually had a posting, so
+ * an edit never invents a movement.
+ */
+function repostEditedPaymentGl(
+  db: Database.Database,
+  paymentId: number,
+  finalPayment: PaymentDetailRow,
+  finalAmount: number,
+  isRefund: boolean,
+  voidedLines: number,
+  userId: number | undefined
+): void {
+  if (voidedLines <= 0) return;
+
+  if (isRefund && finalPayment.customer_id) {
+    AccountingService.postRefundEntry(db, {
+      refundPaymentId: paymentId,
+      refundPaymentNo: finalPayment.payment_no,
+      amount: Math.abs(finalAmount),
+      refundDate: finalPayment.payment_date,
+      paymentMethod: finalPayment.payment_method,
+      customerId: finalPayment.customer_id,
+      userId,
+    });
+    return;
+  }
+
+  if (finalPayment.customer_id) {
+    AccountingService.postPaymentEntry(db, {
+      paymentId,
+      paymentNo: finalPayment.payment_no,
+      amount: finalAmount,
+      paymentDate: finalPayment.payment_date,
+      paymentMethod: finalPayment.payment_method,
+      customerId: finalPayment.customer_id,
+      userId,
+    });
+    return;
+  }
+
+  if (finalPayment.supplier_id) {
+    AccountingService.postSupplierPaymentEntry(db, {
+      paymentId,
+      paymentNo: finalPayment.payment_no,
+      amount: finalAmount,
+      paymentDate: finalPayment.payment_date,
+      paymentMethod: finalPayment.payment_method,
+      userId,
+    });
+  }
+}
+
+/**
+ * H8: a date edit must also move the subledger row — otherwise the ledger
+ * keeps posting on the old date while the payment row carries the new one.
+ * Reverse the active PAYMENT row append-only and reissue one fresh row at
+ * the new date (ACC-14 / ACC-20 reversal rules — the same primitives
+ * payment deletion uses).
+ *
+ * NB: ledgerUtils writes through the config/database singleton, so these nest
+ * as savepoints only when `db` IS that singleton (as all controllers pass it).
+ */
+function moveEditedPaymentLedgerDate(
+  db: Database.Database,
+  finalPayment: PaymentDetailRow,
+  finalAmount: number,
+  isRefund: boolean,
+  newDate: string
+): void {
+  if (finalPayment.customer_id) {
+    // Refund payments sit in the ledger as REFUND debits (applyRefund);
+    // ordinary customer payments as PAYMENT credits.
+    const ledgerType = isRefund ? 'REFUND' : 'PAYMENT';
+    const custRows = db.prepare(
+      `SELECT id, description FROM customer_ledger
+       WHERE reference_no = ? AND voided = 0 AND transaction_type = ? AND customer_id = ?`
+    ).all(finalPayment.payment_no, ledgerType, finalPayment.customer_id) as Array<{ id: number; description: string | null }>;
+    if (custRows.length > 0) {
+      for (const row of custRows) {
+        ledgerUtils.reverseLedgerEntry('customer_ledger', row.id, `payment ${finalPayment.payment_no} date edited to ${newDate}`);
+      }
+      ledgerUtils.createLedgerEntry(
+        finalPayment.customer_id,
+        newDate,
+        ledgerType,
+        finalPayment.payment_no,
+        isRefund ? Math.abs(finalAmount) : 0,
+        isRefund ? 0 : finalAmount,
+        custRows[0].description || `Payment ${finalPayment.payment_no}`,
+      );
+      ledgerUtils.recalcCustomerBalanceFromLedger(finalPayment.customer_id);
+    }
+    return;
+  }
+
+  if (finalPayment.supplier_id) {
+    const supRows = db.prepare(
+      `SELECT id, description FROM supplier_ledger
+       WHERE reference_no = ? AND voided = 0 AND transaction_type = 'PAYMENT' AND supplier_id = ?`
+    ).all(finalPayment.payment_no, finalPayment.supplier_id) as Array<{ id: number; description: string | null }>;
+    if (supRows.length > 0) {
+      for (const row of supRows) {
+        ledgerUtils.reverseLedgerEntry('supplier_ledger', row.id, `payment ${finalPayment.payment_no} date edited to ${newDate}`);
+      }
+      SupplierLedgerModel.createEntry({
+        supplier_id: finalPayment.supplier_id,
+        transaction_date: newDate,
+        transaction_type: 'PAYMENT',
+        reference_no: finalPayment.payment_no,
+        credit: parseCurrency(finalPayment.amount),
+        description: supRows[0].description || `Payment ${finalPayment.payment_no}`,
+      }, db);
+      SupplierLedgerModel.rebuildBalances(finalPayment.supplier_id, db);
+    }
+  }
+}
 
 export class PaymentModel {
   /**
@@ -118,24 +239,6 @@ export class PaymentModel {
    * Re-syncs from the actual max in the table on every call to prevent
    * duplicate payment_no errors when data is manually inserted or restored.
    */
-  static generatePaymentNo(db: Database.Database): string {
-    // Use numeric MAX (not string MAX) so PAY1000 sorts after PAY999.
-    // String comparison would make PAY999 > PAY1000, causing duplicate generation.
-    const maxResult = db.prepare(
-      `SELECT MAX(CAST(SUBSTR(payment_no, 4) AS INTEGER)) as max_val FROM payments WHERE payment_no LIKE 'PAY%'`
-    ).get() as { max_val: number | null } | undefined;
-    const maxNo = maxResult?.max_val ?? 0;
-
-    const currentSetting = db.prepare("SELECT value FROM settings WHERE key = 'PAY_last_no'").get() as { value: string } | undefined;
-    const currentSeq = currentSetting ? parseInt(currentSetting.value, 10) || 0 : 0;
-
-    if (maxNo > currentSeq) {
-      db.prepare("UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = 'PAY_last_no'").run(maxNo.toString());
-    }
-
-    const nextNo = getNextSequenceNumber(db, 'PAY_last_no');
-    return `PAY${String(nextNo).padStart(3, '0')}`;
-  }
 
   /**
    * Get payment by ID
@@ -159,7 +262,7 @@ export class PaymentModel {
         SELECT pa.id, pa.payment_id, pa.invoice_id, i.invoice_no, pa.amount
         FROM payment_allocations pa LEFT JOIN invoices i ON pa.invoice_id = i.id
         WHERE pa.payment_id = ? AND pa.voided_at IS NULL ORDER BY pa.id
-      `).all(id) as PaymentAllocation[];
+      `).all(id) as PaymentAllocationRow[];
     } else if (payment) {
       payment.allocations = [];
     }
@@ -545,38 +648,7 @@ export class PaymentModel {
       });
       const finalAmount = parseCurrency(finalPayment.amount);
       const isRefund = finalAmount < 0;
-      if (voidedLines > 0) {
-        if (isRefund && finalPayment.customer_id) {
-          AccountingService.postRefundEntry(db, {
-            refundPaymentId: id,
-            refundPaymentNo: finalPayment.payment_no,
-            amount: Math.abs(finalAmount),
-            refundDate: finalPayment.payment_date,
-            paymentMethod: finalPayment.payment_method,
-            customerId: finalPayment.customer_id,
-            userId: attribution?.userId ?? undefined,
-          });
-        } else if (finalPayment.customer_id) {
-          AccountingService.postPaymentEntry(db, {
-            paymentId: id,
-            paymentNo: finalPayment.payment_no,
-            amount: finalAmount,
-            paymentDate: finalPayment.payment_date,
-            paymentMethod: finalPayment.payment_method,
-            customerId: finalPayment.customer_id,
-            userId: attribution?.userId ?? undefined,
-          });
-        } else if (finalPayment.supplier_id) {
-          AccountingService.postSupplierPaymentEntry(db, {
-            paymentId: id,
-            paymentNo: finalPayment.payment_no,
-            amount: finalAmount,
-            paymentDate: finalPayment.payment_date,
-            paymentMethod: finalPayment.payment_method,
-            userId: attribution?.userId ?? undefined,
-          });
-        }
-      }
+      repostEditedPaymentGl(db, id, finalPayment, finalAmount, isRefund, voidedLines, attribution?.userId ?? undefined);
 
       if (voidedLines > 0 && existing.customer_id && Number(existing.amount) > 0) {
         assertCashTimeline(db, { paymentMethod: existing.payment_method, fromDate: existing.payment_date });
@@ -592,51 +664,11 @@ export class PaymentModel {
       // these nest as savepoints only when `db` IS that singleton (as all
       // controllers pass it).
       if (dateChanged) {
-        const newDate = data.payment_date as string;
-        if (finalPayment.customer_id) {
-          // Refund payments sit in the ledger as REFUND debits (applyRefund);
-          // ordinary customer payments as PAYMENT credits.
-          const ledgerType = isRefund ? 'REFUND' : 'PAYMENT';
-          const custRows = db.prepare(
-            `SELECT id, description FROM customer_ledger
-             WHERE reference_no = ? AND voided = 0 AND transaction_type = ? AND customer_id = ?`
-          ).all(finalPayment.payment_no, ledgerType, finalPayment.customer_id) as Array<{ id: number; description: string | null }>;
-          if (custRows.length > 0) {
-            for (const row of custRows) {
-              ledgerUtils.reverseLedgerEntry('customer_ledger', row.id, `payment ${finalPayment.payment_no} date edited to ${newDate}`);
-            }
-            ledgerUtils.createLedgerEntry(
-              finalPayment.customer_id,
-              newDate,
-              ledgerType,
-              finalPayment.payment_no,
-              isRefund ? Math.abs(finalAmount) : 0,
-              isRefund ? 0 : finalAmount,
-              custRows[0].description || `Payment ${finalPayment.payment_no}`,
-            );
-            ledgerUtils.recalcCustomerBalanceFromLedger(finalPayment.customer_id);
-          }
-        } else if (finalPayment.supplier_id) {
-          const supRows = db.prepare(
-            `SELECT id, description FROM supplier_ledger
-             WHERE reference_no = ? AND voided = 0 AND transaction_type = 'PAYMENT' AND supplier_id = ?`
-          ).all(finalPayment.payment_no, finalPayment.supplier_id) as Array<{ id: number; description: string | null }>;
-          if (supRows.length > 0) {
-            for (const row of supRows) {
-              ledgerUtils.reverseLedgerEntry('supplier_ledger', row.id, `payment ${finalPayment.payment_no} date edited to ${newDate}`);
-            }
-            SupplierLedgerModel.createEntry({
-              supplier_id: finalPayment.supplier_id,
-              transaction_date: newDate,
-              transaction_type: 'PAYMENT',
-              reference_no: finalPayment.payment_no,
-              credit: parseCurrency(finalPayment.amount),
-              description: supRows[0].description || `Payment ${finalPayment.payment_no}`,
-            }, db);
-            SupplierLedgerModel.rebuildBalances(finalPayment.supplier_id, db);
-          }
-        }
+        moveEditedPaymentLedgerDate(
+          db, finalPayment, finalAmount, isRefund, data.payment_date as string
+        );
       }
+
     })();
   }
 

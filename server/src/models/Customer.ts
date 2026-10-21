@@ -200,10 +200,6 @@ class CustomerModel {
     );
   }
 
-  static deactivate(id: string | string[] | number, db: Database.Database): void {
-    db.prepare('UPDATE customers SET is_active = 0 WHERE id = ?').run(id);
-  }
-
   /// Soft-delete (SHORTCOMINGS-FIX 4.2): stamps `deleted_at`/`deleted_by`
   /// and deactivates instead of removing the row, so an accidental delete
   /// can be undone via [restore].

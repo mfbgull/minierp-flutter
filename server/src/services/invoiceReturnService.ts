@@ -74,6 +74,91 @@ export interface SettlementInput {
   target_invoice_id?: number | null;
 }
 
+/**
+ * Validate each requested return line against its invoice line and mirror it
+ * proportionally (§3.5).
+ */
+function validateReturnLines(
+  db: Database.Database,
+  invoiceId: number,
+  items: Array<{ invoice_item_id: number; return_quantity: number }>
+): Array<ReturnedLine & { invoice_item_id: number; item_id: number }> {
+  const rawLines: Array<ReturnedLine & { invoice_item_id: number; item_id: number }> = [];
+  for (const line of items) {
+    const row = db.prepare(
+      `SELECT ii.id, ii.item_id, ii.quantity, ii.unit_price, ii.tax_rate,
+              ii.discount_type, ii.discount_value, ii.returned_qty,
+              i.item_name
+       FROM invoice_items ii
+       LEFT JOIN items i ON i.id = ii.item_id
+       WHERE ii.invoice_id = ? AND ii.id = ?`
+    ).get(invoiceId, Number(line.invoice_item_id)) as {
+      id: number; item_id: number; quantity: number; unit_price: number;
+      tax_rate: number | null; discount_type: string | null;
+      discount_value: number | null; returned_qty: number | null;
+      item_name: string | null;
+    } | undefined;
+
+    if (!row) {
+      throw new ReturnError(400, `Invoice item ${line.invoice_item_id} not found`);
+    }
+    const returnQty = Number(line.return_quantity);
+    if (!(returnQty > 0)) throw new ReturnError(400, 'Return quantity must be positive');
+
+    const alreadyReturned = Number(row.returned_qty) || 0;
+    const available = Number(row.quantity) - alreadyReturned;
+    if (returnQty > available + 1e-9) {
+      throw new ReturnError(
+        400,
+        `Return quantity (${returnQty}) exceeds available quantity (${available}) for item ${row.item_name ?? row.item_id}. Already returned: ${alreadyReturned}.`
+      );
+    }
+
+    rawLines.push({
+      invoice_item_id: row.id,
+      item_id: row.item_id,
+      ...computeReturnedLine({
+        quantity: Number(row.quantity),
+        unitPrice: Number(row.unit_price),
+        taxRate: Number(row.tax_rate) || 0,
+        discountType: row.discount_type ?? undefined,
+        discountValue: Number(row.discount_value) || 0,
+        returnQuantity: returnQty,
+      }),
+    });
+  }
+  return rawLines;
+}
+
+/**
+ * Write the return's line items and track the returned quantity on each
+ * originating invoice line. Returns the new return-item ids.
+ */
+function addReturnItems(
+  db: Database.Database,
+  headerId: number,
+  lines: Array<ReturnedLine & { invoice_item_id: number; item_id: number }>
+): number[] {
+  const returnItemIds: number[] = [];
+  for (const line of lines) {
+    InvoiceReturnModel.addReturnItem(db, {
+      return_id: headerId,
+      invoice_item_id: line.invoice_item_id,
+      item_id: line.item_id,
+      quantity: line.returnedQuantity,
+      unit_price: roundCurrency(line.returnedGross / line.returnedQuantity),
+      tax_amount: line.returnedTax,
+      line_amount: line.returnedGross,
+    });
+    const inserted = db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number };
+    returnItemIds.push(inserted.id);
+    // Track the returned quantity on the sale line (existing behaviour).
+    db.prepare('UPDATE invoice_items SET returned_qty = returned_qty + ? WHERE id = ?')
+      .run(line.returnedQuantity, line.invoice_item_id);
+  }
+  return returnItemIds;
+}
+
 export interface ProcessReturnInput {
   invoiceId: number;
   items: Array<{ invoice_item_id: number; return_quantity: number }>;
@@ -227,50 +312,7 @@ export class InvoiceReturnService {
       assertPeriodOpen(returnDate);
 
       // Validate each line and mirror it proportionally (§3.5).
-      const rawLines: Array<ReturnedLine & { invoice_item_id: number; item_id: number }> = [];
-      for (const line of input.items) {
-        const row = db.prepare(
-          `SELECT ii.id, ii.item_id, ii.quantity, ii.unit_price, ii.tax_rate,
-                  ii.discount_type, ii.discount_value, ii.returned_qty,
-                  i.item_name
-           FROM invoice_items ii
-           LEFT JOIN items i ON i.id = ii.item_id
-           WHERE ii.invoice_id = ? AND ii.id = ?`
-        ).get(input.invoiceId, Number(line.invoice_item_id)) as {
-          id: number; item_id: number; quantity: number; unit_price: number;
-          tax_rate: number | null; discount_type: string | null;
-          discount_value: number | null; returned_qty: number | null;
-          item_name: string | null;
-        } | undefined;
-
-        if (!row) {
-          throw new ReturnError(400, `Invoice item ${line.invoice_item_id} not found`);
-        }
-        const returnQty = Number(line.return_quantity);
-        if (!(returnQty > 0)) throw new ReturnError(400, 'Return quantity must be positive');
-
-        const alreadyReturned = Number(row.returned_qty) || 0;
-        const available = Number(row.quantity) - alreadyReturned;
-        if (returnQty > available + 1e-9) {
-          throw new ReturnError(
-            400,
-            `Return quantity (${returnQty}) exceeds available quantity (${available}) for item ${row.item_name ?? row.item_id}. Already returned: ${alreadyReturned}.`
-          );
-        }
-
-        rawLines.push({
-          invoice_item_id: row.id,
-          item_id: row.item_id,
-          ...computeReturnedLine({
-            quantity: Number(row.quantity),
-            unitPrice: Number(row.unit_price),
-            taxRate: Number(row.tax_rate) || 0,
-            discountType: row.discount_type ?? undefined,
-            discountValue: Number(row.discount_value) || 0,
-            returnQuantity: returnQty,
-          }),
-        });
-      }
+      const rawLines = validateReturnLines(db, input.invoiceId, input.items);
 
       // H2: give back the invoice-scope header discount proportionally.
       // The sale discounted the pre-tax subtotal, so the return deducts
@@ -341,23 +383,7 @@ export class InvoiceReturnService {
         created_by: input.userId,
       });
 
-      const returnItemIds: number[] = [];
-      for (const line of lines) {
-        InvoiceReturnModel.addReturnItem(db, {
-          return_id: header.id,
-          invoice_item_id: line.invoice_item_id,
-          item_id: line.item_id,
-          quantity: line.returnedQuantity,
-          unit_price: roundCurrency(line.returnedGross / line.returnedQuantity),
-          tax_amount: line.returnedTax,
-          line_amount: line.returnedGross,
-        });
-        const inserted = db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number };
-        returnItemIds.push(inserted.id);
-        // Track the returned quantity on the sale line (existing behaviour).
-        db.prepare('UPDATE invoice_items SET returned_qty = returned_qty + ? WHERE id = ?')
-          .run(line.returnedQuantity, line.invoice_item_id);
-      }
+      const returnItemIds = addReturnItems(db, header.id, lines);
 
       // Reverse stock — restocked into the chosen warehouse. The movement
       // ids are attributed to the returned lines so a later void can post

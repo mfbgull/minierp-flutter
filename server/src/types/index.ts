@@ -12,49 +12,6 @@ export interface AuthRequest extends Request {
   user?: AuthUser;
 }
 
-// ============ Customer Types ============
-export interface Customer {
-  id: number;
-  customer_name: string;
-  email?: string;
-  phone?: string;
-  billing_address?: string;
-  shipping_address?: string;
-  credit_limit?: number;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface CreateCustomerDTO {
-  customer_name: string;
-  email?: string;
-  phone?: string;
-  billing_address?: string;
-  shipping_address?: string;
-  credit_limit?: number;
-}
-
-// ============ Item Types ============
-export interface Item {
-  id: number;
-  item_code: string;
-  item_name: string;
-  description?: string;
-  category?: string;
-  unit_of_measure: string;
-  current_stock: number;
-  reorder_level?: number;
-  standard_selling_price?: number;
-  standard_cost?: number;
-  is_raw_material: boolean;
-  is_finished_good: boolean;
-  is_purchased: boolean;
-  has_expiry?: boolean;
-  near_expiry_threshold_days?: number;
-  created_at?: string;
-  updated_at?: string;
-}
-
 // ============ Invoice Types ============
 export type InvoiceStatus =
   | 'Draft'
@@ -66,9 +23,6 @@ export type InvoiceStatus =
   | 'Cancelled'
   | 'Returned'
   | 'Partially Returned';
-
-export type PaymentStatus = 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overpaid' | 'Overdue';
-export type ReturnStatus = 'None' | 'Partially Returned' | 'Fully Returned';
 
 export interface InvoiceItemDTO {
   item_id: number;
@@ -137,33 +91,6 @@ export interface Invoice {
   deleted_from_return_status?: string | null;
 }
 
-// ============ BOM Types ============
-export interface BOMItemDTO {
-  item_id: number;
-  quantity: number;
-}
-
-export interface CreateBOMDTO {
-  bom_name: string;
-  finished_item_id: number;
-  quantity: number;
-  description?: string;
-  items: BOMItemDTO[];
-}
-
-export interface BOM {
-  id: number;
-  bom_no: string;
-  bom_name: string;
-  finished_item_id: number;
-  finished_item_name?: string;
-  quantity: number;
-  description?: string;
-  is_active: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
-
 // ============ API Response Types ============
 
 // ============ Forecast Types ============
@@ -184,27 +111,6 @@ export type TrendDirection = 'growing' | 'stable' | 'declining';
 
 /** Forecast periods */
 export type ForecastPeriod = 'next_week' | 'next_month' | 'next_quarter';
-
-/** Base demand_forecasts row from DB */
-export interface DemandForecast {
-  id: number;
-  item_id: number;
-  forecast_date: string;
-  period: ForecastPeriod;
-  predicted_quantity: number;
-  confidence_level: number;
-  trend_direction: TrendDirection;
-  trend_percentage: number;
-  model_type: string;
-  is_manual_override: number;
-  override_reason: string | null;
-  override_expires: string | null;
-  bias_adjustment: number | null;
-  seasonal_multiplier: number | null;
-  run_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
 /** Per-item config for model selection */
 export interface ForecastModelConfig {
@@ -237,36 +143,6 @@ export interface SeasonalEvent {
   applies_to_item_id: number | null;
   is_recurring: number;
   created_at: string;
-}
-
-/** Forecast accuracy record */
-export interface ForecastAccuracy {
-  id: number;
-  forecast_date: string;
-  item_id: number;
-  period: ForecastPeriod;
-  model_type: string;
-  predicted_quantity: number;
-  actual_quantity: number | null;
-  mape: number | null;
-  mae: number | null;
-  smape: number | null;
-  is_override: number;
-  computed_at: string | null;
-  created_at: string;
-}
-
-/** Track a forecast run */
-export interface ForecastRun {
-  id: number;
-  run_id: string;
-  run_type: 'auto' | 'manual' | 'scheduled';
-  started_at: string;
-  completed_at: string | null;
-  items_processed: number;
-  errors: number;
-  status: 'running' | 'completed' | 'failed';
-  error_message: string | null;
 }
 
 /** Enhanced forecast result returned by the service */
@@ -386,14 +262,6 @@ export interface SafetyStockResult {
   currentStock: number;
 }
 
-/** ABC classification for items */
-export interface ABCClassification {
-  itemId: number;
-  itemName: string;
-  annualValue: number;
-  class: 'A' | 'B' | 'C';
-}
-
 // ============ Stock Balance Types ============
 export interface StockBalance {
   id: number;
@@ -401,16 +269,6 @@ export interface StockBalance {
   warehouse_id: number;
   quantity: number;
   last_updated: string;
-}
-
-// ============ Warehouse Types ============
-export interface Warehouse {
-  id: number;
-  warehouse_code: string;
-  warehouse_name: string;
-  location?: string;
-  created_at?: string;
-  updated_at?: string;
 }
 
 // ============ Sales Order Types ============
@@ -476,115 +334,6 @@ export interface InvoiceWithUsername extends Invoice {
   created_by_username?: string;
 }
 
-// ============ Integration Service Types ============
-export interface Setting {
-  key: string;
-  value: string;
-}
-
-export interface TaxRate {
-  rate: number;
-  state?: string;
-  zip?: string;
-  country?: string;
-  name?: string;
-}
-
-export interface TaxCalculation {
-  amount: number;
-  rate: number;
-  tax: number;
-  jurisdiction: string;
-}
-
-export interface TaxJarResponse {
-  error?: string;
-  tax?: TaxCalculation;
-  validation?: Record<string, unknown>;
-  categories?: Array<{ name: string }>;
-}
-
-export interface FixerResponse {
-  success?: boolean;
-  error?: { info: string };
-  base?: string;
-  date?: string;
-  rates?: Record<string, number>;
-}
-
-export interface WeatherResponse {
-  error?: { info: string };
-  main?: { temp: number; humidity: number };
-  weather?: Array<{ description: string }>;
-  name?: string;
-}
-
-export interface NotificationResponse {
-  success?: boolean;
-  message?: string;
-}
-
-export interface EmailResponse {
-  success?: boolean;
-  message?: string;
-  messageId?: string;
-}
-
-export interface NumverifyResponse {
-  success?: boolean;
-  valid?: boolean;
-  error?: { info: string };
-  number?: {
-    country_code: string;
-    country_name: string;
-    location: string;
-    carrier: string;
-    line_type: string;
-  };
-}
-
-// ============ Batch Costing Types ============
-export interface StockBatch {
-  id: number;
-  batch_no: string;
-  item_id: number;
-  warehouse_id: number;
-  source_type: 'PRODUCTION' | 'PURCHASE' | 'GOODS_RECEIPT' | 'RETURN' | 'ADJUSTMENT' | 'OPENING' | 'TRANSFER' | 'RECON';
-  source_id: number;
-  quantity_original: number;
-  quantity_remaining: number;
-  unit_cost: number;
-  received_date: string;
-  expiry_date?: string | null;
-  halted?: boolean;
-  halted_reason?: string | null;
-  created_at?: string;
-  // Joined fields
-  item_code?: string;
-  item_name?: string;
-  warehouse_code?: string;
-  warehouse_name?: string;
-  source_no?: string; // production_no or purchase_no
-}
-
-export interface BatchSummary {
-  batch_no: string;
-  item_id: number;
-  item_code: string;
-  item_name: string;
-  warehouse_name: string;
-  source_type: string;
-  source_no: string;
-  quantity_original: number;
-  quantity_remaining: number;
-  unit_cost: number;
-  total_value: number;
-  received_date: string;
-  expiry_date?: string | null;
-  halted?: boolean;
-  halted_reason?: string | null;
-}
-
 // ============ Activity Log Types ============
 export interface ActivityLogDbEntry {
   id: number;
@@ -597,13 +346,6 @@ export interface ActivityLogDbEntry {
   metadata: string | null;
   ip_address: string | null;
   created_at: string;
-}
-
-export interface ActivityStat {
-  action?: string;
-  count?: number;
-  username?: string;
-  date?: string;
 }
 
 // ============ Sellable Stock Errors ============

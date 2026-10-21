@@ -421,10 +421,6 @@ export const logCRUD = (...args: Parameters<typeof activityLogger.logCRUD>) => a
 export const logWithRequest = (...args: Parameters<typeof activityLogger.logWithRequest>) => activityLogger.logWithRequest(...args);
 export const flushLogs = () => activityLogger.flush();
 export const disposeLogger = () => activityLogger.dispose();
-export const getRecentLogs = (...args: Parameters<typeof activityLogger.getRecent>) => activityLogger.getRecent(...args);
-export const getUserLogs = (...args: Parameters<typeof activityLogger.getByUser>) => activityLogger.getByUser(...args);
-export const getEntityLogs = (...args: Parameters<typeof activityLogger.getByEntity>) => activityLogger.getByEntity(...args);
-export const cleanupLogs = (...args: Parameters<typeof activityLogger.cleanup>) => activityLogger.cleanup(...args);
 /** Task 4.2: per-request correlation id shared by all trail rows of one flow. */
 export function newCorrelationId(): string {
   return `corr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -437,40 +433,3 @@ export default activityLogger;
  * database transaction (audit-remediation task 4.5). Unlike the queued
  * service, this row commits/rolls back atomically with the business change.
  */
-export function logActivityInTx(
-  db: import('better-sqlite3').Database,
-  entry: {
-    userId?: number;
-    action: string;
-    entityType: string;
-    entityId?: number | null;
-    description: string;
-    oldValue?: unknown;
-    newValue?: unknown;
-    reason?: string;
-    correlationId?: string;
-  }
-): void {
-  const MAX = 8 * 1024;
-  const cap = (v: unknown): string | null => {
-    if (v === undefined || v === null) return null;
-    const raw = typeof v === 'string' ? v : JSON.stringify(v);
-    return raw.length > MAX ? raw.slice(0, MAX - 32) + '...[truncated]' : raw;
-  };
-  db.prepare(`
-    INSERT INTO activity_log (
-      user_id, action, entity_type, entity_id, description, log_level,
-      old_value, new_value, reason, correlation_id
-    ) VALUES (?, ?, ?, ?, ?, 'INFO', ?, ?, ?, ?)
-  `).run(
-    entry.userId ?? null,
-    entry.action,
-    entry.entityType,
-    entry.entityId ?? null,
-    entry.description,
-    cap(entry.oldValue),
-    cap(entry.newValue),
-    entry.reason ?? null,
-    entry.correlationId ?? null
-  );
-}

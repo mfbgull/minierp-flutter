@@ -4,7 +4,6 @@ import { roundQty } from '../utils/quantity';
 import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
 import { sanitizeSortParams, PRODUCTION_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
-import { assertInventoryDateNotRetroactive } from '../services/inventoryEffectiveDate';
 import ItemModel from './Item';
 import AccountingService from '../services/accountingService';
 import { SqlParam } from '../utils/sqlTypes';

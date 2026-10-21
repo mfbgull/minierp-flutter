@@ -190,11 +190,6 @@ class UserModel {
     return result.count;
   }
 
-  static getRoleName(db: Database.Database, roleId: number): string {
-    const result = db.prepare('SELECT role_name FROM roles WHERE id = ?').get(roleId) as { role_name: string };
-    return result.role_name;
-  }
-
   static getRoleId(db: Database.Database, userId: number): number {
     const result = db.prepare('SELECT role_id FROM users WHERE id = ?').get(userId) as { role_id: number };
     return result.role_id;

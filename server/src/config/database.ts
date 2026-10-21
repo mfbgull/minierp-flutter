@@ -7,15 +7,46 @@ import { passwordPolicyError } from '../utils/passwordPolicy';
 import logger from '../utils/logger';
 import { getNextSequenceNumber } from '../utils/sequence';
 import { backfillPurchaseReturns } from '../utils/purchaseReturnBackfill';
-import { runBackfillGlPreposting } from '../migrations/backfillGlPreposting';
-import { runBackfillGlUnification } from '../migrations/backfillGlUnification';
-import { runBackfillInvoiceItemTax } from '../migrations/backfillInvoiceItemTax';
-import { runBackfillInvoiceTaxGl } from '../migrations/backfillInvoiceTaxGl';
-import { runBackfillMobileInvoiceStockReference } from '../migrations/backfillMobileInvoiceStockReference';
-import { runBackfillInvoiceHeaderDiscount } from '../migrations/backfillInvoiceHeaderDiscount';
-import { runBackfillBatchLocations } from "../migrations/backfillBatchLocations";
+import { createRequire } from 'node:module';
 import { errorMessage } from '../utils/errorMessage';
 import { defaultDbDir } from '../utils/serverRoot';
+
+/**
+ * The backfill runners import models and services, which import this module
+ * back. A static import here is a require cycle (database → migration →
+ * model/service → database) with fragile load order, so they are required
+ * lazily instead: by the time they run this module is fully loaded, and the
+ * backfill's own `import db` resolves to the live instance.
+ */
+const requireModule = createRequire(__filename);
+
+function lazyRequire<T>(modulePath: string): T {
+  return requireModule(modulePath) as T;
+}
+
+const backfills = {
+  glPreposting: (db: Database.Database) =>
+    lazyRequire<typeof import('../migrations/backfillGlPreposting')>('../migrations/backfillGlPreposting')
+      .runBackfillGlPreposting(db),
+  glUnification: (db: Database.Database) =>
+    lazyRequire<typeof import('../migrations/backfillGlUnification')>('../migrations/backfillGlUnification')
+      .runBackfillGlUnification(db),
+  invoiceItemTax: (db: Database.Database) =>
+    lazyRequire<typeof import('../migrations/backfillInvoiceItemTax')>('../migrations/backfillInvoiceItemTax')
+      .runBackfillInvoiceItemTax(db),
+  invoiceTaxGl: (db: Database.Database) =>
+    lazyRequire<typeof import('../migrations/backfillInvoiceTaxGl')>('../migrations/backfillInvoiceTaxGl')
+      .runBackfillInvoiceTaxGl(db),
+  invoiceHeaderDiscount: (db: Database.Database) =>
+    lazyRequire<typeof import('../migrations/backfillInvoiceHeaderDiscount')>('../migrations/backfillInvoiceHeaderDiscount')
+      .runBackfillInvoiceHeaderDiscount(db),
+  batchLocations: (db: Database.Database) =>
+    lazyRequire<typeof import('../migrations/backfillBatchLocations')>('../migrations/backfillBatchLocations')
+      .runBackfillBatchLocations(db),
+  mobileInvoiceStockReference: (db: Database.Database) =>
+    lazyRequire<typeof import('../migrations/backfillMobileInvoiceStockReference')>('../migrations/backfillMobileInvoiceStockReference')
+      .runBackfillMobileInvoiceStockReference(db),
+};
 
 // Fail-closed: tests must never fall through to a shared dev DB by accident
 if (process.env.NODE_ENV === 'test' && !process.env.DATABASE_PATH) {
@@ -1870,21 +1901,21 @@ export function applyPendingMigrations(): void {
   runLedgered('fn.reconcileOrphanedJournalLines', reconcileOrphanedJournalLines);
   // GL backfill for documents created before live posting (reporting-search-remediation):
   // posts purchases/payments/expenses/salaries + opening capital; skips docs already posted.
-  runLedgered('fn.backfillGlPreposting', () => runBackfillGlPreposting(db));
+  runLedgered('fn.backfillGlPreposting', () => backfills.glPreposting(db));
   // Phase 3 (GL unification): re-link orphaned/mis-linked journal_lines to
   // fresh headers and give line-less legacy journal_entries canonical lines,
   // so journal_lines is the single source of GL truth.
-  runLedgered('fn.backfillGlUnification', () => runBackfillGlUnification(db));
+  runLedgered('fn.backfillGlUnification', () => backfills.glUnification(db));
   // Per-line tax decomposition (report-query-integrity): columns first, then the
   // one-time decomposition of stored amounts into net_amount + tax_amount.
   runLedgered('add-invoice-item-tax-columns.sql');
-  runLedgered('fn.backfillInvoiceItemTax', () => runBackfillInvoiceItemTax(db));
+  runLedgered('fn.backfillInvoiceItemTax', () => backfills.invoiceItemTax(db));
   // H3 repair: with the stored tax authoritative, move the historical GL Tax
   // Payable split by the delta (AR/COGS/returns untouched; idempotent).
-  runLedgered('fn.backfillInvoiceTaxGl', () => runBackfillInvoiceTaxGl(db));
+  runLedgered('fn.backfillInvoiceTaxGl', () => backfills.invoiceTaxGl(db));
   // H2 repair: recover the header discount that createInvoice never
   // persisted (stored total < line sum), so returns give it back.
-  runLedgered('fn.backfillInvoiceHeaderDiscount', () => runBackfillInvoiceHeaderDiscount(db));
+  runLedgered('fn.backfillInvoiceHeaderDiscount', () => backfills.invoiceHeaderDiscount(db));
   // INV-21 prerequisite: reconcile live batch/balance drift before CHECK constraints land
   runLedgered('fn.runStockCoverageReconciliation', runStockCoverageReconciliation);
   // INV-21: database-level invariants — applied only after live data reconciled
@@ -1899,12 +1930,12 @@ export function applyPendingMigrations(): void {
   // so its guarded add runs after this file too.
   runLedgered("add-batch-location-model.sql");
   runLedgered('fn.runPurchaseReturnBatchesLocationMigration', runPurchaseReturnBatchesLocationMigration);
-  runLedgered("fn.backfillBatchLocations", () => runBackfillBatchLocations(db));
+  runLedgered("fn.backfillBatchLocations", () => backfills.batchLocations(db));
   // TASK 17: mobile-invoice SALE movements were keyed to the invoice ID while
   // every reversal resolves them by invoice_no, so a cancelled mobile invoice
   // left stock permanently reduced. Re-key the legacy movements and restore the
   // stock of invoices already cancelled under the old key (idempotent).
-  runLedgered('fn.backfillMobileInvoiceStockReference', () => runBackfillMobileInvoiceStockReference(db));
+  runLedgered('fn.backfillMobileInvoiceStockReference', () => backfills.mobileInvoiceStockReference(db));
 
   // Salary payment duplicate guard: pay_period column + unique index
   runLedgered('add-salary-pay-period.sql');

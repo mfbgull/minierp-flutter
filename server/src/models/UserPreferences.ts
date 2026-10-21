@@ -1,7 +1,5 @@
 import Database from 'better-sqlite3';
-
-/** Week-start day for the date-range picker (spec §4.5). */
-export type WeekStart = 'monday' | 'saturday' | 'sunday';
+import type { WeekStart } from '../utils/weekMath';
 
 /** One user-defined named preset (spec §6.2). */
 export interface UserPreset {

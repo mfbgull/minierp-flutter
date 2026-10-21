@@ -146,6 +146,67 @@ type PosSaleBody = {
   payments?: PosPaymentLeg[];
 };
 
+/**
+ * Resolve the payment legs of a POS sale.
+ *
+ * Presence of `payments` — even as an empty array — selects the split path.
+ * Its absence is the legacy payload, which keeps the cash guard so an old
+ * client cannot silently turn into a credit sale.
+ */
+function resolvePosPaymentLegs(
+  body: PosSaleBody,
+  total: number,
+  usesLegs: boolean
+): { legs: PosPaymentLeg[] } | { error: string } {
+  if (!usesLegs) {
+    const cashReceived = parseFloat(String(body.cash_received)) || total;
+    if (cashReceived < total) {
+      return {
+        error: `Insufficient cash. Total: ${total.toFixed(2)}, Received: ${cashReceived.toFixed(2)}`,
+      };
+    }
+    return {
+      legs: [{
+        amount: Math.min(cashReceived, total),
+        payment_method: 'Cash',
+        payment_date: body.sale_date,
+      }],
+    };
+  }
+
+  const legs = body.payments!;
+  for (const leg of legs) {
+    if (!leg.payment_date) leg.payment_date = body.sale_date;
+  }
+  return { legs };
+}
+
+/**
+ * Map a POS sale failure to the HTTP status the client should see.
+ * Returns null when the error is not one of the known business errors.
+ */
+function posSaleErrorResponse(error: unknown): { status: number; message: string } | null {
+  if (error instanceof SellableStockUnavailableError) {
+    return { status: 400, message: error.message };
+  }
+  if (error instanceof InvoiceCreationPaymentMethodError) {
+    return { status: 400, message: error.message };
+  }
+  if (error instanceof InvoiceCreationIdempotencyError) {
+    return { status: 409, message: error.message };
+  }
+  if (error instanceof InvoiceCreationTotalMismatchError) {
+    return { status: 400, message: error.message };
+  }
+  if (error instanceof InvoiceCreationOffsetError) {
+    return { status: 400, message: error.message };
+  }
+  if (error instanceof InvoiceCreationCreditError) {
+    return { status: 400, message: error.message };
+  }
+  return null;
+}
+
 function createPOSSale(req: AuthRequest, res: Response): void {
   if (!req.user) {
     res.status(401).json({ error: 'Authentication required' });
@@ -185,26 +246,12 @@ function createPOSSale(req: AuthRequest, res: Response): void {
       discount_value: body.discount_value,
     });
 
-    const legs: PosPaymentLeg[] = usesLegs
-      ? body.payments!
-      : [{ amount: 0, payment_method: 'Cash' }];
-
-    if (!usesLegs) {
-      const cashReceived = parseFloat(String(body.cash_received)) || total;
-      if (cashReceived < total) {
-        res.status(400).json({ error: `Insufficient cash. Total: ${total.toFixed(2)}, Received: ${cashReceived.toFixed(2)}` });
-        return;
-      }
-      legs[0] = {
-        amount: Math.min(cashReceived, total),
-        payment_method: 'Cash',
-        payment_date: body.sale_date,
-      };
-    } else {
-      for (const leg of legs) {
-        if (!leg.payment_date) leg.payment_date = body.sale_date;
-      }
+    const legResolution = resolvePosPaymentLegs(body, total, usesLegs);
+    if ('error' in legResolution) {
+      res.status(400).json({ error: legResolution.error });
+      return;
     }
+    const legs = legResolution.legs;
 
     // H6: a closed period must not gain new money movements. A POS sale
     // posts a new AR entry dated sale_date, so refuse before any write
@@ -262,28 +309,9 @@ function createPOSSale(req: AuthRequest, res: Response): void {
     logCRUD(ActionType.INVOICE_CREATE, 'Invoice', result.invoiceId, `POS sale ${result.invoiceNo}`, req.user.id, { total_amount: total }, { correlationId: newCorrelationId() });
     res.status(201).json({ success: true, message: 'POS sale completed successfully', data: replayed });
   } catch (error: unknown) {
-    if (error instanceof SellableStockUnavailableError) {
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    if (error instanceof InvoiceCreationPaymentMethodError) {
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    if (error instanceof InvoiceCreationIdempotencyError) {
-      res.status(409).json({ error: error.message });
-      return;
-    }
-    if (error instanceof InvoiceCreationTotalMismatchError) {
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    if (error instanceof InvoiceCreationOffsetError) {
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    if (error instanceof InvoiceCreationCreditError) {
-      res.status(400).json({ error: error.message });
+    const mapped = posSaleErrorResponse(error);
+    if (mapped) {
+      res.status(mapped.status).json({ error: mapped.message });
       return;
     }
     const message = error instanceof Error ? error.message : 'Failed to process POS sale';

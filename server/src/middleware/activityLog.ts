@@ -7,7 +7,7 @@
  * exposed via `req.correlationId` so services can join their rows to it.
  */
 import { Request, Response, NextFunction } from 'express';
-import activityLogger, { ActionType } from '../services/activityLogger';
+import activityLogger, { ActionType, newCorrelationId } from '../services/activityLogger';
 import { AuthRequest } from '../types';
 
 interface RouteMeta {
@@ -39,10 +39,6 @@ const ROUTE_MAP: Array<{ method: string; re: RegExp; meta: RouteMeta }> = [
   { method: 'PUT', re: /\/api\/expenses\/(\d+)$/, meta: { action: ActionType.EXPENSE_UPDATE, entityType: 'Expense' } },
   { method: 'DELETE', re: /\/api\/expenses\/(\d+)$/, meta: { action: ActionType.EXPENSE_DELETE, entityType: 'Expense' } },
 ];
-
-export function newCorrelationId(): string {
-  return `corr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
 
 /**
  * Stamp correlationId on the request; run the handler; on 2xx of a mapped

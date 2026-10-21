@@ -66,11 +66,3 @@ export function setBatchStatusOverride(
   `).run(statusOverride ?? null, batchId, locationId);
 }
 
-export function isBatchAllocatable(
-  db: Database.Database,
-  batchId: number,
-  locationId?: number
-): boolean {
-  const status = getEffectiveBatchStatus(db, batchId, locationId);
-  return status === 'ACTIVE';
-}

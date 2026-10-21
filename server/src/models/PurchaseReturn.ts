@@ -137,6 +137,284 @@ const HEADER_SELECT = `
   LEFT JOIN credit_notes cn ON cn.id = pr.credit_note_id
 `;
 
+type PurchaseReturnLine = {
+  source_item_id: number;
+  item_id: number;
+  item_name: string;
+  unit_cost: number;
+  quantity: number;
+  amount: number;
+  input_tax_amount: number;
+};
+
+type AggregatedReturnLine = { quantity: number; unit_cost: number };
+
+/**
+ * PRET-01 (task 4.1): aggregate duplicate lines for the same source item
+ * BEFORE validating — each line previously validated against the same
+ * pre-request returned_quantity, so duplicates over-returned.
+ */
+function aggregateReturnLines(
+  items: CreatePurchaseReturnItemDTO[]
+): Map<number, AggregatedReturnLine> {
+  const aggregated = new Map<number, AggregatedReturnLine>();
+  for (const line of items) {
+    if (!line.quantity || line.quantity <= 0) {
+      throw new Error('Return quantity must be positive');
+    }
+    if (!line.source_item_id) throw new Error('source_item_id is required');
+    const key = Number(line.source_item_id);
+    const entry = aggregated.get(key);
+    if (entry) {
+      // Duplicate lines for the same source item must price identically.
+      if (Math.abs(Number(line.unit_cost ?? 0) - entry.unit_cost) > 0.001) {
+        throw new Error(
+          `Conflicting unit costs for source item ${key}: ${entry.unit_cost} vs ${line.unit_cost}`
+        );
+      }
+      entry.quantity += line.quantity;
+    } else {
+      aggregated.set(key, { quantity: line.quantity, unit_cost: Number(line.unit_cost ?? 0) });
+    }
+  }
+  return aggregated;
+}
+
+/**
+ * Validate one aggregated line against its PURCHASE source line and price it.
+ * The input tax is the purchase line's tax net of what earlier posted
+ * returns already took, prorated when the return is partial.
+ */
+function validatePurchaseSourceLine(
+  db: Database.Database,
+  sourceId: number,
+  sourceItemId: number,
+  agg: AggregatedReturnLine
+): PurchaseReturnLine {
+  const purchase = db.prepare(`
+    SELECT p.*, i.item_name
+    FROM purchases p JOIN items i ON p.item_id = i.id
+    WHERE p.id = ?
+  `).get(sourceItemId) as {
+    id: number; item_id: number; item_name: string;
+    quantity: number; unit_cost: number; returned_quantity: number; input_tax_amount: number;
+  } | undefined;
+  if (!purchase) throw new Error(`Purchase line ${sourceItemId} not found`);
+  if (purchase.id !== sourceId) {
+    throw new Error(`Purchase ${sourceItemId} does not belong to source ${sourceId}`);
+  }
+
+  const returned = purchase.returned_quantity || 0;
+  const returnable = roundQty(purchase.quantity - returned);
+  const returnQty = roundQty(agg.quantity);
+  if (returnQty > returnable) {
+    throw new Error(
+      `Return quantity (${returnQty}) exceeds remaining available (${returnable}) ` +
+      `for purchase ${purchase.id}`
+    );
+  }
+
+  const amount = roundCurrency(agg.quantity * purchase.unit_cost);
+  const priorTax = db.prepare(`SELECT COALESCE(SUM(i.input_tax_amount), 0) AS amount
+    FROM purchase_return_items i JOIN purchase_returns r ON r.id = i.purchase_return_id
+    WHERE r.source_type = 'PURCHASE' AND r.source_id = ? AND r.status = 'POSTED' AND i.source_item_id = ?
+  `).get(purchase.id, purchase.id) as { amount: number };
+  const remainingTax = Math.max(0, roundCurrency(purchase.input_tax_amount - priorTax.amount));
+  const tax = roundQty(returnQty - returnable) === 0 ? remainingTax
+    : Math.min(remainingTax, roundCurrency(purchase.input_tax_amount * returnQty / purchase.quantity));
+
+  return {
+    source_item_id: purchase.id,
+    item_id: purchase.item_id,
+    item_name: purchase.item_name,
+    unit_cost: purchase.unit_cost,
+    quantity: agg.quantity,
+    amount,
+    input_tax_amount: tax,
+  };
+}
+
+/**
+ * Validate one aggregated line against its PURCHASE_ORDER source line
+ * (a purchase_order_items.id) and price it.
+ */
+function validatePurchaseOrderSourceLine(
+  db: Database.Database,
+  sourceId: number,
+  sourceItemId: number,
+  agg: AggregatedReturnLine
+): PurchaseReturnLine {
+  const poItem = db.prepare(`
+    SELECT poi.*, i.item_name
+    FROM purchase_order_items poi JOIN items i ON poi.item_id = i.id
+    WHERE poi.id = ?
+  `).get(sourceItemId) as {
+    id: number; po_id: number; item_id: number; item_name: string;
+    received_quantity: number; returned_quantity: number; unit_price: number;
+  } | undefined;
+  if (!poItem) throw new Error(`PO line ${sourceItemId} not found`);
+  if (poItem.po_id !== sourceId) {
+    throw new Error(`PO line ${sourceItemId} does not belong to PO ${sourceId}`);
+  }
+
+  const returned = poItem.returned_quantity || 0;
+  const netReceived = roundQty((poItem.received_quantity || 0) - returned);
+  const returnQty = roundQty(agg.quantity);
+  if (returnQty > netReceived) {
+    throw new Error(
+      `Return quantity (${returnQty}) exceeds net received quantity ` +
+      `(${netReceived}) for PO line ${poItem.id}`
+    );
+  }
+
+  const amount = roundCurrency(agg.quantity * poItem.unit_price);
+  const receivedTax = (db.prepare(`SELECT COALESCE(SUM(i.input_tax_amount), 0) AS amount
+    FROM goods_receipt_items i JOIN goods_receipts r ON r.id = i.receipt_id
+    WHERE i.po_item_id = ? AND r.voided_at IS NULL`).get(poItem.id) as { amount: number }).amount;
+  const priorTax = (db.prepare(`SELECT COALESCE(SUM(i.input_tax_amount), 0) AS amount
+    FROM purchase_return_items i JOIN purchase_returns r ON r.id = i.purchase_return_id
+    WHERE r.source_type = 'PURCHASE_ORDER' AND r.source_id = ? AND r.status = 'POSTED' AND i.source_item_id = ?
+  `).get(sourceId, poItem.id) as { amount: number }).amount;
+  const remainingTax = Math.max(0, roundCurrency(receivedTax - priorTax));
+  const tax = roundQty(returnQty - netReceived) === 0 ? remainingTax
+    : Math.min(remainingTax, roundCurrency(remainingTax * returnQty / netReceived));
+
+  return {
+    source_item_id: poItem.id,
+    item_id: poItem.item_id,
+    item_name: poItem.item_name,
+    unit_cost: poItem.unit_price,
+    quantity: agg.quantity,
+    amount,
+    input_tax_amount: tax,
+  };
+}
+
+type BatchDraw = { batchId: number; quantity: number; locationId: number | null };
+
+/**
+ * PRET-02 (task 4.2): consume the SOURCE DOCUMENT's own batch, not
+ * FIFO-oldest layers — returning goods must deplete the batch they
+ * came from at their own cost. Short coverage is an error: never
+ * silently under-consume while recording a full return.
+ */
+function drawFromSourceBatches(
+  db: Database.Database,
+  line: PurchaseReturnLine,
+  sourceType: 'PURCHASE' | 'PURCHASE_ORDER',
+  warehouseId: number,
+  batchLocationsEnabled: boolean
+): BatchDraw[] {
+  const batchDraws: BatchDraw[] = [];
+  const sourceBatchIds: number[] =
+    sourceType === 'PURCHASE'
+      ? (
+          db.prepare(`
+            SELECT id FROM stock_batches
+            WHERE source_type = 'PURCHASE' AND source_id = ?
+              AND item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+            ORDER BY id
+          `).all(line.source_item_id, line.item_id, warehouseId) as { id: number }[]
+        ).map((r) => r.id)
+      : (
+          db.prepare(`
+            SELECT sb.id FROM stock_batches sb
+            JOIN goods_receipt_items gri ON gri.id = sb.source_id
+            WHERE sb.source_type = 'GOODS_RECEIPT'
+              AND gri.po_item_id = ?
+              AND sb.item_id = ?
+              AND sb.warehouse_id = ?
+              AND sb.quantity_remaining > 0
+            ORDER BY sb.id
+          `).all(line.source_item_id, line.item_id, warehouseId) as { id: number }[]
+        ).map((r) => r.id);
+
+  const coverage = sourceBatchIds.reduce((sum, id) => {
+    const row = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id = ?`).get(id) as
+      | { quantity_remaining: number }
+      | undefined;
+    return roundQty(sum + (row ? Number(row.quantity_remaining) : 0));
+  }, 0);
+
+  if (sourceBatchIds.length === 0 || coverage < roundQty(line.quantity)) {
+    throw new Error(
+      `Insufficient stock in the source batch for ${line.item_name}: ` +
+      `available ${coverage}, required ${roundQty(line.quantity)}. ` +
+      `Goods already sold cannot be returned to the supplier.`
+    );
+  }
+
+  // Draw the return down across the line's own batches, oldest first, so a
+  // line received in several partial receipts is fully recoverable.
+  let remainingToDraw = roundQty(line.quantity);
+
+  for (const batchId of sourceBatchIds) {
+    if (remainingToDraw <= 0) break;
+
+    const batch = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id = ?`).get(batchId) as
+      | { quantity_remaining: number }
+      | undefined;
+    if (!batch) continue;
+
+    const take = roundQty(Math.min(remainingToDraw, roundQty(Number(batch.quantity_remaining))));
+    if (take <= 0) continue;
+
+    if (batchLocationsEnabled) {
+      const locRows = db.prepare(`
+        SELECT bsl.id, bsl.quantity_available, bsl.location_id
+        FROM batch_stock_by_location bsl
+        JOIN locations l ON bsl.location_id = l.id
+        WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+          AND bsl.quantity_available > 0
+        ORDER BY l.created_at ASC, bsl.id ASC
+      `).all(batchId, warehouseId) as Array<{ id: number; quantity_available: number; location_id: number }>;
+
+      let locRemaining = take;
+      for (const loc of locRows) {
+        if (locRemaining <= 0) break;
+        const locTake = roundQty(Math.min(locRemaining, roundQty(loc.quantity_available)));
+        db.prepare(`
+          UPDATE batch_stock_by_location
+          SET quantity_physical = quantity_physical - ?
+          WHERE id = ?
+        `).run(locTake, loc.id);
+        locRemaining -= locTake;
+      }
+      if (locRemaining > 0) {
+        throw new Error(
+          `Insufficient batch_stock_by_location for ${line.item_name}: ` +
+          `required ${take}, only ${roundQty(take - locRemaining).toFixed(3)} available in source batch locations`
+        );
+      }
+    }
+
+    db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')
+      .run(take, batchId);
+
+    remainingToDraw -= take;
+    batchDraws.push({ batchId, quantity: take, locationId: null });
+
+    if (batchLocationsEnabled) {
+      const consumedLoc = db.prepare(`
+        SELECT bsl.location_id FROM batch_stock_by_location bsl
+        JOIN locations l ON bsl.location_id = l.id
+        WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+        ORDER BY l.created_at ASC LIMIT 1
+      `).get(batchId, warehouseId) as { location_id: number } | undefined;
+      batchDraws[batchDraws.length - 1].locationId = consumedLoc?.location_id ?? null;
+    }
+  }
+
+  if (roundQty(remainingToDraw) > 0) {
+    throw new Error(
+      `Insufficient stock in the source batch for ${line.item_name}: ` +
+      `short by ${roundQty(remainingToDraw)}. Goods already sold cannot be returned to the supplier.`
+    );
+  }
+
+  return batchDraws;
+}
+
 class PurchaseReturnModel {
   static generateReturnNo(db: Database.Database): string {
     return generateDocNo(db, 'PR');
@@ -241,6 +519,42 @@ class PurchaseReturnModel {
   // Create (transactional: stock + GL + credit note + ledger + audit)
   // ------------------------------------------------------------------
 
+  /**
+   * PRET-06 (task 4.5): returning goods worth more than is still owed
+   * drives the supplier balance negative (a hidden receivable). Require
+   * an explicit disposition and stamp it on the credit note's status.
+   */
+  private static assertDispositionAllowed(
+    data: CreatePurchaseReturnDTO,
+    totalAmount: number,
+    db: Database.Database
+  ): void {
+    const unpaidBalance = PurchaseReturnModel.sourceUnpaidBalance(data.source_type, data.source_id, db);
+    if (totalAmount > unpaidBalance + 0.01) {
+      const d = data.disposition;
+      if (d !== 'credit_on_account' && d !== 'refund_expected') {
+        throw new Error(
+          `Return value (${totalAmount.toFixed(2)}) exceeds the unpaid balance (${unpaidBalance.toFixed(2)}). ` +
+          `Supply a disposition: 'credit_on_account' or 'refund_expected'.`
+        );
+      }
+    } else if (data.disposition &&
+      data.disposition !== 'credit_on_account' && data.disposition !== 'refund_expected') {
+      throw new Error(`Invalid disposition '${data.disposition}' — use 'credit_on_account' or 'refund_expected'`);
+    }
+
+    if (data.disposition === 'refund_expected') {
+      const collected = PurchaseReturnModel.sourceCollected(data.source_type, data.source_id, db);
+      if (collected <= 0.01) {
+        throw new Error(
+          `Cannot refund ${totalAmount.toFixed(2)} — nothing has been collected against this ` +
+          `${data.source_type === 'PURCHASE' ? 'purchase' : 'purchase order'}. ` +
+          `Use 'credit_on_account' instead.`
+        );
+      }
+    }
+  }
+
   static create(data: CreatePurchaseReturnDTO, userId: number, db: Database.Database): PurchaseReturnHeaderRow {
     if (!data.return_date) throw new Error('return_date is required');
     if (!data.source_type || !data.source_id) throw new Error('Source document is required');
@@ -250,170 +564,29 @@ class PurchaseReturnModel {
     const transaction = db.transaction(() => {
       // Load the source document and validate every line against its
       // returnable quantity BEFORE mutating anything.
-      const lines: Array<{
-        source_item_id: number;
-        item_id: number;
-        item_name: string;
-        unit_cost: number;
-        quantity: number;
-        amount: number;
-        input_tax_amount: number;
-      }> = [];
+      const lines: PurchaseReturnLine[] = [];
 
       let totalQty = 0;
       let totalAmount = 0;
 
-      // PRET-01 (task 4.1): aggregate duplicate lines for the same source
-      // item BEFORE validating — each line previously validated against the
-      // same pre-request returned_quantity, so duplicates over-returned.
-      const aggregated = new Map<number, { quantity: number; unit_cost: number }>();
-      for (const line of data.items) {
-        if (!line.quantity || line.quantity <= 0) {
-          throw new Error('Return quantity must be positive');
-        }
-        if (!line.source_item_id) throw new Error('source_item_id is required');
-        const key = Number(line.source_item_id);
-        const entry = aggregated.get(key);
-        if (entry) {
-          // Duplicate lines for the same source item must price identically.
-          if (Math.abs(Number(line.unit_cost ?? 0) - entry.unit_cost) > 0.001) {
-            throw new Error(
-              `Conflicting unit costs for source item ${key}: ${entry.unit_cost} vs ${line.unit_cost}`
-            );
-          }
-          entry.quantity += line.quantity;
-        } else {
-          aggregated.set(key, { quantity: line.quantity, unit_cost: Number(line.unit_cost ?? 0) });
-        }
-      }
+      const aggregated = aggregateReturnLines(data.items);
 
 
       // Validate each AGGREGATE against its source document headroom.
       for (const [sourceItemId, agg] of aggregated) {
-        if (data.source_type === 'PURCHASE') {
-          const purchase = db.prepare(`
-            SELECT p.*, i.item_name
-            FROM purchases p JOIN items i ON p.item_id = i.id
-            WHERE p.id = ?
-          `).get(sourceItemId) as {
-            id: number; item_id: number; item_name: string;
-            quantity: number; unit_cost: number; returned_quantity: number; input_tax_amount: number;
-          } | undefined;
-          if (!purchase) throw new Error(`Purchase line ${sourceItemId} not found`);
-          if (purchase.id !== data.source_id) {
-            throw new Error(`Purchase ${sourceItemId} does not belong to source ${data.source_id}`);
-          }
-
-          const returned = purchase.returned_quantity || 0;
-          const returnable = roundQty(purchase.quantity - returned);
-          const returnQty = roundQty(agg.quantity);
-          if (returnQty > returnable) {
-            throw new Error(
-              `Return quantity (${returnQty}) exceeds remaining available (${returnable}) ` +
-              `for purchase ${purchase.id}`
-            );
-          }
-
-          const amount = roundCurrency(agg.quantity * purchase.unit_cost);
-          const priorTax = db.prepare(`SELECT COALESCE(SUM(i.input_tax_amount), 0) AS amount
-            FROM purchase_return_items i JOIN purchase_returns r ON r.id = i.purchase_return_id
-            WHERE r.source_type = 'PURCHASE' AND r.source_id = ? AND r.status = 'POSTED' AND i.source_item_id = ?
-          `).get(purchase.id, purchase.id) as { amount: number };
-          const remainingTax = Math.max(0, roundCurrency(purchase.input_tax_amount - priorTax.amount));
-          const tax = roundQty(returnQty - returnable) === 0 ? remainingTax
-            : Math.min(remainingTax, roundCurrency(purchase.input_tax_amount * returnQty / purchase.quantity));
-          lines.push({
-            source_item_id: purchase.id,
-            item_id: purchase.item_id,
-            item_name: purchase.item_name,
-            unit_cost: purchase.unit_cost,
-            quantity: agg.quantity,
-            amount,
-            input_tax_amount: tax,
-          });
-          totalQty += agg.quantity;
-          totalAmount += amount;
-        } else {
-          // PURCHASE_ORDER — source_item_id is a purchase_order_items.id
-          const poItem = db.prepare(`
-            SELECT poi.*, i.item_name
-            FROM purchase_order_items poi JOIN items i ON poi.item_id = i.id
-            WHERE poi.id = ?
-          `).get(sourceItemId) as {
-            id: number; po_id: number; item_id: number; item_name: string;
-            received_quantity: number; returned_quantity: number; unit_price: number;
-          } | undefined;
-          if (!poItem) throw new Error(`PO line ${sourceItemId} not found`);
-          if (poItem.po_id !== data.source_id) {
-            throw new Error(`PO line ${sourceItemId} does not belong to PO ${data.source_id}`);
-          }
-
-          const returned = poItem.returned_quantity || 0;
-          const netReceived = roundQty((poItem.received_quantity || 0) - returned);
-          const returnQty = roundQty(agg.quantity);
-          if (returnQty > netReceived) {
-            throw new Error(
-              `Return quantity (${returnQty}) exceeds net received quantity ` +
-              `(${netReceived}) for PO line ${poItem.id}`
-            );
-          }
-
-          const amount = roundCurrency(agg.quantity * poItem.unit_price);
-          const receivedTax = (db.prepare(`SELECT COALESCE(SUM(i.input_tax_amount), 0) AS amount
-            FROM goods_receipt_items i JOIN goods_receipts r ON r.id = i.receipt_id
-            WHERE i.po_item_id = ? AND r.voided_at IS NULL`).get(poItem.id) as { amount: number }).amount;
-          const priorTax = (db.prepare(`SELECT COALESCE(SUM(i.input_tax_amount), 0) AS amount
-            FROM purchase_return_items i JOIN purchase_returns r ON r.id = i.purchase_return_id
-            WHERE r.source_type = 'PURCHASE_ORDER' AND r.source_id = ? AND r.status = 'POSTED' AND i.source_item_id = ?
-          `).get(data.source_id, poItem.id) as { amount: number }).amount;
-          const remainingTax = Math.max(0, roundCurrency(receivedTax - priorTax));
-          const tax = roundQty(returnQty - netReceived) === 0 ? remainingTax
-            : Math.min(remainingTax, roundCurrency(remainingTax * returnQty / netReceived));
-          lines.push({
-            source_item_id: poItem.id,
-            item_id: poItem.item_id,
-            item_name: poItem.item_name,
-            unit_cost: poItem.unit_price,
-            quantity: agg.quantity,
-            amount,
-            input_tax_amount: tax,
-          });
-          totalQty += agg.quantity;
-          totalAmount += amount;
-        }
+        const line = data.source_type === 'PURCHASE'
+          ? validatePurchaseSourceLine(db, data.source_id, sourceItemId, agg)
+          : validatePurchaseOrderSourceLine(db, data.source_id, sourceItemId, agg);
+        lines.push(line);
+        totalQty += line.quantity;
+        totalAmount += line.amount;
       }
 
       const netTotalAmount = roundCurrency(totalAmount);
       const totalInputTax = lines.reduce((sum, line) => addCurrency(sum, line.input_tax_amount), 0);
       totalAmount = addCurrency(netTotalAmount, totalInputTax);
 
-      // PRET-06 (task 4.5): returning goods worth more than is still owed
-      // drives the supplier balance negative (a hidden receivable). Require
-      // an explicit disposition and stamp it on the credit note's status.
-      const unpaidBalance = this.sourceUnpaidBalance(data.source_type, data.source_id, db);
-      if (totalAmount > unpaidBalance + 0.01) {
-        const d = data.disposition;
-        if (d !== 'credit_on_account' && d !== 'refund_expected') {
-          throw new Error(
-            `Return value (${totalAmount.toFixed(2)}) exceeds the unpaid balance (${unpaidBalance.toFixed(2)}). ` +
-            `Supply a disposition: 'credit_on_account' or 'refund_expected'.`
-          );
-        }
-      } else if (data.disposition &&
-        data.disposition !== 'credit_on_account' && data.disposition !== 'refund_expected') {
-        throw new Error(`Invalid disposition '${data.disposition}' — use 'credit_on_account' or 'refund_expected'`);
-      }
-
-      if (data.disposition === 'refund_expected') {
-        const collected = this.sourceCollected(data.source_type, data.source_id, db);
-        if (collected <= 0.01) {
-          throw new Error(
-            `Cannot refund ${totalAmount.toFixed(2)} — nothing has been collected against this ` +
-            `${data.source_type === 'PURCHASE' ? 'purchase' : 'purchase order'}. ` +
-            `Use 'credit_on_account' instead.`
-          );
-        }
-      }
+      PurchaseReturnModel.assertDispositionAllowed(data, totalAmount, db);
 
       // Header
       const returnNo = this.generateReturnNo(db);
@@ -451,7 +624,6 @@ class PurchaseReturnModel {
       const batchLocationsEnabled = isFeatureEnabled(db, 'feature_batch_locations');
 
       for (const line of lines) {
-        const batchDraws: { batchId: number; quantity: number; locationId: number | null }[] = [];
         // Stock must exist in the restock warehouse before we remove it.
         const balance = db.prepare(`
           SELECT quantity FROM stock_balances
@@ -497,115 +669,9 @@ class PurchaseReturnModel {
         db.prepare('UPDATE stock_movements SET purchase_return_id = ? WHERE id = ?')
           .run(returnId, movement.id);
 
-        // PRET-02 (task 4.2): consume the SOURCE DOCUMENT's own batch, not
-        // FIFO-oldest layers — returning goods must deplete the batch they
-        // came from at their own cost. Short coverage is an error: never
-        // silently under-consume while recording a full return.
-        const sourceBatchIds: number[] =
-          data.source_type === 'PURCHASE'
-            ? (
-                db.prepare(`
-                  SELECT id FROM stock_batches
-                  WHERE source_type = 'PURCHASE' AND source_id = ?
-                    AND item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
-                  ORDER BY id
-                `).all(line.source_item_id, line.item_id, data.warehouse_id) as { id: number }[]
-              ).map((r) => r.id)
-            : (
-                db.prepare(`
-                  SELECT sb.id FROM stock_batches sb
-                  JOIN goods_receipt_items gri ON gri.id = sb.source_id
-                  WHERE sb.source_type = 'GOODS_RECEIPT'
-                    AND gri.po_item_id = ?
-                    AND sb.item_id = ?
-                    AND sb.warehouse_id = ?
-                    AND sb.quantity_remaining > 0
-                  ORDER BY sb.id
-                `).all(line.source_item_id, line.item_id, data.warehouse_id) as { id: number }[]
-              ).map((r) => r.id);
-
-        const coverage = sourceBatchIds.reduce((sum, id) => {
-          const row = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id = ?`).get(id) as
-            | { quantity_remaining: number }
-            | undefined;
-          return roundQty(sum + (row ? Number(row.quantity_remaining) : 0));
-        }, 0);
-
-        if (sourceBatchIds.length === 0 || coverage < roundQty(line.quantity)) {
-          throw new Error(
-            `Insufficient stock in the source batch for ${line.item_name}: ` +
-            `available ${coverage}, required ${roundQty(line.quantity)}. ` +
-            `Goods already sold cannot be returned to the supplier.`
-          );
-        }
-
-        // Draw the return down across the line's own batches, oldest first, so a
-        // line received in several partial receipts is fully recoverable.
-        let remainingToDraw = roundQty(line.quantity);
-
-        for (const batchId of sourceBatchIds) {
-          if (remainingToDraw <= 0) break;
-
-          const batch = db.prepare(`SELECT quantity_remaining FROM stock_batches WHERE id = ?`).get(batchId) as
-            | { quantity_remaining: number }
-            | undefined;
-          if (!batch) continue;
-
-          const take = roundQty(Math.min(remainingToDraw, roundQty(Number(batch.quantity_remaining))));
-          if (take <= 0) continue;
-
-          if (batchLocationsEnabled) {
-            const locRows = db.prepare(`
-              SELECT bsl.id, bsl.quantity_available, bsl.location_id
-              FROM batch_stock_by_location bsl
-              JOIN locations l ON bsl.location_id = l.id
-              WHERE bsl.batch_id = ? AND l.warehouse_id = ?
-                AND bsl.quantity_available > 0
-              ORDER BY l.created_at ASC, bsl.id ASC
-            `).all(batchId, data.warehouse_id) as Array<{ id: number; quantity_available: number; location_id: number }>;
-
-            let locRemaining = take;
-            for (const loc of locRows) {
-              if (locRemaining <= 0) break;
-              const locTake = roundQty(Math.min(locRemaining, roundQty(loc.quantity_available)));
-              db.prepare(`
-                UPDATE batch_stock_by_location
-                SET quantity_physical = quantity_physical - ?
-                WHERE id = ?
-              `).run(locTake, loc.id);
-              locRemaining -= locTake;
-            }
-            if (locRemaining > 0) {
-              throw new Error(
-                `Insufficient batch_stock_by_location for ${line.item_name}: ` +
-                `required ${take}, only ${roundQty(take - locRemaining).toFixed(3)} available in source batch locations`
-              );
-            }
-          }
-
-          db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')
-            .run(take, batchId);
-
-          remainingToDraw -= take;
-          batchDraws.push({ batchId, quantity: take, locationId: null });
-
-          if (batchLocationsEnabled) {
-            const consumedLoc = db.prepare(`
-              SELECT bsl.location_id FROM batch_stock_by_location bsl
-              JOIN locations l ON bsl.location_id = l.id
-              WHERE bsl.batch_id = ? AND l.warehouse_id = ?
-              ORDER BY l.created_at ASC LIMIT 1
-            `).get(batchId, data.warehouse_id) as { location_id: number } | undefined;
-            batchDraws[batchDraws.length - 1].locationId = consumedLoc?.location_id ?? null;
-          }
-        }
-
-        if (roundQty(remainingToDraw) > 0) {
-          throw new Error(
-            `Insufficient stock in the source batch for ${line.item_name}: ` +
-            `short by ${roundQty(remainingToDraw)}. Goods already sold cannot be returned to the supplier.`
-          );
-        }
+        const batchDraws = drawFromSourceBatches(
+          db, line, data.source_type, data.warehouse_id, batchLocationsEnabled
+        );
 
         insertLine.run(
           returnId,

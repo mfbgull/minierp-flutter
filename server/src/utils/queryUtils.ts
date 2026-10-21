@@ -39,14 +39,6 @@ export function getRouteParam(param: string | string[]): string {
  * @param defaultValue Default value if parameter is not present or invalid
  * @returns The parsed number or default value
  */
-export function getQueryNumber(param: string | ParsedQs | string[] | undefined, defaultValue: number = NaN): number {
-  const strValue = getQueryParam(param);
-  if (strValue === undefined) {
-    return defaultValue;
-  }
-  const numValue = Number(strValue);
-  return isNaN(numValue) ? defaultValue : numValue;
-}
 
 /**
  * Safely extracts an integer value from a query parameter

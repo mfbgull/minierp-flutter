@@ -5,12 +5,7 @@ import SupplierRefundModel, { creditNoteRefundable } from '../models/SupplierRef
 import db from '../config/database';
 import logger from '../utils/logger';
 import { isValidPaymentMethod } from '../services/cashService';
-import {
-  IDEMPOTENCY_SCOPES,
-  claimIdempotencyKey,
-  hashRequestPayload,
-  startIdempotentRequest,
-} from '../utils/idempotency';
+import { IDEMPOTENCY_SCOPES, claimIdempotencyKey, hashRequestPayload, respondToIdempotencyReplay, startIdempotentRequest } from '../utils/idempotency';
 
 function getSupplierRefunds(req: Request, res: Response): void {
   try {
@@ -100,13 +95,10 @@ function createSupplierRefund(req: AuthRequest, res: Response): Response | void 
     // retry after a lost response must replay rather than refund twice.
     const hash = hashRequestPayload(req.body);
     const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.SUPPLIER_REFUND_CREATE, hash);
-    if (start.kind === 'error') {
-      return res.status(start.status).json({ error: start.message });
-    }
-    if (start.kind === 'replay') {
-      res.set('X-Idempotent-Replay', 'true');
-      return res.status(201).json({ success: true, idempotentReplay: true, data: { id: start.resourceId } });
-    }
+    if (respondToIdempotencyReplay(res, start, {
+      status: 201,
+      buildBody: (resourceId) => ({ success: true, idempotentReplay: true, data: { id: resourceId } }),
+    })) return;
 
     const created = db.transaction(() => {
       const row = SupplierRefundModel.create(
@@ -120,7 +112,7 @@ function createSupplierRefund(req: AuthRequest, res: Response): Response | void 
         req.user!.id,
         db
       );
-      if (start.key) {
+      if (start.kind === 'proceed' && start.key) {
         claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.SUPPLIER_REFUND_CREATE, start.key, hash, row.id);
       }
       return row;
