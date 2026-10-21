@@ -240,3 +240,136 @@ a time series or whether as-of stock is reconstructed from `stock_movements`.
 clear warning and leave costing as-is — preserves today's behaviour and costs nothing;
 option (a) — full as-of allocation — is correct but is an accounting-model change with a
 performance and migration cost.
+## D13 — Dead-code cleanup: what was removed, what was kept, and why
+
+Recorded 2026-10-20. `npx fallow` reported 318 dead-code findings at the repo root. Every
+finding was verified one by one against the tracked tree, the live SQLite database and the CI
+config before anything was changed; see `audit/fallow-verification-2026-10-20.md` for the
+per-finding evidence.
+
+**What was removed (all confirmed dead):**
+
+- 14 files: 8 stale copies of `auditRegression*.test.ts` under `audit/tests/` (broken import
+  paths, and they encoded *superseded* designs — the pre-D3 salary split, the pre-D6 overhead
+  rule, the pre-D5 supplier rule — all superseded by the live `server/src/__tests__/` copies),
+  4 orphan CSS files under `styles/` (Flutter does not consume CSS), 2 orphan scripts with zero
+  references.
+- 12 exports, 22 type exports, 23 class members, and 7 further types that became dead as a
+  consequence of the earlier removals.
+- `PaymentModel.generatePaymentNo` — the superseded, non-atomic twin of the live
+  `InvoiceModel.generatePaymentNoAtomic`. Leaving both in place was a live duplicate-payment_no
+  hazard, not just clutter.
+
+**What was kept, and why:**
+
+- **The 28 unused `ActionType` enum members** (PO_*, GRN_*, SO_*, WO_*, POS_*, REPORT_*,
+  DATA_*, MATERIAL_CONSUME, INVOICE_POST, DEBUG). They are the canonical vocabulary for the
+  `activity_log.action` column. `activity_log` currently holds 24 distinct action values and
+  **14 rows carry the value `INVOICE_RETURN`**, which no current code path emits — so the
+  vocabulary is the only record of what historical rows mean. Several members' *string values*
+  are also load-bearing in SQL literals elsewhere (`'SO_CANCEL'`,
+  `'INVOICE_RETURN'` in `models/Dashboard.ts` and `controllers/invoiceController.ts`), where they
+  mean `reference_doctype`/`reference_type` rather than `action` — a name collision across
+  domains, not a use of the enum member. Deleting the members would remove the vocabulary
+  without removing the strings, and would make a future re-typing of the string more likely to
+  drift. The `unused-enum-members` rule is therefore set to `warn`: still reported, never
+  gating. **Wiring the unwired modules to log activity (purchasing, work orders, POS) is a
+  product decision that is still open** — it is not guessed here.
+- **The inbound half of `services/inventoryEffectiveDate.ts`.** `assertInboundDateNotRetroactive`
+  is live: it is called by `models/Purchase.ts` and `models/PurchaseOrder.ts` and it implements
+  the FIFO-reorder rule. The outbound half (`assertInventoryDateNotRetroactive`,
+  `assertOutboundDateNotRetroactive`, `assertLinesNotRetroactive`) was written in `e43f7df8`
+  with two dangling imports and **never had a call site**; the outbound rule ended up enforced
+  in the consumption path instead, by the `asOf` filter in
+  `StockMovement.consumeFromOldestBatches`. The module was scoped down to its live surface and
+  the rationale moved to `docs/INVENTORY-EFFECTIVE-DATES.md` so it is not lost.
+  The outbound rule was **not** newly wired, because that would change which transactions are
+  rejected and 16 tests legitimately purchase stock and then invoice it with a historical date
+  (D9, D12).
+
+**Two duplicate-type families were resolved by name, not by deletion:**
+
+- `PaymentAllocation` existed twice with entirely different shapes — a persisted row
+  (`id`, `payment_id`, `invoice_id`, `invoice_no`, `amount`) in `models/Payment.ts` and a
+  command input (`invoiceId`, `amount`) in `services/paymentRecordingTypes.ts`. The model copy
+  is now `PaymentAllocationRow`, matching the `SupplierPaymentAllocation` naming already used in
+  the same file.
+- `Invoice`, `CreateInvoiceDTO`, `Quotation` and `SalesOrder` each existed in both
+  `types/index.ts` and the corresponding model file, with **different shapes**. The
+  `types/index.ts` copies are the ones imported across modules; the model-local copies are
+  internal only, so the model copies are no longer exported. Which shape is correct is a
+  separate question — the two have drifted, and the drift was not resolved here because
+  choosing one is a behaviour change, not a cleanup.
+
+**Two fallow rules are demoted to `warn`, with the reason recorded in `.fallowrc.json`:**
+
+- `unused-class-members` — fallow cannot resolve the owning class when a file uses
+  `export default <ClassName>;` (it attributes members to a pseudo-class literally named
+  `"default"`), and it does not track static-method calls at all. Of 64 findings, 23 were real
+  dead code and were removed; the 35 that remain are all live methods that fallow cannot see.
+- `unused-enum-members` — see above.
+
+**One unresolved-import finding is suppressed, not fixed:** `web/index.html` imports
+`./flutter_bootstrap.js`, which Flutter generates into `web/` at build time.
+
+**Circular dependencies were fixed at the root, not suppressed.** All four cycles ran
+`config/database.ts → migrations/* → models/services → config/database.ts`. The seven one-time
+backfill runners are now `require`d lazily inside `applyPendingMigrations()`, so the require
+graph is acyclic. The backfills still run in the same order, in the same transaction
+boundaries, and by then `config/database.ts` is fully loaded.
+
+## D14 — How the dead-code and complexity gates are enforced
+
+Recorded 2026-10-20, after the `fallow` verification and cleanup in
+`audit/fallow-verification-2026-10-20.md`.
+
+**The problem.** `fallow` reported 275 dead-code findings and 221 health findings. A gate that
+fails on the whole legacy backlog is a gate nobody keeps green, so it would have been switched off
+within a week. The choice was between hiding the findings and baselining them.
+
+**Decision — baseline the backlog, gate on what is new.**
+
+- `audit/fallow-baselines/{dead-code,health,dupes}.json` are committed snapshots of the findings
+  that are known and accepted today.
+- `.fallowrc.json` sets `audit.gate: "new-only"` and points the three baseline paths at them, so
+  `fallow audit` fails only on findings that are **new** relative to the base ref.
+- `.github/workflows/ci.yml` gains a `fallow` job; `scripts/check.sh` gains the matching
+  `server: fallow` step. Both were changed together, because `scripts/check.sh` states that its
+  commands must stay byte-identical to CI's — a local check that passes while CI fails teaches
+  you to ignore the result. The analyzer version is pinned (`fallow@3.34.1`) because the baselines
+  are only comparable against the analyzer that produced them.
+
+**Why not suppression comments.** The dead-code findings that were false positives came from one
+root cause: fallow cannot trace property access on a default-imported module namespace, so every
+`export default { handler }` route module looked like dead code. That was fixed in the code, not
+suppressed — the redundant named exports were removed and the modules now export only what they
+are consumed through.
+
+**Why the complexity thresholds were not raised.** The 137 CRAP-only findings were computed from
+fallow's *estimated* coverage model, which is a guess. `health.coverage` now points at real
+Istanbul coverage (`server/coverage/coverage-final.json`, 66.77% statements), so CRAP is measured
+rather than assumed. The 84 findings that exceeded a real structural threshold were refactored
+where the fix was mechanical — 22 functions, behaviour-preserving, each verified against its own
+test suite. The remaining 75 are baselined, not hidden, and CI now blocks them from growing.
+
+**The `unused-enum-members` and `unused-class-members` rules are demoted to `warn`.** Both rules
+produce false positives in this codebase for a reason that is structural, not incidental:
+`unused-class-members` cannot resolve the owning class when a file uses
+`export default <ClassName>;` (it attributes members to a pseudo-class literally named `default`),
+and it does not track static-method calls at all — 22 of its 25 `AccountingService` findings were
+live methods. `unused-enum-members` flags `ActionType` members that are the canonical vocabulary
+for the `activity_log.action` column: `activity_log` holds 24 distinct action values and **14 rows
+carry `INVOICE_RETURN`, which no current code path emits**, so the enum is the only record of what
+those historical rows mean. Both rules stay visible in the report; they just do not gate CI.
+
+**The 28 `ActionType` members are kept, not deleted.** Deleting them is a product decision, not a
+cleanup: they describe purchasing, work orders, POS and reporting activity that exists in the
+product but does not log yet. `audit/FINDINGS-STATUS.md` already carries ACCT-006 as an open
+blocker; the enum members are its cheapest possible marker.
+
+**Still open, deliberately.** The `types/index.ts` vs model type drift for `Invoice`,
+`CreateInvoiceDTO`, `Quotation` and `SalesOrder` is unresolved: two shapes still exist for each
+name. Choosing one changes behaviour, so it is a decision, not a cleanup. `PaymentAllocation` was
+resolved by renaming the model-side copy to `PaymentAllocationRow`, because the two were
+genuinely unrelated types (a persisted row vs a command input) sharing one name.
+
