@@ -2,24 +2,42 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { Request, Response } from 'express';
 import logger from '../utils/logger';
 
+type SensitiveOperationPolicy = {
+  readonly windowMs: number;
+  readonly max: number;
+  readonly logAction: string;
+  readonly error: string;
+};
+
+function sensitiveOperationOptions(policy: SensitiveOperationPolicy) {
+  return {
+    windowMs: policy.windowMs,
+    max: process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development' ? 999999 : policy.max,
+    standardHeaders: true as const,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === 'development',
+    handler: (req: Request, res: Response) => {
+      logger.warn(`[Rate Limit] ${policy.logAction} for IP: ${req.ip}`);
+      res.status(429).json({
+        error: policy.error,
+        retryAfter: Math.ceil(policy.windowMs / 1000),
+      });
+    },
+  };
+}
+
 /**
  * Rate limiter for authentication endpoints
  * Limits: 5 requests per 15 minutes per IP
  * Disabled in development to avoid blocking local testing
  */
 export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development' ? 999999 : 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === 'development',
-  handler: (req: Request, res: Response) => {
-    logger.warn(`[Rate Limit] Login attempts exceeded for IP: ${req.ip}`);
-    res.status(429).json({
-      error: 'Too many login attempts. Please try again later.',
-      retryAfter: Math.ceil(15 * 60)
-    });
-  },
+  ...sensitiveOperationOptions({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    logAction: 'Login attempts exceeded',
+    error: 'Too many login attempts. Please try again later.',
+  }),
   keyGenerator: (req: Request) => {
     return ipKeyGenerator(req.ip || '');
   }
@@ -29,20 +47,12 @@ export const authLimiter = rateLimit({
  * Stricter rate limiter for password change operations
  * Disabled in development to avoid blocking local testing
  */
-export const passwordChangeLimiter = rateLimit({
+export const passwordChangeLimiter = rateLimit(sensitiveOperationOptions({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development' ? 999999 : 3, // 3 attempts per hour
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === 'development',
-  handler: (req: Request, res: Response) => {
-    logger.warn(`[Rate Limit] Password change attempts exceeded for IP: ${req.ip}`);
-    res.status(429).json({
-      error: 'Too many password change attempts. Please try again later.',
-      retryAfter: Math.ceil(60 * 60)
-    });
-  }
-});
+  max: 3,
+  logAction: 'Password change attempts exceeded',
+  error: 'Too many password change attempts. Please try again later.',
+}));
 
 /**
  * General API rate limiter for all routes
@@ -96,17 +106,9 @@ export function shutdownRateLimiters() {
  * (e.g., data exports, bulk operations)
  * Disabled in development
  */
-export const sensitiveOperationLimiter = rateLimit({
+export const sensitiveOperationLimiter = rateLimit(sensitiveOperationOptions({
   windowMs: 60 * 1000, // 1 minute
-  max: process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development' ? 999999 : 10, // 10 requests per minute
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === 'development',
-  handler: (req: Request, res: Response) => {
-    logger.warn(`[Rate Limit] Sensitive operation rate limit exceeded for IP: ${req.ip}`);
-    res.status(429).json({
-      error: 'Too many requests for this operation. Please try again later.',
-      retryAfter: Math.ceil(60)
-    });
-  }
-});
+  max: 10,
+  logAction: 'Sensitive operation rate limit exceeded',
+  error: 'Too many requests for this operation. Please try again later.',
+}));

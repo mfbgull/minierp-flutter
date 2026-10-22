@@ -24,7 +24,7 @@ import type Database from 'better-sqlite3';
 import logger from '../utils/logger';
 
 export function runBackfillGlUnification(db: Database.Database): void {
-  const run = (): void => {
+  const relinkOrphanedLines = () => {
     // Pass 1: re-link orphaned / mis-linked journal_lines
     const brokenGroups = db.prepare(`
       SELECT jl.reference_type, jl.reference_id,
@@ -99,6 +99,10 @@ export function runBackfillGlUnification(db: Database.Database): void {
       relinkedGroups += 1;
     }
 
+    return { relinkedGroups, relinkedLines };
+  };
+
+  const migrateLegacyEntries = () => {
     // Pass 2: give line-less legacy journal_entries rows lines
     const accountByCode = new Map(
       (db.prepare(`SELECT id, code, text_code FROM chart_of_accounts`).all() as Array<{
@@ -157,6 +161,13 @@ export function runBackfillGlUnification(db: Database.Database): void {
       migratedEntries += 1;
       migratedLines += 2;
     }
+
+    return { migratedEntries, migratedLines };
+  };
+
+  const run = (): void => {
+    const { relinkedGroups, relinkedLines } = relinkOrphanedLines();
+    const { migratedEntries, migratedLines } = migrateLegacyEntries();
 
     // Post-conditions
     const orphans = db.prepare(`

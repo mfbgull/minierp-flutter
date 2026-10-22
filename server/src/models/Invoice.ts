@@ -1,3 +1,4 @@
+import { localMonthCode } from '../utils/documentNumbering';
 import { addCurrency, subtractCurrency, parseCurrency, decomposeLineAmount } from '../utils/currency';
 import ledgerUtils from '../utils/ledgerUtils';
 import { getNextSequenceNumber } from '../utils/sequence';
@@ -200,6 +201,12 @@ function assertInvoiceItemsValid(items: CreateInvoiceItemDTO[]): void {
   }
 }
 
+function invoicePaymentStatus(data: CreateInvoiceDTO): string {
+  return (data.status === 'Paid' || (data.paid_amount ?? 0) >= (data.total_amount ?? 0)) ? 'Paid'
+    : data.status === 'Partially Paid' ? 'Partially Paid'
+    : 'Unpaid';
+}
+
 /**
  * Positional parameters for the invoices INSERT, in column order.
  */
@@ -211,10 +218,7 @@ function buildInvoiceInsertParams(
   balanceAmount: number,
   creditOffset: number
 ): SqlParam[] {
-  const paymentStatus =
-    (data.status === 'Paid' || (data.paid_amount ?? 0) >= (data.total_amount ?? 0)) ? 'Paid'
-      : data.status === 'Partially Paid' ? 'Partially Paid'
-      : 'Unpaid';
+  const paymentStatus = invoicePaymentStatus(data);
 
   return [
     data.invoice_no || null,
@@ -499,9 +503,8 @@ class InvoiceModel {
     // Atomically increment and get the next sequence number
     const nextNo = getNextSequenceNumber(db, settingKey);
     const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    return `PAY-${month}${year}-${String(nextNo).padStart(5, '0')}`;
+    const monthCode = localMonthCode(now);
+    return `PAY-${monthCode}-${String(nextNo).padStart(5, '0')}`;
   }
 
   /**
@@ -575,7 +578,7 @@ class InvoiceModel {
     explicitWarehouseId?: number
   ): Array<{ item_id: number; movement_id: number; quantity: number; warehouse_id: number; unit_cost: number }> {
     const posted: Array<{ item_id: number; movement_id: number; quantity: number; warehouse_id: number; unit_cost: number }> = [];
-    for (const item of items) {
+    const reverseInvoiceItemStock = (item: typeof items[number]): void => {
       // Find all SALE movements for this item + invoice (they have batch_id links)
       const saleMovements = db.prepare(`
         SELECT warehouse_id, quantity, unit_cost, batch_id
@@ -591,7 +594,7 @@ class InvoiceModel {
 
       if (saleMovements.length === 0) {
         logger.warn(`[BatchReversal] No SALE movements found for item ${item.item_id} on invoice ${invoiceNo}`);
-        continue;
+        return;
       }
 
       // A customer return is restocked into the warehouse the user chose
@@ -619,7 +622,7 @@ class InvoiceModel {
       const effectiveRemaining = referenceDoctype === 'RETURN' ? totalToReturn : remainingToReturn;
       if (effectiveRemaining <= 0) {
         logger.warn(`[BatchReversal] Item ${item.item_id} already fully returned on invoice ${invoiceNo}`);
-        continue;
+        return;
       }
 
       // Ratio based on this return's quantity vs total sold.
@@ -631,53 +634,59 @@ class InvoiceModel {
       const effectiveQty = referenceDoctype === 'RETURN' ? totalToReturn : remainingToReturn;
       const ratio = Math.abs(totalSold) < 0.001 ? 1 : Math.min(effectiveQty / totalSold, 1);
 
-      // Restore quantity on each consumed batch (new path: batch_stock_by_location)
-      for (const movement of saleMovements) {
-        if (movement.batch_id !== null) {
-          const restoreQty = roundQty(Math.abs(movement.quantity) * ratio);
-          if (isFeatureEnabled(db, 'feature_batch_locations')) {
-            // Restore to target warehouse default location (explicit or original)
-            const targetWarehouseId = explicitWarehouseId ?? movement.warehouse_id;
-            const locRow = db.prepare(`
-              SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-            `).get(targetWarehouseId) as { id: number } | undefined;
-            if (locRow) {
-              db.prepare(`
-                INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
-                VALUES (?, ?, ?, 0, ?)
-                ON CONFLICT(batch_id, location_id) DO UPDATE SET
-                  quantity_physical = quantity_physical + excluded.quantity_physical,
-                  quantity_available = quantity_available + excluded.quantity_available
-              `).run(movement.batch_id, locRow.id, restoreQty, restoreQty);
-
-              // Record the restoration for audit — identified by the
-              // invoice itself (there is no separate return header table).
-              const invRow = db.prepare(`
-                SELECT id FROM invoices WHERE invoice_no = ? LIMIT 1
-              `).get(invoiceNo) as { id: number } | undefined;
-              if (invRow) {
+      const restoreSaleBatchQuantities = (): void => {
+        // Restore quantity on each consumed batch (new path: batch_stock_by_location)
+        const restoreSaleBatch = (movement: typeof saleMovements[number]): void => {
+          if (movement.batch_id !== null) {
+            const restoreQty = roundQty(Math.abs(movement.quantity) * ratio);
+            if (isFeatureEnabled(db, 'feature_batch_locations')) {
+              // Restore to target warehouse default location (explicit or original)
+              const targetWarehouseId = explicitWarehouseId ?? movement.warehouse_id;
+              const locRow = db.prepare(`
+                SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+              `).get(targetWarehouseId) as { id: number } | undefined;
+              if (locRow) {
                 db.prepare(`
-                  INSERT INTO invoice_return_batches (invoice_id, batch_id, location_id, quantity, reference_doctype, reference_docno)
-                  VALUES (?, ?, ?, ?, 'RETURN', ?)
-                `).run(invRow.id, movement.batch_id, locRow.id, restoreQty, invoiceNo);
+                  INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+                  VALUES (?, ?, ?, 0, ?)
+                  ON CONFLICT(batch_id, location_id) DO UPDATE SET
+                    quantity_physical = quantity_physical + excluded.quantity_physical,
+                    quantity_available = quantity_available + excluded.quantity_available
+                `).run(movement.batch_id, locRow.id, restoreQty, restoreQty);
+
+                // Record the restoration for audit — identified by the
+                // invoice itself (there is no separate return header table).
+                const invRow = db.prepare(`
+                  SELECT id FROM invoices WHERE invoice_no = ? LIMIT 1
+                `).get(invoiceNo) as { id: number } | undefined;
+                if (invRow) {
+                  db.prepare(`
+                    INSERT INTO invoice_return_batches (invoice_id, batch_id, location_id, quantity, reference_doctype, reference_docno)
+                    VALUES (?, ?, ?, ?, 'RETURN', ?)
+                  `).run(invRow.id, movement.batch_id, locRow.id, restoreQty, invoiceNo);
+                }
               }
             }
-          }
 
-          // Credit the master batch row on every flag state. Consumption
-          // decrements it at StockMovement.ts:953-956 ("for backward
-          // compatibility"), but the flag-on restore path only credited the
-          // location rows — so returned stock stayed invisible to
-          // stock_batches.quantity_remaining, which is what Dashboard.ts:103
-          // and :460 value inventory from, ungated by the flag. Keep this
-          // write outside the isFeatureEnabled branch.
-          db.prepare(`
-            UPDATE stock_batches
-            SET quantity_remaining = quantity_remaining + ?
-            WHERE id = ?
-          `).run(restoreQty, movement.batch_id);
+            // Credit the master batch row on every flag state. Consumption
+            // decrements it at StockMovement.ts:953-956 ("for backward
+            // compatibility"), but the flag-on restore path only credited the
+            // location rows — so returned stock stayed invisible to
+            // stock_batches.quantity_remaining, which is what Dashboard.ts:103
+            // and :460 value inventory from, ungated by the flag. Keep this
+            // write outside the isFeatureEnabled branch.
+            db.prepare(`
+              UPDATE stock_batches
+              SET quantity_remaining = quantity_remaining + ?
+              WHERE id = ?
+            `).run(restoreQty, movement.batch_id);
+          }
+        };
+        for (const movement of saleMovements) {
+          restoreSaleBatch(movement);
         }
-      }
+      };
+      restoreSaleBatchQuantities();
 
       // Calculate the total actual cost from the original SALE movements
       let totalActualCost = 0;
@@ -725,6 +734,9 @@ class InvoiceModel {
         warehouse_id: warehouseId,
         unit_cost: avgUnitCost,
       });
+    };
+    for (const item of items) {
+      reverseInvoiceItemStock(item);
     }
     return posted;
   }

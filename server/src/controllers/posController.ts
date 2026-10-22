@@ -207,6 +207,29 @@ function posSaleErrorResponse(error: unknown): { status: number; message: string
   return null;
 }
 
+function posSaleInputError(body: PosSaleBody): string | null {
+  if (!body.warehouse_id) return 'Warehouse is required';
+  if (!body.sale_date) return 'Sale date is required';
+  if (!Array.isArray(body.items) || body.items.length === 0) return 'At least one item is required';
+  if (!WarehouseModel.getById(db, body.warehouse_id)) return 'Warehouse not found';
+  return null;
+}
+
+function handleCreatePOSSaleError(res: Response, error: unknown) {
+  const mapped = posSaleErrorResponse(error);
+  if (mapped) {
+    res.status(mapped.status).json({ error: mapped.message });
+    return;
+  }
+  const message = error instanceof Error ? error.message : 'Failed to process POS sale';
+  if (message.includes('inside closed accounting period')) {
+    res.status(409).json({ error: message });
+    return;
+  }
+  logger.error('POS Sale Error:', { error: message });
+  res.status(500).json({ error: message });
+}
+
 function createPOSSale(req: AuthRequest, res: Response): void {
   if (!req.user) {
     res.status(401).json({ error: 'Authentication required' });
@@ -215,21 +238,9 @@ function createPOSSale(req: AuthRequest, res: Response): void {
 
   try {
     const body = req.body as PosSaleBody;
-    if (!body.warehouse_id) {
-      res.status(400).json({ error: 'Warehouse is required' });
-      return;
-    }
-    if (!body.sale_date) {
-      res.status(400).json({ error: 'Sale date is required' });
-      return;
-    }
-    if (!Array.isArray(body.items) || body.items.length === 0) {
-      res.status(400).json({ error: 'At least one item is required' });
-      return;
-    }
-    const warehouse = WarehouseModel.getById(db, body.warehouse_id);
-    if (!warehouse) {
-      res.status(400).json({ error: 'Warehouse not found' });
+    const inputError = posSaleInputError(body);
+    if (inputError) {
+      res.status(400).json({ error: inputError });
       return;
     }
 
@@ -309,18 +320,7 @@ function createPOSSale(req: AuthRequest, res: Response): void {
     logCRUD(ActionType.INVOICE_CREATE, 'Invoice', result.invoiceId, `POS sale ${result.invoiceNo}`, req.user.id, { total_amount: total }, { correlationId: newCorrelationId() });
     res.status(201).json({ success: true, message: 'POS sale completed successfully', data: replayed });
   } catch (error: unknown) {
-    const mapped = posSaleErrorResponse(error);
-    if (mapped) {
-      res.status(mapped.status).json({ error: mapped.message });
-      return;
-    }
-    const message = error instanceof Error ? error.message : 'Failed to process POS sale';
-    if (message.includes('inside closed accounting period')) {
-      res.status(409).json({ error: message });
-      return;
-    }
-    logger.error('POS Sale Error:', { error: message });
-    res.status(500).json({ error: message });
+    return handleCreatePOSSaleError(res, error);
   }
 }
 

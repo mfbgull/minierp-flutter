@@ -1,3 +1,4 @@
+import { listPagination, listPageQuery } from '../utils/controllerPagination';
 import { Request, Response } from 'express';
 import { getQueryInteger } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
@@ -9,8 +10,7 @@ import { IDEMPOTENCY_SCOPES, claimIdempotencyKey, hashRequestPayload, respondToI
 
 function getSupplierRefunds(req: Request, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
+    const { page, limit } = listPageQuery(req.query);
     const supplierId = Number(req.query.supplier_id) || undefined;
 
     const { rows, total, pageNum, limitNum } = SupplierRefundModel.getAll(
@@ -21,13 +21,7 @@ function getSupplierRefunds(req: Request, res: Response): void {
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1,
-      },
+      pagination: listPagination(total, pageNum, limitNum),
     });
   } catch (error) {
     logger.error('Get supplier refunds error:', error);

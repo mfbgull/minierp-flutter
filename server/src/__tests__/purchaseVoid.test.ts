@@ -34,9 +34,12 @@ function seedPurchase(db: Database.Database, overrides: PurchaseSeedOverrides = 
   counter += 1;
   const itemId = overrides.item_id ?? counter;
   const warehouseId = overrides.warehouse_id ?? 1;
+  const quantity = overrides.quantity ?? 10;
+  const unitCost = overrides.unit_cost ?? 10;
+  const purchaseDate = overrides.purchase_date ?? '2026-08-01';
   if (!db.prepare('SELECT id FROM items WHERE id = ?').get(itemId)) {
     db.prepare(`INSERT INTO items (id, item_code, item_name, unit_of_measure, standard_cost, is_purchased, is_active)
-                VALUES (?, ?, ?, 'Nos', ?, 1, 1)`).run(itemId, `IT-${itemId}`, `Item ${itemId}`, overrides.unit_cost ?? 10);
+                VALUES (?, ?, ?, 'Nos', ?, 1, 1)`).run(itemId, `IT-${itemId}`, `Item ${itemId}`, unitCost);
   }
   if (!db.prepare('SELECT id FROM warehouses WHERE id = ?').get(warehouseId)) {
     db.prepare(`INSERT INTO warehouses (id, warehouse_code, warehouse_name, is_active)
@@ -51,11 +54,11 @@ function seedPurchase(db: Database.Database, overrides: PurchaseSeedOverrides = 
     overrides.purchase_no ?? `PURCH-V-${counter}`,
     itemId,
     warehouseId,
-    overrides.quantity ?? 10,
-    overrides.unit_cost ?? 10,
-    (overrides.quantity ?? 10) * (overrides.unit_cost ?? 10),
+    quantity,
+    unitCost,
+    quantity * unitCost,
     overrides.supplier_id ?? 1,
-    overrides.purchase_date ?? '2026-08-01',
+    purchaseDate,
   );
   const purchaseId = result.lastInsertRowid as number;
 
@@ -69,10 +72,10 @@ function seedPurchase(db: Database.Database, overrides: PurchaseSeedOverrides = 
     itemId,
     warehouseId,
     purchaseId,
-    overrides.quantity ?? 10,
-    overrides.quantity ?? 10,
-    overrides.unit_cost ?? 10,
-    overrides.purchase_date ?? '2026-08-01',
+    quantity,
+    quantity,
+    unitCost,
+    purchaseDate,
   );
   // Mirror the fixed model: identity from lastInsertRowid, never re-query.
   const batchId = Number(batchResult.lastInsertRowid);

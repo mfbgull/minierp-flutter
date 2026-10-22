@@ -93,8 +93,7 @@ export function backfillPurchaseReturns(db: Database.Database): number {
     LIMIT 1
   `);
 
-  const backfill = db.transaction(() => {
-    for (const [key, bucket] of groups) {
+  const backfillGroup = (key: string, bucket: typeof movements): void => {
       const [reference_doctype, reference_docno, movement_date, itemIdRaw] = key.split('|');
       const itemId = parseInt(itemIdRaw, 10);
       const first = bucket[0];
@@ -106,7 +105,7 @@ export function backfillPurchaseReturns(db: Database.Database): number {
         // Orphaned movement (item deleted) — skip: a return needs a real
         // item row. The movement keeps purchase_return_id NULL.
         logger.warn(`[Backfill] Skipping legacy return movement ${first.id}: item ${itemId} no longer exists`);
-        continue;
+        return;
       }
 
       // Resolve the source document id from the denormalized doc number.
@@ -160,6 +159,11 @@ export function backfillPurchaseReturns(db: Database.Database): number {
         );
         backlinkMovement.run(headerId, m.id);
       }
+  };
+
+  const backfill = db.transaction(() => {
+    for (const [key, bucket] of groups) {
+      backfillGroup(key, bucket);
     }
   });
 

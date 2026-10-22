@@ -1,0 +1,5400 @@
+{
+  "input": "audit/fallow-tools/fallow-before-20261021.json",
+  "counts": {
+    "deadCode": 63,
+    "duplicates": 39,
+    "health": 238,
+    "structural": 75,
+    "crapOnly": 163
+  },
+  "rows": [
+    {
+      "id": "dc1:unused-class-member:aac174de68b660ee",
+      "section": "check.unused_class_members",
+      "originalIndex": 0,
+      "path": "server/src/models/EmployeeLoan.ts",
+      "symbol": "default.getById",
+      "line": 100,
+      "owner": "models",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 327,
+          "text": "const loan = EmployeeLoanModel.getById(loanId as number, db);"
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 841,
+          "text": "return EmployeeLoanModel.getById(loanId, db);"
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 856,
+          "text": "const loan = EmployeeLoanModel.getById(parsedLoanId, db);"
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 881,
+          "text": "const loan = EmployeeLoanModel.getById(parsedLoanId, db);"
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 958,
+          "text": "const updatedLoan = EmployeeLoanModel.getById(parsedLoanId, db);"
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 981,
+          "text": "const loan = EmployeeLoanModel.getById(parsedLoanId, db);"
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 1045,
+          "text": "const loan = EmployeeLoanModel.getById(parsedLoanId, db);"
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 1113,
+          "text": "const updatedLoan = EmployeeLoanModel.getById(parsedLoanId, db);"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:56e2f8e84505f065",
+      "section": "check.unused_class_members",
+      "originalIndex": 1,
+      "path": "server/src/models/EmployeeLoan.ts",
+      "symbol": "default.getByEmployee",
+      "line": 104,
+      "owner": "models",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 757,
+          "text": "const loans = EmployeeLoanModel.getByEmployee(employeeId, db);"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:b2ea83e8bdb68b84",
+      "section": "check.unused_class_members",
+      "originalIndex": 2,
+      "path": "server/src/models/EmployeeLoan.ts",
+      "symbol": "default.getRepayments",
+      "line": 110,
+      "owner": "models",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 862,
+          "text": "const repayments = EmployeeLoanModel.getRepayments(parsedLoanId, db);"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:ce83b2dc14c9493b",
+      "section": "check.unused_class_members",
+      "originalIndex": 3,
+      "path": "server/src/models/EmployeeLoan.ts",
+      "symbol": "default.getRepaymentById",
+      "line": 116,
+      "owner": "models",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 1087,
+          "text": "const repayment = EmployeeLoanModel.getRepaymentById(parsedRepaymentId, db);"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:aaba87fdc9e6c808",
+      "section": "check.unused_class_members",
+      "originalIndex": 4,
+      "path": "server/src/models/EmployeeLoan.ts",
+      "symbol": "default.getSummary",
+      "line": 120,
+      "owner": "models",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 758,
+          "text": "const summary = EmployeeLoanModel.getSummary(employeeId, db);"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:254d4e998536dc50",
+      "section": "check.unused_class_members",
+      "originalIndex": 5,
+      "path": "server/src/models/EmployeeLoan.ts",
+      "symbol": "default.hasRepayments",
+      "line": 133,
+      "owner": "models",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 766,
+          "text": "repayment_count: EmployeeLoanModel.hasRepayments(l.id, db) ? 1 : 0,"
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 1054,
+          "text": "if (EmployeeLoanModel.hasRepayments(parsedLoanId, db)) {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:ab2e599f61e80df8",
+      "section": "check.unused_class_members",
+      "originalIndex": 6,
+      "path": "server/src/models/EmployeeLoan.ts",
+      "symbol": "default.updateJournalEntry",
+      "line": 140,
+      "owner": "models",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 838,
+          "text": "EmployeeLoanModel.updateJournalEntry(loanId, journalEntryId, db);"
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 1017,
+          "text": "EmployeeLoanModel.updateJournalEntry(parsedLoanId, journalEntryId, db);"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:33d8d3d0fd547183",
+      "section": "check.unused_class_members",
+      "originalIndex": 7,
+      "path": "server/src/models/EmployeeLoan.ts",
+      "symbol": "default.updateRepaymentJournal",
+      "line": 192,
+      "owner": "models",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 346,
+          "text": "if (repaymentEntry) EmployeeLoanModel.updateRepaymentJournal(repaymentId, repaymentEntry.journal_entry_id, db);"
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 955,
+          "text": "EmployeeLoanModel.updateRepaymentJournal(repaymentId, journalEntryId, db);"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:e7810d001349f1d0",
+      "section": "check.unused_class_members",
+      "originalIndex": 8,
+      "path": "server/src/models/EmployeeLoan.ts",
+      "symbol": "default.writeOff",
+      "line": 199,
+      "owner": "models",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 996,
+          "text": "EmployeeLoanModel.writeOff(parsedLoanId, db);"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:43ac4825dfd4ad20",
+      "section": "check.unused_class_members",
+      "originalIndex": 9,
+      "path": "server/src/models/EmployeeLoan.ts",
+      "symbol": "default.getGlobalActiveLoans",
+      "line": 251,
+      "owner": "models",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/dashboardController.ts",
+          "line": 351,
+          "text": "const loans = EmployeeLoanModel.getGlobalActiveLoans(db);"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:0f55a3bc2e9be2c1",
+      "section": "check.unused_class_members",
+      "originalIndex": 10,
+      "path": "server/src/models/EmployeeLoan.ts",
+      "symbol": "default.getGlobalLoanSummary",
+      "line": 269,
+      "owner": "models",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/dashboardController.ts",
+          "line": 352,
+          "text": "const summary = EmployeeLoanModel.getGlobalLoanSummary(db);"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:4891044cfddc4a1e",
+      "section": "check.unused_class_members",
+      "originalIndex": 11,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.getAllAccountBalances",
+      "line": 172,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/accountingController.ts",
+          "line": 104,
+          "text": "const balances = AccountingService.getAllAccountBalances(db, asOfDate);"
+        },
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 470,
+          "text": "const balances = AccountingService.getAllAccountBalances(db, asOfDate);"
+        },
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 599,
+          "text": "const balances = AccountingService.getAllAccountBalances(db, asOfDate);"
+        },
+        {
+          "path": "server/src/__tests__/expenseStatusConsistency.test.ts",
+          "line": 179,
+          "text": "const balances = AccountingService.getAllAccountBalances(db, RANGE.to);"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:f95a612b0df00b17",
+      "section": "check.unused_class_members",
+      "originalIndex": 12,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.getPeriodMovement",
+      "line": 186,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 422,
+          "text": "const revenueMovement = AccountingService.getPeriodMovement(db, {"
+        },
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 425,
+          "text": "const cogsMovement = AccountingService.getPeriodMovement(db, {"
+        },
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 429,
+          "text": "const opexMovement = AccountingService.getPeriodMovement(db, {"
+        },
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 1101,
+          "text": "const output = AccountingService.getPeriodMovement(db, { accountCodes: ['2100'], startDate, endDate });"
+        },
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 1102,
+          "text": "const input = AccountingService.getPeriodMovement(db, { accountCodes: ['1320'], startDate, endDate });"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:31b2a152ad9203c6",
+      "section": "check.unused_class_members",
+      "originalIndex": 13,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postInvoiceEntry",
+      "line": 519,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/invoiceController.ts",
+          "line": 710,
+          "text": "AccountingService.postInvoiceEntry(db, {"
+        },
+        {
+          "path": "server/src/services/InvoiceCreationService.ts",
+          "line": 229,
+          "text": "AccountingService.postInvoiceEntry(this.db, { invoiceId, invoiceNo, totalAmount, invoiceDate: input.invoiceDate, userId: input.userId, taxAmount: InvoiceModel.getInvoiceTaxTotal(this.db, invoiceId) });"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:fe62a91a8e9f178b",
+      "section": "check.unused_class_members",
+      "originalIndex": 14,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postPaymentEntry",
+      "line": 579,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/invoiceController.ts",
+          "line": 526,
+          "text": "AccountingService.postPaymentEntry(db, {"
+        },
+        {
+          "path": "server/src/models/Payment.ts",
+          "line": 147,
+          "text": "AccountingService.postPaymentEntry(db, {"
+        },
+        {
+          "path": "server/src/services/PaymentRecordingService.ts",
+          "line": 197,
+          "text": "AccountingService.postPaymentEntry(this.db, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:5c9aca51e09f1d87",
+      "section": "check.unused_class_members",
+      "originalIndex": 15,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postCreditOffsetEntry",
+      "line": 620,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/services/PaymentRecordingService.ts",
+          "line": 161,
+          "text": "AccountingService.postCreditOffsetEntry(this.db, {"
+        },
+        {
+          "path": "server/src/services/InvoiceCreationService.ts",
+          "line": 377,
+          "text": "AccountingService.postCreditOffsetEntry(this.db, { invoiceId, invoiceNo, amount: creditOffset, invoiceDate: input.invoiceDate, customerId: input.customerId, userId: input.userId });"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:25502cb0fe669547",
+      "section": "check.unused_class_members",
+      "originalIndex": 16,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postGoodsReceiptEntry",
+      "line": 667,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/models/PurchaseOrder.ts",
+          "line": 1102,
+          "text": "AccountingService.postGoodsReceiptEntry(db, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:8e31524e63884f0e",
+      "section": "check.unused_class_members",
+      "originalIndex": 17,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postPurchaseEntry",
+      "line": 711,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/models/Purchase.ts",
+          "line": 323,
+          "text": "AccountingService.postPurchaseEntry(db, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:a148fa57f6f67fdb",
+      "section": "check.unused_class_members",
+      "originalIndex": 18,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postSupplierPaymentEntry",
+      "line": 758,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/models/Payment.ts",
+          "line": 160,
+          "text": "AccountingService.postSupplierPaymentEntry(db, {"
+        },
+        {
+          "path": "server/src/services/SupplierPaymentService.ts",
+          "line": 129,
+          "text": "AccountingService.postSupplierPaymentEntry(this.db, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:190f5cc835a03bc5",
+      "section": "check.unused_class_members",
+      "originalIndex": 19,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postExpenseEntry",
+      "line": 798,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/models/Expense.ts",
+          "line": 230,
+          "text": "AccountingService.postExpenseEntry(db, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:a90eea2da74a8b4c",
+      "section": "check.unused_class_members",
+      "originalIndex": 20,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postOwnerCapitalEntry",
+      "line": 905,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/models/OwnerCapital.ts",
+          "line": 72,
+          "text": "AccountingService.postOwnerCapitalEntry(db, {"
+        },
+        {
+          "path": "server/src/models/OwnerCapital.ts",
+          "line": 188,
+          "text": "AccountingService.postOwnerCapitalEntry(db, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:9342747106485a16",
+      "section": "check.unused_class_members",
+      "originalIndex": 21,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postOwnerWithdrawalCashEntry",
+      "line": 942,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/models/OwnerWithdrawal.ts",
+          "line": 235,
+          "text": "AccountingService.postOwnerWithdrawalCashEntry(db, {"
+        },
+        {
+          "path": "server/src/models/OwnerWithdrawal.ts",
+          "line": 479,
+          "text": "AccountingService.postOwnerWithdrawalCashEntry(db, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:188e8ab5f8d0e887",
+      "section": "check.unused_class_members",
+      "originalIndex": 22,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postOwnerWithdrawalGoodsEntry",
+      "line": 983,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/models/OwnerWithdrawal.ts",
+          "line": 289,
+          "text": "AccountingService.postOwnerWithdrawalGoodsEntry(db, {"
+        },
+        {
+          "path": "server/src/models/OwnerWithdrawal.ts",
+          "line": 561,
+          "text": "AccountingService.postOwnerWithdrawalGoodsEntry(db, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:f84af7911a6efa12",
+      "section": "check.unused_class_members",
+      "originalIndex": 23,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.assertNoActivePosting",
+      "line": 1085,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/models/OwnerWithdrawal.ts",
+          "line": 225,
+          "text": "AccountingService.assertNoActivePosting(db, 'OWNER_WITHDRAWAL', newId);"
+        },
+        {
+          "path": "server/src/models/OwnerWithdrawal.ts",
+          "line": 288,
+          "text": "AccountingService.assertNoActivePosting(db, 'OWNER_WITHDRAWAL', newId);"
+        },
+        {
+          "path": "server/src/models/OwnerCapital.ts",
+          "line": 70,
+          "text": "AccountingService.assertNoActivePosting(db, 'OWNER_CAPITAL', newId);"
+        },
+        {
+          "path": "server/src/__tests__/ownerEquity.test.ts",
+          "line": 185,
+          "text": "AccountingService.assertNoActivePosting(db, 'OWNER_CAPITAL', id)"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:7e58bcafc45b7bf5",
+      "section": "check.unused_class_members",
+      "originalIndex": 24,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postCOGSEntry",
+      "line": 1107,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/invoiceController.ts",
+          "line": 720,
+          "text": "AccountingService.postCOGSEntry(db, {"
+        },
+        {
+          "path": "server/src/services/InvoiceCreationService.ts",
+          "line": 230,
+          "text": "if (cogsAmount > 0) AccountingService.postCOGSEntry(this.db, { invoiceId, invoiceNo, cogsAmount: parseCurrency(cogsAmount), invoiceDate: input.invoiceDate, userId: input.userId });"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:d4b52e158f032044",
+      "section": "check.unused_class_members",
+      "originalIndex": 25,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "default.postCOGSReversalEntry",
+      "line": 1153,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/services/invoiceReturnService.ts",
+          "line": 432,
+          "text": "AccountingService.postCOGSReversalEntry(db, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:d2a465aa0cb0de99",
+      "section": "check.unused_class_members",
+      "originalIndex": 26,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "default.postInvoiceReturnEntry",
+      "line": 1211,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/services/invoiceReturnService.ts",
+          "line": 414,
+          "text": "AccountingService.postInvoiceReturnEntry(db, {"
+        },
+        {
+          "path": "server/src/__tests__/glReturnTaxBalance.test.ts",
+          "line": 42,
+          "text": "return AccountingService.postInvoiceReturnEntry(database, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:c3f5ea81ff4a7c3e",
+      "section": "check.unused_class_members",
+      "originalIndex": 27,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "default.postReturnFeeEntry",
+      "line": 1285,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/services/invoiceReturnService.ts",
+          "line": 422,
+          "text": "AccountingService.postReturnFeeEntry(db, {"
+        },
+        {
+          "path": "server/src/__tests__/glReturnTaxBalance.test.ts",
+          "line": 52,
+          "text": "return AccountingService.postReturnFeeEntry(database, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:2977847bcc6bdaa8",
+      "section": "check.unused_class_members",
+      "originalIndex": 28,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postPurchaseReturnEntry",
+      "line": 1327,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/models/PurchaseReturn.ts",
+          "line": 719,
+          "text": "AccountingService.postPurchaseReturnEntry(db, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:e94616dbd9ed3ddf",
+      "section": "check.unused_class_members",
+      "originalIndex": 29,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.postRefundEntry",
+      "line": 1380,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/models/Payment.ts",
+          "line": 134,
+          "text": "AccountingService.postRefundEntry(db, {"
+        },
+        {
+          "path": "server/src/services/PaymentRecordingService.ts",
+          "line": 180,
+          "text": "AccountingService.postRefundEntry(this.db, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:55f9a3fdc0fc8759",
+      "section": "check.unused_class_members",
+      "originalIndex": 30,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.restoreJournalLinesByReference",
+      "line": 1469,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/invoiceController.ts",
+          "line": 935,
+          "text": "AccountingService.restoreJournalLinesByReference(db, 'INVOICE', invoiceId);"
+        },
+        {
+          "path": "server/src/controllers/invoiceController.ts",
+          "line": 936,
+          "text": "AccountingService.restoreJournalLinesByReference(db, 'INVOICE_RETURN', invoiceId, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:ec57c122e3f4e1d5",
+      "section": "check.unused_class_members",
+      "originalIndex": 31,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.voidOwnInvoiceReturnLines",
+      "line": 1511,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/models/Invoice.ts",
+          "line": 1015,
+          "text": "return voided + AccountingService.voidOwnInvoiceReturnLines("
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-class-member:6c345197036f4a48",
+      "section": "check.unused_class_members",
+      "originalIndex": 32,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "AccountingService.openPeriod",
+      "line": 1543,
+      "owner": "services",
+      "status": "removed-awaiting-verification",
+      "evidence": [],
+      "reason": "Previously removed method; current corpus contains no owner-qualified callers. Lifecycle coverage verification pending."
+    },
+    {
+      "id": "dc1:unused-class-member:5cd9470ff75d62d5",
+      "section": "check.unused_class_members",
+      "originalIndex": 33,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "default.openPeriod",
+      "line": 1543,
+      "owner": "services",
+      "status": "removed-awaiting-verification",
+      "evidence": [],
+      "reason": "Previously removed method; current corpus contains no owner-qualified callers. Lifecycle coverage verification pending."
+    },
+    {
+      "id": "dc1:unused-class-member:849deb27e1c72d7a",
+      "section": "check.unused_class_members",
+      "originalIndex": 34,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "default.postLoanWriteOff",
+      "line": 1691,
+      "owner": "services",
+      "status": "retained-live-verified",
+      "evidence": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 1002,
+          "text": "const result = AccountingService.postLoanWriteOff(db, {"
+        }
+      ],
+      "reason": "Owner-qualified call sites confirm runtime/test use; D13 retains live methods."
+    },
+    {
+      "id": "dc1:unused-enum-member:6363d36b85c18d91",
+      "section": "check.unused_enum_members",
+      "originalIndex": 0,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.PO_CREATE",
+      "line": 32,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 32,
+          "text": "PO_CREATE = 'PO_CREATE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:7c5643ffac7e740a",
+      "section": "check.unused_enum_members",
+      "originalIndex": 1,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.PO_UPDATE",
+      "line": 33,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 33,
+          "text": "PO_UPDATE = 'PO_UPDATE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:f99d5cb309845a4a",
+      "section": "check.unused_enum_members",
+      "originalIndex": 2,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.PO_APPROVE",
+      "line": 34,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 34,
+          "text": "PO_APPROVE = 'PO_APPROVE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:4a8052bf2d57b58f",
+      "section": "check.unused_enum_members",
+      "originalIndex": 3,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.PO_CANCEL",
+      "line": 35,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 35,
+          "text": "PO_CANCEL = 'PO_CANCEL',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:f1b2ab8ec008701c",
+      "section": "check.unused_enum_members",
+      "originalIndex": 4,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.PO_DELETE",
+      "line": 36,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 36,
+          "text": "PO_DELETE = 'PO_DELETE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:c959c29ad118bb11",
+      "section": "check.unused_enum_members",
+      "originalIndex": 5,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.GRN_CREATE",
+      "line": 37,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 37,
+          "text": "GRN_CREATE = 'GRN_CREATE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:e24c332ef7d5a18a",
+      "section": "check.unused_enum_members",
+      "originalIndex": 6,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.GRN_UPDATE",
+      "line": 38,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 38,
+          "text": "GRN_UPDATE = 'GRN_UPDATE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:d35411b17a177fa6",
+      "section": "check.unused_enum_members",
+      "originalIndex": 7,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.SO_CREATE",
+      "line": 51,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 51,
+          "text": "SO_CREATE = 'SO_CREATE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:daeed0621c164511",
+      "section": "check.unused_enum_members",
+      "originalIndex": 8,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.SO_UPDATE",
+      "line": 52,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 52,
+          "text": "SO_UPDATE = 'SO_UPDATE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:8ec3ec0cbcc34710",
+      "section": "check.unused_enum_members",
+      "originalIndex": 9,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.SO_CONFIRM",
+      "line": 53,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 53,
+          "text": "SO_CONFIRM = 'SO_CONFIRM',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:1db1a1bd09455ee3",
+      "section": "check.unused_enum_members",
+      "originalIndex": 10,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.SO_DELIVER",
+      "line": 54,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 54,
+          "text": "SO_DELIVER = 'SO_DELIVER',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:9ba2db28902533dd",
+      "section": "check.unused_enum_members",
+      "originalIndex": 11,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.SO_INVOICE",
+      "line": 55,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 55,
+          "text": "SO_INVOICE = 'SO_INVOICE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:566d52f6f1a7eb4c",
+      "section": "check.unused_enum_members",
+      "originalIndex": 12,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.SO_CANCEL",
+      "line": 56,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 56,
+          "text": "SO_CANCEL = 'SO_CANCEL',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:8cf24b48093db84f",
+      "section": "check.unused_enum_members",
+      "originalIndex": 13,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.SO_DELETE",
+      "line": 57,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 57,
+          "text": "SO_DELETE = 'SO_DELETE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:f0642a170c3afcad",
+      "section": "check.unused_enum_members",
+      "originalIndex": 14,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.INVOICE_POST",
+      "line": 62,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 62,
+          "text": "INVOICE_POST = 'INVOICE_POST',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:a84200b57843ba75",
+      "section": "check.unused_enum_members",
+      "originalIndex": 15,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.INVOICE_RETURN",
+      "line": 65,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 65,
+          "text": "INVOICE_RETURN = 'INVOICE_RETURN',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:2b7091f3b64d1c0c",
+      "section": "check.unused_enum_members",
+      "originalIndex": 16,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.WO_START",
+      "line": 82,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 82,
+          "text": "WO_START = 'WO_START',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:4385d3bc2adf687b",
+      "section": "check.unused_enum_members",
+      "originalIndex": 17,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.WO_COMPLETE",
+      "line": 83,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 83,
+          "text": "WO_COMPLETE = 'WO_COMPLETE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:e3e7edd7eace1f38",
+      "section": "check.unused_enum_members",
+      "originalIndex": 18,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.WO_CANCEL",
+      "line": 84,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 84,
+          "text": "WO_CANCEL = 'WO_CANCEL',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:7f563ec40cf1ce4f",
+      "section": "check.unused_enum_members",
+      "originalIndex": 19,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.MATERIAL_CONSUME",
+      "line": 86,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 86,
+          "text": "MATERIAL_CONSUME = 'MATERIAL_CONSUME',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:c06f6dab93b9967f",
+      "section": "check.unused_enum_members",
+      "originalIndex": 20,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.DATA_IMPORT",
+      "line": 106,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 106,
+          "text": "DATA_IMPORT = 'DATA_IMPORT',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:6c2bb391a6b65712",
+      "section": "check.unused_enum_members",
+      "originalIndex": 21,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.DATA_EXPORT",
+      "line": 107,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 107,
+          "text": "DATA_EXPORT = 'DATA_EXPORT',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:375ae81bfda4336f",
+      "section": "check.unused_enum_members",
+      "originalIndex": 22,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.POS_SALE",
+      "line": 111,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 111,
+          "text": "POS_SALE = 'POS_SALE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:09cbce62e3b4675c",
+      "section": "check.unused_enum_members",
+      "originalIndex": 23,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.POS_RETURN",
+      "line": 112,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 112,
+          "text": "POS_RETURN = 'POS_RETURN',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:202bdadc1abcbbfb",
+      "section": "check.unused_enum_members",
+      "originalIndex": 24,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.REPORT_GENERATE",
+      "line": 115,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 115,
+          "text": "REPORT_GENERATE = 'REPORT_GENERATE',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:bf5013d629bf16b0",
+      "section": "check.unused_enum_members",
+      "originalIndex": 25,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "ActionType.REPORT_EXPORT",
+      "line": 116,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 116,
+          "text": "REPORT_EXPORT = 'REPORT_EXPORT'"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:a60d61a20c294c20",
+      "section": "check.unused_enum_members",
+      "originalIndex": 26,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "LogLevel.DEBUG",
+      "line": 121,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 121,
+          "text": "DEBUG = 'DEBUG',"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dc1:unused-enum-member:2bab67a6cc141fe3",
+      "section": "check.unused_enum_members",
+      "originalIndex": 27,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "LogLevel.ERROR",
+      "line": 124,
+      "owner": "services",
+      "status": "retained-vocabulary-verified",
+      "reason": "D13 preserves persisted activity/audit vocabulary; deleting an unused writer enum does not establish historical stored values are absent.",
+      "evidence": [
+        {
+          "path": "server/src/services/activityLogger.ts",
+          "line": 124,
+          "text": "ERROR = 'ERROR'"
+        },
+        {
+          "path": "audit/DECISIONS.md",
+          "section": "D13"
+        }
+      ]
+    },
+    {
+      "id": "dup:31de3227",
+      "section": "dupes.clone_groups",
+      "originalIndex": 0,
+      "instances": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 65
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 482
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 611
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 630
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 716
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:82a87f0f",
+      "section": "dupes.clone_groups",
+      "originalIndex": 1,
+      "instances": [
+        {
+          "path": "server/src/controllers/inventoryController.ts",
+          "line": 15
+        },
+        {
+          "path": "server/src/controllers/inventoryController.ts",
+          "line": 774
+        },
+        {
+          "path": "server/src/controllers/inventoryController.ts",
+          "line": 809
+        },
+        {
+          "path": "server/src/controllers/purchaseReturnController.ts",
+          "line": 8
+        },
+        {
+          "path": "server/src/controllers/salesController.ts",
+          "line": 73
+        },
+        {
+          "path": "server/src/controllers/salesController.ts",
+          "line": 258
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:36e0053a",
+      "section": "dupes.clone_groups",
+      "originalIndex": 2,
+      "instances": [
+        {
+          "path": "server/src/controllers/inventoryController.ts",
+          "line": 40
+        },
+        {
+          "path": "server/src/controllers/inventoryController.ts",
+          "line": 561
+        },
+        {
+          "path": "server/src/controllers/inventoryController.ts",
+          "line": 788
+        },
+        {
+          "path": "server/src/controllers/inventoryController.ts",
+          "line": 821
+        },
+        {
+          "path": "server/src/controllers/supplierRefundController.ts",
+          "line": 17
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:4d3320a0",
+      "section": "dupes.clone_groups",
+      "originalIndex": 3,
+      "instances": [
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 965
+        },
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 978
+        },
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 1021
+        },
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 1034
+        },
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 1046
+        },
+        {
+          "path": "server/src/models/Reports.ts",
+          "line": 1083
+        }
+      ],
+      "owner": "models",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:a08ba3bb",
+      "section": "dupes.clone_groups",
+      "originalIndex": 4,
+      "instances": [
+        {
+          "path": "server/src/controllers/inventoryController.ts",
+          "line": 809
+        },
+        {
+          "path": "server/src/controllers/invoiceController.ts",
+          "line": 125
+        },
+        {
+          "path": "server/src/controllers/salesController.ts",
+          "line": 73
+        },
+        {
+          "path": "server/src/controllers/salesController.ts",
+          "line": 258
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:d0c6ebb5",
+      "section": "dupes.clone_groups",
+      "originalIndex": 5,
+      "instances": [
+        {
+          "path": "server/src/models/Production.ts",
+          "line": 171
+        },
+        {
+          "path": "server/src/models/Purchase.ts",
+          "line": 123
+        },
+        {
+          "path": "server/src/models/PurchaseOrder.ts",
+          "line": 218
+        }
+      ],
+      "owner": "models",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:fd6c6b7f",
+      "section": "dupes.clone_groups",
+      "originalIndex": 6,
+      "instances": [
+        {
+          "path": "server/src/models/BOM.ts",
+          "line": 85
+        },
+        {
+          "path": "server/src/models/OwnerWithdrawal.ts",
+          "line": 128
+        },
+        {
+          "path": "server/src/models/Production.ts",
+          "line": 174
+        },
+        {
+          "path": "server/src/models/Purchase.ts",
+          "line": 126
+        },
+        {
+          "path": "server/src/models/PurchaseOrder.ts",
+          "line": 226
+        }
+      ],
+      "owner": "models",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:a594d0a8",
+      "section": "dupes.clone_groups",
+      "originalIndex": 7,
+      "instances": [
+        {
+          "path": "server/src/controllers/customersController.ts",
+          "line": 78
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 107
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 202
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 209
+        },
+        {
+          "path": "server/src/controllers/suppliersController.ts",
+          "line": 286
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:559d53da",
+      "section": "dupes.clone_groups",
+      "originalIndex": 8,
+      "instances": [
+        {
+          "path": "server/src/controllers/invoiceController.ts",
+          "line": 151
+        },
+        {
+          "path": "server/src/controllers/invoiceController.ts",
+          "line": 1188
+        },
+        {
+          "path": "server/src/controllers/salesController.ts",
+          "line": 95
+        },
+        {
+          "path": "server/src/controllers/salesController.ts",
+          "line": 281
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:59f71812",
+      "section": "dupes.clone_groups",
+      "originalIndex": 9,
+      "instances": [
+        {
+          "path": "server/src/controllers/ownerPersonalLoansController.ts",
+          "line": 713
+        },
+        {
+          "path": "server/src/controllers/ownerPersonalLoansController.ts",
+          "line": 746
+        },
+        {
+          "path": "server/src/controllers/ownerPersonalLoansController.ts",
+          "line": 769
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:d6f9d6c0",
+      "section": "dupes.clone_groups",
+      "originalIndex": 10,
+      "instances": [
+        {
+          "path": "server/src/controllers/ownerEquityController.ts",
+          "line": 104
+        },
+        {
+          "path": "server/src/controllers/ownerEquityController.ts",
+          "line": 326
+        },
+        {
+          "path": "server/src/controllers/purchaseOrderController.ts",
+          "line": 409
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:b23a802c",
+      "section": "dupes.clone_groups",
+      "originalIndex": 11,
+      "instances": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 482
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 611
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 630
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:66fc37bd",
+      "section": "dupes.clone_groups",
+      "originalIndex": 12,
+      "instances": [
+        {
+          "path": "server/scripts/backfill-ledger-dates.js",
+          "line": 23
+        },
+        {
+          "path": "server/scripts/dedupe-po.js",
+          "line": 26
+        },
+        {
+          "path": "server/scripts/recompute-item-amounts.js",
+          "line": 51
+        }
+      ],
+      "owner": "remaining",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:c4d0924d",
+      "section": "dupes.clone_groups",
+      "originalIndex": 13,
+      "instances": [
+        {
+          "path": "server/src/controllers/productionController.ts",
+          "line": 140
+        },
+        {
+          "path": "server/src/controllers/purchaseController.ts",
+          "line": 213
+        },
+        {
+          "path": "server/src/controllers/purchaseOrderController.ts",
+          "line": 112
+        },
+        {
+          "path": "server/src/controllers/purchaseReturnController.ts",
+          "line": 34
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:2bcde3d5",
+      "section": "dupes.clone_groups",
+      "originalIndex": 14,
+      "instances": [
+        {
+          "path": "server/src/models/BOM.ts",
+          "line": 85
+        },
+        {
+          "path": "server/src/models/Production.ts",
+          "line": 174
+        },
+        {
+          "path": "server/src/models/Purchase.ts",
+          "line": 126
+        },
+        {
+          "path": "server/src/models/PurchaseOrder.ts",
+          "line": 226
+        }
+      ],
+      "owner": "models",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:47019eb7",
+      "section": "dupes.clone_groups",
+      "originalIndex": 15,
+      "instances": [
+        {
+          "path": "server/src/controllers/inventoryController.ts",
+          "line": 809
+        },
+        {
+          "path": "server/src/controllers/salesController.ts",
+          "line": 73
+        },
+        {
+          "path": "server/src/controllers/salesController.ts",
+          "line": 258
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:d87f4d72",
+      "section": "dupes.clone_groups",
+      "originalIndex": 16,
+      "instances": [
+        {
+          "path": "server/src/models/Production.ts",
+          "line": 174
+        },
+        {
+          "path": "server/src/models/Purchase.ts",
+          "line": 126
+        },
+        {
+          "path": "server/src/models/PurchaseOrder.ts",
+          "line": 226
+        },
+        {
+          "path": "server/src/utils/sequence.ts",
+          "line": 27
+        }
+      ],
+      "owner": "models",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:2e389da0",
+      "section": "dupes.clone_groups",
+      "originalIndex": 17,
+      "instances": [
+        {
+          "path": "server/src/controllers/inventoryController.ts",
+          "line": 38
+        },
+        {
+          "path": "server/src/controllers/inventoryController.ts",
+          "line": 786
+        },
+        {
+          "path": "server/src/controllers/inventoryController.ts",
+          "line": 819
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:a3471acf",
+      "section": "dupes.clone_groups",
+      "originalIndex": 18,
+      "instances": [
+        {
+          "path": "server/src/models/Expense.ts",
+          "line": 53
+        },
+        {
+          "path": "server/src/models/OwnerCapital.ts",
+          "line": 44
+        },
+        {
+          "path": "server/src/models/OwnerWithdrawal.ts",
+          "line": 76
+        }
+      ],
+      "owner": "models",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:e2a1deae",
+      "section": "dupes.clone_groups",
+      "originalIndex": 19,
+      "instances": [
+        {
+          "path": "server/src/models/PhysicalCount.ts",
+          "line": 225
+        },
+        {
+          "path": "server/src/models/StockMovement.ts",
+          "line": 663
+        },
+        {
+          "path": "server/src/models/StockMovement.ts",
+          "line": 951
+        }
+      ],
+      "owner": "models",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:74d8a899",
+      "section": "dupes.clone_groups",
+      "originalIndex": 20,
+      "instances": [
+        {
+          "path": "server/src/models/Invoice.ts",
+          "line": 500
+        },
+        {
+          "path": "server/src/models/InvoiceReturn.ts",
+          "line": 89
+        },
+        {
+          "path": "server/src/models/InvoiceReturn.ts",
+          "line": 114
+        }
+      ],
+      "owner": "models",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:162f33b3",
+      "section": "dupes.clone_groups",
+      "originalIndex": 21,
+      "instances": [
+        {
+          "path": "server/src/controllers/suppliersController.ts",
+          "line": 54
+        },
+        {
+          "path": "server/src/controllers/suppliersController.ts",
+          "line": 270
+        },
+        {
+          "path": "server/src/controllers/suppliersController.ts",
+          "line": 341
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:5b440746",
+      "section": "dupes.clone_groups",
+      "originalIndex": 22,
+      "instances": [
+        {
+          "path": "server/src/controllers/invoiceController.ts",
+          "line": 151
+        },
+        {
+          "path": "server/src/controllers/salesController.ts",
+          "line": 95
+        },
+        {
+          "path": "server/src/controllers/salesController.ts",
+          "line": 281
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:a4eb6554",
+      "section": "dupes.clone_groups",
+      "originalIndex": 23,
+      "instances": [
+        {
+          "path": "server/src/controllers/customersController.ts",
+          "line": 109
+        },
+        {
+          "path": "server/src/controllers/customersController.ts",
+          "line": 133
+        },
+        {
+          "path": "server/src/controllers/customersController.ts",
+          "line": 166
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:b504882c",
+      "section": "dupes.clone_groups",
+      "originalIndex": 24,
+      "instances": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 202
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 209
+        },
+        {
+          "path": "server/src/controllers/suppliersController.ts",
+          "line": 286
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:0a1ca975",
+      "section": "dupes.clone_groups",
+      "originalIndex": 25,
+      "instances": [
+        {
+          "path": "server/src/controllers/reportsController.ts",
+          "line": 122
+        },
+        {
+          "path": "server/src/controllers/reportsController.ts",
+          "line": 137
+        },
+        {
+          "path": "server/src/controllers/reportsController.ts",
+          "line": 145
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:c79c25b2",
+      "section": "dupes.clone_groups",
+      "originalIndex": 26,
+      "instances": [
+        {
+          "path": "server/src/controllers/reportsController.ts",
+          "line": 61
+        },
+        {
+          "path": "server/src/controllers/reportsController.ts",
+          "line": 97
+        },
+        {
+          "path": "server/src/controllers/reportsController.ts",
+          "line": 106
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:2383cf9f",
+      "section": "dupes.clone_groups",
+      "originalIndex": 27,
+      "instances": [
+        {
+          "path": "server/scripts/backfill-ledger-dates.js",
+          "line": 33
+        },
+        {
+          "path": "server/scripts/dedupe-po.js",
+          "line": 36
+        },
+        {
+          "path": "server/scripts/recompute-item-amounts.js",
+          "line": 61
+        }
+      ],
+      "owner": "remaining",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:6d5a9349",
+      "section": "dupes.clone_groups",
+      "originalIndex": 28,
+      "instances": [
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 357
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 525
+        },
+        {
+          "path": "server/src/controllers/employeeController.ts",
+          "line": 754
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:f6b635c5",
+      "section": "dupes.clone_groups",
+      "originalIndex": 29,
+      "instances": [
+        {
+          "path": "server/src/controllers/ownerEquityController.ts",
+          "line": 88
+        },
+        {
+          "path": "server/src/controllers/ownerPersonalLoansController.ts",
+          "line": 177
+        },
+        {
+          "path": "server/src/controllers/ownerPersonalLoansController.ts",
+          "line": 410
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:305f54ab",
+      "section": "dupes.clone_groups",
+      "originalIndex": 30,
+      "instances": [
+        {
+          "path": "server/src/models/StockMovement.ts",
+          "line": 1250
+        },
+        {
+          "path": "server/src/models/StockMovement.ts",
+          "line": 1387
+        },
+        {
+          "path": "server/src/models/StockMovement.ts",
+          "line": 1502
+        }
+      ],
+      "owner": "models",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:58949ae7",
+      "section": "dupes.clone_groups",
+      "originalIndex": 31,
+      "instances": [
+        {
+          "path": "server/src/middleware/rateLimiter.ts",
+          "line": 13
+        },
+        {
+          "path": "server/src/middleware/rateLimiter.ts",
+          "line": 35
+        },
+        {
+          "path": "server/src/middleware/rateLimiter.ts",
+          "line": 102
+        }
+      ],
+      "owner": "remaining",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:827d201f",
+      "section": "dupes.clone_groups",
+      "originalIndex": 32,
+      "instances": [
+        {
+          "path": "server/src/services/accountingService.ts",
+          "line": 775
+        },
+        {
+          "path": "server/src/services/accountingService.ts",
+          "line": 919
+        },
+        {
+          "path": "server/src/services/accountingService.ts",
+          "line": 956
+        }
+      ],
+      "owner": "services",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:1c02a814",
+      "section": "dupes.clone_groups",
+      "originalIndex": 33,
+      "instances": [
+        {
+          "path": "server/src/controllers/invoiceController.ts",
+          "line": 843
+        },
+        {
+          "path": "server/src/controllers/invoiceReturnController.ts",
+          "line": 53
+        },
+        {
+          "path": "server/src/controllers/invoiceReturnController.ts",
+          "line": 72
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:b49eb11a",
+      "section": "dupes.clone_groups",
+      "originalIndex": 34,
+      "instances": [
+        {
+          "path": "server/src/models/BOM.ts",
+          "line": 199
+        },
+        {
+          "path": "server/src/models/Production.ts",
+          "line": 643
+        },
+        {
+          "path": "server/src/models/PurchaseReturn.ts",
+          "line": 485
+        }
+      ],
+      "owner": "models",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:3b83cf27",
+      "section": "dupes.clone_groups",
+      "originalIndex": 35,
+      "instances": [
+        {
+          "path": "server/src/controllers/accountingController.ts",
+          "line": 98
+        },
+        {
+          "path": "server/src/controllers/accountingController.ts",
+          "line": 133
+        },
+        {
+          "path": "server/src/controllers/accountingController.ts",
+          "line": 154
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:1b29f147",
+      "section": "dupes.clone_groups",
+      "originalIndex": 36,
+      "instances": [
+        {
+          "path": "server/src/controllers/ownerPersonalLoansController.ts",
+          "line": 703
+        },
+        {
+          "path": "server/src/controllers/ownerPersonalLoansController.ts",
+          "line": 759
+        },
+        {
+          "path": "server/src/controllers/ownerPersonalLoansController.ts",
+          "line": 786
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:9541b61c",
+      "section": "dupes.clone_groups",
+      "originalIndex": 37,
+      "instances": [
+        {
+          "path": "server/src/controllers/ownerPersonalLoansController.ts",
+          "line": 666
+        },
+        {
+          "path": "server/src/controllers/ownerPersonalLoansController.ts",
+          "line": 716
+        },
+        {
+          "path": "server/src/controllers/ownerPersonalLoansController.ts",
+          "line": 772
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "dup:e4702e5d",
+      "section": "dupes.clone_groups",
+      "originalIndex": 38,
+      "instances": [
+        {
+          "path": "server/src/controllers/customersController.ts",
+          "line": 13
+        },
+        {
+          "path": "server/src/controllers/paymentsController.ts",
+          "line": 44
+        },
+        {
+          "path": "server/src/controllers/suppliersController.ts",
+          "line": 14
+        }
+      ],
+      "owner": "controllers",
+      "status": "pending-lane-verification"
+    },
+    {
+      "id": "health:server/src/models/PhysicalCount.ts:transaction:510",
+      "section": "health.findings",
+      "originalIndex": 0,
+      "path": "server/src/models/PhysicalCount.ts",
+      "symbol": "transaction",
+      "line": 510,
+      "cyclomatic": 30,
+      "cognitive": 67,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/invoiceReturnService.ts:txn:301",
+      "section": "health.findings",
+      "originalIndex": 1,
+      "path": "server/src/services/invoiceReturnService.ts",
+      "symbol": "txn",
+      "line": 301,
+      "cyclomatic": 30,
+      "cognitive": 38,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/__tests__/accountingInvariants.test.ts:it(\"holds after invoice → payment → return →...\"):153",
+      "section": "health.findings",
+      "originalIndex": 2,
+      "path": "server/src/__tests__/accountingInvariants.test.ts",
+      "symbol": "it(\"holds after invoice → payment → return →...\")",
+      "line": 153,
+      "cyclomatic": 28,
+      "cognitive": 24,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/preferencesController.ts:updatePreferences:49",
+      "section": "health.findings",
+      "originalIndex": 3,
+      "path": "server/src/controllers/preferencesController.ts",
+      "symbol": "updatePreferences",
+      "line": 49,
+      "cyclomatic": 27,
+      "cognitive": 33,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/productionController.ts:recordProduction:10",
+      "section": "health.findings",
+      "originalIndex": 4,
+      "path": "server/src/controllers/productionController.ts",
+      "symbol": "recordProduction",
+      "line": 10,
+      "cyclomatic": 27,
+      "cognitive": 35,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Expense.ts:<arrow>:179",
+      "section": "health.findings",
+      "originalIndex": 5,
+      "path": "server/src/models/Expense.ts",
+      "symbol": "<arrow>",
+      "line": 179,
+      "cyclomatic": 27,
+      "cognitive": 27,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/mobileInvoiceController.ts:processReturn:249",
+      "section": "health.findings",
+      "originalIndex": 6,
+      "path": "server/src/controllers/mobileInvoiceController.ts",
+      "symbol": "processReturn",
+      "line": 249,
+      "cyclomatic": 26,
+      "cognitive": 23,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/invoiceController.ts:returnInvoiceItems:1081",
+      "section": "health.findings",
+      "originalIndex": 7,
+      "path": "server/src/controllers/invoiceController.ts",
+      "symbol": "returnInvoiceItems",
+      "line": 1081,
+      "cyclomatic": 25,
+      "cognitive": 23,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/SalesOrder.ts:transaction:115",
+      "section": "health.findings",
+      "originalIndex": 8,
+      "path": "server/src/models/SalesOrder.ts",
+      "symbol": "transaction",
+      "line": 115,
+      "cyclomatic": 25,
+      "cognitive": 31,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/customReportsController.ts:validateReportConfig:55",
+      "section": "health.findings",
+      "originalIndex": 9,
+      "path": "server/src/controllers/customReportsController.ts",
+      "symbol": "validateReportConfig",
+      "line": 55,
+      "cyclomatic": 24,
+      "cognitive": 39,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/employeeController.ts:trx:890",
+      "section": "health.findings",
+      "originalIndex": 10,
+      "path": "server/src/controllers/employeeController.ts",
+      "symbol": "trx",
+      "line": 890,
+      "cyclomatic": 24,
+      "cognitive": 22,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/paymentsController.ts:getPaymentReceipt:418",
+      "section": "health.findings",
+      "originalIndex": 11,
+      "path": "server/src/controllers/paymentsController.ts",
+      "symbol": "getPaymentReceipt",
+      "line": 418,
+      "cyclomatic": 24,
+      "cognitive": 27,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Production.ts:transaction:240",
+      "section": "health.findings",
+      "originalIndex": 12,
+      "path": "server/src/models/Production.ts",
+      "symbol": "transaction",
+      "line": 240,
+      "cyclomatic": 24,
+      "cognitive": 34,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Quotation.ts:transaction:117",
+      "section": "health.findings",
+      "originalIndex": 13,
+      "path": "server/src/models/Quotation.ts",
+      "symbol": "transaction",
+      "line": 117,
+      "cyclomatic": 24,
+      "cognitive": 28,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/cashService.ts:getCashAccountTransactions:529",
+      "section": "health.findings",
+      "originalIndex": 14,
+      "path": "server/src/services/cashService.ts",
+      "symbol": "getCashAccountTransactions",
+      "line": 529,
+      "cyclomatic": 24,
+      "cognitive": 25,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/mobileInvoiceController.ts:submitInvoice:149",
+      "section": "health.findings",
+      "originalIndex": 15,
+      "path": "server/src/controllers/mobileInvoiceController.ts",
+      "symbol": "submitInvoice",
+      "line": 149,
+      "cyclomatic": 23,
+      "cognitive": 30,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Dashboard.ts:getKPI:448",
+      "section": "health.findings",
+      "originalIndex": 16,
+      "path": "server/src/models/Dashboard.ts",
+      "symbol": "getKPI",
+      "line": 448,
+      "cyclomatic": 23,
+      "cognitive": 6,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/posController.ts:createPOSSale:210",
+      "section": "health.findings",
+      "originalIndex": 17,
+      "path": "server/src/controllers/posController.ts",
+      "symbol": "createPOSSale",
+      "line": 210,
+      "cyclomatic": 22,
+      "cognitive": 24,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/cashService.ts:collectFlows:102",
+      "section": "health.findings",
+      "originalIndex": 18,
+      "path": "server/src/services/cashService.ts",
+      "symbol": "collectFlows",
+      "line": 102,
+      "cyclomatic": 22,
+      "cognitive": 21,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/verify-reversal-rules.ts:main:68",
+      "section": "health.findings",
+      "originalIndex": 19,
+      "path": "server/scripts/verify-reversal-rules.ts",
+      "symbol": "main",
+      "line": 68,
+      "cyclomatic": 21,
+      "cognitive": 12,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/userController.ts:updateUser:110",
+      "section": "health.findings",
+      "originalIndex": 20,
+      "path": "server/src/controllers/userController.ts",
+      "symbol": "updateUser",
+      "line": 110,
+      "cyclomatic": 21,
+      "cognitive": 21,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/PurchaseReturn.ts:transaction:759",
+      "section": "health.findings",
+      "originalIndex": 21,
+      "path": "server/src/models/PurchaseReturn.ts",
+      "symbol": "transaction",
+      "line": 759,
+      "cyclomatic": 21,
+      "cognitive": 45,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/InvoiceCreationService.ts:transaction:155",
+      "section": "health.findings",
+      "originalIndex": 22,
+      "path": "server/src/services/InvoiceCreationService.ts",
+      "symbol": "transaction",
+      "line": 155,
+      "cyclomatic": 21,
+      "cognitive": 25,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/accountingService.ts:postEntry:243",
+      "section": "health.findings",
+      "originalIndex": 23,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "postEntry",
+      "line": 243,
+      "cyclomatic": 21,
+      "cognitive": 25,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/paymentValidation.ts:validateSupplierPayment:110",
+      "section": "health.findings",
+      "originalIndex": 24,
+      "path": "server/src/services/paymentValidation.ts",
+      "symbol": "validateSupplierPayment",
+      "line": 110,
+      "cyclomatic": 21,
+      "cognitive": 32,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/employeeController.ts:paySalary:354",
+      "section": "health.findings",
+      "originalIndex": 25,
+      "path": "server/src/controllers/employeeController.ts",
+      "symbol": "paySalary",
+      "line": 354,
+      "cyclomatic": 20,
+      "cognitive": 18,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/inventoryController.ts:createStockMovement:599",
+      "section": "health.findings",
+      "originalIndex": 26,
+      "path": "server/src/controllers/inventoryController.ts",
+      "symbol": "createStockMovement",
+      "line": 599,
+      "cyclomatic": 20,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/invoiceController.ts:transaction:504",
+      "section": "health.findings",
+      "originalIndex": 27,
+      "path": "server/src/controllers/invoiceController.ts",
+      "symbol": "transaction",
+      "line": 504,
+      "cyclomatic": 20,
+      "cognitive": 19,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/ownerPersonalLoansController.ts:updateBorrower:662",
+      "section": "health.findings",
+      "originalIndex": 28,
+      "path": "server/src/controllers/ownerPersonalLoansController.ts",
+      "symbol": "updateBorrower",
+      "line": 662,
+      "cyclomatic": 20,
+      "cognitive": 19,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/purchaseController.ts:recordPurchase:71",
+      "section": "health.findings",
+      "originalIndex": 29,
+      "path": "server/src/controllers/purchaseController.ts",
+      "symbol": "recordPurchase",
+      "line": 71,
+      "cyclomatic": 20,
+      "cognitive": 26,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Payment.ts:update:562",
+      "section": "health.findings",
+      "originalIndex": 30,
+      "path": "server/src/models/Payment.ts",
+      "symbol": "update",
+      "line": 562,
+      "cyclomatic": 20,
+      "cognitive": 22,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/StockMovement.ts:transaction:472",
+      "section": "health.findings",
+      "originalIndex": 31,
+      "path": "server/src/models/StockMovement.ts",
+      "symbol": "transaction",
+      "line": 472,
+      "cyclomatic": 20,
+      "cognitive": 21,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Invoice.ts:reverseStockForItems:569",
+      "section": "health.findings",
+      "originalIndex": 32,
+      "path": "server/src/models/Invoice.ts",
+      "symbol": "reverseStockForItems",
+      "line": 569,
+      "cyclomatic": 19,
+      "cognitive": 44,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/config/database.ts:<arrow>:1118",
+      "section": "health.findings",
+      "originalIndex": 33,
+      "path": "server/src/config/database.ts",
+      "symbol": "<arrow>",
+      "line": 1118,
+      "cyclomatic": 18,
+      "cognitive": 18,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/inventoryController.ts:runWriteOff:1020",
+      "section": "health.findings",
+      "originalIndex": 34,
+      "path": "server/src/controllers/inventoryController.ts",
+      "symbol": "runWriteOff",
+      "line": 1020,
+      "cyclomatic": 18,
+      "cognitive": 19,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Invoice.ts:buildInvoiceInsertParams:206",
+      "section": "health.findings",
+      "originalIndex": 35,
+      "path": "server/src/models/Invoice.ts",
+      "symbol": "buildInvoiceInsertParams",
+      "line": 206,
+      "cyclomatic": 18,
+      "cognitive": 18,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Quotation.ts:transaction:400",
+      "section": "health.findings",
+      "originalIndex": 36,
+      "path": "server/src/models/Quotation.ts",
+      "symbol": "transaction",
+      "line": 400,
+      "cyclomatic": 18,
+      "cognitive": 20,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/StockMovement.ts:run:1724",
+      "section": "health.findings",
+      "originalIndex": 37,
+      "path": "server/src/models/StockMovement.ts",
+      "symbol": "run",
+      "line": 1724,
+      "cyclomatic": 18,
+      "cognitive": 30,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/SupplierBill.ts:<arrow>:60",
+      "section": "health.findings",
+      "originalIndex": 38,
+      "path": "server/src/models/SupplierBill.ts",
+      "symbol": "<arrow>",
+      "line": 60,
+      "cyclomatic": 18,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/__tests__/purchaseVoid.test.ts:seedPurchase:33",
+      "section": "health.findings",
+      "originalIndex": 39,
+      "path": "server/src/__tests__/purchaseVoid.test.ts",
+      "symbol": "seedPurchase",
+      "line": 33,
+      "cyclomatic": 17,
+      "cognitive": 16,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/employeeController.ts:repayLoan:847",
+      "section": "health.findings",
+      "originalIndex": 40,
+      "path": "server/src/controllers/employeeController.ts",
+      "symbol": "repayLoan",
+      "line": 847,
+      "cyclomatic": 17,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/expenseController.ts:updateExpense:283",
+      "section": "health.findings",
+      "originalIndex": 41,
+      "path": "server/src/controllers/expenseController.ts",
+      "symbol": "updateExpense",
+      "line": 283,
+      "cyclomatic": 17,
+      "cognitive": 17,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/invoiceController.ts:updateInvoice:450",
+      "section": "health.findings",
+      "originalIndex": 42,
+      "path": "server/src/controllers/invoiceController.ts",
+      "symbol": "updateInvoice",
+      "line": 450,
+      "cyclomatic": 17,
+      "cognitive": 24,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Item.ts:create:190",
+      "section": "health.findings",
+      "originalIndex": 43,
+      "path": "server/src/models/Item.ts",
+      "symbol": "create",
+      "line": 190,
+      "cyclomatic": 17,
+      "cognitive": 17,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/OwnerWithdrawal.ts:update:431",
+      "section": "health.findings",
+      "originalIndex": 44,
+      "path": "server/src/models/OwnerWithdrawal.ts",
+      "symbol": "update",
+      "line": 431,
+      "cyclomatic": 17,
+      "cognitive": 19,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/SalesOrder.ts:convertToInvoice:620",
+      "section": "health.findings",
+      "originalIndex": 45,
+      "path": "server/src/models/SalesOrder.ts",
+      "symbol": "convertToInvoice",
+      "line": 620,
+      "cyclomatic": 17,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/InvoiceCreationService.ts:create:111",
+      "section": "health.findings",
+      "originalIndex": 46,
+      "path": "server/src/services/InvoiceCreationService.ts",
+      "symbol": "create",
+      "line": 111,
+      "cyclomatic": 17,
+      "cognitive": 20,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/reportQueryEngine.ts:executeReport:204",
+      "section": "health.findings",
+      "originalIndex": 47,
+      "path": "server/src/services/reportQueryEngine.ts",
+      "symbol": "executeReport",
+      "line": 204,
+      "cyclomatic": 17,
+      "cognitive": 19,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/inventoryController.ts:correctPhysicalCount:952",
+      "section": "health.findings",
+      "originalIndex": 48,
+      "path": "server/src/controllers/inventoryController.ts",
+      "symbol": "correctPhysicalCount",
+      "line": 952,
+      "cyclomatic": 16,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/ownerEquityController.ts:createWithdrawal:284",
+      "section": "health.findings",
+      "originalIndex": 49,
+      "path": "server/src/controllers/ownerEquityController.ts",
+      "symbol": "createWithdrawal",
+      "line": 284,
+      "cyclomatic": 16,
+      "cognitive": 18,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/ownerEquityController.ts:updateWithdrawal:448",
+      "section": "health.findings",
+      "originalIndex": 50,
+      "path": "server/src/controllers/ownerEquityController.ts",
+      "symbol": "updateWithdrawal",
+      "line": 448,
+      "cyclomatic": 16,
+      "cognitive": 18,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/purchaseOrderController.ts:createGoodsReceipt:363",
+      "section": "health.findings",
+      "originalIndex": 51,
+      "path": "server/src/controllers/purchaseOrderController.ts",
+      "symbol": "createGoodsReceipt",
+      "line": 363,
+      "cyclomatic": 16,
+      "cognitive": 17,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/ExpensePayment.ts:<arrow>:36",
+      "section": "health.findings",
+      "originalIndex": 52,
+      "path": "server/src/models/ExpensePayment.ts",
+      "symbol": "<arrow>",
+      "line": 36,
+      "cyclomatic": 16,
+      "cognitive": 15,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Invoice.ts:getAll:351",
+      "section": "health.findings",
+      "originalIndex": 53,
+      "path": "server/src/models/Invoice.ts",
+      "symbol": "getAll",
+      "line": 351,
+      "cyclomatic": 16,
+      "cognitive": 15,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Production.ts:transaction:736",
+      "section": "health.findings",
+      "originalIndex": 54,
+      "path": "server/src/models/Production.ts",
+      "symbol": "transaction",
+      "line": 736,
+      "cyclomatic": 16,
+      "cognitive": 21,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/PurchaseReturn.ts:drawFromSourceBatches:301",
+      "section": "health.findings",
+      "originalIndex": 55,
+      "path": "server/src/models/PurchaseReturn.ts",
+      "symbol": "drawFromSourceBatches",
+      "line": 301,
+      "cyclomatic": 16,
+      "cognitive": 26,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/StockMovement.ts:run:1592",
+      "section": "health.findings",
+      "originalIndex": 56,
+      "path": "server/src/models/StockMovement.ts",
+      "symbol": "run",
+      "line": 1592,
+      "cyclomatic": 16,
+      "cognitive": 17,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/accountingService.ts:postPurchaseEntry:711",
+      "section": "health.findings",
+      "originalIndex": 57,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "postPurchaseEntry",
+      "line": 711,
+      "cyclomatic": 16,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/reportQueryEngine.ts:buildSelectClause:347",
+      "section": "health.findings",
+      "originalIndex": 58,
+      "path": "server/src/services/reportQueryEngine.ts",
+      "symbol": "buildSelectClause",
+      "line": 347,
+      "cyclomatic": 16,
+      "cognitive": 23,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/utils/purchaseReturnBackfill.ts:backfill:96",
+      "section": "health.findings",
+      "originalIndex": 59,
+      "path": "server/src/utils/purchaseReturnBackfill.ts",
+      "symbol": "backfill",
+      "line": 96,
+      "cyclomatic": 16,
+      "cognitive": 19,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/dev/audit-trace.ts:main:1231",
+      "section": "health.findings",
+      "originalIndex": 60,
+      "path": "server/scripts/dev/audit-trace.ts",
+      "symbol": "main",
+      "line": 1231,
+      "cyclomatic": 15,
+      "cognitive": 15,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/fixtures/unapplied-cash-ui.cjs:control.post(\"/command\"):80",
+      "section": "health.findings",
+      "originalIndex": 61,
+      "path": "server/scripts/fixtures/unapplied-cash-ui.cjs",
+      "symbol": "control.post(\"/command\")",
+      "line": 80,
+      "cyclomatic": 15,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/__tests__/glPostingMatrix.test.ts:it(\"SO conversion produces subledger row plu...\"):255",
+      "section": "health.findings",
+      "originalIndex": 62,
+      "path": "server/src/__tests__/glPostingMatrix.test.ts",
+      "symbol": "it(\"SO conversion produces subledger row plu...\")",
+      "line": 255,
+      "cyclomatic": 15,
+      "cognitive": 6,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/__tests__/purchaseReturn.test.ts:seedPO:157",
+      "section": "health.findings",
+      "originalIndex": 63,
+      "path": "server/src/__tests__/purchaseReturn.test.ts",
+      "symbol": "seedPO",
+      "line": 157,
+      "cyclomatic": 15,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/dashboardController.ts:getBoot:216",
+      "section": "health.findings",
+      "originalIndex": 64,
+      "path": "server/src/controllers/dashboardController.ts",
+      "symbol": "getBoot",
+      "line": 216,
+      "cyclomatic": 15,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/expenseController.ts:createExpense:25",
+      "section": "health.findings",
+      "originalIndex": 65,
+      "path": "server/src/controllers/expenseController.ts",
+      "symbol": "createExpense",
+      "line": 25,
+      "cyclomatic": 15,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/ownerEquityController.ts:validateItemLines:260",
+      "section": "health.findings",
+      "originalIndex": 66,
+      "path": "server/src/controllers/ownerEquityController.ts",
+      "symbol": "validateItemLines",
+      "line": 260,
+      "cyclomatic": 15,
+      "cognitive": 15,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/paymentsController.ts:allocatePaymentToInvoice:561",
+      "section": "health.findings",
+      "originalIndex": 67,
+      "path": "server/src/controllers/paymentsController.ts",
+      "symbol": "allocatePaymentToInvoice",
+      "line": 561,
+      "cyclomatic": 15,
+      "cognitive": 16,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/purchaseOrderController.ts:createPurchaseOrder:18",
+      "section": "health.findings",
+      "originalIndex": 68,
+      "path": "server/src/controllers/purchaseOrderController.ts",
+      "symbol": "createPurchaseOrder",
+      "line": 18,
+      "cyclomatic": 15,
+      "cognitive": 17,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/suppliersController.ts:deleteSupplier:189",
+      "section": "health.findings",
+      "originalIndex": 69,
+      "path": "server/src/controllers/suppliersController.ts",
+      "symbol": "deleteSupplier",
+      "line": 189,
+      "cyclomatic": 15,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/migrations/backfillGlUnification.ts:run:27",
+      "section": "health.findings",
+      "originalIndex": 70,
+      "path": "server/src/migrations/backfillGlUnification.ts",
+      "symbol": "run",
+      "line": 27,
+      "cyclomatic": 15,
+      "cognitive": 21,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Expense.ts:update:153",
+      "section": "health.findings",
+      "originalIndex": 71,
+      "path": "server/src/models/Expense.ts",
+      "symbol": "update",
+      "line": 153,
+      "cyclomatic": 15,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Item.ts:update:226",
+      "section": "health.findings",
+      "originalIndex": 72,
+      "path": "server/src/models/Item.ts",
+      "symbol": "update",
+      "line": 226,
+      "cyclomatic": 15,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/OwnerWithdrawal.ts:<arrow>:209",
+      "section": "health.findings",
+      "originalIndex": 73,
+      "path": "server/src/models/OwnerWithdrawal.ts",
+      "symbol": "<arrow>",
+      "line": 209,
+      "cyclomatic": 15,
+      "cognitive": 16,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Purchase.ts:validateCreateDTO:139",
+      "section": "health.findings",
+      "originalIndex": 74,
+      "path": "server/src/models/Purchase.ts",
+      "symbol": "validateCreateDTO",
+      "line": 139,
+      "cyclomatic": 15,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Purchase.ts:getAll:436",
+      "section": "health.findings",
+      "originalIndex": 75,
+      "path": "server/src/models/Purchase.ts",
+      "symbol": "getAll",
+      "line": 436,
+      "cyclomatic": 15,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/PurchaseReturn.ts:transaction:564",
+      "section": "health.findings",
+      "originalIndex": 76,
+      "path": "server/src/models/PurchaseReturn.ts",
+      "symbol": "transaction",
+      "line": 564,
+      "cyclomatic": 15,
+      "cognitive": 25,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/SalesOrder.ts:getAll:273",
+      "section": "health.findings",
+      "originalIndex": 77,
+      "path": "server/src/models/SalesOrder.ts",
+      "symbol": "getAll",
+      "line": 273,
+      "cyclomatic": 15,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/StockMovement.ts:consumeFromOldestBatches:1149",
+      "section": "health.findings",
+      "originalIndex": 78,
+      "path": "server/src/models/StockMovement.ts",
+      "symbol": "consumeFromOldestBatches",
+      "line": 1149,
+      "cyclomatic": 15,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/accountingService.ts:postGoodsReceiptEntry:667",
+      "section": "health.findings",
+      "originalIndex": 79,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "postGoodsReceiptEntry",
+      "line": 667,
+      "cyclomatic": 15,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/accountingService.ts:postPurchaseReturnEntry:1327",
+      "section": "health.findings",
+      "originalIndex": 80,
+      "path": "server/src/services/accountingService.ts",
+      "symbol": "postPurchaseReturnEntry",
+      "line": 1327,
+      "cyclomatic": 15,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/expressionValidator.ts:parseCastArguments:305",
+      "section": "health.findings",
+      "originalIndex": 81,
+      "path": "server/src/services/expressionValidator.ts",
+      "symbol": "parseCastArguments",
+      "line": 305,
+      "cyclomatic": 15,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/forecastService.ts:readCachedForecasts:655",
+      "section": "health.findings",
+      "originalIndex": 82,
+      "path": "server/src/services/forecastService.ts",
+      "symbol": "readCachedForecasts",
+      "line": 655,
+      "cyclomatic": 15,
+      "cognitive": 21,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/searchService.ts:search:848",
+      "section": "health.findings",
+      "originalIndex": 83,
+      "path": "server/src/services/searchService.ts",
+      "symbol": "search",
+      "line": 848,
+      "cyclomatic": 15,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/utils/ledgerUtils.ts:derivePaymentStatus:198",
+      "section": "health.findings",
+      "originalIndex": 84,
+      "path": "server/src/utils/ledgerUtils.ts",
+      "symbol": "derivePaymentStatus",
+      "line": 198,
+      "cyclomatic": 15,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:scripts/openspec-archive-guard.js:main:109",
+      "section": "health.findings",
+      "originalIndex": 85,
+      "path": "scripts/openspec-archive-guard.js",
+      "symbol": "main",
+      "line": 109,
+      "cyclomatic": 14,
+      "cognitive": 17,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/__tests__/purchaseReturn.test.ts:seedPurchase:69",
+      "section": "health.findings",
+      "originalIndex": 86,
+      "path": "server/src/__tests__/purchaseReturn.test.ts",
+      "symbol": "seedPurchase",
+      "line": 69,
+      "cyclomatic": 14,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/customReportsController.ts:createTemplate:417",
+      "section": "health.findings",
+      "originalIndex": 87,
+      "path": "server/src/controllers/customReportsController.ts",
+      "symbol": "createTemplate",
+      "line": 417,
+      "cyclomatic": 14,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/invoiceController.ts:createInvoice:200",
+      "section": "health.findings",
+      "originalIndex": 88,
+      "path": "server/src/controllers/invoiceController.ts",
+      "symbol": "createInvoice",
+      "line": 200,
+      "cyclomatic": 14,
+      "cognitive": 19,
+      "kind": "structural",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/paymentsController.ts:createSupplierPayment:244",
+      "section": "health.findings",
+      "originalIndex": 89,
+      "path": "server/src/controllers/paymentsController.ts",
+      "symbol": "createSupplierPayment",
+      "line": 244,
+      "cyclomatic": 14,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/middleware/auth.ts:authenticateToken:16",
+      "section": "health.findings",
+      "originalIndex": 90,
+      "path": "server/src/middleware/auth.ts",
+      "symbol": "authenticateToken",
+      "line": 16,
+      "cyclomatic": 14,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/migrations/backfillGlPreposting.ts:backfill23Payments:158",
+      "section": "health.findings",
+      "originalIndex": 91,
+      "path": "server/src/migrations/backfillGlPreposting.ts",
+      "symbol": "backfill23Payments",
+      "line": 158,
+      "cyclomatic": 14,
+      "cognitive": 29,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/PurchaseOrder.ts:transaction:917",
+      "section": "health.findings",
+      "originalIndex": 92,
+      "path": "server/src/models/PurchaseOrder.ts",
+      "symbol": "transaction",
+      "line": 917,
+      "cyclomatic": 14,
+      "cognitive": 20,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Quotation.ts:getAll:272",
+      "section": "health.findings",
+      "originalIndex": 93,
+      "path": "server/src/models/Quotation.ts",
+      "symbol": "getAll",
+      "line": 272,
+      "cyclomatic": 14,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Reports.ts:getCashMovements:943",
+      "section": "health.findings",
+      "originalIndex": 94,
+      "path": "server/src/models/Reports.ts",
+      "symbol": "getCashMovements",
+      "line": 943,
+      "cyclomatic": 14,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/SalesOrder.ts:transaction:411",
+      "section": "health.findings",
+      "originalIndex": 95,
+      "path": "server/src/models/SalesOrder.ts",
+      "symbol": "transaction",
+      "line": 411,
+      "cyclomatic": 14,
+      "cognitive": 16,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/StockMovement.ts:consumeLegacyStock:400",
+      "section": "health.findings",
+      "originalIndex": 96,
+      "path": "server/src/models/StockMovement.ts",
+      "symbol": "consumeLegacyStock",
+      "line": 400,
+      "cyclomatic": 14,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/SupplierPaymentService.ts:<arrow>:24",
+      "section": "health.findings",
+      "originalIndex": 97,
+      "path": "server/src/services/SupplierPaymentService.ts",
+      "symbol": "<arrow>",
+      "line": 24,
+      "cyclomatic": 14,
+      "cognitive": 18,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/activityLogger.ts:flush:282",
+      "section": "health.findings",
+      "originalIndex": 98,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "flush",
+      "line": 282,
+      "cyclomatic": 14,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/backup-db.js:run:43",
+      "section": "health.findings",
+      "originalIndex": 99,
+      "path": "server/scripts/backup-db.js",
+      "symbol": "run",
+      "line": 43,
+      "cyclomatic": 13,
+      "cognitive": 17,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/config/database.ts:run:1238",
+      "section": "health.findings",
+      "originalIndex": 100,
+      "path": "server/src/config/database.ts",
+      "symbol": "run",
+      "line": 1238,
+      "cyclomatic": 13,
+      "cognitive": 25,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/accountingController.ts:openPeriod:232",
+      "section": "health.findings",
+      "originalIndex": 101,
+      "path": "server/src/controllers/accountingController.ts",
+      "symbol": "openPeriod",
+      "line": 232,
+      "cyclomatic": 13,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/employeeController.ts:applySalaryLoanDeduction:314",
+      "section": "health.findings",
+      "originalIndex": 102,
+      "path": "server/src/controllers/employeeController.ts",
+      "symbol": "applySalaryLoanDeduction",
+      "line": 314,
+      "cyclomatic": 13,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/employeeController.ts:trx:557",
+      "section": "health.findings",
+      "originalIndex": 103,
+      "path": "server/src/controllers/employeeController.ts",
+      "symbol": "trx",
+      "line": 557,
+      "cyclomatic": 13,
+      "cognitive": 5,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/inventoryController.ts:deleteWarehouse:463",
+      "section": "health.findings",
+      "originalIndex": 104,
+      "path": "server/src/controllers/inventoryController.ts",
+      "symbol": "deleteWarehouse",
+      "line": 463,
+      "cyclomatic": 13,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/userController.ts:createUser:64",
+      "section": "health.findings",
+      "originalIndex": 105,
+      "path": "server/src/controllers/userController.ts",
+      "symbol": "createUser",
+      "line": 64,
+      "cyclomatic": 13,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/userController.ts:toggleUserStatus:214",
+      "section": "health.findings",
+      "originalIndex": 106,
+      "path": "server/src/controllers/userController.ts",
+      "symbol": "toggleUserStatus",
+      "line": 214,
+      "cyclomatic": 13,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/OwnerWithdrawal.ts:getAll:331",
+      "section": "health.findings",
+      "originalIndex": 107,
+      "path": "server/src/models/OwnerWithdrawal.ts",
+      "symbol": "getAll",
+      "line": 331,
+      "cyclomatic": 13,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Production.ts:getAll:570",
+      "section": "health.findings",
+      "originalIndex": 108,
+      "path": "server/src/models/Production.ts",
+      "symbol": "getAll",
+      "line": 570,
+      "cyclomatic": 13,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/PurchaseReturn.ts:getAll:431",
+      "section": "health.findings",
+      "originalIndex": 109,
+      "path": "server/src/models/PurchaseReturn.ts",
+      "symbol": "getAll",
+      "line": 431,
+      "cyclomatic": 13,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/StockMovement.ts:getAll:595",
+      "section": "health.findings",
+      "originalIndex": 110,
+      "path": "server/src/models/StockMovement.ts",
+      "symbol": "getAll",
+      "line": 595,
+      "cyclomatic": 13,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/SupplierPrepayment.ts:<arrow>:81",
+      "section": "health.findings",
+      "originalIndex": 111,
+      "path": "server/src/models/SupplierPrepayment.ts",
+      "symbol": "<arrow>",
+      "line": 81,
+      "cyclomatic": 13,
+      "cognitive": 10,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/forecastService.ts:runModel:285",
+      "section": "health.findings",
+      "originalIndex": 112,
+      "path": "server/src/services/forecastService.ts",
+      "symbol": "runModel",
+      "line": 285,
+      "cyclomatic": 13,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/reportQueryEngine.ts:assertComputedNamesAreSafe:166",
+      "section": "health.findings",
+      "originalIndex": 113,
+      "path": "server/src/services/reportQueryEngine.ts",
+      "symbol": "assertComputedNamesAreSafe",
+      "line": 166,
+      "cyclomatic": 13,
+      "cognitive": 18,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/reportQueryEngine.ts:resolveNeededJoins:464",
+      "section": "health.findings",
+      "originalIndex": 114,
+      "path": "server/src/services/reportQueryEngine.ts",
+      "symbol": "resolveNeededJoins",
+      "line": 464,
+      "cyclomatic": 13,
+      "cognitive": 18,
+      "kind": "structural",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:scripts/openspec-archive-guard.js:parseArgv:58",
+      "section": "health.findings",
+      "originalIndex": 115,
+      "path": "scripts/openspec-archive-guard.js",
+      "symbol": "parseArgv",
+      "line": 58,
+      "cyclomatic": 12,
+      "cognitive": 18,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/repair-stock.ts:run:73",
+      "section": "health.findings",
+      "originalIndex": 116,
+      "path": "server/scripts/repair-stock.ts",
+      "symbol": "run",
+      "line": 73,
+      "cyclomatic": 12,
+      "cognitive": 22,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/employeeController.ts:addEmployeeDocument:630",
+      "section": "health.findings",
+      "originalIndex": 117,
+      "path": "server/src/controllers/employeeController.ts",
+      "symbol": "addEmployeeDocument",
+      "line": 630,
+      "cyclomatic": 12,
+      "cognitive": 10,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/inventoryController.ts:planOpeningStock:122",
+      "section": "health.findings",
+      "originalIndex": 118,
+      "path": "server/src/controllers/inventoryController.ts",
+      "symbol": "planOpeningStock",
+      "line": 122,
+      "cyclomatic": 12,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/invoiceController.ts:transaction:880",
+      "section": "health.findings",
+      "originalIndex": 119,
+      "path": "server/src/controllers/invoiceController.ts",
+      "symbol": "transaction",
+      "line": 880,
+      "cyclomatic": 12,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/ownerPersonalLoansController.ts:listLoans:85",
+      "section": "health.findings",
+      "originalIndex": 120,
+      "path": "server/src/controllers/ownerPersonalLoansController.ts",
+      "symbol": "listLoans",
+      "line": 85,
+      "cyclomatic": 12,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/ownerPersonalLoansController.ts:createLoan:170",
+      "section": "health.findings",
+      "originalIndex": 121,
+      "path": "server/src/controllers/ownerPersonalLoansController.ts",
+      "symbol": "createLoan",
+      "line": 170,
+      "cyclomatic": 12,
+      "cognitive": 10,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/ownerPersonalLoansController.ts:<arrow>:338",
+      "section": "health.findings",
+      "originalIndex": 122,
+      "path": "server/src/controllers/ownerPersonalLoansController.ts",
+      "symbol": "<arrow>",
+      "line": 338,
+      "cyclomatic": 12,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/purchaseOrderController.ts:voidGoodsReceipt:331",
+      "section": "health.findings",
+      "originalIndex": 123,
+      "path": "server/src/controllers/purchaseOrderController.ts",
+      "symbol": "voidGoodsReceipt",
+      "line": 331,
+      "cyclomatic": 12,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/purchaseReturnController.ts:createPurchaseReturn:71",
+      "section": "health.findings",
+      "originalIndex": 124,
+      "path": "server/src/controllers/purchaseReturnController.ts",
+      "symbol": "createPurchaseReturn",
+      "line": 71,
+      "cyclomatic": 12,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/middleware/activityLog.ts:res.on(\"finish\"):54",
+      "section": "health.findings",
+      "originalIndex": 125,
+      "path": "server/src/middleware/activityLog.ts",
+      "symbol": "res.on(\"finish\")",
+      "line": 54,
+      "cyclomatic": 12,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/ActivityLog.ts:find:112",
+      "section": "health.findings",
+      "originalIndex": 126,
+      "path": "server/src/models/ActivityLog.ts",
+      "symbol": "find",
+      "line": 112,
+      "cyclomatic": 12,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Invoice.ts:getReturnHistory:1226",
+      "section": "health.findings",
+      "originalIndex": 127,
+      "path": "server/src/models/Invoice.ts",
+      "symbol": "getReturnHistory",
+      "line": 1226,
+      "cyclomatic": 12,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Payment.ts:moveEditedPaymentLedgerDate:181",
+      "section": "health.findings",
+      "originalIndex": 128,
+      "path": "server/src/models/Payment.ts",
+      "symbol": "moveEditedPaymentLedgerDate",
+      "line": 181,
+      "cyclomatic": 12,
+      "cognitive": 22,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Payment.ts:getUnifiedPayments:381",
+      "section": "health.findings",
+      "originalIndex": 129,
+      "path": "server/src/models/Payment.ts",
+      "symbol": "getUnifiedPayments",
+      "line": 381,
+      "cyclomatic": 12,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Payment.ts:<arrow>:629",
+      "section": "health.findings",
+      "originalIndex": 130,
+      "path": "server/src/models/Payment.ts",
+      "symbol": "<arrow>",
+      "line": 629,
+      "cyclomatic": 12,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/PhysicalCount.ts:transaction:305",
+      "section": "health.findings",
+      "originalIndex": 131,
+      "path": "server/src/models/PhysicalCount.ts",
+      "symbol": "transaction",
+      "line": 305,
+      "cyclomatic": 12,
+      "cognitive": 24,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/PurchaseOrder.ts:getAll:235",
+      "section": "health.findings",
+      "originalIndex": 132,
+      "path": "server/src/models/PurchaseOrder.ts",
+      "symbol": "getAll",
+      "line": 235,
+      "cyclomatic": 12,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/PurchaseOrder.ts:run:687",
+      "section": "health.findings",
+      "originalIndex": 133,
+      "path": "server/src/models/PurchaseOrder.ts",
+      "symbol": "run",
+      "line": 687,
+      "cyclomatic": 12,
+      "cognitive": 16,
+      "kind": "structural",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/StockMovement.ts:postFinancialEntryForAdjustment:749",
+      "section": "health.findings",
+      "originalIndex": 134,
+      "path": "server/src/models/StockMovement.ts",
+      "symbol": "postFinancialEntryForAdjustment",
+      "line": 749,
+      "cyclomatic": 12,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/StockMovement.ts:run:1333",
+      "section": "health.findings",
+      "originalIndex": 135,
+      "path": "server/src/models/StockMovement.ts",
+      "symbol": "run",
+      "line": 1333,
+      "cyclomatic": 12,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/SupplierRefund.ts:create:138",
+      "section": "health.findings",
+      "originalIndex": 136,
+      "path": "server/src/models/SupplierRefund.ts",
+      "symbol": "create",
+      "line": 138,
+      "cyclomatic": 12,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/InvoiceCreationService.ts:validateInput:97",
+      "section": "health.findings",
+      "originalIndex": 137,
+      "path": "server/src/services/InvoiceCreationService.ts",
+      "symbol": "validateInput",
+      "line": 97,
+      "cyclomatic": 12,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/reportQueryEngine.ts:buildFilterExpression:637",
+      "section": "health.findings",
+      "originalIndex": 138,
+      "path": "server/src/services/reportQueryEngine.ts",
+      "symbol": "buildFilterExpression",
+      "line": 637,
+      "cyclomatic": 12,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/dev/audit-trace.ts:runAllMigrations:76",
+      "section": "health.findings",
+      "originalIndex": 139,
+      "path": "server/scripts/dev/audit-trace.ts",
+      "symbol": "runAllMigrations",
+      "line": 76,
+      "cyclomatic": 11,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/__tests__/accountingInvariants.test.ts:it(\"voiding a stock transfer twice: second a...\"):464",
+      "section": "health.findings",
+      "originalIndex": 140,
+      "path": "server/src/__tests__/accountingInvariants.test.ts",
+      "symbol": "it(\"voiding a stock transfer twice: second a...\")",
+      "line": 464,
+      "cyclomatic": 11,
+      "cognitive": 7,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/__tests__/auditRegression9.test.ts:it(\"splits materials + overhead between outp...\"):467",
+      "section": "health.findings",
+      "originalIndex": 141,
+      "path": "server/src/__tests__/auditRegression9.test.ts",
+      "symbol": "it(\"splits materials + overhead between outp...\")",
+      "line": 467,
+      "cyclomatic": 11,
+      "cognitive": 3,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/__tests__/search.test.ts:createFixture:13",
+      "section": "health.findings",
+      "originalIndex": 142,
+      "path": "server/src/__tests__/search.test.ts",
+      "symbol": "createFixture",
+      "line": 13,
+      "cyclomatic": 11,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/config/database.ts:runLedgered:162",
+      "section": "health.findings",
+      "originalIndex": 143,
+      "path": "server/src/config/database.ts",
+      "symbol": "runLedgered",
+      "line": 162,
+      "cyclomatic": 11,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/accountingController.ts:closePeriod:313",
+      "section": "health.findings",
+      "originalIndex": 144,
+      "path": "server/src/controllers/accountingController.ts",
+      "symbol": "closePeriod",
+      "line": 313,
+      "cyclomatic": 11,
+      "cognitive": 7,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/bomController.ts:createBOM:69",
+      "section": "health.findings",
+      "originalIndex": 145,
+      "path": "server/src/controllers/bomController.ts",
+      "symbol": "createBOM",
+      "line": 69,
+      "cyclomatic": 11,
+      "cognitive": 7,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/customReportsController.ts:updateReport:221",
+      "section": "health.findings",
+      "originalIndex": 146,
+      "path": "server/src/controllers/customReportsController.ts",
+      "symbol": "updateReport",
+      "line": 221,
+      "cyclomatic": 11,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/employeeController.ts:createEmployee:81",
+      "section": "health.findings",
+      "originalIndex": 147,
+      "path": "server/src/controllers/employeeController.ts",
+      "symbol": "createEmployee",
+      "line": 81,
+      "cyclomatic": 11,
+      "cognitive": 10,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/employeeController.ts:deleteSalaryPayment:521",
+      "section": "health.findings",
+      "originalIndex": 148,
+      "path": "server/src/controllers/employeeController.ts",
+      "symbol": "deleteSalaryPayment",
+      "line": 521,
+      "cyclomatic": 11,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/expenseController.ts:buildExpenseUpdatePayload:264",
+      "section": "health.findings",
+      "originalIndex": 149,
+      "path": "server/src/controllers/expenseController.ts",
+      "symbol": "buildExpenseUpdatePayload",
+      "line": 264,
+      "cyclomatic": 11,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/inventoryController.ts:resolveOpeningWarehouse:101",
+      "section": "health.findings",
+      "originalIndex": 150,
+      "path": "server/src/controllers/inventoryController.ts",
+      "symbol": "resolveOpeningWarehouse",
+      "line": 101,
+      "cyclomatic": 11,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/inventoryController.ts:createStockTransfer:669",
+      "section": "health.findings",
+      "originalIndex": 151,
+      "path": "server/src/controllers/inventoryController.ts",
+      "symbol": "createStockTransfer",
+      "line": 669,
+      "cyclomatic": 11,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/inventoryController.ts:correctBatchReconciliation:1258",
+      "section": "health.findings",
+      "originalIndex": 152,
+      "path": "server/src/controllers/inventoryController.ts",
+      "symbol": "correctBatchReconciliation",
+      "line": 1258,
+      "cyclomatic": 11,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/ownerPersonalLoansController.ts:createBorrower:625",
+      "section": "health.findings",
+      "originalIndex": 153,
+      "path": "server/src/controllers/ownerPersonalLoansController.ts",
+      "symbol": "createBorrower",
+      "line": 625,
+      "cyclomatic": 11,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/paymentsController.ts:updatePayment:357",
+      "section": "health.findings",
+      "originalIndex": 154,
+      "path": "server/src/controllers/paymentsController.ts",
+      "symbol": "updatePayment",
+      "line": 357,
+      "cyclomatic": 11,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/supplierBillController.ts:listSupplierBills:10",
+      "section": "health.findings",
+      "originalIndex": 155,
+      "path": "server/src/controllers/supplierBillController.ts",
+      "symbol": "listSupplierBills",
+      "line": 10,
+      "cyclomatic": 11,
+      "cognitive": 7,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/supplierPrepaymentController.ts:listSupplierPrepayments:10",
+      "section": "health.findings",
+      "originalIndex": 156,
+      "path": "server/src/controllers/supplierPrepaymentController.ts",
+      "symbol": "listSupplierPrepayments",
+      "line": 10,
+      "cyclomatic": 11,
+      "cognitive": 5,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/supplierRefundController.ts:createSupplierRefund:63",
+      "section": "health.findings",
+      "originalIndex": 157,
+      "path": "server/src/controllers/supplierRefundController.ts",
+      "symbol": "createSupplierRefund",
+      "line": 63,
+      "cyclomatic": 11,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Expense.ts:getAll:90",
+      "section": "health.findings",
+      "originalIndex": 158,
+      "path": "server/src/models/Expense.ts",
+      "symbol": "getAll",
+      "line": 90,
+      "cyclomatic": 11,
+      "cognitive": 10,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Invoice.ts:<arrow>:903",
+      "section": "health.findings",
+      "originalIndex": 159,
+      "path": "server/src/models/Invoice.ts",
+      "symbol": "<arrow>",
+      "line": 903,
+      "cyclomatic": 11,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/OwnerCapital.ts:getAll:85",
+      "section": "health.findings",
+      "originalIndex": 160,
+      "path": "server/src/models/OwnerCapital.ts",
+      "symbol": "getAll",
+      "line": 85,
+      "cyclomatic": 11,
+      "cognitive": 10,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Payment.ts:<arrow>:685",
+      "section": "health.findings",
+      "originalIndex": 161,
+      "path": "server/src/models/Payment.ts",
+      "symbol": "<arrow>",
+      "line": 685,
+      "cyclomatic": 11,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Purchase.ts:transaction:651",
+      "section": "health.findings",
+      "originalIndex": 162,
+      "path": "server/src/models/Purchase.ts",
+      "symbol": "transaction",
+      "line": 651,
+      "cyclomatic": 11,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Reports.ts:computeAPAging:317",
+      "section": "health.findings",
+      "originalIndex": 163,
+      "path": "server/src/models/Reports.ts",
+      "symbol": "computeAPAging",
+      "line": 317,
+      "cyclomatic": 11,
+      "cognitive": 15,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Role.ts:update:80",
+      "section": "health.findings",
+      "originalIndex": 164,
+      "path": "server/src/models/Role.ts",
+      "symbol": "update",
+      "line": 80,
+      "cyclomatic": 11,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/StockMovement.ts:run:1452",
+      "section": "health.findings",
+      "originalIndex": 165,
+      "path": "server/src/models/StockMovement.ts",
+      "symbol": "run",
+      "line": 1452,
+      "cyclomatic": 11,
+      "cognitive": 10,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/StockReservation.ts:create:22",
+      "section": "health.findings",
+      "originalIndex": 166,
+      "path": "server/src/models/StockReservation.ts",
+      "symbol": "create",
+      "line": 22,
+      "cyclomatic": 11,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/scripts/reconcile-stock-cash.ts:flagDuplicatePurchases:134",
+      "section": "health.findings",
+      "originalIndex": 167,
+      "path": "server/src/scripts/reconcile-stock-cash.ts",
+      "symbol": "flagDuplicatePurchases",
+      "line": 134,
+      "cyclomatic": 11,
+      "cognitive": 24,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/backupService.ts:runBackup:145",
+      "section": "health.findings",
+      "originalIndex": 168,
+      "path": "server/src/services/backupService.ts",
+      "symbol": "runBackup",
+      "line": 145,
+      "cyclomatic": 11,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/invoiceReturnService.ts:processReturn:280",
+      "section": "health.findings",
+      "originalIndex": 169,
+      "path": "server/src/services/invoiceReturnService.ts",
+      "symbol": "processReturn",
+      "line": 280,
+      "cyclomatic": 11,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/fixtures/unapplied-cash-ui.cjs:<arrow>:47",
+      "section": "health.findings",
+      "originalIndex": 170,
+      "path": "server/scripts/fixtures/unapplied-cash-ui.cjs",
+      "symbol": "<arrow>",
+      "line": 47,
+      "cyclomatic": 10,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/lib/correctionSafety.ts:assertCorrectionAuthorized:56",
+      "section": "health.findings",
+      "originalIndex": 171,
+      "path": "server/scripts/lib/correctionSafety.ts",
+      "symbol": "assertCorrectionAuthorized",
+      "line": 56,
+      "cyclomatic": 10,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/__tests__/cashTruth.test.ts:it(\"an unpaid purchase contributes nothing t...\"):68",
+      "section": "health.findings",
+      "originalIndex": 172,
+      "path": "server/src/__tests__/cashTruth.test.ts",
+      "symbol": "it(\"an unpaid purchase contributes nothing t...\")",
+      "line": 68,
+      "cyclomatic": 10,
+      "cognitive": 5,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/__tests__/reverseStockRestock.test.ts:it(\"return 2 then return 3 on same item; eac...\"):442",
+      "section": "health.findings",
+      "originalIndex": 173,
+      "path": "server/src/__tests__/reverseStockRestock.test.ts",
+      "symbol": "it(\"return 2 then return 3 on same item; eac...\")",
+      "line": 442,
+      "cyclomatic": 10,
+      "cognitive": 3,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/customReportsController.ts:createReport:179",
+      "section": "health.findings",
+      "originalIndex": 174,
+      "path": "server/src/controllers/customReportsController.ts",
+      "symbol": "createReport",
+      "line": 179,
+      "cyclomatic": 10,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/employeeController.ts:updateEmployee:141",
+      "section": "health.findings",
+      "originalIndex": 175,
+      "path": "server/src/controllers/employeeController.ts",
+      "symbol": "updateEmployee",
+      "line": 141,
+      "cyclomatic": 10,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/employeeController.ts:trx:427",
+      "section": "health.findings",
+      "originalIndex": 176,
+      "path": "server/src/controllers/employeeController.ts",
+      "symbol": "trx",
+      "line": 427,
+      "cyclomatic": 10,
+      "cognitive": 3,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/employeeController.ts:createLoan:751",
+      "section": "health.findings",
+      "originalIndex": 177,
+      "path": "server/src/controllers/employeeController.ts",
+      "symbol": "createLoan",
+      "line": 751,
+      "cyclomatic": 10,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/inventoryController.ts:updateWarehouse:395",
+      "section": "health.findings",
+      "originalIndex": 178,
+      "path": "server/src/controllers/inventoryController.ts",
+      "symbol": "updateWarehouse",
+      "line": 395,
+      "cyclomatic": 10,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/invoiceController.ts:getInvoices:125",
+      "section": "health.findings",
+      "originalIndex": 179,
+      "path": "server/src/controllers/invoiceController.ts",
+      "symbol": "getInvoices",
+      "line": 125,
+      "cyclomatic": 10,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/invoiceController.ts:resolveUpdatedInvoiceStatus:301",
+      "section": "health.findings",
+      "originalIndex": 180,
+      "path": "server/src/controllers/invoiceController.ts",
+      "symbol": "resolveUpdatedInvoiceStatus",
+      "line": 301,
+      "cyclomatic": 10,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/invoiceController.ts:transaction:779",
+      "section": "health.findings",
+      "originalIndex": 181,
+      "path": "server/src/controllers/invoiceController.ts",
+      "symbol": "transaction",
+      "line": 779,
+      "cyclomatic": 10,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/invoiceReturnController.ts:settleReturn:13",
+      "section": "health.findings",
+      "originalIndex": 182,
+      "path": "server/src/controllers/invoiceReturnController.ts",
+      "symbol": "settleReturn",
+      "line": 13,
+      "cyclomatic": 10,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/ownerPersonalLoansController.ts:<arrow>:197",
+      "section": "health.findings",
+      "originalIndex": 183,
+      "path": "server/src/controllers/ownerPersonalLoansController.ts",
+      "symbol": "<arrow>",
+      "line": 197,
+      "cyclomatic": 10,
+      "cognitive": 11,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/ownerPersonalLoansController.ts:addRepayment:398",
+      "section": "health.findings",
+      "originalIndex": 184,
+      "path": "server/src/controllers/ownerPersonalLoansController.ts",
+      "symbol": "addRepayment",
+      "line": 398,
+      "cyclomatic": 10,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/paymentsController.ts:createCustomerPayment:195",
+      "section": "health.findings",
+      "originalIndex": 185,
+      "path": "server/src/controllers/paymentsController.ts",
+      "symbol": "createCustomerPayment",
+      "line": 195,
+      "cyclomatic": 10,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/paymentsController.ts:createPayment:296",
+      "section": "health.findings",
+      "originalIndex": 186,
+      "path": "server/src/controllers/paymentsController.ts",
+      "symbol": "createPayment",
+      "line": 296,
+      "cyclomatic": 10,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/controllers/reportsController.ts:getCustomerStatements:29",
+      "section": "health.findings",
+      "originalIndex": 187,
+      "path": "server/src/controllers/reportsController.ts",
+      "symbol": "getCustomerStatements",
+      "line": 29,
+      "cyclomatic": 10,
+      "cognitive": 7,
+      "kind": "crap-only",
+      "owner": "controllers",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/migrations/backfillGlPreposting.ts:post:95",
+      "section": "health.findings",
+      "originalIndex": 188,
+      "path": "server/src/migrations/backfillGlPreposting.ts",
+      "symbol": "post",
+      "line": 95,
+      "cyclomatic": 10,
+      "cognitive": 7,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Customer.ts:create:159",
+      "section": "health.findings",
+      "originalIndex": 189,
+      "path": "server/src/models/Customer.ts",
+      "symbol": "create",
+      "line": 159,
+      "cyclomatic": 10,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/MobileInvoice.ts:toInvoiceStatus:174",
+      "section": "health.findings",
+      "originalIndex": 190,
+      "path": "server/src/models/MobileInvoice.ts",
+      "symbol": "toInvoiceStatus",
+      "line": 174,
+      "cyclomatic": 10,
+      "cognitive": 1,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/OwnerCapital.ts:update:154",
+      "section": "health.findings",
+      "originalIndex": 191,
+      "path": "server/src/models/OwnerCapital.ts",
+      "symbol": "update",
+      "line": 154,
+      "cyclomatic": 10,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Production.ts:normalizeOutputLines:135",
+      "section": "health.findings",
+      "originalIndex": 192,
+      "path": "server/src/models/Production.ts",
+      "symbol": "normalizeOutputLines",
+      "line": 135,
+      "cyclomatic": 10,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Production.ts:recordProduction:187",
+      "section": "health.findings",
+      "originalIndex": 193,
+      "path": "server/src/models/Production.ts",
+      "symbol": "recordProduction",
+      "line": 187,
+      "cyclomatic": 10,
+      "cognitive": 10,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Purchase.ts:writePurchaseRow:182",
+      "section": "health.findings",
+      "originalIndex": 194,
+      "path": "server/src/models/Purchase.ts",
+      "symbol": "writePurchaseRow",
+      "line": 182,
+      "cyclomatic": 10,
+      "cognitive": 10,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/PurchaseReturn.ts:assertDispositionAllowed:527",
+      "section": "health.findings",
+      "originalIndex": 195,
+      "path": "server/src/models/PurchaseReturn.ts",
+      "symbol": "assertDispositionAllowed",
+      "line": 527,
+      "cyclomatic": 10,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/StockMovement.ts:getStockBalances:899",
+      "section": "health.findings",
+      "originalIndex": 196,
+      "path": "server/src/models/StockMovement.ts",
+      "symbol": "getStockBalances",
+      "line": 899,
+      "cyclomatic": 10,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/SupplierRefund.ts:creditNoteRefundable:75",
+      "section": "health.findings",
+      "originalIndex": 197,
+      "path": "server/src/models/SupplierRefund.ts",
+      "symbol": "creditNoteRefundable",
+      "line": 75,
+      "cyclomatic": 10,
+      "cognitive": 6,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/UserPreferences.ts:parseRow:43",
+      "section": "health.findings",
+      "originalIndex": 198,
+      "path": "server/src/models/UserPreferences.ts",
+      "symbol": "parseRow",
+      "line": 43,
+      "cyclomatic": 10,
+      "cognitive": 7,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/routes/stockBatches.ts:router.get(\"/stock-batches\"):50",
+      "section": "health.findings",
+      "originalIndex": 199,
+      "path": "server/src/routes/stockBatches.ts",
+      "symbol": "router.get(\"/stock-batches\")",
+      "line": 50,
+      "cyclomatic": 10,
+      "cognitive": 22,
+      "kind": "structural",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/PaymentRecordingService.ts:<arrow>:36",
+      "section": "health.findings",
+      "originalIndex": 200,
+      "path": "server/src/services/PaymentRecordingService.ts",
+      "symbol": "<arrow>",
+      "line": 36,
+      "cyclomatic": 10,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/cashService.ts:normalizeCashMethod:62",
+      "section": "health.findings",
+      "originalIndex": 201,
+      "path": "server/src/services/cashService.ts",
+      "symbol": "normalizeCashMethod",
+      "line": 62,
+      "cyclomatic": 10,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/expressionValidator.ts:parseFactor:234",
+      "section": "health.findings",
+      "originalIndex": 202,
+      "path": "server/src/services/expressionValidator.ts",
+      "symbol": "parseFactor",
+      "line": 234,
+      "cyclomatic": 10,
+      "cognitive": 7,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/forecastService.ts:computeForecastAccuracy:948",
+      "section": "health.findings",
+      "originalIndex": 203,
+      "path": "server/src/services/forecastService.ts",
+      "symbol": "computeForecastAccuracy",
+      "line": 948,
+      "cyclomatic": 10,
+      "cognitive": 14,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/invoiceReturnService.ts:validateReturnLines:81",
+      "section": "health.findings",
+      "originalIndex": 204,
+      "path": "server/src/services/invoiceReturnService.ts",
+      "symbol": "validateReturnLines",
+      "line": 81,
+      "cyclomatic": 10,
+      "cognitive": 12,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/paymentValidation.ts:validateCustomerPayment:64",
+      "section": "health.findings",
+      "originalIndex": 205,
+      "path": "server/src/services/paymentValidation.ts",
+      "symbol": "validateCustomerPayment",
+      "line": 64,
+      "cyclomatic": 10,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/reportQueryEngine.ts:buildHavingClause:688",
+      "section": "health.findings",
+      "originalIndex": 206,
+      "path": "server/src/services/reportQueryEngine.ts",
+      "symbol": "buildHavingClause",
+      "line": 688,
+      "cyclomatic": 10,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/returnMath.ts:validateAllocations:299",
+      "section": "health.findings",
+      "originalIndex": 207,
+      "path": "server/src/services/returnMath.ts",
+      "symbol": "validateAllocations",
+      "line": 299,
+      "cyclomatic": 10,
+      "cognitive": 10,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/unappliedCashService.ts:<arrow>:70",
+      "section": "health.findings",
+      "originalIndex": 208,
+      "path": "server/src/services/unappliedCashService.ts",
+      "symbol": "<arrow>",
+      "line": 70,
+      "cyclomatic": 10,
+      "cognitive": 15,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/unappliedCashService.ts:<arrow>:128",
+      "section": "health.findings",
+      "originalIndex": 209,
+      "path": "server/src/services/unappliedCashService.ts",
+      "symbol": "<arrow>",
+      "line": 128,
+      "cyclomatic": 10,
+      "cognitive": 7,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/scripts/backfill-batches.ts:backfillProductions:34",
+      "section": "health.findings",
+      "originalIndex": 210,
+      "path": "server/src/scripts/backfill-batches.ts",
+      "symbol": "backfillProductions",
+      "line": 34,
+      "cyclomatic": 9,
+      "cognitive": 13,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/dev/audit-trace.ts:testFullPayment:462",
+      "section": "health.findings",
+      "originalIndex": 211,
+      "path": "server/scripts/dev/audit-trace.ts",
+      "symbol": "testFullPayment",
+      "line": 462,
+      "cyclomatic": 8,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/dev/audit-trace.ts:testCustomerStatement:1177",
+      "section": "health.findings",
+      "originalIndex": 212,
+      "path": "server/scripts/dev/audit-trace.ts",
+      "symbol": "testCustomerStatement",
+      "line": 1177,
+      "cyclomatic": 7,
+      "cognitive": 8,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/recompute-item-amounts.js:main:65",
+      "section": "health.findings",
+      "originalIndex": 213,
+      "path": "server/scripts/recompute-item-amounts.js",
+      "symbol": "main",
+      "line": 65,
+      "cyclomatic": 7,
+      "cognitive": 6,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/repair-stock.ts:repairOrphanedBatches:181",
+      "section": "health.findings",
+      "originalIndex": 214,
+      "path": "server/scripts/repair-stock.ts",
+      "symbol": "repairOrphanedBatches",
+      "line": 181,
+      "cyclomatic": 7,
+      "cognitive": 7,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Reports.ts:getCustomerStatements:14",
+      "section": "health.findings",
+      "originalIndex": 215,
+      "path": "server/src/models/Reports.ts",
+      "symbol": "getCustomerStatements",
+      "line": 14,
+      "cyclomatic": 7,
+      "cognitive": 6,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:docs/superpowers/verification/unapplied-cash-stage-d.cjs:main:76",
+      "section": "health.findings",
+      "originalIndex": 216,
+      "path": "docs/superpowers/verification/unapplied-cash-stage-d.cjs",
+      "symbol": "main",
+      "line": 76,
+      "cyclomatic": 6,
+      "cognitive": 4,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/backfill-ledger-dates.js:main:37",
+      "section": "health.findings",
+      "originalIndex": 217,
+      "path": "server/scripts/backfill-ledger-dates.js",
+      "symbol": "main",
+      "line": 37,
+      "cyclomatic": 6,
+      "cognitive": 5,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/dev/audit-trace.ts:testPartialPayment:569",
+      "section": "health.findings",
+      "originalIndex": 218,
+      "path": "server/scripts/dev/audit-trace.ts",
+      "symbol": "testPartialPayment",
+      "line": 569,
+      "cyclomatic": 6,
+      "cognitive": 5,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/dev/audit-trace.ts:testReturnWithFee:645",
+      "section": "health.findings",
+      "originalIndex": 219,
+      "path": "server/scripts/dev/audit-trace.ts",
+      "symbol": "testReturnWithFee",
+      "line": 645,
+      "cyclomatic": 6,
+      "cognitive": 5,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/dev/audit-trace.ts:testTransferBug:1061",
+      "section": "health.findings",
+      "originalIndex": 220,
+      "path": "server/scripts/dev/audit-trace.ts",
+      "symbol": "testTransferBug",
+      "line": 1061,
+      "cyclomatic": 6,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/recompute-item-amounts.js:computeLineAmount:34",
+      "section": "health.findings",
+      "originalIndex": 221,
+      "path": "server/scripts/recompute-item-amounts.js",
+      "symbol": "computeLineAmount",
+      "line": 34,
+      "cyclomatic": 6,
+      "cognitive": 6,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Supplier.ts:create:127",
+      "section": "health.findings",
+      "originalIndex": 222,
+      "path": "server/src/models/Supplier.ts",
+      "symbol": "create",
+      "line": 127,
+      "cyclomatic": 6,
+      "cognitive": 5,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/scripts/reconcile-stock-cash.ts:flagUnbatchableStock:44",
+      "section": "health.findings",
+      "originalIndex": 223,
+      "path": "server/src/scripts/reconcile-stock-cash.ts",
+      "symbol": "flagUnbatchableStock",
+      "line": 44,
+      "cyclomatic": 6,
+      "cognitive": 9,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/activityLogger.ts:logWithRequest:268",
+      "section": "health.findings",
+      "originalIndex": 224,
+      "path": "server/src/services/activityLogger.ts",
+      "symbol": "logWithRequest",
+      "line": 268,
+      "cyclomatic": 6,
+      "cognitive": 1,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:docs/superpowers/verification/unapplied-customer-payments.cjs:fixture:76",
+      "section": "health.findings",
+      "originalIndex": 225,
+      "path": "docs/superpowers/verification/unapplied-customer-payments.cjs",
+      "symbol": "fixture",
+      "line": 76,
+      "cyclomatic": 5,
+      "cognitive": 5,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/apply-customer15-correction.ts:<arrow>:145",
+      "section": "health.findings",
+      "originalIndex": 226,
+      "path": "server/scripts/apply-customer15-correction.ts",
+      "symbol": "<arrow>",
+      "line": 145,
+      "cyclomatic": 5,
+      "cognitive": 6,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/dedupe-po.js:main:40",
+      "section": "health.findings",
+      "originalIndex": 227,
+      "path": "server/scripts/dedupe-po.js",
+      "symbol": "main",
+      "line": 40,
+      "cyclomatic": 5,
+      "cognitive": 4,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/dedupe-po.js:tx:101",
+      "section": "health.findings",
+      "originalIndex": 228,
+      "path": "server/scripts/dedupe-po.js",
+      "symbol": "tx",
+      "line": 101,
+      "cyclomatic": 5,
+      "cognitive": 6,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/recompute-item-amounts.js:parseCurrency:28",
+      "section": "health.findings",
+      "originalIndex": 229,
+      "path": "server/scripts/recompute-item-amounts.js",
+      "symbol": "parseCurrency",
+      "line": 28,
+      "cyclomatic": 5,
+      "cognitive": 4,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/reconcile-customer-credits.ts:main:15",
+      "section": "health.findings",
+      "originalIndex": 230,
+      "path": "server/scripts/reconcile-customer-credits.ts",
+      "symbol": "main",
+      "line": 15,
+      "cyclomatic": 5,
+      "cognitive": 4,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/scripts/rollback-customer15-correction.ts:<arrow>:39",
+      "section": "health.findings",
+      "originalIndex": 231,
+      "path": "server/scripts/rollback-customer15-correction.ts",
+      "symbol": "<arrow>",
+      "line": 39,
+      "cyclomatic": 5,
+      "cognitive": 4,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/server.ts:getLocalIP:105",
+      "section": "health.findings",
+      "originalIndex": 232,
+      "path": "server/server.ts",
+      "symbol": "getLocalIP",
+      "line": 105,
+      "cyclomatic": 5,
+      "cognitive": 7,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/ActivityLog.ts:getStats:245",
+      "section": "health.findings",
+      "originalIndex": 233,
+      "path": "server/src/models/ActivityLog.ts",
+      "symbol": "getStats",
+      "line": 245,
+      "cyclomatic": 5,
+      "cognitive": 4,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Supplier.ts:safeSortBy:69",
+      "section": "health.findings",
+      "originalIndex": 234,
+      "path": "server/src/models/Supplier.ts",
+      "symbol": "safeSortBy",
+      "line": 69,
+      "cyclomatic": 5,
+      "cognitive": 4,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/models/Supplier.ts:getLedger:177",
+      "section": "health.findings",
+      "originalIndex": 235,
+      "path": "server/src/models/Supplier.ts",
+      "symbol": "getLedger",
+      "line": 177,
+      "cyclomatic": 5,
+      "cognitive": 4,
+      "kind": "crap-only",
+      "owner": "models",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/scripts/fix-duplicate-purchase.ts:fix:56",
+      "section": "health.findings",
+      "originalIndex": 236,
+      "path": "server/src/scripts/fix-duplicate-purchase.ts",
+      "symbol": "fix",
+      "line": 56,
+      "cyclomatic": 5,
+      "cognitive": 3,
+      "kind": "crap-only",
+      "owner": "remaining",
+      "status": "pending-fresh-mapped-coverage"
+    },
+    {
+      "id": "health:server/src/services/forecastService.ts:calculateHolts:157",
+      "section": "health.findings",
+      "originalIndex": 237,
+      "path": "server/src/services/forecastService.ts",
+      "symbol": "calculateHolts",
+      "line": 157,
+      "cyclomatic": 5,
+      "cognitive": 4,
+      "kind": "crap-only",
+      "owner": "services",
+      "status": "pending-fresh-mapped-coverage"
+    }
+  ]
+}

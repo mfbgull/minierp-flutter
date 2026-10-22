@@ -149,6 +149,16 @@ async function getFirstWarehouseId(): Promise<number> {
 // Invariant lifecycle test
 // ---------------------------------------------------------------------
 
+function expectOperationStatus(
+  response: { readonly status: number; readonly body: unknown },
+  operation: string,
+  acceptedStatuses: readonly number[] = [201, 200],
+): void {
+  if (!acceptedStatuses.includes(response.status)) {
+    throw new Error(`${operation}: ${response.status} ${JSON.stringify(response.body)}`);
+  }
+}
+
 describe('Accounting invariants over a full lifecycle', () => {
   it('holds after invoice → payment → return → cancel; purchase → payment → return', async () => {
     // --- Baseline before any of our activity.
@@ -160,9 +170,7 @@ describe('Accounting invariants over a full lifecycle', () => {
       .post('/api/owner-equity/capital')
       .set('Cookie', token)
       .send({ capital_date: '2026-09-01', amount: 10000 });
-    if (capRes.status !== 201 && capRes.status !== 200) {
-      throw new Error(`capital: ${capRes.status} ${JSON.stringify(capRes.body)}`);
-    }
+    expectOperationStatus(capRes, 'capital');
     expectAllInvariantsHold('after capital');
 
     // --- Sales side -----------------------------------------------------
@@ -182,9 +190,7 @@ describe('Accounting invariants over a full lifecycle', () => {
         items: [{ item_id: itemId, quantity: 10, unit_price: 15, warehouse_id: warehouseId }],
       });
     const invoice = invRes.body?.data ?? invRes.body;
-    if (invRes.status !== 201 && invRes.status !== 200) {
-      throw new Error(`createInvoice: ${invRes.status} ${JSON.stringify(invRes.body)}`);
-    }
+    expectOperationStatus(invRes, 'createInvoice');
     expectAllInvariantsHold('after invoice');
 
     // Pay 100 of the 150 invoice.
@@ -198,9 +204,7 @@ describe('Accounting invariants over a full lifecycle', () => {
         payment_method: 'cash',
         invoice_allocations: [{ invoice_id: invoice.id, amount: 100 }],
       });
-    if (payRes.status !== 201 && payRes.status !== 200) {
-      throw new Error(`payment: ${payRes.status} ${JSON.stringify(payRes.body)}`);
-    }
+    expectOperationStatus(payRes, 'payment');
     expectAllInvariantsHold('after payment');
 
     // ACC-18: Partial return of 4 units (60 of 150) with disposition 'refund'
@@ -231,9 +235,7 @@ describe('Accounting invariants over a full lifecycle', () => {
     `).all(invoice.id) as Array<{ id: number }>;
     for (const p of leftover) {
       const voidRes = await request(app).delete(`/api/payments/${p.id}`).set('Cookie', token);
-      if (voidRes.status !== 200 && voidRes.status !== 204) {
-        throw new Error(`void leftover payment: ${voidRes.status} ${JSON.stringify(voidRes.body)}`);
-      }
+      expectOperationStatus(voidRes, 'void leftover payment', [200, 204]);
     }
     expectAllInvariantsHold('after voiding leftover payment');
 
@@ -255,18 +257,14 @@ describe('Accounting invariants over a full lifecycle', () => {
         items: [{ item_id: itemId, quantity: 2, unit_price: 15, warehouse_id: warehouseId }],
       });
     const invoice2 = inv2Res.body?.data ?? inv2Res.body;
-    if (inv2Res.status !== 201 && inv2Res.status !== 200) {
-      throw new Error(`createInvoice2: ${inv2Res.status} ${JSON.stringify(inv2Res.body)}`);
-    }
+    expectOperationStatus(inv2Res, 'createInvoice2');
 
     // Cancel the untouched invoice (C1 path).
     const cancelRes = await request(app)
       .put(`/api/invoices/${invoice2.id}/cancel`)
       .set('Cookie', token)
       .send({});
-    if (cancelRes.status !== 200) {
-      throw new Error(`cancel: ${cancelRes.status} ${JSON.stringify(cancelRes.body)}`);
-    }
+    expectOperationStatus(cancelRes, 'cancel', [200]);
     expectAllInvariantsHold('after invoice cancel');
 
     // --- Purchase side ---------------------------------------------------
@@ -275,9 +273,7 @@ describe('Accounting invariants over a full lifecycle', () => {
       .set('Cookie', token)
       .send({ supplier_name: `INV Sup ${seq}`, supplier_code: `INV-S-${seq}` });
     const supplier = supRes.body?.data ?? supRes.body;
-    if (supRes.status !== 201 && supRes.status !== 200) {
-      throw new Error(`createSupplier: ${supRes.status} ${JSON.stringify(supRes.body)}`);
-    }
+    expectOperationStatus(supRes, 'createSupplier');
 
     const poRes = await request(app)
       .post('/api/purchase-orders')
@@ -288,9 +284,7 @@ describe('Accounting invariants over a full lifecycle', () => {
         items: [{ item_id: itemId, quantity: 20, unit_price: 8 }],
       });
     const po = poRes.body?.data ?? poRes.body;
-    if (poRes.status !== 201 && poRes.status !== 200) {
-      throw new Error(`createPO: ${poRes.status} ${JSON.stringify(poRes.body)}`);
-    }
+    expectOperationStatus(poRes, 'createPO');
     await request(app).post(`/api/purchase-orders/${po.id}/status`)
       .set('Cookie', token).send({ status: 'Submitted' });
     expectAllInvariantsHold('after PO (no GL yet)');
@@ -306,9 +300,7 @@ describe('Accounting invariants over a full lifecycle', () => {
         payment_method: 'cash',
         po_allocations: [{ po_id: po.id, amount: 80 }],
       });
-    if (supPay.status !== 201 && supPay.status !== 200) {
-      throw new Error(`supplier payment: ${supPay.status} ${JSON.stringify(supPay.body)}`);
-    }
+    expectOperationStatus(supPay, 'supplier payment');
     expectAllInvariantsHold('after supplier payment');
 
     // PO cancel after payment — payment must be handled (C3).
@@ -316,9 +308,7 @@ describe('Accounting invariants over a full lifecycle', () => {
       .post(`/api/purchase-orders/${po.id}/status`)
       .set('Cookie', token)
       .send({ status: 'Cancelled' });
-    if (poCancel.status !== 200) {
-      throw new Error(`PO cancel: ${poCancel.status} ${JSON.stringify(poCancel.body)}`);
-    }
+    expectOperationStatus(poCancel, 'PO cancel', [200]);
     expectAllInvariantsHold('after PO cancel');
   });
 });

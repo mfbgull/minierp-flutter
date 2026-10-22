@@ -1,3 +1,5 @@
+import { localMonthCode } from '../utils/documentNumbering';
+import { listPagination, rawListPageQuery } from '../utils/controllerPagination';
 import { Request, Response } from 'express';
 import { getQueryParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
@@ -11,11 +13,15 @@ import { initializeSequenceFromMax, getNextSequenceNumber } from '../utils/seque
 
 import { errorCode } from '../utils/errorMessage';
 
+function findSupplierForResponse(supplierId: number, res: Response) {
+  const record = SupplierModel.getById(supplierId, db);
+  if (!record) res.status(404).json({ success: false, error: 'Supplier not found' });
+  return record;
+}
+
 function getSuppliers(req: Request, res: Response): void {
   try {
-    const pageParam = getQueryParam(req.query.page);
-    const limitParam = getQueryParam(req.query.limit);
-    const searchParam = getQueryParam(req.query.search);
+    const { pageParam, limitParam, searchParam } = rawListPageQuery(req.query);
     const sortByParam = getQueryParam(req.query.sortBy);
     const sortOrderParam = getQueryParam(req.query.sortOrder);
     const statusParam = getQueryParam(req.query.status);
@@ -35,13 +41,7 @@ function getSuppliers(req: Request, res: Response): void {
     res.json({
       success: true,
       data: suppliers,
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        totalItems: total,
-        hasNext: page < Math.ceil(total / limit),
-        hasPrev: page > 1
-      }
+      pagination: listPagination(total, page, limit)
     });
   } catch (error) {
     logger.error('Error fetching suppliers:', error);
@@ -53,12 +53,8 @@ function getSupplier(req: Request, res: Response): void {
   try {
     const { id } = req.params;
     const supplierId = parseInt(Array.isArray(id) ? id[0] : id, 10);
-    const supplier = SupplierModel.getById(supplierId, db);
-
-    if (!supplier) {
-      res.status(404).json({ success: false, error: 'Supplier not found' });
-      return;
-    }
+    const supplier = findSupplierForResponse(supplierId, res);
+    if (!supplier) return;
 
     res.json({ success: true, data: supplier });
   } catch (error) {
@@ -269,11 +265,8 @@ function getSupplierById(req: Request, res: Response): void {
   try {
     const { id } = req.params;
     const supplierId = parseInt(Array.isArray(id) ? id[0] : id, 10);
-    const supplier = SupplierModel.getById(supplierId, db);
-    if (!supplier) {
-      res.status(404).json({ success: false, error: 'Supplier not found' });
-      return;
-    }
+    const supplier = findSupplierForResponse(supplierId, res);
+    if (!supplier) return;
     res.json({ success: true, data: supplier });
   } catch {
     res.status(500).json({ success: false, error: 'Failed to fetch supplier' });
@@ -285,9 +278,7 @@ function getNextSupplierCode(req: Request, res: Response): void {
     initializeSequenceFromMax(db, 'SUP_last_no', 'suppliers', 'supplier_code', 'SUP-');
     const nextNumber = getNextSequenceNumber(db, 'SUP_last_no');
     const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    const code = `SUP-${month}${year}-${String(nextNumber).padStart(5, '0')}`;
+    const code = `SUP-${localMonthCode(now)}-${String(nextNumber).padStart(5, '0')}`;
     res.json({ success: true, data: { code } });
   } catch (error) {
     logger.error('Error generating supplier code:', error);
@@ -309,11 +300,8 @@ function getSupplierLedger(req: Request, res: Response): void {
 
     const sortParams = sanitizeSortParams(sortBy, sortOrder, LEDGER_SORT_COLUMNS as unknown as string[], 'transaction_date', 'DESC');
 
-    const supplier = SupplierModel.getById(supplierId, db);
-    if (!supplier) {
-      res.status(404).json({ success: false, error: 'Supplier not found' });
-      return;
-    }
+    const supplier = findSupplierForResponse(supplierId, res);
+    if (!supplier) return;
 
     // Task 8.7: bounded ledger listing with a pagination envelope.
     // Optional inclusive fromDate/toDate bounds (unified detail date picker)
@@ -341,11 +329,8 @@ function getSupplierStatement(req: Request, res: Response): void {
     const toDate = toDateParam as string;
 
     const supplierId = parseInt(Array.isArray(id) ? id[0] : id, 10);
-    const supplier = SupplierModel.getById(supplierId, db);
-    if (!supplier) {
-      res.status(404).json({ success: false, error: 'Supplier not found' });
-      return;
-    }
+    const supplier = findSupplierForResponse(supplierId, res);
+    if (!supplier) return;
 
     const { transactions, openingBalance } = SupplierModel.getStatement(supplierId, fromDate, toDate, db);
 

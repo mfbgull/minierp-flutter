@@ -9,9 +9,8 @@ import { getQueryParam } from '../utils/queryUtils';
 import {
   InvoiceReturnService,
   ReturnError,
-  type SettlementInput,
 } from '../services/invoiceReturnService';
-import type { FeeType } from '../services/returnMath';
+import { invoiceReturnOptions } from '../utils/controllerInvoiceReturn';
 import { generateDocNo } from '../utils/sequence';
 import {
   IDEMPOTENCY_KEY_HEADER,
@@ -146,6 +145,58 @@ export async function getPaymentTerms(req: AuthRequest, res: Response) {
   }
 }
 
+function replayMobileInvoice(req: AuthRequest, res: Response, idemKey: string | null): { hash: string; replayed: boolean } {
+  const idemHash = idemKey ? hashRequestPayload(req.body) : '';
+  if (idemKey) {
+    const existing = findIdempotencyRecord(db, MOBILE_INVOICE_CREATE_SCOPE, idemKey);
+    if (existing) {
+      if (existing.request_hash !== idemHash) {
+        res.status(409).json({
+          success: false,
+          error: 'Idempotency-Key was already used with a different request payload',
+        });
+        return { hash: idemHash, replayed: true };
+      }
+      if (existing.resource_id != null) {
+        const original = MobileInvoiceModel.getInvoiceWithCustomer(db, existing.resource_id);
+        if (original) {
+          res.set('X-Idempotent-Replay', 'true');
+          res.status(201).json({ success: true, data: original, message: 'Invoice created successfully' });
+          return { hash: idemHash, replayed: true };
+        }
+      }
+    }
+  }
+
+  return { hash: idemHash, replayed: false };
+}
+
+function handleMobileSubmitError(res: Response, error: unknown) {
+  if (error instanceof SellableStockUnavailableError) {
+    logger.warn('Submit invoice rejected:', { error: error.message });
+    // Keep the mobile error envelope ({success: false}); the message
+    // names the item and shortfall.
+    res.status(400).json({ success: false, error: error.message });
+    return;
+  }
+  if (
+    error instanceof InvoiceCreationTotalMismatchError ||
+    error instanceof InvoiceCreationPaymentMethodError ||
+    error instanceof InvoiceCreationCreditError ||
+    error instanceof InvoiceCreationOffsetError
+  ) {
+    logger.warn('Submit invoice rejected:', { error: error.message });
+    res.status(400).json({ success: false, error: error.message });
+    return;
+  }
+  if (error instanceof InvoiceCreationIdempotencyError) {
+    logger.warn('Submit invoice idempotency conflict:', { error: error.message });
+    res.status(409).json({ success: false, error: error.message });
+    return;
+  }
+  handleBusinessError(res, error, 'Submit invoice', 'Failed to create invoice', { success: true });
+}
+
 export async function submitInvoice(req: AuthRequest, res: Response) {
   try {
     const { draft_id, customer_id, invoice_date, due_date, status, terms, notes, items, record_payment, payment } = req.body;
@@ -171,25 +222,8 @@ export async function submitInvoice(req: AuthRequest, res: Response) {
         userAgent: req.headers['user-agent'],
       });
     }
-    const idemHash = idemKey ? hashRequestPayload(req.body) : '';
-    if (idemKey) {
-      const existing = findIdempotencyRecord(db, MOBILE_INVOICE_CREATE_SCOPE, idemKey);
-      if (existing) {
-        if (existing.request_hash !== idemHash) {
-          return res.status(409).json({
-            success: false,
-            error: 'Idempotency-Key was already used with a different request payload',
-          });
-        }
-        if (existing.resource_id != null) {
-          const original = MobileInvoiceModel.getInvoiceWithCustomer(db, existing.resource_id);
-          if (original) {
-            res.set('X-Idempotent-Replay', 'true');
-            return res.status(201).json({ success: true, data: original, message: 'Invoice created successfully' });
-          }
-        }
-      }
-    }
+    const { hash: idemHash, replayed } = replayMobileInvoice(req, res, idemKey);
+    if (replayed) return;
 
     const resolvedInvoiceNo = generateDocNo(db, 'INV', 5);
     const invoiceId = MobileInvoiceModel.submitInvoice(db, {
@@ -211,29 +245,7 @@ export async function submitInvoice(req: AuthRequest, res: Response) {
     const createdInvoice = MobileInvoiceModel.getInvoiceWithCustomer(db, invoiceId);
     res.status(201).json({ success: true, data: createdInvoice, message: 'Invoice created successfully' });
   } catch (error) {
-    if (error instanceof SellableStockUnavailableError) {
-      logger.warn('Submit invoice rejected:', { error: error.message });
-      // Keep the mobile error envelope ({success: false}); the message
-      // names the item and shortfall.
-      res.status(400).json({ success: false, error: error.message });
-      return;
-    }
-    if (
-      error instanceof InvoiceCreationTotalMismatchError ||
-      error instanceof InvoiceCreationPaymentMethodError ||
-      error instanceof InvoiceCreationCreditError ||
-      error instanceof InvoiceCreationOffsetError
-    ) {
-      logger.warn('Submit invoice rejected:', { error: error.message });
-      res.status(400).json({ success: false, error: error.message });
-      return;
-    }
-    if (error instanceof InvoiceCreationIdempotencyError) {
-      logger.warn('Submit invoice idempotency conflict:', { error: error.message });
-      res.status(409).json({ success: false, error: error.message });
-      return;
-    }
-    handleBusinessError(res, error, 'Submit invoice', 'Failed to create invoice', { success: true });
+    return handleMobileSubmitError(res, error);
   }
 }
 
@@ -274,24 +286,8 @@ export async function processReturn(req: AuthRequest, res: Response) {
     const result = InvoiceReturnService.processReturn({
       invoiceId,
       items,
-      feeType: (body.fee_type as FeeType | undefined) ?? undefined,
-      feeValue: body.fee_value !== undefined ? Number(body.fee_value) : undefined,
-      returnDate: body.return_date ? String(body.return_date) : null,
-      warehouseId:
-        body.warehouse_id === undefined || body.warehouse_id === null || body.warehouse_id === ''
-          ? null
-          : Number(body.warehouse_id),
+      ...invoiceReturnOptions(body),
       reason: body.reason ? String(body.reason) : legacyReason || null,
-      settlements:
-        Array.isArray(body.settlements) && body.settlements.length > 0
-          ? (body.settlements as SettlementInput[])
-          : null,
-      disposition: (body.disposition as 'refund' | 'credit' | 'adjust' | null) ?? null,
-      adjustInvoiceIds: Array.isArray(body.adjust_invoice_ids)
-        ? (body.adjust_invoice_ids as number[])
-        : null,
-      deductionType: (body.deduction_type as 'fixed' | 'percentage' | 'flat' | null) ?? null,
-      deductionValue: body.deduction_value !== undefined ? Number(body.deduction_value) : undefined,
       userId,
     });
 

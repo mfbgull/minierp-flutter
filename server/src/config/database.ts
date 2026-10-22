@@ -1097,6 +1097,18 @@ function runPaymentsCustomerNullableRebuild(): void {
 
 const BATCH_SOURCE_TYPES = "('PRODUCTION','PURCHASE','GOODS_RECEIPT','RETURN','ADJUSTMENT','OPENING','TRANSFER','RECON')";
 
+function optionalStockBatchDefinitions(columnNames: readonly string[]): string[] {
+  const definitions = {
+    created_at: 'created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+    expiry_date: 'expiry_date DATE',
+    halted: 'halted BOOLEAN DEFAULT 0',
+    halted_reason: 'halted_reason TEXT',
+  } as const;
+  return Object.entries(definitions)
+    .filter(([name]) => columnNames.includes(name))
+    .map(([, definition]) => definition);
+}
+
 function runBatchSourceTypeRebuild(): void {
   // INV-10 / INV-22: widen stock_batches.source_type to a disjoint
   // namespace per origin table and re-stamp existing rows.
@@ -1146,13 +1158,9 @@ function runBatchSourceTypeRebuild(): void {
       if (hasHalted) insertCols.push('halted');
       if (hasHaltedReason) insertCols.push('halted_reason');
       // Create the new table without optional columns when the source lacks them.
-      const optionalCols: string[] = [];
-      if (hasCreatedAt) optionalCols.push('created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
-      if (hasExpiry) optionalCols.push('expiry_date DATE');
       // FEFO halt columns (add-item-expiry-tracking.sql) — dropping these
       // silently breaks invoice creation's batch consumption.
-      if (hasHalted) optionalCols.push('halted BOOLEAN DEFAULT 0');
-      if (hasHaltedReason) optionalCols.push('halted_reason TEXT');
+      const optionalCols = optionalStockBatchDefinitions(batchCols.map(column => column.name));
       const newTableSQL = `
         CREATE TABLE stock_batches_new (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1235,23 +1243,50 @@ function runStockCoverageReconciliation(): void {
   if (mismatches.length === 0) return;
   logger.info(`Reconciling ${mismatches.length} batch/balance coverage mismatch(es)...`);
 
+  const trimOvercoverage = (m: typeof mismatches[number], delta: number): void => {
+    let toTrim = -delta;
+    const layers = db.prepare(`
+      SELECT id, quantity_remaining FROM stock_batches
+      WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
+      ORDER BY received_date DESC, id DESC
+    `).all(m.item_id, m.warehouse_id) as Array<{ id: number; quantity_remaining: number }>;
+    for (const layer of layers) {
+      if (toTrim <= 0.0005) break;
+      const trim = Math.min(layer.quantity_remaining, toTrim);
+      db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?').run(trim, layer.id);
+      toTrim -= trim;
+    }
+    logger.info(`  item ${m.item_id}/wh ${m.warehouse_id}: trimmed over-coverage by ${(-delta).toFixed(3)}`);
+  };
+
+  const postCoverageAdjustment = (m: typeof mismatches[number], delta: number, unitCost: number): void => {
+    const value = delta * unitCost;
+    if (value > 0.005 && db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='journal_entries'`).get()) {
+      const desc = `Coverage reconciliation: +${delta} units @ ${unitCost} (item ${m.item_id}, warehouse ${m.warehouse_id})`;
+      const je = db.prepare(`
+        INSERT INTO journal_entries (reference_type, reference_id, entry_date, description, debit_account, credit_account, amount, voided)
+        VALUES ('RECON', 0, ?, ?, '1200', '4999', ?, 0)
+      `).run(new Date().toISOString().split('T')[0], desc, value);
+      const jeId = je.lastInsertRowid as number;
+      const invAcc = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1200'`).get() as { id: number } | undefined;
+      const adjAcc = db.prepare(`SELECT id FROM chart_of_accounts WHERE code IN ('4999','4000') ORDER BY code DESC LIMIT 1`).get() as { id: number } | undefined;
+      if (invAcc && adjAcc) {
+        const lines = db.prepare(`
+          INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, line_date)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        const today = new Date().toISOString().split('T')[0];
+        lines.run(jeId, invAcc.id, value, 0, 'Inventory increase (coverage reconciliation)', today);
+        lines.run(jeId, adjAcc.id, 0, value, 'Coverage reconciliation adjustment', today);
+      }
+    }
+  };
+
   const run = db.transaction(() => {
     for (const m of mismatches) {
       const delta = m.balance_qty - m.covered; // >0 under-covered, <0 over-covered
       if (delta < 0) {
-        let toTrim = -delta;
-        const layers = db.prepare(`
-          SELECT id, quantity_remaining FROM stock_batches
-          WHERE item_id = ? AND warehouse_id = ? AND quantity_remaining > 0
-          ORDER BY received_date DESC, id DESC
-        `).all(m.item_id, m.warehouse_id) as Array<{ id: number; quantity_remaining: number }>;
-        for (const layer of layers) {
-          if (toTrim <= 0.0005) break;
-          const trim = Math.min(layer.quantity_remaining, toTrim);
-          db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?').run(trim, layer.id);
-          toTrim -= trim;
-        }
-        logger.info(`  item ${m.item_id}/wh ${m.warehouse_id}: trimmed over-coverage by ${(-delta).toFixed(3)}`);
+        trimOvercoverage(m, delta);
       } else {
         const avg = db.prepare(`
           SELECT COALESCE(SUM(quantity * unit_cost) * 1.0 / NULLIF(SUM(quantity), 0), 0) AS cost
@@ -1277,26 +1312,7 @@ function runStockCoverageReconciliation(): void {
           new Date().toISOString().split('T')[0]
         );
 
-        const value = delta * unitCost;
-        if (value > 0.005 && db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='journal_entries'`).get()) {
-          const desc = `Coverage reconciliation: +${delta} units @ ${unitCost} (item ${m.item_id}, warehouse ${m.warehouse_id})`;
-          const je = db.prepare(`
-            INSERT INTO journal_entries (reference_type, reference_id, entry_date, description, debit_account, credit_account, amount, voided)
-            VALUES ('RECON', 0, ?, ?, '1200', '4999', ?, 0)
-          `).run(new Date().toISOString().split('T')[0], desc, value);
-          const jeId = je.lastInsertRowid as number;
-          const invAcc = db.prepare(`SELECT id FROM chart_of_accounts WHERE code = '1200'`).get() as { id: number } | undefined;
-          const adjAcc = db.prepare(`SELECT id FROM chart_of_accounts WHERE code IN ('4999','4000') ORDER BY code DESC LIMIT 1`).get() as { id: number } | undefined;
-          if (invAcc && adjAcc) {
-            const lines = db.prepare(`
-              INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, line_date)
-              VALUES (?, ?, ?, ?, ?, ?)
-            `);
-            const today = new Date().toISOString().split('T')[0];
-            lines.run(jeId, invAcc.id, value, 0, 'Inventory increase (coverage reconciliation)', today);
-            lines.run(jeId, adjAcc.id, 0, value, 'Coverage reconciliation adjustment', today);
-          }
-        }
+        postCoverageAdjustment(m, delta, unitCost);
         logger.info(`  item ${m.item_id}/wh ${m.warehouse_id}: minted RECON layer of ${delta} @ ${unitCost}`);
       }
     }
@@ -1362,11 +1378,7 @@ function runStockInvariantChecksRebuild(): void {
       }
       if (batchNeeds) {
         const cols0 = (db.prepare(`SELECT name FROM pragma_table_info('stock_batches')`).all() as Array<{ name: string }>).map(c => c.name);
-        const optionalDefs: string[] = [];
-        if (cols0.includes('created_at')) optionalDefs.push('created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
-        if (cols0.includes('expiry_date')) optionalDefs.push('expiry_date DATE');
-        if (cols0.includes('halted')) optionalDefs.push('halted BOOLEAN DEFAULT 0');
-        if (cols0.includes('halted_reason')) optionalDefs.push('halted_reason TEXT');
+        const optionalDefs = optionalStockBatchDefinitions(cols0);
         db.exec(`
           CREATE TABLE stock_batches_inv (
               id INTEGER PRIMARY KEY AUTOINCREMENT,

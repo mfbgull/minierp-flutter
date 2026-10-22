@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { validateSalesDocumentItems, validateSalesWarehouse } from './salesDocumentValidation';
 import { generateDocNo } from '../utils/sequence';
 import { sanitizeSortParams, QUOTATION_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import { SalesOrderWithWarehouse, InvoiceWithUsername } from '../types';
@@ -122,33 +123,10 @@ class QuotationModel {
       }
 
       // Validate warehouse if provided
-      if (warehouse_id) {
-        const warehouse = db.prepare('SELECT id FROM warehouses WHERE id = ? AND is_active = 1').get(warehouse_id);
-        if (!warehouse) {
-          throw new Error('Warehouse not found or inactive');
-        }
-      }
+      validateSalesWarehouse(db, warehouse_id);
 
       // Validate items
-      if (!items || items.length === 0) {
-        throw new Error('Quotation must have at least one item');
-      }
-
-      for (const item of items) {
-        const dbItem = db.prepare('SELECT id, is_active FROM items WHERE id = ?').get(item.item_id) as { id: number; is_active: number } | undefined;
-        if (!dbItem) {
-          throw new Error(`Item ${item.item_id} not found`);
-        }
-        if (!dbItem.is_active) {
-          throw new Error(`Item ${item.item_id} is inactive`);
-        }
-        if (item.quantity <= 0) {
-          throw new Error('Item quantity must be positive');
-        }
-        if (item.unit_price < 0) {
-          throw new Error('Item unit price cannot be negative');
-        }
-      }
+      validateSalesDocumentItems(db, items, 'Quotation');
 
       // Generate quotation number
       const quotationNo = this.generateQuotationNo(db);
@@ -416,47 +394,50 @@ class QuotationModel {
         }
       }
 
-      // Update header
-      const updateFields: string[] = [];
-      const updateParams: SqlParam[] = [];
+      const updateHeader = (): void => {
+        // Update header
+        const updateFields: string[] = [];
+        const updateParams: SqlParam[] = [];
 
-      if (customer_id !== undefined) {
-        updateFields.push('customer_id = ?');
-        updateParams.push(customer_id);
-      }
-      if (customer_name !== undefined) {
-        updateFields.push('customer_name = ?');
-        updateParams.push(customer_name);
-      }
-      if (quotation_date !== undefined) {
-        updateFields.push('quotation_date = ?');
-        updateParams.push(quotation_date);
-      }
-      if (expiry_date !== undefined) {
-        updateFields.push('expiry_date = ?');
-        updateParams.push(expiry_date);
-      }
-      if (status !== undefined) {
-        updateFields.push('status = ?');
-        updateParams.push(status);
-      }
-      if (notes !== undefined) {
-        updateFields.push('notes = ?');
-        updateParams.push(notes);
-      }
-      if (terms !== undefined) {
-        updateFields.push('terms = ?');
-        updateParams.push(terms);
-      }
-      if (warehouse_id !== undefined) {
-        updateFields.push('warehouse_id = ?');
-        updateParams.push(warehouse_id);
-      }
+        if (customer_id !== undefined) {
+          updateFields.push('customer_id = ?');
+          updateParams.push(customer_id);
+        }
+        if (customer_name !== undefined) {
+          updateFields.push('customer_name = ?');
+          updateParams.push(customer_name);
+        }
+        if (quotation_date !== undefined) {
+          updateFields.push('quotation_date = ?');
+          updateParams.push(quotation_date);
+        }
+        if (expiry_date !== undefined) {
+          updateFields.push('expiry_date = ?');
+          updateParams.push(expiry_date);
+        }
+        if (status !== undefined) {
+          updateFields.push('status = ?');
+          updateParams.push(status);
+        }
+        if (notes !== undefined) {
+          updateFields.push('notes = ?');
+          updateParams.push(notes);
+        }
+        if (terms !== undefined) {
+          updateFields.push('terms = ?');
+          updateParams.push(terms);
+        }
+        if (warehouse_id !== undefined) {
+          updateFields.push('warehouse_id = ?');
+          updateParams.push(warehouse_id);
+        }
 
-      updateFields.push('updated_at = CURRENT_TIMESTAMP');
-      updateParams.push(id);
+        updateFields.push('updated_at = CURRENT_TIMESTAMP');
+        updateParams.push(id);
 
-      db.prepare(`UPDATE quotations SET ${updateFields.join(', ')} WHERE id = ?`).run(...updateParams);
+        db.prepare(`UPDATE quotations SET ${updateFields.join(', ')} WHERE id = ?`).run(...updateParams);
+      };
+      updateHeader();
 
       // Update items if provided
       if (items) {
@@ -645,7 +626,7 @@ class QuotationModel {
    */
   private static calculateLineAmount(item: CreateQuotationItemDTO): number {
     const baseAmount = item.quantity * item.unit_price;
-    
+
     let afterDiscount: number;
     if (item.discount_type === 'percentage') {
       afterDiscount = baseAmount * (1 - (item.discount_value || 0) / 100);

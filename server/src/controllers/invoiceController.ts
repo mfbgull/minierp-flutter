@@ -1,3 +1,5 @@
+import { respondToClosedPeriod } from '../utils/controllerErrors';
+import { listPagination, listPageQuery, listRequestQuery } from '../utils/controllerPagination';
 import { Response } from 'express';
 import type Database from 'better-sqlite3';
 import db from '../config/database';
@@ -7,8 +9,8 @@ import InvoiceModel from '../models/Invoice';
 import { InvoiceCancellationGuardError } from '../models/Invoice';
 import PaymentModel from '../models/Payment';
 import AccountingService from '../services/accountingService';
-import { InvoiceReturnService, ReturnError, type SettlementInput } from '../services/invoiceReturnService';
-import type { FeeType } from '../services/returnMath';
+import { InvoiceReturnService, ReturnError } from '../services/invoiceReturnService';
+import { invoiceReturnOptions } from '../utils/controllerInvoiceReturn';
 import ledgerUtils from '../utils/ledgerUtils';
 import logger from '../utils/logger';
 import { log, logCRUD, ActionType, newCorrelationId } from '../services/activityLogger';
@@ -124,11 +126,6 @@ interface InvoiceItemRow {
  */
 function getInvoices(req: AuthRequest, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
-    const search = getQueryParam(req.query.search);
-    const sortBy = getQueryParam(req.query.sortBy);
-    const sortOrder = getQueryParam(req.query.sortOrder);
     const customerIdParam = getQueryParam(req.query.customer_id) ?? getQueryParam(req.query.customerId);
     const statusParam = getQueryParam(req.query.status);
     const startDate = getQueryParam(req.query.start_date);
@@ -139,13 +136,9 @@ function getInvoices(req: AuthRequest, res: Response): void {
         ? statusParam.split(',').map((s) => s.trim())
         : undefined,
       customer_id: customerIdParam ? parseInt(customerIdParam, 10) : undefined,
-      search: search || undefined,
       start_date: startDate || undefined,
       end_date: endDate || undefined,
-      sortBy: sortBy || undefined,
-      sortOrder: sortOrder || undefined,
-      page,
-      limit
+      ...listRequestQuery(req.query)
     };
 
     const { rows, total, pageNum, limitNum } = InvoiceModel.getAll(filters, db);
@@ -156,13 +149,7 @@ function getInvoices(req: AuthRequest, res: Response): void {
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error: unknown) {
     logger.error('Get invoices error:', { error });
@@ -197,6 +184,28 @@ function getInvoice(req: AuthRequest, res: Response): Response | void {
  * Create a new invoice. Payment recording, ledger entries, stock movements,
  * and customer balance updates all happen inside a single transaction.
  */
+function handleCreateInvoiceError(res: Response, error: unknown): Response | void {
+  if (error instanceof SellableStockUnavailableError) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (error instanceof InvoiceCreationTotalMismatchError) {
+    return res.status(400).json({ error: 'total_amount disagrees with line items' });
+  }
+  if (error instanceof InvoiceCreationPaymentMethodError) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (error instanceof InvoiceCreationCreditError) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (error instanceof InvoiceCreationOffsetError) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (error instanceof InvoiceCreationIdempotencyError) {
+    return res.status(409).json({ error: error.message });
+  }
+  return handleBusinessError(res, error, 'Create invoice', 'Failed to create invoice');
+}
+
 function createInvoice(req: AuthRequest, res: Response): Response | void {
   if (!req.user) return res.status(401).json({ error: 'Authentication required' });
 
@@ -253,25 +262,7 @@ function createInvoice(req: AuthRequest, res: Response): Response | void {
     );
     return res.status(201).json(createdInvoice);
   } catch (error: unknown) {
-    if (error instanceof SellableStockUnavailableError) {
-      return res.status(400).json({ error: error.message });
-    }
-    if (error instanceof InvoiceCreationTotalMismatchError) {
-      return res.status(400).json({ error: 'total_amount disagrees with line items' });
-    }
-    if (error instanceof InvoiceCreationPaymentMethodError) {
-      return res.status(400).json({ error: error.message });
-    }
-    if (error instanceof InvoiceCreationCreditError) {
-      return res.status(400).json({ error: error.message });
-    }
-    if (error instanceof InvoiceCreationOffsetError) {
-      return res.status(400).json({ error: error.message });
-    }
-    if (error instanceof InvoiceCreationIdempotencyError) {
-      return res.status(409).json({ error: error.message });
-    }
-    return handleBusinessError(res, error, 'Create invoice', 'Failed to create invoice');
+    return handleCreateInvoiceError(res, error);
   }
 }
 
@@ -447,6 +438,93 @@ function consumeInvoiceItemsAndPostCogs(
     return updatedCogsTotal;
 }
 
+function handleUpdateInvoiceError(res: Response, error: unknown): Response | void {
+  // Expired/blocked stock is a client-recoverable error, not a 500
+  if (error instanceof SellableStockUnavailableError) {
+    logger.warn('Update invoice rejected:', { error: error.message });
+    res.status(400).json({ error: error.message });
+    return;
+  }
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorName = error instanceof Error ? error.name : 'Unknown';
+  // PAY-01: crafted cross-invoice payment deletion → client error, not 500
+  if (errorMessage.includes('refusing to delete')) {
+    logger.warn('Update invoice rejected payment deletion:', { error: errorMessage });
+    res.status(400).json({ error: 'One or more payments are not allocated to this invoice; nothing was deleted' });
+    return;
+  }
+
+  // ACC-18 interim: client total disagrees with line items → 400
+  if (error instanceof TotalMismatchError) {
+    logger.warn('Update invoice rejected:', { error: error.message });
+    res.status(400).json({ error: 'total_amount disagrees with line items' });
+    return;
+  }
+  if (error instanceof InvalidPaymentMethodError) {
+    logger.warn('Update invoice rejected:', { error: error.message });
+    res.status(400).json({ error: error.message });
+    return;
+  }
+  if (error instanceof InvoiceCreationOffsetError) {
+    logger.warn('Update invoice rejected:', { error: error.message });
+    res.status(400).json({ error: error.message });
+    return;
+  }
+  if (error instanceof CreditOffsetChangeNotSupportedError) {
+    logger.warn('Update invoice rejected:', { error: error.message });
+    res.status(400).json({ error: error.message });
+    return;
+  }
+  // Closed accounting period: cannot rewrite history.
+  if (respondToClosedPeriod(res, errorMessage)) return;
+
+  logger.error('Update invoice error:', { error: errorMessage, name: errorName, stack: error instanceof Error ? error.stack : undefined });
+  handleBusinessError(res, error, 'Update invoice', 'Failed to update invoice');
+}
+
+function recordUpdatedInvoicePayment(payment: PaymentDTO, context: { invoiceId: number; parsedCustomerId: number; resolvedInvoiceNo: string; originalInvoice: NonNullable<ReturnType<typeof InvoiceModel.getById>>; totalAmountNum: number; userId: number }): void {
+  const { invoiceId, parsedCustomerId, resolvedInvoiceNo, originalInvoice, totalAmountNum, userId } = context;
+  const newPaymentAmount = parseCurrency(payment.amount);
+
+  if (!isValidPaymentMethod(payment.payment_method)) {
+      throw new InvalidPaymentMethodError(payment.payment_method);
+  }
+
+  AccountingService.assertPeriodNotClosed(db, payment.payment_date, `Payment for Invoice ${resolvedInvoiceNo}`);
+
+  const paidSoFar = parseCurrency(PaymentModel.getTotalPaidByInvoiceId(db, invoiceId));
+  const returnedForGuard = parseCurrency(originalInvoice?.returned_amount || 0);
+  if (paidSoFar + newPaymentAmount + returnedForGuard > totalAmountNum + 0.01) {
+      throw new InvoiceCreationOffsetError(
+          paidSoFar + newPaymentAmount + returnedForGuard,
+          totalAmountNum,
+      );
+  }
+
+  // FIX #5: Atomic payment number generation
+  const newPaymentNo = InvoiceModel.generatePaymentNoAtomic(db);
+
+  const newPaymentId = InvoiceModel.createPayment(db, newPaymentNo, parsedCustomerId, payment.payment_date, newPaymentAmount, payment.payment_method, payment.reference_no, payment.notes);
+
+  InvoiceModel.createPaymentAllocation(db, newPaymentId, invoiceId, newPaymentAmount);
+
+  // Ledger entry for payment (credit to reduce AR)
+  InvoiceModel.createLedgerEntry(db, parsedCustomerId, 'PAYMENT', newPaymentNo, payment.payment_date, 0, newPaymentAmount, `Payment ${newPaymentNo} for Invoice ${resolvedInvoiceNo}`);
+
+  // GL posting (ACC-09 companion): the create-invoice path posts
+  // its recorded payments; the update path must too, else the
+  // payment's Dr Cash / Cr AR lines never exist.
+  AccountingService.postPaymentEntry(db, {
+      paymentId: newPaymentId,
+      paymentNo: newPaymentNo,
+      amount: newPaymentAmount,
+      paymentDate: payment.payment_date,
+      paymentMethod: payment.payment_method,
+      customerId: parsedCustomerId,
+      userId,
+  });
+}
+
 function updateInvoice(req: AuthRequest, res: Response): Response | void {
   try {
     const { id } = req.params;
@@ -560,48 +638,8 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
         // Rebuild running balances after deleting payment ledger entries
         ledgerUtils.rebuildLedgerBalances(parsedCustomerId);
 
-        // === Handle new payment recording (FIX #2: inside transaction) ===
-        let newPaymentAmount: number;
         if (record_payment && payment && parseCurrency(payment.amount) > 0) {
-            newPaymentAmount = parseCurrency(payment.amount);
-
-            if (!isValidPaymentMethod(payment.payment_method)) {
-                throw new InvalidPaymentMethodError(payment.payment_method);
-            }
-
-            AccountingService.assertPeriodNotClosed(db, payment.payment_date, `Payment for Invoice ${resolvedInvoiceNo}`);
-
-            const paidSoFar = parseCurrency(PaymentModel.getTotalPaidByInvoiceId(db, invoiceId));
-            const returnedForGuard = parseCurrency(originalInvoice?.returned_amount || 0);
-            if (paidSoFar + newPaymentAmount + returnedForGuard > totalAmountNum + 0.01) {
-                throw new InvoiceCreationOffsetError(
-                    paidSoFar + newPaymentAmount + returnedForGuard,
-                    totalAmountNum,
-                );
-            }
-
-            // FIX #5: Atomic payment number generation
-            const newPaymentNo = InvoiceModel.generatePaymentNoAtomic(db);
-
-            const newPaymentId = InvoiceModel.createPayment(db, newPaymentNo, parsedCustomerId, payment.payment_date, newPaymentAmount, payment.payment_method, payment.reference_no, payment.notes);
-
-            InvoiceModel.createPaymentAllocation(db, newPaymentId, invoiceId, newPaymentAmount);
-
-            // Ledger entry for payment (credit to reduce AR)
-            InvoiceModel.createLedgerEntry(db, parsedCustomerId, 'PAYMENT', newPaymentNo, payment.payment_date, 0, newPaymentAmount, `Payment ${newPaymentNo} for Invoice ${resolvedInvoiceNo}`);
-
-            // GL posting (ACC-09 companion): the create-invoice path posts
-            // its recorded payments; the update path must too, else the
-            // payment's Dr Cash / Cr AR lines never exist.
-            AccountingService.postPaymentEntry(db, {
-                paymentId: newPaymentId,
-                paymentNo: newPaymentNo,
-                amount: newPaymentAmount,
-                paymentDate: payment.payment_date,
-                paymentMethod: payment.payment_method,
-                customerId: parsedCustomerId,
-                userId,
-            });
+          recordUpdatedInvoicePayment(payment, { invoiceId, parsedCustomerId, resolvedInvoiceNo, originalInvoice, totalAmountNum, userId });
         }
 
         // === Recalculate paid/balance (accounting for returned_amount) ===
@@ -699,49 +737,7 @@ function updateInvoice(req: AuthRequest, res: Response): Response | void {
       { newValue: updatedInvoice, correlationId: newCorrelationId() });
     res.json(updatedInvoice);
   } catch (error: unknown) {
-    // Expired/blocked stock is a client-recoverable error, not a 500
-    if (error instanceof SellableStockUnavailableError) {
-      logger.warn('Update invoice rejected:', { error: error.message });
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorName = error instanceof Error ? error.name : 'Unknown';
-    // PAY-01: crafted cross-invoice payment deletion → client error, not 500
-    if (errorMessage.includes('refusing to delete')) {
-      logger.warn('Update invoice rejected payment deletion:', { error: errorMessage });
-      res.status(400).json({ error: 'One or more payments are not allocated to this invoice; nothing was deleted' });
-      return;
-    }
-
-    // ACC-18 interim: client total disagrees with line items → 400
-    if (error instanceof TotalMismatchError) {
-      logger.warn('Update invoice rejected:', { error: error.message });
-      res.status(400).json({ error: 'total_amount disagrees with line items' });
-      return;
-    }
-    if (error instanceof InvalidPaymentMethodError) {
-      logger.warn('Update invoice rejected:', { error: error.message });
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    if (error instanceof InvoiceCreationOffsetError) {
-      logger.warn('Update invoice rejected:', { error: error.message });
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    if (error instanceof CreditOffsetChangeNotSupportedError) {
-      logger.warn('Update invoice rejected:', { error: error.message });
-      res.status(400).json({ error: error.message });
-      return;
-    }
-    // Closed accounting period: cannot rewrite history.
-    if (errorMessage.includes('inside closed accounting period')) {
-      return res.status(409).json({ error: errorMessage });
-    }
-
-    logger.error('Update invoice error:', { error: errorMessage, name: errorName, stack: error instanceof Error ? error.stack : undefined });
-    handleBusinessError(res, error, 'Update invoice', 'Failed to update invoice');
+    return handleUpdateInvoiceError(res, error);
   }
 }
 
@@ -842,9 +838,7 @@ function deleteInvoice(req: AuthRequest, res: Response): Response | void {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     // Closed accounting period: cannot rewrite history.
-    if (errorMessage.includes('inside closed accounting period')) {
-      return res.status(409).json({ error: errorMessage });
-    }
+    if (respondToClosedPeriod(res, errorMessage)) return;
     handleBusinessError(res, error, 'Delete invoice', 'Failed to delete invoice');
   }
 }
@@ -1107,21 +1101,8 @@ function returnInvoiceItems(req: AuthRequest, res: Response): Response | void {
     const result = InvoiceReturnService.processReturn({
       invoiceId,
       items,
-      feeType: (body.fee_type as FeeType | undefined) ?? undefined,
-      feeValue: body.fee_value !== undefined ? Number(body.fee_value) : undefined,
-      returnDate: body.return_date ? String(body.return_date) : null,
-      warehouseId: body.warehouse_id === undefined || body.warehouse_id === null || body.warehouse_id === ''
-        ? null
-        : Number(body.warehouse_id),
+      ...invoiceReturnOptions(body),
       reason,
-      settlements: Array.isArray(body.settlements) && body.settlements.length > 0
-        ? (body.settlements as SettlementInput[])
-        : null,
-      // Legacy shim (spec §10) — honoured only when `settlements` is absent.
-      disposition: (body.disposition as 'refund' | 'credit' | 'adjust' | null) ?? null,
-      adjustInvoiceIds: Array.isArray(body.adjust_invoice_ids) ? (body.adjust_invoice_ids as number[]) : null,
-      deductionType: (body.deduction_type as 'fixed' | 'percentage' | 'flat' | null) ?? null,
-      deductionValue: body.deduction_value !== undefined ? Number(body.deduction_value) : undefined,
       userId,
     });
 
@@ -1163,8 +1144,7 @@ function getInvoicePosition(req: AuthRequest, res: Response): Response | void {
  */
 function getInvoiceReturnHistory(req: AuthRequest, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
+    const { page, limit } = listPageQuery(req.query);
     const search = getQueryParam(req.query.search);
     const warehouseName = getQueryParam(req.query.warehouse_name);
     const sortBy = getQueryParam(req.query.sortBy);
@@ -1192,13 +1172,7 @@ function getInvoiceReturnHistory(req: AuthRequest, res: Response): void {
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error: unknown) {
     logger.error('Get invoice return history error:', { error });

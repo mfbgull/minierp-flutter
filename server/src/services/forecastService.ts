@@ -652,6 +652,60 @@ function saveForecastsToAccuracy(forecasts: ForecastResult[], runId: string): vo
   insertMany(forecasts);
 }
 
+function refreshCachedRecommendation(item: ForecastResult): void {
+  const config = loadModelConfig({
+    id: item.itemId,
+    category: item.category
+  });
+  // Estimate daily demand from the monthly prediction
+  const estimatedDailyDemand = item.predictedDemand.nextMonth / 30;
+  // Assume a default CV of 0.3 (moderate variability) when in cache mode
+  const estimatedDailyStdDev = estimatedDailyDemand * 0.3;
+  const leadTimeInDays = config.lead_time_days;
+  const zScores: Record<number, number> = { 0.90: 1.28, 0.95: 1.65, 0.975: 1.96, 0.99: 2.33 };
+  const keys = Object.keys(zScores).map(Number).sort((a, b) => a - b);
+  let zScore = zScores[0.95];
+  for (const k of keys) {
+    if (config.service_level <= k) { zScore = zScores[k]; break; }
+  }
+  const safetyStock = Math.round(zScore * Math.sqrt(leadTimeInDays) * estimatedDailyStdDev);
+  const reorderPoint = Math.round(estimatedDailyDemand * leadTimeInDays + safetyStock);
+
+  item.safetyStock = safetyStock;
+  item.reorderPoint = reorderPoint;
+  item.recommendation = getRecommendation(item.currentStock, item.predictedDemand.nextMonth, safetyStock, reorderPoint);
+}
+
+type ForecastCacheRow = {
+    item_id: number; item_code: string; item_name: string; category: string;
+    current_stock: number; period: string; predicted_quantity: number;
+    confidence_level: number; trend_direction: string; trend_percentage: number;
+    model_type: string; bias_adjustment: number | null; seasonal_multiplier: number | null;
+    is_manual_override: number;
+  };
+
+function cachedForecastItem(row: ForecastCacheRow, today: string): ForecastResult {
+  return {
+    itemId: row.item_id,
+    itemCode: row.item_code,
+    itemName: row.item_name,
+    category: row.category || 'Uncategorized',
+    currentStock: row.current_stock,
+    predictedDemand: { nextWeek: 0, nextMonth: 0, nextQuarter: 0 },
+    trend: (row.trend_direction as 'growing' | 'stable' | 'declining') || 'stable',
+    trendPercentage: row.trend_percentage || 0,
+    confidence: row.confidence_level || 0,
+    recommendation: 'monitor',
+    modelType: (row.model_type as ForecastModelType) || 'weighted_moving_average',
+    safetyStock: 0,
+    reorderPoint: 0,
+    biasAdjustment: row.bias_adjustment,
+    seasonalMultiplier: row.seasonal_multiplier,
+    isOverride: row.is_manual_override === 1,
+    lastUpdated: today
+  };
+}
+
 function readCachedForecasts(): ForecastResult[] | null {
   const today = new Date().toISOString().split('T')[0];
 
@@ -661,38 +715,14 @@ function readCachedForecasts(): ForecastResult[] | null {
     JOIN items i ON i.id = df.item_id
     WHERE df.forecast_date = ?
     ORDER BY df.item_id, df.period
-  `).all(today) as (Record<string, unknown> & {
-    item_id: number; item_code: string; item_name: string; category: string;
-    current_stock: number; period: string; predicted_quantity: number;
-    confidence_level: number; trend_direction: string; trend_percentage: number;
-    model_type: string; bias_adjustment: number | null; seasonal_multiplier: number | null;
-    is_manual_override: number;
-  })[];
+  `).all(today) as ForecastCacheRow[];
 
   if (cachedRows.length === 0) return null;
 
   const itemMap = new Map<number, ForecastResult>();
   for (const row of cachedRows) {
     if (!itemMap.has(row.item_id)) {
-      itemMap.set(row.item_id, {
-        itemId: row.item_id,
-        itemCode: row.item_code,
-        itemName: row.item_name,
-        category: row.category || 'Uncategorized',
-        currentStock: row.current_stock,
-        predictedDemand: { nextWeek: 0, nextMonth: 0, nextQuarter: 0 },
-        trend: (row.trend_direction as 'growing' | 'stable' | 'declining') || 'stable',
-        trendPercentage: row.trend_percentage || 0,
-        confidence: row.confidence_level || 0,
-        recommendation: 'monitor',
-        modelType: (row.model_type as ForecastModelType) || 'weighted_moving_average',
-        safetyStock: 0,
-        reorderPoint: 0,
-        biasAdjustment: row.bias_adjustment,
-        seasonalMultiplier: row.seasonal_multiplier,
-        isOverride: row.is_manual_override === 1,
-        lastUpdated: today
-      });
+      itemMap.set(row.item_id, cachedForecastItem(row, today));
     }
 
     const item = itemMap.get(row.item_id)!;
@@ -701,31 +731,7 @@ function readCachedForecasts(): ForecastResult[] | null {
     if (row.period === 'next_quarter') item.predictedDemand.nextQuarter = Math.round(row.predicted_quantity);
   }
 
-  // Compute recommendation + safety stock for each cached item
-  // Use the predicted demand to estimate daily demand and variability
-  for (const item of itemMap.values()) {
-    const config = loadModelConfig({
-      id: item.itemId,
-      category: item.category
-    });
-    // Estimate daily demand from the monthly prediction
-    const estimatedDailyDemand = item.predictedDemand.nextMonth / 30;
-    // Assume a default CV of 0.3 (moderate variability) when in cache mode
-    const estimatedDailyStdDev = estimatedDailyDemand * 0.3;
-    const leadTimeInDays = config.lead_time_days;
-    const zScores: Record<number, number> = { 0.90: 1.28, 0.95: 1.65, 0.975: 1.96, 0.99: 2.33 };
-    const keys = Object.keys(zScores).map(Number).sort((a, b) => a - b);
-    let zScore = zScores[0.95];
-    for (const k of keys) {
-      if (config.service_level <= k) { zScore = zScores[k]; break; }
-    }
-    const safetyStock = Math.round(zScore * Math.sqrt(leadTimeInDays) * estimatedDailyStdDev);
-    const reorderPoint = Math.round(estimatedDailyDemand * leadTimeInDays + safetyStock);
-
-    item.safetyStock = safetyStock;
-    item.reorderPoint = reorderPoint;
-    item.recommendation = getRecommendation(item.currentStock, item.predictedDemand.nextMonth, safetyStock, reorderPoint);
-  }
+  for (const item of itemMap.values()) refreshCachedRecommendation(item);
 
   return Array.from(itemMap.values());
 }

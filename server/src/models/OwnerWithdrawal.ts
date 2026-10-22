@@ -1,3 +1,4 @@
+import { localMonthCode } from '../utils/documentNumbering';
 import Database from 'better-sqlite3';
 import AccountingService from '../services/accountingService';
 import { getNextSequenceNumber } from '../utils/sequence';
@@ -74,13 +75,12 @@ const round2 = (n: number): number => parseFloat(n.toFixed(2));
 
 export function generateWithdrawalNo(db: Database.Database, withdrawalDate: string): string {
   const date = new Date(withdrawalDate);
-  const year = date.getFullYear().toString().slice(-2);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const monthCode = localMonthCode(date, 'YYMM');
 
   // Shared atomic counter allocated inside the caller's INSERT transaction
   // (EXP-05 pattern); UNIQUE(withdrawal_no) backstops it.
-  const nextNo = getNextSequenceNumber(db, `WD_last_no_${year}${month}`);
-  return `WD-${year}${month}-${String(nextNo).padStart(5, '0')}`;
+  const nextNo = getNextSequenceNumber(db, `WD_last_no_${monthCode}`);
+  return `WD-${monthCode}-${String(nextNo).padStart(5, '0')}`;
 }
 
 /**
@@ -127,10 +127,9 @@ function getOriginalMovements(db: Database.Database, withdrawalNo: string): Orig
 
 function nextAdjBatchNo(db: Database.Database): string {
   const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = String(now.getFullYear()).slice(-2);
-  const nextNo = getNextSequenceNumber(db, `BATCH_ADJ_last_no_${month}${year}`);
-  return `BATCH-${month}${year}-ADJ-${String(nextNo).padStart(5, '0')}`;
+  const monthCode = localMonthCode(now);
+  const nextNo = getNextSequenceNumber(db, `BATCH_ADJ_last_no_${monthCode}`);
+  return `BATCH-${monthCode}-ADJ-${String(nextNo).padStart(5, '0')}`;
 }
 
 /**
@@ -208,39 +207,42 @@ function insertItems(
 function create(db: Database.Database, data: CreateOwnerWithdrawalDTO): { id: number; amount: number } {
   return db.transaction(() => {
     if (data.kind === 'cash') {
-      const amount = Number(data.amount);
-      if (!Number.isFinite(amount) || amount <= 0) {
-        throw new Error('Cash withdrawal amount must be a positive number');
-      }
-      const result = db.prepare(`
-        INSERT INTO owner_withdrawals (
-          withdrawal_no, withdrawal_date, kind, amount, payment_method, note, status, created_by
-        ) VALUES (?, ?, 'cash', ?, ?, ?, 'posted', ?)
-      `).run(
-        data.withdrawal_no, data.withdrawal_date, amount,
-        data.payment_method || 'cash', data.note || null, data.created_by
-      );
-      const newId = result.lastInsertRowid as number;
+      const createCashWithdrawal = (): { id: number; amount: number } => {
+        const amount = Number(data.amount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          throw new Error('Cash withdrawal amount must be a positive number');
+        }
+        const result = db.prepare(`
+          INSERT INTO owner_withdrawals (
+            withdrawal_no, withdrawal_date, kind, amount, payment_method, note, status, created_by
+          ) VALUES (?, ?, 'cash', ?, ?, ?, 'posted', ?)
+        `).run(
+          data.withdrawal_no, data.withdrawal_date, amount,
+          data.payment_method || 'cash', data.note || null, data.created_by
+        );
+        const newId = result.lastInsertRowid as number;
 
-      AccountingService.assertNoActivePosting(db, 'OWNER_WITHDRAWAL', newId);
-      const cashCode = AccountingService._cashOrBankAccountCode(data.payment_method || 'cash');
-      const cash = AccountingService.getAccountByCode(db, cashCode);
-      if (!cash) throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
-      AccountingService.assertSufficientFunds(db, {
-        accountId: cash.id,
-        amount,
-        asOfDate: data.withdrawal_date,
-        label: `owner withdrawal ${data.withdrawal_no}`,
-      });
-      AccountingService.postOwnerWithdrawalCashEntry(db, {
-        withdrawalId: newId,
-        withdrawalNo: data.withdrawal_no,
-        amount,
-        withdrawalDate: data.withdrawal_date,
-        paymentMethod: data.payment_method || 'cash',
-        userId: data.created_by,
-      });
-      return { id: newId, amount };
+        AccountingService.assertNoActivePosting(db, 'OWNER_WITHDRAWAL', newId);
+        const cashCode = AccountingService._cashOrBankAccountCode(data.payment_method || 'cash');
+        const cash = AccountingService.getAccountByCode(db, cashCode);
+        if (!cash) throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
+        AccountingService.assertSufficientFunds(db, {
+          accountId: cash.id,
+          amount,
+          asOfDate: data.withdrawal_date,
+          label: `owner withdrawal ${data.withdrawal_no}`,
+        });
+        AccountingService.postOwnerWithdrawalCashEntry(db, {
+          withdrawalId: newId,
+          withdrawalNo: data.withdrawal_no,
+          amount,
+          withdrawalDate: data.withdrawal_date,
+          paymentMethod: data.payment_method || 'cash',
+          userId: data.created_by,
+        });
+        return { id: newId, amount };
+      };
+      return createCashWithdrawal();
     }
 
     // ---- goods kind -------------------------------------------------
@@ -440,54 +442,57 @@ function update(
   AccountingService.assertPeriodNotClosed(db, existing.withdrawal_date, `Owner withdrawal ${existing.withdrawal_no}`);
 
   if (existing.kind === 'cash') {
-    const newDate = data.withdrawal_date ?? existing.withdrawal_date;
-    const newAmount = data.amount !== undefined ? Number(data.amount) : existing.amount;
-    const newMethod = data.payment_method !== undefined ? data.payment_method : existing.payment_method;
-    const moneyChanged =
-      String(newDate) !== String(existing.withdrawal_date) ||
-      Number(newAmount) !== Number(existing.amount) ||
-      String(newMethod ?? '') !== String(existing.payment_method ?? '');
+    const updateCashWithdrawal = (): { amount: number } => {
+      const newDate = data.withdrawal_date ?? existing.withdrawal_date;
+      const newAmount = data.amount !== undefined ? Number(data.amount) : existing.amount;
+      const newMethod = data.payment_method !== undefined ? data.payment_method : existing.payment_method;
+      const moneyChanged =
+        String(newDate) !== String(existing.withdrawal_date) ||
+        Number(newAmount) !== Number(existing.amount) ||
+        String(newMethod ?? '') !== String(existing.payment_method ?? '');
 
-    db.transaction(() => {
-      if (moneyChanged) {
-        if (!(newAmount > 0)) throw new Error('Cash withdrawal amount must be a positive number');
+      db.transaction(() => {
+        if (moneyChanged) {
+          if (!(newAmount > 0)) throw new Error('Cash withdrawal amount must be a positive number');
 
-        AccountingService.voidJournalLinesByReference(db, 'OWNER_WITHDRAWAL', id, {
-          voidedBy: opts.userId ?? null,
-          voidReason: 'Re-posted after edit',
-        });
+          AccountingService.voidJournalLinesByReference(db, 'OWNER_WITHDRAWAL', id, {
+            voidedBy: opts.userId ?? null,
+            voidReason: 'Re-posted after edit',
+          });
 
-        const cashCode = AccountingService._cashOrBankAccountCode(newMethod ?? undefined);
-        const cash = AccountingService.getAccountByCode(db, cashCode);
-        if (!cash) throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
-        AccountingService.assertSufficientFunds(db, {
-          accountId: cash.id,
-          amount: newAmount,
-          asOfDate: newDate,
-          label: `owner withdrawal ${existing.withdrawal_no}`,
-        });
+          const cashCode = AccountingService._cashOrBankAccountCode(newMethod ?? undefined);
+          const cash = AccountingService.getAccountByCode(db, cashCode);
+          if (!cash) throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
+          AccountingService.assertSufficientFunds(db, {
+            accountId: cash.id,
+            amount: newAmount,
+            asOfDate: newDate,
+            label: `owner withdrawal ${existing.withdrawal_no}`,
+          });
 
-        db.prepare(`
-          UPDATE owner_withdrawals SET withdrawal_date = ?, amount = ?, payment_method = ?,
-            note = COALESCE(?, note), updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `).run(newDate, newAmount, newMethod, data.note ?? null, id);
+          db.prepare(`
+            UPDATE owner_withdrawals SET withdrawal_date = ?, amount = ?, payment_method = ?,
+              note = COALESCE(?, note), updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(newDate, newAmount, newMethod, data.note ?? null, id);
 
-        AccountingService.postOwnerWithdrawalCashEntry(db, {
-          withdrawalId: id,
-          withdrawalNo: existing.withdrawal_no,
-          amount: newAmount,
-          withdrawalDate: newDate,
-          paymentMethod: newMethod ?? undefined,
-          userId: opts.userId,
-        });
-      } else {
-        db.prepare(`
-          UPDATE owner_withdrawals SET note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-        `).run(data.note !== undefined ? data.note : existing.note, id);
-      }
-    })();
-    return { amount: moneyChanged ? Number(data.amount ?? existing.amount) : existing.amount };
+          AccountingService.postOwnerWithdrawalCashEntry(db, {
+            withdrawalId: id,
+            withdrawalNo: existing.withdrawal_no,
+            amount: newAmount,
+            withdrawalDate: newDate,
+            paymentMethod: newMethod ?? undefined,
+            userId: opts.userId,
+          });
+        } else {
+          db.prepare(`
+            UPDATE owner_withdrawals SET note = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+          `).run(data.note !== undefined ? data.note : existing.note, id);
+        }
+      })();
+      return { amount: moneyChanged ? Number(data.amount ?? existing.amount) : existing.amount };
+    };
+    return updateCashWithdrawal();
   }
 
   // ---- goods kind ---------------------------------------------------

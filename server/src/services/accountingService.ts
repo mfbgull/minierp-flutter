@@ -104,6 +104,13 @@ export class AccountingService {
     return rows as Account[];
   }
 
+  private static requiredCashAccount(db: Database.Database, method?: string): { cashCode: string; cash: Account } {
+    const cashCode = AccountingService._cashOrBankAccountCode(method);
+    const cash = AccountingService.getAccountByCode(db, cashCode);
+    if (!cash) throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
+    return { cashCode, cash };
+  }
+
   static getAccountByCode(db: Database.Database, code: string): Account | undefined {
     return db.prepare(`SELECT * FROM chart_of_accounts WHERE code = ?`).get(code) as Account | undefined;
   }
@@ -240,14 +247,7 @@ export class AccountingService {
    *
    * Returns the new journal_entry_id (logical grouping) and totals.
    */
-  static postEntry(db: Database.Database, input: PostEntryInput): PostedEntry {
-    if (!input.lines || input.lines.length < 2) {
-      throw new Error('A journal entry must have at least 2 lines');
-    }
-    if (!input.entry_date) {
-      throw new Error('entry_date is required');
-    }
-
+  private static normalizeBalancedLines(db: Database.Database, lines: JournalLineInput[]) {
     // Validate every line. Amounts are normalized to the currency minor
     // unit first, so validation, the balance check and the stored rows
     // all speak the same precision. Callers already pass 2dp values, so
@@ -261,7 +261,7 @@ export class AccountingService {
     }> = [];
     let totalDebitMinor = 0;
     let totalCreditMinor = 0;
-    for (const line of input.lines) {
+    for (const line of lines) {
       const debit = roundCurrency(Number(line.debit || 0));
       const credit = roundCurrency(Number(line.credit || 0));
       if (debit < 0 || credit < 0) {
@@ -301,6 +301,19 @@ export class AccountingService {
         `total credit ${totalCredit.toFixed(2)}`
       );
     }
+
+    return { normalizedLines, totalDebit, totalCredit };
+  }
+
+  static postEntry(db: Database.Database, input: PostEntryInput): PostedEntry {
+    if (!input.lines || input.lines.length < 2) {
+      throw new Error('A journal entry must have at least 2 lines');
+    }
+    if (!input.entry_date) {
+      throw new Error('entry_date is required');
+    }
+
+    const { normalizedLines, totalDebit, totalCredit } = AccountingService.normalizeBalancedLines(db, input.lines);
 
     // A closed period is immutable: refuse before any auto-create logic can
     // open an overlapping period over it (ACCT-004).
@@ -772,11 +785,7 @@ export class AccountingService {
     if (!ap) {
       throw new Error('Chart of accounts is missing required account: 2000 (Accounts Payable)');
     }
-    const cashCode = AccountingService._cashOrBankAccountCode(args.paymentMethod);
-    const cash = AccountingService.getAccountByCode(db, cashCode);
-    if (!cash) {
-      throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
-    }
+    const { cashCode, cash } = AccountingService.requiredCashAccount(db, args.paymentMethod);
 
     return AccountingService.postEntry(db, {
       entry_date: args.paymentDate,
@@ -916,11 +925,7 @@ export class AccountingService {
     if (!args.amount || args.amount <= 0) return null;
 
     const capital = AccountingService._ownerCapitalAccount(db);
-    const cashCode = AccountingService._cashOrBankAccountCode(args.paymentMethod);
-    const cash = AccountingService.getAccountByCode(db, cashCode);
-    if (!cash) {
-      throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
-    }
+    const { cashCode, cash } = AccountingService.requiredCashAccount(db, args.paymentMethod);
 
     return AccountingService.postEntry(db, {
       entry_date: args.capitalDate,
@@ -953,11 +958,7 @@ export class AccountingService {
     if (!args.amount || args.amount <= 0) return null;
 
     const drawings = AccountingService._ownerDrawingsAccount(db);
-    const cashCode = AccountingService._cashOrBankAccountCode(args.paymentMethod);
-    const cash = AccountingService.getAccountByCode(db, cashCode);
-    if (!cash) {
-      throw new Error(`Chart of accounts is missing required account: ${cashCode}`);
-    }
+    const { cashCode, cash } = AccountingService.requiredCashAccount(db, args.paymentMethod);
 
     return AccountingService.postEntry(db, {
       entry_date: args.withdrawalDate,
@@ -1538,15 +1539,6 @@ export class AccountingService {
       invoiceId
     );
     return result.changes;
-  }
-
-  static openPeriod(db: Database.Database, periodName: string, startDate: string, endDate: string): number {
-    // Will throw on UNIQUE collision if period_name already exists
-    const result = db.prepare(`
-      INSERT INTO accounting_periods (period_name, start_date, end_date, status)
-      VALUES (?, ?, ?, 'open')
-    `).run(periodName, startDate, endDate);
-    return Number(result.lastInsertRowid);
   }
 
   // ------------------------------------------------------------------

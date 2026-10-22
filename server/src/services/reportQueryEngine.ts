@@ -163,8 +163,7 @@ function realColumns(table: string): Set<string> {
  * must be plain identifiers that collide with no column of the entity's
  * table or of any table it can join to, and with no registry field.
  */
-function assertComputedNamesAreSafe(config: ReportConfig, entityDef: EntityDefinition): void {
-  if (!Array.isArray(config.computedColumns) || config.computedColumns.length === 0) return;
+function reservedColumnNames(entityDef: EntityDefinition): Set<string> {
   const taken = new Set<string>(entityDef.fields.map(f => f.name));
   for (const c of realColumns(entityDef.table)) taken.add(c);
   for (const join of entityDef.joins) {
@@ -173,6 +172,12 @@ function assertComputedNamesAreSafe(config: ReportConfig, entityDef: EntityDefin
     for (const c of realColumns(joined.table)) taken.add(c);
     for (const f of joined.fields) taken.add(f.name);
   }
+  return taken;
+}
+
+function assertComputedNamesAreSafe(config: ReportConfig, entityDef: EntityDefinition): void {
+  if (!Array.isArray(config.computedColumns) || config.computedColumns.length === 0) return;
+  const taken = reservedColumnNames(entityDef);
   const seen = new Set<string>();
   for (const cc of config.computedColumns) {
     if (typeof cc.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(cc.name)) {
@@ -317,16 +322,7 @@ export function executeReport(config: ReportConfig): QueryResult {
     // Execute main query
     const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
 
-    // Build column names from SELECT items (aliases)
-    const colNames: string[] = [];
-    for (const item of selectItems) {
-      const asMatch = item.match(/AS\s+(.+)$/i);
-      if (asMatch) {
-        colNames.push(asMatch[1].replace(/^"|"$/g, ''));
-      } else {
-        colNames.push(item.replace(/^e\./, '').replace(/^"|"$/g, ''));
-      }
-    }
+    const colNames = selectItems.map(selectedColumnName);
 
     const elapsedMs = Date.now() - startTime;
 
@@ -344,6 +340,22 @@ export function executeReport(config: ReportConfig): QueryResult {
 
 // ── SELECT Builder ───────────────────────────────────────────
 
+function selectedReportColumn(col: ColumnDef, config: ReportConfig, ctx: BuildContext): string {
+  if (!ctx.validFieldNames.has(col.field)) {
+    throw new Error(`Column field "${col.field}" not found on entity "${config.entity}"`);
+  }
+
+  const isComputed = config.computedColumns?.some(cc => cc.name === col.field);
+  const alias = quoteIdentifier(col.alias || col.field);
+
+  if (isComputed) {
+    const cc = config.computedColumns!.find(c => c.name === col.field)!;
+    return `${cc.expression} AS ${alias}`;
+  } else {
+    return `${ctx.primaryTableAlias}.${quoteIdentifier(col.field)} AS ${alias}`;
+  }
+}
+
 function buildSelectClause(
   config: ReportConfig,
   entityDef: EntityDefinition,
@@ -352,21 +364,7 @@ function buildSelectClause(
   const items: string[] = [];
   const isGrouped = config.groupBy?.enabled && config.groupBy.fields.length > 0;
 
-  for (const col of config.columns) {
-    if (!ctx.validFieldNames.has(col.field)) {
-      throw new Error(`Column field "${col.field}" not found on entity "${config.entity}"`);
-    }
-
-    const isComputed = config.computedColumns?.some(cc => cc.name === col.field);
-    const alias = quoteIdentifier(col.alias || col.field);
-
-    if (isComputed) {
-      const cc = config.computedColumns!.find(c => c.name === col.field)!;
-      items.push(`${cc.expression} AS ${alias}`);
-    } else {
-      items.push(`${ctx.primaryTableAlias}.${quoteIdentifier(col.field)} AS ${alias}`);
-    }
-  }
+  items.push(...config.columns.map(col => selectedReportColumn(col, config, ctx)));
 
   // If grouped, also add group by fields that aren't already selected
   if (isGrouped) {
@@ -383,16 +381,7 @@ function buildSelectClause(
     items.push(...buildAggregateItems(config.groupBy!, entityDef, ctx));
   }
 
-  // Add computed columns referenced in ORDER BY that aren't already in the SELECT
-  if (config.computedColumns && config.sort) {
-    const sortFieldNames = new Set(config.sort.map(s => s.field));
-    for (const cc of config.computedColumns) {
-      if (sortFieldNames.has(cc.name) && !config.columns.some(c => c.field === cc.name)) {
-        items.push(`${cc.expression} AS ${quoteIdentifier(cc.name)}`);
-      }
-    }
-  }
-
+  items.push(...computedSortSelections(config));
   return items;
 }
 
@@ -466,6 +455,47 @@ function resolveNeededJoins(
   entityDef: EntityDefinition,
   ctx: BuildContext
 ): void {
+  const referencedFields = referencedReportFields(config);
+
+  // Check which fields belong to joined entities
+  for (const join of entityDef.joins) {
+    const joinEntity = getEntity(join.entity);
+    if (!joinEntity) continue;
+
+    const joinFieldNames = new Set(joinEntity.fields.map(f => f.name));
+    const needsJoin = [...referencedFields].some(field => joinFieldNames.has(field));
+    if (needsJoin) {
+      const joinAlias = `j_${join.entity}`;
+      ctx.usedJoins.set(join.entity, joinAlias);
+
+      ctx.joinClauses.push(
+        `LEFT JOIN ${joinEntity.table} ${joinAlias} ON ${ctx.primaryTableAlias}.${quoteIdentifier(join.localField)} = ${joinAlias}.${quoteIdentifier(join.foreignField)}`
+      );
+    }
+  }
+}
+
+function selectedColumnName(item: string): string {
+  const asMatch = item.match(/AS\s+(.+)$/i);
+  return asMatch ? asMatch[1].replace(/^"|"$/g, '') : item.replace(/^e\./, '').replace(/^"|"$/g, '');
+}
+
+function computedSortSelections(config: ReportConfig): string[] {
+  const items: string[] = [];
+  // Add computed columns referenced in ORDER BY that aren't already in the SELECT
+  if (config.computedColumns && config.sort) {
+    const sortFieldNames = new Set(config.sort.map(s => s.field));
+    for (const cc of config.computedColumns) {
+      if (sortFieldNames.has(cc.name) && !config.columns.some(c => c.field === cc.name)) {
+        items.push(`${cc.expression} AS ${quoteIdentifier(cc.name)}`);
+      }
+    }
+  }
+
+  return items;
+}
+
+function referencedReportFields(config: ReportConfig): Set<string> {
   // Collect all field references from columns, filters, sorts, group by
   const referencedFields = new Set<string>();
 
@@ -485,30 +515,7 @@ function resolveNeededJoins(
       referencedFields.add(f);
     }
   }
-
-  // Check which fields belong to joined entities
-  for (const join of entityDef.joins) {
-    const joinEntity = getEntity(join.entity);
-    if (!joinEntity) continue;
-
-    const joinFieldNames = new Set(joinEntity.fields.map(f => f.name));
-    let needsJoin = false;
-    for (const field of referencedFields) {
-      if (joinFieldNames.has(field)) {
-        needsJoin = true;
-        break;
-      }
-    }
-
-    if (needsJoin) {
-      const joinAlias = `j_${join.entity}`;
-      ctx.usedJoins.set(join.entity, joinAlias);
-
-      ctx.joinClauses.push(
-        `LEFT JOIN ${joinEntity.table} ${joinAlias} ON ${ctx.primaryTableAlias}.${quoteIdentifier(join.localField)} = ${joinAlias}.${quoteIdentifier(join.foreignField)}`
-      );
-    }
-  }
+  return referencedFields;
 }
 
 function collectFilterFields(filters: FilterDef[], fields: Set<string>): void {

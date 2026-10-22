@@ -359,34 +359,37 @@ function drawFromSourceBatches(
     const take = roundQty(Math.min(remainingToDraw, roundQty(Number(batch.quantity_remaining))));
     if (take <= 0) continue;
 
-    if (batchLocationsEnabled) {
-      const locRows = db.prepare(`
-        SELECT bsl.id, bsl.quantity_available, bsl.location_id
-        FROM batch_stock_by_location bsl
-        JOIN locations l ON bsl.location_id = l.id
-        WHERE bsl.batch_id = ? AND l.warehouse_id = ?
-          AND bsl.quantity_available > 0
-        ORDER BY l.created_at ASC, bsl.id ASC
-      `).all(batchId, warehouseId) as Array<{ id: number; quantity_available: number; location_id: number }>;
+    const drawSourceBatchLocations = (): void => {
+      if (batchLocationsEnabled) {
+        const locRows = db.prepare(`
+          SELECT bsl.id, bsl.quantity_available, bsl.location_id
+          FROM batch_stock_by_location bsl
+          JOIN locations l ON bsl.location_id = l.id
+          WHERE bsl.batch_id = ? AND l.warehouse_id = ?
+            AND bsl.quantity_available > 0
+          ORDER BY l.created_at ASC, bsl.id ASC
+        `).all(batchId, warehouseId) as Array<{ id: number; quantity_available: number; location_id: number }>;
 
-      let locRemaining = take;
-      for (const loc of locRows) {
-        if (locRemaining <= 0) break;
-        const locTake = roundQty(Math.min(locRemaining, roundQty(loc.quantity_available)));
-        db.prepare(`
-          UPDATE batch_stock_by_location
-          SET quantity_physical = quantity_physical - ?
-          WHERE id = ?
-        `).run(locTake, loc.id);
-        locRemaining -= locTake;
+        let locRemaining = take;
+        for (const loc of locRows) {
+          if (locRemaining <= 0) break;
+          const locTake = roundQty(Math.min(locRemaining, roundQty(loc.quantity_available)));
+          db.prepare(`
+            UPDATE batch_stock_by_location
+            SET quantity_physical = quantity_physical - ?
+            WHERE id = ?
+          `).run(locTake, loc.id);
+          locRemaining -= locTake;
+        }
+        if (locRemaining > 0) {
+          throw new Error(
+            `Insufficient batch_stock_by_location for ${line.item_name}: ` +
+            `required ${take}, only ${roundQty(take - locRemaining).toFixed(3)} available in source batch locations`
+          );
+        }
       }
-      if (locRemaining > 0) {
-        throw new Error(
-          `Insufficient batch_stock_by_location for ${line.item_name}: ` +
-          `required ${take}, only ${roundQty(take - locRemaining).toFixed(3)} available in source batch locations`
-        );
-      }
-    }
+    };
+    drawSourceBatchLocations();
 
     db.prepare('UPDATE stock_batches SET quantity_remaining = quantity_remaining - ? WHERE id = ?')
       .run(take, batchId);
@@ -623,7 +626,7 @@ class PurchaseReturnModel {
       // Stock: verify availability, then record negative movements per line.
       const batchLocationsEnabled = isFeatureEnabled(db, 'feature_batch_locations');
 
-      for (const line of lines) {
+      const postPurchaseReturnLine = (line: PurchaseReturnLine): void => {
         // Stock must exist in the restock warehouse before we remove it.
         const balance = db.prepare(`
           SELECT quantity FROM stock_balances
@@ -705,6 +708,9 @@ class PurchaseReturnModel {
             `).run(draw.batchId, draw.quantity, returnId, line.source_item_id);
           }
         }
+      };
+      for (const line of lines) {
+        postPurchaseReturnLine(line);
       }
 
       // GL reversal — Dr AP / Cr Inventory at actual return cost, keyed to
@@ -759,7 +765,7 @@ class PurchaseReturnModel {
     const transaction = db.transaction(() => {
       const lines = header.items || [];
 
-      for (const line of lines) {
+      const reversePurchaseReturnLine = (line: typeof lines[number]): void => {
         // Restore returned_quantity on the source document.
         if (header.source_type === 'PURCHASE' && line.source_item_id) {
           db.prepare(`UPDATE purchases SET returned_quantity = MAX(0, COALESCE(returned_quantity, 0) - ?) WHERE id = ?`)
@@ -804,7 +810,7 @@ class PurchaseReturnModel {
         `).all(line.id) as Array<{ batch_id: number; quantity: number }>;
 
         if (consumed.length > 0) {
-          for (const c of consumed) {
+          const restoreConsumedReturnBatch = (c: typeof consumed[number]): void => {
             db.prepare(`UPDATE stock_batches SET quantity_remaining = MAX(0, quantity_remaining + ?) WHERE id = ?`)
               .run(c.quantity, c.batch_id);
             // New path: restore to batch_stock_by_location using recorded location
@@ -824,33 +830,42 @@ class PurchaseReturnModel {
                 `).run(c.batch_id, prb.location_id, c.quantity, c.quantity);
               }
             }
+          };
+          for (const c of consumed) {
+            restoreConsumedReturnBatch(c);
           }
         } else {
-          const latest = db.prepare(`
-            SELECT id FROM stock_batches
-            WHERE item_id = ? AND warehouse_id = ?
-            ORDER BY received_date DESC, id DESC
-            LIMIT 1
-          `).get(line.item_id, header.warehouse_id) as { id: number } | undefined;
-          if (latest) {
-            db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?`)
-              .run(line.quantity, latest.id);
-            if (isFeatureEnabled(db, 'feature_batch_locations')) {
-              const defLoc = db.prepare(`
-                SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
-              `).get(header.warehouse_id) as { id: number } | undefined;
-              if (defLoc) {
-                db.prepare(`
-                  INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
-                  VALUES (?, ?, ?, 0, ?)
-                  ON CONFLICT(batch_id, location_id) DO UPDATE SET
-                    quantity_physical = quantity_physical + excluded.quantity_physical,
-                    quantity_available = quantity_available + excluded.quantity_available
-                `).run(latest.id, defLoc.id, line.quantity, line.quantity);
+          const restoreLegacyReturnStock = (): void => {
+            const latest = db.prepare(`
+              SELECT id FROM stock_batches
+              WHERE item_id = ? AND warehouse_id = ?
+              ORDER BY received_date DESC, id DESC
+              LIMIT 1
+            `).get(line.item_id, header.warehouse_id) as { id: number } | undefined;
+            if (latest) {
+              db.prepare(`UPDATE stock_batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?`)
+                .run(line.quantity, latest.id);
+              if (isFeatureEnabled(db, 'feature_batch_locations')) {
+                const defLoc = db.prepare(`
+                  SELECT id FROM locations WHERE warehouse_id = ? AND location_code = 'DEFAULT' LIMIT 1
+                `).get(header.warehouse_id) as { id: number } | undefined;
+                if (defLoc) {
+                  db.prepare(`
+                    INSERT INTO batch_stock_by_location (batch_id, location_id, quantity_physical, quantity_reserved, quantity_available)
+                    VALUES (?, ?, ?, 0, ?)
+                    ON CONFLICT(batch_id, location_id) DO UPDATE SET
+                      quantity_physical = quantity_physical + excluded.quantity_physical,
+                      quantity_available = quantity_available + excluded.quantity_available
+                  `).run(latest.id, defLoc.id, line.quantity, line.quantity);
+                }
               }
             }
-          }
+          };
+          restoreLegacyReturnStock();
         }
+      };
+      for (const line of lines) {
+        reversePurchaseReturnLine(line);
       }
 
       // Reverse the GL entry (journal_lines voided by reference).

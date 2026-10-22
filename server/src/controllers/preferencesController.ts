@@ -16,6 +16,31 @@ function isIsoDate(value: unknown): value is string {
   return typeof value === 'string' && ISO_DATE.test(value);
 }
 
+function validateDefaultRange(range: unknown): string | null {
+  if (range === null) return null;
+  if (typeof range !== 'object' || !range || !('from' in range) || !('to' in range)
+      || !isIsoDate(range.from) || !isIsoDate(range.to)) {
+    return 'defaultRange must be { from, to } with YYYY-MM-DD dates, or null';
+  }
+  return range.from > range.to ? 'defaultRange.from must not be after defaultRange.to' : null;
+}
+
+function validatePresets(presets: unknown): string | null {
+  if (!Array.isArray(presets)) return 'presets must be an array';
+  const presetIds = new Set<string>();
+  for (const preset of presets) {
+    const p = preset as Record<string, unknown> | null;
+    if (!p || typeof p !== 'object' || typeof p.id !== 'string' || p.id === ''
+        || typeof p.name !== 'string' || !isIsoDate(p.from) || !isIsoDate(p.to)) {
+      return 'Each preset must be { id, name, from, to } with YYYY-MM-DD dates';
+    }
+    if (p.from > p.to) return `Preset "${p.id}" has from after to`;
+    if (presetIds.has(p.id)) return `Duplicate preset id: ${p.id}`;
+    presetIds.add(p.id);
+  }
+  return null;
+}
+
 function requireUser(req: AuthRequest, res: Response): number | null {
   if (!req.user) {
     res.status(401).json({ error: 'Authentication required' });
@@ -68,62 +93,20 @@ function updatePreferences(req: AuthRequest, res: Response): void {
     }
 
     if (body.defaultRange !== undefined) {
-      if (body.defaultRange === null) {
-        partial.defaultRange = null;
-      } else {
-        const range = body.defaultRange as Record<string, unknown> | null;
-        if (
-          !range ||
-          typeof range !== 'object' ||
-          !isIsoDate(range.from) ||
-          !isIsoDate(range.to)
-        ) {
-          res.status(400).json({
-            error: 'defaultRange must be { from, to } with YYYY-MM-DD dates, or null',
-          });
-          return;
-        }
-        // ISO strings compare lexicographically — from > to would store a
-        // reversed window that later produces an empty range.
-        if (range.from > range.to) {
-          res.status(400).json({ error: 'defaultRange.from must not be after defaultRange.to' });
-          return;
-        }
-        partial.defaultRange = { from: range.from, to: range.to };
+      const error = validateDefaultRange(body.defaultRange);
+      if (error) {
+        res.status(400).json({ error });
+        return;
       }
+      const range = body.defaultRange as { from: string; to: string } | null;
+      partial.defaultRange = range === null ? null : { from: range.from, to: range.to };
     }
 
     if (body.presets !== undefined) {
-      if (!Array.isArray(body.presets)) {
-        res.status(400).json({ error: 'presets must be an array' });
+      const error = validatePresets(body.presets);
+      if (error) {
+        res.status(400).json({ error });
         return;
-      }
-      const presetIds = new Set<string>();
-      for (const preset of body.presets) {
-        const p = preset as Record<string, unknown> | null;
-        if (
-          !p ||
-          typeof p !== 'object' ||
-          typeof p.id !== 'string' ||
-          p.id === '' ||
-          typeof p.name !== 'string' ||
-          !isIsoDate(p.from) ||
-          !isIsoDate(p.to)
-        ) {
-          res.status(400).json({
-            error: 'Each preset must be { id, name, from, to } with YYYY-MM-DD dates',
-          });
-          return;
-        }
-        if (p.from > p.to) {
-          res.status(400).json({ error: `Preset "${p.id}" has from after to` });
-          return;
-        }
-        if (presetIds.has(p.id)) {
-          res.status(400).json({ error: `Duplicate preset id: ${p.id}` });
-          return;
-        }
-        presetIds.add(p.id);
       }
       partial.presets = body.presets as UserPreferences['presets'];
     }

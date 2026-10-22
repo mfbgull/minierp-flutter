@@ -1,3 +1,4 @@
+import { localMonthCode } from '../utils/documentNumbering';
 /**
  * InvoiceReturn — row model for the first-class return documents
  * (invoice-return-spec.md §4.1 / Milestone 1).
@@ -88,9 +89,8 @@ export class InvoiceReturnModel {
     }
     const nextNo = getNextSequenceNumber(db, 'RET_last_no');
     const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    return `RET-${month}${year}-${String(nextNo).padStart(5, '0')}`;
+    const monthCode = localMonthCode(now);
+    return `RET-${monthCode}-${String(nextNo).padStart(5, '0')}`;
   }
 
   /** Atomic credit-note number: CR-MMYY-NNNNN (used by credit settlements). */
@@ -113,9 +113,8 @@ export class InvoiceReturnModel {
     }
     const nextNo = getNextSequenceNumber(db, 'CR_last_no');
     const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    return `CR-${month}${year}-${String(nextNo).padStart(5, '0')}`;
+    const monthCode = localMonthCode(now);
+    return `CR-${monthCode}-${String(nextNo).padStart(5, '0')}`;
   }
 
   static createReturn(

@@ -264,6 +264,76 @@ describe('owner withdrawals — cash', () => {
     const cashAfter = AccountingService.getAccountBalance(db, cashAccountId(), '2026-04-01').balance;
     expect(cashAfter).toBeCloseTo(cashBefore - 300, 2);
   });
+
+  it('re-posts the entry when the amount is edited, keeping cash and GL in step', () => {
+    const { id } = OwnerWithdrawalModel.create(db, {
+      withdrawal_no: generateWithdrawalNo(db, '2026-04-02'),
+      withdrawal_date: '2026-04-02',
+      kind: 'cash',
+      amount: 300,
+      payment_method: 'Cash',
+      created_by: USER,
+    });
+    const cashBefore = AccountingService.getAccountBalance(db, cashAccountId(), '2026-04-02').balance;
+
+    const updated = OwnerWithdrawalModel.update(db, id, { amount: 450, note: 'raised' }, { userId: USER });
+    expect(updated.amount).toBe(450);
+
+    const totals = activeJournalTotals('OWNER_WITHDRAWAL', id);
+    expect(totals.n).toBe(2);
+    expect(totals.dr).toBeCloseTo(450, 2);
+    expect(totals.dr - totals.cr).toBeCloseTo(0, 2);
+
+    // cashBefore is measured after the original 300 posting; raising it to
+    // 450 voids the old entry and posts the new one, so only the 150
+    // difference leaves the account.
+    const cashAfter = AccountingService.getAccountBalance(db, cashAccountId(), '2026-04-02').balance;
+    expect(cashAfter).toBeCloseTo(cashBefore - 150, 2);
+    expect(wholeLedgerImbalance()).toBeCloseTo(0, 2);
+    expect(OwnerWithdrawalModel.getById(db, id)?.note).toBe('raised');
+  });
+
+  it('a note-only cash edit leaves the posting and the cash balance alone', () => {
+    const { id } = OwnerWithdrawalModel.create(db, {
+      withdrawal_no: generateWithdrawalNo(db, '2026-04-03'),
+      withdrawal_date: '2026-04-03',
+      kind: 'cash',
+      amount: 200,
+      payment_method: 'Cash',
+      created_by: USER,
+    });
+    const before = activeJournalTotals('OWNER_WITHDRAWAL', id);
+    const cashBefore = AccountingService.getAccountBalance(db, cashAccountId(), '2026-04-03').balance;
+
+    OwnerWithdrawalModel.update(db, id, { note: 'just a note' }, { userId: USER });
+
+    const after = activeJournalTotals('OWNER_WITHDRAWAL', id);
+    expect(after.n).toBe(before.n);
+    expect(after.dr).toBeCloseTo(before.dr, 2);
+    expect(OwnerWithdrawalModel.getById(db, id)?.note).toBe('just a note');
+    const cashAfter = AccountingService.getAccountBalance(db, cashAccountId(), '2026-04-03').balance;
+    expect(cashAfter).toBeCloseTo(cashBefore, 2);
+  });
+
+  it('refuses a cash edit that would overdraw the account', () => {
+    const { id } = OwnerWithdrawalModel.create(db, {
+      withdrawal_no: generateWithdrawalNo(db, '2026-04-04'),
+      withdrawal_date: '2026-04-04',
+      kind: 'cash',
+      amount: 100,
+      payment_method: 'Cash',
+      created_by: USER,
+    });
+    const before = activeJournalTotals('OWNER_WITHDRAWAL', id);
+
+    expect(() => OwnerWithdrawalModel.update(db, id, { amount: 1_000_000_000 }, { userId: USER }))
+      .toThrow(/Insufficient funds/i);
+
+    const after = activeJournalTotals('OWNER_WITHDRAWAL', id);
+    expect(after.n).toBe(before.n);
+    expect(after.dr).toBeCloseTo(before.dr, 2);
+    expect(wholeLedgerImbalance()).toBeCloseTo(0, 2);
+  });
 });
 
 describe('owner withdrawals — goods', () => {

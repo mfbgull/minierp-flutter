@@ -55,6 +55,25 @@ const UNVERIFIABLE = 3;
 class UsageError extends Error {}
 class ChangeError extends Error {}
 
+function parseGuardOption(argv, index, opts) {
+  const flag = argv[index];
+  switch (flag) {
+    case '--force-incomplete':
+      opts.forceIncomplete = true;
+      return index;
+    case '--reason':
+      opts.reason = argv[index + 1];
+      if (!opts.reason) throw new UsageError('--reason requires a value');
+      return index + 1;
+    default:
+      if (flag.startsWith('--reason=')) {
+        opts.reason = flag.slice('--reason='.length);
+        return index;
+      }
+      throw new UsageError(`unknown flag: ${flag}`);
+  }
+}
+
 function parseArgv(argv) {
   const change = argv[0];
   if (!change || change.startsWith('--')) {
@@ -67,14 +86,7 @@ function parseArgv(argv) {
     const a = argv[i];
     if (passthrough) { opts.passthrough.push(a); continue; }
     if (a === '--') { passthrough = true; continue; }
-    if (a === '--force-incomplete') { opts.forceIncomplete = true; continue; }
-    if (a === '--reason') {
-      opts.reason = argv[++i];
-      if (!opts.reason) throw new UsageError('--reason requires a value');
-      continue;
-    }
-    if (a.startsWith('--reason=')) { opts.reason = a.slice('--reason='.length); continue; }
-    throw new UsageError(`unknown flag: ${a}`);
+    i = parseGuardOption(argv, i, opts);
   }
 
   if (opts.forceIncomplete && !opts.reason) {
@@ -106,25 +118,28 @@ function appendArchiveNote(changeDir, change, reason, uncheckedCount) {
   return notes;
 }
 
+function loadChangeTasks(opts) {
+  const changeDir = path.join(CHANGES_DIR, opts.change);
+  if (!fs.existsSync(changeDir)) {
+    throw new ChangeError(`change not found: openspec/changes/${opts.change}`);
+  }
+  const unchecked = findUnchecked(changeDir);
+  if (unchecked === null) {
+    throw new ChangeError(
+      `no tasks.md in openspec/changes/${opts.change} — nothing to verify. ` +
+      `Refusing to archive an unverifiable change.`
+    );
+  }
+  return { changeDir, unchecked };
+}
+
 function main() {
   let opts;
   let changeDir;
   let unchecked;
   try {
     opts = parseArgv(process.argv.slice(2));
-    changeDir = path.join(CHANGES_DIR, opts.change);
-
-    if (!fs.existsSync(changeDir)) {
-      throw new ChangeError(`change not found: openspec/changes/${opts.change}`);
-    }
-
-    unchecked = findUnchecked(changeDir);
-    if (unchecked === null) {
-      throw new ChangeError(
-        `no tasks.md in openspec/changes/${opts.change} — nothing to verify. ` +
-        `Refusing to archive an unverifiable change.`
-      );
-    }
+    ({ changeDir, unchecked } = loadChangeTasks(opts));
   } catch (e) {
     if (!(e instanceof UsageError) && !(e instanceof ChangeError)) throw e;
     process.stderr.write(`openspec-archive-guard: ${e.message}\n`);

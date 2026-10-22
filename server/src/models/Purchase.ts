@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
+import { generateDocNo, generateReceiptBatchNo } from '../utils/sequence';
 import { sanitizeSortParams, PURCHASE_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
 import ItemModel from './Item';
@@ -124,12 +124,7 @@ class PurchaseModel {
   }
 
   static generateBatchNo(db: Database.Database): string {
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    const settingKey = `BATCH_last_no_${month}${year}`;
-    const nextNo = getNextSequenceNumber(db, settingKey);
-    return `BATCH-${month}${year}-PUR-${String(nextNo).padStart(5, '0')}`;
+    return generateReceiptBatchNo(db, 'PUR');
   }
 
   static generateMovementNo(db: Database.Database): string {

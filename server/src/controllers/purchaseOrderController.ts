@@ -1,3 +1,5 @@
+import { respondToIdempotencyReplay } from '../utils/idempotency';
+import { listPagination, listPageQuery } from '../utils/controllerPagination';
 import { Request, Response } from 'express';
 import { getQueryInteger, getQueryParam, getRouteParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
@@ -14,6 +16,25 @@ import {
 import { requireSupplierForPurchase } from '../utils/purchaseValidation';
 import { BusinessRuleError } from '../utils/businessRuleError';
 import { errorMessage } from '../utils/errorMessage';
+
+function validatePurchaseOrderItems(items: Array<{ item_id?: number; quantity?: number; unit_price?: number }>): string | null {
+  // Validate items
+  for (const item of items) {
+    if (!item.item_id || !item.quantity || !item.unit_price) {
+      return 'Each item must have item_id, quantity, and unit_price';
+    }
+
+    if (item.quantity <= 0) {
+      return 'Item quantity must be positive';
+    }
+
+    if (item.unit_price <= 0) {
+      return 'Item unit price must be positive';
+    }
+  }
+
+  return null;
+}
 
 function createPurchaseOrder(req: AuthRequest, res: Response): void {
   try {
@@ -52,29 +73,8 @@ function createPurchaseOrder(req: AuthRequest, res: Response): void {
       return;
     }
 
-    // Validate items
-    for (const item of items) {
-      if (!item.item_id || !item.quantity || !item.unit_price) {
-        res.status(400).json({
-          error: 'Each item must have item_id, quantity, and unit_price'
-        });
-        return;
-      }
-
-      if (item.quantity <= 0) {
-        res.status(400).json({
-          error: 'Item quantity must be positive'
-        });
-        return;
-      }
-
-      if (item.unit_price <= 0) {
-        res.status(400).json({
-          error: 'Item unit price must be positive'
-        });
-        return;
-      }
-    }
+    const itemError = validatePurchaseOrderItems(items);
+    if (itemError) { res.status(400).json({ error: itemError }); return; }
 
     const po = PurchaseOrderModel.create(req.body, req.user!.id, db);
 
@@ -87,8 +87,7 @@ function createPurchaseOrder(req: AuthRequest, res: Response): void {
 
 function getPurchaseOrders(req: Request, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
+    const { page, limit } = listPageQuery(req.query);
     const supplierIdParam = getQueryParam(req.query.supplier_id);
     const statusParam = getQueryParam(req.query.status);
     const search = getQueryParam(req.query.search);
@@ -116,13 +115,7 @@ function getPurchaseOrders(req: Request, res: Response): void {
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error) {
     logger.error('Get POs error:', error);
@@ -360,6 +353,22 @@ function voidGoodsReceipt(req: AuthRequest, res: Response): void {
   }
 }
 
+function validateReceiptItems(items: Array<{ po_item_id?: number; received_quantity?: number | string | boolean }>): string | null {
+  // Validate receipt items
+  for (const item of items) {
+    if (!item.po_item_id || !item.received_quantity) {
+      return 'Each receipt item must have po_item_id and received_quantity';
+    }
+
+    const receivedQty = Number(item.received_quantity);
+    if (typeof item.received_quantity === 'boolean' || !Number.isFinite(receivedQty) || receivedQty <= 0) {
+      return 'Received quantity must be positive';
+    }
+  }
+
+  return null;
+}
+
 function createGoodsReceipt(req: AuthRequest, res: Response): void {
   try {
     const {
@@ -384,38 +393,18 @@ function createGoodsReceipt(req: AuthRequest, res: Response): void {
       return;
     }
 
-    // Validate receipt items
-    for (const item of items) {
-      if (!item.po_item_id || !item.received_quantity) {
-        res.status(400).json({
-          error: 'Each receipt item must have po_item_id and received_quantity'
-        });
-        return;
-      }
-
-      const receivedQty = Number(item.received_quantity);
-      if (typeof item.received_quantity === 'boolean' || !Number.isFinite(receivedQty) || receivedQty <= 0) {
-        res.status(400).json({
-          error: 'Received quantity must be positive'
-        });
-        return;
-      }
-    }
+    const itemError = validateReceiptItems(items);
+    if (itemError) { res.status(400).json({ error: itemError }); return; }
 
     // audit-3 task 08: a goods receipt brings stock IN and a payable with
     // it, so a retry after a lost response must replay rather than receive
     // the same goods twice.
     const hash = hashRequestPayload(req.body);
     const start = startIdempotentRequest(db, req.headers, IDEMPOTENCY_SCOPES.PURCHASE_ORDER_RECEIPT, hash);
-    if (start.kind === 'error') {
-      res.status(start.status).json({ error: start.message });
-      return;
-    }
-    if (start.kind === 'replay') {
-      res.set('X-Idempotent-Replay', 'true');
-      res.status(201).json({ success: true, idempotentReplay: true, data: { id: start.resourceId } });
-      return;
-    }
+    if (respondToIdempotencyReplay(res, start, {
+      status: 201,
+      buildBody: (id) => ({ success: true, idempotentReplay: true, data: { id } }),
+    })) return;
 
     const receipt = db.transaction(() => {
       const created = PurchaseOrderModel.addReceipt(
@@ -429,7 +418,7 @@ function createGoodsReceipt(req: AuthRequest, res: Response): void {
         req.user!.id,
         db
       );
-      if (start.key) {
+      if (start.kind === 'proceed' && start.key) {
         claimIdempotencyKey(db, IDEMPOTENCY_SCOPES.PURCHASE_ORDER_RECEIPT, start.key, hash, created.id);
       }
       return created;

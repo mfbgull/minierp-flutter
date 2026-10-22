@@ -155,6 +155,35 @@ export function runBackfillGlPreposting(db: Database.Database): void {
     return posted;
   };
 
+  const backfillPayment = (pay: PaymentRow): boolean => {
+    if (hasActiveLines.get('PAYMENT', pay.id)) return false;
+    const amount = round2(Math.abs(pay.amount));
+    const code = methodToAccountCode(pay.payment_method);
+
+    if (pay.supplier_id !== null && pay.supplier_id !== undefined) {
+      if (!code) { reviewList.push(`supplier payment ${pay.payment_no}: non-cash method '${pay.payment_method}'`); return false; }
+      if (pay.amount <= 0) { reviewList.push(`supplier payment ${pay.payment_no}: non-positive amount`); return false; }
+      return post(pay.payment_date, pay.payment_no, 'PAYMENT', pay.id, [
+        { code: '2000', debit: amount, label: `AP settled by ${pay.payment_no} (backfill)` },
+        { code, credit: amount, label: `Cash paid via ${pay.payment_no} (backfill)` },
+      ]);
+    }
+
+    if (pay.customer_id === null || pay.customer_id === undefined) return false;
+    if (!code) { reviewList.push(`customer payment ${pay.payment_no}: non-cash method '${pay.payment_method}'`); return false; }
+    if (pay.amount > 0) {
+      return post(pay.payment_date, pay.payment_no, 'PAYMENT', pay.id, [
+        { code, debit: amount, label: `Cash received via ${pay.payment_no} (backfill)` },
+        { code: '1100', credit: amount, label: `AR reduced by ${pay.payment_no} (backfill)` },
+      ]);
+    }
+    // Refund paid out to the customer.
+    return post(pay.payment_date, pay.payment_no, 'PAYMENT', pay.id, [
+      { code: '1100', debit: amount, label: `AR adjusted for refund ${pay.payment_no} (backfill)` },
+      { code, credit: amount, label: `Cash refunded via ${pay.payment_no} (backfill)` },
+    ]);
+  };
+
   const backfill23Payments = (): number => {
     let posted = 0;
     // ── 2+3. Payments (supplier out / customer in-or-refund) ─────────
@@ -164,34 +193,7 @@ export function runBackfillGlPreposting(db: Database.Database): void {
       FROM payments WHERE amount <> 0
     `).all() as PaymentRow[];
     for (const pay of payments) {
-      if (hasActiveLines.get('PAYMENT', pay.id)) continue;
-      const amount = round2(Math.abs(pay.amount));
-      const code = methodToAccountCode(pay.payment_method);
-
-      if (pay.supplier_id !== null && pay.supplier_id !== undefined) {
-        if (!code) { reviewList.push(`supplier payment ${pay.payment_no}: non-cash method '${pay.payment_method}'`); continue; }
-        if (pay.amount <= 0) { reviewList.push(`supplier payment ${pay.payment_no}: non-positive amount`); continue; }
-        if (post(pay.payment_date, pay.payment_no, 'PAYMENT', pay.id, [
-          { code: '2000', debit: amount, label: `AP settled by ${pay.payment_no} (backfill)` },
-          { code, credit: amount, label: `Cash paid via ${pay.payment_no} (backfill)` },
-        ])) posted += 1;
-        continue;
-      }
-
-      if (pay.customer_id === null || pay.customer_id === undefined) continue;
-      if (!code) { reviewList.push(`customer payment ${pay.payment_no}: non-cash method '${pay.payment_method}'`); continue; }
-      if (pay.amount > 0) {
-        if (post(pay.payment_date, pay.payment_no, 'PAYMENT', pay.id, [
-          { code, debit: amount, label: `Cash received via ${pay.payment_no} (backfill)` },
-          { code: '1100', credit: amount, label: `AR reduced by ${pay.payment_no} (backfill)` },
-        ])) posted += 1;
-      } else {
-        // Refund paid out to the customer.
-        if (post(pay.payment_date, pay.payment_no, 'PAYMENT', pay.id, [
-          { code: '1100', debit: amount, label: `AR adjusted for refund ${pay.payment_no} (backfill)` },
-          { code, credit: amount, label: `Cash refunded via ${pay.payment_no} (backfill)` },
-        ])) posted += 1;
-      }
+      if (backfillPayment(pay)) posted += 1;
     }
 
     return posted;

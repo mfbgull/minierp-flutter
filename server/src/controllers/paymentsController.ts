@@ -1,3 +1,4 @@
+import { listPagination, rawListPageQuery } from '../utils/controllerPagination';
 import { Request, Response } from 'express';
 import type Database from 'better-sqlite3';
 import { getQueryParam } from '../utils/queryUtils';
@@ -43,9 +44,7 @@ import { formatCurrency, getCurrencySymbol } from '../utils/displayCurrency';
 
 function getPayments(req: Request, res: Response): void {
   try {
-    const pageParam = getQueryParam(req.query.page);
-    const limitParam = getQueryParam(req.query.limit);
-    const searchParam = getQueryParam(req.query.search);
+    const { pageParam, limitParam, searchParam } = rawListPageQuery(req.query);
     const customerIdParam = getQueryParam(req.query.customerId);
     const supplierIdParam = getQueryParam(req.query.supplierId);
     const fromDateParam = getQueryParam(req.query.fromDate);
@@ -69,7 +68,7 @@ function getPayments(req: Request, res: Response): void {
 
     res.json({
       success: true, data: payments,
-      pagination: { currentPage: pageNum, totalPages: Math.ceil(total / limitNum), totalItems: total, hasNext: pageNum < Math.ceil(total / limitNum), hasPrev: pageNum > 1 }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error) {
     logger.error('Error fetching payments:', error);
@@ -94,7 +93,7 @@ function getUnifiedPayments(req: Request, res: Response): void {
 
     res.json({
       success: true, data: payments,
-      pagination: { currentPage: pageNum, totalPages: Math.ceil(total / limitNum), totalItems: total, hasNext: pageNum < Math.ceil(total / limitNum), hasPrev: pageNum > 1 }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error) {
     logger.error('Error fetching unified payments:', error);
@@ -415,6 +414,26 @@ function deletePayment(req: AuthRequest, res: Response): void {
   }
 }
 
+function receiptContact(entity: { entity_address: string; entity_phone: string; entity_email: string }) {
+  return { entityAddress: entity.entity_address || '', entityPhone: entity.entity_phone || '', entityEmail: entity.entity_email || '' };
+}
+
+function receiptCompany() {
+  const settingsRows = db.prepare("SELECT key, value FROM settings WHERE key IN ('company_name','company_address','company_phone','company_email','company_tax_id')").all() as { key: string; value: string }[];
+  const company: Record<string, string> = {};
+  for (const row of settingsRows) {
+    company[row.key.replace('company_', '')] = row.value;
+  }
+
+  return {
+    name: company.name || 'Mini ERP',
+    address: company.address || '',
+    phone: company.phone || '',
+    email: company.email || '',
+    tax_id: company.tax_id || '',
+  };
+}
+
 function getPaymentReceipt(req: Request, res: Response): void {
   try {
     const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
@@ -443,9 +462,7 @@ function getPaymentReceipt(req: Request, res: Response): void {
       if (!customer) { res.status(404).json({ success: false, error: 'Customer not found' }); return; }
 
       entityName = customer.customer_name;
-      entityAddress = customer.entity_address || '';
-      entityPhone = customer.entity_phone || '';
-      entityEmail = customer.entity_email || '';
+      ({ entityAddress, entityPhone, entityEmail } = receiptContact(customer));
       currentBalance = parseCurrency(customer.current_balance);
       // PAY-11 (task 2.6): previous balance comes from the payment's own
       // ledger row — today's balance is polluted by everything since.
@@ -478,9 +495,7 @@ function getPaymentReceipt(req: Request, res: Response): void {
       if (!supplier) { res.status(404).json({ success: false, error: 'Supplier not found' }); return; }
 
       entityName = supplier.supplier_name;
-      entityAddress = supplier.entity_address || '';
-      entityPhone = supplier.entity_phone || '';
-      entityEmail = supplier.entity_email || '';
+      ({ entityAddress, entityPhone, entityEmail } = receiptContact(supplier));
       currentBalance = parseCurrency(supplier.current_balance);
       // PAY-11 (task 2.6): supplier sign convention — debit increases what
       // we owe, credit (a payment) decreases it.
@@ -512,11 +527,7 @@ function getPaymentReceipt(req: Request, res: Response): void {
 
     const amount = parseCurrency(payment.amount);
 
-    const settingsRows = db.prepare("SELECT key, value FROM settings WHERE key IN ('company_name','company_address','company_phone','company_email','company_tax_id')").all() as { key: string; value: string }[];
-    const company: Record<string, string> = {};
-    for (const row of settingsRows) {
-      company[row.key.replace('company_', '')] = row.value;
-    }
+    const company = receiptCompany();
 
     res.json({
       success: true,
@@ -543,19 +554,20 @@ function getPaymentReceipt(req: Request, res: Response): void {
           current_balance: currentBalance,
         },
         allocations,
-        company: {
-          name: company.name || 'Mini ERP',
-          address: company.address || '',
-          phone: company.phone || '',
-          email: company.email || '',
-          tax_id: company.tax_id || '',
-        },
+        company,
       },
     });
   } catch (error) {
     logger.error('Error fetching payment receipt:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch receipt data' });
   }
+}
+
+function invalidAllocationInvoice(allocations: Array<{ invoice_id: number | string }>): string | null {
+  for (const alloc of allocations) {
+    if (isNaN(parseInt(alloc.invoice_id as string, 10))) return `Invalid invoice ID: ${alloc.invoice_id}`;
+  }
+  return null;
 }
 
 function allocatePaymentToInvoice(req: AuthRequest, res: Response): void {
@@ -576,12 +588,8 @@ function allocatePaymentToInvoice(req: AuthRequest, res: Response): void {
       return;
     }
 
-    for (const alloc of allocations) {
-      if (isNaN(parseInt(alloc.invoice_id as string, 10))) {
-        res.status(400).json({ success: false, error: `Invalid invoice ID: ${alloc.invoice_id}` });
-        return;
-      }
-    }
+    const allocationError = invalidAllocationInvoice(allocations);
+    if (allocationError) { res.status(400).json({ success: false, error: allocationError }); return; }
 
     // TASK 33: the per-invoice ceiling, the remainder match and the
     // allocation writes belong to the single payment writer, so this path

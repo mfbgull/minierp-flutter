@@ -18,30 +18,13 @@
  *   node dist/scripts/dedupe-po.js            (dry run)
  *   node dist/scripts/dedupe-po.js --apply    (write)
  */
-const path = require('path');
-const fs = require('fs');
+const { openMaintenanceDatabase } = require('./lib/maintenance-database');
 
 const SENTINEL = 'PO commitment reversal (backfill)';
 
-function resolveDbPath() {
-  const candidates = [
-    process.env.DATABASE_PATH && path.join(process.env.DATABASE_PATH, 'erp.db'),
-    process.env.DATABASE_PATH,
-    path.join(__dirname, '../../../database/erp.db'),
-    path.join(__dirname, '../../database/erp.db'),
-  ].filter(Boolean);
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return p;
-  }
-  console.error('[dedupe-po] database not found; set DATABASE_PATH');
-  process.exit(1);
-}
-
 function main() {
   const apply = process.argv.includes('--apply');
-  const dbPath = resolveDbPath();
-  const Database = require('better-sqlite3');
-  const db = new Database(dbPath);
+  const db = openMaintenanceDatabase(__dirname, 'dedupe-po');
 
   try {
     // PURCHASE_ORDER debits not yet reversed by this script, paired with any

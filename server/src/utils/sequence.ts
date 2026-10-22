@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { localMonthCode } from './documentNumbering';
 
 /**
  * Atomically get the next number in a sequence, using INSERT ... ON CONFLICT
@@ -26,11 +27,16 @@ export function getNextSequenceNumber(db: Database.Database, settingKey: string)
  */
 export function generateDocNo(db: Database.Database, prefix: string, padLength = 4): string {
   const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = String(now.getFullYear()).slice(-2);
-  const settingKey = `${prefix}_last_no_${month}${year}`;
+  const monthCode = localMonthCode(now);
+  const settingKey = `${prefix}_last_no_${monthCode}`;
   const nextNo = getNextSequenceNumber(db, settingKey);
-  return `${prefix}-${month}${year}-${nextNo.toString().padStart(padLength, '0')}`;
+  return `${prefix}-${monthCode}-${nextNo.toString().padStart(padLength, '0')}`;
+}
+
+export function generateReceiptBatchNo(db: Database.Database, source: 'PRD' | 'PUR'): string {
+  const monthCode = localMonthCode(new Date());
+  const nextNo = getNextSequenceNumber(db, `BATCH_last_no_${monthCode}`);
+  return `BATCH-${monthCode}-${source}-${String(nextNo).padStart(5, '0')}`;
 }
 
 /**

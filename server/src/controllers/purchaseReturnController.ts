@@ -1,3 +1,4 @@
+import { listPagination, listPageQuery } from '../utils/controllerPagination';
 import { Request, Response } from 'express';
 import { getQueryInteger, getQueryParam } from '../utils/queryUtils';
 import { AuthRequest } from '../types';
@@ -7,8 +8,7 @@ import logger from '../utils/logger';
 
 function getPurchaseReturns(req: Request, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
+    const { page, limit } = listPageQuery(req.query);
     const search = getQueryParam(req.query.search);
     const startDate = getQueryParam(req.query.start_date);
     const endDate = getQueryParam(req.query.end_date);
@@ -38,13 +38,7 @@ function getPurchaseReturns(req: Request, res: Response): void {
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error) {
     logger.error('Get purchase returns error:', error);

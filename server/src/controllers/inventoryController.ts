@@ -1,3 +1,4 @@
+import { listPagination, listPageQuery, listRequestQuery } from '../utils/controllerPagination';
 import { Request, Response } from 'express';
 import { getQueryInteger, getQueryParam, getRouteParam } from '../utils/queryUtils';
 import ItemModel from '../models/Item';
@@ -14,8 +15,7 @@ import { SqlParam } from '../utils/sqlTypes';
 
 function getItems(req: Request, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
+    const { page, limit } = listPageQuery(req.query);
     const search = getQueryParam(req.query.search);
     const category = getQueryParam(req.query.category);
     const sortBy = getQueryParam(req.query.sortBy);
@@ -44,13 +44,7 @@ function getItems(req: Request, res: Response): void {
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error) {
     logger.error('Get items error:', error);
@@ -546,8 +540,7 @@ function deleteWarehouse(req: AuthRequest, res: Response): void {
 
 function getStockMovements(req: Request, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
+    const { page, limit } = listPageQuery(req.query);
     const movementType = getQueryParam(req.query.movement_type);
     const sortBy = getQueryParam(req.query.sortBy);
     const sortOrder = getQueryParam(req.query.sortOrder);
@@ -568,13 +561,7 @@ function getStockMovements(req: Request, res: Response): void {
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error) {
     logger.error('Get stock movements error:', error);
@@ -773,8 +760,7 @@ function getItemLedger(req: Request, res: Response): void {
 
 function getStockBalances(req: Request, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
+    const { page, limit } = listPageQuery(req.query);
     const search = getQueryParam(req.query.search);
     const warehouseCode = getQueryParam(req.query.warehouse_code);
     const sortBy = getQueryParam(req.query.sortBy);
@@ -792,13 +778,7 @@ function getStockBalances(req: Request, res: Response): void {
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error) {
     logger.error('Get stock balances error:', error);
@@ -808,30 +788,12 @@ function getStockBalances(req: Request, res: Response): void {
 
 function getPhysicalCounts(req: Request, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
-    const search = getQueryParam(req.query.search);
-    const sortBy = getQueryParam(req.query.sortBy);
-    const sortOrder = getQueryParam(req.query.sortOrder);
-
-    const { rows, total, pageNum, limitNum } = PhysicalCountModel.getAll({
-      search: search || undefined,
-      sortBy: sortBy || undefined,
-      sortOrder: sortOrder || undefined,
-      page,
-      limit
-    }, db);
+    const { rows, total, pageNum, limitNum } = PhysicalCountModel.getAll(listRequestQuery(req.query), db);
 
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error) {
     logger.error('Get physical counts error:', error);
@@ -1017,6 +979,37 @@ function deletePhysicalCount(req: AuthRequest, res: Response): void {
 // and posts Dr <loss 7201-7204> / Cr inventory_asset (1200) at batch cost.
 const WRITE_OFF_LOSS_ACCOUNTS = new Set(['7201', '7202', '7203', '7204']);
 
+function writeOffRequestedBatches(batchIds: number[], userId: number, target: { warehouseId: number; disposition: 'expired' | 'damaged'; reason: string; accountCode: string }) {
+  const results: Array<{
+    batchId: number; batchNo?: string; movementNo?: string; journalEntryId?: number | null;
+    transferred?: boolean; qty?: number; value?: number; error?: string;
+  }> = [];
+  let succeeded = 0;
+  for (const batchId of batchIds as number[]) {
+    try {
+      const r = StockMovementModel.writeOffBatch(
+        {
+          batchId,
+          targetWarehouseId: target.warehouseId,
+          disposition: target.disposition,
+          reason: target.reason,
+          lossAccountCode: target.accountCode,
+        },
+        userId,
+        db
+      );
+      results.push({ batchId, batchNo: undefined, movementNo: r.movementNo, journalEntryId: r.journalEntryId, transferred: r.transferred, qty: r.qty, value: r.value });
+      succeeded++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      results.push({ batchId, error: message });
+      logger.warn(`Write-off failed for batch ${batchId}: ${message}`);
+    }
+  }
+
+  return { results, succeeded };
+}
+
 function runWriteOff(
   req: AuthRequest,
   res: Response,
@@ -1070,32 +1063,7 @@ function runWriteOff(
       return;
     }
 
-    const results: Array<{
-      batchId: number; batchNo?: string; movementNo?: string; journalEntryId?: number | null;
-      transferred?: boolean; qty?: number; value?: number; error?: string;
-    }> = [];
-    let succeeded = 0;
-    for (const batchId of batchIds as number[]) {
-      try {
-        const r = StockMovementModel.writeOffBatch(
-          {
-            batchId,
-            targetWarehouseId: dispositionWarehouse.id,
-            disposition,
-            reason: reasonText,
-            lossAccountCode: account.code,
-          },
-          req.user!.id,
-          db
-        );
-        results.push({ batchId, batchNo: undefined, movementNo: r.movementNo, journalEntryId: r.journalEntryId, transferred: r.transferred, qty: r.qty, value: r.value });
-        succeeded++;
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        results.push({ batchId, error: message });
-        logger.warn(`Write-off failed for batch ${batchId}: ${message}`);
-      }
-    }
+    const { results, succeeded } = writeOffRequestedBatches(batchIds, req.user!.id, { warehouseId: dispositionWarehouse.id, disposition, reason: reasonText, accountCode: account.code });
 
     if (succeeded === 0) {
       res.status(400).json({ error: 'No batches were written off', data: results });

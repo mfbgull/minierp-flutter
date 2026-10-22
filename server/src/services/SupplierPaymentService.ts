@@ -23,24 +23,7 @@ export class SupplierPaymentService {
   recordSupplierPayment(input: SupplierPaymentInput): PaymentRecordingResult {
     return this.db.transaction(() => {
       validateSupplierPayment(this.db, input);
-      if (input.supplierPrepaymentId !== undefined) {
-        if (!Number.isSafeInteger(input.supplierPrepaymentId) || input.supplierPrepaymentId <= 0 || input.paymentMethod !== 'credit') {
-          throw new BusinessRuleError(400, 'Invalid supplier advance funding');
-        }
-        const source = this.db.prepare(`
-          SELECT a.supplier_id, a.prepay_date, a.amount - COALESCE((
-            SELECT SUM(x.amount) FROM supplier_prepayment_applications x
-            JOIN payments p ON p.id = x.payment_id
-            WHERE x.prepayment_id = a.id AND p.voided_at IS NULL
-          ), 0) AS available
-          FROM supplier_prepayments a WHERE a.id = ? AND a.voided_at IS NULL
-        `).get(input.supplierPrepaymentId) as { supplier_id: number; prepay_date: string; available: number } | undefined;
-        if (!source || source.supplier_id !== input.supplierId) throw new BusinessRuleError(400, 'Active advance not found for this supplier');
-        if (input.paymentDate < source.prepay_date || parseCurrency(input.amount) > parseCurrency(source.available)) throw new BusinessRuleError(400, 'Application precedes or exceeds the supplier advance');
-        AccountingService.assertPeriodNotClosed(this.db, source.prepay_date, 'Supplier advance');
-      } else {
-        assertPaymentMethod(input.paymentMethod);
-      }
+      this.assertFunding(input);
       assertPeriodOpen(this.db, input.paymentDate);
 
       const paymentNo = input.paymentNo ?? InvoiceModel.generatePaymentNoAtomic(this.db);
@@ -79,6 +62,27 @@ export class SupplierPaymentService {
       this.postAccounting(paymentId, paymentNo, input, amount);
       return { paymentId, paymentNo, amount };
     })();
+  }
+
+  private assertFunding(input: SupplierPaymentInput): void {
+    if (input.supplierPrepaymentId !== undefined) {
+      if (!Number.isSafeInteger(input.supplierPrepaymentId) || input.supplierPrepaymentId <= 0 || input.paymentMethod !== 'credit') {
+        throw new BusinessRuleError(400, 'Invalid supplier advance funding');
+      }
+      const source = this.db.prepare(`
+        SELECT a.supplier_id, a.prepay_date, a.amount - COALESCE((
+          SELECT SUM(x.amount) FROM supplier_prepayment_applications x
+          JOIN payments p ON p.id = x.payment_id
+          WHERE x.prepayment_id = a.id AND p.voided_at IS NULL
+        ), 0) AS available
+        FROM supplier_prepayments a WHERE a.id = ? AND a.voided_at IS NULL
+      `).get(input.supplierPrepaymentId) as { supplier_id: number; prepay_date: string; available: number } | undefined;
+      if (!source || source.supplier_id !== input.supplierId) throw new BusinessRuleError(400, 'Active advance not found for this supplier');
+      if (input.paymentDate < source.prepay_date || parseCurrency(input.amount) > parseCurrency(source.available)) throw new BusinessRuleError(400, 'Application precedes or exceeds the supplier advance');
+      AccountingService.assertPeriodNotClosed(this.db, source.prepay_date, 'Supplier advance');
+    } else {
+      assertPaymentMethod(input.paymentMethod);
+    }
   }
 
   private postAccounting(

@@ -1,3 +1,4 @@
+import { listPagination, listPageQuery, listRequestQuery } from '../utils/controllerPagination';
 import { Request, Response } from 'express';
 import { AuthRequest } from '../types';
 import QuotationModel from '../models/Quotation';
@@ -72,24 +73,14 @@ function createQuotation(req: AuthRequest, res: Response): void {
 
 function getQuotations(req: Request, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
-    const search = getQueryParam(req.query.search);
-    const sortBy = getQueryParam(req.query.sortBy);
-    const sortOrder = getQueryParam(req.query.sortOrder);
-
     const filters = {
       status: req.query.status as string | undefined,
       customer_id: req.query.customer_id ? Number(req.query.customer_id) : undefined,
       customer_name: req.query.customer_name as string | undefined,
-      search: search || undefined,
       start_date: req.query.start_date as string | undefined,
       end_date: req.query.end_date as string | undefined,
       warehouse_id: req.query.warehouse_id ? Number(req.query.warehouse_id) : undefined,
-      sortBy: sortBy || undefined,
-      sortOrder: sortOrder || undefined,
-      page,
-      limit
+      ...listRequestQuery(req.query)
     };
 
     const { rows, total, pageNum, limitNum } = QuotationModel.getAll(filters, db);
@@ -99,13 +90,7 @@ function getQuotations(req: Request, res: Response): void {
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error: unknown) {
     logger.error('Get quotations error:', error);
@@ -257,25 +242,15 @@ function createSalesOrder(req: AuthRequest, res: Response): void {
 
 function getSalesOrders(req: Request, res: Response): void {
   try {
-    const page = getQueryInteger(req.query.page, 1);
-    const limit = getQueryInteger(req.query.limit, 10);
-    const search = getQueryParam(req.query.search);
-    const sortBy = getQueryParam(req.query.sortBy);
-    const sortOrder = getQueryParam(req.query.sortOrder);
-
     const filters = {
       status: req.query.status as string | undefined,
       customer_id: req.query.customer_id ? Number(req.query.customer_id) : undefined,
       customer_name: req.query.customer_name as string | undefined,
-      search: search || undefined,
       start_date: req.query.start_date as string | undefined,
       end_date: req.query.end_date as string | undefined,
       warehouse_id: req.query.warehouse_id ? Number(req.query.warehouse_id) : undefined,
       source_type: req.query.source_type as string | undefined,
-      sortBy: sortBy || undefined,
-      sortOrder: sortOrder || undefined,
-      page,
-      limit
+      ...listRequestQuery(req.query)
     };
 
     const { rows, total, pageNum, limitNum } = SalesOrderModel.getAll(filters, db);
@@ -285,13 +260,7 @@ function getSalesOrders(req: Request, res: Response): void {
     res.json({
       success: true,
       data: rows,
-      pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalItems: total,
-        hasNext: pageNum < Math.ceil(total / limitNum),
-        hasPrev: pageNum > 1
-      }
+      pagination: listPagination(total, pageNum, limitNum)
     });
   } catch (error: unknown) {
     logger.error('Get sales orders error:', error);

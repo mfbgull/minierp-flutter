@@ -53,6 +53,15 @@ interface CreateItemDTO {
   warehouse_id?: number;
 }
 
+function itemSupplyFlags(data: CreateItemDTO): number[] {
+  return [
+    data.is_raw_material ? 1 : 0,
+    data.is_finished_good ? 1 : 0,
+    data.is_purchased !== undefined ? (data.is_purchased ? 1 : 0) : 1,
+    data.is_manufactured ? 1 : 0,
+  ];
+}
+
 interface UpdateItemDTO {
   item_name: string;
   description?: string;
@@ -208,10 +217,7 @@ class ItemModel {
       data.reorder_level || 0,
       data.standard_cost || 0,
       data.standard_selling_price || 0,
-      data.is_raw_material ? 1 : 0,
-      data.is_finished_good ? 1 : 0,
-      data.is_purchased !== undefined ? (data.is_purchased ? 1 : 0) : 1,
-      data.is_manufactured ? 1 : 0,
+      ...itemSupplyFlags(data),
       data.sale_type === 'loose' ? 'loose' : 'packed',
       data.qty_decimal_precision || 0,
       data.rounding_step ?? null,

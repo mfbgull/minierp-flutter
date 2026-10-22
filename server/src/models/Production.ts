@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { parseCurrency, roundCurrency } from '../utils/currency';
 import { roundQty } from '../utils/quantity';
-import { generateDocNo, getNextSequenceNumber } from '../utils/sequence';
+import { generateDocNo, generateReceiptBatchNo } from '../utils/sequence';
 import { sanitizeSortParams, PRODUCTION_SORT_COLUMNS } from '../utils/sqlSanitizer';
 import StockMovementModel from './StockMovement';
 import ItemModel from './Item';
@@ -172,12 +172,7 @@ class ProductionModel {
   }
 
   static generateBatchNo(db: Database.Database): string {
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    const settingKey = `BATCH_last_no_${month}${year}`;
-    const nextNo = getNextSequenceNumber(db, settingKey);
-    return `BATCH-${month}${year}-PRD-${String(nextNo).padStart(5, '0')}`;
+    return generateReceiptBatchNo(db, 'PRD');
   }
 
   static generateProductionNo(db: Database.Database): string {
@@ -263,85 +258,89 @@ class ProductionModel {
 
       const productionId = result.lastInsertRowid as number;
 
-      const inputStmt = db.prepare(`
-        INSERT INTO production_inputs (
-          production_id, item_id, quantity, warehouse_id
-        ) VALUES (?, ?, ?, ?)
-      `);
+      const consumeProductionInputs = (): number => {
+        const inputStmt = db.prepare(`
+          INSERT INTO production_inputs (
+            production_id, item_id, quantity, warehouse_id
+          ) VALUES (?, ?, ?, ?)
+        `);
 
-      let totalMaterialCost = 0;
+        let totalMaterialCost = 0;
 
-      for (const input of input_items) {
-        const stockBalance = db.prepare(`
-          SELECT quantity FROM stock_balances
-          WHERE item_id = ? AND warehouse_id = ?
-        `).get(input.item_id, materialsWarehouseId) as { quantity: number } | undefined;
-
-        const availableStock = roundQty(stockBalance ? parseFloat(String(stockBalance.quantity)) : 0);
-        const requiredQty = roundQty(input.quantity);
-
-        if (availableStock < requiredQty) {
-          const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(input.item_id) as { item_name: string };
-          throw new BusinessRuleError(400, `Insufficient stock for ${item.item_name} in warehouse. Available: ${availableStock}, Required: ${requiredQty}`);
-        }
-
-        // ACCT-006: a production dated before the material it consumes was
-        // received would post consumption and COGS to a day the stock did
-        // not exist.
-        inputStmt.run(productionId, input.item_id, input.quantity, materialsWarehouseId);
-
-        // FIFO consumption from oldest batches
-        const consumption = this.consumeFromOldestBatches(input.item_id, materialsWarehouseId, input.quantity, db, production_date);
-
-        // Create one stock_movement per consumed batch for full traceability
-        for (const entry of consumption) {
-          const inputMovementNo = StockMovementModel.generateMovementNo(db);
-          db.prepare(`
-            INSERT INTO stock_movements (
-              movement_no, item_id, warehouse_id, movement_type,
-              quantity, unit_cost, reference_doctype, reference_docno,
-              remarks, movement_date, created_by, batch_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            inputMovementNo,
-            input.item_id,
-            materialsWarehouseId,
-            'PRODUCTION',
-            -entry.consumed,
-            entry.unitCost,
-            'Production',
-            productionNo,
-            `Consumed for production: ${productionNo} ${entry.batchId ? `(batch ${entry.batchId})` : '(legacy stock)'}`,
-            production_date,
-            userId,
-            entry.batchId
-          );
-
-          totalMaterialCost += entry.consumed * entry.unitCost;
-        }
-
-        // Update stock_balances
-        const existingBalance = db.prepare(`
-          SELECT * FROM stock_balances
-          WHERE item_id = ? AND warehouse_id = ?
-        `).get(input.item_id, materialsWarehouseId) as Record<string, unknown> | undefined;
-
-        if (existingBalance) {
-          db.prepare(`
-            UPDATE stock_balances
-            SET quantity = quantity + ?,
-                last_updated = CURRENT_TIMESTAMP
+        for (const input of input_items) {
+          const stockBalance = db.prepare(`
+            SELECT quantity FROM stock_balances
             WHERE item_id = ? AND warehouse_id = ?
-          `).run(-input.quantity, input.item_id, materialsWarehouseId);
-        } else {
-          db.prepare(`
-            INSERT INTO stock_balances (item_id, warehouse_id, quantity)
-            VALUES (?, ?, ?)
-          `).run(input.item_id, materialsWarehouseId, -input.quantity);
-        }
+          `).get(input.item_id, materialsWarehouseId) as { quantity: number } | undefined;
 
-        StockMovementModel.refreshItemStockMirror(input.item_id, db);
-      }
+          const availableStock = roundQty(stockBalance ? parseFloat(String(stockBalance.quantity)) : 0);
+          const requiredQty = roundQty(input.quantity);
+
+          if (availableStock < requiredQty) {
+            const item = db.prepare('SELECT item_name FROM items WHERE id = ?').get(input.item_id) as { item_name: string };
+            throw new BusinessRuleError(400, `Insufficient stock for ${item.item_name} in warehouse. Available: ${availableStock}, Required: ${requiredQty}`);
+          }
+
+          // ACCT-006: a production dated before the material it consumes was
+          // received would post consumption and COGS to a day the stock did
+          // not exist.
+          inputStmt.run(productionId, input.item_id, input.quantity, materialsWarehouseId);
+
+          // FIFO consumption from oldest batches
+          const consumption = this.consumeFromOldestBatches(input.item_id, materialsWarehouseId, input.quantity, db, production_date);
+
+          // Create one stock_movement per consumed batch for full traceability
+          for (const entry of consumption) {
+            const inputMovementNo = StockMovementModel.generateMovementNo(db);
+            db.prepare(`
+              INSERT INTO stock_movements (
+                movement_no, item_id, warehouse_id, movement_type,
+                quantity, unit_cost, reference_doctype, reference_docno,
+                remarks, movement_date, created_by, batch_id
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+              inputMovementNo,
+              input.item_id,
+              materialsWarehouseId,
+              'PRODUCTION',
+              -entry.consumed,
+              entry.unitCost,
+              'Production',
+              productionNo,
+              `Consumed for production: ${productionNo} ${entry.batchId ? `(batch ${entry.batchId})` : '(legacy stock)'}`,
+              production_date,
+              userId,
+              entry.batchId
+            );
+
+            totalMaterialCost += entry.consumed * entry.unitCost;
+          }
+
+          // Update stock_balances
+          const existingBalance = db.prepare(`
+            SELECT * FROM stock_balances
+            WHERE item_id = ? AND warehouse_id = ?
+          `).get(input.item_id, materialsWarehouseId) as Record<string, unknown> | undefined;
+
+          if (existingBalance) {
+            db.prepare(`
+              UPDATE stock_balances
+              SET quantity = quantity + ?,
+                  last_updated = CURRENT_TIMESTAMP
+              WHERE item_id = ? AND warehouse_id = ?
+            `).run(-input.quantity, input.item_id, materialsWarehouseId);
+          } else {
+            db.prepare(`
+              INSERT INTO stock_balances (item_id, warehouse_id, quantity)
+              VALUES (?, ?, ?)
+            `).run(input.item_id, materialsWarehouseId, -input.quantity);
+          }
+
+          StockMovementModel.refreshItemStockMirror(input.item_id, db);
+        }
+        return totalMaterialCost;
+      };
+      const totalMaterialCost = consumeProductionInputs();
 
       // PROD-001: consuming raw materials must relieve inventory. The output
       // posting below is Dr Inventory / Cr Production Clearing for the whole
@@ -424,110 +423,113 @@ class ProductionModel {
       // expiry may carry it — the boot-time expiry sweep filters batches
       // on expiry_date alone, so stamping a non-expiry co-product would
       // later move it to the EXPIRED warehouse.
-      for (let index = 0; index < outputLines.length; index++) {
-        const line = outputLines[index];
-        const lineQty = Number(line.quantity);
-        const allocated = allocations[index];
-        const lineBatchNo = this.generateBatchNo(db);
-        const lineUnitCost = lineQty > 0 ? roundQty(allocated / lineQty, 6) : 0;
-        const lineExpiryDate = ItemModel.batchExpiryDate(
-          db,
-          line.item_id,
-          expiry_date,
-        );
+      const postProductionOutputs = (): void => {
+        for (let index = 0; index < outputLines.length; index++) {
+          const line = outputLines[index];
+          const lineQty = Number(line.quantity);
+          const allocated = allocations[index];
+          const lineBatchNo = this.generateBatchNo(db);
+          const lineUnitCost = lineQty > 0 ? roundQty(allocated / lineQty, 6) : 0;
+          const lineExpiryDate = ItemModel.batchExpiryDate(
+            db,
+            line.item_id,
+            expiry_date,
+          );
 
-        db.prepare(`
-          INSERT INTO stock_batches (
-            batch_no, item_id, warehouse_id, source_type,
-            source_id, quantity_original, quantity_remaining,
-            unit_cost, received_date, expiry_date
-          ) VALUES (?, ?, ?, 'PRODUCTION', ?, ?, ?, ?, ?, ?)
-        `).run(
-          lineBatchNo,
-          line.item_id,
-          warehouse_id,
-          productionId,
-          lineQty,
-          lineQty,
-          lineUnitCost,
-          production_date,
-          lineExpiryDate
-        );
-
-        const batchRecord = db.prepare(`
-          SELECT id FROM stock_batches
-          WHERE source_type = 'PRODUCTION' AND source_id = ? AND item_id = ?
-        `).get(productionId, line.item_id) as { id: number } | undefined;
-        const outputBatchId = batchRecord?.id;
-        if (outputBatchId) outputBatchIds.push(outputBatchId);
-        if (index === 0 && outputBatchId) primaryBatchIds.push(outputBatchId);
-
-        db.prepare(`
-          INSERT INTO production_outputs (production_id, item_id, quantity, unit_cost, allocated_cost)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(productionId, line.item_id, lineQty, lineUnitCost, allocated);
-
-        // Record output stock movement linked to the new batch
-        const outputMovementNo = StockMovementModel.generateMovementNo(db);
-        const outputMovementResult = db.prepare(`
-          INSERT INTO stock_movements (
-            movement_no, item_id, warehouse_id, movement_type,
-            quantity, unit_cost, reference_doctype, reference_docno,
-            remarks, movement_date, created_by, batch_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          outputMovementNo,
-          line.item_id,
-          warehouse_id,
-          'PRODUCTION',
-          lineQty,
-          lineUnitCost,
-          'Production',
-          productionNo,
-          `Produced to: ${productionNo} (batch ${outputBatchId})`,
-          production_date,
-          userId,
-          outputBatchId
-        );
-
-        // CRITICAL-4 fix: post a financial entry for the production output
-        // so the inventory asset account on the GL is updated when goods
-        // are produced. Previously this movement was inserted without a
-        // journal entry, causing the GL inventory balance to drift from
-        // the actual stock-on-hand value. See StockMovementModel.
-        // postFinancialEntryForProduction for the full context.
-        const outputMovementId = outputMovementResult.lastInsertRowid as number;
-        StockMovementModel.postFinancialEntryForProduction({
-          id: outputMovementId,
-          item_id: line.item_id,
-          quantity: lineQty,
-          total_batch_cost: allocated,
-          movement_date: production_date,
-          created_by: userId
-        }, db);
-
-        // Update stock_balances for this output item
-        const outputExistingBalance = db.prepare(`
-          SELECT * FROM stock_balances
-          WHERE item_id = ? AND warehouse_id = ?
-        `).get(line.item_id, warehouse_id) as Record<string, unknown> | undefined;
-
-        if (outputExistingBalance) {
           db.prepare(`
-            UPDATE stock_balances
-            SET quantity = quantity + ?,
-                last_updated = CURRENT_TIMESTAMP
+            INSERT INTO stock_batches (
+              batch_no, item_id, warehouse_id, source_type,
+              source_id, quantity_original, quantity_remaining,
+              unit_cost, received_date, expiry_date
+            ) VALUES (?, ?, ?, 'PRODUCTION', ?, ?, ?, ?, ?, ?)
+          `).run(
+            lineBatchNo,
+            line.item_id,
+            warehouse_id,
+            productionId,
+            lineQty,
+            lineQty,
+            lineUnitCost,
+            production_date,
+            lineExpiryDate
+          );
+
+          const batchRecord = db.prepare(`
+            SELECT id FROM stock_batches
+            WHERE source_type = 'PRODUCTION' AND source_id = ? AND item_id = ?
+          `).get(productionId, line.item_id) as { id: number } | undefined;
+          const outputBatchId = batchRecord?.id;
+          if (outputBatchId) outputBatchIds.push(outputBatchId);
+          if (index === 0 && outputBatchId) primaryBatchIds.push(outputBatchId);
+
+          db.prepare(`
+            INSERT INTO production_outputs (production_id, item_id, quantity, unit_cost, allocated_cost)
+            VALUES (?, ?, ?, ?, ?)
+          `).run(productionId, line.item_id, lineQty, lineUnitCost, allocated);
+
+          // Record output stock movement linked to the new batch
+          const outputMovementNo = StockMovementModel.generateMovementNo(db);
+          const outputMovementResult = db.prepare(`
+            INSERT INTO stock_movements (
+              movement_no, item_id, warehouse_id, movement_type,
+              quantity, unit_cost, reference_doctype, reference_docno,
+              remarks, movement_date, created_by, batch_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            outputMovementNo,
+            line.item_id,
+            warehouse_id,
+            'PRODUCTION',
+            lineQty,
+            lineUnitCost,
+            'Production',
+            productionNo,
+            `Produced to: ${productionNo} (batch ${outputBatchId})`,
+            production_date,
+            userId,
+            outputBatchId
+          );
+
+          // CRITICAL-4 fix: post a financial entry for the production output
+          // so the inventory asset account on the GL is updated when goods
+          // are produced. Previously this movement was inserted without a
+          // journal entry, causing the GL inventory balance to drift from
+          // the actual stock-on-hand value. See StockMovementModel.
+          // postFinancialEntryForProduction for the full context.
+          const outputMovementId = outputMovementResult.lastInsertRowid as number;
+          StockMovementModel.postFinancialEntryForProduction({
+            id: outputMovementId,
+            item_id: line.item_id,
+            quantity: lineQty,
+            total_batch_cost: allocated,
+            movement_date: production_date,
+            created_by: userId
+          }, db);
+
+          // Update stock_balances for this output item
+          const outputExistingBalance = db.prepare(`
+            SELECT * FROM stock_balances
             WHERE item_id = ? AND warehouse_id = ?
-          `).run(lineQty, line.item_id, warehouse_id);
-        } else {
-          db.prepare(`
-            INSERT INTO stock_balances (item_id, warehouse_id, quantity)
-            VALUES (?, ?, ?)
-          `).run(line.item_id, warehouse_id, lineQty);
-        }
+          `).get(line.item_id, warehouse_id) as Record<string, unknown> | undefined;
 
-        StockMovementModel.refreshItemStockMirror(line.item_id, db);
-      }
+          if (outputExistingBalance) {
+            db.prepare(`
+              UPDATE stock_balances
+              SET quantity = quantity + ?,
+                  last_updated = CURRENT_TIMESTAMP
+              WHERE item_id = ? AND warehouse_id = ?
+            `).run(lineQty, line.item_id, warehouse_id);
+          } else {
+            db.prepare(`
+              INSERT INTO stock_balances (item_id, warehouse_id, quantity)
+              VALUES (?, ?, ?)
+            `).run(line.item_id, warehouse_id, lineQty);
+          }
+
+          StockMovementModel.refreshItemStockMirror(line.item_id, db);
+        }
+      };
+      postProductionOutputs();
 
       // Update production record with batch costing info. The header keeps the
       // PRIMARY (first) output for list/report compatibility; the full split
@@ -774,24 +776,27 @@ class ProductionModel {
       // production_clearing) and keep the legacy header consistent.
       // Without this, deleting a production removed the stock but left
       // its GL entry active forever.
-      let voidedOutputPosting = false;
-      for (const outputMovement of outputMovements) {
-        if (outputMovement.active_gl_lines > 0 || outputMovement.journal_entry_id) {
-          AccountingService.voidJournalLinesByReference(db, 'production', outputMovement.id);
-          if (outputMovement.journal_entry_id) {
-            StockMovementModel.voidJournalEntry(outputMovement.journal_entry_id, db);
+      const voidProductionOutputs = (): void => {
+        let voidedOutputPosting = false;
+        for (const outputMovement of outputMovements) {
+          if (outputMovement.active_gl_lines > 0 || outputMovement.journal_entry_id) {
+            AccountingService.voidJournalLinesByReference(db, 'production', outputMovement.id);
+            if (outputMovement.journal_entry_id) {
+              StockMovementModel.voidJournalEntry(outputMovement.journal_entry_id, db);
+            }
+            voidedOutputPosting = true;
           }
-          voidedOutputPosting = true;
         }
-      }
-      if (!voidedOutputPosting && parseCurrency(production.total_batch_cost) > 0) {
-        // Must-void guard: a production with real cost but no linked
-        // GL lines means GL state is unexpected — refuse rather than
-        // silently orphan.
-        throw new Error(
-          `Refusing to delete production ${production.production_no}: its GL journal entry is missing — GL state unexpected`
-        );
-      }
+        if (!voidedOutputPosting && parseCurrency(production.total_batch_cost) > 0) {
+          // Must-void guard: a production with real cost but no linked
+          // GL lines means GL state is unexpected — refuse rather than
+          // silently orphan.
+          throw new Error(
+            `Refusing to delete production ${production.production_no}: its GL journal entry is missing — GL state unexpected`
+          );
+        }
+      };
+      voidProductionOutputs();
 
       // PROD-001: void the raw-material consumption posting too (productions
       // recorded before it existed simply have none).

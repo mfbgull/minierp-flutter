@@ -1,3 +1,4 @@
+import { positiveFiniteAmount } from '../utils/controllerValidation';
 // Owner Personal Loans Controller — purely record-keeping, no GL impact.
 // Manages personal loans the owner gives to friends, family, customers, suppliers.
 // No journal entries, no chart_of_accounts modifications, no accounting flow.
@@ -177,8 +178,8 @@ function createLoan(req: AuthRequest, res: Response): void {
       res.status(400).json({ success: false, error: 'borrower_name is required' });
       return;
     }
-    const parsedAmount = Number(amount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    const parsedAmount = positiveFiniteAmount(amount);
+    if (parsedAmount === null) {
       res.status(400).json({ success: false, error: 'Amount must be a positive number' });
       return;
     }
@@ -314,8 +315,8 @@ function updateLoan(req: AuthRequest, res: Response): void {
 
     // Validate amount if changing
     if (amount !== undefined) {
-      const parsedAmount = Number(amount);
-      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      const parsedAmount = positiveFiniteAmount(amount);
+      if (parsedAmount === null) {
         res.status(400).json({ success: false, error: 'Amount must be a positive number' });
         return;
       }
@@ -411,8 +412,8 @@ function addRepayment(req: AuthRequest, res: Response): void {
       return;
     }
 
-    const parsedAmount = Number(amount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    const parsedAmount = positiveFiniteAmount(amount);
+    if (parsedAmount === null) {
       res.status(400).json({ success: false, error: 'Amount must be a positive number' });
       return;
     }
@@ -659,17 +660,62 @@ function createBorrower(req: AuthRequest, res: Response): void {
   }
 }
 
+function findBorrower(id: number): BorrowerRow | undefined {
+  return db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as BorrowerRow | undefined;
+}
+
+function findBorrowerForResponse(id: number, res: Response): BorrowerRow | undefined {
+  const borrower = findBorrower(id);
+  if (!borrower) res.status(404).json({ success: false, error: 'Borrower not found' });
+  return borrower;
+}
+
+/**
+ * Resolve the borrower named by the :id route param together with the acting
+ * user, answering the standard 404 when the borrower is unknown. Handlers
+ * return early when this yields null.
+ */
+function borrowerRequestContext(
+  req: AuthRequest,
+  res: Response
+): { id: number; userId: number; existing: BorrowerRow } | null {
+  const id = parseInt(getRouteParam(req.params.id), 10);
+  const userId = req.user!.id;
+
+  const existing = findBorrowerForResponse(id, res);
+  if (!existing) return null;
+
+  return { id, userId, existing };
+}
+
+function respondWithBorrower(res: Response, id: number): void {
+  res.json({ success: true, data: findBorrower(id) });
+}
+
+function updateBorrowerFields(id: number, fields: { name?: string; phone?: string; linked_type?: string; linked_id?: number }): void {
+  const { name, phone, linked_type, linked_id } = fields;
+  const updates: string[] = [];
+  const values: SqlParam[] = [];
+  if (name !== undefined) { updates.push('name = ?'); values.push(name.trim()); }
+  if (phone !== undefined) { updates.push('phone = ?'); values.push(phone || null); }
+  if (linked_type !== undefined) { updates.push('linked_type = ?'); values.push(linked_type || null); }
+  if (linked_id !== undefined) { updates.push('linked_id = ?'); values.push(linked_id || null); }
+
+  if (updates.length > 0) {
+    values.push(id);
+    db.prepare(`UPDATE owner_personal_loan_borrowers SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  }
+
+}
+
 function updateBorrower(req: AuthRequest, res: Response): void {
   try {
     const id = parseInt(getRouteParam(req.params.id), 10);
     const userId = req.user!.id;
     const { name, phone, linked_type, linked_id } = req.body;
 
-    const existing = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as BorrowerRow | undefined;
-    if (!existing) {
-      res.status(404).json({ success: false, error: 'Borrower not found' });
-      return;
-    }
+    const existing = findBorrowerForResponse(id, res);
+    if (!existing) return;
 
     if (name !== undefined && (!name || name.trim().length === 0)) {
       res.status(400).json({ success: false, error: 'Borrower name cannot be empty' });
@@ -688,23 +734,12 @@ function updateBorrower(req: AuthRequest, res: Response): void {
       return;
     }
 
-    const updates: string[] = [];
-    const values: SqlParam[] = [];
-    if (name !== undefined) { updates.push('name = ?'); values.push(name.trim()); }
-    if (phone !== undefined) { updates.push('phone = ?'); values.push(phone || null); }
-    if (linked_type !== undefined) { updates.push('linked_type = ?'); values.push(linked_type || null); }
-    if (linked_id !== undefined) { updates.push('linked_id = ?'); values.push(linked_id || null); }
-
-    if (updates.length > 0) {
-      values.push(id);
-      db.prepare(`UPDATE owner_personal_loan_borrowers SET ${updates.join(', ')} WHERE id = ?`).run(...values);
-    }
+    updateBorrowerFields(id, { name, phone, linked_type, linked_id });
 
     logCRUD(ActionType.SETTING_UPDATE, 'PersonalLoanBorrower', id, `Updated borrower: ${checkName}`, userId);
     req.activityLogged = true;
 
-    const updated = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id);
-    res.json({ success: true, data: updated });
+    respondWithBorrower(res, id);
   } catch (error) {
     fail(res, error, 'Failed to update borrower');
   }
@@ -712,14 +747,9 @@ function updateBorrower(req: AuthRequest, res: Response): void {
 
 function deactivateBorrower(req: AuthRequest, res: Response): void {
   try {
-    const id = parseInt(getRouteParam(req.params.id), 10);
-    const userId = req.user!.id;
-
-    const existing = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as BorrowerRow | undefined;
-    if (!existing) {
-      res.status(404).json({ success: false, error: 'Borrower not found' });
-      return;
-    }
+    const context = borrowerRequestContext(req, res);
+    if (!context) return;
+    const { id, userId, existing } = context;
     if (!existing.is_active) {
       res.status(400).json({ success: false, error: 'Borrower is already deactivated' });
       return;
@@ -745,22 +775,16 @@ function deactivateBorrower(req: AuthRequest, res: Response): void {
 
 function reactivateBorrower(req: AuthRequest, res: Response): void {
   try {
-    const id = parseInt(getRouteParam(req.params.id), 10);
-    const userId = req.user!.id;
-
-    const existing = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as BorrowerRow | undefined;
-    if (!existing) {
-      res.status(404).json({ success: false, error: 'Borrower not found' });
-      return;
-    }
+    const context = borrowerRequestContext(req, res);
+    if (!context) return;
+    const { id, userId, existing } = context;
 
     db.prepare('UPDATE owner_personal_loan_borrowers SET is_active = 1 WHERE id = ?').run(id);
 
     logCRUD(ActionType.SETTING_UPDATE, 'PersonalLoanBorrower', id, `Reactivated borrower: ${existing.name}`, userId);
     req.activityLogged = true;
 
-    const updated = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id);
-    res.json({ success: true, data: updated });
+    respondWithBorrower(res, id);
   } catch (error) {
     fail(res, error, 'Failed to reactivate borrower');
   }
@@ -768,14 +792,9 @@ function reactivateBorrower(req: AuthRequest, res: Response): void {
 
 function unlinkBorrower(req: AuthRequest, res: Response): void {
   try {
-    const id = parseInt(getRouteParam(req.params.id), 10);
-    const userId = req.user!.id;
-
-    const existing = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id) as BorrowerRow | undefined;
-    if (!existing) {
-      res.status(404).json({ success: false, error: 'Borrower not found' });
-      return;
-    }
+    const context = borrowerRequestContext(req, res);
+    if (!context) return;
+    const { id, userId, existing } = context;
     if (!existing.linked_type) {
       res.status(400).json({ success: false, error: 'Borrower is not linked to any customer or supplier' });
       return;
@@ -786,8 +805,7 @@ function unlinkBorrower(req: AuthRequest, res: Response): void {
     logCRUD(ActionType.SETTING_UPDATE, 'PersonalLoanBorrower', id, `Unlinked borrower: ${existing.name}`, userId);
     req.activityLogged = true;
 
-    const updated = db.prepare('SELECT * FROM owner_personal_loan_borrowers WHERE id = ?').get(id);
-    res.json({ success: true, data: updated });
+    respondWithBorrower(res, id);
   } catch (error) {
     fail(res, error, 'Failed to unlink borrower');
   }

@@ -69,7 +69,15 @@ function validateReportConfig(config: ReportConfigUnderValidation): ValidationEr
   // Build a set of valid field names (including computed column names)
   const validFields = new Set(entity.fields.map((f) => f.name));
 
-  // Validate columns
+  errors.push(...validateReportColumns(config, validFields));
+  errors.push(...validateReportSort(config, validFields));
+  errors.push(...validateReportFilters(config, validFields));
+  errors.push(...validateReportExpressions(config, validFields));
+  return errors;
+}
+
+function validateReportColumns(config: ReportConfigUnderValidation, validFields: Set<string>): ValidationError[] {
+  const errors: ValidationError[] = [];
   if (!Array.isArray(config.columns) || config.columns.length === 0) {
     errors.push({ field: 'columns', message: 'At least one column is required' });
   } else {
@@ -83,7 +91,11 @@ function validateReportConfig(config: ReportConfigUnderValidation): ValidationEr
     }
   }
 
-  // Validate sort fields
+  return errors;
+}
+
+function validateReportSort(config: ReportConfigUnderValidation, validFields: Set<string>): ValidationError[] {
+  const errors: ValidationError[] = [];
   if (Array.isArray(config.sort)) {
     for (let i = 0; i < config.sort.length; i++) {
       const s = config.sort[i];
@@ -98,7 +110,11 @@ function validateReportConfig(config: ReportConfigUnderValidation): ValidationEr
     }
   }
 
-  // Validate filter fields
+  return errors;
+}
+
+function validateReportFilters(config: ReportConfigUnderValidation, validFields: Set<string>): ValidationError[] {
+  const errors: ValidationError[] = [];
   if (Array.isArray(config.filters)) {
     for (let i = 0; i < config.filters.length; i++) {
       const f = config.filters[i];
@@ -107,6 +123,11 @@ function validateReportConfig(config: ReportConfigUnderValidation): ValidationEr
       }
     }
   }
+  return errors;
+}
+
+function validateReportExpressions(config: ReportConfigUnderValidation, validFields: Set<string>): ValidationError[] {
+  const errors: ValidationError[] = [];
   // REP-18: computed-column expressions must pass the safe-grammar
   // validator before a config may be stored.
   if (Array.isArray(config.computedColumns)) {

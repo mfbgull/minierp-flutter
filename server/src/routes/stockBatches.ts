@@ -43,6 +43,24 @@ export function initStockBatchesRoutes(database: Database.Database): Router {
   return router;
 }
 
+function attachBatchLocations(batches: BatchListRow[]): void {
+  for (const batch of batches) {
+    const locations = db.prepare(`
+      SELECT l.id as location_id, l.location_code, l.location_name,
+             bsl.quantity_physical, bsl.quantity_reserved, bsl.quantity_available,
+             bsl.status_override
+      FROM batch_stock_by_location bsl
+      JOIN locations l ON bsl.location_id = l.id
+      WHERE bsl.batch_id = ?
+    `).all(batch.id) as BatchLocationRow[];
+    for (const location of locations) {
+      location.effective_status = getEffectiveBatchStatus(db, batch.id, location.location_id);
+    }
+    batch.locations = locations;
+    batch.effective_status = getEffectiveBatchStatus(db, batch.id);
+  }
+}
+
 /**
  * GET /api/inventory/stock-batches
  * List batches with optional filters
@@ -102,41 +120,13 @@ router.get('/stock-batches', requirePermission('inventory', 'read'), (req, res) 
       params.push(p.limit, p.offset);
       const batches = db.prepare(sql).all(...params) as BatchListRow[];
       if (featureOn) {
-        for (const b of batches) {
-          const locs = db.prepare(`
-            SELECT l.id as location_id, l.location_code, l.location_name,
-                   bsl.quantity_physical, bsl.quantity_reserved, bsl.quantity_available,
-                   bsl.status_override
-            FROM batch_stock_by_location bsl
-            JOIN locations l ON bsl.location_id = l.id
-            WHERE bsl.batch_id = ?
-          `).all(b.id) as BatchLocationRow[];
-          for (const loc of locs) {
-            loc.effective_status = getEffectiveBatchStatus(db, b.id, loc.location_id);
-          }
-          b.locations = locs;
-          b.effective_status = getEffectiveBatchStatus(db, b.id);
-        }
+        attachBatchLocations(batches);
       }
       res.json({ success: true, data: batches, pagination: envelope(total, p) });
     } else {
       const batches = db.prepare(sql).all(...params) as BatchListRow[];
       if (featureOn) {
-        for (const b of batches) {
-          const locs = db.prepare(`
-            SELECT l.id as location_id, l.location_code, l.location_name,
-                   bsl.quantity_physical, bsl.quantity_reserved, bsl.quantity_available,
-                   bsl.status_override
-            FROM batch_stock_by_location bsl
-            JOIN locations l ON bsl.location_id = l.id
-            WHERE bsl.batch_id = ?
-          `).all(b.id) as BatchLocationRow[];
-          for (const loc of locs) {
-            loc.effective_status = getEffectiveBatchStatus(db, b.id, loc.location_id);
-          }
-          b.locations = locs;
-          b.effective_status = getEffectiveBatchStatus(db, b.id);
-        }
+        attachBatchLocations(batches);
       }
       res.json(batches);
     }
